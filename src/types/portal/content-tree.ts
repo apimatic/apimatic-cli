@@ -12,6 +12,7 @@ import {
   GROUP_FOLDER,
   INDEX_NAME,
   NAVIGATION_FILE_NAME,
+  NavigationContext,
   NavigationSettings,
   PortalNavigation
 } from './portal-navigation.js';
@@ -145,7 +146,7 @@ export class ContentTree {
   private contentPages(): ContentPage[] {
     return this.tree
       .getAllFiles()
-      .filter((file) => ContentTree.pageName(file.name()) !== undefined && !this.isSkipped(file))
+      .filter((file) => pageName(file.name()) !== undefined && !this.isSkipped(file))
       .map((file) => ({ file, segments: file.relativeTo(this.tree.directoryPath).split('/') }));
   }
 
@@ -175,134 +176,8 @@ export class ContentTree {
    * directory has to be seen before its file can be checked against it.
    */
   private navigation(navigationFiles: ContentFile[], specs: PortalSpec[]): NavigationScan {
-    const ignoredFiles: FilePath[] = [];
-
-    // Children first, because a directory counts as one of its parent's children only when
-    // a page sits somewhere beneath it, and the walk below already has to find out. Each
-    // directory's errors go ahead of its children's, so the report still reads top down.
-    const visit = (directory: Directory, isContentRoot: boolean, isApiDirectory: boolean): DirectoryScan => {
-      const childNames: string[] = [];
-      const pageNames = new Set<string>();
-      const childErrors: string[] = [];
-      const subfolders: DirectoryScan['subfolders'] = new Map();
-      const foldersServingThisAddress: string[] = [];
-      const emptyFolders: string[] = [];
-      let holdsPage = false;
-      let navigationFile: FileName | undefined;
-      let indexPage: FilePath | undefined;
-
-      for (const item of directory.items) {
-        if (isSkippedByGlob(item instanceof Directory ? item.directoryPath.leafName() : item.fileName.toString())) {
-          continue;
-        }
-        // A directory with no page anywhere beneath it becomes no node in the page tree, so
-        // naming it would resolve to nothing. Fumadocs would build one for a directory that
-        // holds only a `nav.json`, but the template drops it again to keep to this rule.
-        if (item instanceof Directory) {
-          const name = item.directoryPath.leafName();
-          const isApiChild = isContentRoot && name === API_REFERENCE_NAME;
-          const child = visit(item, false, isApiChild);
-          childErrors.push(...child.errors);
-          if (child.servesOwnAddress && GROUP_FOLDER.test(name)) {
-            foldersServingThisAddress.push(name);
-          }
-          if (child.holdsPage || isApiChild) {
-            subfolders.set(name, { directory: item.directoryPath, scan: child });
-          }
-          if (child.holdsPage) {
-            holdsPage = true;
-            // The reference's own directory is listed below instead: it is a child of the
-            // content root whether or not the user keeps pages in it.
-            if (!isApiChild) {
-              childNames.push(name);
-            }
-          } else if (!isApiChild) {
-            emptyFolders.push(name);
-          }
-          continue;
-        }
-        // `compare` is by code point, so this matches the build's glob exactly. A file named
-        // `Nav.json` is read by neither, and is reported rather than left sitting inert.
-        if (item.fileName.compare(NAVIGATION_FILE) === 0) {
-          navigationFile = item.fileName;
-          continue;
-        }
-        if (item.fileName.is(NAVIGATION_FILE_NAME)) {
-          ignoredFiles.push(new FilePath(directory.directoryPath, item.fileName));
-          continue;
-        }
-        // An entry addresses a page by the name it is reached at, which is the file name
-        // without its extension -- the same way the content source derives a slug.
-        const pageName = ContentTree.pageName(item.fileName);
-        if (pageName !== undefined) {
-          childNames.push(pageName);
-          pageNames.add(pageName);
-          holdsPage = true;
-          if (pageName === INDEX_NAME) {
-            indexPage ??= new FilePath(directory.directoryPath, item.fileName);
-          }
-        }
-      }
-
-      // The reference is mounted at `content/api` whether or not a directory is there to see,
-      // so it is a child of the content root in every portal. Listed unconditionally, so one
-      // entry gets one answer whatever else shares the directory: without this, the same
-      // mistake read as "not a page or folder" in a project with no such directory and as the
-      // mount point in a project with one. A page of that name is a second child, and the
-      // clash is what says it can never be positioned.
-      if (isContentRoot) {
-        childNames.push(API_REFERENCE_NAME);
-      }
-
-      // The reference pages are mounted in this directory, one folder per specification, and
-      // its `nav.json` positions those folders like any other child of its own.
-      // A directory of the same name is that very folder, so it is not listed twice; a page
-      // of the same name is a second child, and listed again so the validator sees the clash.
-      if (isApiDirectory) {
-        for (const spec of specs) {
-          if (!childNames.includes(spec.slug) || pageNames.has(spec.slug)) {
-            childNames.push(spec.slug);
-          }
-        }
-      }
-
-      const errors: string[] = [];
-      let navigation: CheckedNavigation | undefined;
-      if (navigationFile !== undefined) {
-        const file = new FilePath(directory.directoryPath, navigationFile);
-        const label = file.relativeTo(this.sourceDirectory);
-        const contents = navigationFiles.find((read) => read.file.isEqual(file))?.contents;
-        // An empty file goes through too: the build parses it as JSON and fails on it, so the
-        // CLI has to refuse it here rather than treat it as no file.
-        if (contents === undefined) {
-          errors.push(`${label} could not be read.`);
-        } else {
-          // The reference's own directory is a folder in the sidebar however few pages the
-          // user keeps in it, because the specification sections are mounted there.
-          const becomesFolder = holdsPage || isApiDirectory;
-          const checked = PortalNavigation.validate(contents, {
-            label,
-            isContentRoot,
-            isApiDirectory,
-            becomesFolder,
-            childNames,
-            emptyFolders,
-            // At the content root, the address such a folder serves is the home page's.
-            homePageFolders: isContentRoot ? foldersServingThisAddress : []
-          });
-          if (checked.isErr()) {
-            errors.push(...checked.error);
-          } else {
-            navigation = { file, settings: checked.value };
-          }
-        }
-      }
-
-      const servesOwnAddress = indexPage !== undefined || foldersServingThisAddress.length > 0;
-      return { holdsPage, servesOwnAddress, navigation, indexPage, subfolders, errors: [...errors, ...childErrors] };
-    };
-
-    return { root: visit(this.tree, true, false), ignoredFiles };
+    const walk = new NavigationWalk(navigationFiles, specs, this.sourceDirectory);
+    return { root: walk.visit(this.tree, true, false), ignoredFiles: walk.ignoredFiles };
   }
 
   /**
@@ -350,7 +225,7 @@ export class ContentTree {
     const problems: ContentProblem[] = [];
 
     // Fumadocs throws on one: a `(group)` name is left out of every address, so it has none.
-    const groupNamed = pages.filter(({ file }) => GROUP_FOLDER.test(ContentTree.pageName(file.name()) ?? ''));
+    const groupNamed = pages.filter(({ file }) => GROUP_FOLDER.test(pageName(file.name()) ?? ''));
     if (groupNamed.length > 0) {
       problems.push({ kind: 'groupNamedPages', pages: groupNamed.map(({ file }) => file) });
     }
@@ -416,23 +291,181 @@ export class ContentTree {
     return pages
       .filter(({ segments }) => {
         const [first, second, ...rest] = segments;
-        if (first !== API_REFERENCE_NAME || !slugs.has(second) || rest.length === 0) {
+        const last = rest.at(-1);
+        if (first !== API_REFERENCE_NAME || !slugs.has(second) || last === undefined) {
           return false;
         }
-        const isFolderIndex =
-          rest.length <= 2 && ContentTree.pageName(new FileName(rest[rest.length - 1])) === INDEX_NAME;
+        const isFolderIndex = rest.length <= 2 && pageName(new FileName(last)) === INDEX_NAME;
         return !isFolderIndex;
       })
       .map(({ file }) => file);
   }
+}
 
-  /**
-   * The name an entry addresses a page by, or undefined when the file is not a page. Matched
-   * by code point, like the docs glob: `Guide.MD` is no more a page to the build than here.
-   */
-  private static pageName(fileName: FileName): string | undefined {
-    return PAGE_EXTENSIONS.some((extension) => fileName.hasExactExtension(extension))
-      ? `${fileName.withoutExtension()}`
-      : undefined;
+/**
+ * The name an entry addresses a page by, which is its file's without the extension, or undefined
+ * when the file is not a page. By code point, like the docs glob: `Guide.MD` is no page to either.
+ */
+function pageName(fileName: FileName): string | undefined {
+  return PAGE_EXTENSIONS.some((extension) => fileName.hasExactExtension(extension))
+    ? `${fileName.withoutExtension()}`
+    : undefined;
+}
+
+/** A directory's entries as the walk reads them, in the order the directory lists them. */
+interface DirectoryListing {
+  entries: ({ page: string; file: FilePath } | { folder: Directory })[];
+  navigationFile: FilePath | undefined;
+  /** A `nav.json` in another case, which the build's glob, matching by code point, never reads. */
+  ignoredFiles: FilePath[];
+}
+
+/** A subfolder of the directory being walked, walked already. */
+interface WalkedFolder {
+  name: string;
+  directory: DirectoryPath;
+  /** `content/api`, where the reference is mounted, which is a folder in the sidebar whatever it holds. */
+  isApiChild: boolean;
+  scan: DirectoryScan;
+}
+
+/**
+ * The walk of `ContentTree.navigation`. Children first, because a directory counts as one of its
+ * parent's children only when a page sits somewhere beneath it, and each directory's errors go
+ * ahead of its children's, so the report still reads top down.
+ */
+class NavigationWalk {
+  public readonly ignoredFiles: FilePath[] = [];
+
+  constructor(
+    private readonly navigationFiles: ContentFile[],
+    private readonly specs: PortalSpec[],
+    private readonly sourceDirectory: DirectoryPath
+  ) {}
+
+  public visit(directory: Directory, isContentRoot: boolean, isApiDirectory: boolean): DirectoryScan {
+    const listing = NavigationWalk.listing(directory);
+    this.ignoredFiles.push(...listing.ignoredFiles);
+
+    const entries = listing.entries.map((entry) =>
+      'folder' in entry ? this.walk(entry.folder, isContentRoot) : entry
+    );
+    const folders = entries.flatMap((entry) => ('scan' in entry ? [entry] : []));
+    const pages = entries.flatMap((entry) => ('page' in entry ? [entry] : []));
+    const holdsPage = pages.length > 0 || folders.some(({ scan }) => scan.holdsPage);
+    const indexPage = pages.find(({ page }) => page === INDEX_NAME)?.file;
+    const servingThisAddress = folders
+      .filter(({ name, scan }) => scan.servesOwnAddress && GROUP_FOLDER.test(name))
+      .map(({ name }) => name);
+
+    // A directory with no page anywhere beneath it becomes no node in the page tree, so naming it
+    // would resolve to nothing. Fumadocs would build one for a directory that holds only a
+    // `nav.json`, but the template drops it again to keep to this rule.
+    const childNames = entries.flatMap((entry) => {
+      if ('page' in entry) {
+        return [entry.page];
+      }
+      return entry.scan.holdsPage && !entry.isApiChild ? [entry.name] : [];
+    });
+    const { errors, navigation } = this.checkedNavigation(listing.navigationFile, {
+      isContentRoot,
+      isApiDirectory,
+      // The reference's own directory is a folder in the sidebar however few pages the user
+      // keeps in it, because the specification sections are mounted there.
+      becomesFolder: holdsPage || isApiDirectory,
+      childNames: this.withMountedChildren(childNames, pages, isContentRoot, isApiDirectory),
+      emptyFolders: folders.filter(({ scan, isApiChild }) => !scan.holdsPage && !isApiChild).map(({ name }) => name),
+      // At the content root, the address such a folder serves is the home page's.
+      homePageFolders: isContentRoot ? servingThisAddress : []
+    });
+
+    return {
+      holdsPage,
+      servesOwnAddress: indexPage !== undefined || servingThisAddress.length > 0,
+      navigation,
+      indexPage,
+      subfolders: new Map(
+        folders
+          .filter(({ scan, isApiChild }) => scan.holdsPage || isApiChild)
+          .map((folder) => [folder.name, { directory: folder.directory, scan: folder.scan }])
+      ),
+      errors: [...errors, ...folders.flatMap(({ scan }) => scan.errors)]
+    };
+  }
+
+  private walk(folder: Directory, parentIsContentRoot: boolean): WalkedFolder {
+    const name = folder.directoryPath.leafName();
+    const isApiChild = parentIsContentRoot && name === API_REFERENCE_NAME;
+    return { name, directory: folder.directoryPath, isApiChild, scan: this.visit(folder, false, isApiChild) };
+  }
+
+  /** The children an entry can name that no directory of the user's holds: the reference's. */
+  private withMountedChildren(
+    childNames: string[],
+    pages: { page: string }[],
+    isContentRoot: boolean,
+    isApiDirectory: boolean
+  ): string[] {
+    // The reference is mounted at `content/api` whether or not a directory is there to see, so it
+    // is a child of the content root in every portal, and one entry gets one answer whatever else
+    // shares the directory. A page of that name is a second child, and the clash is what says it
+    // can never be positioned.
+    if (isContentRoot) {
+      return [...childNames, API_REFERENCE_NAME];
+    }
+    if (!isApiDirectory) {
+      return childNames;
+    }
+    // The reference pages are mounted here, one folder per specification. A directory of the same
+    // name is that very folder, so it is not listed twice; a page of the same name is a second
+    // child, and listed again so the validator sees the clash.
+    const names = [...childNames];
+    for (const { slug } of this.specs) {
+      if (!names.includes(slug) || pages.some(({ page }) => page === slug)) {
+        names.push(slug);
+      }
+    }
+    return names;
+  }
+
+  private checkedNavigation(
+    file: FilePath | undefined,
+    context: Omit<NavigationContext, 'label'>
+  ): { errors: string[]; navigation: CheckedNavigation | undefined } {
+    if (file === undefined) {
+      return { errors: [], navigation: undefined };
+    }
+    const label = file.relativeTo(this.sourceDirectory);
+    // An empty file goes through too: the build parses it as JSON and fails on it.
+    const contents = this.navigationFiles.find((read) => read.file.isEqual(file))?.contents;
+    if (contents === undefined) {
+      return { errors: [`${label} could not be read.`], navigation: undefined };
+    }
+    const checked = PortalNavigation.validate(contents, { label, ...context });
+    return checked.isErr()
+      ? { errors: checked.error, navigation: undefined }
+      : { errors: [], navigation: { file, settings: checked.value } };
+  }
+
+  private static listing(directory: Directory): DirectoryListing {
+    const listing: DirectoryListing = { entries: [], navigationFile: undefined, ignoredFiles: [] };
+    for (const item of directory.items) {
+      if (item instanceof Directory) {
+        if (!isSkippedByGlob(item.directoryPath.leafName())) {
+          listing.entries.push({ folder: item });
+        }
+      } else if (!isSkippedByGlob(item.fileName.toString())) {
+        const file = new FilePath(directory.directoryPath, item.fileName);
+        const page = pageName(item.fileName);
+        if (item.fileName.compare(NAVIGATION_FILE) === 0) {
+          listing.navigationFile = file;
+        } else if (item.fileName.is(NAVIGATION_FILE_NAME)) {
+          listing.ignoredFiles.push(file);
+        } else if (page !== undefined) {
+          listing.entries.push({ page, file });
+        }
+      }
+    }
+    return listing;
   }
 }

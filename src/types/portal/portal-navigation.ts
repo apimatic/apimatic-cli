@@ -96,7 +96,12 @@ export class PortalNavigation {
 
     // Every bad entry is reported at once rather than stopping at the first, so one edit
     // fixes the file.
-    const errors = [...settingErrors];
+    const errors = [...settingErrors, ...PortalNavigation.entryErrors(entries, context)];
+    return errors.length > 0 ? err(errors) : ok({ title, pages: entries });
+  }
+
+  private static entryErrors(entries: string[], context: NavigationContext): string[] {
+    const errors: string[] = [];
     // Keyed by the node an entry positions rather than its text: `content/api` is where the
     // reference is mounted, so at the content root the name and the token reach one node --
     // a directory the user keeps there merges into it rather than making a second. Naming it
@@ -121,8 +126,7 @@ export class PortalNavigation {
         errors.push(checked.error);
       }
     }
-
-    return errors.length > 0 ? err(errors) : ok({ title, pages: entries });
+    return errors;
   }
 
   private static checkEntry(entry: string, context: NavigationContext): Result<void, string> {
