@@ -2,7 +2,9 @@
 
 Status: all three batches implemented as three commits of one PR (#374) on
 `saeedjamshaid/one-home-per-concept`; §3.8, §4.6 and §5.6 record where each
-departed from this plan. Open: the gitignore/`--destination` decision (§5.2). Grounded in `dev` at `ecf76668`; every file:line
+departed from this plan. The gitignore/`--destination` decision (§5.2) is
+deferred to its own ticket: `main` has no `.gitignore` handling at all, so it
+is not a regression, and the fix is a behaviour change that wants its own design. Grounded in `dev` at `ecf76668`; every file:line
 below was verified there.
 
 ## 1. Goal and scope
@@ -310,10 +312,14 @@ no mock-fs), all cases cross-platform — no chmod tricks:
   not one — which is why its import of the absent JSON never failed.
   `portal.server.ts` now casts once, as `portal.ts` does. `APIMATIC_E2E=1`
   (two real Vite builds) passes.
-- 4.3: `stripUnallowedFeatures` has no caller on `dev` — quickstart used it on
-  `main` to prune a spec's unallowed features, and #363 removed the call. The
-  fix is applied; whether to delete the method or restore the pruning is an
-  open question for the release PR.
+- 4.3: `stripUnallowedFeatures` had no caller on `dev` — quickstart used it on
+  `main` to prune a spec's unallowed features, and #363 removed the call.
+  Decided in review: the method goes, with `parseErrorResponse` and
+  `FeaturesToRemove`, which existed only for it; the pruning does not return.
+  So does what fed it: `validateViaFile` no longer decodes the
+  `x-unallowed-features` header, `UnallowedFeaturesResponse`,
+  `RemovableFeature` and the `ValidateApiResponse` wrapper go, and
+  `ValidateAction` returns a plain `ActionResult` — nothing read its value.
 - 4.5: ten cases rather than seven — `exists()`'s three and `saveBuildLog`'s
   two are separate `it`s.
 
@@ -440,8 +446,8 @@ name derivation, destination overrides); the seven action suites and
 - The interactive `sdk publish` still takes the default project directory as
   a `DirectoryPath`: it is the default a prompt offers, and the project is made
   once the user answers.
-- Not done, for review: step 9 (the gitignore/`--destination` decision above);
-  the `leafName()` rider. Noticed, not fixed: `SdkPublishAction` zips
+- Deferred in review: step 9 (the gitignore/`--destination` gap, to a ticket)
+  and the `leafName()` rider. Left as is in review: `SdkPublishAction` zips
   `outputDirectory.join(language)`, re-deriving `SdkContext`'s layout, which a
   versioned project writes one level deeper — pre-existing on `main`.
 

@@ -2,15 +2,14 @@ import { log } from '@clack/prompts';
 import { replaceHTML } from '../../utils/utils.js';
 import { ValidationMessages } from '../../types/utils.js';
 import { Result } from 'neverthrow';
-import { ValidationEntry, ValidationSummary } from '@apimatic/sdk';
+import { ValidateApiResult, ValidationEntry, ValidationSummary } from '@apimatic/sdk';
 import { ServiceError } from '../../infrastructure/service-error.js';
 import { FilePath } from '../../types/file/filePath.js';
 import { format as f } from '../format.js';
 import { withSpinner } from '../prompt.js';
-import { ValidateApiResponse } from '../../infrastructure/services/validation-service.js';
 
 export class ApiValidatePrompts {
-  public async validateApi(fn: Promise<Result<ValidateApiResponse, string>>) {
+  public async validateApi(fn: Promise<Result<ValidateApiResult, string>>) {
     return withSpinner('Validating API', 'API validation completed', 'API validation failed', fn);
   }
 
