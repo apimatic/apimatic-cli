@@ -865,6 +865,15 @@ describe('PortalSourceContext', () => {
       ]);
     });
 
+    it('names an address as the build serves it, encoded as a URL is', async () => {
+      write('content/café.md', page('Café'));
+      write('content/(menu)/café.mdx', page('Café again'));
+
+      expect(shared((await resolve())._unsafeUnwrapErr())).to.deep.equal([
+        '/caf%C3%A9 content/(menu)/café.mdx,content/café.md'
+      ]);
+    });
+
     it('accepts a page beside a folder of the same name that has no index page', async () => {
       write('content/guides.md', page('Guides page'));
       write('content/guides/intro.md', page('Intro'));

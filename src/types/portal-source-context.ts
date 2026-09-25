@@ -1,3 +1,4 @@
+import { getSlugs } from 'fumadocs-core/source/plugins/slugs';
 import { err, ok, Result } from 'neverthrow';
 import { FileService } from '../infrastructure/file-service.js';
 import { errorMessage } from '../utils/error-utils.js';
@@ -711,7 +712,7 @@ export class PortalSourceContext {
    */
   private static reservedAddressPages(pages: ContentPage[]): ReservedAddressPage[] {
     return pages.flatMap(({ file, segments }) => {
-      const slugs = PortalSourceContext.slugs(segments);
+      const slugs = getSlugs(segments.join('/'));
       const section = GENERATED_SECTIONS.find((candidate) => candidate.folder === slugs[0]);
       return section === undefined ? [] : [{ file, address: `/${slugs.join('/')}`, section }];
     });
@@ -721,18 +722,12 @@ export class PortalSourceContext {
   private static sharedAddresses(pages: ContentPage[]): SharedAddress[] {
     const byAddress = new Map<string, FilePath[]>();
     for (const { file, segments } of pages) {
-      const address = `/${PortalSourceContext.slugs(segments).join('/')}`;
+      const address = `/${getSlugs(segments.join('/')).join('/')}`;
       byAddress.set(address, [...(byAddress.get(address) ?? []), file]);
     }
     return [...byAddress]
       .filter(([, files]) => files.length > 1)
       .map(([address, files]) => ({ address, pages: files }));
-  }
-
-  private static slugs(segments: string[]): string[] {
-    const folders = segments.slice(0, -1).filter((segment) => !GROUP_FOLDER.test(segment));
-    const name = PortalSourceContext.pageName(new FileName(segments[segments.length - 1]));
-    return name === undefined || name === INDEX_NAME ? folders : [...folders, name];
   }
 
   private static contentPages(contentTree: Directory): ContentPage[] {
