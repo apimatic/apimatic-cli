@@ -164,7 +164,7 @@ describe('reportSourceProblem', () => {
     expect(rest).to.deep.equal([
       '  • content/notes.md has no front matter, which is where its title goes.',
       "  • content/faq.md: 'title' must not be empty.",
-      'Every page starts with front matter that gives its title, for example:',
+      'Start each page with front matter that gives its title, for example:',
       '---',
       'title: Getting started',
       '---'
@@ -204,7 +204,7 @@ describe('reportSourceProblem', () => {
 
       const [heading, ...rest] = printed().split('\n');
 
-      expect(heading).to.match(/^Pages in .+ would be served at the same addresses, which only one page can have:$/);
+      expect(heading).to.match(/^Pages in .+ would share addresses, but only one page can be served at each:$/);
       expect(rest).to.deep.equal([
         "  • '/guides': 'content/guides.md' and 'content/guides/index.md'",
         "  • '/': 'content/index.md' and 'content/(start)/index.md'",
@@ -222,7 +222,7 @@ describe('reportSourceProblem', () => {
         source
       );
 
-      expect(printed()).to.contain('would be served at the same address, which only one page can have:');
+      expect(printed()).to.contain('would share an address, but only one page can be served at each:');
       expect(printed()).to.contain('Rename or move all but one of them.');
     });
   });
@@ -325,14 +325,14 @@ describe('reportSharedTabNames', () => {
     );
 
     expect(printed().split('\n')).to.deep.equal([
-      'More than one tab has the same name, so the tab bar cannot tell them apart:',
+      'More than one tab has the same name, so readers cannot tell them apart:',
       "  • 'Guides': the Home tab (titled in 'content/nav.json'), the tab of the 'guides' folder (titled in " +
         "'content/guides/nav.json') and the API reference (titled in 'content/api/index.md')",
       "  • 'SDKs': the tab of the 'sdk-docs' folder (titled in 'content/sdk-docs/index.md') and the tab of the " +
         'SDK pages',
       "  • 'Home': the Home tab and the tab of the 'home' folder (named after the folder)",
-      "Give all but one of each a name of its own with a 'title' in its folder's 'nav.json', or in " +
-        "'content/nav.json' for the Home tab."
+      "Rename all but one tab of each name with a 'title' in its folder's 'nav.json', or in " +
+        "'content/nav.json' for the Home tab; the tabs of the SDK pages and the context plugin keep their names."
     ]);
   });
 });

@@ -42,3 +42,10 @@ export function stripAnsi(str: string) {
 export function stripByteOrderMark(contents: string): string {
   return contents.codePointAt(0) === 0xfeff ? contents.slice(1) : contents;
 }
+
+const PROSE_LIST = new Intl.ListFormat('en-GB', { type: 'conjunction' });
+
+/** The items as a sentence lists them: `a`, `a and b`, `a, b and c`. */
+export function listedInProse(items: readonly string[]): string {
+  return PROSE_LIST.format(items);
+}

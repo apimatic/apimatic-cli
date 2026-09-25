@@ -326,7 +326,7 @@ describe('tabsTransformer', () => {
       expect(guides.children.some((child) => child.type === 'folder' && child.root === true)).to.be.false;
     });
 
-    // The setting that once made a tab, which the CLI now refuses as unknown.
+    // Fumadocs' own key for a tab, which the CLI reports as an unknown setting.
     it('is not made by a root setting in the folder’s own nav.json', () => {
       const docs = [
         ...CONTENT,

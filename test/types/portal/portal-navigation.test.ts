@@ -315,8 +315,8 @@ describe('PortalNavigation', () => {
       ]);
     });
 
-    // Listing the folder in the content root's file is what makes a tab now.
-    it('reports the root setting that used to make one as unknown', () => {
+    // Fumadocs' own key for a tab; here, listing the folder in the content root's file makes one.
+    it('reports a root setting as unknown', () => {
       const tutorials = { label: 'content/tutorials/nav.json', isContentRoot: false, childNames: ['first-call'] };
 
       expect(PortalNavigation.validate('{"root":true}', contextFor(tutorials))._unsafeUnwrapErr()).to.deep.equal([

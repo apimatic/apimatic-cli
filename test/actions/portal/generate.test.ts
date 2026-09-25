@@ -291,4 +291,13 @@ describe('GenerateAction', () => {
     expect(result.isSuccess()).to.be.true;
     expect(shared.prompts.filesShadowedByStatic.firstCall.args[0].map(String)).to.deep.equal(['robots.txt']);
   });
+
+  // The fixture's root nav.json lists `guides`, and no two tabs share a name.
+  it('says which folders the root nav.json makes tabs of, and which tab names are shared', async () => {
+    const result = await execute();
+
+    expect(result.isSuccess()).to.be.true;
+    expect(shared.prompts.folderTabs.firstCall.args[0].map((folder) => folder.leafName())).to.deep.equal(['guides']);
+    expect(shared.prompts.sharedTabNames.firstCall.args[0]).to.deep.equal([]);
+  });
 });

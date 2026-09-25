@@ -1,6 +1,6 @@
 import { err, ok, Result } from 'neverthrow';
 import { isJsonObject } from '../../utils/json-utils.js';
-import { listedInProse } from './config/fields.js';
+import { listedInProse } from '../../utils/string-utils.js';
 import { GENERATED_SECTIONS, GeneratedSection } from './generated-pages.js';
 import { unknownFieldErrors } from './unknown-fields.js';
 
@@ -180,9 +180,7 @@ export class PortalNavigation {
       );
     }
 
-    // Only below the content root: there, the index page is the folder's own -- the page it
-    // links to, or as a tab opens on first -- so no position among its pages would be
-    // honoured. The content root lists `index` as an ordinary child.
+    // Below the content root the index page is the folder's own, not one of the pages it orders.
     if (entry === INDEX_NAME && !context.isContentRoot) {
       return err(
         `${context.label}: '${INDEX_NAME}' is the page this folder opens on, so it cannot be positioned ` +
@@ -257,8 +255,7 @@ export class PortalNavigation {
     if (title === undefined) {
       return [];
     }
-    // Below the content root, a directory with no page beneath it becomes no folder, so the
-    // name would reach nothing. At the root it names the Home tab, which exists without one.
+    // At the root it names the Home tab, which exists without a page; a folder without one does not.
     if (!context.isContentRoot && !context.becomesFolder) {
       return [
         `${context.label}: 'title' names this folder, but a directory with no page in it or ` +

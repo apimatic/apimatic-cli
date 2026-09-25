@@ -819,7 +819,6 @@ describe('PortalSourceContext', () => {
     });
   });
 
-  // The build fails as a whole over one page its schema refuses, with a stack trace for a message.
   // What `portal serve` runs on each save in content/, with the specifications `resolve` found.
   describe('resolveContent', () => {
     beforeEach(() => {
@@ -850,6 +849,7 @@ describe('PortalSourceContext', () => {
     });
   });
 
+  // The build fails as a whole over one page its schema refuses, with a stack trace for a message.
   describe('the front matter of the pages', () => {
     beforeEach(() => {
       writeConfig({ site: { name: 'Calc' } });
@@ -958,7 +958,7 @@ describe('PortalSourceContext', () => {
     });
 
     // Listing a folder in the content root's file is what makes it a tab.
-    it('refuses the root setting that used to make a tab, wherever it is written', async () => {
+    it('reports a root setting in a folder’s nav.json as unknown', async () => {
       write('content/tutorials/first-call.md', page('First call'));
       write('content/tutorials/nav.json', JSON.stringify({ root: true }));
 

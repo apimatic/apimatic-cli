@@ -65,8 +65,7 @@ export class FileWatchService {
   ): Result<FileWatch, string> {
     return settledWatch(onChange, onFailed, (notify, fail) => {
       const root = realPath(directory);
-      // Node watches a tree natively only here; elsewhere it watches each file, and loses one
-      // that an editor saves by renaming a new file over it.
+      // Elsewhere Node watches each file, and loses one an editor saves by renaming a new one over it.
       if (platform === 'win32' || platform === 'darwin') {
         const watcher = fs.watch(root, { recursive: true }, notify);
         watcher.on('error', fail);
@@ -145,11 +144,7 @@ function settledWatch(
   });
 }
 
-/**
- * One watch per directory, as `watch` keeps on its one: a directory's watch hears a file renamed
- * over another in it. A directory made later is watched once its parent reports it, and the
- * watch of one taken away is closed, since Windows would otherwise report it without end.
- */
+/** One watch per directory, as `watch` keeps on its one, since a directory's watch hears a file renamed over. */
 function watchEachDirectory(root: string, notify: () => void, fail: (error: unknown) => void): () => void {
   const watchers = new Map<string, fs.FSWatcher>();
 
@@ -161,6 +156,7 @@ function watchEachDirectory(root: string, notify: () => void, fail: (error: unkn
   const watchDirectory = (directory: string) => {
     const watcher = fs.watch(directory, (_event, changed) => {
       try {
+        // Windows goes on reporting a watched directory that was taken away until its watch closes.
         if (!fs.existsSync(directory)) {
           unwatch(directory);
         } else if (changed !== null) {

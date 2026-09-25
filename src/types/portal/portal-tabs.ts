@@ -3,7 +3,7 @@ import { FilePath } from '../file/filePath.js';
 import { GeneratedSection } from './generated-pages.js';
 import { GROUP_FOLDER } from './portal-navigation.js';
 
-/** One tab of the portal's tab bar. */
+/** What a tab is made of. */
 export type TabOwner =
   | { kind: 'home' }
   // A folder directly under `content/` that `content/nav.json` lists.

@@ -14,6 +14,11 @@ injected SDK page" and whose section 11 deferred its shape, and from
 reserved the SDKs tab, and left both resolving to nothing. Section 11 lists what
 those plans need amended once this is implemented.
 
+**Amended 2026-09-25**: a folder becomes a tab when the root `nav.json` lists
+it, not through `"root": true`, which is gone (`.ai/plans/portal-config.md`
+section 5). Where this plan compares a generated folder with a `root: true`
+folder, read "a folder the root `nav.json` lists".
+
 ## 1. Goal and scope
 
 Three kinds of page the CLI generates and injects into the portal, none of which

@@ -1,7 +1,7 @@
 import { log } from '@clack/prompts';
 import { APIMATIC_CONFIG_FILE_NAME } from '../../types/apimatic-config/document.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
-import { listedInProse } from '../../types/portal/config/fields.js';
+import { listedInProse } from '../../utils/string-utils.js';
 import { PortalSourceProblem, ReservedAddressPage, SharedAddress } from '../../types/portal/portal-source.js';
 import { PortalTab, SharedTabName } from '../../types/portal/portal-tabs.js';
 import { FileName } from '../../types/file/fileName.js';
@@ -46,7 +46,7 @@ export function reportSourceProblem(
     case 'invalidFrontMatter': {
       log.error(`The front matter of pages in ${f.path(sourceDirectory)} would fail the build:`);
       log.message(problem.errors.map((error) => `  • ${error}`).join('\n'));
-      log.message(`Every page starts with front matter that gives its title, for example:\n${TITLE_EXAMPLE}`);
+      log.message(`Start each page with front matter that gives its title, for example:\n${TITLE_EXAMPLE}`);
       return;
     }
     case 'groupNamedPages': {
@@ -147,8 +147,8 @@ function reportSharedAddresses(addresses: SharedAddress[], sourceDirectory: Dire
       `  • ${f.var(address)}: ${listedInProse(pages.map((page) => f.var(page.relativeTo(sourceDirectory))))}`
   );
   log.error(
-    `Pages in ${f.path(sourceDirectory)} would be served at the same ${one ? 'address' : 'addresses'}, ` +
-      `which only one page can have:`
+    `Pages in ${f.path(sourceDirectory)} would share ${one ? 'an address' : 'addresses'}, but only one page ` +
+      `can be served at each:`
   );
   log.message(lines.join('\n'));
   log.message(
@@ -205,11 +205,12 @@ export function reportSharedTabNames(shared: SharedTabName[], sourceDirectory: D
       }
     }
   };
-  log.warn('More than one tab has the same name, so the tab bar cannot tell them apart:');
+  log.warn('More than one tab has the same name, so readers cannot tell them apart:');
   log.message(shared.map(({ name, tabs }) => `  • ${f.var(name)}: ${listedInProse(tabs.map(describe))}`).join('\n'));
   log.message(
-    `Give all but one of each a name of its own with a ${f.var('title')} in its folder's ${f.var('nav.json')}, ` +
-      `or in ${f.var('content/nav.json')} for the Home tab.`
+    `Rename all but one tab of each name with a ${f.var('title')} in its folder's ${f.var('nav.json')}, or in ` +
+      `${f.var('content/nav.json')} for the Home tab; the tabs of the SDK pages and the context plugin keep ` +
+      `their names.`
   );
 }
 

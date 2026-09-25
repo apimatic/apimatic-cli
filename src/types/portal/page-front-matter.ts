@@ -8,10 +8,7 @@ export const OPTIONAL_PAGE_FIELDS = { description: 'string', icon: 'string', ful
 
 const EXPECTED = { string: 'text', boolean: 'true or false' } as const;
 
-/**
- * A page's front matter, read by the parser the build reads it with and held to the build's page
- * schema, which fails the whole build with a stack trace over a single page it refuses.
- */
+/** Read by the build's own parser and held to its schema, which fails the whole build over one page. */
 export class PageFrontMatter {
   /** The page's title, as the sidebar and a tab are named by it. */
   public static title(markdown: string, label: string): Result<string, string[]> {
@@ -39,15 +36,15 @@ export class PageFrontMatter {
   }
 
   private static titleErrors(title: unknown, label: string): string[] {
-    if (title === undefined || title === null) {
+    if (title === undefined) {
       return [`${label} has no 'title' in its front matter.`];
+    }
+    // The build takes an empty string, and the page is then a blank entry in the sidebar.
+    if (title === null || (typeof title === 'string' && title.trim().length === 0)) {
+      return [`${label}: 'title' must not be empty.`];
     }
     if (typeof title !== 'string') {
       return [`${label}: 'title' must be text. Put it in quotes if it looks like a number or true or false.`];
-    }
-    // The build takes an empty one, and the page is then a blank entry in the sidebar.
-    if (title.trim().length === 0) {
-      return [`${label}: 'title' must not be empty.`];
     }
     return [];
   }

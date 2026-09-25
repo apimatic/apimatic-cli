@@ -33,7 +33,7 @@ describe('PageFrontMatter', () => {
       '---\ndescription: More\n---\n',
       "content/page.md has no 'title' in its front matter."
     ],
-    ['a title left blank', '---\ntitle:\n---\n', "content/page.md has no 'title' in its front matter."],
+    ['a title left blank', '---\ntitle:\n---\n', "content/page.md: 'title' must not be empty."],
     [
       'a title that is a number',
       '---\ntitle: 404\n---\n',

@@ -173,11 +173,7 @@ export class PortalSourceContext {
     });
   }
 
-  /**
-   * The `content/` half of `resolve`, for `portal serve` to run on every save there, so a
-   * mistake is reported when it is made rather than at the next start. `specs` is what `resolve`
-   * found, which is not read again; changing them needs a restart anyway.
-   */
+  /** The `content/` half of `resolve`, for `portal serve` to run on each save, against the `specs` it found. */
   public async resolveContent(specs: PortalSpec[]): Promise<Result<void, PortalSourceProblem>> {
     const content = await this.content(await this.existingContentDirectory(), specs);
     return content.map(() => undefined);

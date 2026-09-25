@@ -176,10 +176,7 @@ export class PortalServeAction {
     return watch.value;
   }
 
-  /**
-   * The preview reloads a page or a `nav.json` itself, and drops what the build would refuse
-   * without a word, so each save is checked as `portal generate` would check it.
-   */
+  /** The preview drops what a build would refuse without a word, so each save is checked as a build would. */
   private watchContent(source: PortalSource, sourceDirectory: DirectoryPath): FileWatch | undefined {
     if (source.contentDirectory === null) {
       return undefined;

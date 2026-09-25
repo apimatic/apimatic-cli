@@ -12,6 +12,14 @@ marked *as reviewed* where its rule is stated. On 2026-09-24 the block was
 trimmed for the first release; section 15 lists what was cut and why, and the
 sections above describe what remains.
 
+**Amended 2026-09-25** on `saeedjamshaid/portal-home-tab`, after a colleague's
+QA of the tabs; section 5 records the decisions. There is no Guides tab: Home
+holds every page at the top level and every folder the root `nav.json` does not
+list, and that file's `title` names it. `"root": true` is gone: a folder the
+root `nav.json` lists is a tab. Passages elsewhere that still mention the Guides
+tab, `/tab/guides`, `root` or its checks and tests describe the first cut and
+are superseded by section 5.
+
 Builds on `.ai/plans/fumadocs-portal.md` (PR #343), `.ai/plans/portal-navigation.md`
 (`nav.json`, PR #346) and `.ai/plans/apimatic-config.md` (`apimatic.json`,
 PR #348, with the language entry's `publishing` level from #350), all
@@ -397,7 +405,9 @@ under `portal serve` as they do today, tabs included, with no config watcher.
 - `PortalSourceContext.navigation`'s `visit` gains a flag for "directly under
   the content root", beside the `isContentRoot` and `isApiDirectory` it already
   passes, and `PortalNavigation.validate`'s context gains the same field. Today
-  the walk cannot tell a top-level folder from a nested one.
+  the walk cannot tell a top-level folder from a nested one. *(Amended
+  2026-09-25: removed with `root`; only the content root's own entries make
+  tabs, section 5.)*
 
 ## 6. Template changes
 
@@ -657,7 +667,8 @@ Following `.ai/instructions.md` and the skills in `.ai/skills/`.
   created; `root: true` ignored on a nested folder and on `api`; the synthetic
   Home node when there is no index; folder-tab and API
   labels from `nav.json` `title`; the explicit tab list (a URL found through
-  nested folders, `$folder` bound); the document filter (internal operations
+  nested folders, `$folder` bound) *(amended 2026-09-25: there is no Guides tab
+  or `root` setting; the tab tests follow section 5 as amended)*; the document filter (internal operations
   removed and deprecated ones kept, an emptied path item removed, `x-ext`
   references intact, a document with nothing internal left untouched).
 - Fixtures: `test/resources/portal-inputs/default/apimatic.json` moves to the

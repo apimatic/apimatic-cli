@@ -117,8 +117,7 @@ describe('navigationTransformer', () => {
   });
 
   describe('a nav.json it cannot use', () => {
-    // The CLI refuses these, but only at startup: during `portal serve` a half-typed file
-    // reloads straight into the transformer.
+    // The CLI reports these, but under `portal serve` a half-typed file still reloads into the transformer.
     it('leaves the order alone for a file that is null, a string or an array', () => {
       for (const data of [null, 'hi', ['index']]) {
         const docs = [...CONTENT, { type: 'meta' as const, path: 'nav.json', data: data as never }];

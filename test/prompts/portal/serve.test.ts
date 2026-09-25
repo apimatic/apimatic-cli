@@ -44,7 +44,7 @@ describe('PortalServePrompts', () => {
     });
 
     it('says a mistake in a page or a nav.json is reported when it is saved', () => {
-      expect(printed()).to.contain("So is a mistake in a page or a 'nav.json'");
+      expect(printed()).to.contain("A mistake in a page or a 'nav.json' is reported when you save it too");
     });
   });
 });

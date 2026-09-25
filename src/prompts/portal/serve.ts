@@ -46,8 +46,8 @@ export class PortalServePrompts {
     log.message(`The portal is running at ${f.link(url.toString())}`);
     noteWrapped(
       [
-        `Edits to the Markdown pages in ${f.path(sourceDirectory.join('content'))}, to the order and ` +
-          `folder titles in a ${f.var('nav.json')}, and to the ${f.var('portal')} block of ${f.var(
+        `Edits to the Markdown pages in ${f.path(sourceDirectory.join('content'))}, to the order, tabs and ` +
+          `titles in a ${f.var('nav.json')}, and to the ${f.var('portal')} block of ${f.var(
             'apimatic.json'
           )} appear in the browser automatically, and so does a language added to or removed from its ${f.var(
             'languages'
@@ -55,8 +55,8 @@ export class PortalServePrompts {
             'plugin'
           )} block added or removed, which adds or removes the Context Plugin tab. A mistake in ${f.var(
             'apimatic.json'
-          )} is reported when you save it, and the preview keeps what it last accepted. So is a mistake in a ` +
-          `page or a ${f.var('nav.json')}, which the preview shows as it can until you fix it.`,
+          )} is reported when you save it, and the preview keeps what it last accepted. A mistake in a page ` +
+          `or a ${f.var('nav.json')} is reported when you save it too, while the preview shows what it can.`,
         '',
         `Adding or removing a page in ${f.path(sourceDirectory.join('content'))}, creating ${f.path(
           sourceDirectory.join('static')
@@ -123,7 +123,7 @@ export class PortalServePrompts {
   public contentNotWatched(reason: string, sourceDirectory: DirectoryPath) {
     log.warn(
       `${f.path(sourceDirectory.join('content'))} cannot be watched (${reason}), so a mistake in a page or a ` +
-        `${f.var('nav.json')} is only reported when the preview starts.`
+        `${f.var('nav.json')} is only reported when the preview is restarted.`
     );
   }
 

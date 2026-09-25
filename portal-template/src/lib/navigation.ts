@@ -98,9 +98,7 @@ export function navigationTransformer<S extends ContentStorage>(): PageTreeTrans
       if (folderPath === apiBaseDir) {
         applyApiStructure(this, node);
       }
-      // Last, so a name the user wrote outranks both the title Fumadocs takes from an index
-      // page and the default the API wrapper is given just above. Never at the content root,
-      // which is no folder in the sidebar: its title names the Home tab instead.
+      // Last, to outrank the index page's title and the API wrapper's; at the root it names Home instead.
       if (folderPath !== '' && settings?.title !== undefined) {
         node.name = settings.title;
       }
@@ -109,13 +107,7 @@ export function navigationTransformer<S extends ContentStorage>(): PageTreeTrans
   };
 }
 
-/**
- * A tab is a root folder, which is how Fumadocs builds a tab bar. Each folder the root
- * `nav.json` lists becomes one, as do the API reference and each folder the CLI generates; the
- * pages, and the folders the file does not list, are gathered into Home, which the file's `title`
- * names. The tabs keep the root's order, except that Home leads unless the file places the index
- * page, which puts it there. Tabs change no address: URLs come from slugs.
- */
+/** A tab per folder the root `nav.json` lists, the API reference and each generated folder; the rest is Home. */
 export function tabsTransformer<S extends ContentStorage>(): PageTreeTransformer<S> {
   return {
     root(root) {
@@ -135,9 +127,7 @@ function readSettings(context: NavigationContext, folderPath: string): Navigatio
   // Resolved through the builder's own index so the extension is never hard-coded.
   const path = context.builder.resolveFlattenPath(PathUtils.joinPath(folderPath, NAVIGATION_FILE_STEM), 'meta');
   const file = context.storage.read(path);
-  // `data` is whatever was in the file. The CLI refuses a `nav.json` that is not an object,
-  // but only once at startup: during `portal serve` a half-typed file reloads straight to
-  // here, and `null` would throw out of the page-tree build.
+  // Under `portal serve` a half-typed file reloads to here whatever the CLI says of it, and `null` would throw.
   if (file === undefined || file.format !== 'meta' || typeof file.data !== 'object' || file.data === null) {
     return undefined;
   }
@@ -158,7 +148,7 @@ function isTabFolder(rootSettings: NavigationSettings | undefined, folder: Folde
   return (
     folderPath !== undefined &&
     folderPath !== apiBaseDir &&
-    (rootSettings?.pages?.some((entry) => entry.trim() === folderPath) ?? false) &&
+    lists(rootSettings, folderPath) &&
     // The home page is the Home tab's, whichever `(group)` folder serves it.
     !containsUrl([folder], HOME_URL)
   );
@@ -202,7 +192,7 @@ function groupIntoTabs(context: NavigationContext, children: Node[]): Node[] {
   // The home page opens the site, so its tab leads unless the file placed the page itself --
   // which it can only do when there is an index page: without one, an `index` entry names a
   // folder of that name.
-  const at = tabsBeforeIndex !== undefined && namesIndex(settings) ? tabsBeforeIndex : 0;
+  const at = tabsBeforeIndex !== undefined && lists(settings, INDEX_STEM) ? tabsBeforeIndex : 0;
   return [...tabs.slice(0, at), home, ...tabs.slice(at)];
 }
 
@@ -228,8 +218,8 @@ function asTab(folder: Folder): Folder {
   return folder;
 }
 
-function namesIndex(settings: NavigationSettings | undefined): boolean {
-  return settings?.pages?.some((entry) => entry.trim() === INDEX_STEM) ?? false;
+function lists(settings: NavigationSettings | undefined, name: string): boolean {
+  return settings?.pages?.some((entry) => entry.trim() === name) ?? false;
 }
 
 /**
