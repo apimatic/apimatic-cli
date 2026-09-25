@@ -6,7 +6,7 @@ import { stringify as toYaml } from 'yaml';
 import { createOpenAPI } from 'fumadocs-openapi/server';
 import type { Document } from 'fumadocs-openapi';
 import { placeCodeSamples, readCodeSamples } from '../../portal-template/src/lib/code-samples.server';
-import { bundleSpecification } from '../../portal-template/src/lib/openapi-bundle.server';
+import { bundleSpec } from '../../portal-template/src/lib/openapi-bundle.server';
 
 const EXTENSION = 'x-apimatic-codeSamples';
 
@@ -118,7 +118,7 @@ describe('placeCodeSamples', () => {
 
       const samples = await readCodeSamples(samplesFile);
       const server = createOpenAPI({
-        input: { api: async () => placeCodeSamples(await bundleSpecification(file), samples) }
+        input: { api: async () => placeCodeSamples(await bundleSpec(file), samples) }
       });
       const document: any = (await server.getSchemas()).api.bundled;
 
