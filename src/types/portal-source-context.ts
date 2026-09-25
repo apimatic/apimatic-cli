@@ -60,6 +60,9 @@ const NAVIGATION_FILE = new FileName(NAVIGATION_FILE_NAME);
 /** Extensions the docs collection compiles, and so the ones an entry can address. */
 const PAGE_EXTENSIONS = ['.md', '.mdx'];
 
+/** Passed over by Vite's `import.meta.glob`, which the build reads the content through. */
+const isSkippedByGlob = (name: string) => name.startsWith('.') || name === 'node_modules';
+
 /** The order the tabs take when the root `nav.json` names none, which a report lists them in. */
 const TAB_ORDER: TabOwner['kind'][] = ['home', 'folder', 'generated', 'apiReference'];
 
@@ -203,6 +206,12 @@ export class PortalSourceContext {
     }
 
     const pages = contentTree === null ? [] : PortalSourceContext.contentPages(contentTree);
+
+    // Fumadocs throws on one: a `(group)` name is left out of every address, so it has none.
+    const groupNamed = pages.filter(({ file }) => GROUP_FOLDER.test(PortalSourceContext.pageName(file.name()) ?? ''));
+    if (groupNamed.length > 0) {
+      return err({ kind: 'groupNamedPages', pages: groupNamed.map(({ file }) => file) });
+    }
 
     // Refused before the navigation scan, which would otherwise answer an entry naming such a
     // page as if it were an ordinary one. In the build, the user's page and the generated one
@@ -416,6 +425,9 @@ export class PortalSourceContext {
       let indexPage: FilePath | undefined;
 
       for (const item of directory.items) {
+        if (isSkippedByGlob(item instanceof Directory ? item.directoryPath.leafName() : item.fileName.toString())) {
+          continue;
+        }
         // A directory with no page anywhere beneath it becomes no node in the page tree, so
         // naming it would resolve to nothing. Fumadocs would build one for a directory that
         // holds only a `nav.json`, but the template drops it again to keep to this rule.
@@ -672,7 +684,8 @@ export class PortalSourceContext {
     return contentTree
       .getAllFiles()
       .filter((file) => PortalSourceContext.pageName(file.name()) !== undefined)
-      .map((file) => ({ file, segments: file.relativeTo(contentTree.directoryPath).split('/') }));
+      .map((file) => ({ file, segments: file.relativeTo(contentTree.directoryPath).split('/') }))
+      .filter(({ segments }) => !segments.some(isSkippedByGlob));
   }
 
   // With several specifications there is no suggested site: no one of them speaks for the portal.

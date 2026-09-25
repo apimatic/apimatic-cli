@@ -171,6 +171,21 @@ describe('reportSourceProblem', () => {
     ]);
   });
 
+  it('names a page named like a (group) folder, and why it cannot be served', () => {
+    reportSourceProblem(
+      {
+        kind: 'groupNamedPages',
+        pages: [new FilePath(source.join('content'), new FileName('(intro).md'))]
+      },
+      source
+    );
+
+    expect(printed()).to.equal(
+      "'content/(intro).md' is named like a '(group)' folder, which is left out of every address, so the " +
+        'build cannot serve it. Rename the file.'
+    );
+  });
+
   describe('pages at the same address', () => {
     const content = source.join('content');
     const page = (directory: DirectoryPath, name: string) => new FilePath(directory, new FileName(name));

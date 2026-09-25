@@ -754,6 +754,39 @@ describe('PortalSourceContext', () => {
         .sort();
     };
 
+    it('refuses a page named like a (group) folder, which Fumadocs throws on', async () => {
+      write('content/(intro).md', page('Intro'));
+
+      expect((await resolve())._unsafeUnwrapErr()).to.deep.equal({
+        kind: 'groupNamedPages',
+        pages: [new FilePath(new DirectoryPath(root).join('content'), new FileName('(intro).md'))]
+      });
+    });
+
+    // Vite's glob, which the build reads the content through, never loads them.
+    it('leaves out dot files, dot folders and node_modules, whatever they hold', async () => {
+      write('content/._index.md', 'binary AppleDouble data');
+      write('content/.drafts/notes.md', '# No front matter');
+      write('content/.drafts/nav.json', 'not even JSON');
+      write('content/node_modules/pkg/README.md', '# Readme');
+      write('content/nav.json', JSON.stringify({ pages: ['index'] }));
+
+      const source = (await resolve())._unsafeUnwrap();
+
+      expect(source.hiddenPages).to.deep.equal([]);
+    });
+
+    it('does not count a dot folder as one a nav.json entry can name', async () => {
+      write('content/.drafts/notes.md', page('Notes'));
+      write('content/nav.json', JSON.stringify({ pages: ['index', '.drafts'] }));
+
+      const problem = (await resolve())._unsafeUnwrapErr();
+
+      expect(problem.kind === 'invalidNavigation' && problem.errors).to.deep.equal([
+        "content/nav.json: '.drafts' is not a page or folder in this directory."
+      ]);
+    });
+
     // The build would serve the page there and move the folder's own to /guides/index.
     it('refuses a page beside a folder whose index page has the same address', async () => {
       write('content/guides.md', page('Guides page'));
@@ -834,6 +867,26 @@ describe('PortalSourceContext', () => {
         "content/guides/intro.mdx: 'title' must be text. Put it in quotes if it looks like a number or true or false.",
         'content/notes.md has no front matter, which is where its title goes.'
       ]);
+    });
+
+    it('reports a page it cannot read, rather than throwing', async () => {
+      write('content/notes.md', page('Notes'));
+      const getContents = FileService.prototype.getContents;
+      const read = sinon
+        .stub(FileService.prototype, 'getContents')
+        .callsFake(function (this: FileService, file: FilePath) {
+          return file.name().is('notes.md') ? Promise.reject(new Error('EACCES')) : getContents.call(this, file);
+        });
+
+      try {
+        const problem = (await resolve())._unsafeUnwrapErr();
+
+        expect(problem.kind === 'invalidFrontMatter' && problem.errors).to.deep.equal([
+          'content/notes.md could not be read.'
+        ]);
+      } finally {
+        read.restore();
+      }
     });
 
     it('checks the pages below content/api too, which the build compiles as well', async () => {

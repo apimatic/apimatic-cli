@@ -86,6 +86,7 @@ export type PortalSourceProblem =
   | { kind: 'invalidConfig'; errors: string[]; missingPortal: boolean }
   | { kind: 'invalidNavigation'; errors: string[] }
   | { kind: 'invalidFrontMatter'; errors: string[] }
+  | { kind: 'groupNamedPages'; pages: FilePath[] }
   | { kind: 'reservedAddresses'; pages: ReservedAddressPage[] }
   | { kind: 'sharedAddresses'; addresses: SharedAddress[] }
   | { kind: 'unreadableContent' }

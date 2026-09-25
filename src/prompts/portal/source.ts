@@ -49,6 +49,15 @@ export function reportSourceProblem(
       log.message(`Every page starts with front matter that gives its title, for example:\n${TITLE_EXAMPLE}`);
       return;
     }
+    case 'groupNamedPages': {
+      const names = listedInProse(problem.pages.map((page) => f.var(page.relativeTo(sourceDirectory))));
+      const one = problem.pages.length === 1;
+      log.error(
+        `${names} ${one ? 'is' : 'are'} named like a ${f.var('(group)')} folder, which is left out of every ` +
+          `address, so the build cannot serve ${one ? 'it' : 'them'}. Rename ${one ? 'the file' : 'each file'}.`
+      );
+      return;
+    }
     case 'reservedAddresses': {
       reportReservedAddresses(problem.pages, sourceDirectory);
       return;
