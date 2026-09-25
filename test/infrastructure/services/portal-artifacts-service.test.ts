@@ -4,33 +4,30 @@ import os from 'node:os';
 import path from 'node:path';
 import { AddressInfo } from 'node:net';
 import { Buffer } from 'node:buffer';
+import { buffer } from 'node:stream/consumers';
 import { expect } from 'chai';
 import { PortalArtifactsService } from '../../../src/infrastructure/services/portal-artifacts-service';
-import { ServiceError, ServiceErrorCode } from '../../../src/infrastructure/service-error';
+import { ServiceErrorCode } from '../../../src/infrastructure/service-error';
 import { ZipService } from '../../../src/infrastructure/zip-service';
 import { envInfo } from '../../../src/infrastructure/env-info';
 import { DirectoryPath } from '../../../src/types/file/directoryPath';
 import { FileName } from '../../../src/types/file/fileName';
 import { FilePath } from '../../../src/types/file/filePath';
-import { Endpoint } from '../../../src/types/portal/endpoint';
 
 const GENERATION_ID = '11111111-2222-3333-4444-555555555555';
 const AUTH_KEY = 'test-auth-key';
 const metadata = { commandName: 'portal generate', shell: 'bash' };
 
-const CATALOG = {
-  paths: { '/payments': { get: { 'sample-a': 'client.payments.list()' } } }
-};
+/** What the endpoint answers the download with; the service hands it on without reading it. */
+const ARTIFACTS_ZIP = Buffer.from('PK portal artifacts');
 
 describe('PortalArtifactsService', () => {
   let server: http.Server;
   let workDir: string;
-  let source: DirectoryPath;
+  let build: FilePath;
   let configDir: DirectoryPath;
   let service: PortalArtifactsService;
 
-  /** What the endpoint will answer the download with, built fresh per test. */
-  let artifactsZip: Buffer;
   let respondToStatus: (res: http.ServerResponse) => void;
   let postedBodyBytes: number;
 
@@ -41,25 +38,7 @@ describe('PortalArtifactsService', () => {
 
   const statusBody = (body: unknown) => (res: http.ServerResponse) => json(res, 200, body);
 
-  /** Lays a artifactsZip out on disk exactly as the endpoint does, then zips it. */
-  const artifactsZipOf = async (entries: Record<string, string>): Promise<Buffer> => {
-    const staging = path.join(workDir, `artifacts-${Math.random().toString(36).slice(2)}`);
-    for (const [entry, contents] of Object.entries(entries)) {
-      const file = path.join(staging, entry);
-      fs.mkdirSync(path.dirname(file), { recursive: true });
-      fs.writeFileSync(file, contents);
-    }
-    fs.mkdirSync(staging, { recursive: true });
-
-    const zipPath = new FilePath(new DirectoryPath(workDir), new FileName(`${path.basename(staging)}.zip`));
-    await new ZipService().archive(new DirectoryPath(staging), zipPath);
-    return fs.readFileSync(zipPath.toString());
-  };
-
-  const generate = async (into?: string) => {
-    const destination = into ?? fs.mkdtempSync(path.join(workDir, 'into-'));
-    return await service.generate(source, new DirectoryPath(destination), configDir, metadata, AUTH_KEY);
-  };
+  const generate = async () => await service.generate(build, configDir, metadata, AUTH_KEY);
 
   before(async () => {
     server = http.createServer((req, res) => {
@@ -79,7 +58,7 @@ describe('PortalArtifactsService', () => {
 
       if (url.endsWith('/download')) {
         res.writeHead(200, { 'Content-Type': 'application/zip' });
-        res.end(artifactsZip);
+        res.end(ARTIFACTS_ZIP);
         return;
       }
 
@@ -93,12 +72,13 @@ describe('PortalArtifactsService', () => {
 
     workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'portal-artifacts-'));
 
-    // The source directory the service zips and uploads.
+    // The zipped source directory the service uploads.
     const sourceDir = path.join(workDir, 'src');
     fs.mkdirSync(path.join(sourceDir, 'spec'), { recursive: true });
     fs.writeFileSync(path.join(sourceDir, 'apimatic.json'), JSON.stringify({ schemaVersion: 1 }));
     fs.writeFileSync(path.join(sourceDir, 'spec', 'openapi.json'), '{}');
-    source = new DirectoryPath(sourceDir);
+    build = new FilePath(new DirectoryPath(workDir), new FileName('build.zip'));
+    await new ZipService().archive(new DirectoryPath(sourceDir), build);
 
     // No config.json here, so the explicit authKey is used.
     configDir = new DirectoryPath(workDir);
@@ -113,86 +93,32 @@ describe('PortalArtifactsService', () => {
     await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
   });
 
-  beforeEach(async () => {
+  beforeEach(() => {
     respondToStatus = statusBody({ status: 'Completed' });
-    artifactsZip = await artifactsZipOf({});
   });
 
-  describe('a run that delivers everything', () => {
-    beforeEach(async () => {
-      artifactsZip = await artifactsZipOf({
-        'sdk/csharp.zip': 'PK csharp-sdk',
-        'sdk/typescript.zip': 'PK typescript-sdk',
-        'code-samples/csharp.json': JSON.stringify(CATALOG),
-        'plugin.zip': 'PK plugin'
-      });
-    });
+  it('hands back the zip exactly as the endpoint delivered it', async () => {
+    const zip = (await generate())._unsafeUnwrap();
 
-    it('reads a catalog per language into the samples the build merges', async () => {
-      const artifacts = (await generate())._unsafeUnwrap();
-
-      const samples = artifacts.codeSampleCatalogs.samplesFor(new Endpoint('GET', '/payments'));
-      expect(samples.map((sample) => sample.lang)).to.deep.equal(['csharp']);
-    });
-
-    // Keyed by the delivered name rather than parsed, so placement is a copy under the same name.
-    it('names each SDK by the file it arrived as', async () => {
-      const artifacts = (await generate())._unsafeUnwrap();
-
-      expect([...artifacts.sdks.keys()].sort()).to.deep.equal(['csharp', 'typescript']);
-      expect(fs.readFileSync(artifacts.sdks.get('csharp')!.toString(), 'utf8')).to.equal('PK csharp-sdk');
-    });
-
-    it('hands back the plugin archive', async () => {
-      const artifacts = (await generate())._unsafeUnwrap();
-
-      expect(artifacts.plugin).to.not.be.undefined;
-      expect(fs.readFileSync(artifacts.plugin!.toString(), 'utf8')).to.equal('PK plugin');
-    });
-
-    it('unpacks into the directory it was given, and nowhere else', async () => {
-      const into = fs.mkdtempSync(path.join(workDir, 'into-'));
-
-      const artifacts = (await generate(into))._unsafeUnwrap();
-
-      expect(artifacts.plugin!.toString()).to.have.string(into);
-    });
-  });
-
-  // A portal that declares no languages and no plugin is a valid run. It must not look like a
-  // failure, or a docs-only portal could never be built.
-  describe('a run that delivers nothing', () => {
-    it('succeeds with no samples, no SDKs and no plugin', async () => {
-      const artifacts = (await generate())._unsafeUnwrap();
-
-      expect(artifacts.codeSampleCatalogs.samplesFor(new Endpoint('GET', '/payments'))).to.be.empty;
-      expect(artifacts.sdks.size).to.equal(0);
-      expect(artifacts.plugin).to.be.undefined;
-    });
+    expect(await buffer(zip)).to.deep.equal(ARTIFACTS_ZIP);
   });
 
   // How a finished run actually reports itself: the gateway redirects the status to the download
   // rather than answering `Completed`, the same as it does for plugin generation. Read against the
   // deployed service, which never sends a status body saying the run is done.
-  describe('a run the gateway reports by redirecting', () => {
-    beforeEach(async () => {
-      artifactsZip = await artifactsZipOf({ 'sdk/typescript.zip': 'PK typescript-sdk', 'plugin.zip': 'PK plugin' });
-      respondToStatus = (res) => {
-        res.writeHead(302, { Location: `/portal-artifacts/${GENERATION_ID}/download` });
-        res.end();
-      };
-    });
+  it('takes a redirect from the status as the run having finished, and downloads', async () => {
+    respondToStatus = (res) => {
+      res.writeHead(302, { Location: `/portal-artifacts/${GENERATION_ID}/download` });
+      res.end();
+    };
 
-    it('takes the redirect as the run having finished, and downloads', async () => {
-      const artifacts = (await generate())._unsafeUnwrap();
+    const zip = (await generate())._unsafeUnwrap();
 
-      expect([...artifacts.sdks.keys()]).to.deep.equal(['typescript']);
-      expect(artifacts.plugin).to.not.be.undefined;
-    });
+    expect(await buffer(zip)).to.deep.equal(ARTIFACTS_ZIP);
   });
 
-  it('uploads the source directory as the build', async () => {
-    await generate();
+  it('uploads the build it was given', async () => {
+    await buffer((await generate())._unsafeUnwrap());
 
     // The zip carries the two files written above, so a body this size cannot be an empty archive.
     expect(postedBodyBytes).to.be.greaterThan(100);
@@ -228,43 +154,15 @@ describe('PortalArtifactsService', () => {
       respondToStatus = statusBody({ status: 'GeneratingArtifacts' });
       const impatient = new PortalArtifactsService({ pollIntervalMs: 1, generationTimeoutMs: 15 });
 
-      const error = (
-        await impatient.generate(
-          source,
-          new DirectoryPath(fs.mkdtempSync(path.join(workDir, 'into-'))),
-          configDir,
-          metadata,
-          AUTH_KEY
-        )
-      )._unsafeUnwrapErr();
+      const error = (await impatient.generate(build, configDir, metadata, AUTH_KEY))._unsafeUnwrapErr();
 
       expect(error.code).to.equal(ServiceErrorCode.Timeout);
       expect(error.errorMessage).to.contain('Portal artifacts generation timed out');
     });
-
-    it('refuses a catalog for a language it cannot read, rather than leaving it out', async () => {
-      artifactsZip = await artifactsZipOf({ 'code-samples/cobol.json': JSON.stringify(CATALOG) });
-
-      expect((await generate())._unsafeUnwrapErr()).to.equal(ServiceError.InvalidResponse);
-    });
-
-    it('refuses a catalog that is not a catalog', async () => {
-      artifactsZip = await artifactsZipOf({ 'code-samples/csharp.json': '{ not json' });
-
-      expect((await generate())._unsafeUnwrapErr()).to.equal(ServiceError.InvalidResponse);
-    });
   });
 
   it('asks for an auth key it does not have rather than calling without one', async () => {
-    const error = (
-      await service.generate(
-        source,
-        new DirectoryPath(fs.mkdtempSync(path.join(workDir, 'into-'))),
-        configDir,
-        metadata,
-        null
-      )
-    )._unsafeUnwrapErr();
+    const error = (await service.generate(build, configDir, metadata, null))._unsafeUnwrapErr();
 
     expect(error.code).to.equal(ServiceErrorCode.UnAuthorized);
   });

@@ -1,11 +1,17 @@
+import { err, Result } from 'neverthrow';
 import { PortalProjectPaths, PortalProjectService } from '../../infrastructure/portal-project-service.js';
+import { ServiceError } from '../../infrastructure/service-error.js';
 import { PortalArtifactsService } from '../../infrastructure/services/portal-artifacts-service.js';
 import { withPortalProjectDirectory, withDirPath } from '../../infrastructure/tmp-extensions.js';
 import { PreparePortalProjectPrompts } from '../../prompts/portal/prepare-project.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
+import { FilePath } from '../../types/file/filePath.js';
+import { PortalArtifactsContext } from '../../types/portal-artifacts-context.js';
 import { PortalSourceContext } from '../../types/portal-source-context.js';
+import { PortalArtifacts, PortalArtifactsProblem } from '../../types/portal/portal-artifacts.js';
 import { PortalSource } from '../../types/portal/portal-source.js';
+import { TempContext } from '../../types/temp-context.js';
 import { ActionResult } from '../action-result.js';
 
 /**
@@ -36,15 +42,7 @@ export class PreparePortalProjectAction {
     // The artifacts live in this directory for as long as the caller needs them, so it wraps
     // everything that reads them rather than being opened and closed around the call.
     return await withDirPath(async (artifactsDirectory) => {
-      const artifacts = await this.prompts.generateArtifacts(
-        this.artifactsService.generate(
-          sourceDirectory,
-          artifactsDirectory,
-          this.configDir,
-          this.commandMetadata,
-          this.authKey
-        )
-      );
+      const artifacts = await this.prompts.generateArtifacts(this.fetchArtifacts(sourceDirectory, artifactsDirectory));
       if (artifacts.isErr()) {
         return ActionResult.failed();
       }
@@ -72,5 +70,25 @@ export class PreparePortalProjectAction {
         return await onPrepared(project.value, source.value);
       });
     });
+  };
+
+  // Unpacked under the same spinner as the call: the zip streams in after the response starts,
+  // so reading it off the wire is part of the wait.
+  private readonly fetchArtifacts = async (
+    sourceDirectory: DirectoryPath,
+    artifactsDirectory: DirectoryPath
+  ): Promise<Result<PortalArtifacts, ServiceError | PortalArtifactsProblem>> => {
+    let build: FilePath;
+    try {
+      build = await new TempContext(artifactsDirectory).zip(sourceDirectory);
+    } catch {
+      return err({ kind: 'sourceNotZipped' });
+    }
+
+    const zip = await this.artifactsService.generate(build, this.configDir, this.commandMetadata, this.authKey);
+    if (zip.isErr()) {
+      return err(zip.error);
+    }
+    return await new PortalArtifactsContext(artifactsDirectory).unpack(zip.value);
   };
 }

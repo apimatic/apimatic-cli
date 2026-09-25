@@ -5,16 +5,12 @@ import { AuthInfo, getAuthInfo } from '../../client-utils/auth-manager.js';
 import { REQUEST_TIMEOUT_MS } from '../../config/axios-config.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
-import { FileName } from '../../types/file/fileName.js';
 import { FilePath } from '../../types/file/filePath.js';
-import { CodeSampleCatalog, CodeSampleCatalogs } from '../../types/portal/code-samples.js';
 import {
   PortalArtifactsGenerationStatus,
   PortalArtifactsInitiatedResponse,
   PortalArtifactsStatusResponse
 } from '../../types/portal/generation-status.js';
-import { PortalArtifacts } from '../../types/portal/portal-artifacts.js';
-import { Language } from '../../types/sdk/generate.js';
 import { discardStreamBody } from '../../utils/utils.js';
 import { envInfo } from '../env-info.js';
 import { FileService } from '../file-service.js';
@@ -25,7 +21,6 @@ import {
   ValidationErrorFormatter
 } from '../generation-status-poller.js';
 import { mapRequestError, mapTransportError, ServiceError } from '../service-error.js';
-import { ZipService } from '../zip-service.js';
 
 const TIMING_DEFAULTS = {
   pollIntervalMs: STATUS_POLL_INTERVAL_MS,
@@ -38,17 +33,9 @@ const TIMING_DEFAULTS = {
 /** Overridable so tests are not paced by the production defaults; nothing else overrides them. */
 export type GenerationTimings = Partial<typeof TIMING_DEFAULTS>;
 
-/** The entries the portal artifacts zip is made of, as the endpoint lays them out. */
-const ARTIFACTS_ZIP = {
-  sdkDirectory: 'sdk',
-  codeSamplesDirectory: 'code-samples',
-  plugin: 'plugin.zip'
-} as const;
-
 export class PortalArtifactsService {
   private readonly apiBaseUrl = 'https://api.apimatic.io' as const;
   private readonly fileService = new FileService();
-  private readonly zipService = new ZipService();
   private readonly timings: typeof TIMING_DEFAULTS;
 
   constructor(timings: GenerationTimings = {}) {
@@ -57,32 +44,23 @@ export class PortalArtifactsService {
 
   /**
    * One run of `/portal-artifacts`: the SDKs, the code-sample catalogs and the context plugin,
-   * delivered as a single archive and unpacked into `into`.
+   * delivered as a single zip.
    *
-   * `source` is the `src/` directory, which is zipped and uploaded as the build. What the run
-   * produces is decided entirely by the `apimatic.json` inside it — the languages it names, and
-   * whether it carries a `plugin` block.
+   * `build` is the zipped `src/` directory. What the run produces is decided entirely by the
+   * `apimatic.json` inside it — the languages it names, and whether it carries a `plugin` block.
    */
   public async generate(
-    source: DirectoryPath,
-    into: DirectoryPath,
+    build: FilePath,
     configDir: DirectoryPath,
     commandMetadata: CommandMetadata,
     authKey: string | null
-  ): Promise<Result<PortalArtifacts, ServiceError>> {
+  ): Promise<Result<NodeJS.ReadableStream, ServiceError>> {
     const authInfo: AuthInfo | null = await getAuthInfo(configDir.toString());
     // `auth logout` blanks config.json rather than deleting it, so a logged-out user still has a
     // non-null AuthInfo with an empty key — check the key, not the object.
     const token = authKey || authInfo?.authKey;
     if (!token) {
       return err(ServiceError.unauthorizedWithHint(null));
-    }
-
-    const build = new FilePath(into, new FileName('build.zip'));
-    try {
-      await this.zipService.archive(source, build);
-    } catch {
-      return err(ServiceError.InvalidResponse);
     }
 
     const initiated = await this.initiateGeneration(build, commandMetadata, token);
@@ -101,12 +79,7 @@ export class PortalArtifactsService {
       return err(completed.error);
     }
 
-    const zip = await this.download(generationId, commandMetadata.shell, token);
-    if (zip.isErr()) {
-      return err(zip.error);
-    }
-
-    return await this.unpack(zip.value, into);
+    return await this.download(generationId, commandMetadata.shell, token);
   }
 
   private async initiateGeneration(
@@ -191,101 +164,6 @@ export class PortalArtifactsService {
       }
       return err(mapTransportError(error));
     }
-  }
-
-  /**
-   * The archive holds `sdk/<language>.zip`, `code-samples/<language>.json` and, when the config
-   * asked for one, `plugin.zip`. Everything is optional: a portal that declares no languages and
-   * no plugin is a valid run that delivers an empty zip.
-   */
-  private async unpack(
-    zip: NodeJS.ReadableStream,
-    into: DirectoryPath
-  ): Promise<Result<PortalArtifacts, ServiceError>> {
-    const archive = new FilePath(into, new FileName('portal-artifacts.zip'));
-    const contents = into.join('artifacts');
-
-    try {
-      await this.fileService.writeFile(archive, zip);
-      await this.fileService.createDirectoryIfNotExists(contents);
-      await this.zipService.unArchive(archive, contents);
-    } catch {
-      return err(ServiceError.InvalidResponse);
-    }
-
-    const codeSampleCatalogs = await this.readCodeSampleCatalogs(contents.join(ARTIFACTS_ZIP.codeSamplesDirectory));
-    if (codeSampleCatalogs.isErr()) {
-      return err(codeSampleCatalogs.error);
-    }
-
-    const plugin = new FilePath(contents, new FileName(ARTIFACTS_ZIP.plugin));
-
-    return ok(
-      new PortalArtifacts(
-        codeSampleCatalogs.value,
-        await this.readSdks(contents.join(ARTIFACTS_ZIP.sdkDirectory)),
-        (await this.fileService.fileExists(plugin)) ? plugin : undefined
-      )
-    );
-  }
-
-  /**
-   * Keyed by the delivered file's stem rather than parsed into `Language`, so a language the
-   * server adds before this CLI models it is still placed rather than dropped.
-   */
-  private async readSdks(directory: DirectoryPath): Promise<ReadonlyMap<string, FilePath>> {
-    if (!(await this.fileService.directoryExists(directory))) {
-      return new Map();
-    }
-
-    const sdks = new Map<string, FilePath>();
-    for (const fileName of await this.fileService.getFileNames(directory)) {
-      const name = fileName.toString();
-      if (name.endsWith('.zip')) {
-        sdks.set(name.slice(0, -'.zip'.length), new FilePath(directory, fileName));
-      }
-    }
-    return sdks;
-  }
-
-  /**
-   * A catalog this CLI cannot read is an error rather than an omission: silently dropping one
-   * would publish a portal missing the samples for a language the user asked for, and say nothing.
-   */
-  private async readCodeSampleCatalogs(directory: DirectoryPath): Promise<Result<CodeSampleCatalogs, ServiceError>> {
-    if (!(await this.fileService.directoryExists(directory))) {
-      return ok(new CodeSampleCatalogs([]));
-    }
-
-    const languages = Object.values(Language) as string[];
-    const catalogs: CodeSampleCatalog[] = [];
-
-    for (const fileName of await this.fileService.getFileNames(directory)) {
-      const name = fileName.toString();
-      if (!name.endsWith('.json')) {
-        continue;
-      }
-
-      const language = name.slice(0, -'.json'.length);
-      if (!languages.includes(language)) {
-        return err(ServiceError.InvalidResponse);
-      }
-
-      let json: unknown;
-      try {
-        json = JSON.parse(await this.fileService.getContents(new FilePath(directory, fileName)));
-      } catch {
-        return err(ServiceError.InvalidResponse);
-      }
-
-      const catalog = CodeSampleCatalog.fromJson(language as Language, json);
-      if (!catalog) {
-        return err(ServiceError.InvalidResponse);
-      }
-      catalogs.push(catalog);
-    }
-
-    return ok(new CodeSampleCatalogs(catalogs));
   }
 
   private axiosInstance(shell: string, apiKey: string) {

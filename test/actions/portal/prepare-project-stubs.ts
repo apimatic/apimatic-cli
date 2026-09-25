@@ -1,3 +1,4 @@
+import { Readable } from 'stream';
 import { ok } from 'neverthrow';
 import sinon from 'sinon';
 import { PortalProjectService } from '../../../src/infrastructure/portal-project-service';
@@ -5,10 +6,12 @@ import { PortalArtifactsService } from '../../../src/infrastructure/services/por
 import { PreparePortalProjectPrompts } from '../../../src/prompts/portal/prepare-project';
 import { FileName } from '../../../src/types/file/fileName';
 import { FilePath } from '../../../src/types/file/filePath';
+import { PortalArtifactsContext } from '../../../src/types/portal-artifacts-context';
 import { PortalArtifacts } from '../../../src/types/portal/portal-artifacts';
 
 export interface PreparePortalProjectStubs {
   prompts: sinon.SinonStubbedInstance<PreparePortalProjectPrompts>;
+  service: sinon.SinonStub;
   artifacts: sinon.SinonStub;
   runtimeProblem: sinon.SinonStub;
   prepare: sinon.SinonStub;
@@ -25,7 +28,8 @@ export function stubPreparePortalProject(): PreparePortalProjectStubs {
 
   return {
     prompts,
-    artifacts: sinon.stub(PortalArtifactsService.prototype, 'generate').resolves(ok(PortalArtifacts.none())),
+    service: sinon.stub(PortalArtifactsService.prototype, 'generate').resolves(ok(Readable.from([]))),
+    artifacts: sinon.stub(PortalArtifactsContext.prototype, 'unpack').resolves(ok(PortalArtifacts.none())),
     runtimeProblem: sinon.stub(PortalProjectService.prototype, 'runtimeProblem').returns(null),
     prepare: sinon
       .stub(PortalProjectService.prototype, 'prepare')

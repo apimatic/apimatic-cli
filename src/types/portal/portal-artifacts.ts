@@ -6,8 +6,8 @@ import { CodeSampleCatalogs } from './code-samples.js';
  * are in memory because the build merges them into a copy of each spec; the SDKs and the plugin
  * are still files, because placing them is copying them.
  *
- * The paths point inside the directory the caller handed to `generate`, so they live exactly as
- * long as that directory does.
+ * The paths point inside the directory `PortalArtifactsContext` unpacked into, so they live exactly
+ * as long as that directory does.
  */
 export class PortalArtifacts {
   public constructor(

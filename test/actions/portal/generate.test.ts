@@ -80,13 +80,21 @@ describe('GenerateAction', () => {
   });
 
   it('fails without building when the artifacts cannot be generated', async () => {
-    shared.artifacts.resolves(err(ServiceError.ServerError));
+    shared.service.resolves(err(ServiceError.ServerError));
 
     const result = await execute();
 
     expect(result.isFailed()).to.be.true;
     expect(build.called).to.be.false;
     expect(fs.existsSync(portalDirectory.toString())).to.be.false;
+  });
+
+  it('fails without calling the service when the source directory cannot be zipped for upload', async () => {
+    const result = await execute(new DirectoryPath(root).join('missing', 'src'));
+
+    expect(result.isFailed()).to.be.true;
+    expect(shared.service.called).to.be.false;
+    expect(build.called).to.be.false;
   });
 
   it("builds from the user's own specs, handing the project their code samples", async () => {
