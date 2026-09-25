@@ -30,7 +30,7 @@ export class ProjectContext {
    * Appends what is missing and rewrites nothing. A project may already have a `.gitignore` the
    * user wrote, and a run that adds no entry leaves the file untouched.
    */
-  public async ignoreGeneratedFiles(): Promise<void> {
+  public async upsertGitignore(): Promise<void> {
     const existing = (await this.fileService.fileExists(this.gitignore))
       ? await this.fileService.getContents(this.gitignore)
       : '';

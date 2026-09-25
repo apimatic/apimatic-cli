@@ -173,24 +173,17 @@ export class PortalQuickstartAction {
         return ActionResult.cancelled();
       }
 
-      // Recorded before anything is built: `apimatic.json` is what says which SDKs the portal
-      // documents and what names its plugin, and every command after this one reads it rather
-      // than the answers. The identity is derived, never asked: quickstart has two questions and
-      // neither of them is about plugins.
-      const configContext = new PluginConfigContext(sourceDirectory);
-      const recorded = await configContext
-        .recordLanguages(selection)
-        .then(async (languages) =>
-          languages.isErr() ? languages : await configContext.upsertMetadata(deriveMetadata(inputDirectory.leafName()))
-        );
-      if (recorded.isErr()) {
+      const pluginConfig = new PluginConfigContext(sourceDirectory);
+      const languagesRecorded = await pluginConfig.recordLanguages(selection);
+      const pluginConfigRecorded = languagesRecorded.isErr()
+        ? languagesRecorded
+        : await pluginConfig.upsertMetadata(deriveMetadata(inputDirectory.leafName()));
+      if (pluginConfigRecorded.isErr()) {
         this.prompts.configNotWritten();
         return ActionResult.failed();
       }
 
-      // Written while the project is being made, because the files it names are generated on
-      // every build from here on and none of them belongs in a repository.
-      await new ProjectContext(inputDirectory).ignoreGeneratedFiles();
+      await new ProjectContext(inputDirectory).upsertGitignore();
 
       const structure = await this.fileService.getDirectory(sourceDirectory);
       this.prompts.printDirectoryStructure(inputDirectory, structure);

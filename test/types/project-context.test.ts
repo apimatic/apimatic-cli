@@ -5,12 +5,12 @@ import { expect } from 'chai';
 import { DirectoryPath } from '../../src/types/file/directoryPath';
 import { ProjectContext } from '../../src/types/project-context';
 
-describe('ProjectContext.ignoreGeneratedFiles', () => {
+describe('ProjectContext.upsertGitignore', () => {
   let root: string;
 
   const gitignorePath = () => path.join(root, '.gitignore');
   const gitignore = () => fs.readFileSync(gitignorePath(), 'utf8');
-  const ignore = async () => await new ProjectContext(new DirectoryPath(root)).ignoreGeneratedFiles();
+  const ignore = async () => await new ProjectContext(new DirectoryPath(root)).upsertGitignore();
 
   beforeEach(() => {
     root = fs.mkdtempSync(path.join(os.tmpdir(), 'project-context-'));
