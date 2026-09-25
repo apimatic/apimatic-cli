@@ -59,6 +59,18 @@ describe('tabsTransformer', () => {
     page('tutorials/errors.mdx', 'Errors'),
     meta('tutorials/nav.json', { title: 'Tutorials', root: true })
   ];
+  /** What the CLI writes, each folder titled by its nav.json whatever its index page says. */
+  const SDKS = [
+    page('sdks/index.mdx', 'All the SDKs'),
+    page('sdks/typescript.mdx', 'TypeScript'),
+    page('sdks/python.mdx', 'Python'),
+    meta('sdks/nav.json', { title: 'SDKs', pages: ['typescript', 'python'] })
+  ];
+  const PLUGIN = [
+    page('context-plugin/index.mdx', 'Install the plugin'),
+    meta('context-plugin/nav.json', { title: 'Context Plugin' })
+  ];
+  const GENERATED = [...SDKS, ...PLUGIN];
 
   it('makes every top-level node part of exactly one tab, each a root folder', () => {
     const tree = treeOf({ docs: [...CONTENT, ...TUTORIALS], openapi: API });
@@ -82,16 +94,44 @@ describe('tabsTransformer', () => {
     expect(tabNames({ docs: CONTENT, openapi: API })).to.deep.equal(['Home', 'Guides', 'API Reference']);
   });
 
-  it('keeps the SDKs tab before the API reference when neither token is named', () => {
-    const generated = [page('sdks.mdx', 'SDKs page')];
-
-    expect(tabNames({ docs: CONTENT, generated, openapi: API })).to.deep.equal([
+  it('keeps the generated tabs before the API reference, SDKs first, when no token is named', () => {
+    expect(tabNames({ docs: CONTENT, generated: GENERATED, openapi: API })).to.deep.equal([
       'Home',
       'Guides',
       'SDKs',
+      'Context Plugin',
       'API Reference'
     ]);
-    expect(tabsOf({ docs: CONTENT, generated, openapi: API }).SDKs).to.deep.equal(['SDKs page']);
+  });
+
+  // The label is the CLI's, from the folder's nav.json, and the index page opens the tab.
+  it('makes each generated folder a tab named by its nav.json, listing its index page first', () => {
+    const tabs = tabsOf({ docs: CONTENT, generated: GENERATED, openapi: API });
+
+    expect(tabs.SDKs).to.deep.equal(['All the SDKs', 'TypeScript', 'Python']);
+    expect(tabs['Context Plugin']).to.deep.equal(['Install the plugin']);
+    expect(
+      portalTabs(treeOf({ docs: CONTENT, generated: GENERATED, openapi: API })).map((each) => [each.title, each.url])
+    ).to.deep.include.members([
+      ['SDKs', '/sdks'],
+      ['Context Plugin', '/context-plugin']
+    ]);
+  });
+
+  it('places each generated tab where its token puts it', () => {
+    const docs = [
+      ...CONTENT,
+      meta('nav.json', { pages: ['index', 'apimatic:plugin', 'apimatic:api', 'apimatic:sdks'] })
+    ];
+
+    // The unnamed page joins the named one before it, so Guides follows Home.
+    expect(tabNames({ docs, generated: GENERATED, openapi: API })).to.deep.equal([
+      'Home',
+      'Guides',
+      'Context Plugin',
+      'API Reference',
+      'SDKs'
+    ]);
   });
 
   // The home page opens the site whatever order the rest of the file sets.
@@ -132,17 +172,22 @@ describe('tabsTransformer', () => {
     expect(tabNames({ docs, openapi: API })).to.deep.equal(['Home', 'Tutorials', 'API Reference']);
   });
 
-  it('makes no SDKs tab while nothing is generated', () => {
-    expect(tabNames({ docs: CONTENT, openapi: API })).to.not.include('SDKs');
+  it('makes no tab for a section that is not generated', () => {
+    expect(tabNames({ docs: CONTENT, openapi: API })).to.deep.equal(['Home', 'Guides', 'API Reference']);
+    expect(tabNames({ docs: CONTENT, generated: SDKS, openapi: API })).to.deep.equal([
+      'Home',
+      'Guides',
+      'SDKs',
+      'API Reference'
+    ]);
   });
 
   // Matching tabs to folders goes by id on the client, after the tree has been serialised.
   it('gives the tabs no folder backs fixed ids', () => {
-    const generated = [page('sdks.mdx', 'SDKs page')];
-    const ids = treeOf({ docs: CONTENT, generated, openapi: API }).children.map((child) => child.$id);
+    const ids = treeOf({ docs: CONTENT, generated: GENERATED, openapi: API }).children.map((child) => child.$id);
 
-    expect(ids.slice(0, 3)).to.deep.equal(['/tab/home', '/tab/guides', '/tab/sdks']);
-    expect(ids[3]).to.not.match(/^\/tab\//);
+    expect(ids.slice(0, 2)).to.deep.equal(['/tab/home', '/tab/guides']);
+    expect(ids.slice(2).filter((id) => id?.startsWith('/tab/'))).to.be.empty;
   });
 
   // Fumadocs ids a folder by its path, so a directory could be named after an id that was.
@@ -164,7 +209,7 @@ describe('tabsTransformer', () => {
       page('tutorials/overview.mdx', 'Overview'),
       page('api/overview.mdx', 'API overview')
     ];
-    const tree = treeOf({ docs, openapi: API });
+    const tree = treeOf({ docs, generated: GENERATED, openapi: API });
     const reading = flattenTree(tab(tree, 'Tutorials').children).find((node) => node.url === '/tutorials/overview');
 
     for (const other of tree.children) {
@@ -186,12 +231,19 @@ describe('tabsTransformer', () => {
       page('guides/intro.mdx', 'Intro'),
       page('api/index.mdx', 'Reference')
     ];
-    const generated = [page('sdks.mdx', 'SDKs page')];
-    const tree = treeOf({ docs, generated, openapi: API });
+    const tree = treeOf({ docs, generated: GENERATED, openapi: API });
     const tabs = portalTabs(tree);
 
     const urls = flattenTree(tree.children).map((node) => node.url);
-    expect(urls).to.include.members(['/', '/tutorials', '/tutorials/deep/more', '/api/petstore/pet/addPet', '/sdks']);
+    expect(urls).to.include.members([
+      '/',
+      '/tutorials',
+      '/tutorials/deep/more',
+      '/api/petstore/pet/addPet',
+      '/sdks',
+      '/sdks/typescript',
+      '/context-plugin'
+    ]);
     for (const url of urls) {
       const active = tabs.filter((each) => isLayoutTabActive(each, url)).map((each) => each.title);
       expect(active, url).to.have.lengthOf(1);

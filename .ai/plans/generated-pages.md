@@ -1,11 +1,12 @@
 # Plan: the generated SDK and context plugin pages
 
 Status: designed 2026-09-24 and committed on `saeedjamshaid/portal-config` so it
-travels with PR #355, which it builds on. **Not started.** Implementation begins
-on a branch cut from `dev` once #355 merges (section 12). The questions asked
-and answered the same day are recorded in section 2, section 14 records
-what an adversarial review of the first draft changed, and section 15 records
-the later decision to give the context plugin page a tab of its own.
+travels with PR #355, which it builds on. **Implemented 2026-09-24** on
+`saeedjamshaid/generated-pages`, PR #360, stacked on #355 (section 12); every
+step of section 13 is done. The questions asked and answered the same day are recorded in
+section 2, section 14 records what an adversarial review of the first draft
+changed, section 15 records the later decision to give the context plugin page
+a tab of its own, and section 16 what the step 1 spike changed.
 
 Follows on from `.ai/plans/portal-navigation.md`, whose section 4 specified "the
 injected SDK page" and whose section 11 deferred its shape, and from
@@ -58,13 +59,13 @@ gains no key; and quickstart, which writes nothing new.
 | Tokens | `apimatic:sdks` positions the SDKs tab and `apimatic:plugin` the Context Plugin tab; each claims its own section's folder, `sdks` and `context-plugin`. The token takes the word the `apimatic.json` block and the `apimatic plugin` commands use, which is what the portal's author writes; the address takes the product's name, which is what the portal's readers see. Both are accepted in the root `nav.json` whether or not the page exists, as `apimatic:sdks` is in #355 while nothing is generated, so removing the `plugin` block never forces an edit to `nav.json` as well. |
 | Default position | An unnamed section collects at today's anchor, before the API reference and after the user's pages, in a fixed order: SDKs, then Context Plugin. Fumadocs orders the root's folders by path, which would put `context-plugin` first, so the transformer orders the band itself. No `nav.json` at all gives Home, Guides, SDKs, Context Plugin, API Reference. |
 | Tab labels | "SDKs" and "Context Plugin", fixed, as portal-config section 2 decided for the tabs the CLI names. Set by `title` in each folder's generated `nav.json`, which the transformer already applies to any folder below the root, so the labels are the CLI's whatever the design team titles the index pages. |
-| Plugin page condition | The `plugin` key holds a JSON object, which is what `ApimaticConfigDocument.plugin()` answers; a bare `{}` counts. Nothing in the block is read or checked: the backend validates the file on the coming `portal generate` call and refuses an empty or invalid block, so a malformed block here is treated as absent and left to that call. |
+| Plugin page condition | The `plugin` key holds a JSON object, which is what `ApimaticConfigDocument.plugin()` answers; a bare `{}` counts. Nothing in the block is read or checked: the backend validates the file on the coming `portal generate` call and refuses an empty or invalid block, so an object gets the page whatever it holds, a malformed `pluginId` included, and is left to that call. Only a `plugin` key that is not an object is treated as absent. |
 | Language order | As written in the `languages` block. `sdk publish` appends, and the user reorders by editing the file. |
-| Reserved addresses | `/sdks` and `/context-plugin`, each with everything below it, are the CLI's. A content page whose slugs begin with either name is refused by `PortalSourceContext.resolve()` naming each file: `content/sdks.md`, `content/sdks.mdx`, anything under `content/sdks/`, the same for `context-plugin`, and the same behind a `(group)` folder, which the content source drops from the address (`getSlugs('(intro)/sdks.mdx')` is `['sdks']`). Two pages at one address are settled without a word by whichever source was scanned last (portal-navigation, section 10). `/context-plugin` is reserved with or without a `plugin` block, so adding the block never starts refusing a page that built the day before. A root `nav.json` entry `sdks` or `context-plugin` is refused as today, with a hint naming the token, and so is `plugin` when no page of that name exists, since the token invites the guess. |
+| Reserved addresses | `/sdks` and `/context-plugin`, each with everything below it, are the CLI's. A content page whose slugs begin with either name is refused by `PortalSourceContext.resolve()` naming each file: `content/sdks.md`, `content/sdks.mdx`, anything under `content/sdks/`, the same for `context-plugin`, and the same behind a `(group)` folder, which the content source drops from the address (`getSlugs('(intro)/sdks.mdx')` is `['sdks']`). Without the refusal, two pages at one address would fail the build with Fumadocs' opaque `Duplicated slugs` error, or, when one of them is an index page, move it to `…/index` without a word (the slugs plugin of `fumadocs-core@16.15.8`, read on 2026-09-24). `/context-plugin` is reserved with or without a `plugin` block, so adding the block never starts refusing a page that built the day before. A root `nav.json` entry `sdks` or `context-plugin` is refused as today, with a hint naming the token, and so is `plugin` when no page of that name exists, since the token invites the guess. |
 | Templates | Three `.mdx` files in a new top-level `portal-pages/` directory, shipped in the npm package beside `portal-template/`. Dynamic text is `{{key}}`. A renderer of a few lines substitutes flat string keys and refuses an unknown or unfilled key, so a template and its data cannot drift silently. No dependency today; mustache, whose `{{key}}` is the same, is adopted when the real templates need sections (section 10). Rendering happens before MDX compilation, so the braces never reach MDX. |
 | Data today | `sdks.mdx` and `context-plugin.mdx` take `{}`. `sdk.mdx` takes `{ language, name }`, the enum value and a display name, so the per-language pages have distinct titles and sidebar rows. Everything else waits for the backend data. |
-| Display names | A `Record<Language, string>` beside `GeneratedPages`: `csharp` C#, `go` Go, `java` Java, `php` PHP, `python` Python, `ruby` Ruby, `typescript` TypeScript. `LANGUAGE_CHOICES` in `src/types/sdk/generate.ts` spells "Typescript" for the quickstart prompt and is left alone. |
-| `portal serve` | The watcher that re-applies the `portal` block also regenerates the pages: a language added or removed, or the `plugin` block added or removed, rewrites `generated/` (changed files written, stale files and emptied directories deleted) and Vite reloads, so the Context Plugin tab appears and disappears with the block. The generated directory sits inside the Vite root, which Vite watches, unlike the user's content directory, whose additions need a restart today; whether an added or removed page or folder reaches the tree without a restart is the first thing implementation verifies (section 13, step 1). If it does not, the serve notice names the case among the edits that need a restart, and the rewritten index page and `nav.json` still reload. |
+| Display names | One `Record<Language, string>`, `LANGUAGE_NAMES` in `src/types/sdk/generate.ts`: `csharp` C#, `go` Go, `java` Java, `php` PHP, `python` Python, `ruby` Ruby, `typescript` TypeScript. First written beside `GeneratedPages`, with `LANGUAGE_CHOICES` left spelling "Typescript" for the quickstart prompt; the review of PR #360 had the two tables made one, so the prompt's labels are read from it and say "TypeScript" too. |
+| `portal serve` | The watcher that re-applies the `portal` block also regenerates the pages: a language added or removed, or the `plugin` block added or removed, rewrites `generated/` (changed files written, stale files and emptied directories deleted) and Vite reloads, so the Context Plugin tab appears and disappears with the block. Step 1 found that an edited generated file reaches the preview on its own but an added or removed one does not, and that a removed one fails every request until a restart (section 16). A serve-only Vite plugin in the template makes adds and removes reach it as edits do (section 4), so no case needs a restart. |
 | Prerender | `prerender-pages.ts` enumerates the generated directory as it enumerates the content directory. `portal.config.json` gains `generatedDir`, absolute and server-only, as `contentDir` is. |
 | Backend data | Not in this PR. `portal generate` will call the backend, which validates `apimatic.json` and answers with what the pages show; `GeneratedPages.of(...)` is where that answer lands (section 10). |
 
@@ -198,7 +199,10 @@ Rules the renderer holds them to, which the design team's pages inherit:
   and the key; a key the template does not use is fine.
 - Nothing else between double braces is accepted yet, so a section such as
   `{{#languages}}` is refused today rather than written through as text; it
-  arrives with mustache (section 10).
+  arrives with mustache (section 10). That includes a JSX object written
+  straight inside an expression, `style={{ color: 'red' }}`: the refusal says
+  to write it `style={ { color: 'red' } }`, which is the same JSX. The
+  template's own components style with Tailwind classes, so the case is rare.
 - Values are written as they are, with no escaping. When mustache is adopted,
   it is configured not to HTML-escape either, so `{{key}}` keeps its meaning
   and no template needs `{{{key}}}`.
@@ -271,11 +275,36 @@ through `source.getPages()` and need nothing.
 
 ### Tailwind
 
-`app.css` gains `@source '../../generated';`, written as the existing
-`@source not '../../dist';` is, relative to `src/styles/`. Tailwind's automatic
-detection is rooted at the project and would likely find the directory on its
-own, but the content directory's line exists for a reason that reads the same
-here, and a fixed relative path costs nothing.
+Nothing changes. Tailwind's automatic detection is rooted at the project and
+scans `generated/` as it scans `src/`, which step 1 confirmed in a plain
+directory and in one whose `.gitignore` is `*`, as the cross-drive
+`.apimatic-build/` fallback's is (section 16). `app.css` names the content
+directory with `@source` only because that directory lies outside the project.
+
+### Adding and removing pages under `portal serve`
+
+fumadocs-mdx's macro expands each collection into a glob of imports. Under
+`vite dev` an edit to a file the glob found reloads the server's modules, but
+the glob itself is not expanded again when a file is added or removed, so an
+added page never appears and a removed one leaves an import of a missing file
+that fails every request with a 500 until a restart (step 1, section 16).
+
+A small Vite plugin, `generatedPagesReload()` in a new
+`portal-template/generated-pages-reload.ts`, registered in `vite.config.ts` and
+applied under `serve` only, closes the gap: when the
+watcher reports an `add` or `unlink` of a page or `nav.json` under
+`<root>/generated/`, or an `unlinkDir` there, it emits a `change` for
+`<root>/src/lib/source.ts`. The temporary file each page is written through
+(below) is not one the collection reads, so it sets off nothing. Vite handles that as an edit to
+the module that declares the collections: it transforms it again, which
+expands the glob afresh, and reloads the server's program. Step 1 ran exactly
+this: a page added, a page removed, a folder removed and a folder added each
+reached the tree within half a second, with no failed request.
+
+The user's content directory has the same limitation today and is left alone.
+It lies outside the Vite root, which is all the watcher covers besides the
+files already imported, so a fix there would also have to add the directory to
+the watcher; that is a change of its own.
 
 ### Prerender
 
@@ -355,7 +384,9 @@ two together.
   `'openapi'` versus the two Markdown collections, and the collection carried
   in the loader's answer.
 - `portal-config.ts` and `prerender-pages.ts`: `generatedDir`.
-- `src/styles/app.css`: the second `@source` line.
+- `generated-pages-reload.ts` (new) and `vite.config.ts`: the serve-only plugin
+  that turns an add or remove under `generated/` into an edit to
+  `src/lib/source.ts`.
 
 No new dependency, so `TEMPLATE_DEPENDENCIES` is unchanged.
 
@@ -373,47 +404,53 @@ Following `.ai/instructions.md` and the skills in `.ai/skills/`.
   template it uses and its data; and each section's `nav.json` text. Exports
   the sections, each with its name, its token and the words a message uses
   for it (`sdks`, `apimatic:sdks`, "the SDK pages"; `context-plugin`,
-  `apimatic:plugin`, "the context plugin page"), the template names
-  and the display-name table. The sections are the one list the reserved
-  addresses, the tokens and the hints are read from, so a third section, such
-  as the AI one portal-config expects, is one entry. The languages come from
-  `PortalLanguages.all()`, which keeps the block's key order.
+  `apimatic:plugin`, "the context plugin page") and the template names; the
+  display names are `LANGUAGE_NAMES` in `src/types/sdk/generate.ts`. The
+  sections are the one list the reserved addresses, the tokens and the hints
+  are read from, so a third section, such as the AI one portal-config
+  expects, is one entry. The languages come from `PortalLanguages.all()`,
+  which keeps the block's key order.
 - **`PortalSource`** gains `generatedPages: GeneratedPages`, computed in
-  `PortalSourceContext.parseConfig` from the `PortalLanguages` it already
-  builds and discards, and from `document.plugin() !== undefined`. What
-  `resolveConfig` answers for the watcher widens from `PortalConfig` to the
-  pair of `config` and `generatedPages` (a `PortalSettings` type in
-  `portal-source.ts`), so a `languages` edit under `portal serve` reaches the
-  generator by the same path a `portal` edit reaches the identity file. Every
-  `PortalSource` literal in the tests, and the `resolveConfig` stub in
-  `test/actions/portal/serve.test.ts`, gains the field.
+  `PortalSourceContext.parseSettings` (formerly `parseConfig`) from the
+  `PortalLanguages` it already builds and discards, and from
+  `document.plugin() !== undefined`. `PortalSource` extends a new
+  `PortalSettings`, the pair of `config` and `generatedPages`, and what the
+  watcher calls widens to answer it: `resolveConfig` becomes
+  `resolveSettings`, so a `languages` edit under `portal serve` reaches the
+  generator by the same path a `portal` edit reaches the identity file. The
+  `PortalSource` literal in the project-service tests and the stub in
+  `test/actions/portal/serve.test.ts` follow.
 - **Reserved addresses.** `resolve()` walks the content tree already; from the
-  pages it collects, it takes each one's path segments with `(group)` folders
-  dropped, as `getSlugs` drops them, and refuses every page whose first
-  segment is a section's name, or whose only segment is that name with `.md`
-  or `.mdx`, as a new `PortalSourceProblem` variant, `{ kind:
-  'reservedAddress'; name: string; files: FilePath[] }`, one per name, before
-  the navigation scan. `reportSourceProblem` names each file relative to
-  `src/` and says which generated page the address is kept for. A `nav.json`
-  alone under `content/sdks/` or `content/context-plugin/` is not a page and is
-  left to the walk, which already treats a directory with no page as no
-  folder.
+  pages it collects, it computes each one's slugs as `getSlugs` does (`(group)`
+  folders dropped, an `index` page at its folder's address) and refuses every
+  page whose first slug is a section's folder, before the navigation scan. One
+  `PortalSourceProblem` carries them all, `{ kind: 'reservedAddresses'; pages:
+  { file, address, section }[] }`, since `resolve` answers with one problem;
+  `reportSourceProblem` lists each file relative to `src/`, where it would be
+  served, the section's address when that differs, and what it is kept for. A
+  `nav.json` alone under `content/sdks/` or `content/context-plugin/` is not a
+  page and is left to the walk, which already treats a directory with no page
+  as no folder.
 - **Tokens.** `PortalNavigation` accepts `apimatic:plugin` beside
   `apimatic:sdks` and `apimatic:api`, at the content root only, with or
   without a `plugin` block, and the unknown-token message lists all three.
   `INJECTED_PAGES_TOKEN` gives way to the sections' tokens.
 - **Navigation hints.** `PortalNavigation.suggestion` answers an entry of
-  `sdks` at the content root with "The SDK pages are positioned with
-  'apimatic:sdks'." and one of `context-plugin` or `plugin` with "The context
-  plugin page is positioned with 'apimatic:plugin'.", as it answers `api` with
-  the API token. `plugin` is the guess the token invites, and is answered only
+  `sdks` at the content root with "'apimatic:sdks' positions the SDK pages."
+  and one of `context-plugin` or `plugin` with "'apimatic:plugin' positions
+  the context plugin page.", as it answers `api` with the API token; the
+  sentence puts the token first so its verb agrees whatever the section. `plugin` is the guess the token invites, and is answered only
   when no page of that name exists, since `/plugin` is not reserved. The
   entries stay refused; only the hints are new.
 - **`PortalPagesService`** (`src/infrastructure/portal-pages-service.ts`):
-  reads the three templates from `portal-pages/` once, renders a
-  `GeneratedPages` and writes it under a given directory. Each file is written
-  only when its contents differ, files the plan no longer names are deleted
-  with any directory they leave empty (the plugin's, when the block goes),
+  reads the templates a `GeneratedPages` needs from `portal-pages/`, each once
+  per write, renders it and writes it under a given directory. Each file is
+  written only when its contents differ, and replaced whole, written beside
+  itself and renamed over, since the dev server watching the directory could
+  otherwise read it half-written (the rule #355's review set for the
+  appearance files, 2026-09-24). Files and section folders the
+  pages no longer call for are deleted (the plugin's folder, when the block
+  goes),
   and the answer says whether anything changed, which is the same contract
   `applyConfig` has for the appearance files. A missing templates directory or
   a rendering failure is a `Result` error with a message, never a throw. The
@@ -429,9 +466,8 @@ Following `.ai/instructions.md` and the skills in `.ai/skills/`.
 - **`PortalServeAction.watchConfig`**: passes the pair through; `PreviewConfig`
   keeps taking the `PortalConfig` half. The serve notice says that adding or
   removing a language updates the SDK pages and that adding or removing the
-  `plugin` block adds or removes the Context Plugin tab, or names either case
-  as needing a restart if step 1 finds Vite does not pick up the change
-  (section 13).
+  `plugin` block adds or removes the Context Plugin tab, both without a
+  restart (section 4).
 - **Packaging.** `portal-pages` joins `files` in `package.json`.
 - **Prompts and copy.** The `portal generate` and `portal serve` descriptions
   say the portal carries generated SDK and context plugin pages; the README's
@@ -452,12 +488,13 @@ Nothing changes in `apimatic.schema.json`, `PortalConfig`, `PortalLanguages`,
   the SDKs order file with its title; several keep the block's order; the
   `context-plugin/` folder, its index and its titled `nav.json` appear only
   with a `plugin` block, and nothing about the plugin lands under `sdks/`;
-  each language's display name; every template name it uses exists in
-  `portal-pages/`, and each placeholder renders with the data the plan gives
-  it (the one test that holds the templates and the generator together); the
-  sections and their tokens are the ones `navigation.ts` exports, imported
-  from the template as the template units import it (the one test that holds
-  the CLI and the transformer together).
+  each language's display name. That every template it names ships in
+  `portal-pages/`, and nothing else does, is checked in
+  `portal-template.test.ts`; that each renders with the data it is given,
+  every language and the plugin included, in the `PortalPagesService` tests.
+  That the sections and their tokens are the ones `navigation.ts` exports is
+  checked in `test/portal-template/navigation.test.ts`, beside the existing
+  cases holding the token vocabulary both halves share.
 - `PortalSourceContext`: `generatedPages` carries the block's languages in
   order and the plugin section only with the block; `content/sdks.md`,
   `content/sdks.mdx`, a page under `content/sdks/`, `content/(intro)/sdks.md`,
@@ -466,7 +503,9 @@ Nothing changes in `apimatic.schema.json`, `PortalConfig`, `PortalLanguages`,
   `content/context-plugin.md` refused with no `plugin` block too; a `nav.json`
   alone under either directory not refused; an `sdks`, `context-plugin` or
   `plugin` entry in the root `nav.json` refused with its token hint, and a
-  `plugin` entry that names a user's `content/plugin.md` accepted.
+  `plugin` entry that names a user's `content/plugin.md` accepted; and the
+  plugin section carried for a block whose `pluginId` and `pluginVersion` the
+  plugin commands would refuse.
 - `PortalNavigation` (`test/types/portal/portal-navigation.test.ts`):
   `apimatic:plugin` accepted at the content root and refused below it,
   as the other two tokens are; the unknown-token message, asserted in full
@@ -505,9 +544,14 @@ Nothing changes in `apimatic.schema.json`, `PortalConfig`, `PortalLanguages`,
   exactly one tab active on every page, `/sdks`, `/sdks/typescript` and
   `/context-plugin` among them. In `prerender-pages.test.ts`: the generated
   directory's pages and their `.md` twins are listed, and the config literal
-  gains `generatedDir`.
+  gains `generatedDir`. In a new `generated-pages-reload.test.ts`, over a fake
+  watcher: an `add`, an `unlink` and an `unlinkDir` under `generated/` each
+  emit one `change` for `src/lib/source.ts`; the same events elsewhere in the
+  project, and a `change` under `generated/`, emit nothing; the plugin applies
+  under `serve` only.
 - `portal-template.test.ts`: `source.ts` declares the generated collection
-  over the relative literal `'generated'`; `generated/` and its files among
+  over the relative literal `'generated'`; `vite.config.ts` registers the
+  reload plugin; `generated/` and its files among
   what the template does not ship; `portal-pages` listed in `files` and every
   template packed.
 - End to end (`test/e2e/portal-build.test.ts`): the default fixture's root
@@ -525,7 +569,7 @@ Nothing changes in `apimatic.schema.json`, `PortalConfig`, `PortalLanguages`,
   Plugin first. The existing sidebar-order and tab-order assertions gain the
   SDKs entries.
 
-## 9. Verified, and to verify
+## 9. Verified
 
 Read from the pinned `fumadocs-mdx@15.4.0`, `fumadocs-core@16.15.8` and
 `vite@8.2.2` on 2026-09-24, and from portal-navigation section 10 where marked:
@@ -561,25 +605,35 @@ Read from the pinned `fumadocs-mdx@15.4.0`, `fumadocs-core@16.15.8` and
   `navigation.ts`: `api` sorts above a user folder named later in the
   alphabet). Left to it, `context-plugin` would sit above `sdks`.
 
-To verify in step 1, against a running dev server and a real build, before
-anything is built on it:
+**Ran in step 1** (2026-09-24), on the default fixture prepared by
+`PortalProjectService`, with the collection, the loader source, the `$.tsx`
+and `llms.server.ts` split, `generatedDir` and its prerender loop made by hand
+in the prepared project, and a generated `sdks/` (index, a language page with
+an arbitrary Tailwind class, titled `nav.json`) and `context-plugin/` (index,
+titled `nav.json`). The transformer was not changed, so both folders sat in
+Guides:
 
-- A file added to or removed from the generated directory while `vite dev`
-  runs reaches the page tree without a restart, and so does a whole folder,
-  which is what adding or removing the `plugin` block does. The directory is
-  inside the Vite root, which Vite's watcher covers, and the user's content
-  directory, whose additions need a restart today, is not; but the metadata
-  collection and the async docs mode have not been observed under an add or a
-  remove. If it fails, `applyConfig` still writes the files and the serve
-  notice names the case as needing a restart.
-- The built `source.ts` chunk carries `base: 'generated'` for the second
-  collection and no path into the project directory, so the end-to-end
-  assertion `publishes neither the specification paths nor the project
-  directory` stays green.
-- A Tailwind utility written in a generated page reaches the built CSS with
-  the second `@source` line in place.
-- The `.md` twin of a generated page carries its body under the collection
-  split in `llms.server.ts`.
+- **The build.** It passed in 12 seconds and prerendered `/sdks`,
+  `/sdks/typescript` and `/context-plugin` with their `.md` twins. The
+  collection's `base` in the browser bundle is `` `generated` `` beside the
+  content directory's absolute one; no spelling of the project directory
+  (forward slashes, backslashes, escaped backslashes) appears in any published
+  file; and `sdks/typescript.md` carries the page's processed Markdown, body
+  included.
+- **Tailwind.** The class reached the CSS with an `@source` line for
+  `generated/`, and again without one, and again without one inside a git
+  directory whose `.gitignore` is `*`, where the template's own classes were
+  also all present. The line is dropped from the plan (section 4).
+- **The tree under `vite dev`.** Both folders reach the tree, named by their
+  `nav.json` titles, and the plugin's folder is kept although it holds only
+  its index page. An edit to an existing generated page's front matter or to a
+  generated `nav.json` reached the tree within half a second, as an edit to
+  the content directory's `nav.json` does (run as the baseline). An added page
+  never appeared, and a removed one made every request fail with a 500
+  (`ERR_LOAD_URL` for the deleted file) until a restart. With the reload
+  plugin of section 4 added to the prepared project, a page added, a page
+  removed, a whole folder removed and a whole folder added each reached the
+  tree within half a second, with no failed request.
 
 Known and left alone: two content addresses that differ only in case, such as
 `/SDKs` and `/sdks`, are two pages to Fumadocs and one file to a Windows or
@@ -613,7 +667,7 @@ address; the reservation is exact-case, as `content/api/` is.
 
 ## 11. Changes to the other plans
 
-Made in the implementation PR's last step, as dated amendments:
+Made in the implementation PR's last step, as dated amendments (done 2026-09-24):
 
 `.ai/plans/portal-navigation.md`:
 
@@ -654,52 +708,58 @@ and Context Plugin tabs; section 4 gains the second collection.
 This document is committed on `saeedjamshaid/portal-config` so that it merges
 with #355, which it depends on: `PortalLanguages`, the tabs transformer,
 `applyConfig`, the watcher and `GENERATED_SOURCE` all come from that PR.
-**Implementation waits for #355 to merge**, then starts on
-`saeedjamshaid/generated-pages` cut from `origin/dev`, as the navigation work
-waited for #343 (portal-navigation, section 16). Stacking on #355 would run no
-CI on the stacked PR (repository memory: stacked PRs get no Tests or Build).
 
-One PR against `dev`, `feat(portal)`. It adds two reserved addresses, a token
-and a second collection to a portal no release has shipped, and removes the
-synthetic SDKs tab no release rendered, so it carries no
-`BREAKING CHANGE:` footer. The steps of section 13 are each reviewed and
-committed on their own inside the PR, with a stop for a go-ahead after each and
-before every commit.
+Decided 2026-09-24, in place of waiting for #355 to merge: implementation runs
+on `saeedjamshaid/generated-pages`, cut from `saeedjamshaid/portal-config`, as
+a PR stacked on #355. A stacked PR gets no Tests or Build run (repository
+memory), so the affected suites and the end-to-end builds are run locally at
+each step, and CI runs once the PR is retargeted at `dev` after #355 merges
+(closed and reopened if the retarget alone does not trigger it).
+
+One PR, `feat(portal)`, against `saeedjamshaid/portal-config` and then `dev`.
+It adds two reserved addresses, a token and a second collection to a portal no
+release has shipped, and removes the synthetic SDKs tab no release rendered,
+so it carries no `BREAKING CHANGE:` footer. Each step of section 13 is
+reviewed, fixed, committed and pushed on its own before the next begins
+(agreed 2026-09-24).
 
 ## 13. Implementation steps
 
 Ordered so the unknowns are retired first, and so each step stands alone with
 build, lint on touched files and the affected tests green.
 
-1. **Retire the unknowns.** A throwaway second collection over `'generated'`
-   and a generated folder in a prepared project: under `vite dev`, add and
-   remove a page, a `nav.json` entry and a whole second folder, and watch the
-   tree; under `vite build`, read the `source.ts` chunk for the collection's
-   `base` and grep the output for the project directory; write a utility class in a generated page and
-   read the CSS. Record what holds in section 9 and settle the serve notice
-   wording. Nothing from this step is kept but the findings.
-2. **Types.** `PageTemplate`, `GeneratedPages` with the sections, the display
+1. **Retire the unknowns.** *Done 2026-09-24* (sections 9 and 16). A
+   throwaway second collection over `'generated'` and a generated folder in a
+   prepared project: under `vite dev`, add and remove a page, a `nav.json`
+   entry and a whole second folder, and watch the tree; under `vite build`,
+   read the `source.ts` chunk for the collection's `base` and grep the output
+   for the project directory; write a utility class in a generated page and
+   read the CSS. Nothing from this step is kept but the findings.
+2. **Types.** *Done 2026-09-24.* `PageTemplate`, `GeneratedPages` with the sections, the display
    names and the `nav.json` titles, `PortalSource.generatedPages`,
-   `resolveConfig` answering the pair, the reserved-address refusal and its
+   `resolveSettings` answering the pair, the reserved-address refusal and its
    prompt, `apimatic:plugin` in `PortalNavigation`, the navigation
    hints. CLI only; unit and prompt tests. The test holding the sections
-   against `navigation.ts` waits for step 4, which exports the template's list.
-3. **Templates and the writer.** `portal-pages/` with the three placeholders,
+   against `navigation.ts` waited for step 4, which exports the template's list.
+3. **Templates and the writer.** *Done 2026-09-24.* `portal-pages/` with the three placeholders,
    the shared package-root lookup, `PortalPagesService`,
    `PortalProjectService.prepare` and `applyConfig` writing the generated
    directory, `generatedDir` in `portal.config.json`, `files` in
    `package.json`, the packaging and project-service tests. The template does
    not read the directory yet, so a build at this point is unchanged.
-4. **Template.** The second `defineDocs`, the third loader source, `$.tsx` and
+4. **Template.** *Done 2026-09-24; the end-to-end build and the template's
+   type-check pass with the pages in it.* The second `defineDocs`, the third loader source, `$.tsx` and
    `llms.server.ts` split by collection, `prerender-pages.ts` and
-   `portal-config.ts`, `app.css`, the transformer's folder support, the
-   sections table and its tokens, the tabs, and the synthetic SDKs tab's
-   removal. Template unit tests, the existing ones moved onto the folders, and
-   the test from step 2 that holds the two lists together. A build now carries
-   the pages.
-5. **Serve.** The watcher passing the pair, the notice wording from step 1,
-   the serve tests.
-6. **Surfacing.** Fixtures (`apimatic:sdks` in the default root `nav.json`, a
+   `portal-config.ts`, the reload plugin in `vite.config.ts`, the
+   transformer's folder support, the sections table and its tokens, the tabs,
+   and the synthetic SDKs tab's removal. Template unit tests, the existing ones
+   moved onto the folders, and the test from step 2 that holds the two lists
+   together. A build now carries the pages.
+5. **Serve.** *Done 2026-09-24.* The notice wording of section 7 (no case needs a restart) and
+   its prompt test. The watcher already passes the pair, and the serve tests
+   cover a language and a `plugin` block added, since step 3: `applyConfig`'s
+   new signature needed the caller changed to compile.
+6. **Surfacing.** *Done 2026-09-24.* Fixtures (`apimatic:sdks` in the default root `nav.json`, a
    `plugin` block in the branded one, which has no `nav.json` and so shows the
    default tab order), the e2e cases, command descriptions and
    the README by hand and through `pnpm readme`, the amendments of section 11,
@@ -779,3 +839,25 @@ the SDKs tab, and had declined a tab of its own. What that changed:
    author writes it. Both `context-plugin` and `plugin` were tried for both
    the same day; the reasons are with the rejected alternatives in
    section 2.
+
+## 16. What step 1 changed (2026-09-24)
+
+The spike of section 13, step 1, run on this branch before any code was kept;
+the observations are in section 9. What they changed in the plan:
+
+1. **Adds and removes under `portal serve` needed a fix, not a notice.**
+   Section 14's finding 6 expected the generated directory, being inside the
+   Vite root, to reload where the content directory does not. Edits do; an
+   added page never appears, and a removed one fails every request until a
+   restart, which a notice could not have made acceptable. The reload plugin of
+   section 4 fixes both, and the serve notice names no restart.
+2. **The `@source` line is dropped.** Tailwind's own scan found the generated
+   pages in a plain directory and in one ignored by a `*` rule, as the
+   `.apimatic-build/` fallback is, so the template gains no line in `app.css`.
+   The end-to-end build on the cross-drive CI runner is where the fallback
+   itself is exercised.
+3. **The rest held as planned.** The relative `dir` literal publishes only the
+   word `generated`, no path of the build machine reaches the output, the
+   `.md` twins carry the page bodies through the collection split, a generated
+   `nav.json` names its folder, and a folder holding only its index page is
+   kept.

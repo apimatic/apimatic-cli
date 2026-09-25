@@ -1,7 +1,7 @@
 import { log } from '@clack/prompts';
 import { APIMATIC_CONFIG_FILE_NAME } from '../../types/apimatic-config/document.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
-import { PortalSourceProblem } from '../../types/portal/portal-source.js';
+import { PortalSourceProblem, ReservedAddressPage } from '../../types/portal/portal-source.js';
 import { FileName } from '../../types/file/fileName.js';
 import { FilePath } from '../../types/file/filePath.js';
 import { format as f } from '../format.js';
@@ -37,6 +37,10 @@ export function reportSourceProblem(
     case 'invalidNavigation': {
       log.error(`The page order in ${f.path(sourceDirectory)} could not be applied:`);
       log.message(problem.errors.map((error) => `  • ${error}`).join('\n'));
+      return;
+    }
+    case 'reservedAddresses': {
+      reportReservedAddresses(problem.pages, sourceDirectory);
       return;
     }
     case 'unreadableContent': {
@@ -94,6 +98,24 @@ export function reportSourceProblem(
       return;
     }
   }
+}
+
+function reportReservedAddresses(pages: ReservedAddressPage[], sourceDirectory: DirectoryPath): void {
+  const one = pages.length === 1;
+  const lines = pages.map(({ file, address, section }) => {
+    const kept = `/${section.folder}`;
+    const within = address === kept ? '' : `, under ${f.var(kept)}`;
+    return `  • ${f.var(file.relativeTo(sourceDirectory))}, at ${f.var(address)}${within}, which is kept for ${
+      section.description
+    }`;
+  });
+  log.error(
+    one
+      ? `A page in ${f.path(sourceDirectory)} would be served where the portal puts the pages it generates:`
+      : `Pages in ${f.path(sourceDirectory)} would be served where the portal puts the pages it generates:`
+  );
+  log.message(lines.join('\n'));
+  log.message(one ? 'Rename or move the page.' : 'Rename or move each page.');
 }
 
 export function reportShadowedFiles(shadowed: FileName[]): void {

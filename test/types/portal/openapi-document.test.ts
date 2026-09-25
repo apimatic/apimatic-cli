@@ -1,6 +1,8 @@
 import { expect } from 'chai';
+import path from 'path';
 import { OpenApiDocument, SpecFormat } from '../../../src/types/portal/openapi-document';
 import { FileName } from '../../../src/types/file/fileName';
+import { DirectoryPath } from '../../../src/types/file/directoryPath';
 
 const JSON_FILE = new FileName('spec.json');
 const YAML_FILE = new FileName('spec.yaml');
@@ -118,6 +120,90 @@ describe('OpenApiDocument', () => {
 
     it('copes with a document that has no info block at all', () => {
       expect(readJson({ openapi: '3.0.0' }).suggestedSite().name).to.equal('My API');
+    });
+  });
+
+  describe('endpoints', () => {
+    it('reads YAML as the portal bundler does, merging keys and allowing many aliases', () => {
+      const aliases = Array.from({ length: 150 }, (_, index) => `  a${index}: *ops`);
+      const yaml = [
+        'openapi: 3.0.0',
+        'ops: &ops',
+        '  get: {}',
+        'paths:',
+        '  /merged:',
+        '    <<: *ops',
+        'many:',
+        ...aliases
+      ].join('\n');
+
+      expect(read(yaml, YAML_FILE).endpoints().map(String)).to.deep.equal(['GET /merged']);
+    });
+
+    it('lists the inline operations of every path, leaving a path item in another file to its reference', () => {
+      const document = readJson({
+        openapi: '3.0.0',
+        paths: { '/pets': { summary: 'Pets', get: {}, post: {} }, '/health': { $ref: './health.yaml' } }
+      });
+
+      expect(document.endpoints().map(String)).to.deep.equal(['GET /pets', 'POST /pets']);
+    });
+
+    it('follows a path item that is a reference into the document, letting its siblings add operations', () => {
+      const document = readJson({
+        openapi: '3.1.0',
+        paths: {
+          '/owners': { $ref: '#/components/pathItems/Owners', delete: {} },
+          '/pets~1{id}': { $ref: '#/components/pathItems/Alias' }
+        },
+        components: { pathItems: { Owners: { get: {} }, Alias: { $ref: '#/x-items/pets~1one' } } },
+        'x-items': { 'pets/one': { put: {} } }
+      });
+
+      expect(document.endpoints().map(String)).to.deep.equal(['GET /owners', 'DELETE /owners', 'PUT /pets~1{id}']);
+    });
+
+    it('survives a path item that refers to itself', () => {
+      const document = readJson({ openapi: '3.1.0', paths: { '/loop': { $ref: '#/paths/~1loop' } } });
+
+      expect(document.endpoints()).to.be.empty;
+    });
+  });
+
+  describe('pathItemReferences', () => {
+    const specDirectory = new DirectoryPath('/project/src/spec');
+    const references = (paths: Record<string, unknown>) =>
+      readJson({ openapi: '3.0.0', paths })
+        .pathItemReferences(specDirectory)
+        .map(({ path: route, file, pointer }) => [route, String(file), pointer]);
+
+    it('resolves a path item in another file against the directory the document sits in', () => {
+      expect(
+        references({ '/pets': { $ref: './paths/pets.yaml' }, '/owners': { $ref: '../shared.yaml#/Owners' } })
+      ).to.deep.equal([
+        ['/pets', path.resolve('/project/src/spec/paths/pets.yaml'), ''],
+        ['/owners', path.resolve('/project/src/shared.yaml'), '/Owners']
+      ]);
+    });
+
+    it('ignores inline path items, references into the document, and URLs', () => {
+      expect(
+        references({
+          '/inline': { get: {} },
+          '/local': { $ref: '#/components/pathItems/Local' },
+          '/remote': { $ref: 'https://example.com/pets.yaml' }
+        })
+      ).to.be.empty;
+    });
+  });
+
+  describe('endpointsAt', () => {
+    it('names the operations of the path item a pointer locates after the path it is mounted at', () => {
+      const file = readJson({ get: {}, 'x-library': { owners: { post: {} } } });
+
+      expect(file.endpointsAt('/pets', '').map(String)).to.deep.equal(['GET /pets']);
+      expect(file.endpointsAt('/owners', '/x-library/owners').map(String)).to.deep.equal(['POST /owners']);
+      expect(file.endpointsAt('/missing', '/nowhere')).to.be.empty;
     });
   });
 });

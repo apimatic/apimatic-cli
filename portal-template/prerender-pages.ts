@@ -20,6 +20,9 @@ export async function prerenderPages(config: PortalConfig, siteUrl: string | nul
   }
 
   for (const url of await contentUrls(config.contentDir)) urls.add(url);
+  // The CLI keeps the user's pages away from the generated ones' addresses, so the two
+  // directories never collide and can be listed apart.
+  for (const url of await contentUrls(config.generatedDir)) urls.add(url);
   for (const url of await openApiUrls(config.specs)) urls.add(url);
 
   // The copy is load-bearing, not redundant: this loop adds to `urls`, and a `Set` visits
@@ -66,7 +69,7 @@ async function contentUrls(contentDir: string): Promise<string[]> {
 // Through the same sections as the site, so an internal operation gets no page here either.
 async function openApiUrls(specs: Record<string, string>): Promise<string[]> {
   const sources = Object.fromEntries(
-    await Promise.all(Object.entries(specs).map(async ([id, file]) => [id, await openApiSection(id, file)]))
+    await Promise.all(Object.entries(specs).map(async ([id, file]) => [id, await openApiSection(id, file, null)]))
   );
   if (Object.keys(sources).length === 0) return [];
   return loader(sources, { baseUrl: '/' })

@@ -1,8 +1,12 @@
+import { basename, dirname } from 'node:path';
 import { parse as parseYaml } from 'yaml';
+import { DirectoryPath } from '../file/directoryPath.js';
 import { FileName } from '../file/fileName.js';
-import { isJsonObject } from '../../utils/json-utils.js';
+import { FilePath } from '../file/filePath.js';
+import { isJsonObject, JsonObject } from '../../utils/json-utils.js';
 import { stripByteOrderMark } from '../../utils/string-utils.js';
 import { PLACEHOLDER_SITE, SuggestedSite } from './config/site-config.js';
+import { Endpoint } from './endpoint.js';
 
 /**
  * Whether a parsed document is one a portal can be built from. `format` names what it is
@@ -11,11 +15,25 @@ import { PLACEHOLDER_SITE, SuggestedSite } from './config/site-config.js';
  */
 export type SpecFormat = { supported: true } | { supported: false; format: string | null };
 
+/** A path item kept in another file, where `pointer` locates it; empty for the whole file. */
+export interface PathItemReference {
+  path: string;
+  file: FilePath;
+  pointer: string;
+}
+
 const DESCRIPTION_LIMIT = 300;
+
+const HTTP_METHODS = new Set(['get', 'put', 'post', 'delete', 'options', 'head', 'patch', 'trace']);
+
+const URL_SCHEME = /^[a-z][a-z\d+.-]+:/i;
+
+// The options @scalar/json-magic bundles with, so a spec reads here as it does in the portal.
+const YAML_OPTIONS = { merge: true, maxAliasCount: 10000 };
 
 /** A specification as written to disk, read the one way the wizard and the build agree on. */
 export class OpenApiDocument {
-  private constructor(private readonly document: Record<string, unknown>) {}
+  private constructor(private readonly document: JsonObject) {}
 
   /**
    * Undefined when neither parser accepts the text. A document that parses to something other
@@ -26,11 +44,33 @@ export class OpenApiDocument {
       // JSON is valid YAML, but the YAML parser is far slower and specs run to megabytes,
       // so each extension gets the parser built for it.
       const text = stripByteOrderMark(contents);
-      const document: unknown = fileName.hasExtension('.json') ? JSON.parse(text) : parseYaml(text);
+      const document: unknown = fileName.hasExtension('.json') ? JSON.parse(text) : parseYaml(text, YAML_OPTIONS);
       return new OpenApiDocument(isJsonObject(document) ? document : {});
     } catch {
       return undefined;
     }
+  }
+
+  /** Every operation declared inline or behind a `$ref` into this document; see `pathItemReferences` for the rest. */
+  public endpoints(): Endpoint[] {
+    return Object.entries(this.paths()).flatMap(([path, pathItem]) => this.endpointsOf(path, pathItem));
+  }
+
+  /** The path items kept in other local files, resolved against the `directory` this document sits in. */
+  public pathItemReferences(directory: DirectoryPath): PathItemReference[] {
+    return Object.entries(this.paths()).flatMap(([path, pathItem]) => {
+      const reference = isJsonObject(pathItem) && typeof pathItem.$ref === 'string' ? pathItem.$ref : '';
+      const [file, pointer = ''] = reference.split('#');
+      if (file === '' || URL_SCHEME.test(file)) {
+        return [];
+      }
+      return [{ path, file: new FilePath(directory.resolve(dirname(file)), new FileName(basename(file))), pointer }];
+    });
+  }
+
+  /** The operations of the path item `pointer` locates in this document, as they are mounted at `path`. */
+  public endpointsAt(path: string, pointer: string): Endpoint[] {
+    return this.endpointsOf(path, valueAt(this.document, pointer));
   }
 
   public format(): SpecFormat {
@@ -58,6 +98,44 @@ export class OpenApiDocument {
     const name = oneLine(fields.title) ?? PLACEHOLDER_SITE.name;
     const description = oneLine(firstParagraph(fields.description));
     return { name, description: description === null ? null : cap(description, DESCRIPTION_LIMIT) };
+  }
+
+  private paths(): JsonObject {
+    return isJsonObject(this.document.paths) ? this.document.paths : {};
+  }
+
+  private endpointsOf(path: string, pathItem: unknown): Endpoint[] {
+    return Object.entries(this.followLocal(pathItem, new Set()))
+      .filter(([key, value]) => HTTP_METHODS.has(key.toLowerCase()) && isJsonObject(value))
+      .map(([method]) => new Endpoint(method, path));
+  }
+
+  // Siblings of a `$ref` override what it points to, as the portal bundles a path item.
+  private followLocal(pathItem: unknown, seen: Set<string>): JsonObject {
+    if (!isJsonObject(pathItem)) {
+      return {};
+    }
+    const { $ref, ...siblings } = pathItem;
+    if (typeof $ref !== 'string' || !$ref.startsWith('#') || seen.has($ref)) {
+      return siblings;
+    }
+    seen.add($ref);
+    return { ...this.followLocal(valueAt(this.document, $ref.slice(1)), seen), ...siblings };
+  }
+}
+
+function valueAt(document: JsonObject, pointer: string): unknown {
+  try {
+    const segments = pointer
+      .split('/')
+      .slice(1)
+      .map((segment) => decodeURIComponent(segment));
+    return segments.reduce<unknown>(
+      (node, segment) => (isJsonObject(node) ? node[segment.replace(/~1/g, '/').replace(/~0/g, '~')] : undefined),
+      document
+    );
+  } catch {
+    return undefined;
   }
 }
 

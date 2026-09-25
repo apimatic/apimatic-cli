@@ -49,6 +49,7 @@ describe('PortalServeAction', () => {
     prompts = sinon.stub(PortalServePrompts.prototype);
     // The spinner would render to stdout; pass the underlying promise straight through.
     prompts.startPreview.callsFake((fn) => fn);
+    prompts.generateCodeSamples.callsFake((fn) => fn);
     prompts.blockExecution.returns(
       new Promise<void>((resolve) => {
         interrupt = resolve;
@@ -220,13 +221,13 @@ describe('PortalServeAction', () => {
       source = new DirectoryPath(root).join('src');
       fs.cpSync(FIXTURE.toString(), source.toString(), { recursive: true });
 
-      // `prepare` is stubbed above; this one writes the two files a real one would, so the
-      // test can see what an edit changes.
+      // `prepare` is stubbed above; this one writes the files an edit can change, as a real one
+      // would, so the test can see what an edit changes.
       (PortalProjectService.prototype.prepare as sinon.SinonStub).callsFake(
         async (directory: DirectoryPath, portal: PortalSource) => {
           projectDirectory = directory;
           fs.mkdirSync(path.join(directory.toString(), 'src/styles'), { recursive: true });
-          (await new PortalProjectService().applyConfig(directory, portal.config))._unsafeUnwrap();
+          (await new PortalProjectService().applyConfig(directory, portal))._unsafeUnwrap();
           return ok({ projectDirectory: directory, viteBinary: new FilePath(directory, new FileName('vite.js')) });
         }
       );
@@ -294,18 +295,36 @@ describe('PortalServeAction', () => {
     });
 
     // `sdk publish` and `plugin generate` rewrite the whole file to change their own block.
+    // What `sdk publish` writes: the generated pages show a language, not where it was published.
     it('applies nothing, and says nothing, for a change outside what the preview shows', async () => {
       await whileServing(async () => {
-        const before = readProject('portal.identity.json');
+        const before = [readProject('portal.identity.json'), readProject('generated/sdks/typescript.mdx')];
         const config = originalConfig();
-        config.plugin = { pluginId: 'calc', pluginVersion: '0.1.0' };
-        config.languages.python = {};
+        config.languages.typescript = {
+          publishing: { package: { name: 'calc', version: '1.0.0' }, codegenVersion: 'v4' }
+        };
 
         await save(config);
 
-        expect(readProject('portal.identity.json')).to.equal(before);
+        expect([readProject('portal.identity.json'), readProject('generated/sdks/typescript.mdx')]).to.deep.equal(
+          before
+        );
         expect(prompts.configApplied.called).to.be.false;
         expect(prompts.configRejected.called).to.be.false;
+      });
+    });
+
+    it('writes the pages of a language and a plugin block added, and says the edit was applied', async () => {
+      await whileServing(async () => {
+        const config = originalConfig();
+        config.languages.python = {};
+        config.plugin = { pluginId: 'calc', pluginVersion: '0.1.0' };
+
+        await save(config);
+
+        expect(readProject('generated/sdks/python.mdx')).to.contain('title: "Python"');
+        expect(readProject('generated/context-plugin/index.mdx')).to.contain('Context Plugin');
+        expect(prompts.configApplied.calledOnce).to.be.true;
       });
     });
 
@@ -406,8 +425,8 @@ describe('PortalServeAction', () => {
 
     it('reports a fault it did not expect while re-reading the file, and keeps watching', async () => {
       await whileServing(async () => {
-        const resolveConfig = sinon
-          .stub(PortalSourceContext.prototype, 'resolveConfig')
+        const resolveSettings = sinon
+          .stub(PortalSourceContext.prototype, 'resolveSettings')
           .rejects(new Error('EBUSY: resource busy or locked'));
         const config = originalConfig();
         config.portal.site.name = 'Renamed API';
@@ -415,7 +434,7 @@ describe('PortalServeAction', () => {
         await save(config);
 
         expect(prompts.configNotApplied.calledOnceWith('EBUSY: resource busy or locked')).to.be.true;
-        resolveConfig.restore();
+        resolveSettings.restore();
         await save(config);
         expect(prompts.configApplied.calledOnce).to.be.true;
       });

@@ -33,6 +33,9 @@ export class ServiceError {
   static notFound(customMessage: string): ServiceError {
     return new ServiceError(ServiceErrorCode.NotFound, customMessage, {});
   }
+  static invalidResponse(customMessage: string): ServiceError {
+    return new ServiceError(ServiceErrorCode.InvalidResponse, customMessage, {});
+  }
   static timeout(customMessage: string): ServiceError {
     return new ServiceError(ServiceErrorCode.Timeout, customMessage, {});
   }

@@ -40,8 +40,12 @@ Documentation portals are now built on your machine from a `src/` directory, and
   files in `src/static/`.
 - Page order comes from a `nav.json` beside your pages, listing them by file name, and a
   `title` there names the folder it sits in. The top level of the portal is shown as tabs:
-  Home, Guides, the API reference, and any folder directly under `src/content/` whose own
-  `nav.json` sets `"root": true`.
+  Home, Guides, SDKs, Context Plugin, the API reference, and any folder directly under
+  `src/content/` whose own `nav.json` sets `"root": true`. The root `nav.json` places the
+  tabs the CLI makes with `apimatic:sdks`, `apimatic:plugin` and `apimatic:api`.
+- The SDKs tab has a page per language in the `languages` block, and the Context Plugin tab
+  appears when there is a `plugin` block. Their addresses, `/sdks` and `/context-plugin`, are
+  kept for them, so a page in `src/content/` that would be served there is refused.
 - `portal toc new`, `portal recipe new` and `portal copilot` are gone, and `portal serve` no
   longer takes `--destination` or `--no-reload`. Run `apimatic autocomplete --refresh-cache`
   to drop the removed commands from shell completion.
@@ -334,7 +338,8 @@ DESCRIPTION
   Builds a documentation portal from the OpenAPI documents and Markdown pages in your 'src' directory.
 
   The portal is built on your machine and written as static files you can host anywhere. Configure it with
-  'src/apimatic.json'.
+  'src/apimatic.json', whose 'languages' block gives the portal a page for each SDK language, and whose 'plugin' block,
+  when there is one, a page for the context plugin.
 
 EXAMPLES
   apimatic portal generate
@@ -365,10 +370,11 @@ DESCRIPTION
   Preview your API Documentation Portal with live reload.
 
   Serves the portal described by 'src/apimatic.json' from your machine, reloading the browser as you edit the Markdown
-  pages in 'src/content', reorder them in a 'nav.json', or change the 'portal' block of 'apimatic.json'.
+  pages in 'src/content', reorder them in a 'nav.json', or change the 'portal', 'languages' or 'plugin' block of
+  'apimatic.json'.
 
-  Adding or removing a page, creating 'src/static', or changing which documents are in 'src/spec', needs the preview
-  restarted.
+  Adding or removing a page in 'src/content', creating 'src/static', or changing which documents are in 'src/spec',
+  needs the preview restarted.
 
   Nothing is written to disk; run 'apimatic portal generate' to produce the static files.
 

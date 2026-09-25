@@ -21,6 +21,7 @@
         "./bin",
         "./lib",
         "./portal-template",
+        "./portal-pages",
         "/oclif.manifest.json",
         "/apimatic.schema.json"
     ],
@@ -56,6 +57,7 @@
         "@apimatic/sdk": "0.2.0-alpha.10",
         "@clack/core": "1.0.0-alpha.1",
         "@clack/prompts": "1.0.0-alpha.1",
+        "@fumadocs/api-docs": "0.2.8",
         "@oclif/core": "^4.2.8",
         "@oclif/plugin-autocomplete": "^3.2.24",
         "@oclif/plugin-help": "^6.2.26",

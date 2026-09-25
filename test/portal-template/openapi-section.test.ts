@@ -373,7 +373,7 @@ describe('openApiSection', () => {
     fs.rmSync(directory, { recursive: true, force: true });
   });
 
-  const section = () => openApiSection('pets', path.join(directory, 'api.json'));
+  const section = () => openApiSection('pets', path.join(directory, 'api.json'), null);
 
   /** Each generated file's path, with forward slashes whatever the platform joined it with. */
   const filesOf = async () => (await section()).files.map((file) => file.path.split(path.sep).join('/'));
