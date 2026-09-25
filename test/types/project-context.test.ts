@@ -10,7 +10,7 @@ describe('ProjectContext.upsertGitignore', () => {
 
   const gitignorePath = () => path.join(projectDirectory, '.gitignore');
   const gitignore = () => fs.readFileSync(gitignorePath(), 'utf8');
-  const ignore = async () => await new ProjectContext(new DirectoryPath(projectDirectory)).upsertGitignore();
+  const ignore = async () => await ProjectContext.in(new DirectoryPath(projectDirectory)).upsertGitignore();
 
   beforeEach(() => {
     projectDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'project-context-'));
@@ -60,6 +60,25 @@ describe('ProjectContext.upsertGitignore', () => {
     await ignore();
 
     expect(gitignore()).to.equal(written);
+  });
+
+  // The entries and the directories the commands write to are one list now; a rename that
+  // reached only one of them would leave a project tracking what it just generated.
+  it('names the directories the commands write to', async () => {
+    const project = ProjectContext.at(projectDirectory);
+
+    await ignore();
+
+    const named = gitignore().split('\n').filter(Boolean);
+    for (const directory of [project.sdkDirectory(), project.portalDirectory(), project.pluginDirectory()]) {
+      expect(named, directory.toString()).to.contain(`/${path.basename(directory.toString())}/`);
+    }
+  });
+
+  it('takes a --destination over its own directory, which the gitignore then does not name', () => {
+    const project = ProjectContext.at(projectDirectory);
+
+    expect(project.pluginDirectory('./elsewhere').toString()).to.equal(path.resolve('./elsewhere'));
   });
 
   it('adds only what is missing', async () => {

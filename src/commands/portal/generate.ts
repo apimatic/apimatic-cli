@@ -1,5 +1,6 @@
 import { Command, Flags } from '@oclif/core';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
+import { ProjectContext } from '../../types/project-context.js';
 import { GenerateAction } from '../../actions/portal/generate.js';
 import { FlagsProvider } from '../../types/flags-provider.js';
 import { format, intro, outro } from '../../prompts/format.js';
@@ -36,9 +37,9 @@ The portal is built on your machine and written as static files you can host any
       flags: { input, destination, force, zip: zipPortal, 'auth-key': authKey }
     } = await this.parse(PortalGenerate);
 
-    const workingDirectory = DirectoryPath.createInput(input);
-    const sourceDirectory = workingDirectory.join('src');
-    const portalDirectory = destination ? new DirectoryPath(destination) : workingDirectory.join('portal');
+    const project = ProjectContext.at(input);
+    const sourceDirectory = project.sourceDirectory();
+    const portalDirectory = project.portalDirectory(destination);
     const commandMetadata: CommandMetadata = {
       commandName: PortalGenerate.id,
       shell: this.config.shell

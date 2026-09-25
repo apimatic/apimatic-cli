@@ -1,5 +1,6 @@
 import { Command, Flags } from '@oclif/core';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
+import { ProjectContext } from '../../types/project-context.js';
 import { FlagsProvider } from '../../types/flags-provider.js';
 import { CodeGenerationVersion, Language, Stability } from '../../types/sdk/generate.js';
 import { StabilityChoice } from '../../types/sdk/stability-choice.js';
@@ -101,9 +102,10 @@ export default class SdkPublish extends Command {
       shell: this.config.shell
     };
 
-    const workingDirectory = DirectoryPath.createInput(input);
-    const sourceDirectory = input ? new DirectoryPath(input, 'src') : workingDirectory.join('src');
-    const sdkDirectory = destination ? new DirectoryPath(destination) : workingDirectory.join('sdk');
+    const projectDirectory = DirectoryPath.createInput(input);
+    const project = ProjectContext.in(projectDirectory);
+    const sourceDirectory = project.sourceDirectory();
+    const sdkDirectory = project.sdkDirectory(destination);
 
     const configDir = this.getConfigDir();
     const telemetryService = new TelemetryService(configDir);
@@ -129,7 +131,7 @@ export default class SdkPublish extends Command {
 
     intro('Publish SDK');
     const result = interactive
-      ? await new SdkPublishInteractiveAction(configDir, commandMetadata).execute(workingDirectory, onPublishSdkError)
+      ? await new SdkPublishInteractiveAction(configDir, commandMetadata).execute(projectDirectory, onPublishSdkError)
       : await new SdkPublishNonInteractiveAction(configDir, commandMetadata).execute(
           sourceDirectory,
           sdkDirectory,

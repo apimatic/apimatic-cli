@@ -1,6 +1,7 @@
 import { Command, Flags } from '@oclif/core';
 import { DEFAULT_PORTAL_PORT, PortalServeAction } from '../../actions/portal/serve.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
+import { ProjectContext } from '../../types/project-context.js';
 import { FlagsProvider } from '../../types/flags-provider.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { format, intro, outro } from '../../prompts/format.js';
@@ -44,7 +45,7 @@ Nothing is written to disk; run 'apimatic portal generate' to produce the static
       flags: { input, port, open, 'auth-key': authKey }
     } = await this.parse(PortalServe);
 
-    const sourceDirectory = DirectoryPath.createInput(input).join('src');
+    const sourceDirectory = ProjectContext.at(input).sourceDirectory();
     const commandMetadata: CommandMetadata = {
       commandName: PortalServe.id,
       shell: this.config.shell

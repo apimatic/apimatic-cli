@@ -1,5 +1,6 @@
 import { Command, Flags } from '@oclif/core';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
+import { ProjectContext } from '../../types/project-context.js';
 import { FlagsProvider } from '../../types/flags-provider.js';
 import { GenerateAction } from '../../actions/sdk/generate.js';
 import { CodeGenerationVersion, Language, Stability } from '../../types/sdk/generate.js';
@@ -72,9 +73,9 @@ C#, TypeScript and Python are available; Java, Ruby, Go and PHP are on their way
       }
     } = await this.parse(SdkGenerate);
 
-    const workingDirectory = DirectoryPath.createInput(input);
-    const sourceDirectory = input ? new DirectoryPath(input, 'src') : workingDirectory.join('src');
-    const sdkDirectory = destination ? new DirectoryPath(destination) : workingDirectory.join('sdk');
+    const project = ProjectContext.at(input);
+    const sourceDirectory = project.sourceDirectory();
+    const sdkDirectory = project.sdkDirectory(destination);
 
     const commandMetadata: CommandMetadata = {
       commandName: SdkGenerate.id,
