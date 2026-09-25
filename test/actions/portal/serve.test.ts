@@ -36,6 +36,7 @@ describe('PortalServeAction', () => {
   let start: sinon.SinonStub;
   let stop: sinon.SinonStub;
   let watch: sinon.SinonStub;
+  let watchTree: sinon.SinonStub;
   /** Stands in for the user pressing CTRL+C. */
   let interrupt: () => void;
   /** Stands in for the preview process dying, with what it printed on the way out. */
@@ -70,6 +71,9 @@ describe('PortalServeAction', () => {
     // Never a real watch: most tests serve the shared fixture, which nothing may edit.
     watch = sinon
       .stub(FileWatchService.prototype, 'watch')
+      .returns(ok({ close: sinon.stub().resolves(), recheck: sinon.stub() }));
+    watchTree = sinon
+      .stub(FileWatchService.prototype, 'watchTree')
       .returns(ok({ close: sinon.stub().resolves(), recheck: sinon.stub() }));
   });
 
@@ -185,6 +189,105 @@ describe('PortalServeAction', () => {
    * a call the test makes; everything behind it -- reading the file, the rules, writing the
    * preview's files -- is the real thing, on a copy of the fixture.
    */
+  // The preview reloads the content itself; the CLI's part is saying what a build would refuse.
+  describe('checking a save in the content directory', () => {
+    let source: DirectoryPath;
+    let onChange: Promise<() => Promise<void>>;
+    let closeWatch: sinon.SinonStub;
+    let recheck: sinon.SinonStub;
+
+    const writeNavigation = (contents: string) =>
+      fs.writeFileSync(path.join(source.toString(), 'content/guides/nav.json'), contents);
+
+    /** Runs the preview until `body` is done with it, then stops it as CTRL+C would. */
+    const whileServing = async (body: (save: (contents: string) => Promise<void>) => Promise<void>) => {
+      const running = execute(source);
+      const check = await onChange;
+      try {
+        await body(async (contents) => {
+          writeNavigation(contents);
+          await check();
+        });
+      } finally {
+        interrupt();
+        await running;
+      }
+    };
+
+    beforeEach(() => {
+      source = new DirectoryPath(root).join('src');
+      fs.cpSync(FIXTURE.toString(), source.toString(), { recursive: true });
+
+      closeWatch = sinon.stub().resolves();
+      recheck = sinon.stub();
+      onChange = new Promise((resolve) => {
+        watchTree.callsFake((directory: DirectoryPath, change: () => Promise<void>) => {
+          expect(directory.toString()).to.equal(source.join('content').toString());
+          resolve(change);
+          return ok({ close: closeWatch, recheck });
+        });
+      });
+    });
+
+    // What `portal serve` showed before: every page a raw HTTP 500, and nothing in the terminal.
+    it('reports a nav.json saved half typed, as a build would', async () => {
+      await whileServing(async (save) => {
+        await save('{ "pages": ["intro", ');
+
+        const [problem] = prompts.contentRejected.firstCall.args;
+        expect(problem).to.deep.equal({
+          kind: 'invalidNavigation',
+          errors: ['content/guides/nav.json is not valid JSON.']
+        });
+      });
+    });
+
+    it('reports an entry that matches nothing, which the preview drops without a word', async () => {
+      await whileServing(async (save) => {
+        await save(JSON.stringify({ pages: ['intro', 'does-not-exist'] }));
+
+        const [problem] = prompts.contentRejected.firstCall.args;
+        expect(problem.kind === 'invalidNavigation' && problem.errors[0]).to.contain(
+          "'does-not-exist' is not a page or folder in this directory."
+        );
+      });
+    });
+
+    it('says once that the content is fixed, and nothing for a save a build accepts', async () => {
+      await whileServing(async (save) => {
+        await save(JSON.stringify({ pages: ['intro'] }));
+        expect(prompts.contentRejected.called || prompts.contentAccepted.called).to.be.false;
+
+        await save('{');
+        await save(JSON.stringify({ pages: ['intro'] }));
+        await save(JSON.stringify({ pages: ['intro', '...'] }));
+
+        expect(prompts.contentRejected.calledOnce).to.be.true;
+        expect(prompts.contentAccepted.calledOnce).to.be.true;
+      });
+    });
+
+    // The content is checked before the preview starts, which can take a minute.
+    it('checks the content again once it is watched, and stops watching when the preview stops', async () => {
+      await whileServing(async () => {
+        expect(recheck.calledOnce).to.be.true;
+      });
+
+      expect(closeWatch.called).to.be.true;
+      expect(closeWatch.calledBefore(prompts.stopping)).to.be.true;
+    });
+
+    it('says when the content cannot be watched, and serves regardless', async () => {
+      watchTree.returns(err('EMFILE: too many open files'));
+      interrupt();
+
+      const result = await execute(source);
+
+      expect(prompts.contentNotWatched.calledOnceWith('EMFILE: too many open files')).to.be.true;
+      expect(result.isCancelled()).to.be.true;
+    });
+  });
+
   describe('re-applying apimatic.json', () => {
     let source: DirectoryPath;
     let save: (config: object) => Promise<void>;

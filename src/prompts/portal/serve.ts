@@ -44,8 +44,6 @@ export class PortalServePrompts {
 
   public portalServed(url: UrlPath, sourceDirectory: DirectoryPath) {
     log.message(`The portal is running at ${f.link(url.toString())}`);
-    // `nav.json` is validated only at startup, and the build drops an entry it cannot resolve
-    // without a word, which is why the note warns that a mistake typed later is ignored.
     noteWrapped(
       [
         `Edits to the Markdown pages in ${f.path(sourceDirectory.join('content'))}, to the order and ` +
@@ -57,10 +55,8 @@ export class PortalServePrompts {
             'plugin'
           )} block added or removed, which adds or removes the Context Plugin tab. A mistake in ${f.var(
             'apimatic.json'
-          )} is reported when you save it, and the preview keeps what it last accepted. A mistake in a ${f.var(
-            'nav.json'
-          )} is only reported when the preview starts; until then an entry or a title that the build would ` +
-          `refuse is ignored here.`,
+          )} is reported when you save it, and the preview keeps what it last accepted. So is a mistake in a ` +
+          `page or a ${f.var('nav.json')}, which the preview shows as it can until you fix it.`,
         '',
         `Adding or removing a page in ${f.path(sourceDirectory.join('content'))}, creating ${f.path(
           sourceDirectory.join('static')
@@ -104,6 +100,33 @@ export class PortalServePrompts {
     log.warn(
       `${f.var(APIMATIC_CONFIG_FILE_NAME)} is no longer watched (${reason}), so further edits to it need the ` +
         `preview restarted.`
+    );
+  }
+
+  /** Explained as `portal generate` would explain it, since the same rules refused it. */
+  public contentRejected(problem: PortalSourceProblem, sourceDirectory: DirectoryPath) {
+    reportSourceProblem(problem, sourceDirectory, { offerQuickstart: false });
+    log.message(
+      `The preview may show the pages wrongly, or not at all, until ${f.path(sourceDirectory.join('content'))} ` +
+        `is fixed; a build would stop here.`
+    );
+  }
+
+  public contentAccepted(sourceDirectory: DirectoryPath) {
+    log.success(`${f.path(sourceDirectory.join('content'))} is fixed; a build would accept it again.`);
+  }
+
+  public contentNotWatched(reason: string, sourceDirectory: DirectoryPath) {
+    log.warn(
+      `${f.path(sourceDirectory.join('content'))} cannot be watched (${reason}), so a mistake in a page or a ` +
+        `${f.var('nav.json')} is only reported when the preview starts.`
+    );
+  }
+
+  public contentWatchFailed(reason: string, sourceDirectory: DirectoryPath) {
+    log.warn(
+      `${f.path(sourceDirectory.join('content'))} is no longer watched (${reason}), so a mistake in a page or ` +
+        `a ${f.var('nav.json')} is only reported when the preview is restarted.`
     );
   }
 

@@ -42,5 +42,9 @@ describe('PortalServePrompts', () => {
     it('says which added pages need the preview restarted', () => {
       expect(printed()).to.match(/Adding or removing a page in '.*content', creating .* needs the preview restarted\./);
     });
+
+    it('says a mistake in a page or a nav.json is reported when it is saved', () => {
+      expect(printed()).to.contain("So is a mistake in a page or a 'nav.json'");
+    });
   });
 });

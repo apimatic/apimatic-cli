@@ -268,4 +268,34 @@ describe('FileWatchService', () => {
 
     expect(result.isErr()).to.be.true;
   });
+
+  // `portal serve` checks the content directory on any save in it, a page or a nav.json alike.
+  describe('a whole tree', () => {
+    const nested = () => path.join(root, 'guides', 'deep', 'nav.json');
+
+    beforeEach(async () => {
+      fs.mkdirSync(path.dirname(nested()), { recursive: true });
+      await settled();
+    });
+
+    it('reports a save at any depth below the directory, once it has settled', async () => {
+      let calls = 0;
+      watch = service
+        .watchTree(
+          new DirectoryPath(root),
+          async () => {
+            calls += 1;
+          },
+          () => undefined
+        )
+        ._unsafeUnwrap();
+      await pause(SETTLE_MS * 2);
+
+      fs.writeFileSync(nested(), '{}');
+      fs.appendFileSync(nested(), '\n');
+      await until(() => calls >= 1);
+
+      expect(calls).to.equal(1);
+    });
+  });
 });

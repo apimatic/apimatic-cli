@@ -787,6 +787,36 @@ describe('PortalSourceContext', () => {
   });
 
   // The build fails as a whole over one page its schema refuses, with a stack trace for a message.
+  // What `portal serve` runs on each save in content/, with the specifications `resolve` found.
+  describe('resolveContent', () => {
+    beforeEach(() => {
+      writeConfig({ site: { name: 'Calc' } });
+      write('spec/api.json', OPENAPI);
+      write('content/index.md', page('Home'));
+    });
+
+    it('refuses what resolve refuses about the content, and accepts it once fixed', async () => {
+      const { specs } = (await resolve())._unsafeUnwrap();
+      const context = new PortalSourceContext(new DirectoryPath(root));
+
+      write('content/nav.json', JSON.stringify({ pages: ['index', 'missing'] }));
+      const refused = (await context.resolveContent(specs))._unsafeUnwrapErr();
+      write('content/nav.json', JSON.stringify({ pages: ['index'] }));
+
+      expect(refused.kind).to.equal('invalidNavigation');
+      expect((await context.resolveContent(specs)).isOk()).to.be.true;
+    });
+
+    // The reference's folders are the specifications' own, which it takes as they were at startup.
+    it('lets content/api/nav.json name a specification without reading it again', async () => {
+      const { specs } = (await resolve())._unsafeUnwrap();
+      write('content/api/nav.json', JSON.stringify({ pages: [specs[0].slug] }));
+      fs.rmSync(path.join(root, 'spec/api.json'));
+
+      expect((await new PortalSourceContext(new DirectoryPath(root)).resolveContent(specs)).isOk()).to.be.true;
+    });
+  });
+
   describe('the front matter of the pages', () => {
     beforeEach(() => {
       writeConfig({ site: { name: 'Calc' } });

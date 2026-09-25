@@ -148,51 +148,13 @@ export class PortalSourceContext {
     const staticDirectory = (await this.fileService.directoryExists(this.staticDirectory))
       ? this.staticDirectory
       : null;
-    const contentDirectory = (await this.fileService.directoryExists(this.contentDirectory))
-      ? this.contentDirectory
-      : null;
+    const contentDirectory = await this.existingContentDirectory();
 
-    // Walked once and shared: both the navigation scan and the hidden-page check read the
-    // whole content tree, and `getDirectory` stats every entry in it.
-    // Not swallowed: a tree that cannot be walked would otherwise pass as one with no files,
-    // and a `nav.json` in it would go unvalidated to a build that drops bad entries silently.
-    let contentTree: Directory | null = null;
-    if (contentDirectory !== null) {
-      try {
-        contentTree = await this.fileService.getDirectory(contentDirectory);
-      } catch {
-        return err({ kind: 'unreadableContent' });
-      }
+    const content = await this.content(contentDirectory, specs);
+    if (content.isErr()) {
+      return err(content.error);
     }
-
-    const contentPages = contentTree === null ? [] : PortalSourceContext.contentPages(contentTree);
-
-    // Refused before the navigation scan, which would otherwise answer an entry naming such a
-    // page as if it were an ordinary one. In the build, the user's page and the generated one
-    // would compete for the address.
-    const reserved = PortalSourceContext.reservedAddressPages(contentPages);
-    if (reserved.length > 0) {
-      return err({ kind: 'reservedAddresses', pages: reserved });
-    }
-
-    // The build fails on two pages at one address, or moves an index page to `<folder>/index`.
-    const shared = PortalSourceContext.sharedAddresses(contentPages);
-    if (shared.length > 0) {
-      return err({ kind: 'sharedAddresses', addresses: shared });
-    }
-
-    // The build fails as a whole, with a stack trace, over one page whose front matter it refuses.
-    const titledPages = await this.titledPages(contentPages);
-    if (titledPages.isErr()) {
-      return err({ kind: 'invalidFrontMatter', errors: titledPages.error });
-    }
-
-    // Validated here rather than in the template: Fumadocs drops an entry it cannot resolve
-    // without a word, so a typo would otherwise reach the user as a quietly wrong sidebar.
-    const navigation = await this.navigation(contentTree, specs, titledPages.value);
-    if (navigation.errors.length > 0) {
-      return err({ kind: 'invalidNavigation', errors: navigation.errors });
-    }
+    const { pages: contentPages, navigation } = content.value;
 
     return ok({
       ...settings.value,
@@ -206,6 +168,69 @@ export class PortalSourceContext {
       folderTabs: navigation.tabs.flatMap(({ owner }) => (owner.kind === 'folder' ? [owner.directory] : [])),
       sharedTabNames: sharedTabNames(PortalSourceContext.allTabs(navigation.tabs, settings.value.generatedPages))
     });
+  }
+
+  /**
+   * The `content/` half of `resolve`, for `portal serve` to run on every save there, so a
+   * mistake is reported when it is made rather than at the next start. `specs` is what `resolve`
+   * found, which is not read again; changing them needs a restart anyway.
+   */
+  public async resolveContent(specs: PortalSpec[]): Promise<Result<void, PortalSourceProblem>> {
+    const content = await this.content(await this.existingContentDirectory(), specs);
+    return content.map(() => undefined);
+  }
+
+  private async existingContentDirectory(): Promise<DirectoryPath | null> {
+    return (await this.fileService.directoryExists(this.contentDirectory)) ? this.contentDirectory : null;
+  }
+
+  /** The content tree's pages and `nav.json` files, held to the rules the build reads them by. */
+  private async content(
+    contentDirectory: DirectoryPath | null,
+    specs: PortalSpec[]
+  ): Promise<Result<{ pages: ContentPage[]; navigation: NavigationScan }, PortalSourceProblem>> {
+    // Walked once and shared: both the navigation scan and the hidden-page check read the
+    // whole content tree, and `getDirectory` stats every entry in it.
+    // Not swallowed: a tree that cannot be walked would otherwise pass as one with no files,
+    // and a `nav.json` in it would go unvalidated to a build that drops bad entries silently.
+    let contentTree: Directory | null = null;
+    if (contentDirectory !== null) {
+      try {
+        contentTree = await this.fileService.getDirectory(contentDirectory);
+      } catch {
+        return err({ kind: 'unreadableContent' });
+      }
+    }
+
+    const pages = contentTree === null ? [] : PortalSourceContext.contentPages(contentTree);
+
+    // Refused before the navigation scan, which would otherwise answer an entry naming such a
+    // page as if it were an ordinary one. In the build, the user's page and the generated one
+    // would compete for the address.
+    const reserved = PortalSourceContext.reservedAddressPages(pages);
+    if (reserved.length > 0) {
+      return err({ kind: 'reservedAddresses', pages: reserved });
+    }
+
+    // The build fails on two pages at one address, or moves an index page to `<folder>/index`.
+    const shared = PortalSourceContext.sharedAddresses(pages);
+    if (shared.length > 0) {
+      return err({ kind: 'sharedAddresses', addresses: shared });
+    }
+
+    // The build fails as a whole, with a stack trace, over one page whose front matter it refuses.
+    const titledPages = await this.titledPages(pages);
+    if (titledPages.isErr()) {
+      return err({ kind: 'invalidFrontMatter', errors: titledPages.error });
+    }
+
+    // Validated here rather than in the template: Fumadocs drops an entry it cannot resolve
+    // without a word, so a typo would otherwise reach the user as a quietly wrong sidebar.
+    const navigation = await this.navigation(contentTree, specs, titledPages.value);
+    if (navigation.errors.length > 0) {
+      return err({ kind: 'invalidNavigation', errors: navigation.errors });
+    }
+    return ok({ pages, navigation });
   }
 
   /**

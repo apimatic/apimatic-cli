@@ -80,6 +80,11 @@ export class PortalServeAction {
         }
 
         const configWatch = this.watchConfig(source, project.projectDirectory, sourceDirectory);
+        const contentWatch = this.watchContent(source, sourceDirectory);
+        const closeWatches = async () => {
+          await configWatch?.close();
+          await contentWatch?.close();
+        };
 
         this.clearStandardInput();
 
@@ -96,13 +101,13 @@ export class PortalServeAction {
           }
 
           // First, so a save still being handled is not reported after the preview says it stops.
-          await configWatch?.close();
+          await closeWatches();
           this.prompts.stopping();
           await server.value.stop();
           return ActionResult.stopped();
         } finally {
           // Before the portal project goes: a save being handled writes into it.
-          await configWatch?.close();
+          await closeWatches();
         }
       }
     );
@@ -167,6 +172,40 @@ export class PortalServeAction {
     }
     // The file was read before the preview started, which can take a minute, and a save made
     // in the meantime reached no watch.
+    watch.value.recheck();
+    return watch.value;
+  }
+
+  /**
+   * The preview reloads a page or a `nav.json` itself, and drops what the build would refuse
+   * without a word, so each save is checked as `portal generate` would check it.
+   */
+  private watchContent(source: PortalSource, sourceDirectory: DirectoryPath): FileWatch | undefined {
+    if (source.contentDirectory === null) {
+      return undefined;
+    }
+    const sourceContext = new PortalSourceContext(sourceDirectory);
+    let rejected = false;
+
+    const check = async () => {
+      const checked = await sourceContext.resolveContent(source.specs);
+      if (checked.isErr()) {
+        rejected = true;
+        this.prompts.contentRejected(checked.error, sourceDirectory);
+      } else if (rejected) {
+        rejected = false;
+        this.prompts.contentAccepted(sourceDirectory);
+      }
+    };
+
+    const watch = this.fileWatchService.watchTree(source.contentDirectory, check, (reason) =>
+      this.prompts.contentWatchFailed(reason, sourceDirectory)
+    );
+    if (watch.isErr()) {
+      this.prompts.contentNotWatched(watch.error, sourceDirectory);
+      return undefined;
+    }
+    // As for `apimatic.json`: a save made while the preview started reached no watch.
     watch.value.recheck();
     return watch.value;
   }

@@ -40,6 +40,27 @@ export class FileWatchService {
     onChange: () => Promise<void>,
     onFailed: (reason: string) => void
   ): Result<FileWatch, string> {
+    // Some platforms leave the name out of an event; one without it may be this file.
+    const isWatched = (changed: string | null) => changed === null || fileName.is(changed);
+    return this.watchDirectory(directory, false, isWatched, onChange, onFailed);
+  }
+
+  /** As `watch`, for a save of any file at any depth below `directory`. */
+  public watchTree(
+    directory: DirectoryPath,
+    onChange: () => Promise<void>,
+    onFailed: (reason: string) => void
+  ): Result<FileWatch, string> {
+    return this.watchDirectory(directory, true, () => true, onChange, onFailed);
+  }
+
+  private watchDirectory(
+    directory: DirectoryPath,
+    recursive: boolean,
+    isWatched: (changed: string | null) => boolean,
+    onChange: () => Promise<void>,
+    onFailed: (reason: string) => void
+  ): Result<FileWatch, string> {
     let watcher: fs.FSWatcher;
     let timer: NodeJS.Timeout | undefined;
     let closed = false;
@@ -64,9 +85,8 @@ export class FileWatchService {
       // On Windows, libuv aborts the whole process at the first event under a directory named by
       // its 8.3 short name, as a TEMP of C:\Users\RUNNER~1\... is, so the real path is watched.
       const watched = fs.realpathSync.native(directory.toString());
-      // Some platforms leave the name out of an event; one without it may be this file.
-      watcher = fs.watch(watched, (_event, changed) => {
-        if (closed || (changed !== null && !fileName.is(changed.toString()))) {
+      watcher = fs.watch(watched, { recursive }, (_event, changed) => {
+        if (closed || !isWatched(changed === null ? null : changed.toString())) {
           return;
         }
         clearTimeout(timer);
