@@ -73,6 +73,12 @@ export interface ReservedAddressPage {
   section: GeneratedSection;
 }
 
+/** Pages of the user's that would be served at one address, which only one of them can have. */
+export interface SharedAddress {
+  address: string;
+  pages: FilePath[];
+}
+
 /** Why a source directory cannot be built; each variant maps to its own message. */
 export type PortalSourceProblem =
   | { kind: 'missingConfig' }
@@ -80,6 +86,7 @@ export type PortalSourceProblem =
   | { kind: 'invalidConfig'; errors: string[]; missingPortal: boolean }
   | { kind: 'invalidNavigation'; errors: string[] }
   | { kind: 'reservedAddresses'; pages: ReservedAddressPage[] }
+  | { kind: 'sharedAddresses'; addresses: SharedAddress[] }
   | { kind: 'unreadableContent' }
   | { kind: 'unreadableSpec'; fileName: FileName }
   | { kind: 'emptySpecDirectory' }

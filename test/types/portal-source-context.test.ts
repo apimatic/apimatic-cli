@@ -525,12 +525,13 @@ describe('PortalSourceContext', () => {
 
     // The reference emits no page at the section's own address, so a page there is served
     // and shown: as the section's landing page, or beside it.
-    it('does not report a page at the section’s own address', async () => {
-      write('content/api/api.md', '# Landing');
-      write('content/api/api/index.md', '# Overview');
+    for (const landing of ['content/api/api.md', 'content/api/api/index.md']) {
+      it(`does not report ${landing}, at the section’s own address`, async () => {
+        write(landing, '# Landing');
 
-      expect(hidden((await resolve())._unsafeUnwrap())).to.deep.equal([]);
-    });
+        expect(hidden((await resolve())._unsafeUnwrap())).to.deep.equal([]);
+      });
+    }
 
     // An index page is a folder's own link, and the folders directly below a section are the
     // tag folders, which the CLI cannot tell from the user's without reading the specification.
@@ -728,6 +729,57 @@ describe('PortalSourceContext', () => {
         "content/nav.json: 'sdks' is not a page or folder in this directory. 'apimatic:sdks' positions the SDK pages.",
         "content/nav.json: 'context-plugin' is not a page or folder in this directory. 'apimatic:plugin' positions the context plugin page."
       ]);
+    });
+  });
+
+  describe('the addresses the pages are served at', () => {
+    beforeEach(() => {
+      writeConfig({ site: { name: 'Calc' } });
+      write('spec/api.json', OPENAPI);
+      write('content/index.md', '# Home');
+    });
+
+    /** Each shared address with the pages that would be served there. */
+    const shared = (problem: PortalSourceProblem): string[] => {
+      if (problem.kind !== 'sharedAddresses') {
+        throw new Error(`expected a 'sharedAddresses' problem, got '${problem.kind}'`);
+      }
+      return problem.addresses
+        .map(
+          ({ address, pages }) => `${address} ${pages.map((page) => page.relativeTo(new DirectoryPath(root))).sort()}`
+        )
+        .sort();
+    };
+
+    // The build would serve the page there and move the folder's own to /guides/index.
+    it('refuses a page beside a folder whose index page has the same address', async () => {
+      write('content/guides.md', '# Guides page');
+      write('content/guides/index.md', '# Guides');
+
+      expect(shared((await resolve())._unsafeUnwrapErr())).to.deep.equal([
+        '/guides content/guides.md,content/guides/index.md'
+      ]);
+    });
+
+    it('refuses every address two pages share, through a (group) folder or two extensions', async () => {
+      write('content/(start)/index.md', '# Start');
+      write('content/intro.md', '# Intro');
+      write('content/(learn)/intro.mdx', '# Grouped intro');
+      write('content/faq.md', '# FAQ');
+      write('content/faq.mdx', '# FAQ again');
+
+      expect(shared((await resolve())._unsafeUnwrapErr())).to.deep.equal([
+        '/ content/(start)/index.md,content/index.md',
+        '/faq content/faq.md,content/faq.mdx',
+        '/intro content/(learn)/intro.mdx,content/intro.md'
+      ]);
+    });
+
+    it('accepts a page beside a folder of the same name that has no index page', async () => {
+      write('content/guides.md', '# Guides page');
+      write('content/guides/intro.md', '# Intro');
+
+      expect((await resolve()).isOk()).to.be.true;
     });
   });
 

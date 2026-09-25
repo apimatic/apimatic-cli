@@ -2,7 +2,7 @@ import { log } from '@clack/prompts';
 import { APIMATIC_CONFIG_FILE_NAME } from '../../types/apimatic-config/document.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { listedInProse } from '../../types/portal/config/fields.js';
-import { PortalSourceProblem, ReservedAddressPage } from '../../types/portal/portal-source.js';
+import { PortalSourceProblem, ReservedAddressPage, SharedAddress } from '../../types/portal/portal-source.js';
 import { PortalTab, SharedTabName } from '../../types/portal/portal-tabs.js';
 import { FileName } from '../../types/file/fileName.js';
 import { FilePath } from '../../types/file/filePath.js';
@@ -43,6 +43,10 @@ export function reportSourceProblem(
     }
     case 'reservedAddresses': {
       reportReservedAddresses(problem.pages, sourceDirectory);
+      return;
+    }
+    case 'sharedAddresses': {
+      reportSharedAddresses(problem.addresses, sourceDirectory);
       return;
     }
     case 'unreadableContent': {
@@ -117,6 +121,24 @@ function reportReservedAddresses(pages: ReservedAddressPage[], sourceDirectory: 
   );
   log.message(lines.join('\n'));
   log.message(one ? 'Rename or move the page.' : 'Rename or move each page.');
+}
+
+function reportSharedAddresses(addresses: SharedAddress[], sourceDirectory: DirectoryPath): void {
+  const one = addresses.length === 1;
+  const lines = addresses.map(
+    ({ address, pages }) =>
+      `  • ${f.var(address)}: ${listedInProse(pages.map((page) => f.var(page.relativeTo(sourceDirectory))))}`
+  );
+  log.error(
+    `Pages in ${f.path(sourceDirectory)} would be served at the same ${one ? 'address' : 'addresses'}, ` +
+      `which only one page can have:`
+  );
+  log.message(lines.join('\n'));
+  log.message(
+    `Rename or move all but one ${one ? 'of them' : 'page at each address'}. A page in a ${f.var(
+      '(group)'
+    )} folder is served as if the folder were not there, and an ${f.var('index')} page at its folder's address.`
+  );
 }
 
 export function reportShadowedFiles(shadowed: FileName[]): void {

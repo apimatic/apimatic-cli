@@ -28,7 +28,8 @@ import {
   PortalSource,
   PortalSourceProblem,
   PortalSpec,
-  ReservedAddressPage
+  ReservedAddressPage,
+  SharedAddress
 } from './portal/portal-source.js';
 import { frontMatterTitle, PortalTab, sharedTabNames, TabOwner, untitledTabName } from './portal/portal-tabs.js';
 import { SpecContext } from './spec-context.js';
@@ -165,6 +166,12 @@ export class PortalSourceContext {
     const reserved = PortalSourceContext.reservedAddressPages(contentPages);
     if (reserved.length > 0) {
       return err({ kind: 'reservedAddresses', pages: reserved });
+    }
+
+    // The build fails on two pages at one address, or moves an index page to `<folder>/index`.
+    const shared = PortalSourceContext.sharedAddresses(contentPages);
+    if (shared.length > 0) {
+      return err({ kind: 'sharedAddresses', addresses: shared });
     }
 
     // Validated here rather than in the template: Fumadocs drops an entry it cannot resolve
@@ -590,6 +597,18 @@ export class PortalSourceContext {
       const section = GENERATED_SECTIONS.find((candidate) => candidate.folder === slugs[0]);
       return section === undefined ? [] : [{ file, address: `/${slugs.join('/')}`, section }];
     });
+  }
+
+  /** Addresses more than one page would be served at, each with its pages in the order walked. */
+  private static sharedAddresses(pages: ContentPage[]): SharedAddress[] {
+    const byAddress = new Map<string, FilePath[]>();
+    for (const { file, segments } of pages) {
+      const address = `/${PortalSourceContext.slugs(segments).join('/')}`;
+      byAddress.set(address, [...(byAddress.get(address) ?? []), file]);
+    }
+    return [...byAddress]
+      .filter(([, files]) => files.length > 1)
+      .map(([address, files]) => ({ address, pages: files }));
   }
 
   private static slugs(segments: string[]): string[] {

@@ -145,6 +145,47 @@ describe('reportSourceProblem', () => {
       expect(printed()).to.contain('Rename or move each page.');
     });
   });
+
+  describe('pages at the same address', () => {
+    const content = source.join('content');
+    const page = (directory: DirectoryPath, name: string) => new FilePath(directory, new FileName(name));
+
+    it('names each address and its pages, and why a (group) or index page lands there', () => {
+      reportSourceProblem(
+        {
+          kind: 'sharedAddresses',
+          addresses: [
+            { address: '/guides', pages: [page(content, 'guides.md'), page(content.join('guides'), 'index.md')] },
+            { address: '/', pages: [page(content, 'index.md'), page(content.join('(start)'), 'index.md')] }
+          ]
+        },
+        source
+      );
+
+      const [heading, ...rest] = printed().split('\n');
+
+      expect(heading).to.match(/^Pages in .+ would be served at the same addresses, which only one page can have:$/);
+      expect(rest).to.deep.equal([
+        "  • '/guides': 'content/guides.md' and 'content/guides/index.md'",
+        "  • '/': 'content/index.md' and 'content/(start)/index.md'",
+        "Rename or move all but one page at each address. A page in a '(group)' folder is served as if the " +
+          "folder were not there, and an 'index' page at its folder's address."
+      ]);
+    });
+
+    it('speaks of one address when there is one', () => {
+      reportSourceProblem(
+        {
+          kind: 'sharedAddresses',
+          addresses: [{ address: '/faq', pages: [page(content, 'faq.md'), page(content, 'faq.mdx')] }]
+        },
+        source
+      );
+
+      expect(printed()).to.contain('would be served at the same address, which only one page can have:');
+      expect(printed()).to.contain('Rename or move all but one of them.');
+    });
+  });
 });
 
 describe('reportFolderTabs', () => {
