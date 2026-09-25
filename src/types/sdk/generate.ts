@@ -62,11 +62,8 @@ export const LANGUAGE_CHOICES: ReadonlyArray<{ label: string; value: Language }>
   Language.GO
 ].map((value) => ({ label: LANGUAGE_NAMES[value], value }));
 
-// java, php, ruby and go have no v4 renderer, so a plugin cannot carry them whatever the config says.
+// Only these have a v4 renderer, so a plugin cannot carry the rest whatever the config says.
 export const PLUGIN_LANGUAGES: readonly Language[] = [Language.CSHARP, Language.TYPESCRIPT, Language.PYTHON];
-
-// The four a plugin cannot carry, named so a user whose language is missing sees it rather than wonders.
-export const UPCOMING_LANGUAGES: readonly Language[] = [Language.JAVA, Language.RUBY, Language.GO, Language.PHP];
 
 /** The name a language is shown under everywhere, so one reads the same in every message. */
 export const languageLabel = (language: string): string =>
@@ -75,6 +72,11 @@ export const languageLabel = (language: string): string =>
 export function isPluginLanguage(language: string): language is Language {
   return PLUGIN_LANGUAGES.includes(language as Language);
 }
+
+/** The rest of the enum, so a language cannot be named by both lists or by neither. */
+export const UPCOMING_LANGUAGES: readonly Language[] = LANGUAGE_CHOICES.map((choice) => choice.value).filter(
+  (language) => !isPluginLanguage(language)
+);
 
 export class CodegenOption {
   public static readonly v3 = new CodegenOption(CodeGenerationVersion.V3, Stability.STABLE);
