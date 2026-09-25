@@ -5,7 +5,7 @@ import { expect } from 'chai';
 import { stringify as toYaml } from 'yaml';
 import { createOpenAPI } from 'fumadocs-openapi/server';
 import type { Document } from 'fumadocs-openapi';
-import { placeCodeSamples, readCodeSampleCatalogs } from '../../portal-template/src/lib/code-samples.server';
+import { placeCodeSamples, readCodeSamples } from '../../portal-template/src/lib/code-samples.server';
 import { bundleSpec } from '../../portal-template/src/lib/openapi-bundle.server';
 
 const EXTENSION = 'x-apimatic-codeSamples';
@@ -70,7 +70,7 @@ describe('placeCodeSamples', () => {
   it('drops the samples an operation carries when the build has no samples file', async () => {
     const written = { paths: { '/pets': { get: { ...operation('List'), [EXTENSION]: [typescript('own')] } } } };
 
-    expect(placed(written, await readCodeSampleCatalogs(null)).paths['/pets'].get).to.not.have.property(EXTENSION);
+    expect(placed(written, await readCodeSamples(null)).paths['/pets'].get).to.not.have.property(EXTENSION);
   });
 
   it('gives two paths that share one operation object their own samples', () => {
@@ -111,12 +111,12 @@ describe('placeCodeSamples', () => {
         paths: { '/pets': { $ref: './paths/pets.yaml' }, '/owners': { $ref: '#/components/pathItems/Owners' } },
         components: { pathItems: { Owners: { get: operation('List owners') } } }
       });
-      const samplesFile = write('code-sample-catalogs.json', {
+      const samplesFile = write('code-samples.json', {
         '/pets': { GET: [typescript('pets')] },
         '/owners': { GET: [typescript('owners')] }
       });
 
-      const samples = await readCodeSampleCatalogs(samplesFile);
+      const samples = await readCodeSamples(samplesFile);
       const server = createOpenAPI({
         input: { api: async () => placeCodeSamples(await bundleSpec(file), samples) }
       });

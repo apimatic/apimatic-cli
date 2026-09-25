@@ -103,7 +103,7 @@ export class PortalProjectService {
     await this.writeConfiguration(
       projectDirectory,
       source,
-      await this.writeCodeSampleCatalogs(projectDirectory, artifacts.codeSampleCatalogs),
+      await this.writeCodeSamples(projectDirectory, artifacts.codeSampleCatalogs),
       await this.writeDownloads(projectDirectory, artifacts)
     );
 
@@ -156,14 +156,14 @@ export class PortalProjectService {
   }
 
   // The template places the samples on the specs as it bundles them, so the specs are read where they are.
-  private async writeCodeSampleCatalogs(
+  private async writeCodeSamples(
     projectDirectory: DirectoryPath,
     codeSampleCatalogs: CodeSampleCatalogs
   ): Promise<FilePath | null> {
     if (codeSampleCatalogs.isEmpty()) {
       return null;
     }
-    const file = new FilePath(projectDirectory, new FileName('code-sample-catalogs.json'));
+    const file = new FilePath(projectDirectory, new FileName('code-samples.json'));
     await this.fileService.writeContents(file, JSON.stringify(codeSampleCatalogs.toJson()));
     return file;
   }
@@ -209,7 +209,7 @@ export class PortalProjectService {
   private async writeConfiguration(
     projectDirectory: DirectoryPath,
     source: PortalSource,
-    codeSampleCatalogs: FilePath | null,
+    codeSamples: FilePath | null,
     downloads: DirectoryPath | null
   ): Promise<void> {
     const contentDirectory = source.contentDirectory ?? projectDirectory.join('content');
@@ -226,7 +226,7 @@ export class PortalProjectService {
     // build's own config files.
     const configuration = {
       specs,
-      codeSampleCatalogs: codeSampleCatalogs === null ? null : this.toPosix(codeSampleCatalogs.toString()),
+      codeSamples: codeSamples === null ? null : this.toPosix(codeSamples.toString()),
       contentDir: this.toPosix(contentDirectory.toString()),
       generatedDir: this.toPosix(projectDirectory.join(GENERATED_DIRECTORY_NAME).toString()),
       staticDir: source.staticDirectory === null ? null : this.toPosix(source.staticDirectory.toString()),

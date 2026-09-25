@@ -135,7 +135,7 @@ describe('PortalProjectService', () => {
 
       const config = readConfig();
       expect(Object.keys(config).sort()).to.deep.equal([
-        'codeSampleCatalogs',
+        'codeSamples',
         'contentDir',
         'downloadsDir',
         'generatedDir',
@@ -264,10 +264,8 @@ describe('PortalProjectService', () => {
       (await service.prepare(project, sourceFor(), withCatalogs))._unsafeUnwrap();
 
       const config = readConfig();
-      expect(config.codeSampleCatalogs).to.equal(
-        path.join(project.toString(), 'code-sample-catalogs.json').split(path.sep).join('/')
-      );
-      expect(JSON.parse(fs.readFileSync(config.codeSampleCatalogs, 'utf8'))).to.deep.equal({
+      expect(config.codeSamples).to.equal(path.join(project.toString(), 'code-samples.json').split(path.sep).join('/'));
+      expect(JSON.parse(fs.readFileSync(config.codeSamples, 'utf8'))).to.deep.equal({
         '/pets': {
           GET: [{ lang: 'typescript', label: 'TypeScript', sources: { Example: 'await client.pets.list();' } }]
         }
@@ -285,8 +283,8 @@ describe('PortalProjectService', () => {
     it('names no samples when there are none', async () => {
       (await service.prepare(project, sourceFor(), NO_ARTIFACTS))._unsafeUnwrap();
 
-      expect(readConfig().codeSampleCatalogs).to.be.null;
-      expect(fs.existsSync(path.join(project.toString(), 'code-sample-catalogs.json'))).to.be.false;
+      expect(readConfig().codeSamples).to.be.null;
+      expect(fs.existsSync(path.join(project.toString(), 'code-samples.json'))).to.be.false;
     });
   });
 

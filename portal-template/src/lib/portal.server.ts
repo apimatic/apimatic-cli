@@ -7,4 +7,4 @@ import portalConfig from '../../portal.config.json';
 export const specs = portalConfig.specs as Record<string, string>;
 
 /** The code samples the CLI placed beside `portal.config.json`, or null for a build without any. */
-export const codeSampleCatalogsFile = portalConfig.codeSampleCatalogs as string | null;
+export const codeSamplesFile = portalConfig.codeSamples as string | null;

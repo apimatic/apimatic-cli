@@ -6,7 +6,7 @@ export interface PortalConfig {
   /** Section slug -> absolute path of an OpenAPI document. */
   specs: Record<string, string>;
   /** Absolute path of the code samples, keyed by path then method; null when there are none. */
-  codeSampleCatalogs: string | null;
+  codeSamples: string | null;
   /** Absolute. Always exists, and may be empty. */
   contentDir: string;
   /** Absolute, inside this project: the pages the CLI generates, which `src/lib/source.ts` compiles. */
