@@ -6,18 +6,18 @@ import { DirectoryPath } from '../../src/types/file/directoryPath';
 import { ProjectContext } from '../../src/types/project-context';
 
 describe('ProjectContext.upsertGitignore', () => {
-  let root: string;
+  let projectDirectory: string;
 
-  const gitignorePath = () => path.join(root, '.gitignore');
+  const gitignorePath = () => path.join(projectDirectory, '.gitignore');
   const gitignore = () => fs.readFileSync(gitignorePath(), 'utf8');
-  const ignore = async () => await new ProjectContext(new DirectoryPath(root)).upsertGitignore();
+  const ignore = async () => await new ProjectContext(new DirectoryPath(projectDirectory)).upsertGitignore();
 
   beforeEach(() => {
-    root = fs.mkdtempSync(path.join(os.tmpdir(), 'project-context-'));
+    projectDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'project-context-'));
   });
 
   afterEach(() => {
-    fs.rmSync(root, { recursive: true, force: true });
+    fs.rmSync(projectDirectory, { recursive: true, force: true });
   });
 
   it('writes the generated paths into a project that has no gitignore', async () => {

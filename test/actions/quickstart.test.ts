@@ -28,7 +28,7 @@ const PASSED = { isSuccess: true, blocking: [], errors: [], warnings: [], inform
 
 describe('QuickstartAction', () => {
   let root: string;
-  let project: DirectoryPath;
+  let projectDirectory: DirectoryPath;
   let prompts: sinon.SinonStubbedInstance<QuickstartPrompts>;
   let runtimeProblem: sinon.SinonStub;
   let authorize: sinon.SinonStub;
@@ -41,12 +41,12 @@ describe('QuickstartAction', () => {
     root = fs.mkdtempSync(path.join(os.tmpdir(), 'portal-quickstart-'));
     // Signed in already, so the wizard goes straight to its questions.
     fs.writeFileSync(path.join(root, 'config.json'), JSON.stringify({ email: 'a@b.test', authKey: 'auth-key' }));
-    project = new DirectoryPath(root).join('project');
-    fs.mkdirSync(project.toString());
+    projectDirectory = new DirectoryPath(root).join('project');
+    fs.mkdirSync(projectDirectory.toString());
 
     prompts = sinon.stub(QuickstartPrompts.prototype);
     prompts.specPathPrompt.resolves(SPEC);
-    prompts.inputDirectoryPathPrompt.resolves(project);
+    prompts.projectDirectoryPrompt.resolves(projectDirectory);
 
     sinon.stub(ApiValidatePrompts.prototype, 'validateApi').callsFake((fn) => fn);
     sinon
@@ -92,7 +92,7 @@ describe('QuickstartAction', () => {
 
     await execute();
 
-    const written = JSON.parse(fs.readFileSync(path.join(project.toString(), 'src', 'apimatic.json'), 'utf8'));
+    const written = JSON.parse(fs.readFileSync(path.join(projectDirectory.toString(), 'src', 'apimatic.json'), 'utf8'));
     expect(written.languages).to.deep.equal({ typescript: {}, python: {} });
     expect(written.plugin).to.deep.equal({
       pluginId: 'my-api-plugin',
@@ -102,8 +102,8 @@ describe('QuickstartAction', () => {
     });
     expect(written.portal, 'the portal block survives the language write').to.not.be.undefined;
 
-    expect(fs.existsSync(path.join(project.toString(), 'src', 'spec', 'Apimatic-Calculator.json'))).to.be.true;
-    expect(fs.readFileSync(path.join(project.toString(), '.gitignore'), 'utf8')).to.contain('/plugin/');
+    expect(fs.existsSync(path.join(projectDirectory.toString(), 'src', 'spec', 'Apimatic-Calculator.json'))).to.be.true;
+    expect(fs.readFileSync(path.join(projectDirectory.toString(), '.gitignore'), 'utf8')).to.contain('/plugin/');
 
     // Reaching either is the handoff: nothing else in the wizard asks for artifacts or
     // prepares a project.
@@ -138,15 +138,15 @@ describe('QuickstartAction', () => {
       await execute(downloaded);
 
       expect(prompts.specPathPrompt.called, 'asked for a specification the project has').to.be.false;
-      expect(prompts.inputDirectoryPathPrompt.called, 'asked where to put a project that exists').to.be.false;
+      expect(prompts.projectDirectoryPrompt.called, 'asked where to put a project that exists').to.be.false;
 
-      const source = path.join(downloaded.toString(), 'src');
-      const written = JSON.parse(fs.readFileSync(path.join(source, 'apimatic.json'), 'utf8'));
+      const sourceDirectory = path.join(downloaded.toString(), 'src');
+      const written = JSON.parse(fs.readFileSync(path.join(sourceDirectory, 'apimatic.json'), 'utf8'));
       expect(written.languages).to.deep.equal({ typescript: {} });
       expect(written.portal, 'the portal block is scaffolded into the project it adopted').to.not.be.undefined;
 
       // The one that was there, and no copy of it beside itself.
-      expect(fs.readdirSync(path.join(source, 'spec'))).to.deep.equal(['Apimatic-Calculator.json']);
+      expect(fs.readdirSync(path.join(sourceDirectory, 'spec'))).to.deep.equal(['Apimatic-Calculator.json']);
     });
 
     // The sample is written where the wizard is told to write, and an adopted `spec/` already

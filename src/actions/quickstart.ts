@@ -25,7 +25,7 @@ import { DEFAULT_PORTAL_PORT, PortalServeAction } from './portal/serve.js';
 
 /** What the wizard writes into, and the specification it builds the portal from. */
 interface Project {
-  directory: DirectoryPath;
+  projectDirectory: DirectoryPath;
   source: PortalSourceContext;
   specPath: FilePath;
   /** True when the project arrived with its own `src/`, which is left where it is. */
@@ -87,11 +87,11 @@ export class QuickstartAction {
     if (project.isErr()) {
       return project.error;
     }
-    const { directory, source, specPath, adopted } = project.value;
+    const { projectDirectory, source, specPath, adopted } = project.value;
     const schemaUrl = schemaUrlFor(envInfo.getCLIVersion());
 
     const scaffolded = adopted ? await source.adopt(specPath, schemaUrl) : await source.scaffold(specPath, schemaUrl);
-    const sourceDirectory = directory.join('src');
+    const sourceDirectory = projectDirectory.join('src');
     if (scaffolded.isErr()) {
       this.prompts.scaffoldFailed(scaffolded.error, sourceDirectory);
       return ActionResult.failed();
@@ -114,13 +114,13 @@ export class QuickstartAction {
     }
 
     // Reported rather than fatal: what Git tracks does not decide whether a portal can be built.
-    const ignored = await new ProjectContext(directory).upsertGitignore();
+    const ignored = await new ProjectContext(projectDirectory).upsertGitignore();
     if (ignored.isErr()) {
-      this.prompts.gitignoreNotUpdated(ignored.error, directory);
+      this.prompts.gitignoreNotUpdated(ignored.error, projectDirectory);
     }
 
     const structure = await this.fileService.getDirectory(sourceDirectory);
-    this.prompts.printDirectoryStructure(directory, structure);
+    this.prompts.printDirectoryStructure(projectDirectory, structure);
 
     const result = await new PortalServeAction(this.configDir, this.commandMetadata, null).execute(
       sourceDirectory,
@@ -150,7 +150,7 @@ export class QuickstartAction {
         return err(validated.error);
       }
       this.prompts.createPortalStep();
-      return ok({ directory: workingDirectory, source: hereSource, specPath: validated.value, adopted: true });
+      return ok({ projectDirectory: workingDirectory, source: hereSource, specPath: validated.value, adopted: true });
     }
 
     this.prompts.importSpecStep();
@@ -164,13 +164,13 @@ export class QuickstartAction {
     }
 
     this.prompts.createPortalStep();
-    const directory = await this.chooseDirectory();
-    if (directory === undefined) {
+    const projectDirectory = await this.chooseProjectDirectory();
+    if (projectDirectory === undefined) {
       return err(ActionResult.cancelled());
     }
     return ok({
-      directory,
-      source: new PortalSourceContext(directory.join('src')),
+      projectDirectory,
+      source: new PortalSourceContext(projectDirectory.join('src')),
       specPath: validated.value,
       adopted: false
     });
@@ -251,20 +251,20 @@ export class QuickstartAction {
     return ok(checked);
   }
 
-  private async chooseDirectory(): Promise<DirectoryPath | undefined> {
+  private async chooseProjectDirectory(): Promise<DirectoryPath | undefined> {
     for (;;) {
-      const inputDirectory = await this.prompts.inputDirectoryPathPrompt();
-      if (!inputDirectory) {
-        this.prompts.noInputDirectoryProvided();
+      const projectDirectory = await this.prompts.projectDirectoryPrompt();
+      if (!projectDirectory) {
+        this.prompts.noProjectDirectoryProvided();
         return undefined;
       }
 
-      if (!(await this.fileService.directoryExists(inputDirectory))) {
-        this.prompts.inputDirectoryPathDoesNotExist(inputDirectory);
-      } else if (!(await this.fileService.directoryEmpty(inputDirectory))) {
-        this.prompts.inputDirectoryNotEmpty(inputDirectory);
+      if (!(await this.fileService.directoryExists(projectDirectory))) {
+        this.prompts.projectDirectoryDoesNotExist(projectDirectory);
+      } else if (!(await this.fileService.directoryEmpty(projectDirectory))) {
+        this.prompts.projectDirectoryNotEmpty(projectDirectory);
       } else {
-        return inputDirectory;
+        return projectDirectory;
       }
     }
   }

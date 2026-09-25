@@ -125,34 +125,34 @@ Let's get started!`);
     reportAuthorizationFailure(failure);
   }
 
-  public async inputDirectoryPathPrompt(): Promise<DirectoryPath | undefined> {
-    const inputDirectory = await text({
+  public async projectDirectoryPrompt(): Promise<DirectoryPath | undefined> {
+    const projectDirectory = await text({
       message:
         'Enter the directory path where you would like to setup the API Portal (must be empty, apart from hidden files such as .git):',
       placeholder: 'Provide absolute path to the directory or press Enter to use the current directory.',
       defaultValue: './'
     });
 
-    if (isCancel(inputDirectory)) {
+    if (isCancel(projectDirectory)) {
       return undefined;
     }
 
-    const cleanedPath = removeQuotes((inputDirectory as string)?.trim() ?? '');
+    const cleanedPath = removeQuotes((projectDirectory as string)?.trim() ?? '');
     return new DirectoryPath(cleanedPath);
   }
 
-  public inputDirectoryPathDoesNotExist(inputDirectory: DirectoryPath) {
-    log.error(`The specified directory path ${f.path(inputDirectory)} does not exist.`);
+  public projectDirectoryDoesNotExist(projectDirectory: DirectoryPath) {
+    log.error(`The specified directory path ${f.path(projectDirectory)} does not exist.`);
   }
 
-  public inputDirectoryNotEmpty(inputDirectory: DirectoryPath) {
+  public projectDirectoryNotEmpty(projectDirectory: DirectoryPath) {
     const message =
-      `The target directory ${f.path(inputDirectory)} is not empty. ` +
+      `The target directory ${f.path(projectDirectory)} is not empty. ` +
       `Please provide a path to an empty directory or clear its contents.`;
     log.error(message);
   }
 
-  public noInputDirectoryProvided() {
+  public noProjectDirectoryProvided() {
     log.error('No directory was specified.');
   }
 
@@ -210,9 +210,9 @@ Let's get started!`);
     log.error(`${serviceError.errorMessage} Could not download ${f.link(url.toString())}.`);
   }
 
-  public printDirectoryStructure(inputDirectory: DirectoryPath, directory: Directory) {
-    const heading = `${f.var('src')} directory containing source files created at ${f.path(inputDirectory)}\n`;
-    const message = getTree(directory.toTreeNode());
+  public printDirectoryStructure(projectDirectory: DirectoryPath, structure: Directory) {
+    const heading = `${f.var('src')} directory containing source files created at ${f.path(projectDirectory)}\n`;
+    const message = getTree(structure.toTreeNode());
     log.info(heading + message);
   }
 
