@@ -38,11 +38,22 @@ Documentation portals are now built on your machine from a `src/` directory, and
   `plugin generate` and `sdk publish` again after upgrading and delete the old file.
 - Put OpenAPI documents in `src/spec/`, Markdown pages in `src/content/` and images and other
   files in `src/static/`.
+- Every page starts with front matter giving its `title`, which names it in the sidebar.
+  Pages written for 1.x had none; the CLI lists each page that needs one before it builds.
+  ```md
+  ---
+  title: Getting started
+  ---
+  ```
 - Page order comes from a `nav.json` beside your pages, listing them by file name, and a
-  `title` there names the folder it sits in. The top level of the portal is shown as tabs:
-  Home, Guides, SDKs, Context Plugin, the API reference, and any folder directly under
-  `src/content/` whose own `nav.json` sets `"root": true`. The root `nav.json` places the
-  tabs the CLI makes with `apimatic:sdks`, `apimatic:plugin` and `apimatic:api`.
+  `title` there names the folder it sits in. A folder links to its `index.md`; without one it
+  is only a heading.
+- The top level of the portal is shown as tabs, which `src/content/nav.json` decides. Home
+  comes first and holds `index.md`, every other page at the top level and the folders the
+  file does not list, in the file's order, and opens on `index.md`; the file's `title` names
+  it. Each folder the file lists becomes a tab of its own after Home, in the file's order,
+  and so do the tabs the CLI makes, placed with `apimatic:sdks`, `apimatic:plugin` and
+  `apimatic:api`.
 - The SDKs tab lists a card per language in the `languages` block, offering its download, and
   its source repository and package once `sdk publish` records them, and gives each language a
   page carrying its SDK's getting-started docs. The Context Plugin tab, with the plugin's install

@@ -38,7 +38,7 @@ export class PortalLanguages {
       errors.push(
         KNOWN_LANGUAGES.includes(key)
           ? `'languages.${key}' is not available yet; the portal supports ${quotedList(SUPPORTED_LANGUAGES)} today.`
-          : `'languages.${key}' is not an SDK language; name one of ${quotedList(SUPPORTED_LANGUAGES)}.`
+          : `'languages.${key}' is not an SDK language; name one of ${quotedList(SUPPORTED_LANGUAGES, 'or')}.`
       );
     }
     if (errors.length > 0) {

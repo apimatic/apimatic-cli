@@ -1,5 +1,6 @@
 import type * as PageTree from 'fumadocs-core/page-tree';
 import type { LayoutTab } from 'fumadocs-ui/layouts/shared';
+import { containsUrl, docsRoute } from './shared';
 
 /**
  * One tab per root folder at the top of the tree, which is every top-level node once the tabs
@@ -11,7 +12,8 @@ import type { LayoutTab } from 'fumadocs-ui/layouts/shared';
 export function portalTabs(tree: PageTree.Root): LayoutTab[] {
   return tree.children.flatMap((node) => {
     if (node.type !== 'folder' || node.root !== true) return [];
-    const url = firstPageUrl(node);
+    // Home keeps the order the root nav.json gives, which need not put the home page first.
+    const url = containsUrl([node], docsRoute) ? docsRoute : firstPageUrl(node);
     return url === undefined
       ? []
       : [{ title: node.name, description: node.description, icon: node.icon, url, $folder: node }];

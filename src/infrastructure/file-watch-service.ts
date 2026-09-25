@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import path from 'node:path';
 import { err, ok, Result } from 'neverthrow';
 import { DirectoryPath } from '../types/file/directoryPath.js';
 import { FileName } from '../types/file/fileName.js';
@@ -25,7 +26,12 @@ export interface FileWatch {
   close(): Promise<void>;
 }
 
+/** Starts the platform's watch, reporting each event through `notify`; answers with what stops it. */
+type StartWatch = (notify: () => void, fail: (error: unknown) => void) => () => void;
+
 export class FileWatchService {
+  public constructor(private readonly platform: NodeJS.Platform = process.platform) {}
+
   /**
    * Calls `onChange` once each save of the file has settled, and never twice at once. Saves
    * that land while one is being handled are handled once more when it finishes, however many
@@ -40,63 +46,166 @@ export class FileWatchService {
     onChange: () => Promise<void>,
     onFailed: (reason: string) => void
   ): Result<FileWatch, string> {
-    let watcher: fs.FSWatcher;
-    let timer: NodeJS.Timeout | undefined;
-    let closed = false;
-    let waiting = false;
-    let running: Promise<void> = Promise.resolve();
-
-    const report = () => {
-      timer = undefined;
-      if (waiting) {
-        return;
-      }
-      waiting = true;
-      running = running.then(async () => {
-        waiting = false;
-        if (!closed) {
-          await onChange().catch(() => undefined);
+    return settledWatch(onChange, onFailed, (notify, fail) => {
+      const watcher = fs.watch(realPath(directory), (_event, changed) => {
+        // Some platforms leave the name out of an event; one without it may be this file.
+        if (changed === null || fileName.is(changed.toString())) {
+          notify();
         }
       });
-    };
-
-    try {
-      // On Windows, libuv aborts the whole process at the first event under a directory named by
-      // its 8.3 short name, as a TEMP of C:\Users\RUNNER~1\... is, so the real path is watched.
-      const watched = fs.realpathSync.native(directory.toString());
-      // Some platforms leave the name out of an event; one without it may be this file.
-      watcher = fs.watch(watched, (_event, changed) => {
-        if (closed || (changed !== null && !fileName.is(changed.toString()))) {
-          return;
-        }
-        clearTimeout(timer);
-        timer = setTimeout(report, SETTLE_MS);
-      });
-    } catch (error) {
-      return err(errorMessage(error));
-    }
-    watcher.on('error', (error) => {
-      if (closed) {
-        return;
-      }
-      closed = true;
-      clearTimeout(timer);
-      watcher.close();
-      onFailed(errorMessage(error));
-    });
-
-    return ok({
-      recheck: () => {
-        if (!closed) {
-          report();
-        }
-      },
-      close: async () => {
-        closed = true;
-        clearTimeout(timer);
-        watcher.close();
-        await running;
-      }
+      watcher.on('error', fail);
+      return () => watcher.close();
     });
   }
+
+  /**
+   * As `watch`, for a save of any file at any depth below `directory`, but for one whose name or
+   * a folder on whose way `isIgnored` answers true for, such as an editor's swap file.
+   */
+  public watchTree(
+    directory: DirectoryPath,
+    onChange: () => Promise<void>,
+    onFailed: (reason: string) => void,
+    isIgnored: (name: string) => boolean = () => false
+  ): Result<FileWatch, string> {
+    return settledWatch(onChange, onFailed, (notify, fail) => {
+      const root = realPath(directory);
+      // Elsewhere Node watches each file, and loses one an editor saves by renaming a new one over it.
+      if (this.platform === 'win32' || this.platform === 'darwin') {
+        const watcher = fs.watch(root, { recursive: true }, (_event, changed) => {
+          if (changed === null || !changed.toString().split(/[\\/]/).some(isIgnored)) {
+            notify();
+          }
+        });
+        watcher.on('error', fail);
+        return () => watcher.close();
+      }
+      return watchEachDirectory(root, isIgnored, notify, fail);
+    });
+  }
+}
+
+// On Windows, libuv aborts the whole process at the first event under a directory named by
+// its 8.3 short name, as a TEMP of C:\Users\RUNNER~1\... is, so the real path is watched.
+function realPath(directory: DirectoryPath): string {
+  return fs.realpathSync.native(directory.toString());
+}
+
+function settledWatch(
+  onChange: () => Promise<void>,
+  onFailed: (reason: string) => void,
+  start: StartWatch
+): Result<FileWatch, string> {
+  let stop: () => void = () => undefined;
+  let timer: NodeJS.Timeout | undefined;
+  let closed = false;
+  let waiting = false;
+  let running: Promise<void> = Promise.resolve();
+
+  const report = () => {
+    timer = undefined;
+    if (waiting) {
+      return;
+    }
+    waiting = true;
+    running = running.then(async () => {
+      waiting = false;
+      if (!closed) {
+        await onChange().catch(() => undefined);
+      }
+    });
+  };
+  const notify = () => {
+    if (closed) {
+      return;
+    }
+    clearTimeout(timer);
+    timer = setTimeout(report, SETTLE_MS);
+  };
+  const fail = (error: unknown) => {
+    if (closed) {
+      return;
+    }
+    closed = true;
+    clearTimeout(timer);
+    stop();
+    onFailed(errorMessage(error));
+  };
+
+  try {
+    stop = start(notify, fail);
+  } catch (error) {
+    return err(errorMessage(error));
+  }
+
+  return ok({
+    recheck: () => {
+      if (!closed) {
+        report();
+      }
+    },
+    close: async () => {
+      closed = true;
+      clearTimeout(timer);
+      stop();
+      await running;
+    }
+  });
+}
+
+/** One watch per directory, as `watch` keeps on its one, since a directory's watch hears a file renamed over. */
+function watchEachDirectory(
+  root: string,
+  isIgnored: (name: string) => boolean,
+  notify: () => void,
+  fail: (error: unknown) => void
+): () => void {
+  const watchers = new Map<string, fs.FSWatcher>();
+
+  const unwatch = (directory: string) => {
+    watchers.get(directory)?.close();
+    watchers.delete(directory);
+  };
+
+  const watchDirectory = (directory: string) => {
+    const watcher = fs.watch(directory, (_event, changed) => {
+      if (changed !== null && isIgnored(changed.toString())) {
+        return;
+      }
+      try {
+        // Windows goes on reporting a watched directory that was taken away until its watch closes.
+        if (!fs.existsSync(directory)) {
+          unwatch(directory);
+        } else if (changed !== null) {
+          watchTreeBelow(path.join(directory, changed.toString()));
+        }
+      } catch (error) {
+        fail(error);
+        return;
+      }
+      notify();
+    });
+    watcher.on('error', (error) => (directory === root ? fail(error) : unwatch(directory)));
+    watchers.set(directory, watcher);
+  };
+
+  const watchTreeBelow = (directory: string) => {
+    if (watchers.has(directory) || !fs.lstatSync(directory, { throwIfNoEntry: false })?.isDirectory()) {
+      return;
+    }
+    watchDirectory(directory);
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+      if (entry.isDirectory() && !isIgnored(entry.name)) {
+        watchTreeBelow(path.join(directory, entry.name));
+      }
+    }
+  };
+
+  try {
+    watchTreeBelow(root);
+  } catch (error) {
+    [...watchers.keys()].forEach(unwatch);
+    throw error;
+  }
+  return () => [...watchers.keys()].forEach(unwatch);
 }

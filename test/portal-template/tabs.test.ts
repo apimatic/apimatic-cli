@@ -10,6 +10,10 @@ import {
   tabsTransformer
 } from '../../portal-template/src/lib/navigation';
 import { portalTabs } from '../../portal-template/src/lib/tabs';
+import { frontmatter } from 'fumadocs-core/content/md/frontmatter';
+import { DirectoryPath } from '../../src/types/file/directoryPath';
+import { parsePageFrontMatter } from '../../src/types/portal/page-front-matter';
+import { untitledTabName } from '../../src/types/portal/portal-tabs';
 
 /**
  * The tabs the transformers make of a real `loader()`'s tree, and the list the layouts are
@@ -21,6 +25,8 @@ describe('tabsTransformer', () => {
 
   const page = (path: string, title: string): File => ({ type: 'page', path, data: { title } });
   const meta = (path: string, data: Record<string, unknown>): File => ({ type: 'meta', path, data });
+  /** The root `nav.json`, which makes a tab of each folder it lists. */
+  const listing = (...pages: string[]): File => meta('nav.json', { pages });
 
   const build = (sources: Sources) => {
     const input: Record<string, { files: File[]; baseDir?: string }> = {};
@@ -57,7 +63,7 @@ describe('tabsTransformer', () => {
   const TUTORIALS = [
     page('tutorials/first-call.mdx', 'First call'),
     page('tutorials/errors.mdx', 'Errors'),
-    meta('tutorials/nav.json', { title: 'Tutorials', root: true })
+    meta('tutorials/nav.json', { title: 'Tutorials' })
   ];
   /** What the CLI writes, each folder titled by its nav.json whatever its index page says. */
   const SDKS = [
@@ -73,31 +79,30 @@ describe('tabsTransformer', () => {
   const GENERATED = [...SDKS, ...PLUGIN];
 
   it('makes every top-level node part of exactly one tab, each a root folder', () => {
-    const tree = treeOf({ docs: [...CONTENT, ...TUTORIALS], openapi: API });
+    const docs = [...CONTENT, ...TUTORIALS, listing('index', 'authentication', 'tutorials')];
+    const tree = treeOf({ docs, openapi: API });
 
     expect(tree.children.every((child) => child.type === 'folder' && child.root === true)).to.be.true;
-    expect(tabsOf({ docs: [...CONTENT, ...TUTORIALS], openapi: API })).to.deep.equal({
-      Home: ['Welcome'],
-      Guides: ['Authentication'],
+    expect(tabsOf({ docs, openapi: API })).to.deep.equal({
+      Home: ['Welcome', 'Authentication'],
       Tutorials: ['Errors', 'First call'],
       'API Reference': ['Pet', 'Store']
     });
   });
 
-  it('orders the tabs by where each one’s first node sits in the root nav.json', () => {
+  it('orders the tabs as the root nav.json orders them', () => {
     const docs = [...CONTENT, ...TUTORIALS, meta('nav.json', { pages: ['index', 'apimatic:api', 'tutorials', '...'] })];
 
-    expect(tabNames({ docs, openapi: API })).to.deep.equal(['Home', 'API Reference', 'Tutorials', 'Guides']);
+    expect(tabNames({ docs, openapi: API })).to.deep.equal(['Home', 'API Reference', 'Tutorials']);
   });
 
-  it('gives the defaults with no nav.json at all: Home, Guides, then the API reference', () => {
-    expect(tabNames({ docs: CONTENT, openapi: API })).to.deep.equal(['Home', 'Guides', 'API Reference']);
+  it('gives the defaults with no nav.json at all: Home, then the API reference', () => {
+    expect(tabNames({ docs: CONTENT, openapi: API })).to.deep.equal(['Home', 'API Reference']);
   });
 
   it('keeps the generated tabs before the API reference, SDKs first, when no token is named', () => {
     expect(tabNames({ docs: CONTENT, generated: GENERATED, openapi: API })).to.deep.equal([
       'Home',
-      'Guides',
       'SDKs',
       'Context Plugin',
       'API Reference'
@@ -124,10 +129,8 @@ describe('tabsTransformer', () => {
       meta('nav.json', { pages: ['index', 'apimatic:plugin', 'apimatic:api', 'apimatic:sdks'] })
     ];
 
-    // The unnamed page joins the named one before it, so Guides follows Home.
     expect(tabNames({ docs, generated: GENERATED, openapi: API })).to.deep.equal([
       'Home',
-      'Guides',
       'Context Plugin',
       'API Reference',
       'SDKs'
@@ -136,19 +139,32 @@ describe('tabsTransformer', () => {
 
   // The home page opens the site whatever order the rest of the file sets.
   it('puts Home first when the root nav.json does not name the index page', () => {
-    const docs = [...CONTENT, meta('nav.json', { pages: ['authentication', '...'] })];
+    const docs = [...CONTENT, meta('nav.json', { pages: ['apimatic:api', 'authentication', '...'] })];
 
-    expect(tabNames({ docs, openapi: API })).to.deep.equal(['Home', 'Guides', 'API Reference']);
+    expect(tabNames({ docs, openapi: API })).to.deep.equal(['Home', 'API Reference']);
   });
 
-  it('keeps Home where the file puts the index page when it names it', () => {
-    const docs = [...CONTENT, meta('nav.json', { pages: ['authentication', 'apimatic:api', 'index'] })];
+  // Listing `index` orders the pages inside Home, which would otherwise move as its pages did.
+  it('puts Home first when the file lists the index page after another tab too', () => {
+    const docs = [
+      ...CONTENT,
+      ...TUTORIALS,
+      meta('nav.json', { pages: ['authentication', 'tutorials', 'apimatic:api', 'index'] })
+    ];
 
-    expect(tabNames({ docs, openapi: API })).to.deep.equal(['Guides', 'API Reference', 'Home']);
+    expect(tabNames({ docs, openapi: API })).to.deep.equal(['Home', 'Tutorials', 'API Reference']);
+    expect(tabsOf({ docs, openapi: API }).Home).to.deep.equal(['Authentication', 'Welcome']);
+  });
+
+  it('keeps the order the file gives in Home, and opens Home on the home page wherever it sits', () => {
+    const docs = [...CONTENT, meta('nav.json', { pages: ['authentication', 'index'] })];
+
+    expect(tabsOf({ docs }).Home).to.deep.equal(['Authentication', 'Welcome']);
+    expect(portalTabs(treeOf({ docs }))[0]).to.include({ title: 'Home', url: '/' });
   });
 
   // Tabs group; they do not reorder what they hold.
-  it('gathers loose nodes either side of a folder tab into one Guides tab, in order', () => {
+  it('gathers loose nodes either side of a folder tab into Home, in order', () => {
     const docs = [
       ...CONTENT,
       ...TUTORIALS,
@@ -156,43 +172,39 @@ describe('tabsTransformer', () => {
       meta('nav.json', { pages: ['index', 'authentication', 'tutorials', 'changelog'] })
     ];
 
-    expect(tabNames({ docs, openapi: API })).to.deep.equal(['Home', 'Guides', 'Tutorials', 'API Reference']);
-    expect(tabsOf({ docs, openapi: API }).Guides).to.deep.equal(['Authentication', 'Changelog']);
+    expect(tabNames({ docs, openapi: API })).to.deep.equal(['Home', 'Tutorials', 'API Reference']);
+    expect(tabsOf({ docs, openapi: API }).Home).to.deep.equal(['Welcome', 'Authentication', 'Changelog']);
   });
 
-  it('keeps an ordinary folder inside Guides', () => {
+  it('keeps a folder the root nav.json does not list inside Home', () => {
     const docs = [...CONTENT, page('guides/intro.mdx', 'Intro')];
 
-    expect(tabsOf({ docs, openapi: API }).Guides).to.deep.equal(['Authentication', 'Guides']);
+    expect(tabsOf({ docs, openapi: API }).Home).to.deep.equal(['Welcome', 'Authentication', 'Guides']);
   });
 
-  it('makes no Guides tab when every loose page is in another tab', () => {
-    const docs = [page('index.mdx', 'Welcome'), ...TUTORIALS];
+  it('keeps the folders the rest entry gathers inside Home, and makes tabs of the listed ones', () => {
+    const docs = [...CONTENT, ...TUTORIALS, page('guides/intro.mdx', 'Intro'), listing('index', '...', 'tutorials')];
 
     expect(tabNames({ docs, openapi: API })).to.deep.equal(['Home', 'Tutorials', 'API Reference']);
+    expect(tabsOf({ docs, openapi: API }).Home).to.deep.equal(['Welcome', 'Authentication', 'Guides']);
   });
 
   it('makes no tab for a section that is not generated', () => {
-    expect(tabNames({ docs: CONTENT, openapi: API })).to.deep.equal(['Home', 'Guides', 'API Reference']);
-    expect(tabNames({ docs: CONTENT, generated: SDKS, openapi: API })).to.deep.equal([
-      'Home',
-      'Guides',
-      'SDKs',
-      'API Reference'
-    ]);
+    expect(tabNames({ docs: CONTENT, openapi: API })).to.deep.equal(['Home', 'API Reference']);
+    expect(tabNames({ docs: CONTENT, generated: SDKS, openapi: API })).to.deep.equal(['Home', 'SDKs', 'API Reference']);
   });
 
   // Matching tabs to folders goes by id on the client, after the tree has been serialised.
-  it('gives the tabs no folder backs fixed ids', () => {
+  it('gives the tab no folder backs a fixed id', () => {
     const ids = treeOf({ docs: CONTENT, generated: GENERATED, openapi: API }).children.map((child) => child.$id);
 
-    expect(ids.slice(0, 2)).to.deep.equal(['/tab/home', '/tab/guides']);
-    expect(ids.slice(2).filter((id) => id?.startsWith('/tab/'))).to.be.empty;
+    expect(ids[0]).to.equal('/tab/home');
+    expect(ids.slice(1).filter((id) => id?.startsWith('/tab/'))).to.be.empty;
   });
 
   // Fumadocs ids a folder by its path, so a directory could be named after an id that was.
-  it('keeps those ids apart from any a directory could be given', () => {
-    const docs = [...CONTENT, page('tab:guides/intro.mdx', 'Intro')];
+  it('keeps that id apart from any a directory could be given', () => {
+    const docs = [...CONTENT, page('tab:home/intro.mdx', 'Intro')];
     const ids = treeOf({ docs }).children.flatMap((child) =>
       child.type === 'folder' ? [child.$id, ...child.children.map((node) => node.$id)] : []
     );
@@ -207,7 +219,8 @@ describe('tabsTransformer', () => {
       ...CONTENT,
       ...TUTORIALS,
       page('tutorials/overview.mdx', 'Overview'),
-      page('api/overview.mdx', 'API overview')
+      page('api/overview.mdx', 'API overview'),
+      listing('index', 'tutorials', '...')
     ];
     const tree = treeOf({ docs, generated: GENERATED, openapi: API });
     const reading = flattenTree(tab(tree, 'Tutorials').children).find((node) => node.url === '/tutorials/overview');
@@ -229,7 +242,8 @@ describe('tabsTransformer', () => {
       page('tutorials/index.mdx', 'Tutorials home'),
       page('tutorials/deep/more.mdx', 'More'),
       page('guides/intro.mdx', 'Intro'),
-      page('api/index.mdx', 'Reference')
+      page('api/index.mdx', 'Reference'),
+      listing('index', 'tutorials', '...')
     ];
     const tree = treeOf({ docs, generated: GENERATED, openapi: API });
     const tabs = portalTabs(tree);
@@ -255,30 +269,26 @@ describe('tabsTransformer', () => {
       const docs = [
         ...CONTENT,
         page('tutorials/first-call.mdx', 'First call'),
-        meta('tutorials/nav.json', { title: 'Learn', root: true })
+        meta('tutorials/nav.json', { title: 'Learn' }),
+        listing('index', 'tutorials')
       ];
 
-      expect(tabNames({ docs })).to.deep.equal(['Home', 'Guides', 'Learn']);
+      expect(tabNames({ docs })).to.deep.equal(['Home', 'Learn']);
     });
 
-    // Fumadocs never reads `root`, so a tab's folder is built, and named, as any other is.
-    it('takes its name from its index page when the file gives none', () => {
+    it('takes its name from its index page when its nav.json gives none', () => {
       const docs = [
         ...CONTENT,
         page('tutorials/index.mdx', 'Learn the API'),
         page('tutorials/first-call.mdx', 'First call'),
-        meta('tutorials/nav.json', { root: true })
+        listing('index', 'tutorials')
       ];
 
       expect(tabsOf({ docs })['Learn the API']).to.deep.equal(['Learn the API', 'First call']);
     });
 
     it('takes its name from its directory when there is neither', () => {
-      const docs = [
-        ...CONTENT,
-        page('tutorials/first-call.mdx', 'First call'),
-        meta('tutorials/nav.json', { root: true })
-      ];
+      const docs = [...CONTENT, page('tutorials/first-call.mdx', 'First call'), listing('index', 'tutorials')];
 
       expect(tabNames({ docs })).to.include('Tutorials');
     });
@@ -291,7 +301,8 @@ describe('tabsTransformer', () => {
         page('tutorials/index.mdx', 'Overview'),
         page('tutorials/first-call.mdx', 'First call'),
         page('tutorials/errors.mdx', 'Errors'),
-        meta('tutorials/nav.json', { title: 'Tutorials', root: true, pages: ['first-call', 'index', 'errors'] })
+        meta('tutorials/nav.json', { title: 'Tutorials', pages: ['first-call', 'index', 'errors'] }),
+        listing('index', 'tutorials')
       ];
       const tutorials = tab(treeOf({ docs }), 'Tutorials');
 
@@ -300,43 +311,42 @@ describe('tabsTransformer', () => {
     });
 
     it('changes no address', () => {
-      const urls = build({ docs: [...CONTENT, ...TUTORIALS] })
+      const urls = build({ docs: [...CONTENT, ...TUTORIALS, listing('index', 'tutorials')] })
         .getPages()
         .map((each) => each.url);
 
       expect(urls).to.include.members(['/tutorials/first-call', '/authentication', '/']);
     });
 
-    // The CLI refuses both. Honouring either would nest one tab bar inside another, or give
-    // the reference a second tab, in a preview the next build refuses.
-    it('is not made of a nested folder, which stays a folder in its tab', () => {
+    // Only the content root's file makes tabs; below it, an entry only orders its folder.
+    it('is not made of a folder a nested nav.json lists, which stays a folder in its tab', () => {
       const docs = [
         ...CONTENT,
         page('guides/deep/intro.mdx', 'Intro'),
-        meta('guides/deep/nav.json', { title: 'Deep', root: true })
+        meta('guides/nav.json', { pages: ['deep'] }),
+        listing('index', 'guides')
       ];
-      const tree = treeOf({ docs });
-      const guides = tab(tree, 'Guides').children.find((child) => child.type === 'folder');
-      const deep = guides?.type === 'folder' ? guides.children.find((child) => child.type === 'folder') : undefined;
+      const guides = tab(treeOf({ docs }), 'Guides');
 
       expect(tabNames({ docs })).to.deep.equal(['Home', 'Guides']);
-      expect(deep?.type === 'folder' && deep.root).to.not.be.ok;
+      expect(guides.children.some((child) => child.type === 'folder' && child.root === true)).to.be.false;
     });
 
-    it('is not made of a half-typed setting', () => {
+    // Fumadocs' own key for a tab, which the CLI reports as an unknown setting.
+    it('is not made by a root setting in the folder’s own nav.json', () => {
       const docs = [
         ...CONTENT,
         page('tutorials/first-call.mdx', 'First call'),
-        meta('tutorials/nav.json', { root: 'yes' })
+        meta('tutorials/nav.json', { root: true })
       ];
 
-      expect(tabsOf({ docs })).to.deep.equal({ Home: ['Welcome'], Guides: ['Authentication', 'Tutorials'] });
+      expect(tabsOf({ docs })).to.deep.equal({ Home: ['Welcome', 'Authentication', 'Tutorials'] });
     });
 
     it('is not made of the API reference twice', () => {
-      const docs = [...CONTENT, meta('api/nav.json', { root: true })];
+      const docs = [...CONTENT, page('api/intro.mdx', 'Intro'), listing('index', 'api')];
 
-      expect(tabNames({ docs, openapi: API })).to.deep.equal(['Home', 'Guides', 'API Reference']);
+      expect(tabNames({ docs, openapi: API })).to.deep.equal(['Home', 'API Reference']);
     });
   });
 
@@ -358,38 +368,113 @@ describe('tabsTransformer', () => {
     });
   });
 
-  describe('the home page', () => {
+  describe('the Home tab', () => {
+    it('takes its name from the root nav.json title', () => {
+      const docs = [...CONTENT, meta('nav.json', { title: 'Overview', pages: ['index', '...'] })];
+
+      expect(tabsOf({ docs, openapi: API })).to.deep.include({ Overview: ['Welcome', 'Authentication'] });
+    });
+
+    // The CLI refuses one, but under `portal serve` a half-typed file reloads straight to here.
+    it('keeps its name while the title is half-typed', () => {
+      const docs = [...CONTENT, meta('nav.json', { title: ' ', pages: ['index', '...'] })];
+
+      expect(tabNames({ docs })).to.deep.equal(['Home']);
+    });
+
     // The route renders a landing page at `/` for a project without an index page, but with
     // no node to reach it the page sits outside every tab and shows no tab bar.
-    it('gets a node of its own when the content has no index page', () => {
+    it('opens on a node of its own when the content has no index page', () => {
       const tree = treeOf({ docs: [page('authentication.mdx', 'Authentication')], openapi: API });
       const home = tab(tree, 'Home');
 
-      expect(tree.children.map(nameOf)).to.deep.equal(['Home', 'Guides', 'API Reference']);
-      expect(home.children).to.have.lengthOf(1);
-      expect(home.children[0]).to.include({ type: 'page', url: '/' });
+      expect(tree.children.map(nameOf)).to.deep.equal(['Home', 'API Reference']);
+      expect(home.children.map((child) => child.type === 'page' && child.url)).to.deep.equal(['/', '/authentication']);
     });
 
-    it('gets one too when there is no content at all', () => {
+    it('is made even when there is no content at all', () => {
       expect(tabNames({ openapi: API })).to.deep.equal(['Home', 'API Reference']);
     });
 
-    // Without an index page, an `index` entry names a folder of that name, not the home page.
+    // Without an index page, an `index` entry names a folder of that name, which is then a tab.
     it('leads with that node however the file names index', () => {
       const docs = [
         page('index/setup.mdx', 'Setup'),
         page('authentication.mdx', 'Authentication'),
-        meta('nav.json', { pages: ['index', 'authentication'] })
+        meta('nav.json', { pages: ['apimatic:api', 'index', 'authentication'] })
       ];
 
-      expect(tabNames({ docs, openapi: API })).to.deep.equal(['Home', 'Guides', 'API Reference']);
+      expect(tabNames({ docs, openapi: API })).to.deep.equal(['Home', 'API Reference', 'Index']);
+      expect(tabsOf({ docs, openapi: API }).Home).to.deep.equal(['Home', 'Authentication']);
     });
 
     // The same URL may appear only once in a page tree.
-    it('gets none when a page deeper down is served at the address', () => {
+    it('opens on the home page a `(group)` folder serves, with no node of its own', () => {
       const docs = [page('(start)/index.mdx', 'Welcome'), page('authentication.mdx', 'Authentication')];
+      const tree = treeOf({ docs });
 
-      expect(tabNames({ docs })).to.not.include('Home');
+      expect(tabsOf({ docs })).to.deep.equal({ Home: ['Authentication', 'Welcome'] });
+      expect(flattenTree(tree.children).map((node) => node.$id)).to.not.include('/page/home');
+      expect(portalTabs(tree)[0]).to.include({ title: 'Home', url: '/' });
+    });
+
+    it('opens on the home page however deep in `(group)` folders it sits', () => {
+      const docs = [page('(start)/a.mdx', 'A'), page('(start)/(inner)/index.mdx', 'Welcome')];
+
+      expect(portalTabs(treeOf({ docs }))[0]).to.include({ title: 'Home', url: '/' });
+    });
+
+    // The CLI refuses the entry, since the home page is the Home tab's.
+    it('keeps a folder that serves the home page, even when the root nav.json lists it', () => {
+      const docs = [
+        page('(start)/index.mdx', 'Welcome'),
+        meta('(start)/nav.json', { title: 'Start' }),
+        page('authentication.mdx', 'Authentication'),
+        listing('(start)', 'authentication')
+      ];
+
+      expect(tabsOf({ docs, openapi: API })).to.deep.include({ Home: ['Start', 'Authentication'] });
+      expect(tabNames({ docs, openapi: API })).to.deep.equal(['Home', 'API Reference']);
+    });
+  });
+
+  // The CLI warns about tabs that share a name, so it has to name each as the template does.
+  describe('the names the CLI expects', () => {
+    const folderNamed = (directory: string) =>
+      untitledTabName({ kind: 'folder', directory: new DirectoryPath('content', directory) });
+
+    it('gives the tabs no title names the names the CLI gives them', () => {
+      expect(tabNames({ docs: CONTENT, openapi: API })).to.deep.equal([
+        untitledTabName({ kind: 'home' }),
+        untitledTabName({ kind: 'apiReference' })
+      ]);
+    });
+
+    it('names a folder tab after its directory as the CLI does', () => {
+      const docs = [
+        ...CONTENT,
+        page('getting-started/first.mdx', 'First'),
+        page('(learn-more)/deep.mdx', 'Deep'),
+        listing('index', 'getting-started', '(learn-more)')
+      ];
+
+      expect(tabNames({ docs })).to.include.members([folderNamed('getting-started'), folderNamed('(learn-more)')]);
+    });
+
+    // fumadocs-mdx hands the loader what `frontmatter` parses, the parser the CLI reads a page with.
+    it('names a folder tab after its index page as the CLI reads the page', async () => {
+      const markdown = '---\ntitle: Learn the API\n--- \n# Learn';
+      const data = frontmatter(markdown).data as File['data'];
+      const docs: File[] = [
+        ...CONTENT,
+        { type: 'page', path: 'tutorials/index.mdx', data },
+        page('tutorials/first.mdx', 'First'),
+        listing('index', 'tutorials')
+      ];
+
+      const { title } = (await parsePageFrontMatter(markdown, 'tutorials/index.mdx'))._unsafeUnwrap();
+
+      expect(tabNames({ docs })).to.include(title);
     });
   });
 });
@@ -405,13 +490,13 @@ describe('portalTabs', () => {
 
   it('lists one tab per root folder, bound to it', () => {
     const home = folder('Home', [pageNode('/')], { root: true, $id: '/tab/home' });
-    const guides = folder('Guides', [pageNode('/authentication')], { root: true, $id: '/tab/guides' });
+    const tutorials = folder('Tutorials', [pageNode('/tutorials/first-call')], { root: true, $id: 'tutorials' });
 
-    const tabs = portalTabs({ name: 'Docs', children: [home, guides] });
+    const tabs = portalTabs({ name: 'Docs', children: [home, tutorials] });
 
     expect(tabs.map((each) => [each.title, each.url])).to.deep.equal([
       ['Home', '/'],
-      ['Guides', '/authentication']
+      ['Tutorials', '/tutorials/first-call']
     ]);
     expect(tabs[0].$folder).to.equal(home);
   });
@@ -439,14 +524,22 @@ describe('portalTabs', () => {
     expect(portalTabs({ name: 'Docs', children: [tutorials] })[0].url).to.equal('/deep-home');
   });
 
+  it('opens a tab that holds the home page on it, wherever it is listed', () => {
+    const home = folder('Home', [pageNode('/authentication'), folder('Start', [pageNode('/a'), pageNode('/')])], {
+      root: true
+    });
+
+    expect(portalTabs({ name: 'Docs', children: [home] })[0].url).to.equal('/');
+  });
+
   it('passes over a link that leaves the portal', () => {
-    const guides = folder(
-      'Guides',
+    const home = folder(
+      'Home',
       [{ type: 'page', name: 'Status', url: 'https://status.test', external: true }, pageNode('/start')],
       { root: true }
     );
 
-    expect(portalTabs({ name: 'Docs', children: [guides] })[0].url).to.equal('/start');
+    expect(portalTabs({ name: 'Docs', children: [home] })[0].url).to.equal('/start');
   });
 
   it('leaves out a folder that is no tab, and a tab with no page to open', () => {

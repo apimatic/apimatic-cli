@@ -1,4 +1,8 @@
-import { PortalProjectPaths, PortalProjectService } from '../../infrastructure/portal-project-service.js';
+import {
+  PortalProjectPaths,
+  PortalProjectService,
+  ProjectContent
+} from '../../infrastructure/portal-project-service.js';
 import { PortalArtifactsService } from '../../infrastructure/services/portal-artifacts-service.js';
 import { withPortalProjectDirectory, withDirPath } from '../../infrastructure/tmp-extensions.js';
 import { PreparePortalProjectPrompts } from '../../prompts/portal/prepare-project.js';
@@ -9,10 +13,19 @@ import { PortalArtifacts } from '../../types/portal/portal-artifacts.js';
 import { PortalSource } from '../../types/portal/portal-source.js';
 import { ActionResult } from '../action-result.js';
 
+/** What the caller does within the shared run, in the order the run does it. */
+export interface PreparationSteps {
+  /** Asked once the source is read, before the artifacts are fetched; false cancels the run. */
+  confirm?: () => Promise<boolean>;
+  /** A preview reads a copy of `content/`, which it updates only with what a build would accept. */
+  content?: ProjectContent;
+  onPrepared: (project: PortalProjectPaths, source: PortalSource, artifacts: PortalArtifacts) => Promise<ActionResult>;
+}
+
 /**
- * The run `portal generate` and `portal serve` share: fetch what `/portal-artifacts` built, read
- * the source, and prepare the Vite project both of them then run. Only what happens to
- * that project differs — one builds it to disk, the other serves it.
+ * The run `portal generate` and `portal serve` share: read the source, fetch what
+ * `/portal-artifacts` builds from it, and prepare the Vite project both of them then run. Only
+ * what happens to that project differs — one builds it to disk, the other serves it.
  */
 export class PreparePortalProjectAction {
   private readonly prompts: PreparePortalProjectPrompts = new PreparePortalProjectPrompts();
@@ -32,8 +45,21 @@ export class PreparePortalProjectAction {
    */
   public readonly execute = async (
     sourceDirectory: DirectoryPath,
-    onPrepared: (project: PortalProjectPaths, source: PortalSource, artifacts: PortalArtifacts) => Promise<ActionResult>
+    { confirm = async () => true, content = 'source', onPrepared }: PreparationSteps
   ): Promise<ActionResult> => {
+    // Ahead of the server run, which can take minutes: a mistake or a question should not wait on it.
+    const source = await new PortalSourceContext(sourceDirectory).resolve();
+    if (source.isErr()) {
+      this.prompts.sourceProblem(source.error, sourceDirectory);
+      return ActionResult.failed();
+    }
+    this.prompts.filesShadowedByStatic(source.value.shadowedFiles);
+    this.prompts.contentNotices(source.value.contentNotices, sourceDirectory);
+
+    if (!(await confirm())) {
+      return ActionResult.cancelled();
+    }
+
     // The artifacts live in this directory for as long as the caller needs them, so it wraps
     // everything that reads them rather than being opened and closed around the call.
     return await withDirPath(async (artifactsDirectory) => {
@@ -50,15 +76,6 @@ export class PreparePortalProjectAction {
         return ActionResult.failed();
       }
 
-      const source = await new PortalSourceContext(sourceDirectory).resolve();
-      if (source.isErr()) {
-        this.prompts.sourceProblem(source.error, sourceDirectory);
-        return ActionResult.failed();
-      }
-      this.prompts.filesShadowedByStatic(source.value.shadowedFiles);
-      this.prompts.pagesHiddenBySpecs(source.value.hiddenPages, sourceDirectory);
-      this.prompts.ignoredNavigationFiles(source.value.ignoredNavigationFiles, sourceDirectory);
-
       this.prompts.unplacedSamples(
         artifacts.value.codeSampleCatalogs.unplacedIn(source.value.specs.flatMap((spec) => spec.endpoints))
       );
@@ -70,7 +87,7 @@ export class PreparePortalProjectAction {
       }
 
       return await withPortalProjectDirectory(sourceDirectory, async (tempDirectory) => {
-        const project = await this.projectService.prepare(tempDirectory, source.value, artifacts.value);
+        const project = await this.projectService.prepare(tempDirectory, source.value, artifacts.value, content);
         if (project.isErr()) {
           this.prompts.runtimeUnsupported(project.error);
           return ActionResult.failed();

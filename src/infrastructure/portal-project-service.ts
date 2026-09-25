@@ -6,6 +6,7 @@ import { DirectoryPath } from '../types/file/directoryPath.js';
 import { FileName } from '../types/file/fileName.js';
 import { FilePath } from '../types/file/filePath.js';
 import { CodeSampleCatalogs } from '../types/portal/code-samples.js';
+import { CheckedFile, isSkippedByGlob } from '../types/portal/content-tree.js';
 import { GENERATED_DIRECTORY_NAME } from '../types/portal/generated-pages.js';
 import { GENERATED_INCLUDES_DIRECTORY_NAME, PageFragment, pageFragments } from '../types/portal/page-fragments.js';
 import { PortalArtifacts } from '../types/portal/portal-artifacts.js';
@@ -59,6 +60,12 @@ const STYLESHEET_FILE_NAME = 'theme.css';
 /** Where the SDKs and the context plugin are laid out as the site serves them, inside the project. */
 export const DOWNLOADS_DIRECTORY_NAME = 'downloads';
 
+/** Where the project keeps its copy of `content/`, and an empty one where the source has none. */
+const CONTENT_DIRECTORY_NAME = 'content';
+
+/** What the project reads the pages from: `content/` itself, or a copy the caller keeps up to date. */
+export type ProjectContent = 'source' | 'copy';
+
 export interface PortalProjectPaths {
   projectDirectory: DirectoryPath;
   /** Vite's CLI entry point, resolved from the CLI's own dependencies. */
@@ -67,7 +74,8 @@ export interface PortalProjectPaths {
 
 /**
  * Prepares the throwaway Vite project that both `portal generate` and `portal serve` run.
- * The user's `src/` is never copied: the project points at it by absolute path.
+ * The project points at the user's `src/` by absolute path, but for a copy of `content/` that
+ * a preview keeps to show what it last accepted.
  */
 export class PortalProjectService {
   private readonly fileService = new FileService();
@@ -87,7 +95,8 @@ export class PortalProjectService {
   public async prepare(
     projectDirectory: DirectoryPath,
     source: PortalSource,
-    artifacts: PortalArtifacts
+    artifacts: PortalArtifacts,
+    content: ProjectContent = 'source'
   ): Promise<Result<PortalProjectPaths, string>> {
     const template = this.templateDirectory();
     if (template === undefined) {
@@ -107,6 +116,7 @@ export class PortalProjectService {
     await this.writeConfiguration(
       projectDirectory,
       source,
+      await this.contentDirectory(projectDirectory, source, content),
       await this.writeCodeSamples(projectDirectory, artifacts.codeSampleCatalogs),
       await this.writeDownloads(projectDirectory, artifacts)
     );
@@ -232,17 +242,31 @@ export class PortalProjectService {
     }
   }
 
+  /** The source's own `content/`, or the project's copy of it, which stands empty where the source has none. */
+  private async contentDirectory(
+    projectDirectory: DirectoryPath,
+    source: PortalSource,
+    content: ProjectContent
+  ): Promise<DirectoryPath> {
+    if (content === 'source' && source.contentDirectory !== null) {
+      return source.contentDirectory;
+    }
+    const copy = projectDirectory.join(CONTENT_DIRECTORY_NAME);
+    await this.fileService.createDirectoryIfNotExists(copy);
+    if (source.contentDirectory !== null) {
+      // Before the dev server starts: it lists the pages once, and one missing then stays missing.
+      await this.syncContent(source.contentDirectory, copy, []);
+    }
+    return copy;
+  }
+
   private async writeConfiguration(
     projectDirectory: DirectoryPath,
     source: PortalSource,
+    contentDirectory: DirectoryPath,
     codeSamples: FilePath | null,
     downloads: DirectoryPath | null
   ): Promise<void> {
-    const contentDirectory = source.contentDirectory ?? projectDirectory.join('content');
-    if (source.contentDirectory === null) {
-      await this.fileService.createDirectoryIfNotExists(contentDirectory);
-    }
-
     const specs: Record<string, string> = {};
     for (const spec of source.specs) {
       specs[spec.slug] = this.toPosix(spec.file.toString());
@@ -301,6 +325,51 @@ export class PortalProjectService {
       settings.generatedPages
     );
     return pages.map((pagesWritten) => written || pagesWritten);
+  }
+
+  /**
+   * Brings the project's copy of `content/` in line: `checked` files as checked, since a later save went
+   * unchecked, the rest as on disk, nothing the source lost, and only what changed, so little reloads.
+   */
+  public async applyContent(
+    projectDirectory: DirectoryPath,
+    contentDirectory: DirectoryPath,
+    checked: CheckedFile[]
+  ): Promise<Result<void, string>> {
+    try {
+      await this.syncContent(contentDirectory, projectDirectory.join(CONTENT_DIRECTORY_NAME), checked);
+      return ok(undefined);
+    } catch (error) {
+      return err(errorMessage(error));
+    }
+  }
+
+  private async syncContent(from: DirectoryPath, to: DirectoryPath, checked: CheckedFile[]): Promise<void> {
+    const files = await this.contentFiles(from);
+    for (const file of files) {
+      const target = file.rebased(from, to);
+      const read = checked.find((each) => each.file.isEqual(file));
+      if (read === undefined) {
+        await this.fileService.copyIfChanged(file, target);
+      } else {
+        await this.fileService.replaceContentsIfChanged(target, read.contents);
+      }
+    }
+    for (const copied of await this.contentFiles(to)) {
+      if (!files.some((file) => file.rebased(from, to).isEqual(copied))) {
+        await this.fileService.deleteFile(copied);
+      }
+    }
+  }
+
+  /** Every file below `directory` that the build reads, and none when it is gone. */
+  private async contentFiles(directory: DirectoryPath): Promise<FilePath[]> {
+    if (!(await this.fileService.directoryExists(directory))) {
+      return [];
+    }
+    return (await this.fileService.getDirectory(directory))
+      .getAllFiles()
+      .filter((file) => !file.relativeTo(directory).split('/').some(isSkippedByGlob));
   }
 
   private async writeAppearance(projectDirectory: DirectoryPath, config: PortalConfig): Promise<void> {

@@ -268,4 +268,124 @@ describe('FileWatchService', () => {
 
     expect(result.isErr()).to.be.true;
   });
+
+  // `portal serve` checks the content directory on any save in it, a page or a nav.json alike.
+  // Each case runs against the platform's own watch and against the one kept per directory,
+  // which Linux gets; the second works on every platform, so it is tested on every one.
+  for (const [mode, platform] of [
+    ['as this platform watches a tree', process.platform],
+    ['one directory at a time', 'linux']
+  ] as const) {
+    describe(`a whole tree, ${mode}`, () => {
+      const deep = () => path.join(root, 'guides', 'deep');
+      const nested = () => path.join(deep(), 'page.md');
+      let calls: number;
+
+      const watchTree = async () => {
+        calls = 0;
+        watch = new FileWatchService(platform)
+          .watchTree(
+            new DirectoryPath(root),
+            async () => {
+              calls += 1;
+            },
+            () => undefined,
+            (name) => name.startsWith('.')
+          )
+          ._unsafeUnwrap();
+        await pause(SETTLE_MS * 2);
+      };
+
+      /** One save, then the count of reports it made once it had settled. */
+      const reportsFor = async (save: () => void) => {
+        const before = calls;
+        save();
+        await until(() => calls > before);
+        return calls - before;
+      };
+
+      beforeEach(async () => {
+        fs.mkdirSync(deep(), { recursive: true });
+        fs.writeFileSync(nested(), 'first');
+        await settled();
+      });
+
+      it('reports a save at any depth below the directory, once it has settled', async () => {
+        await watchTree();
+
+        const reports = await reportsFor(() => {
+          fs.writeFileSync(nested(), 'second');
+          fs.appendFileSync(nested(), '\n');
+        });
+
+        expect(reports).to.equal(1);
+      });
+
+      // What vim, JetBrains' safe write and gedit do, and what Node's own tree watch on Linux
+      // stops hearing after the first time.
+      it('keeps reporting a file saved again and again by renaming a new one over it', async () => {
+        await watchTree();
+
+        for (const round of [1, 2, 3]) {
+          const reports = await reportsFor(() => {
+            const copy = path.join(deep(), `.page.md.${round}`);
+            fs.writeFileSync(copy, `round ${round}`);
+            fs.renameSync(copy, nested());
+          });
+          expect(reports, `save ${round}`).to.equal(1);
+        }
+      });
+
+      it('reports a save in a directory made after the watch began', async () => {
+        await watchTree();
+        const fresh = path.join(root, 'fresh', 'deeper');
+        await reportsFor(() => fs.mkdirSync(fresh, { recursive: true }));
+
+        const reports = await reportsFor(() => fs.writeFileSync(path.join(fresh, 'page.md'), 'x'));
+
+        expect(reports).to.equal(1);
+      });
+
+      it('goes on reporting after a directory in the tree is taken away', async () => {
+        await watchTree();
+        await reportsFor(() => fs.rmSync(path.join(root, 'guides'), { recursive: true }));
+        const settledCalls = calls;
+        await settled();
+
+        const reports = await reportsFor(() => fs.writeFileSync(file(), '{"a":1}'));
+
+        expect(calls - settledCalls, 'reports after the removal settled').to.equal(reports);
+        expect(reports).to.equal(1);
+      });
+    });
+
+    // An editor's swap file, or a folder the caller has no use for, would only run its check again.
+    // Kept to the top, and apart from the tree above: Windows reports a folder changed when a file
+    // in it is, and late enough that a folder made before the watch can still be heard of.
+    it(`reports no save of a file, or in a folder, that it is told to ignore, ${mode}`, async () => {
+      fs.mkdirSync(path.join(root, '.drafts'));
+      await settled();
+      let calls = 0;
+      watch = new FileWatchService(platform)
+        .watchTree(
+          new DirectoryPath(root),
+          async () => {
+            calls += 1;
+          },
+          () => undefined,
+          (name) => name.startsWith('.')
+        )
+        ._unsafeUnwrap();
+      await pause(SETTLE_MS * 2);
+
+      fs.writeFileSync(path.join(root, '.apimatic.json.swp'), 'swap');
+      fs.writeFileSync(path.join(root, '.drafts', 'notes.md'), 'draft');
+      fs.mkdirSync(path.join(root, '.later', 'deeper'), { recursive: true });
+      await settled();
+      fs.writeFileSync(path.join(root, '.later', 'deeper', 'notes.md'), 'later');
+      await settled();
+
+      expect(calls).to.equal(0);
+    });
+  }
 });

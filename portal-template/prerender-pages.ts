@@ -6,6 +6,9 @@ import { openApiSection } from './src/lib/openapi-section.server';
 
 const CONTENT_EXTENSIONS = new Set(['.md', '.mdx']);
 
+/** Passed over by Vite's `import.meta.glob`, which the content collection is read through. */
+const isSkippedByGlob = (segment: string) => segment.startsWith('.') || segment === 'node_modules';
+
 /**
  * Every URL the static build has to emit. TanStack Start's crawler misses links inside
  * collapsed sidebar folders and never sees the `.md` URLs the page actions fetch, so
@@ -41,9 +44,9 @@ async function contentUrls(contentDir: string): Promise<string[]> {
 
   const files = entries
     .filter((entry) => entry.isFile() && CONTENT_EXTENSIONS.has(path.extname(entry.name)))
-    .map((entry) => {
-      const relative = path.relative(contentDir, path.join(entry.parentPath, entry.name));
-      const file = relative.split(path.sep).join('/');
+    .map((entry) => path.relative(contentDir, path.join(entry.parentPath, entry.name)).split(path.sep).join('/'))
+    .filter((file) => !file.split('/').some(isSkippedByGlob))
+    .map((file) => {
       // The content source's own slug rules, not a second implementation: "(group)" folders
       // drop out, "index" collapses into its parent.
       return { slugs: getSlugs(file), isIndex: path.basename(file, path.extname(file)) === 'index' };

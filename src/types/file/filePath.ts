@@ -24,6 +24,11 @@ export class FilePath {
     return new FilePath(newDirectory, this.fileName);
   }
 
+  /** The file at the same place below `to` as this one sits below `from`. */
+  public rebased(from: DirectoryPath, to: DirectoryPath): FilePath {
+    return new FilePath(to.resolve(path.relative(from.toString(), this.directoryPath.toString())), this.fileName);
+  }
+
   /** The same path, spelt the same way: `Logo.png` is not `logo.png`. */
   public isEqual(other: FilePath): boolean {
     return this.directoryPath.isEqual(other.directoryPath) && this.fileName.compare(other.fileName) === 0;

@@ -43,6 +43,13 @@ describe('PortalServePrompts', () => {
         /Adding a language or a 'plugin' block, whose SDK or plugin is fetched when the preview starts, adding or removing a page in '.*content', creating .* needs the preview restarted\./
       );
     });
+
+    it('says a mistake in a page or a nav.json is reported when it is saved, and kept from the preview', () => {
+      expect(printed()).to.contain(
+        "A mistake in 'apimatic.json', a page or a 'nav.json' is reported when you save it, and the preview " +
+          'keeps what it last accepted.'
+      );
+    });
   });
 
   describe('an edit that needs artifacts the preview was started without', () => {

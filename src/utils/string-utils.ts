@@ -42,3 +42,13 @@ export function stripAnsi(str: string) {
 export function stripByteOrderMark(contents: string): string {
   return contents.codePointAt(0) === 0xfeff ? contents.slice(1) : contents;
 }
+
+const PROSE_LISTS = {
+  and: new Intl.ListFormat('en-GB', { type: 'conjunction' }),
+  or: new Intl.ListFormat('en-GB', { type: 'disjunction' })
+};
+
+/** The items as a sentence lists them: `a`, `a and b`, `a, b and c`, or with `or` when they are choices. */
+export function listedInProse(items: readonly string[], joiner: keyof typeof PROSE_LISTS = 'and'): string {
+  return PROSE_LISTS[joiner].format(items);
+}

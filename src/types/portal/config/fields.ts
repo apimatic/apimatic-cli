@@ -1,5 +1,6 @@
 import { err, ok, Result } from 'neverthrow';
 import { isJsonObject } from '../../../utils/json-utils.js';
+import { listedInProse } from '../../../utils/string-utils.js';
 import { UrlPath } from '../../file/urlPath.js';
 import { unknownFieldErrors } from '../unknown-fields.js';
 
@@ -77,11 +78,15 @@ export function oneOf<T extends string>(value: unknown, path: string, allowed: r
   if (typeof value === 'string' && (allowed as readonly string[]).includes(value)) {
     return ok(value as T);
   }
-  return err([`'${path}' must be one of ${quotedList(allowed)}.`]);
+  return err([`'${path}' must be one of ${quotedList(allowed, 'or')}.`]);
 }
 
-export function quotedList(values: readonly string[]): string {
-  return values.map((value) => `'${value}'`).join(', ');
+/** Each value in quotes, listed as a sentence lists them. */
+export function quotedList(values: readonly string[], joiner: 'and' | 'or' = 'and'): string {
+  return listedInProse(
+    values.map((value) => `'${value}'`),
+    joiner
+  );
 }
 
 export function nonEmptyString(value: unknown, path: string): Parsed<string> {

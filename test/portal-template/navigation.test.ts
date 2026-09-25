@@ -117,8 +117,7 @@ describe('navigationTransformer', () => {
   });
 
   describe('a nav.json it cannot use', () => {
-    // The CLI refuses these, but only at startup: during `portal serve` a half-typed file
-    // reloads straight into the transformer.
+    // The CLI reports these, but under `portal serve` a half-typed file still reloads into the transformer.
     it('leaves the order alone for a file that is null, a string or an array', () => {
       for (const data of [null, 'hi', ['index']]) {
         const docs = [...CONTENT, { type: 'meta' as const, path: 'nav.json', data: data as never }];
@@ -488,10 +487,8 @@ describe('navigationTransformer', () => {
       ]);
     });
 
-    // The CLI refuses a title at the content root, so the template has to ignore one: the
-    // root node is the tree itself, and honouring it would rename a preview that the build
-    // then fails. The same asymmetry the token checks in `reorder` exist for.
-    it('is ignored at the content root, which the CLI refuses a title for', () => {
+    // The root node is the tree itself; the title there names the Home tab, in `tabs.test.ts`.
+    it('does not rename the tree at the content root', () => {
       const docs = [...CONTENT, titled('nav.json', 'My Portal', ['index', 'authentication'])];
 
       const tree = build({ docs });
@@ -532,10 +529,11 @@ describe('navigationTransformer', () => {
       PortalNavigation.validate(JSON.stringify({ pages: [entry, 'index'] }), {
         label: 'content/nav.json',
         isContentRoot: true,
-        isTopLevel: false,
         isApiDirectory: false,
         becomesFolder: true,
-        childNames: ['index', 'authentication']
+        childNames: ['index', 'authentication'],
+        emptyFolders: [],
+        homePageFolders: []
       }).isOk();
 
     it('accepts and applies the rest token', () => {

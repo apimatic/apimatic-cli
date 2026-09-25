@@ -19,6 +19,11 @@ injected SDK page" and whose section 11 deferred its shape, and from
 reserved the SDKs tab, and left both resolving to nothing. Section 11 lists what
 those plans need amended once this is implemented.
 
+**Amended 2026-09-25**: a folder becomes a tab when the root `nav.json` lists
+it, not through `"root": true`, which is gone (`.ai/plans/portal-config.md`
+section 5). Where this plan compares a generated folder with a `root: true`
+folder, read "a folder the root `nav.json` lists".
+
 ## 1. Goal and scope
 
 Three kinds of page the CLI generates and injects into the portal, none of which
@@ -62,7 +67,7 @@ gains no key; and quickstart, which writes nothing new.
 | Context plugin | Its own section and its own tab, not a page of the SDKs tab (decided 2026-09-24, reversing the first design; section 15). This is portal-config section 2's rule that each generated section is its own tab with its own token, which that plan wrote for the coming AI section. A folder rather than a lone page, so every generated tab is made one way and the plugin can gain pages beside its index without its address moving. |
 | Tabs | Each generated folder at the root becomes a tab, as a `root: true` folder does today: its index page is listed first, then its other pages. The synthetic `/tab/sdks` is removed: the CLI writes only folders, so nothing is left for it to gather, and a tab that gathers every loose generated page under the label "SDKs" is the very grouping this decision undoes. |
 | Tokens | `apimatic:sdks` positions the SDKs tab and `apimatic:plugin` the Context Plugin tab; each claims its own section's folder, `sdks` and `context-plugin`. The token takes the word the `apimatic.json` block and the `apimatic plugin` commands use, which is what the portal's author writes; the address takes the product's name, which is what the portal's readers see. Both are accepted in the root `nav.json` whether or not the page exists, as `apimatic:sdks` is in #355 while nothing is generated, so removing the `plugin` block never forces an edit to `nav.json` as well. |
-| Default position | An unnamed section collects at today's anchor, before the API reference and after the user's pages, in a fixed order: SDKs, then Context Plugin. Fumadocs orders the root's folders by path, which would put `context-plugin` first, so the transformer orders the band itself. No `nav.json` at all gives Home, Guides, SDKs, Context Plugin, API Reference. |
+| Default position | An unnamed section collects at today's anchor, before the API reference and after the user's pages, in a fixed order: SDKs, then Context Plugin. Fumadocs orders the root's folders by path, which would put `context-plugin` first, so the transformer orders the band itself. No `nav.json` at all gives Home, Guides, SDKs, Context Plugin, API Reference. *(Amended 2026-09-25: Guides is merged into Home, so Home, SDKs, Context Plugin, API Reference; `.ai/plans/portal-config.md` section 5.)* |
 | Tab labels | "SDKs" and "Context Plugin", fixed, as portal-config section 2 decided for the tabs the CLI names. Set by `title` in each folder's generated `nav.json`, which the transformer already applies to any folder below the root, so the labels are the CLI's whatever the design team titles the index pages. |
 | Plugin page condition | The `plugin` key holds a JSON object, which is what `ApimaticConfigDocument.plugin()` answers; a bare `{}` counts. Nothing in the block is read or checked: the backend validates the file on the coming `portal generate` call and refuses an empty or invalid block, so an object gets the page whatever it holds, a malformed `pluginId` included, and is left to that call. Only a `plugin` key that is not an object is treated as absent. *Amended 2026-09-25:* a `portal.pluginUrl` gets the page too, with or without the block, and is where it installs from (sdk-and-plugin-pages, section 2). |
 | Language order | As written in the `languages` block. `sdk publish` appends, and the user reorders by editing the file. |

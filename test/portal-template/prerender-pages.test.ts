@@ -66,6 +66,19 @@ describe('prerenderPages', () => {
     expect(urls).to.include('/index.md');
   });
 
+  // The content collection is read through Vite's glob, which never loads these, so they have no page.
+  it('lists nothing for a dot file, a file in a dot folder, or one in node_modules', async () => {
+    write('index.md');
+    write('._index.md');
+    write('.drafts/notes.md');
+    write('node_modules/pkg/README.md');
+
+    const urls = await urlsFor();
+
+    expect(urls).to.include('/');
+    expect(urls.filter((url) => /drafts|node_modules|\._/.test(url))).to.deep.equal([]);
+  });
+
   it('gives a colliding index file the URL the content source moves it to', async () => {
     write('guides.md');
     write('guides/index.md');

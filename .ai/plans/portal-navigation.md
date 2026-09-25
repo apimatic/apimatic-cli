@@ -19,7 +19,9 @@ things here, each also noted where it applies:
   each generated section is its own tab, and a later one gets its own token.
 - The root `nav.json`'s entries now decide the portal's tabs, in the order
   their first nodes appear (portal-config section 5). A `nav.json` directly
-  under `content/` may set `"root": true` to make its folder a tab.
+  under `content/` may set `"root": true` to make its folder a tab. *(Amended
+  2026-09-25: `root` is gone; a folder the root `nav.json` lists is a tab,
+  portal-config section 5.)*
 - The `languages` requirement of section 4 lands with that PR, before the SDK
   page, which answers open question 2 of section 11.
 - The fallback home page of section 6 now exists and gets a node in the tree.
@@ -158,7 +160,8 @@ pages' token is `apimatic:sdks`, still accepted and resolving to nothing until
 the page exists. The file gains a third setting, `root`, a boolean accepted only
 in the `nav.json` of a folder directly under `content/` other than
 `content/api/`; `true` makes that folder a tab of its own. The root file's
-order now also orders the tabs.
+order now also orders the tabs. *(Amended 2026-09-25: `root` is gone; each
+folder the root file lists is a tab, and its `title` names Home.)*
 
 *Amended 2026-09-24* (`.ai/plans/generated-pages.md`, sections 2 and 5): the
 generated pages are two folders, each a tab of its own, and each token claims

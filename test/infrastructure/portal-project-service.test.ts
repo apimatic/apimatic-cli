@@ -62,8 +62,7 @@ describe('PortalProjectService', () => {
     contentDirectory: null,
     staticDirectory: null,
     shadowedFiles: [],
-    hiddenPages: [],
-    ignoredNavigationFiles: [],
+    contentNotices: { hiddenPages: [], ignoredNavigationFiles: [], folderTabs: [], sharedTabNames: [] },
     ...overrides
   });
 
@@ -371,6 +370,100 @@ describe('PortalProjectService', () => {
   });
 
   // What `portal serve` does with an edited block: the dev server reloads whatever changes.
+  // `portal serve` shows a copy, which it brings in line with each save a build would accept.
+  describe('the copy of content/ a preview reads', () => {
+    let content: DirectoryPath;
+    const copy = () => project.join('content');
+
+    const writeIn = (directory: DirectoryPath, relative: string, contents: string) => {
+      const target = path.join(directory.toString(), relative);
+      fs.mkdirSync(path.dirname(target), { recursive: true });
+      fs.writeFileSync(target, contents);
+    };
+    const readCopy = (relative: string) => fs.readFileSync(path.join(copy().toString(), relative), 'utf8');
+    const filesIn = (directory: DirectoryPath) =>
+      fs
+        .readdirSync(directory.toString(), { recursive: true, withFileTypes: true })
+        .filter((entry) => entry.isFile())
+        .map((entry) => path.relative(directory.toString(), path.join(entry.parentPath, entry.name)))
+        .map((file) => file.split(path.sep).join('/'))
+        .sort();
+    const pageIn = (...relative: string[]) =>
+      new FilePath(content.join(...relative.slice(0, -1)), new FileName(relative[relative.length - 1]));
+
+    beforeEach(() => {
+      content = new DirectoryPath(root).join('src', 'content');
+      writeIn(content, 'index.md', '# Home');
+      writeIn(content, 'guides/intro.md', '# Intro');
+      writeIn(content, 'logo.png', 'png');
+      writeIn(content, '.drafts/notes.md', '# Draft');
+      writeIn(content, 'node_modules/pkg/README.md', '# Readme');
+    });
+
+    const prepareCopy = async () =>
+      (await service.prepare(project, sourceFor({ contentDirectory: content }), NO_ARTIFACTS, 'copy'))._unsafeUnwrap();
+
+    // The dev server lists the pages once, when it starts, so the copy has to be whole by then.
+    it('is made while the project is prepared, of every file but those the build never reads', async () => {
+      await prepareCopy();
+
+      expect(readConfig().contentDir).to.equal(copy().toString().split(path.sep).join('/'));
+      expect(filesIn(copy())).to.deep.equal(['guides/intro.md', 'index.md', 'logo.png']);
+    });
+
+    it('is not made for a build, which reads content/ where it is', async () => {
+      (await service.prepare(project, sourceFor({ contentDirectory: content }), NO_ARTIFACTS))._unsafeUnwrap();
+
+      expect(readConfig().contentDir).to.equal(content.toString().split(path.sep).join('/'));
+      expect(fs.existsSync(copy().toString())).to.be.false;
+    });
+
+    // A save after the check was not checked, and could be the half-typed one the copy exists to keep out.
+    it('takes each checked page as it was checked, and every other file as it is on disk', async () => {
+      await prepareCopy();
+      writeIn(content, 'index.md', '{ half typed');
+      writeIn(content, 'logo.png', 'a new logo');
+      writeIn(content, 'guides/diagram.svg', '<svg/>');
+      fs.rmSync(path.join(content.toString(), 'guides', 'intro.md'));
+
+      const applied = await service.applyContent(project, content, [
+        { file: pageIn('index.md'), contents: '# Home, as checked' }
+      ]);
+
+      expect(applied.isOk()).to.be.true;
+      expect(readCopy('index.md')).to.equal('# Home, as checked');
+      expect(readCopy('logo.png')).to.equal('a new logo');
+      expect(filesIn(copy())).to.deep.equal(['guides/diagram.svg', 'index.md', 'logo.png']);
+    });
+
+    // The dev server reloads the pages of whatever is written, so an unchanged file is left alone.
+    it('writes nothing that did not change', async () => {
+      await prepareCopy();
+      const before = filesIn(copy()).map((file) => fs.statSync(path.join(copy().toString(), file)).mtimeMs);
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      await service.applyContent(project, content, [
+        { file: pageIn('index.md'), contents: '# Home' },
+        { file: pageIn('guides', 'intro.md'), contents: '# Intro' }
+      ]);
+
+      const after = filesIn(copy()).map((file) => fs.statSync(path.join(copy().toString(), file)).mtimeMs);
+      expect(after).to.deep.equal(before);
+    });
+
+    it('says why when the copy cannot be brought in line', async () => {
+      await prepareCopy();
+      fs.rmSync(path.join(copy().toString(), 'guides'), { recursive: true });
+      fs.writeFileSync(path.join(copy().toString(), 'guides'), 'a file where a folder goes');
+
+      const applied = await service.applyContent(project, content, [
+        { file: pageIn('guides', 'intro.md'), contents: '# Intro' }
+      ]);
+
+      expect(applied._unsafeUnwrapErr()).to.be.a('string').and.not.be.empty;
+    });
+  });
+
   describe('applyConfig', () => {
     const themeFile = () => path.join(project.toString(), 'src/styles/theme.css');
     const identityFile = () => path.join(project.toString(), 'portal.identity.json');

@@ -1,10 +1,20 @@
 import { log } from '@clack/prompts';
 import { APIMATIC_CONFIG_FILE_NAME } from '../../types/apimatic-config/document.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
-import { PortalSourceProblem, ReservedAddressPage } from '../../types/portal/portal-source.js';
+import { listedInProse } from '../../utils/string-utils.js';
+import { ContentNotices } from '../../types/portal/content-notices.js';
+import {
+  ContentProblem,
+  PortalSourceProblem,
+  ReservedAddressPage,
+  SharedAddress
+} from '../../types/portal/portal-source.js';
+import { PortalTab, SharedTabName } from '../../types/portal/portal-tabs.js';
 import { FileName } from '../../types/file/fileName.js';
 import { FilePath } from '../../types/file/filePath.js';
 import { format as f } from '../format.js';
+
+const TITLE_EXAMPLE = ['---', 'title: Getting started', '---'].join('\n');
 
 // Quickstart refuses a spec for the same reason, and has to point at the same fix.
 export const convertToOpenApi3 = (): string =>
@@ -39,20 +49,8 @@ export function reportSourceProblem(
       }
       return;
     }
-    case 'invalidNavigation': {
-      log.error(`The page order in ${f.path(sourceDirectory)} could not be applied:`);
-      log.message(problem.errors.map((error) => `  • ${error}`).join('\n'));
-      return;
-    }
-    case 'reservedAddresses': {
-      reportReservedAddresses(problem.pages, sourceDirectory);
-      return;
-    }
-    case 'unreadableContent': {
-      log.error(
-        `${f.path(sourceDirectory.join('content'))} could not be read. Check that it and every ` +
-          `directory beneath it can be listed.`
-      );
+    case 'invalidContent': {
+      reportContentProblems(problem.problems, sourceDirectory);
       return;
     }
     case 'unreadableSpec': {
@@ -103,6 +101,53 @@ export function reportSourceProblem(
   }
 }
 
+/** Each problem in turn, so one run lists everything a build would refuse in `content/`. */
+export function reportContentProblems(problems: ContentProblem[], sourceDirectory: DirectoryPath): void {
+  for (const problem of problems) {
+    reportContentProblem(problem, sourceDirectory);
+  }
+}
+
+function reportContentProblem(problem: ContentProblem, sourceDirectory: DirectoryPath): void {
+  switch (problem.kind) {
+    case 'unreadableContent': {
+      log.error(
+        `${f.path(sourceDirectory.join('content'))} could not be read. Check that it and every ` +
+          `directory beneath it can be listed.`
+      );
+      return;
+    }
+    case 'groupNamedPages': {
+      const names = listedInProse(problem.pages.map((page) => f.var(page.relativeTo(sourceDirectory))));
+      const one = problem.pages.length === 1;
+      log.error(
+        `${names} ${one ? 'is' : 'are'} named like a ${f.var('(group)')} folder, which is left out of every ` +
+          `address, so the build cannot serve ${one ? 'it' : 'them'}. Rename ${one ? 'the file' : 'each file'}.`
+      );
+      return;
+    }
+    case 'reservedAddresses': {
+      reportReservedAddresses(problem.pages, sourceDirectory);
+      return;
+    }
+    case 'sharedAddresses': {
+      reportSharedAddresses(problem.addresses, sourceDirectory);
+      return;
+    }
+    case 'invalidFrontMatter': {
+      log.error(`The front matter of pages in ${f.path(sourceDirectory)} would fail the build:`);
+      log.message(problem.errors.map((error) => `  • ${error}`).join('\n'));
+      log.message(`Start each page with front matter that gives its title, for example:\n${TITLE_EXAMPLE}`);
+      return;
+    }
+    case 'invalidNavigation': {
+      log.error(`The page order in ${f.path(sourceDirectory)} could not be applied:`);
+      log.message(problem.errors.map((error) => `  • ${error}`).join('\n'));
+      return;
+    }
+  }
+}
+
 function reportReservedAddresses(pages: ReservedAddressPage[], sourceDirectory: DirectoryPath): void {
   const one = pages.length === 1;
   const lines = pages.map(({ file, address, section }) => {
@@ -121,30 +166,95 @@ function reportReservedAddresses(pages: ReservedAddressPage[], sourceDirectory: 
   log.message(one ? 'Rename or move the page.' : 'Rename or move each page.');
 }
 
+function reportSharedAddresses(addresses: SharedAddress[], sourceDirectory: DirectoryPath): void {
+  const one = addresses.length === 1;
+  const lines = addresses.map(
+    ({ address, pages }) =>
+      `  • ${f.var(address)}: ${listedInProse(pages.map((page) => f.var(page.relativeTo(sourceDirectory))))}`
+  );
+  log.error(
+    `Pages in ${f.path(sourceDirectory)} would share ${one ? 'an address' : 'addresses'}, but only one page ` +
+      `can be served at each:`
+  );
+  log.message(lines.join('\n'));
+  log.message(
+    `Rename or move all but one ${one ? 'of them' : 'page at each address'}. A page in a ${f.var(
+      '(group)'
+    )} folder is served as if the folder were not there, and an ${f.var('index')} page at its folder's address.`
+  );
+}
+
 export function reportShadowedFiles(shadowed: FileName[]): void {
   if (shadowed.length === 0) {
     return;
   }
-  const names = shadowed.map((fileName) => f.var(fileName.toString())).join(', ');
-  log.warn(`${names} in ${f.var('static')} replaces the file the portal would have generated.`);
+  const names = listedInProse(shadowed.map((fileName) => f.var(fileName.toString())));
+  const replaces = shadowed.length === 1 ? 'replaces the file' : 'replace the files';
+  log.warn(`${names} in ${f.var('static')} ${replaces} the portal would have generated.`);
 }
 
 export function reportIgnoredNavigationFiles(files: FilePath[], sourceDirectory: DirectoryPath): void {
   if (files.length === 0) {
     return;
   }
-  const names = files.map((file) => f.var(file.relativeTo(sourceDirectory))).join(', ');
+  const names = listedInProse(files.map((file) => f.var(file.relativeTo(sourceDirectory))));
   const verb = files.length === 1 ? 'is' : 'are';
   // Not "rename it": on a case-sensitive filesystem a correctly named file may already sit
   // beside it, and the two would then need merging rather than renaming.
   log.warn(`${names} ${verb} not read. Only a file named ${f.var('nav.json')}, in lower case, orders the pages.`);
 }
 
+export function reportContentNotices(notices: ContentNotices, sourceDirectory: DirectoryPath): void {
+  reportHiddenPages(notices.hiddenPages, sourceDirectory);
+  reportIgnoredNavigationFiles(notices.ignoredNavigationFiles, sourceDirectory);
+  reportFolderTabs(notices.folderTabs);
+  reportSharedTabNames(notices.sharedTabNames, sourceDirectory);
+}
+
+export function reportFolderTabs(folders: DirectoryPath[]): void {
+  if (folders.length === 0) {
+    return;
+  }
+  const names = listedInProse(folders.map((folder) => f.var(folder.leafName())));
+  log.info(`${f.var('content/nav.json')} makes a tab of each folder it lists: ${names}.`);
+}
+
+export function reportSharedTabNames(shared: SharedTabName[], sourceDirectory: DirectoryPath): void {
+  if (shared.length === 0) {
+    return;
+  }
+  const relative = (file: FilePath) => f.var(file.relativeTo(sourceDirectory));
+  const describe = ({ owner, namedBy }: PortalTab): string => {
+    const titledIn = namedBy === null ? '' : ` (titled in ${relative(namedBy)})`;
+    switch (owner.kind) {
+      case 'home':
+        return `the Home tab${titledIn}`;
+      case 'apiReference':
+        return `the API reference${titledIn}`;
+      case 'generated':
+        return `the tab of ${owner.section.description}`;
+      case 'folder': {
+        const folder = `the tab of the ${f.var(owner.directory.leafName())} folder`;
+        return namedBy === null ? `${folder} (named after the folder)` : `${folder}${titledIn}`;
+      }
+    }
+  };
+  const spellings = (tabs: PortalTab[]) =>
+    listedInProse([...new Set(tabs.map(({ name }) => name))].map((name) => f.var(name)));
+  log.warn('More than one tab has the same name, or one that differs only in case, so readers cannot tell them apart:');
+  log.message(shared.map(({ tabs }) => `  • ${spellings(tabs)}: ${listedInProse(tabs.map(describe))}`).join('\n'));
+  log.message(
+    `Rename all but one tab of each name with a ${f.var('title')} in its folder's ${f.var('nav.json')}, or in ` +
+      `${f.var('content/nav.json')} for the Home tab; the tabs of the SDK pages and the context plugin keep ` +
+      `their names.`
+  );
+}
+
 export function reportHiddenPages(files: FilePath[], sourceDirectory: DirectoryPath): void {
   if (files.length === 0) {
     return;
   }
-  const names = files.map((file) => f.var(file.relativeTo(sourceDirectory))).join(', ');
+  const names = listedInProse(files.map((file) => f.var(file.relativeTo(sourceDirectory))));
   const [verb, pronoun] = files.length === 1 ? ['sits', 'it'] : ['sit', 'them'];
   log.warn(
     `${names} ${verb} inside a specification's section under ${f.var('content/api')}, which lists only ` +

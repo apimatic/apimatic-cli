@@ -1,3 +1,4 @@
+import { Result } from 'neverthrow';
 import { PortalServePrompts } from '../../prompts/portal/serve.js';
 import { APIMATIC_CONFIG_FILE_NAME } from '../../types/apimatic-config/document.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
@@ -5,9 +6,12 @@ import { FileName } from '../../types/file/fileName.js';
 import { ActionResult } from '../action-result.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { PortalSourceContext } from '../../types/portal-source-context.js';
+import { isSkippedByGlob } from '../../types/portal/content-tree.js';
+import { GeneratedPages } from '../../types/portal/generated-pages.js';
 import { PortalArtifacts } from '../../types/portal/portal-artifacts.js';
-import { PortalSource } from '../../types/portal/portal-source.js';
+import { PortalSettings, PortalSource } from '../../types/portal/portal-source.js';
 import { PreviewConfig } from '../../types/portal/preview-config.js';
+import { PreviewContent } from '../../types/portal/preview-content.js';
 import { FileWatch, FileWatchService } from '../../infrastructure/file-watch-service.js';
 import { NetworkService } from '../../infrastructure/network-service.js';
 import { LauncherService } from '../../infrastructure/launcher-service.js';
@@ -68,46 +72,74 @@ export class PortalServeAction {
 
     return await new PreparePortalProjectAction(this.configDir, this.commandMetadata, this.authKey).execute(
       sourceDirectory,
-      async (project, source, artifacts) => {
-        const server = await this.prompts.startPreview(this.devServerService.start(project, servePort));
+      {
+        // So the browser keeps showing what a build would accept while an edit is half done.
+        content: 'copy',
+        onPrepared: async (project, source, artifacts) => {
+          const server = await this.prompts.startPreview(this.devServerService.start(project, servePort));
 
-        if (server.isErr()) {
-          this.prompts.startFailed(server.error.log);
-          return ActionResult.failed();
-        }
-
-        this.prompts.portalServed(server.value.url, sourceDirectory);
-        if (openInBrowser) {
-          await this.launcherService.openUrlInBrowser(server.value.url);
-        }
-        if (onServing) {
-          onServing();
-        }
-
-        const configWatch = this.watchConfig(source, artifacts, project.projectDirectory, sourceDirectory);
-
-        this.clearStandardInput();
-
-        try {
-          // Whichever comes first: the user stopping the preview, or the preview stopping on its
-          // own. Waiting only on the signal left a crashed server advertised as running.
-          const interrupted = this.prompts.blockExecution().then(() => ({ kind: 'interrupted' as const }));
-          const stopped = server.value.exited.then((output) => ({ kind: 'exited' as const, output }));
-          const outcome = await Promise.race([interrupted, stopped]);
-
-          if (outcome.kind === 'exited') {
-            this.prompts.previewStopped(outcome.output);
+          if (server.isErr()) {
+            this.prompts.startFailed(server.error.log);
             return ActionResult.failed();
           }
 
-          // First, so a save still being handled is not reported after the preview says it stops.
-          await configWatch?.close();
-          this.prompts.stopping();
-          await server.value.stop();
-          return ActionResult.stopped();
-        } finally {
-          // Before the portal project goes: a save being handled writes into it.
-          await configWatch?.close();
+          this.prompts.portalServed(server.value.url, sourceDirectory);
+          if (openInBrowser) {
+            await this.launcherService.openUrlInBrowser(server.value.url);
+          }
+          if (onServing) {
+            onServing();
+          }
+
+          // The content's tab names are checked against the generated tabs, which apimatic.json adds and removes.
+          let generatedPages = source.generatedPages;
+          const contentWatch = this.watchContent(
+            source,
+            () => generatedPages,
+            project.projectDirectory,
+            sourceDirectory
+          );
+          const configWatch = this.watchConfig(
+            source,
+            artifacts,
+            project.projectDirectory,
+            sourceDirectory,
+            (settings) => {
+              const tabsChanged = !settings.generatedPages.makesSameTabsAs(generatedPages);
+              generatedPages = settings.generatedPages;
+              if (tabsChanged) {
+                contentWatch?.recheck();
+              }
+            }
+          );
+          const closeWatches = async () => {
+            await configWatch?.close();
+            await contentWatch?.close();
+          };
+
+          this.clearStandardInput();
+
+          try {
+            // Whichever comes first: the user stopping the preview, or the preview stopping on its
+            // own. Waiting only on the signal left a crashed server advertised as running.
+            const interrupted = this.prompts.blockExecution().then(() => ({ kind: 'interrupted' as const }));
+            const stopped = server.value.exited.then((output) => ({ kind: 'exited' as const, output }));
+            const outcome = await Promise.race([interrupted, stopped]);
+            // First, so a save still being handled is not reported after the preview says it stops.
+            await closeWatches();
+
+            if (outcome.kind === 'exited') {
+              this.prompts.previewStopped(outcome.output);
+              return ActionResult.failed();
+            }
+
+            this.prompts.stopping();
+            await server.value.stop();
+            return ActionResult.stopped();
+          } finally {
+            // Before the portal project goes: a save being handled writes into it.
+            await closeWatches();
+          }
         }
       }
     );
@@ -121,7 +153,8 @@ export class PortalServeAction {
     source: PortalSource,
     artifacts: PortalArtifacts,
     projectDirectory: DirectoryPath,
-    sourceDirectory: DirectoryPath
+    sourceDirectory: DirectoryPath,
+    onApplied: (settings: PortalSettings) => void
   ): FileWatch | undefined {
     const sourceContext = new PortalSourceContext(sourceDirectory);
     const preview = new PreviewConfig(source.config, source.staticDirectory !== null);
@@ -155,33 +188,96 @@ export class PortalServeAction {
       if (preview.show(config, applied.value)) {
         this.prompts.configApplied();
       }
+      onApplied(settings);
     };
 
-    // The watch drops whatever its handler throws, so a fault no Result carries, such as the
-    // static directory turning unreadable mid-check, would otherwise leave the preview stale
-    // without a word.
-    const reapply = async () => {
-      try {
-        await applyEdit();
-      } catch (error) {
-        this.prompts.configNotApplied(errorMessage(error));
+    return this.startWatch(
+      (onChange) =>
+        this.fileWatchService.watch(sourceDirectory, new FileName(APIMATIC_CONFIG_FILE_NAME), onChange, (reason) =>
+          this.prompts.configWatchFailed(reason)
+        ),
+      applyEdit,
+      {
+        notWatched: (reason) => this.prompts.configNotWatched(reason),
+        thrown: (reason) => this.prompts.configNotApplied(reason)
       }
-    };
-
-    const watch = this.fileWatchService.watch(
-      sourceDirectory,
-      new FileName(APIMATIC_CONFIG_FILE_NAME),
-      reapply,
-      (reason) => this.prompts.configWatchFailed(reason)
     );
-    if (watch.isErr()) {
-      this.prompts.configNotWatched(watch.error);
+  }
+
+  /** Held to a build's rules, as `apimatic.json` is: a refused save is reported, and the preview kept as it was. */
+  private watchContent(
+    source: PortalSource,
+    generatedPages: () => GeneratedPages,
+    projectDirectory: DirectoryPath,
+    sourceDirectory: DirectoryPath
+  ): FileWatch | undefined {
+    const contentDirectory = source.contentDirectory;
+    if (contentDirectory === null) {
       return undefined;
     }
-    // The file was read before the preview started, which can take a minute, and a save made
-    // in the meantime reached no watch.
-    watch.value.recheck();
-    return watch.value;
+    const sourceContext = new PortalSourceContext(sourceDirectory);
+    const preview = new PreviewContent(source.contentNotices);
+
+    const check = async () => {
+      const checked = await sourceContext.resolveContent(source.specs, generatedPages());
+      if (checked.isErr()) {
+        preview.refuse();
+        this.prompts.contentRejected(checked.error, sourceDirectory);
+        return;
+      }
+      const applied = await this.projectService.applyContent(projectDirectory, contentDirectory, checked.value.files);
+      if (applied.isErr()) {
+        this.prompts.contentNotApplied(applied.error, sourceDirectory);
+        return;
+      }
+      const shown = preview.show(checked.value.notices);
+      if (shown.fixed) {
+        this.prompts.contentAccepted(sourceDirectory);
+      }
+      this.prompts.contentNotices(shown.notices, sourceDirectory);
+    };
+
+    return this.startWatch(
+      (onChange) =>
+        this.fileWatchService.watchTree(
+          contentDirectory,
+          onChange,
+          (reason) => this.prompts.contentWatchFailed(reason, sourceDirectory),
+          // What the build never reads, as an editor's swap file, would only have the check run again.
+          isSkippedByGlob
+        ),
+      check,
+      {
+        notWatched: (reason) => this.prompts.contentNotWatched(reason, sourceDirectory),
+        thrown: (reason) => this.prompts.contentNotChecked(reason, sourceDirectory)
+      }
+    );
+  }
+
+  /**
+   * Runs `handle` on each save the watch reports, and once at the start: what it handles was read
+   * before the preview started, which can take a minute, and a save made meanwhile reached no watch.
+   */
+  private startWatch(
+    watch: (onChange: () => Promise<void>) => Result<FileWatch, string>,
+    handle: () => Promise<void>,
+    report: { notWatched: (reason: string) => void; thrown: (reason: string) => void }
+  ): FileWatch | undefined {
+    // The watch drops whatever its handler throws, which would leave the preview stale without a word.
+    const onChange = async () => {
+      try {
+        await handle();
+      } catch (error) {
+        report.thrown(errorMessage(error));
+      }
+    };
+    const started = watch(onChange);
+    if (started.isErr()) {
+      report.notWatched(started.error);
+      return undefined;
+    }
+    started.value.recheck();
+    return started.value;
   }
 
   // Clack leaves stdin in raw mode, which swallows CTRL+C until it is released.

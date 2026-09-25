@@ -37,6 +37,7 @@ describe('PortalServeAction', () => {
   let start: sinon.SinonStub;
   let stop: sinon.SinonStub;
   let watch: sinon.SinonStub;
+  let watchTree: sinon.SinonStub;
   /** Stands in for the user pressing CTRL+C. */
   let interrupt: () => void;
   /** Stands in for the preview process dying, with what it printed on the way out. */
@@ -72,6 +73,9 @@ describe('PortalServeAction', () => {
     watch = sinon
       .stub(FileWatchService.prototype, 'watch')
       .returns(ok({ close: sinon.stub().resolves(), recheck: sinon.stub() }));
+    watchTree = sinon
+      .stub(FileWatchService.prototype, 'watchTree')
+      .returns(ok({ close: sinon.stub().resolves(), recheck: sinon.stub() }));
   });
 
   afterEach(() => {
@@ -101,7 +105,7 @@ describe('PortalServeAction', () => {
     expect(start.called).to.be.false;
   });
 
-  it('reports a source directory it cannot serve', async () => {
+  it('reports a source directory it cannot serve, without asking for the artifacts', async () => {
     const empty = new DirectoryPath(root).join('empty');
     fs.mkdirSync(empty.toString());
 
@@ -109,6 +113,7 @@ describe('PortalServeAction', () => {
 
     expect(result.isFailed()).to.be.true;
     expect(shared.prompts.sourceProblem.firstCall.args[0].kind).to.equal('missingConfig');
+    expect(shared.artifacts.called).to.be.false;
     expect(start.called).to.be.false;
   });
 
@@ -178,6 +183,239 @@ describe('PortalServeAction', () => {
     expect(result.isFailed()).to.be.true;
     expect(prompts.previewStopped.calledOnceWith('Error: the specification vanished')).to.be.true;
     expect(stop.called).to.be.false;
+  });
+
+  // The preview reloads the content itself; the CLI's part is saying what a build would refuse.
+  describe('checking a save in the content directory', () => {
+    let source: DirectoryPath;
+    let watched: Promise<{ onChange: () => Promise<void>; onFailed: (reason: string) => void }>;
+    let closeWatch: sinon.SinonStub;
+    let recheck: sinon.SinonStub;
+    let applyContent: sinon.SinonStub;
+
+    const writeNavigation = (contents: string) =>
+      fs.writeFileSync(path.join(source.toString(), 'content/guides/nav.json'), contents);
+
+    /** Runs the preview until `body` is done with it, then stops it as CTRL+C would. */
+    const whileServing = async (body: (save: (contents: string) => Promise<void>) => Promise<void>) => {
+      const running = execute(source);
+      const { onChange } = await watched;
+      try {
+        await body(async (contents) => {
+          writeNavigation(contents);
+          await onChange();
+        });
+      } finally {
+        interrupt();
+        await running;
+      }
+    };
+
+    beforeEach(() => {
+      source = new DirectoryPath(root).join('src');
+      fs.cpSync(FIXTURE.toString(), source.toString(), { recursive: true });
+
+      closeWatch = sinon.stub().resolves();
+      recheck = sinon.stub();
+      applyContent = sinon.stub(PortalProjectService.prototype, 'applyContent').resolves(ok(undefined));
+      watched = new Promise((resolve) => {
+        watchTree.callsFake(
+          (directory: DirectoryPath, onChange: () => Promise<void>, onFailed: (reason: string) => void) => {
+            expect(directory.toString()).to.equal(source.join('content').toString());
+            resolve({ onChange, onFailed });
+            return ok({ close: closeWatch, recheck });
+          }
+        );
+      });
+    });
+
+    // The preview itself turns every page into an HTTP 500 and says nothing.
+    it('reports a nav.json saved half typed, as a build would', async () => {
+      await whileServing(async (save) => {
+        await save('{ "pages": ["intro", ');
+
+        const [problems] = prompts.contentRejected.firstCall.args;
+        expect(problems).to.deep.equal([
+          { kind: 'invalidNavigation', errors: ['content/guides/nav.json is not valid JSON.'] }
+        ]);
+      });
+    });
+
+    it('reports an entry that matches nothing, which the preview drops without a word', async () => {
+      await whileServing(async (save) => {
+        await save(JSON.stringify({ pages: ['intro', 'does-not-exist'] }));
+
+        const [[problem]] = prompts.contentRejected.firstCall.args;
+        expect(problem.kind === 'invalidNavigation' && problem.errors[0]).to.contain(
+          "'does-not-exist' is not a page or folder in this directory."
+        );
+      });
+    });
+
+    it('says once that the content is fixed, and nothing for a save a build accepts', async () => {
+      await whileServing(async (save) => {
+        await save(JSON.stringify({ pages: ['intro'] }));
+        expect(prompts.contentRejected.called || prompts.contentAccepted.called).to.be.false;
+
+        await save('{');
+        await save(JSON.stringify({ pages: ['intro'] }));
+        await save(JSON.stringify({ pages: ['intro', '...'] }));
+
+        expect(prompts.contentRejected.calledOnce).to.be.true;
+        expect(prompts.contentAccepted.calledOnce).to.be.true;
+      });
+    });
+
+    // The dev server reads the copy, so a save a build would refuse never reaches the browser.
+    it('prepares the preview to read a copy of the content', async () => {
+      interrupt();
+
+      await execute(source);
+
+      expect(shared.prepare.firstCall.args[3]).to.equal('copy');
+    });
+
+    it('brings the copy in line with a save a build accepts, as checked, and not with one it refuses', async () => {
+      await whileServing(async (save) => {
+        await save('{ "pages": [');
+        expect(applyContent.called).to.be.false;
+
+        const fixed = JSON.stringify({ title: 'Guides', pages: ['intro'] });
+        await save(fixed);
+
+        const [projectDirectory, contentDirectory, files] = applyContent.firstCall.args;
+        const checked = files.find(
+          ({ file }: { file: FilePath }) => file.relativeTo(source) === 'content/guides/nav.json'
+        );
+        expect(projectDirectory.toString()).to.equal(shared.prepare.firstCall.args[0].toString());
+        expect(contentDirectory.toString()).to.equal(source.join('content').toString());
+        expect(checked.contents).to.equal(fixed);
+      });
+    });
+
+    it('says when a save it accepted could not be applied to the preview, and gives no notice for it', async () => {
+      applyContent.resolves(err('EACCES: permission denied'));
+
+      await whileServing(async (save) => {
+        await save(JSON.stringify({ title: 'Overview', pages: ['intro'] }));
+
+        expect(prompts.contentNotApplied.calledOnceWith('EACCES: permission denied')).to.be.true;
+        expect(prompts.contentNotices.called).to.be.false;
+      });
+    });
+
+    // The fixture's root nav.json names the Home tab 'Overview'.
+    it('gives a notice on the save that brings it about, and not on the saves after it', async () => {
+      await whileServing(async (save) => {
+        await save(JSON.stringify({ title: 'Overview', pages: ['intro'] }));
+        await save(JSON.stringify({ title: 'Overview', pages: ['intro', '...'] }));
+
+        const names = prompts.contentNotices
+          .getCalls()
+          .map(({ args: [notices] }) => notices.sharedTabNames.map(({ name }) => name));
+        expect(names).to.deep.equal([['Overview'], []]);
+      });
+    });
+
+    it('checks the content again when an edit to apimatic.json adds or removes a generated tab', async () => {
+      const configFile = path.join(source.toString(), 'apimatic.json');
+      const config = JSON.parse(fs.readFileSync(configFile, 'utf8'));
+      let saveConfig: (edited: object) => Promise<void> = async () => undefined;
+      watch.callsFake((_directory: DirectoryPath, _fileName: FileName, onChange: () => Promise<void>) => {
+        saveConfig = async (edited) => {
+          fs.writeFileSync(configFile, JSON.stringify(edited));
+          await onChange();
+        };
+        return ok({ close: sinon.stub().resolves(), recheck: sinon.stub() });
+      });
+      sinon.stub(PortalProjectService.prototype, 'applyConfig').resolves(ok(true));
+      writeNavigation(JSON.stringify({ title: 'Context Plugin', pages: ['intro'] }));
+
+      await whileServing(async () => {
+        recheck.resetHistory();
+        await saveConfig({ ...config, portal: { ...config.portal, site: { ...config.portal.site, name: 'Renamed' } } });
+        expect(recheck.called).to.be.false;
+
+        // A hosted plugin, which the artifacts need not carry, so the preview shows its tab without a restart.
+        await saveConfig({ ...config, portal: { ...config.portal, pluginUrl: 'https://plugins.acme.test/calc.zip' } });
+        expect(recheck.calledOnce).to.be.true;
+        // What the watch does on a recheck: check the content as though it had just been saved.
+        await (await watched).onChange();
+
+        const [notices] = prompts.contentNotices.lastCall.args;
+        expect(notices.sharedTabNames.map(({ name }) => name)).to.deep.equal(['Context Plugin']);
+
+        await saveConfig(config);
+        expect(recheck.calledTwice).to.be.true;
+      });
+    });
+
+    // An editor's swap file would only have the content checked again for nothing.
+    it('leaves out of the watch what the build never reads', async () => {
+      await whileServing(async () => {
+        const isIgnored: (name: string) => boolean = watchTree.firstCall.args[3];
+
+        expect(['.intro.md.swp', '.drafts', 'node_modules'].every(isIgnored)).to.be.true;
+        expect(isIgnored('intro.md')).to.be.false;
+      });
+    });
+
+    // The content is checked before the preview starts, which can take a minute.
+    it('checks the content again once it is watched, and stops watching when the preview stops', async () => {
+      await whileServing(async () => {
+        expect(recheck.calledOnce).to.be.true;
+      });
+
+      expect(closeWatch.called).to.be.true;
+      expect(closeWatch.calledBefore(prompts.stopping)).to.be.true;
+    });
+
+    it('says when the content cannot be watched, and serves regardless', async () => {
+      watchTree.returns(err('EMFILE: too many open files'));
+      interrupt();
+
+      const result = await execute(source);
+
+      expect(prompts.contentNotWatched.calledOnceWith('EMFILE: too many open files')).to.be.true;
+      expect(result.isCancelled()).to.be.true;
+    });
+
+    it('tells the user when the content stops being watched', async () => {
+      await whileServing(async () => {
+        (await watched).onFailed('EPERM: operation not permitted');
+
+        expect(prompts.contentWatchFailed.calledOnceWith('EPERM: operation not permitted')).to.be.true;
+      });
+    });
+
+    it('says when a save could not be checked, rather than dropping it', async () => {
+      sinon.stub(PortalSourceContext.prototype, 'resolveContent').rejects(new Error('EIO: i/o error'));
+
+      await whileServing(async (save) => {
+        await save(JSON.stringify({ pages: ['intro'] }));
+
+        expect(prompts.contentNotChecked.calledOnceWith('EIO: i/o error')).to.be.true;
+      });
+    });
+
+    // A check still running would otherwise report after the terminal says the preview stopped.
+    it('stops watching before saying that the preview stopped on its own', async () => {
+      const running = execute(source);
+      await watched;
+      exit('Error: out of memory');
+
+      expect((await running).isFailed()).to.be.true;
+      expect(closeWatch.calledBefore(prompts.previewStopped)).to.be.true;
+    });
+
+    it('watches nothing when there is no content directory', async () => {
+      fs.rmSync(path.join(source.toString(), 'content'), { recursive: true });
+      interrupt();
+
+      await execute(source);
+
+      expect(watchTree.called).to.be.false;
+    });
   });
 
   /**

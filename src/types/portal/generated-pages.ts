@@ -89,6 +89,13 @@ export class GeneratedPages {
     return this.plugin === null ? [SDK_SECTION] : [SDK_SECTION, PLUGIN_SECTION];
   }
 
+  /** Whatever pages the tabs hold, which the languages decide. */
+  public makesSameTabsAs(other: GeneratedPages): boolean {
+    const theirs = other.sections();
+    const mine = this.sections();
+    return mine.length === theirs.length && mine.every((section, index) => section === theirs[index]);
+  }
+
   public pages(): GeneratedPage[] {
     const languagePages = this.sdks.map(
       (sdk): GeneratedPage => ({

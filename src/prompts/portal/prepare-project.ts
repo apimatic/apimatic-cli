@@ -3,14 +3,14 @@ import { Result } from 'neverthrow';
 import { ServiceError } from '../../infrastructure/service-error.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { FileName } from '../../types/file/fileName.js';
-import { FilePath } from '../../types/file/filePath.js';
+import { ContentNotices } from '../../types/portal/content-notices.js';
 import { MissingArtifacts } from '../../types/portal/generated-pages.js';
 import { PortalArtifacts } from '../../types/portal/portal-artifacts.js';
 import { PortalSourceProblem } from '../../types/portal/portal-source.js';
 import { format as f } from '../format.js';
 import { describeMissingArtifacts, generateArtifacts } from './artifacts.js';
 import { reportUnplacedSamples } from './code-samples.js';
-import { reportHiddenPages, reportIgnoredNavigationFiles, reportShadowedFiles, reportSourceProblem } from './source.js';
+import { reportContentNotices, reportShadowedFiles, reportSourceProblem } from './source.js';
 
 /** What both `portal generate` and `portal serve` say while the project they share is prepared. */
 export class PreparePortalProjectPrompts {
@@ -26,12 +26,8 @@ export class PreparePortalProjectPrompts {
     reportShadowedFiles(shadowed);
   }
 
-  public pagesHiddenBySpecs(files: FilePath[], sourceDirectory: DirectoryPath) {
-    reportHiddenPages(files, sourceDirectory);
-  }
-
-  public ignoredNavigationFiles(files: FilePath[], sourceDirectory: DirectoryPath) {
-    reportIgnoredNavigationFiles(files, sourceDirectory);
+  public contentNotices(notices: ContentNotices, sourceDirectory: DirectoryPath) {
+    reportContentNotices(notices, sourceDirectory);
   }
 
   public unplacedSamples(endpoints: string[]) {

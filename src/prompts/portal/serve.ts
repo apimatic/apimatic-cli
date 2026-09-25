@@ -4,15 +4,16 @@ import { APIMATIC_CONFIG_FILE_NAME } from '../../types/apimatic-config/document.
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { UrlPath } from '../../types/file/urlPath.js';
 import { PortalAuthorizationFailure } from '../../infrastructure/services/portal-authorization-service.js';
+import { ContentNotices } from '../../types/portal/content-notices.js';
 import { MissingArtifacts } from '../../types/portal/generated-pages.js';
-import { PortalSourceProblem } from '../../types/portal/portal-source.js';
+import { ContentProblem, PortalSourceProblem } from '../../types/portal/portal-source.js';
 import { PortalDevServer, PortalDevServerFailure } from '../../infrastructure/portal-dev-server-service.js';
 import { Result } from 'neverthrow';
 import { format as f } from '../format.js';
 import { logTail, noteWrapped, withSpinner } from '../prompt.js';
 import { reportAuthorizationFailure } from './authorization.js';
 import { describeMissingArtifacts } from './artifacts.js';
-import { reportSourceProblem } from './source.js';
+import { reportContentNotices, reportContentProblems, reportSourceProblem } from './source.js';
 
 export class PortalServePrompts {
   public authorizationFailed(failure: PortalAuthorizationFailure) {
@@ -46,12 +47,10 @@ export class PortalServePrompts {
 
   public portalServed(url: UrlPath, sourceDirectory: DirectoryPath) {
     log.message(`The portal is running at ${f.link(url.toString())}`);
-    // `nav.json` is validated only at startup, and the build drops an entry it cannot resolve
-    // without a word, which is why the note warns that a mistake typed later is ignored.
     noteWrapped(
       [
-        `Edits to the Markdown pages in ${f.path(sourceDirectory.join('content'))}, to the order and ` +
-          `folder titles in a ${f.var('nav.json')}, and to the ${f.var('portal')} block of ${f.var(
+        `Edits to the Markdown pages in ${f.path(sourceDirectory.join('content'))}, to the order, tabs and ` +
+          `titles in a ${f.var('nav.json')}, and to the ${f.var('portal')} block of ${f.var(
             'apimatic.json'
           )} appear in the browser automatically, and so does a language removed from its ${f.var(
             'languages'
@@ -59,10 +58,8 @@ export class PortalServePrompts {
             'plugin'
           )} block removed, which removes the Context Plugin tab. A mistake in ${f.var(
             'apimatic.json'
-          )} is reported when you save it, and the preview keeps what it last accepted. A mistake in a ${f.var(
-            'nav.json'
-          )} is only reported when the preview starts; until then an entry or a title that the build would ` +
-          `refuse is ignored here.`,
+          )}, a page or a ${f.var('nav.json')} is reported when you save it, and the preview keeps what it ` +
+          `last accepted.`,
         '',
         `Adding a language or a ${f.var('plugin')} block, whose SDK or plugin is fetched when the preview ` +
           `starts, adding or removing a page in ${f.path(sourceDirectory.join('content'))}, creating ${f.path(
@@ -116,6 +113,47 @@ export class PortalServePrompts {
     log.warn(
       `${f.var(APIMATIC_CONFIG_FILE_NAME)} is no longer watched (${reason}), so further edits to it need the ` +
         `preview restarted.`
+    );
+  }
+
+  /** Explained as `portal generate` would explain it, since the same rules refused it. */
+  public contentRejected(problems: ContentProblem[], sourceDirectory: DirectoryPath) {
+    reportContentProblems(problems, sourceDirectory);
+    log.message(
+      `The preview keeps showing what it last accepted until ${f.path(sourceDirectory.join('content'))} is ` +
+        `fixed; a build would stop here.`
+    );
+  }
+
+  public contentNotApplied(reason: string, sourceDirectory: DirectoryPath) {
+    log.warn(
+      `The changes to ${f.path(sourceDirectory.join('content'))} could not be applied to the preview: ${reason}`
+    );
+  }
+
+  public contentNotChecked(reason: string, sourceDirectory: DirectoryPath) {
+    log.warn(`The changes to ${f.path(sourceDirectory.join('content'))} could not be checked: ${reason}`);
+  }
+
+  public contentAccepted(sourceDirectory: DirectoryPath) {
+    log.success(`${f.path(sourceDirectory.join('content'))} is fixed; a build would accept it again.`);
+  }
+
+  public contentNotices(notices: ContentNotices, sourceDirectory: DirectoryPath) {
+    reportContentNotices(notices, sourceDirectory);
+  }
+
+  public contentNotWatched(reason: string, sourceDirectory: DirectoryPath) {
+    log.warn(
+      `${f.path(sourceDirectory.join('content'))} cannot be watched (${reason}), so a mistake in a page or a ` +
+        `${f.var('nav.json')} is only reported when the preview is restarted.`
+    );
+  }
+
+  public contentWatchFailed(reason: string, sourceDirectory: DirectoryPath) {
+    log.warn(
+      `${f.path(sourceDirectory.join('content'))} is no longer watched (${reason}), so a mistake in a page or ` +
+        `a ${f.var('nav.json')} is only reported when the preview is restarted.`
     );
   }
 

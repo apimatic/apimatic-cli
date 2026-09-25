@@ -216,6 +216,21 @@ describe('GeneratedPages', () => {
     });
   });
 
+  // `portal serve` checks the content's tab names again only when the generated tabs change.
+  it('makes the same tabs whatever the languages, and another tab with a plugin, wherever it is installed from', () => {
+    const typescript = pagesFor({ typescript: {} });
+    const bundled = pagesFor({ typescript: {} }, { kind: 'bundled' });
+    const hosted = pagesFor(
+      { typescript: {} },
+      { kind: 'hosted', url: new UrlPath('https://plugins.acme.test/calc.zip') }
+    );
+
+    expect(typescript.makesSameTabsAs(pagesFor({ python: {}, csharp: {} }))).to.be.true;
+    expect(typescript.makesSameTabsAs(bundled)).to.be.false;
+    expect(bundled.makesSameTabsAs(typescript)).to.be.false;
+    expect(bundled.makesSameTabsAs(hosted)).to.be.true;
+  });
+
   it('writes each nav.json as the build reads it, ending in a newline', () => {
     const [file] = pagesFor({ typescript: {} }).navigationFiles();
 

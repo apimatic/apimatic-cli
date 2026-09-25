@@ -1,5 +1,5 @@
 import { PortalBuildService } from '../../infrastructure/portal-build-service.js';
-import { PortalProjectService } from '../../infrastructure/portal-project-service.js';
+import { PortalProjectPaths, PortalProjectService } from '../../infrastructure/portal-project-service.js';
 import { PortalAuthorizationService } from '../../infrastructure/services/portal-authorization-service.js';
 import { PortalGeneratePrompts } from '../../prompts/portal/generate.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
@@ -58,34 +58,50 @@ export class GenerateAction {
     }
 
     const portalContext = new PortalContext(portalDirectory);
-
     return await new PreparePortalProjectAction(this.configDir, this.commandMetadata, this.authKey).execute(
       sourceDirectory,
-      async (project) => {
-        if (!force && (await portalContext.exists()) && !(await this.prompts.overwritePortal(portalDirectory))) {
-          this.prompts.portalDirectoryNotEmpty();
-          return ActionResult.cancelled();
-        }
-
-        const build = await this.prompts.buildPortal(this.buildService.build(project));
-
-        if (build.isErr()) {
-          // Written before the temp directory is removed, so the log outlives the build.
-          const logPath = await portalContext.saveBuildLog(build.error.log);
-          this.prompts.buildFailed(build.error.log, logPath);
-          return ActionResult.failed();
-        }
-
-        const saved = await this.prompts.savePortal(portalContext.save(build.value.output, zipPortal));
-        if (saved.isErr()) {
-          return ActionResult.failed();
-        }
-
-        this.prompts.portalGenerated(portalDirectory);
-        this.prompts.nextSteps(portalDirectory, zipPortal);
-
-        return ActionResult.success();
+      {
+        confirm: () => this.confirmOverwrite(portalContext, portalDirectory, force),
+        onPrepared: (project) => this.build(project, portalContext, portalDirectory, zipPortal)
       }
     );
   };
+
+  private async confirmOverwrite(
+    portalContext: PortalContext,
+    portalDirectory: DirectoryPath,
+    force: boolean
+  ): Promise<boolean> {
+    if (force || !(await portalContext.exists()) || (await this.prompts.overwritePortal(portalDirectory))) {
+      return true;
+    }
+    this.prompts.portalDirectoryNotEmpty();
+    return false;
+  }
+
+  private async build(
+    project: PortalProjectPaths,
+    portalContext: PortalContext,
+    portalDirectory: DirectoryPath,
+    zipPortal: boolean
+  ): Promise<ActionResult> {
+    const build = await this.prompts.buildPortal(this.buildService.build(project));
+
+    if (build.isErr()) {
+      // Written before the temp directory is removed, so the log outlives the build.
+      const logPath = await portalContext.saveBuildLog(build.error.log);
+      this.prompts.buildFailed(build.error.log, logPath);
+      return ActionResult.failed();
+    }
+
+    const saved = await this.prompts.savePortal(portalContext.save(build.value.output, zipPortal));
+    if (saved.isErr()) {
+      return ActionResult.failed();
+    }
+
+    this.prompts.portalGenerated(portalDirectory);
+    this.prompts.nextSteps(portalDirectory, zipPortal);
+
+    return ActionResult.success();
+  }
 }
