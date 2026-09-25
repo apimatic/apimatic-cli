@@ -15,6 +15,8 @@ import { FileName } from '../../../src/types/file/fileName';
 import { FilePath } from '../../../src/types/file/filePath';
 import { CommandMetadata } from '../../../src/types/common/command-metadata';
 import { Language } from '../../../src/types/sdk/generate';
+import { PortalArtifactsService } from '../../../src/infrastructure/services/portal-artifacts-service';
+import { PortalArtifacts } from '../../../src/types/portal/portal-artifacts';
 
 const COMMAND_METADATA: CommandMetadata = { commandName: 'portal quickstart', shell: 'test' };
 const SPEC = new FilePath(
@@ -79,6 +81,11 @@ describe('PortalQuickstartAction', () => {
   // in a repository under. `prepare` is stopped so the test is about the writing, not the build.
   it('records the languages and the derived plugin identity, then hands off to the preview', async () => {
     prompts.selectLanguages.resolves([Language.TYPESCRIPT, Language.PYTHON]);
+    // The preview asks the service for artifacts before it prepares anything; a portal declaring
+    // three languages would otherwise reach the network from a unit test.
+    const artifacts = sinon
+      .stub(PortalArtifactsService.prototype, 'generate')
+      .resolves(ok(PortalArtifacts.none()));
     const prepare = sinon.stub(PortalProjectService.prototype, 'prepare').resolves(err('stopped here'));
 
     await execute();
@@ -96,7 +103,9 @@ describe('PortalQuickstartAction', () => {
     expect(fs.existsSync(path.join(project.toString(), 'src', 'spec', 'Apimatic-Calculator.json'))).to.be.true;
     expect(fs.readFileSync(path.join(project.toString(), '.gitignore'), 'utf8')).to.contain('/plugin/');
 
-    // Reaching the project build is the handoff: nothing else in the wizard prepares one.
+    // Reaching either is the handoff: nothing else in the wizard asks for artifacts or
+    // prepares a project.
+    expect(artifacts.called, 'the wizard asked for the artifacts').to.be.true;
     expect(prepare.called, 'the wizard reached the preview').to.be.true;
   });
 

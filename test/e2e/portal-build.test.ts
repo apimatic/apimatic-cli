@@ -8,16 +8,20 @@ import { PortalProjectService } from '../../src/infrastructure/portal-project-se
 import { PortalSourceContext } from '../../src/types/portal-source-context';
 import { PortalContext } from '../../src/types/portal-context';
 import { DirectoryPath } from '../../src/types/file/directoryPath';
-import { CodeSampleCatalog, CodeSamples } from '../../src/types/portal/code-samples';
+import { CodeSampleCatalog, CodeSampleCatalogs } from '../../src/types/portal/code-samples';
+import { PortalArtifacts } from '../../src/types/portal/portal-artifacts';
 import { Language } from '../../src/types/sdk/generate';
-import { ensureBuildDirectoryBase, removeBuildDirectoryBase } from '../../src/infrastructure/tmp-extensions';
+import {
+  ensurePortalProjectDirectoryBase,
+  removePortalProjectDirectoryBase
+} from '../../src/infrastructure/tmp-extensions';
 
 // A real Vite build takes tens of seconds and needs every runtime dependency installed,
 // so it stays out of the default run. CI switches it on for the platform matrix.
 const enabled = process.env.APIMATIC_E2E === '1';
 
 const CALCULATE_SAMPLE = 'const result = await calculator.calculate(OperationType.Sum, 4, 5);';
-const CODE_SAMPLES = new CodeSamples([
+const CODE_SAMPLES = new CodeSampleCatalogs([
   CodeSampleCatalog.fromJson(Language.TYPESCRIPT, {
     paths: { '/{operation}': { GET: { Example: CALCULATE_SAMPLE } } }
   }) as CodeSampleCatalog
@@ -31,16 +35,22 @@ interface BuiltPortal {
 }
 
 /** Resolves, prepares, builds and saves a fixture as `portal generate` does. */
-async function buildFixture(name: string, codeSamples = new CodeSamples([])): Promise<BuiltPortal> {
+async function buildFixture(name: string, codeSampleCatalogs = new CodeSampleCatalogs([])): Promise<BuiltPortal> {
   const fixture = new DirectoryPath(process.cwd()).join('test/resources/portal-inputs').join(name);
-  const base = await ensureBuildDirectoryBase(fixture);
+  const base = await ensurePortalProjectDirectoryBase(fixture);
   const root = fs.mkdtempSync(path.join(base, 'portal-e2e-'));
 
   const source = (await new PortalSourceContext(fixture).resolve())._unsafeUnwrap();
 
   const project = new DirectoryPath(root).join('build');
   fs.mkdirSync(project.toString(), { recursive: true });
-  const prepared = (await new PortalProjectService().prepare(project, source, codeSamples))._unsafeUnwrap();
+  const prepared = (
+    await new PortalProjectService().prepare(
+      project,
+      source,
+      new PortalArtifacts(codeSampleCatalogs, new Map(), undefined)
+    )
+  )._unsafeUnwrap();
 
   const build = await new PortalBuildService().build(prepared);
   if (build.isErr()) {
@@ -56,7 +66,7 @@ async function buildFixture(name: string, codeSamples = new CodeSamples([])): Pr
 async function removeBuilt(built: BuiltPortal | undefined): Promise<void> {
   if (built === undefined) return;
   fs.rmSync(built.root, { recursive: true, force: true });
-  await removeBuildDirectoryBase(built.base);
+  await removePortalProjectDirectoryBase(built.base);
 }
 
 /**
