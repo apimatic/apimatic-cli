@@ -9,9 +9,9 @@ import { QuickstartCompletedEvent } from '../types/events/quickstart-completed.j
 
 export default class Quickstart extends Command {
   static readonly description =
-    'Point the CLI at your API specification and it builds a documentation portal, the SDKs it documents, and a context plugin that teaches an AI coding assistant to use them.';
+    'Point the CLI at your API specification and it builds a documentation portal, SDKs, and a context plugin that teaches an AI coding assistant to use them.';
 
-  static readonly summary = 'Create your API Documentation Portal, SDKs and Context Plugins.';
+  static readonly summary = 'Create your first API Documentation Portal, SDKs and Context Plugins.';
 
   static readonly cmdTxt = format.cmd('apimatic', 'quickstart');
 

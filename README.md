@@ -402,17 +402,17 @@ _See code: [src/commands/publishing/profile/list.ts](https://github.com/apimatic
 
 ## `apimatic quickstart`
 
-Create your API Documentation Portal, SDKs and Context Plugins.
+Create your first API Documentation Portal, SDKs and Context Plugins.
 
 ```
 USAGE
   $ apimatic quickstart
 
 DESCRIPTION
-  Create your API Documentation Portal, SDKs and Context Plugins.
+  Create your first API Documentation Portal, SDKs and Context Plugins.
 
-  Point the CLI at your API specification and it builds a documentation portal, the SDKs it documents, and a context
-  plugin that teaches an AI coding assistant to use them.
+  Point the CLI at your API specification and it builds a documentation portal, SDKs, and a context plugin that teaches
+  an AI coding assistant to use them.
 
 EXAMPLES
   apimatic quickstart
