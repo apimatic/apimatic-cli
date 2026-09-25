@@ -14,7 +14,6 @@ import { OpenApiDocument } from './portal/openapi-document.js';
 import { PortalConfig } from './portal/portal-config.js';
 import { PortalLanguages } from './portal/portal-languages.js';
 import { API_REFERENCE_NAME, INDEX_NAME, NAVIGATION_FILE_NAME, PortalNavigation } from './portal/portal-navigation.js';
-import { SpecDescription } from './portal/spec-description.js';
 import {
   MissingStaticFile,
   PortalScaffoldProblem,
@@ -110,7 +109,7 @@ export class PortalSourceContext {
     if (discovered.isErr()) {
       return err(discovered.error);
     }
-    const { specs, suggested, description } = discovered.value;
+    const { specs, suggested } = discovered.value;
 
     const settings = await this.settingsFrom(document.value, suggested);
     if (settings.isErr()) {
@@ -157,7 +156,6 @@ export class PortalSourceContext {
     return ok({
       ...settings.value,
       suggestedSite: suggested,
-      specDescription: description,
       specs,
       contentDirectory,
       staticDirectory,
@@ -525,13 +523,9 @@ export class PortalSourceContext {
       .map((file) => ({ file, segments: file.relativeTo(contentTree.directoryPath).split('/') }));
   }
 
-  // With several specifications there is no suggested site and no description: no one of them
-  // speaks for the portal.
+  // With several specifications there is no suggested site: no one of them speaks for the portal.
   private async specs(): Promise<
-    Result<
-      { specs: PortalSpec[]; suggested: SuggestedSite | null; description: SpecDescription | null },
-      PortalSourceProblem
-    >
+    Result<{ specs: PortalSpec[]; suggested: SuggestedSite | null }, PortalSourceProblem>
   > {
     const specs: PortalSpec[] = [];
     // Only the first is kept: it is the one that speaks for the portal when it is alone, and
@@ -562,12 +556,7 @@ export class PortalSourceContext {
     if (first === undefined) {
       return err({ kind: 'noOpenApiSpec' });
     }
-    const alone = specs.length === 1;
-    return ok({
-      specs,
-      suggested: alone ? first.suggestedSite() : null,
-      description: alone ? first.description() : null
-    });
+    return ok({ specs, suggested: specs.length === 1 ? first.suggestedSite() : null });
   }
 
   private async specDirectoryFileNames(): Promise<FileName[]> {

@@ -410,34 +410,6 @@ describe('PortalSourceContext', () => {
       expect((await resolve())._unsafeUnwrapErr().kind).to.equal('emptySpecDirectory');
     });
 
-    it("carries the only spec's whole description, for the SDKs page", async () => {
-      write(
-        'spec/api.json',
-        JSON.stringify({
-          openapi: '3.0.0',
-          info: { title: 'Calc', version: '1', description: 'Adds.\n\n# Auth\n\nA key.' },
-          paths: {}
-        })
-      );
-
-      const description = (await resolve())._unsafeUnwrap().specDescription;
-
-      expect(description?.lead()).to.equal('Adds.');
-      expect(description?.rest()).to.equal('# Auth\n\nA key.');
-    });
-
-    // As with the suggested site, no one of several specifications speaks for the portal.
-    it('carries no description with several specs, or when the only one has none', async () => {
-      write('spec/api.json', OPENAPI);
-      expect((await resolve())._unsafeUnwrap().specDescription).to.be.null;
-
-      write(
-        'spec/more.json',
-        JSON.stringify({ openapi: '3.0.0', info: { title: 'More', version: '1', description: 'More.' }, paths: {} })
-      );
-      expect((await resolve())._unsafeUnwrap().specDescription).to.be.null;
-    });
-
     it('leaves a spec named after the search route with its own name', async () => {
       write('spec/search.json', OPENAPI);
 

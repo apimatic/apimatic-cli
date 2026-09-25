@@ -5,7 +5,6 @@ import { Endpoint } from './endpoint.js';
 import { SuggestedSite } from './config/site-config.js';
 import { GeneratedPages, GeneratedSection } from './generated-pages.js';
 import { PortalConfig } from './portal-config.js';
-import { SpecDescription } from './spec-description.js';
 
 /** An OpenAPI document found in `src/spec/`, with the slug its section is mounted at. */
 export interface PortalSpec {
@@ -28,8 +27,6 @@ export interface PortalSource extends PortalSettings {
    * can judge an edited config without reading the specifications again.
    */
   suggestedSite: SuggestedSite | null;
-  /** The only specification's whole description, for the SDKs page; null with several, or none. */
-  specDescription: SpecDescription | null;
   specs: PortalSpec[];
   contentDirectory: DirectoryPath | null;
   staticDirectory: DirectoryPath | null;

@@ -228,8 +228,8 @@ Rules the renderer holds them to, which the design team's pages inherit:
 
 *Amended 2026-09-25:* the pages now take a card per language, from each
 `publishing` record, and the plugin's install path and languages. The SDK docs
-and the spec's description are Markdown fragments the pages include, rather
-than values (sdk-and-plugin-pages, sections 3 to 5).
+are Markdown fragments the pages include, rather than values
+(sdk-and-plugin-pages, sections 3 to 5).
 
 ## 4. Mechanism
 

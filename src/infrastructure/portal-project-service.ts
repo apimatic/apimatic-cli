@@ -127,10 +127,10 @@ export class PortalProjectService {
     if (pages.isErr()) {
       return err(pages.error);
     }
-    // Once: they change only with the specs and the artifacts, which a preview reads when it starts.
+    // Once: they change only with the artifacts, which a preview fetches when it starts.
     await this.writeFragments(
       projectDirectory.join(GENERATED_INCLUDES_DIRECTORY_NAME),
-      pageFragments(source.specDescription, artifacts.sdkDocs)
+      pageFragments(artifacts.sdkDocs)
     );
 
     return ok({
@@ -191,7 +191,7 @@ export class PortalProjectService {
 
   private async writeFragments(directory: DirectoryPath, fragments: PageFragment[]): Promise<void> {
     for (const { folder, fileName, contents } of fragments) {
-      const target = folder === null ? directory : directory.join(folder);
+      const target = directory.join(folder);
       await this.fileService.createDirectoryIfNotExists(target);
       await this.fileService.writeContents(new FilePath(target, fileName), contents);
     }

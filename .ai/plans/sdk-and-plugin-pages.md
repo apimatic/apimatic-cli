@@ -9,6 +9,12 @@ of that day. **Implemented 2026-09-25**: every step of section 9 is done, each
 committed on its own. Section 10 records what the step 1 spike found and the
 two questions it raised.
 
+**Amended 2026-09-25, after review:** the SDKs page shows none of the spec's
+description, only its title, subtitle and cards. `SpecDescription`, the
+`sdks-intro.md` and `sdks-about.md` fragments, the fallback sentence and the
+`<ShiftHeadings>` step are removed with it; the sections that describe them are
+marked. The step records of section 9 are left as they were.
+
 Follows on from `.ai/plans/generated-pages.md` (PR #360), which shipped the flow
 (three templates in `portal-pages/`, a second Fumadocs collection over
 `generated/`, the SDKs and Context Plugin tabs) with **placeholder** templates,
@@ -23,11 +29,12 @@ Terms follow `CONTEXT.md`: **source directory**, **portal project**, **spec**,
 Replace the three placeholder templates with real pages, written by us rather
 than the design team (decided 2026-09-25):
 
-- **SDKs** (`/sdks`, `portal-pages/sdks.mdx`): the spec description's first
-  paragraph as the intro, a card per configured language, then the rest of the
-  description. Each card shows the language's logo, its name linking to its
-  page, the package name and version when a release is recorded, and up to three
-  buttons: **Download SDK**, **View source**, **View package**.
+- **SDKs** (`/sdks`, `portal-pages/sdks.mdx`): a card per configured language,
+  under the page's title and subtitle. *(Amended 2026-09-25: the spec
+  description's first paragraph was the intro and the rest followed the cards,
+  until review removed it.)* Each card shows the language's logo, its name
+  linking to its page, the package name and version when a release is recorded,
+  and up to three buttons: **Download SDK**, **View source**, **View package**.
 - **One language** (`/sdks/<language>`, `portal-pages/sdk.mdx`): titled
   "<Language> SDK", the same three buttons under the title, then the language's
   SDK docs (getting started: headings, paragraphs, code blocks).
@@ -65,11 +72,11 @@ primitives.
 | View package | Shown when a release is recorded (`publishing.package.version`) and the configuration names the package. Always the public registry: npm, PyPI, NuGet (section 5). |
 | Card contents | Language logo, name linking to `/sdks/<language>`, `package · vVersion` when released, the buttons. No install one-liner on the card; the SDK docs carry it. |
 | Logos | Brand logos as inline SVG, for the three languages and the three platforms, vendored from an MIT or CC0 icon set into small components, with no new dependency. Attribution goes in `portal-template/NOTICE`. |
-| SDKs page text | The spec's full `info.description`, when the source directory has exactly one spec and it has one; otherwise a fixed sentence that names no portal. This matches the rule `suggestedSite` already follows ("with several specifications … no one of them speaks for the portal"). Its first paragraph goes above the cards and the rest below them. |
-| SDKs page headings | Shifted so the description's top heading is H2, since spec authors write `# Authentication` and no backend controls it. Done by a remark step in the template, scoped by a `<ShiftHeadings>` wrapper in `sdks.mdx` (section 4). |
+| SDKs page text | *Removed 2026-09-25, after review: the page shows no spec description.* Was: the spec's full `info.description`, when the source directory has exactly one spec and it has one; otherwise a fixed sentence that names no portal. This matches the rule `suggestedSite` already follows ("with several specifications … no one of them speaks for the portal"). Its first paragraph goes above the cards and the rest below them. |
+| SDKs page headings | *Removed 2026-09-25, with the description.* Was: shifted so the description's top heading is H2, since spec authors write `# Authentication` and no backend controls it. Done by a remark step in the template, scoped by a `<ShiftHeadings>` wrapper in `sdks.mdx` (section 4). |
 | Raw HTML in fragments | Rendered, through `rehype-raw` on the generated collection (section 4). Without it, any HTML in an included fragment fails the build (step 1). |
 | Template data | Components take plain string attributes, which print cleanly in the `.md` twin and `llms-full.txt`. Lists (the SDK cards, the plugin's languages) are mustache sections, so `PageTemplate` moves onto `mustache` with escaping off (section 4). Decided after step 1 showed JSON props printing as entity-escaped blobs. |
-| Fragments | Written once, when the portal project is prepared, from the spec description and the artifacts' SDK docs; `applyConfig` leaves them alone. They could only change on a restart anyway: the specs and the artifacts are read once, and a language added under `portal serve` is refused. The fallback intro names no portal, so no edit to the site name leaves it stale (decided after step 2). |
+| Fragments | Written once, when the portal project is prepared, from the artifacts' SDK docs; `applyConfig` leaves them alone. They could only change on a restart anyway: the artifacts are read once, and a language added under `portal serve` is refused (decided after step 2; the spec description's fragments were removed 2026-09-25). |
 | A language added under `portal serve` | Refused like any edit a build would refuse, with a message to restart `portal serve`, since the artifacts (its SDK docs and zip) are fetched once when the preview starts. The preview keeps what it last accepted. Removing a language still applies live. |
 | Language page | Title "<Language> SDK" (so its sidebar row reads the same), the buttons right under the title, then the SDK docs. |
 | `pluginUrl` | `portal.pluginUrl`, exactly as asked: the first top-level key of `portal` outside its four namespaces (`site`, `brand`, `navigation`, `ai`). Optional, absolute, `https://` only. |
@@ -121,8 +128,8 @@ Rejected, with reasons:
 
 ## 3. What is generated
 
-For `languages: { typescript: {…published…}, python: {} }`, one spec with a
-description, SDK docs for both, and a `plugin` block:
+For `languages: { typescript: {…published…}, python: {} }`, SDK docs for both,
+and a `plugin` block:
 
 ```
 <projectDirectory>/
@@ -136,8 +143,6 @@ description, SDK docs for both, and a `plugin` block:
       index.mdx                       context-plugin.mdx { installPath, languages }
       nav.json                        unchanged
   generated-includes/                 Markdown fragments the pages include; not a collection
-    sdks-intro.md                     the description's first paragraph, or the fallback sentence
-    sdks-about.md                     the rest of the description; empty when there is none
     sdk-docs/typescript.md            docs/typescript.json → gettingStarted
     sdk-docs/python.md
 ```
@@ -146,11 +151,6 @@ The fragments sit outside `generated/` on purpose: `prerender-pages.ts` treats
 every `.md` and `.mdx` under the generated directory as a page, and so does the
 collection unless it is given a `files` filter. Outside it, nothing but the
 `<include>` reads them.
-
-The description is split at its first blank line, as `firstParagraph` already
-does for the suggested site. When the first block is not a plain paragraph (a
-heading, a list, a code fence), nothing is split: the fallback sentence is the
-intro and the whole description goes below the cards.
 
 ## 4. Mechanism
 
@@ -207,28 +207,28 @@ outside the collection is accepted, and what raw HTML in a fragment becomes.
 
 A collection that sets `mdxOptions` loses Fumadocs' defaults. So the generated
 collection passes `applyMdxPreset(...)` from `fumadocs-mdx/config`, with
-function-form plugin lists that keep the defaults and add two plugins. The
+function-form plugin lists that keep the defaults and add `rehype-raw`. The
 `defineDocs` macro accepts the imported functions, and strips them from the
 browser bundle (step 1).
 
 ```ts
 mdxOptions: applyMdxPreset({
-  remarkPlugins: (defaults) => [remarkShiftHeadings, ...defaults],
   rehypePlugins: (defaults) => [[rehypeRaw, { passThrough: MDX_NODE_TYPES }], ...defaults]
 })
 ```
 
 ### Shifting the SDKs page's headings
 
-`remarkShiftHeadings` runs after `remark-include` and before the heading and
-TOC plugins. It finds each `<ShiftHeadings>` element, shifts the headings
-inside it by the same amount so that the shallowest becomes H2 (H2-first
-content is left alone), and replaces the element with its children, so no
-React component exists for it. Code blocks are separate nodes by then, so a
-`# comment` in a fence is never a heading. Only `sdks.mdx` uses the wrapper,
-around the description below the cards. The SDK docs and the plugin page are
-never shifted. A front matter flag was tried first and does not work: the
-collection's front matter schema strips unknown keys before remark runs.
+*Removed 2026-09-25 with the description it shifted; kept as what was learned.*
+`remarkShiftHeadings` ran after `remark-include` and before the heading and
+TOC plugins. It found each `<ShiftHeadings>` element, shifted the headings
+inside it by the same amount so that the shallowest became H2 (H2-first
+content was left alone), and replaced the element with its children, so no
+React component existed for it. Code blocks are separate nodes by then, so a
+`# comment` in a fence was never a heading. Only `sdks.mdx` used the wrapper,
+around the description below the cards. A front matter flag was tried first
+and does not work: the collection's front matter schema strips unknown keys
+before remark runs.
 
 ### Raw HTML in fragments
 
@@ -322,9 +322,11 @@ unreadable catalog. `PortalArtifacts` gains
 
 ### The SDKs page description
 
-`OpenApiDocument` gains the full `info.description` beside `suggestedSite`.
-`PortalSourceContext` carries it only when there is exactly one spec, as it
-does `suggested`, and the CLI splits it into the two fragments (section 3).
+*Removed 2026-09-25: the page shows no spec description, and `OpenApiDocument`
+and `PortalSourceContext` are as `dev` has them.* `OpenApiDocument` gained the
+full `info.description` beside `suggestedSite`. `PortalSourceContext` carried
+it only when there was exactly one spec, as it does `suggested`, and the CLI
+split it into two fragments around the cards.
 
 ## 6. Components (`portal-template/src/components/`)
 
@@ -342,9 +344,8 @@ the theme's `fd-*` tokens, so a portal's brand colour reaches them unchanged:
   (section 4).
 - `plugin-support.tsx`: `PluginLanguages` and `PluginPlatforms`, logo chips.
 
-All registered in `useMDXComponents`. The heading shift (section 4) lives in
-`src/lib/` and is registered in `source.ts` on the generated collection. The
-one new dependency is `rehype-raw` (section 4).
+All registered in `useMDXComponents`. The one new template dependency is
+`rehype-raw` (section 4).
 
 ## 7. Templates (`portal-pages/`)
 
@@ -358,17 +359,11 @@ title: "SDKs"
 description: "Client libraries for this API."
 ---
 
-<include>../../generated-includes/sdks-intro.md</include>
-
 <SdkCards>
 {{#sdks}}
 <SdkCard language="{{language}}" name="{{name}}" page="{{page}}" download="{{download}}" source="{{source}}" packageName="{{packageName}}" packageUrl="{{packageUrl}}" registry="{{registry}}" version="{{version}}" />
 {{/sdks}}
 </SdkCards>
-
-<ShiftHeadings>
-<include>../../generated-includes/sdks-about.md</include>
-</ShiftHeadings>
 ```
 
 `sdk.mdx`:

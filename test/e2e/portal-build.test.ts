@@ -375,13 +375,13 @@ const stylesheetOf = (output: DirectoryPath) => {
     expect(read('__downloads/sdk/typescript.zip')).to.equal('PK typescript');
   });
 
-  // The only spec's description leads the page, above the cards.
-  it("introduces the SDK cards with the spec's first paragraph", () => {
-    const index = read('sdks/index.html');
-    const intro = index.indexOf('Simple calculator API hosted on APIMATIC for demo purposes');
+  // Read from the page's twin rather than its HTML, whose head may carry the spec's first
+  // paragraph as the site's description.
+  it("shows the SDK cards under the title, and nothing of the spec's description", () => {
+    const twin = read('sdks.md');
 
-    expect(intro).to.not.equal(-1);
-    expect(intro).to.be.lessThan(index.indexOf('href="/__downloads/sdk/typescript.zip"'));
+    expect(twin).to.contain('<SdkCards>');
+    expect(twin).to.not.contain('Simple calculator API hosted on APIMATIC');
   });
 
   it('lists each language in the SDKs tab of the sidebar', () => {
@@ -512,15 +512,6 @@ const stylesheetOf = (output: DirectoryPath) => {
       /npx context-plugins install (<!-- -->)?\/__downloads\/plugin\.zip/
     );
     expect(read('__downloads/plugin.zip')).to.equal('PK plugin');
-  });
-
-  // A spec's description is the author's Markdown, and this one opens a section with an H1.
-  it("sits the spec's description under the SDKs page's own title", () => {
-    const index = read('sdks/index.html');
-
-    expect(index).to.match(/<h2[^>]*id="adopting"/);
-    expect(index.match(/<h1[\s>]/g)).to.have.lengthOf(1);
-    expect(index).to.contain('href="#adopting"');
   });
 
   // No nav.json, so the defaults: the generated tabs before the reference, in the CLI's order,

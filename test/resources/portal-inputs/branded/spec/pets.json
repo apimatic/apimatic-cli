@@ -1,10 +1,6 @@
 {
   "openapi": "3.0.3",
-  "info": {
-    "title": "Pets",
-    "version": "1.0.0",
-    "description": "Pets, with a brand of their own.\n\n# Adopting\n\nEvery pet can be adopted."
-  },
+  "info": { "title": "Pets", "version": "1.0.0", "description": "Pets, with a brand of their own." },
   "servers": [{ "url": "https://pets.example.com" }],
   "tags": [{ "name": "pets" }],
   "paths": {

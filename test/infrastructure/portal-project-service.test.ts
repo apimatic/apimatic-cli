@@ -22,7 +22,6 @@ import { PortalArtifacts } from '../../src/types/portal/portal-artifacts';
 import { PortalLanguages } from '../../src/types/portal/portal-languages';
 import { PortalSource } from '../../src/types/portal/portal-source';
 import { PortalStylesheet } from '../../src/types/portal/portal-stylesheet';
-import { SpecDescription } from '../../src/types/portal/spec-description';
 import { Language } from '../../src/types/sdk/generate';
 
 const NO_ARTIFACTS = PortalArtifacts.none();
@@ -54,7 +53,6 @@ describe('PortalProjectService', () => {
     config: configFor({ site: { name: 'My API' } }),
     generatedPages: pagesFor(),
     suggestedSite: null,
-    specDescription: null,
     specs: [
       {
         slug: 'calculator',
@@ -358,28 +356,18 @@ describe('PortalProjectService', () => {
     const includesFile = (...parts: string[]) =>
       fs.readFileSync(path.join(project.toString(), GENERATED_INCLUDES_DIRECTORY_NAME, ...parts), 'utf8');
 
-    it("writes each language's SDK docs, and the spec's description around the SDK cards", async () => {
+    it("writes each language's SDK docs", async () => {
       const artifacts = new PortalArtifacts(
         new CodeSampleCatalogs([]),
         new Map(),
         new Map([['typescript', '## Installation\n\nnpm install calc']]),
         undefined
       );
-      const source = sourceFor({ specDescription: SpecDescription.create('Adds numbers.\n\n# Auth\n\nA key.') });
 
-      (await service.prepare(project, source, artifacts))._unsafeUnwrap();
+      (await service.prepare(project, sourceFor(), artifacts))._unsafeUnwrap();
 
       expect(includesFile('sdk-docs', 'typescript.md')).to.equal('## Installation\n\nnpm install calc\n');
-      expect(includesFile('sdks-intro.md')).to.equal('Adds numbers.\n');
-      expect(includesFile('sdks-about.md')).to.equal('# Auth\n\nA key.\n');
       expect(generatedFiles()).to.not.include('sdk-docs/typescript.md');
-    });
-
-    it('introduces the SDK cards itself when no spec speaks for the portal', async () => {
-      (await service.prepare(project, sourceFor(), NO_ARTIFACTS))._unsafeUnwrap();
-
-      expect(includesFile('sdks-intro.md')).to.match(/^Choose a language/);
-      expect(includesFile('sdks-about.md')).to.equal('');
     });
   });
 
