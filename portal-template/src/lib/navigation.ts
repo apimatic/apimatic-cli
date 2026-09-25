@@ -38,8 +38,6 @@ export const GENERATED_SECTIONS = [
 
 const NAVIGATION_FILE_STEM = 'nav';
 
-const INDEX_STEM = 'index';
-
 const API_REFERENCE_TITLE = 'API Reference';
 
 /** Where the home page is served, which is how its node is told apart from every other page. */
@@ -158,7 +156,6 @@ function groupIntoTabs(context: NavigationContext, children: Node[]): Node[] {
   const settings = readSettings(context, '');
   const tabs: Folder[] = [];
   const loose: Node[] = [];
-  let tabsBeforeIndex: number | undefined;
 
   for (const child of children) {
     if (
@@ -167,9 +164,6 @@ function groupIntoTabs(context: NavigationContext, children: Node[]): Node[] {
     ) {
       tabs.push(asTab(child));
     } else {
-      if (child.type === 'page' && child.url === HOME_URL) {
-        tabsBeforeIndex = tabs.length;
-      }
       loose.push(child);
     }
   }
@@ -189,11 +183,8 @@ function groupIntoTabs(context: NavigationContext, children: Node[]): Node[] {
     root: true,
     children: withFallbackHomePage(loose)
   };
-  // The home page opens the site, so its tab leads unless the file placed the page itself --
-  // which it can only do when there is an index page: without one, an `index` entry names a
-  // folder of that name.
-  const at = tabsBeforeIndex !== undefined && lists(settings, INDEX_STEM) ? tabsBeforeIndex : 0;
-  return [...tabs.slice(0, at), home, ...tabs.slice(at)];
+  // Home opens the site, so it leads wherever the file lists its pages; `index` orders them only.
+  return [home, ...tabs];
 }
 
 /** Without an index page the route still renders a home page, which needs a node to be in a tab. */

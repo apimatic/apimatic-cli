@@ -144,10 +144,16 @@ describe('tabsTransformer', () => {
     expect(tabNames({ docs, openapi: API })).to.deep.equal(['Home', 'API Reference']);
   });
 
-  it('keeps Home where the file puts the index page when it names it', () => {
-    const docs = [...CONTENT, meta('nav.json', { pages: ['authentication', 'apimatic:api', 'index'] })];
+  // Listing `index` orders the pages inside Home, which would otherwise move as its pages did.
+  it('puts Home first when the file lists the index page after another tab too', () => {
+    const docs = [
+      ...CONTENT,
+      ...TUTORIALS,
+      meta('nav.json', { pages: ['authentication', 'tutorials', 'apimatic:api', 'index'] })
+    ];
 
-    expect(tabNames({ docs, openapi: API })).to.deep.equal(['API Reference', 'Home']);
+    expect(tabNames({ docs, openapi: API })).to.deep.equal(['Home', 'Tutorials', 'API Reference']);
+    expect(tabsOf({ docs, openapi: API }).Home).to.deep.equal(['Authentication', 'Welcome']);
   });
 
   it('keeps the order the file gives in Home, and opens Home on the home page wherever it sits', () => {
