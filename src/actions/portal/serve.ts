@@ -101,7 +101,7 @@ export class PortalServeAction {
           await server.value.stop();
           return ActionResult.stopped();
         } finally {
-          // Before the build directory goes: a save being handled writes into it.
+          // Before the portal project goes: a save being handled writes into it.
           await configWatch?.close();
         }
       }

@@ -49,7 +49,7 @@ const STYLESHEET_FILE_NAME = 'theme.css';
 
 /**
  * Where the generated pages are written, inside the project: `src/lib/source.ts` names it as a
- * relative literal, which the browser bundle carries, so the build directory is never published.
+ * relative literal, which the browser bundle carries, so the portal project's location is never published.
  */
 export const GENERATED_DIRECTORY_NAME = 'generated';
 

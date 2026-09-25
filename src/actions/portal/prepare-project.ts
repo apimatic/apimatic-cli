@@ -1,6 +1,6 @@
 import { PortalProjectPaths, PortalProjectService } from '../../infrastructure/portal-project-service.js';
 import { PortalArtifactsService } from '../../infrastructure/services/portal-artifacts-service.js';
-import { withBuildDirectory, withDirPath } from '../../infrastructure/tmp-extensions.js';
+import { withPortalProjectDirectory, withDirPath } from '../../infrastructure/tmp-extensions.js';
 import { PreparePortalProjectPrompts } from '../../prompts/portal/prepare-project.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
@@ -62,7 +62,7 @@ export class PreparePortalProjectAction {
         artifacts.value.codeSamples.unplacedIn(source.value.specs.flatMap((spec) => spec.endpoints))
       );
 
-      return await withBuildDirectory(sourceDirectory, async (tempDirectory) => {
+      return await withPortalProjectDirectory(sourceDirectory, async (tempDirectory) => {
         const project = await this.projectService.prepare(tempDirectory, source.value, artifacts.value);
         if (project.isErr()) {
           this.prompts.runtimeUnsupported(project.error);
