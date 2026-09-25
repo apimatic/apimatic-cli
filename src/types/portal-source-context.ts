@@ -1,4 +1,3 @@
-import { getSlugs } from 'fumadocs-core/source/plugins/slugs';
 import { err, ok, Result } from 'neverthrow';
 import { FileService } from '../infrastructure/file-service.js';
 import { errorMessage } from '../utils/error-utils.js';
@@ -10,20 +9,13 @@ import { FileName } from './file/fileName.js';
 import { FilePath } from './file/filePath.js';
 import { PLACEHOLDER_SITE, SuggestedSite } from './portal/config/site-config.js';
 import { ContentNotices } from './portal/content-notices.js';
+import { ContentFile, ContentTree } from './portal/content-tree.js';
 import { Endpoint } from './portal/endpoint.js';
-import { GENERATED_SECTIONS, GeneratedPages, PluginSource } from './portal/generated-pages.js';
+import { GeneratedPages, PluginSource } from './portal/generated-pages.js';
 import { OpenApiDocument } from './portal/openapi-document.js';
-import { parsePageFrontMatter } from './portal/page-front-matter.js';
 import { PortalConfig } from './portal/portal-config.js';
 import { PortalLanguages } from './portal/portal-languages.js';
-import {
-  API_REFERENCE_NAME,
-  GROUP_FOLDER,
-  INDEX_NAME,
-  NAVIGATION_FILE_NAME,
-  NavigationSettings,
-  PortalNavigation
-} from './portal/portal-navigation.js';
+import { NAVIGATION_FILE_NAME } from './portal/portal-navigation.js';
 import {
   ContentProblem,
   MissingStaticFile,
@@ -31,11 +23,8 @@ import {
   PortalSettings,
   PortalSource,
   PortalSourceProblem,
-  PortalSpec,
-  ReservedAddressPage,
-  SharedAddress
+  PortalSpec
 } from './portal/portal-source.js';
-import { PortalTab, sharedTabNames, TabOwner, untitledTabName } from './portal/portal-tabs.js';
 import { SpecContext } from './spec-context.js';
 
 const SPEC_EXTENSIONS = ['.json', '.yaml', '.yml'];
@@ -57,55 +46,6 @@ const GENERATED_ROOT_FILES = [
   '404.html',
   '_shell.html'
 ];
-
-const NAVIGATION_FILE = new FileName(NAVIGATION_FILE_NAME);
-
-/** Extensions the docs collection compiles, and so the ones an entry can address. */
-const PAGE_EXTENSIONS = ['.md', '.mdx'];
-
-/** Passed over by Vite's `import.meta.glob`, which the build reads the content through. */
-const isSkippedByGlob = (name: string) => name.startsWith('.') || name === 'node_modules';
-
-/** The order the tabs take when the root `nav.json` names none, which a report lists them in. */
-const TAB_ORDER: TabOwner['kind'][] = ['home', 'folder', 'generated', 'apiReference'];
-
-/** What one walk of the content tree found: see `PortalSourceContext.navigation`. */
-interface NavigationScan {
-  errors: string[];
-  ignoredFiles: FilePath[];
-  /** Every tab a directory of the content tree makes, named. */
-  tabs: PortalTab[];
-}
-
-/** A `nav.json` the walk found valid, with what it says. */
-interface CheckedNavigation {
-  file: FilePath;
-  settings: NavigationSettings;
-}
-
-/** A page in the content tree, with its path from the content directory split into segments. */
-interface ContentPage {
-  file: FilePath;
-  segments: string[];
-}
-
-/** A page whose front matter the build accepts, with the title it names the page by. */
-interface TitledPage {
-  file: FilePath;
-  title: string;
-}
-
-/** What the walk found in one directory and everything beneath it. */
-interface DirectoryScan {
-  /** Whether a page sits anywhere beneath it, which is what makes it a folder in the sidebar. */
-  holdsPage: boolean;
-  /** Whether a page beneath it is served at its own address: its index page, or a `(group)`'s. */
-  servesOwnAddress: boolean;
-  /** Its valid `nav.json` and its index page, whose titles name it as a tab, in that order. */
-  navigation: CheckedNavigation | undefined;
-  indexPage: FilePath | undefined;
-  errors: string[];
-}
 
 /**
  * The `src/` directory of a portal project: the `portal` block of `apimatic.json`, the OpenAPI
@@ -187,87 +127,38 @@ export class PortalSourceContext {
     return (await this.fileService.directoryExists(this.contentDirectory)) ? this.contentDirectory : null;
   }
 
-  /** The content tree's pages and `nav.json` files, held to the rules the build reads them by. */
+  /** The content tree, read and handed to the rules the build reads it by. */
   private async content(
     contentDirectory: DirectoryPath | null,
     specs: PortalSpec[],
     generatedPages: GeneratedPages
   ): Promise<Result<ContentNotices, ContentProblem[]>> {
-    // Walked once and shared: both the navigation scan and the hidden-page check read the
-    // whole content tree, and `getDirectory` stats every entry in it.
+    // Walked once, and every check reads the one tree: `getDirectory` stats every entry in it.
     // Not swallowed: a tree that cannot be walked would otherwise pass as one with no files,
     // and a `nav.json` in it would go unvalidated to a build that drops bad entries silently.
-    let contentTree: Directory | null = null;
-    if (contentDirectory !== null) {
-      try {
-        contentTree = await this.fileService.getDirectory(contentDirectory);
-      } catch {
-        return err([{ kind: 'unreadableContent' }]);
-      }
+    let tree: Directory;
+    try {
+      tree =
+        contentDirectory === null
+          ? new Directory(this.contentDirectory, [])
+          : await this.fileService.getDirectory(contentDirectory);
+    } catch {
+      return err([{ kind: 'unreadableContent' }]);
     }
 
-    const pages = contentTree === null ? [] : PortalSourceContext.contentPages(contentTree);
-    const addressProblems = PortalSourceContext.addressProblems(pages);
-
-    // The build fails as a whole, with a stack trace, over one page whose front matter it refuses.
-    const titledPages = await this.titledPages(pages);
-    const problems: ContentProblem[] = titledPages.isErr()
-      ? [{ kind: 'invalidFrontMatter', errors: titledPages.error }]
-      : [];
-
-    // The scan takes each page to be served where it sits, so it would misjudge an entry naming one of these.
-    if (addressProblems.length > 0) {
-      return err([...addressProblems, ...problems]);
-    }
-
-    // Validated here rather than in the template: Fumadocs drops an entry it cannot resolve
-    // without a word, so a typo would otherwise reach the user as a quietly wrong sidebar.
-    // A page refused for its front matter has no title here, which only names tabs never reported.
-    const navigation = await this.navigation(contentTree, specs, titledPages.unwrapOr([]));
-    if (navigation.errors.length > 0) {
-      problems.push({ kind: 'invalidNavigation', errors: navigation.errors });
-    }
-    if (problems.length > 0) {
-      return err(problems);
-    }
-
-    return ok({
-      hiddenPages: PortalSourceContext.hiddenPages(pages, specs),
-      ignoredNavigationFiles: navigation.ignoredFiles,
-      folderTabs: navigation.tabs.flatMap(({ owner }) => (owner.kind === 'folder' ? [owner.directory] : [])),
-      sharedTabNames: sharedTabNames(PortalSourceContext.allTabs(navigation.tabs, generatedPages))
-    });
+    const content = new ContentTree(tree, this.sourceDirectory);
+    const read = {
+      pages: await this.read(content.pages()),
+      navigationFiles: await this.read(content.navigationFiles())
+    };
+    return await content.check(read, specs, generatedPages);
   }
 
-  /**
-   * Pages the build cannot serve where they are, each refused for one reason: a page with no
-   * address is not judged by one, and one at an address kept for the generated pages is not
-   * said to share it as well.
-   */
-  private static addressProblems(pages: ContentPage[]): ContentProblem[] {
-    const problems: ContentProblem[] = [];
-
-    // Fumadocs throws on one: a `(group)` name is left out of every address, so it has none.
-    const groupNamed = pages.filter(({ file }) => GROUP_FOLDER.test(PortalSourceContext.pageName(file.name()) ?? ''));
-    if (groupNamed.length > 0) {
-      problems.push({ kind: 'groupNamedPages', pages: groupNamed.map(({ file }) => file) });
-    }
-    const addressed = pages.filter((page) => !groupNamed.includes(page));
-
-    // In the build, the user's page and the generated one would compete for the address.
-    const reserved = PortalSourceContext.reservedAddressPages(addressed);
-    if (reserved.length > 0) {
-      problems.push({ kind: 'reservedAddresses', pages: reserved });
-    }
-
-    // The build fails on two pages at one address, or moves an index page to `<folder>/index`.
-    const shared = PortalSourceContext.sharedAddresses(
-      addressed.filter(({ file }) => !reserved.some((page) => page.file.isEqual(file)))
+  // A file that cannot be read is reported by the check rather than thrown out of `resolve`.
+  private async read(files: FilePath[]): Promise<ContentFile[]> {
+    return await Promise.all(
+      files.map(async (file) => ({ file, contents: await this.fileService.getContents(file).catch(() => undefined) }))
     );
-    if (shared.length > 0) {
-      problems.push({ kind: 'sharedAddresses', addresses: shared });
-    }
-    return problems;
   }
 
   /**
@@ -446,227 +337,6 @@ export class PortalSourceContext {
   }
 
   /**
-   * Every `nav.json` in the content tree, validated against the directory it orders, plus
-   * any `nav.json` in a case the build does not match. One walk, because both come from the
-   * same tree, and a directory has to be seen before its file can be checked against it.
-   */
-  private async navigation(
-    contentTree: Directory | null,
-    specs: PortalSpec[],
-    pages: TitledPage[]
-  ): Promise<NavigationScan> {
-    if (contentTree === null) {
-      return { errors: [], ignoredFiles: [], tabs: [] };
-    }
-
-    const ignoredFiles: FilePath[] = [];
-    const tabs: PortalTab[] = [];
-
-    // Children first, because a directory counts as one of its parent's children only when
-    // a page sits somewhere beneath it, and the walk below already has to find out. Each
-    // directory's errors go ahead of its children's, so the report still reads top down.
-    const visit = async (
-      directory: Directory,
-      isContentRoot: boolean,
-      isApiDirectory: boolean
-    ): Promise<DirectoryScan> => {
-      const childNames: string[] = [];
-      const pageNames = new Set<string>();
-      const childErrors: string[] = [];
-      const subfolders = new Map<string, { directory: DirectoryPath; scan: DirectoryScan }>();
-      const homePageFolders: string[] = [];
-      const emptyFolders: string[] = [];
-      let holdsPage = false;
-      let navigationFile: FileName | undefined;
-      let indexPage: FilePath | undefined;
-
-      for (const item of directory.items) {
-        if (isSkippedByGlob(item instanceof Directory ? item.directoryPath.leafName() : item.fileName.toString())) {
-          continue;
-        }
-        // A directory with no page anywhere beneath it becomes no node in the page tree, so
-        // naming it would resolve to nothing. Fumadocs would build one for a directory that
-        // holds only a `nav.json`, but the template drops it again to keep to this rule.
-        if (item instanceof Directory) {
-          const name = item.directoryPath.leafName();
-          const isApiChild = isContentRoot && name === API_REFERENCE_NAME;
-          const child = await visit(item, false, isApiChild);
-          childErrors.push(...child.errors);
-          if (child.servesOwnAddress && GROUP_FOLDER.test(name)) {
-            homePageFolders.push(name);
-          }
-          if (child.holdsPage) {
-            holdsPage = true;
-            // The reference's own directory is listed below instead: it is a child of the
-            // content root whether or not the user keeps pages in it.
-            if (!isApiChild) {
-              childNames.push(name);
-              subfolders.set(name, { directory: item.directoryPath, scan: child });
-            }
-          } else if (!isApiChild) {
-            emptyFolders.push(name);
-          }
-          continue;
-        }
-        // `compare` is by code point, so this matches the build's glob exactly. A file named
-        // `Nav.json` is read by neither, and is reported rather than left sitting inert.
-        if (item.fileName.compare(NAVIGATION_FILE) === 0) {
-          navigationFile = item.fileName;
-          continue;
-        }
-        if (item.fileName.is(NAVIGATION_FILE_NAME)) {
-          ignoredFiles.push(new FilePath(directory.directoryPath, item.fileName));
-          continue;
-        }
-        // An entry addresses a page by the name it is reached at, which is the file name
-        // without its extension -- the same way the content source derives a slug.
-        const pageName = PortalSourceContext.pageName(item.fileName);
-        if (pageName !== undefined) {
-          childNames.push(pageName);
-          pageNames.add(pageName);
-          holdsPage = true;
-          if (pageName === INDEX_NAME) {
-            indexPage ??= new FilePath(directory.directoryPath, item.fileName);
-          }
-        }
-      }
-
-      // The reference is mounted at `content/api` whether or not a directory is there to see,
-      // so it is a child of the content root in every portal. Listed unconditionally, so one
-      // entry gets one answer whatever else shares the directory: without this, the same
-      // mistake read as "not a page or folder" in a project with no such directory and as the
-      // mount point in a project with one. A page of that name is a second child, and the
-      // clash is what says it can never be positioned.
-      if (isContentRoot) {
-        childNames.push(API_REFERENCE_NAME);
-      }
-
-      // The reference pages are mounted in this directory, one folder per specification, and
-      // its `nav.json` positions those folders like any other child of its own.
-      // A directory of the same name is that very folder, so it is not listed twice; a page
-      // of the same name is a second child, and listed again so the validator sees the clash.
-      if (isApiDirectory) {
-        for (const spec of specs) {
-          if (!childNames.includes(spec.slug) || pageNames.has(spec.slug)) {
-            childNames.push(spec.slug);
-          }
-        }
-      }
-
-      const errors: string[] = [];
-      let navigation: CheckedNavigation | undefined;
-      if (navigationFile !== undefined) {
-        const file = new FilePath(directory.directoryPath, navigationFile);
-        const label = file.relativeTo(this.sourceDirectory);
-        // Read inside the walk, so one unreadable file is reported rather than thrown out of
-        // `resolve`, which always answers with a Result.
-        let contents: string | undefined;
-        try {
-          contents = await this.fileService.getContents(file);
-        } catch {
-          errors.push(`${label} could not be read.`);
-        }
-        // An empty file goes through too: the build parses it as JSON and fails on it, so the
-        // CLI has to refuse it here rather than treat it as no file.
-        if (contents !== undefined) {
-          // The reference's own directory is a folder in the sidebar however few pages the
-          // user keeps in it, because the specification sections are mounted there.
-          const becomesFolder = holdsPage || isApiDirectory;
-          const checked = PortalNavigation.validate(contents, {
-            label,
-            isContentRoot,
-            isApiDirectory,
-            becomesFolder,
-            childNames,
-            emptyFolders,
-            homePageFolders: isContentRoot ? homePageFolders : []
-          });
-          if (checked.isErr()) {
-            errors.push(...checked.error);
-          } else {
-            navigation = { file, settings: checked.value };
-          }
-        }
-      }
-
-      if (isContentRoot) {
-        // The home page is the content root's index page, which names no tab.
-        tabs.push(PortalSourceContext.namedTab({ kind: 'home' }, navigation, undefined, pages));
-        for (const entry of navigation?.settings.pages ?? []) {
-          const subfolder = subfolders.get(entry);
-          if (subfolder !== undefined) {
-            const { navigation: own, indexPage: index } = subfolder.scan;
-            const owner: TabOwner = { kind: 'folder', directory: subfolder.directory };
-            tabs.push(PortalSourceContext.namedTab(owner, own, index, pages));
-          }
-        }
-      } else if (isApiDirectory) {
-        tabs.push(PortalSourceContext.namedTab({ kind: 'apiReference' }, navigation, indexPage, pages));
-      }
-
-      const servesOwnAddress = indexPage !== undefined || homePageFolders.length > 0;
-      return { holdsPage, servesOwnAddress, navigation, indexPage, errors: [...errors, ...childErrors] };
-    };
-
-    const root = await visit(contentTree, true, false);
-    return { errors: root.errors, ignoredFiles, tabs };
-  }
-
-  /** A tab by the name the template gives it: its `nav.json` title, else its index page's. */
-  private static namedTab(
-    owner: TabOwner,
-    navigation: CheckedNavigation | undefined,
-    indexPage: FilePath | undefined,
-    pages: TitledPage[]
-  ): PortalTab {
-    if (navigation?.settings.title !== undefined) {
-      return { owner, name: navigation.settings.title, namedBy: navigation.file };
-    }
-    const index = indexPage === undefined ? undefined : pages.find((page) => page.file.isEqual(indexPage));
-    if (index !== undefined) {
-      return { owner, name: index.title, namedBy: index.file };
-    }
-    return { owner, name: untitledTabName(owner), namedBy: null };
-  }
-
-  /** The content directory's tabs with the ones no directory backs, in `TAB_ORDER`. */
-  private static allTabs(contentTabs: PortalTab[], generatedPages: GeneratedPages): PortalTab[] {
-    const always: TabOwner[] = [{ kind: 'home' }, { kind: 'apiReference' }];
-    const unbacked = always.filter((owner) => !contentTabs.some((tab) => tab.owner.kind === owner.kind));
-    const generated = generatedPages.sections().map((section): TabOwner => ({ kind: 'generated', section }));
-    const untitled = [...unbacked, ...generated].map(
-      (owner): PortalTab => ({ owner, name: untitledTabName(owner), namedBy: null })
-    );
-    return [...contentTabs, ...untitled].sort(
-      (left, right) => TAB_ORDER.indexOf(left.owner.kind) - TAB_ORDER.indexOf(right.owner.kind)
-    );
-  }
-
-  /** Every page with its title, or all that the build would refuse in their front matter. */
-  private async titledPages(pages: ContentPage[]): Promise<Result<TitledPage[], string[]>> {
-    const titled = await Promise.all(
-      pages.map(async ({ file }) => {
-        const label = file.relativeTo(this.sourceDirectory);
-        const markdown = await this.fileService.getContents(file).catch(() => undefined);
-        const title =
-          markdown === undefined ? err([`${label} could not be read.`]) : await parsePageFrontMatter(markdown, label);
-        return title.map(({ title: name }): TitledPage => ({ file, title: name }));
-      })
-    );
-    return Result.combineWithAllErrors(titled).mapErr((errors) => errors.flat());
-  }
-
-  /**
-   * The name an entry addresses a page by, or undefined when the file is not a page. Matched
-   * by code point, like the docs glob: `Guide.MD` is no more a page to the build than here.
-   */
-  private static pageName(fileName: FileName): string | undefined {
-    return PAGE_EXTENSIONS.some((extension) => fileName.hasExactExtension(extension))
-      ? `${fileName.withoutExtension()}`
-      : undefined;
-  }
-
-  /**
    * Files at the top of `static/` that the build would otherwise have generated itself. Only
    * the top level is read: nothing below it can land on one of these names, and walking the
    * whole tree let one unreadable entry throw out of `resolve`, which otherwise returns a Result.
@@ -674,68 +344,6 @@ export class PortalSourceContext {
   private async shadowedFiles(staticDirectory: DirectoryPath): Promise<FileName[]> {
     const fileNames = await this.fileService.getFileNames(staticDirectory);
     return fileNames.filter((fileName) => GENERATED_ROOT_FILES.some((generated) => fileName.is(generated)));
-  }
-
-  /**
-   * Pages inside a specification's section, below `content/api/<slug>/`. The section and each
-   * tag folder come with generated metadata that lists only the reference pages, and metadata
-   * hides whatever it does not name, so these pages never reach the sidebar. Reported rather
-   * than refused: the build still succeeds, and the fix is to move the page.
-   *
-   * Judged by the directories as written, not by the address: the page tree is keyed on the
-   * path, so `content/API/<slug>/` or a `(group)` folder on the way is a different folder that
-   * no metadata hides. An `index` page is a folder's own link rather than one of its pages, so
-   * the section's is shown, and so is one in a folder directly below it: that is where the tag
-   * folders sit, and the CLI cannot tell a tag folder from one the user made without reading
-   * the specification's tags, so it stays quiet rather than warn about a page that is shown.
-   */
-  private static hiddenPages(pages: ContentPage[], specs: PortalSpec[]): FilePath[] {
-    const slugs = new Set(specs.map((spec) => spec.slug));
-    return pages
-      .filter(({ segments }) => {
-        const [first, second, ...rest] = segments;
-        if (first !== API_REFERENCE_NAME || !slugs.has(second) || rest.length === 0) {
-          return false;
-        }
-        const isFolderIndex =
-          rest.length <= 2 && PortalSourceContext.pageName(new FileName(rest[rest.length - 1])) === INDEX_NAME;
-        return !isFolderIndex;
-      })
-      .map(({ file }) => file);
-  }
-
-  /**
-   * Pages served at a generated section's address or below it, whether or not `apimatic.json`
-   * calls for the section. Judged by the address, as the content source computes it, rather
-   * than by the directories as written: a page in a `(group)` folder is served as if the folder
-   * were not there, and a folder's index page at the folder's own address.
-   */
-  private static reservedAddressPages(pages: ContentPage[]): ReservedAddressPage[] {
-    return pages.flatMap(({ file, segments }) => {
-      const slugs = getSlugs(segments.join('/'));
-      const section = GENERATED_SECTIONS.find((candidate) => candidate.folder === slugs[0]);
-      return section === undefined ? [] : [{ file, address: `/${slugs.join('/')}`, section }];
-    });
-  }
-
-  /** Addresses more than one page would be served at, each with its pages in the order walked. */
-  private static sharedAddresses(pages: ContentPage[]): SharedAddress[] {
-    const byAddress = new Map<string, FilePath[]>();
-    for (const { file, segments } of pages) {
-      const address = `/${getSlugs(segments.join('/')).join('/')}`;
-      byAddress.set(address, [...(byAddress.get(address) ?? []), file]);
-    }
-    return [...byAddress]
-      .filter(([, files]) => files.length > 1)
-      .map(([address, files]) => ({ address, pages: files }));
-  }
-
-  private static contentPages(contentTree: Directory): ContentPage[] {
-    return contentTree
-      .getAllFiles()
-      .filter((file) => PortalSourceContext.pageName(file.name()) !== undefined)
-      .map((file) => ({ file, segments: file.relativeTo(contentTree.directoryPath).split('/') }))
-      .filter(({ segments }) => !segments.some(isSkippedByGlob));
   }
 
   // With several specifications there is no suggested site: no one of them speaks for the portal.

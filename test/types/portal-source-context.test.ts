@@ -1067,6 +1067,24 @@ describe('PortalSourceContext', () => {
       expect((await resolve()).isOk()).to.be.true;
     });
 
+    it('reports a file it cannot read, rather than throwing', async () => {
+      write('content/nav.json', JSON.stringify({ pages: ['index'] }));
+      const getContents = FileService.prototype.getContents;
+      const read = sinon
+        .stub(FileService.prototype, 'getContents')
+        .callsFake(function (this: FileService, file: FilePath) {
+          return file.name().is('nav.json') ? Promise.reject(new Error('EACCES')) : getContents.call(this, file);
+        });
+
+      try {
+        expect(navigationErrors((await resolve())._unsafeUnwrapErr())).to.deep.equal([
+          'content/nav.json could not be read.'
+        ]);
+      } finally {
+        read.restore();
+      }
+    });
+
     it('resolves with no navigation file at all', async () => {
       expect((await resolve()).isOk()).to.be.true;
     });
