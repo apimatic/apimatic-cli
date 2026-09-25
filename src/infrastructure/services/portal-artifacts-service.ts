@@ -59,12 +59,12 @@ export class PortalArtifactsService {
    * One run of `/portal-artifacts`: the SDKs, the code-sample catalogs and the context plugin,
    * delivered as a single archive and unpacked into `into`.
    *
-   * `source` is the `src/` directory, which is zipped and uploaded as the build. What the run
+   * `buildDirectory` is the `src/` directory, which is zipped and uploaded as the build. What the run
    * produces is decided entirely by the `apimatic.json` inside it — the languages it names, and
    * whether it carries a `plugin` block.
    */
   public async generate(
-    source: DirectoryPath,
+    buildDirectory: DirectoryPath,
     into: DirectoryPath,
     configDir: DirectoryPath,
     commandMetadata: CommandMetadata,
@@ -80,7 +80,7 @@ export class PortalArtifactsService {
 
     const build = new FilePath(into, new FileName('build.zip'));
     try {
-      await this.zipService.archive(source, build);
+      await this.zipService.archive(buildDirectory, build);
     } catch {
       return err(ServiceError.InvalidResponse);
     }

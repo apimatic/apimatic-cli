@@ -50,7 +50,7 @@ export class PluginGeneratePrompts {
     log.error(message);
   }
 
-  public srcDirectoryDoesNotExist(directory: DirectoryPath) {
+  public buildDirectoryDoesNotExist(directory: DirectoryPath) {
     const message = `The ${f.var('src')} directory does not exist at the provided location: ${f.path(directory)}`;
     log.error(message);
   }

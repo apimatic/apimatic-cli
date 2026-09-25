@@ -11,7 +11,7 @@ import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { ValidateAction } from '../api/validate.js';
 import { SpecContext } from '../../types/spec-context.js';
 import { OpenApiDocument, SpecFormat } from '../../types/portal/openapi-document.js';
-import { PortalSourceContext } from '../../types/portal-source-context.js';
+import { PortalBuildDirectoryContext } from '../../types/portal-build-directory-context.js';
 import { PortalAuthorizationService } from '../../infrastructure/services/portal-authorization-service.js';
 import { FileDownloadService } from '../../infrastructure/services/file-download-service.js';
 import { PortalProjectService } from '../../infrastructure/portal-project-service.js';
@@ -120,7 +120,7 @@ export class PortalQuickstartAction {
       }
 
       // The validation above accepts Swagger 2.0, which a portal cannot be built from. Asked
-      // here rather than left to `portal serve`, which refuses only once the project is
+      // here rather than left to `portal serve`, which refuses only once the build directory is
       // written -- and running the wizard again then rejects the non-empty tree it created.
       const format = await this.specFormat(specPath);
       if (!format.supported) {
@@ -153,22 +153,22 @@ export class PortalQuickstartAction {
         break;
       }
 
-      const sourceDirectory = inputDirectory.join('src');
-      const scaffolded = await new PortalSourceContext(sourceDirectory).scaffold(
+      const buildDirectory = inputDirectory.join('src');
+      const scaffolded = await new PortalBuildDirectoryContext(buildDirectory).scaffold(
         specPath,
         schemaUrlFor(envInfo.getCLIVersion())
       );
       if (scaffolded.isErr()) {
-        this.prompts.scaffoldFailed(scaffolded.error, sourceDirectory);
+        this.prompts.scaffoldFailed(scaffolded.error, buildDirectory);
         return ActionResult.failed();
       }
 
-      const structure = await this.fileService.getDirectory(sourceDirectory);
+      const structure = await this.fileService.getDirectory(buildDirectory);
       this.prompts.printDirectoryStructure(inputDirectory, structure);
 
       // The wizard does not ask for the project's SDK languages yet, and a portal is not built
       // without them, so it ends here and says what to add rather than starting a preview that
-      // refuses the project it just wrote.
+      // refuses the build directory it just wrote.
       this.prompts.nextSteps(scaffolded.value, inputDirectory);
       return ActionResult.success();
     });

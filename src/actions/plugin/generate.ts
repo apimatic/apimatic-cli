@@ -39,7 +39,7 @@ export class PluginGenerateAction {
     }
 
     if (!(await new BuildContext(buildDirectory).exists())) {
-      this.prompts.srcDirectoryDoesNotExist(buildDirectory);
+      this.prompts.buildDirectoryDoesNotExist(buildDirectory);
       return ActionResult.failed();
     }
 

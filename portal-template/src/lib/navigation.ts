@@ -81,7 +81,7 @@ export const OPENAPI_SOURCE = 'openapi';
  * The hook fires for every directory once its children are built, so this never resolves
  * anything: it permutes a list Fumadocs has already ordered correctly, which is what makes
  * losing a page structurally impossible. Entries that match nothing are ignored rather than
- * reported, because `PortalSourceContext` has already refused a file that contains one.
+ * reported, because `PortalBuildDirectoryContext` has already refused a file that contains one.
  */
 export function navigationTransformer<S extends ContentStorage>(): PageTreeTransformer<S> {
   return {

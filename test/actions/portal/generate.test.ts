@@ -37,9 +37,9 @@ describe('GenerateAction', () => {
   let authorize: sinon.SinonStub;
   let build: sinon.SinonStub;
 
-  const execute = (source = FIXTURE, force = false, zip = false) =>
+  const execute = (buildDirectory = FIXTURE, force = false, zip = false) =>
     new GenerateAction(new DirectoryPath(root), COMMAND_METADATA, 'auth-key').execute(
-      source,
+      buildDirectory,
       portalDirectory,
       force,
       zip
@@ -95,13 +95,13 @@ describe('GenerateAction', () => {
     const result = await execute(CODE_SAMPLES_FIXTURE);
 
     expect(result.isSuccess()).to.be.true;
-    const [, source, artifacts] = shared.prepare.firstCall.args;
-    expect(source.specs[0].file.toString()).to.contain(CODE_SAMPLES_FIXTURE.toString());
+    const [, contents, artifacts] = shared.prepare.firstCall.args;
+    expect(contents.specs[0].file.toString()).to.contain(CODE_SAMPLES_FIXTURE.toString());
     expect(artifacts.codeSampleCatalogs.isEmpty()).to.be.false;
     expect(shared.prompts.unplacedSamples.calledOnceWith([])).to.be.true;
   });
 
-  it('fails when the source and destination are the same directory', async () => {
+  it('fails when the build directory and destination are the same directory', async () => {
     const action = new GenerateAction(new DirectoryPath(root), COMMAND_METADATA);
 
     const result = await action.execute(FIXTURE, FIXTURE, false, false);
@@ -111,13 +111,13 @@ describe('GenerateAction', () => {
     expect(authorize.called).to.be.false;
   });
 
-  it('refuses a destination that contains the source, which it would empty', async () => {
-    const source = portalDirectory.join('src');
+  it('refuses a destination that contains the build directory, which it would empty', async () => {
+    const buildDirectory = portalDirectory.join('src');
 
-    const result = await execute(source);
+    const result = await execute(buildDirectory);
 
     expect(result.isFailed()).to.be.true;
-    expect(prompts.destinationContainsSource.calledOnceWith(source, portalDirectory)).to.be.true;
+    expect(prompts.destinationContainsBuildDirectory.calledOnceWith(buildDirectory, portalDirectory)).to.be.true;
     expect(build.called).to.be.false;
   });
 
@@ -143,19 +143,19 @@ describe('GenerateAction', () => {
     expect(build.called).to.be.false;
   });
 
-  it('reports a source directory it cannot build from', async () => {
+  it('reports a build directory it cannot build from', async () => {
     const empty = new DirectoryPath(root).join('empty');
     fs.mkdirSync(empty.toString());
 
     const result = await execute(empty);
 
     expect(result.isFailed()).to.be.true;
-    expect(shared.prompts.sourceProblem.calledOnce).to.be.true;
-    expect(shared.prompts.sourceProblem.firstCall.args[0].kind).to.equal('missingConfig');
+    expect(shared.prompts.buildDirectoryProblem.calledOnce).to.be.true;
+    expect(shared.prompts.buildDirectoryProblem.firstCall.args[0].kind).to.equal('missingConfig');
     expect(build.called).to.be.false;
   });
 
-  it('reports a source problem before asking to overwrite the destination', async () => {
+  it('reports a build directory problem before asking to overwrite the destination', async () => {
     writeOldPortal();
     const empty = new DirectoryPath(root).join('empty');
     fs.mkdirSync(empty.toString());
@@ -163,7 +163,7 @@ describe('GenerateAction', () => {
     const result = await execute(empty);
 
     expect(result.isFailed()).to.be.true;
-    expect(shared.prompts.sourceProblem.calledOnce).to.be.true;
+    expect(shared.prompts.buildDirectoryProblem.calledOnce).to.be.true;
     expect(prompts.overwritePortal.called).to.be.false;
   });
 
@@ -270,11 +270,11 @@ describe('GenerateAction', () => {
   });
 
   it('warns about static files that replace generated ones, and builds anyway', async () => {
-    const source = new DirectoryPath(root).join('shadowing');
-    fs.cpSync(FIXTURE.toString(), source.toString(), { recursive: true });
-    fs.writeFileSync(path.join(source.toString(), 'static', 'robots.txt'), 'User-agent: *\n');
+    const buildDirectory = new DirectoryPath(root).join('shadowing');
+    fs.cpSync(FIXTURE.toString(), buildDirectory.toString(), { recursive: true });
+    fs.writeFileSync(path.join(buildDirectory.toString(), 'static', 'robots.txt'), 'User-agent: *\n');
 
-    const result = await execute(source);
+    const result = await execute(buildDirectory);
 
     expect(result.isSuccess()).to.be.true;
     expect(shared.prompts.filesShadowedByStatic.firstCall.args[0].map(String)).to.deep.equal(['robots.txt']);

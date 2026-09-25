@@ -36,7 +36,7 @@ export class SdkGeneratePrompts {
     log.error(message);
   }
 
-  public srcDirectoryEmpty(directory: DirectoryPath) {
+  public buildDirectoryEmpty(directory: DirectoryPath) {
     const message = `The ${f.var('src')} directory is either empty or invalid: ${f.path(directory)}`;
     log.error(message);
   }

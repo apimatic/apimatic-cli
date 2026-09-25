@@ -5,9 +5,14 @@ import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { FileName } from '../../types/file/fileName.js';
 import { FilePath } from '../../types/file/filePath.js';
 import { PortalArtifacts } from '../../types/portal/portal-artifacts.js';
-import { PortalSourceProblem } from '../../types/portal/portal-source.js';
+import { PortalBuildDirectoryProblem } from '../../types/portal/portal-build-directory.js';
 import { generateArtifacts, reportUnplacedSamples } from './code-samples.js';
-import { reportHiddenPages, reportIgnoredNavigationFiles, reportShadowedFiles, reportSourceProblem } from './source.js';
+import {
+  reportHiddenPages,
+  reportIgnoredNavigationFiles,
+  reportShadowedFiles,
+  reportBuildDirectoryProblem
+} from './build-directory.js';
 
 /** What both `portal generate` and `portal serve` say while the project they share is prepared. */
 export class PreparePortalProjectPrompts {
@@ -15,20 +20,20 @@ export class PreparePortalProjectPrompts {
     return generateArtifacts(fn);
   }
 
-  public sourceProblem(problem: PortalSourceProblem, sourceDirectory: DirectoryPath) {
-    reportSourceProblem(problem, sourceDirectory);
+  public buildDirectoryProblem(problem: PortalBuildDirectoryProblem, buildDirectory: DirectoryPath) {
+    reportBuildDirectoryProblem(problem, buildDirectory);
   }
 
   public filesShadowedByStatic(shadowed: FileName[]) {
     reportShadowedFiles(shadowed);
   }
 
-  public pagesHiddenBySpecs(files: FilePath[], sourceDirectory: DirectoryPath) {
-    reportHiddenPages(files, sourceDirectory);
+  public pagesHiddenBySpecs(files: FilePath[], buildDirectory: DirectoryPath) {
+    reportHiddenPages(files, buildDirectory);
   }
 
-  public ignoredNavigationFiles(files: FilePath[], sourceDirectory: DirectoryPath) {
-    reportIgnoredNavigationFiles(files, sourceDirectory);
+  public ignoredNavigationFiles(files: FilePath[], buildDirectory: DirectoryPath) {
+    reportIgnoredNavigationFiles(files, buildDirectory);
   }
 
   public unplacedSamples(endpoints: string[]) {

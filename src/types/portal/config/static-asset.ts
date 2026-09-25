@@ -41,11 +41,11 @@ export class StaticAsset {
     return ok(new StaticAsset(value, normalized, path));
   }
 
-  public resolveIn(sourceDirectory: DirectoryPath): FilePath {
+  public resolveIn(buildDirectory: DirectoryPath): FilePath {
     const names = this.relativePath.split('/');
     const fileName = new FileName(names.pop() ?? '');
     return new FilePath(
-      names.reduce((directory, name) => directory.join(name), sourceDirectory),
+      names.reduce((directory, name) => directory.join(name), buildDirectory),
       fileName
     );
   }

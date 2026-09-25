@@ -4,13 +4,13 @@ import { APIMATIC_CONFIG_FILE_NAME } from '../../types/apimatic-config/document.
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { UrlPath } from '../../types/file/urlPath.js';
 import { PortalAuthorizationFailure } from '../../infrastructure/services/portal-authorization-service.js';
-import { PortalSourceProblem } from '../../types/portal/portal-source.js';
+import { PortalBuildDirectoryProblem } from '../../types/portal/portal-build-directory.js';
 import { PortalDevServer, PortalDevServerFailure } from '../../infrastructure/portal-dev-server-service.js';
 import { Result } from 'neverthrow';
 import { format as f } from '../format.js';
 import { logTail, noteWrapped, withSpinner } from '../prompt.js';
 import { reportAuthorizationFailure } from './authorization.js';
-import { reportSourceProblem } from './source.js';
+import { reportBuildDirectoryProblem } from './build-directory.js';
 
 export class PortalServePrompts {
   public authorizationFailed(failure: PortalAuthorizationFailure) {
@@ -42,13 +42,13 @@ export class PortalServePrompts {
     }
   }
 
-  public portalServed(url: UrlPath, sourceDirectory: DirectoryPath) {
+  public portalServed(url: UrlPath, buildDirectory: DirectoryPath) {
     log.message(`The portal is running at ${f.link(url.toString())}`);
     // `nav.json` is validated only at startup, and the build drops an entry it cannot resolve
     // without a word, which is why the note warns that a mistake typed later is ignored.
     noteWrapped(
       [
-        `Edits to the Markdown pages in ${f.path(sourceDirectory.join('content'))}, to the order and ` +
+        `Edits to the Markdown pages in ${f.path(buildDirectory.join('content'))}, to the order and ` +
           `folder titles in a ${f.var('nav.json')}, and to the ${f.var('portal')} block of ${f.var(
             'apimatic.json'
           )} appear in the browser automatically, and so does a language added to or removed from its ${f.var(
@@ -62,9 +62,9 @@ export class PortalServePrompts {
           )} is only reported when the preview starts; until then an entry or a title that the build would ` +
           `refuse is ignored here.`,
         '',
-        `Adding or removing a page in ${f.path(sourceDirectory.join('content'))}, creating ${f.path(
-          sourceDirectory.join('static')
-        )}, or changing which documents are in ${f.path(sourceDirectory.join('spec'))} needs the preview restarted.`,
+        `Adding or removing a page in ${f.path(buildDirectory.join('content'))}, creating ${f.path(
+          buildDirectory.join('static')
+        )}, or changing which documents are in ${f.path(buildDirectory.join('spec'))} needs the preview restarted.`,
         '',
         'Press CTRL+C to stop the server.'
       ].join('\n'),
@@ -77,8 +77,8 @@ export class PortalServePrompts {
   }
 
   /** Explained as `portal generate` would explain it, since the same rules refused it. */
-  public configRejected(problem: PortalSourceProblem, sourceDirectory: DirectoryPath) {
-    reportSourceProblem(problem, sourceDirectory, { offerQuickstart: false });
+  public configRejected(problem: PortalBuildDirectoryProblem, buildDirectory: DirectoryPath) {
+    reportBuildDirectoryProblem(problem, buildDirectory, { offerQuickstart: false });
     log.message('The preview keeps showing what it last accepted until the file is fixed.');
   }
 
@@ -87,9 +87,9 @@ export class PortalServePrompts {
   }
 
   /** Vite reads its public directory once, and a missing one is served as none. */
-  public staticDirectoryNotServed(sourceDirectory: DirectoryPath) {
+  public staticDirectoryNotServed(buildDirectory: DirectoryPath) {
     const message =
-      `${f.path(sourceDirectory.join('static'))} did not exist when the preview started, so the files ` +
+      `${f.path(buildDirectory.join('static'))} did not exist when the preview started, so the files ` +
       `in it are not served. Restart the preview to show them.`;
     log.warn(message);
   }

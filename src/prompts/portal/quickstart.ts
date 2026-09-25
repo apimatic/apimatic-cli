@@ -12,7 +12,7 @@ import { FileDownloadResponse } from '../../infrastructure/services/file-downloa
 import { PortalAuthorizationFailure } from '../../infrastructure/services/portal-authorization-service.js';
 import { APIMATIC_CONFIG_FILE_NAME } from '../../types/apimatic-config/document.js';
 import { LANGUAGES_EXAMPLE } from '../../types/portal/portal-languages.js';
-import { PortalScaffoldProblem } from '../../types/portal/portal-source.js';
+import { PortalScaffoldProblem } from '../../types/portal/portal-build-directory.js';
 import { noteWrapped, withSpinner } from '../prompt.js';
 import { reportAuthorizationFailure } from './authorization.js';
 
@@ -145,21 +145,21 @@ export class PortalQuickstartPrompts {
     log.error('No directory was specified.');
   }
 
-  public scaffoldFailed(problem: PortalScaffoldProblem, sourceDirectory: DirectoryPath) {
+  public scaffoldFailed(problem: PortalScaffoldProblem, buildDirectory: DirectoryPath) {
     switch (problem.kind) {
       case 'configUnreadable': {
         const message =
-          `${f.var(APIMATIC_CONFIG_FILE_NAME)} is already in ${f.path(sourceDirectory)} and could not be read, ` +
+          `${f.var(APIMATIC_CONFIG_FILE_NAME)} is already in ${f.path(buildDirectory)} and could not be read, ` +
           `so the portal was not written into it.`;
         log.error(message);
         return;
       }
       case 'configUnwritable': {
-        log.error(`${f.var(APIMATIC_CONFIG_FILE_NAME)} could not be written to ${f.path(sourceDirectory)}.`);
+        log.error(`${f.var(APIMATIC_CONFIG_FILE_NAME)} could not be written to ${f.path(buildDirectory)}.`);
         return;
       }
-      case 'sourceUnwritable': {
-        log.error(`${f.path(sourceDirectory)} could not be written: ${problem.reason}`);
+      case 'buildDirectoryUnwritable': {
+        log.error(`${f.path(buildDirectory)} could not be written: ${problem.reason}`);
         return;
       }
     }

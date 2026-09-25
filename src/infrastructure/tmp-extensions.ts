@@ -12,33 +12,34 @@ export function withDirPath<T>(fn: (results: DirectoryPath) => Promise<T>): Prom
 export const PORTAL_PROJECT_DIRECTORY_NAME = '.apimatic-build';
 
 /**
- * Where a portal project may live for a source directory. The system temp directory,
- * unless it sits on a different Windows drive from the source: Vite's `import.meta.glob`
+ * Where a portal project may live for a build directory. The system temp directory,
+ * unless it sits on a different Windows drive from the build directory: Vite's `import.meta.glob`
  * needs a relative path from the project to the content directory, and `path.relative`
  * cannot express one across drives, so the content pages would silently go missing.
  * GitHub's Windows runners (workspace on D:, temp on C:) are the common case.
  */
 export function portalProjectDirectoryBase(
-  sourceDirectory: string,
+  buildDirectory: string,
   systemTemp: string = os.tmpdir(),
   platform: NodeJS.Platform = process.platform
 ): string {
   if (platform !== 'win32') return systemTemp;
-  const source = path.win32.resolve(sourceDirectory);
+  const resolved = path.win32.resolve(buildDirectory);
   if (
-    path.win32.parse(source).root.toLowerCase() === path.win32.parse(path.win32.resolve(systemTemp)).root.toLowerCase()
+    path.win32.parse(resolved).root.toLowerCase() ===
+    path.win32.parse(path.win32.resolve(systemTemp)).root.toLowerCase()
   ) {
     return systemTemp;
   }
-  return path.win32.join(path.win32.dirname(source), PORTAL_PROJECT_DIRECTORY_NAME);
+  return path.win32.join(path.win32.dirname(resolved), PORTAL_PROJECT_DIRECTORY_NAME);
 }
 
 /** Creates the base directory when it is the project-side fallback, hidden from git. */
 export async function ensurePortalProjectDirectoryBase(
-  sourceDirectory: DirectoryPath,
+  buildDirectory: DirectoryPath,
   systemTemp: string = os.tmpdir()
 ): Promise<string> {
-  const base = portalProjectDirectoryBase(sourceDirectory.toString(), systemTemp);
+  const base = portalProjectDirectoryBase(buildDirectory.toString(), systemTemp);
   if (base !== systemTemp) {
     await fs.mkdir(base, { recursive: true });
     // A gitignore that ignores everything keeps the folder out of the user's status while it exists.
@@ -48,15 +49,15 @@ export async function ensurePortalProjectDirectoryBase(
 }
 
 /**
- * Like `withDirPath`, for a portal project that must read files under `sourceDirectory`.
+ * Like `withDirPath`, for a portal project that must read files under `buildDirectory`.
  * The project-side fallback folder is removed again once it is empty.
  */
 export async function withPortalProjectDirectory<T>(
-  sourceDirectory: DirectoryPath,
+  buildDirectory: DirectoryPath,
   fn: (directory: DirectoryPath) => Promise<T>,
   systemTemp: string = os.tmpdir()
 ): Promise<T> {
-  const base = await ensurePortalProjectDirectoryBase(sourceDirectory, systemTemp);
+  const base = await ensurePortalProjectDirectoryBase(buildDirectory, systemTemp);
   try {
     return await withDir((results) => fn(new DirectoryPath(results.path)), { tmpdir: base, unsafeCleanup: true });
   } finally {

@@ -25,7 +25,7 @@ const CATALOG = {
 describe('PortalArtifactsService', () => {
   let server: http.Server;
   let workDir: string;
-  let source: DirectoryPath;
+  let buildDirectory: DirectoryPath;
   let configDir: DirectoryPath;
   let service: PortalArtifactsService;
 
@@ -58,7 +58,7 @@ describe('PortalArtifactsService', () => {
 
   const generate = async (into?: string) => {
     const destination = into ?? fs.mkdtempSync(path.join(workDir, 'into-'));
-    return await service.generate(source, new DirectoryPath(destination), configDir, metadata, AUTH_KEY);
+    return await service.generate(buildDirectory, new DirectoryPath(destination), configDir, metadata, AUTH_KEY);
   };
 
   before(async () => {
@@ -93,12 +93,12 @@ describe('PortalArtifactsService', () => {
 
     workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'portal-artifacts-'));
 
-    // The source directory the service zips and uploads.
-    const sourceDir = path.join(workDir, 'src');
-    fs.mkdirSync(path.join(sourceDir, 'spec'), { recursive: true });
-    fs.writeFileSync(path.join(sourceDir, 'apimatic.json'), JSON.stringify({ schemaVersion: 1 }));
-    fs.writeFileSync(path.join(sourceDir, 'spec', 'openapi.json'), '{}');
-    source = new DirectoryPath(sourceDir);
+    // The build directory the service zips and uploads.
+    const buildDir = path.join(workDir, 'src');
+    fs.mkdirSync(path.join(buildDir, 'spec'), { recursive: true });
+    fs.writeFileSync(path.join(buildDir, 'apimatic.json'), JSON.stringify({ schemaVersion: 1 }));
+    fs.writeFileSync(path.join(buildDir, 'spec', 'openapi.json'), '{}');
+    buildDirectory = new DirectoryPath(buildDir);
 
     // No config.json here, so the explicit authKey is used.
     configDir = new DirectoryPath(workDir);
@@ -191,7 +191,7 @@ describe('PortalArtifactsService', () => {
     });
   });
 
-  it('uploads the source directory as the build', async () => {
+  it('uploads the build directory', async () => {
     await generate();
 
     // The zip carries the two files written above, so a body this size cannot be an empty archive.
@@ -230,7 +230,7 @@ describe('PortalArtifactsService', () => {
 
       const error = (
         await impatient.generate(
-          source,
+          buildDirectory,
           new DirectoryPath(fs.mkdtempSync(path.join(workDir, 'into-'))),
           configDir,
           metadata,
@@ -258,7 +258,7 @@ describe('PortalArtifactsService', () => {
   it('asks for an auth key it does not have rather than calling without one', async () => {
     const error = (
       await service.generate(
-        source,
+        buildDirectory,
         new DirectoryPath(fs.mkdtempSync(path.join(workDir, 'into-'))),
         configDir,
         metadata,
