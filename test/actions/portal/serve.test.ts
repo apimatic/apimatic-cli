@@ -17,8 +17,8 @@ import { FileName } from '../../../src/types/file/fileName';
 import { FilePath } from '../../../src/types/file/filePath';
 import { UrlPath } from '../../../src/types/file/urlPath';
 import { CommandMetadata } from '../../../src/types/common/command-metadata';
-import { PortalBuildDirectoryContents } from '../../../src/types/portal/portal-build-directory';
-import { PortalBuildDirectoryContext } from '../../../src/types/portal-build-directory-context';
+import { PortalSource } from '../../../src/types/portal/portal-source';
+import { PortalSourceContext } from '../../../src/types/portal-source-context';
 import { stubPreparePortalProject } from './prepare-project-stubs';
 
 const COMMAND_METADATA: CommandMetadata = { commandName: 'portal serve', shell: 'test' };
@@ -41,12 +41,8 @@ describe('PortalServeAction', () => {
   /** Stands in for the preview process dying, with what it printed on the way out. */
   let exit: (output: string) => void;
 
-  const execute = (buildDirectory = FIXTURE, openInBrowser = false) =>
-    new PortalServeAction(new DirectoryPath(root), COMMAND_METADATA, 'auth-key').execute(
-      buildDirectory,
-      PORT,
-      openInBrowser
-    );
+  const execute = (source = FIXTURE, openInBrowser = false) =>
+    new PortalServeAction(new DirectoryPath(root), COMMAND_METADATA, 'auth-key').execute(source, PORT, openInBrowser);
 
   beforeEach(() => {
     root = fs.mkdtempSync(path.join(os.tmpdir(), 'portal-serve-'));
@@ -104,14 +100,14 @@ describe('PortalServeAction', () => {
     expect(start.called).to.be.false;
   });
 
-  it('reports a build directory it cannot serve', async () => {
+  it('reports a source directory it cannot serve', async () => {
     const empty = new DirectoryPath(root).join('empty');
     fs.mkdirSync(empty.toString());
 
     const result = await execute(empty);
 
     expect(result.isFailed()).to.be.true;
-    expect(shared.prompts.buildDirectoryProblem.firstCall.args[0].kind).to.equal('missingConfig');
+    expect(shared.prompts.sourceProblem.firstCall.args[0].kind).to.equal('missingConfig');
     expect(start.called).to.be.false;
   });
 
@@ -189,7 +185,7 @@ describe('PortalServeAction', () => {
    * preview's files -- is the real thing, on a copy of the fixture.
    */
   describe('re-applying apimatic.json', () => {
-    let buildDirectory: DirectoryPath;
+    let source: DirectoryPath;
     let save: (config: object) => Promise<void>;
     let watched: Promise<{ onChange: () => Promise<void>; onFailed: (reason: string) => void }>;
     let closeWatch: sinon.SinonStub;
@@ -199,11 +195,11 @@ describe('PortalServeAction', () => {
     const originalConfig = () => JSON.parse(fs.readFileSync(path.join(FIXTURE.toString(), 'apimatic.json'), 'utf8'));
     const readProject = (relative: string) => fs.readFileSync(path.join(projectDirectory.toString(), relative), 'utf8');
     const writeConfig = (config: object) =>
-      fs.writeFileSync(path.join(buildDirectory.toString(), 'apimatic.json'), JSON.stringify(config));
+      fs.writeFileSync(path.join(source.toString(), 'apimatic.json'), JSON.stringify(config));
 
     /** Runs the preview until `body` is done with it, then stops it as CTRL+C would. */
     const whileServing = async (body: () => Promise<void>) => {
-      const running = execute(buildDirectory);
+      const running = execute(source);
       const { onChange } = await watched;
       save = async (config: object) => {
         writeConfig(config);
@@ -218,13 +214,13 @@ describe('PortalServeAction', () => {
     };
 
     beforeEach(() => {
-      buildDirectory = new DirectoryPath(root).join('src');
-      fs.cpSync(FIXTURE.toString(), buildDirectory.toString(), { recursive: true });
+      source = new DirectoryPath(root).join('src');
+      fs.cpSync(FIXTURE.toString(), source.toString(), { recursive: true });
 
       // `prepare` is stubbed above; this one writes the files an edit can change, as a real one
       // would, so the test can see what an edit changes.
       (PortalProjectService.prototype.prepare as sinon.SinonStub).callsFake(
-        async (directory: DirectoryPath, portal: PortalBuildDirectoryContents) => {
+        async (directory: DirectoryPath, portal: PortalSource) => {
           projectDirectory = directory;
           fs.mkdirSync(path.join(directory.toString(), 'src/styles'), { recursive: true });
           (await new PortalProjectService().applyConfig(directory, portal))._unsafeUnwrap();
@@ -242,7 +238,7 @@ describe('PortalServeAction', () => {
             onChange: () => Promise<void>,
             onFailed: (reason: string) => void
           ) => {
-            expect(directory.toString()).to.equal(buildDirectory.toString());
+            expect(directory.toString()).to.equal(source.toString());
             expect(fileName.toString()).to.equal('apimatic.json');
             resolve({ onChange, onFailed });
             return ok({ close: closeWatch, recheck });
@@ -339,10 +335,10 @@ describe('PortalServeAction', () => {
         const [problem, directory] = prompts.configRejected.firstCall.args;
         expect(problem.kind).to.equal('missingStaticFiles');
         const files = problem.kind === 'missingStaticFiles' ? problem.files : [];
-        expect(
-          files.map(({ setting, file, foundAs }) => [setting, file.relativeTo(buildDirectory), foundAs])
-        ).to.deep.equal([['portal.brand.favicon', 'static/missing.ico', null]]);
-        expect(directory.toString()).to.equal(buildDirectory.toString());
+        expect(files.map(({ setting, file, foundAs }) => [setting, file.relativeTo(source), foundAs])).to.deep.equal([
+          ['portal.brand.favicon', 'static/missing.ico', null]
+        ]);
+        expect(directory.toString()).to.equal(source.toString());
         expect([readProject('portal.identity.json'), readProject('src/styles/theme.css')]).to.deep.equal(before);
       });
     });
@@ -366,7 +362,7 @@ describe('PortalServeAction', () => {
 
     it('reports a file removed while the preview runs', async () => {
       await whileServing(async () => {
-        fs.rmSync(path.join(buildDirectory.toString(), 'apimatic.json'));
+        fs.rmSync(path.join(source.toString(), 'apimatic.json'));
         await (await watched).onChange();
 
         expect(prompts.configRejected.firstCall.args[0]).to.deep.equal({ kind: 'missingConfig' });
@@ -375,21 +371,21 @@ describe('PortalServeAction', () => {
 
     // Vite reads its public directory once, and one missing at startup is served as none.
     it('says once that the files of a static directory made while it runs need a restart', async () => {
-      fs.rmSync(path.join(buildDirectory.toString(), 'static'), { recursive: true });
+      fs.rmSync(path.join(source.toString(), 'static'), { recursive: true });
       const config = originalConfig();
       delete config.portal.brand;
       writeConfig(config);
 
       await whileServing(async () => {
-        fs.mkdirSync(path.join(buildDirectory.toString(), 'static'));
-        fs.writeFileSync(path.join(buildDirectory.toString(), 'static', 'logo.png'), 'x');
+        fs.mkdirSync(path.join(source.toString(), 'static'));
+        fs.writeFileSync(path.join(source.toString(), 'static', 'logo.png'), 'x');
         const branded = { ...config, portal: { ...config.portal, brand: { logo: 'static/logo.png' } } };
 
         await save(branded);
         await save({ ...branded, portal: { ...branded.portal, ai: { pageActions: false } } });
 
         expect(prompts.staticDirectoryNotServed.calledOnce).to.be.true;
-        expect(prompts.staticDirectoryNotServed.firstCall.args[0].toString()).to.equal(buildDirectory.toString());
+        expect(prompts.staticDirectoryNotServed.firstCall.args[0].toString()).to.equal(source.toString());
         expect(JSON.parse(readProject('portal.identity.json')).logo).to.deep.equal({
           light: '/logo.png',
           dark: '/logo.png'
@@ -426,7 +422,7 @@ describe('PortalServeAction', () => {
     it('reports a fault it did not expect while re-reading the file, and keeps watching', async () => {
       await whileServing(async () => {
         const resolveSettings = sinon
-          .stub(PortalBuildDirectoryContext.prototype, 'resolveSettings')
+          .stub(PortalSourceContext.prototype, 'resolveSettings')
           .rejects(new Error('EBUSY: resource busy or locked'));
         const config = originalConfig();
         config.portal.site.name = 'Renamed API';
@@ -452,7 +448,7 @@ describe('PortalServeAction', () => {
       watch.returns(err('EMFILE: too many open files'));
       interrupt();
 
-      const result = await execute(buildDirectory);
+      const result = await execute(source);
 
       expect(prompts.configNotWatched.calledOnceWith('EMFILE: too many open files')).to.be.true;
       expect(result.isCancelled()).to.be.true;

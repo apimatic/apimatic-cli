@@ -8,12 +8,8 @@ import sinon from 'sinon';
 import { parse as parseYaml } from 'yaml';
 import { FileService } from '../../src/infrastructure/file-service';
 import { APIMATIC_SCHEMA_URL } from '../../src/types/apimatic-config/document';
-import { PortalBuildDirectoryContext } from '../../src/types/portal-build-directory-context';
-import {
-  PortalSettings,
-  PortalBuildDirectoryContents,
-  PortalBuildDirectoryProblem
-} from '../../src/types/portal/portal-build-directory';
+import { PortalSourceContext } from '../../src/types/portal-source-context';
+import { PortalSettings, PortalSource, PortalSourceProblem } from '../../src/types/portal/portal-source';
 import { DirectoryPath } from '../../src/types/file/directoryPath';
 import { FileName } from '../../src/types/file/fileName';
 import { FilePath } from '../../src/types/file/filePath';
@@ -21,7 +17,7 @@ import { ZipService } from '../../src/infrastructure/zip-service';
 
 const OPENAPI = JSON.stringify({ openapi: '3.0.0', info: { title: 'Calc', version: '1' }, paths: {} });
 
-describe('PortalBuildDirectoryContext', () => {
+describe('PortalSourceContext', () => {
   let root: string;
 
   const write = (relative: string, contents: string) => {
@@ -38,18 +34,18 @@ describe('PortalBuildDirectoryContext', () => {
 
   const REQUIRED_LANGUAGES = /^'languages' must name at least one SDK language/;
 
-  const resolve = () => new PortalBuildDirectoryContext(new DirectoryPath(root)).resolve();
+  const resolve = () => new PortalSourceContext(new DirectoryPath(root)).resolve();
 
-  /** The ignored navigation files as the warning names them, relative to the build directory. */
-  const ignored = (contents: PortalBuildDirectoryContents): string[] =>
-    contents.ignoredNavigationFiles.map((file) => file.relativeTo(new DirectoryPath(root)));
+  /** The ignored navigation files as the warning names them, relative to the source directory. */
+  const ignored = (source: PortalSource): string[] =>
+    source.ignoredNavigationFiles.map((file) => file.relativeTo(new DirectoryPath(root)));
 
-  /** The hidden pages as the warning names them, relative to the build directory. */
-  const hidden = (contents: PortalBuildDirectoryContents): string[] =>
-    contents.hiddenPages.map((file) => file.relativeTo(new DirectoryPath(root))).sort();
+  /** The hidden pages as the warning names them, relative to the source directory. */
+  const hidden = (source: PortalSource): string[] =>
+    source.hiddenPages.map((file) => file.relativeTo(new DirectoryPath(root))).sort();
 
   /** Each file the block names that is not on disk: its setting, its path, and its spelling on disk in another case. */
-  const missingFiles = (result: Result<unknown, PortalBuildDirectoryProblem>): [string, string, string | null][] => {
+  const missingFiles = (result: Result<unknown, PortalSourceProblem>): [string, string, string | null][] => {
     const problem = result._unsafeUnwrapErr();
     if (problem.kind !== 'missingStaticFiles') {
       throw new Error(`expected missing static files, got ${JSON.stringify(problem)}`);
@@ -63,7 +59,7 @@ describe('PortalBuildDirectoryContext', () => {
   };
 
   beforeEach(() => {
-    root = fs.mkdtempSync(path.join(os.tmpdir(), 'portal-build-directory-'));
+    root = fs.mkdtempSync(path.join(os.tmpdir(), 'portal-source-'));
   });
 
   afterEach(() => {
@@ -91,10 +87,10 @@ describe('PortalBuildDirectoryContext', () => {
       write('apimatic.json', mark + JSON.stringify({ portal: { site: { name: 'Acme' } }, languages: LANGUAGES }));
       write('spec/api.json', mark + OPENAPI);
 
-      const contents = (await resolve())._unsafeUnwrap();
+      const source = (await resolve())._unsafeUnwrap();
 
-      expect(contents.config.siteTitle()).to.equal('Acme');
-      expect(contents.specs).to.have.lengthOf(1);
+      expect(source.config.siteTitle()).to.equal('Acme');
+      expect(source.specs).to.have.lengthOf(1);
     });
 
     it('passes the field errors through when the config is invalid', async () => {
@@ -315,7 +311,7 @@ describe('PortalBuildDirectoryContext', () => {
 
   // What `portal serve` runs on each save of `apimatic.json`.
   describe('resolveSettings', () => {
-    const context = () => new PortalBuildDirectoryContext(new DirectoryPath(root));
+    const context = () => new PortalSourceContext(new DirectoryPath(root));
 
     beforeEach(() => write('spec/api.json', OPENAPI));
 
@@ -363,9 +359,9 @@ describe('PortalBuildDirectoryContext', () => {
       write('spec/a.yaml', 'openapi: 3.0.0\ninfo:\n  title: A\n  version: "1"\npaths: {}\n');
       write('spec/c.yml', 'openapi: 3.1.0\ninfo:\n  title: C\n  version: "1"\npaths: {}\n');
 
-      const contents = (await resolve())._unsafeUnwrap();
+      const source = (await resolve())._unsafeUnwrap();
 
-      expect(contents.specs.map((spec) => spec.slug)).to.deep.equal(['a', 'b', 'c']);
+      expect(source.specs.map((spec) => spec.slug)).to.deep.equal(['a', 'b', 'c']);
     });
 
     it('ignores documents that carry no version key', async () => {
@@ -373,9 +369,9 @@ describe('PortalBuildDirectoryContext', () => {
       write('spec/APIMATIC-META.json', JSON.stringify({ anything: true }));
       write('spec/shared-schemas.json', JSON.stringify({ components: {} }));
 
-      const contents = (await resolve())._unsafeUnwrap();
+      const source = (await resolve())._unsafeUnwrap();
 
-      expect(contents.specs.map((spec) => spec.slug)).to.deep.equal(['api']);
+      expect(source.specs.map((spec) => spec.slug)).to.deep.equal(['api']);
     });
 
     it('ignores files that are not specifications at all', async () => {
@@ -502,10 +498,10 @@ describe('PortalBuildDirectoryContext', () => {
     });
 
     it('reports content and static as absent when they do not exist', async () => {
-      const contents = (await resolve())._unsafeUnwrap();
+      const source = (await resolve())._unsafeUnwrap();
 
-      expect(contents.contentDirectory).to.be.null;
-      expect(contents.staticDirectory).to.be.null;
+      expect(source.contentDirectory).to.be.null;
+      expect(source.staticDirectory).to.be.null;
     });
 
     // The section's generated metadata lists only the reference pages, and metadata hides
@@ -567,9 +563,9 @@ describe('PortalBuildDirectoryContext', () => {
       write('static/sitemap.xml', '<urlset/>');
       write('static/logo.png', 'x');
 
-      const contents = (await resolve())._unsafeUnwrap();
+      const source = (await resolve())._unsafeUnwrap();
 
-      expect(contents.shadowedFiles.map(String).sort()).to.deep.equal(['robots.txt', 'sitemap.xml']);
+      expect(source.shadowedFiles.map(String).sort()).to.deep.equal(['robots.txt', 'sitemap.xml']);
     });
 
     it('reports nothing when the static directory holds only its own files', async () => {
@@ -597,19 +593,19 @@ describe('PortalBuildDirectoryContext', () => {
       }
       fs.rmSync(target, { recursive: true, force: true });
 
-      const contents = (await resolve())._unsafeUnwrap();
+      const source = (await resolve())._unsafeUnwrap();
 
-      expect(contents.shadowedFiles.map(String)).to.deep.equal(['robots.txt']);
+      expect(source.shadowedFiles.map(String)).to.deep.equal(['robots.txt']);
     });
 
     it('reports them once they exist', async () => {
       write('content/index.md', '# hi');
       write('static/logo.png', 'x');
 
-      const contents = (await resolve())._unsafeUnwrap();
+      const source = (await resolve())._unsafeUnwrap();
 
-      expect(contents.contentDirectory).to.not.be.null;
-      expect(contents.staticDirectory).to.not.be.null;
+      expect(source.contentDirectory).to.not.be.null;
+      expect(source.staticDirectory).to.not.be.null;
     });
   });
 
@@ -658,9 +654,7 @@ describe('PortalBuildDirectoryContext', () => {
       // Named, because nothing suggests a site when the specifications are not read again.
       writeFile({ portal: { site: { name: 'Calc' } }, languages: { go: {} }, plugin: {} });
 
-      const reloaded = (
-        await new PortalBuildDirectoryContext(new DirectoryPath(root)).resolveSettings(null)
-      )._unsafeUnwrap();
+      const reloaded = (await new PortalSourceContext(new DirectoryPath(root)).resolveSettings(null))._unsafeUnwrap();
 
       expect(generated(reloaded)).to.deep.equal(['sdks/index.mdx', 'sdks/go.mdx', 'context-plugin/index.mdx']);
     });
@@ -674,7 +668,7 @@ describe('PortalBuildDirectoryContext', () => {
     });
 
     /** Each refused page as the file, where it would be served, and the section it collides with. */
-    const reserved = (problem: PortalBuildDirectoryProblem): string[] => {
+    const reserved = (problem: PortalSourceProblem): string[] => {
       if (problem.kind !== 'reservedAddresses') {
         throw new Error(`expected a 'reservedAddresses' problem, got '${problem.kind}'`);
       }
@@ -745,7 +739,7 @@ describe('PortalBuildDirectoryContext', () => {
     });
 
     /** The errors behind an `invalidNavigation` problem, as their own type. */
-    const navigationErrors = (problem: PortalBuildDirectoryProblem): string[] => {
+    const navigationErrors = (problem: PortalSourceProblem): string[] => {
       if (problem.kind !== 'invalidNavigation') {
         throw new Error(`expected an 'invalidNavigation' problem, got '${problem.kind}'`);
       }
@@ -997,9 +991,9 @@ describe('PortalBuildDirectoryContext', () => {
     it('reports a case variant of nav.json instead of applying it', async () => {
       write('content/Nav.json', JSON.stringify({ pages: ['nonsense'] }));
 
-      const contents = (await resolve())._unsafeUnwrap();
+      const source = (await resolve())._unsafeUnwrap();
 
-      expect(ignored(contents)).to.deep.equal(['content/Nav.json']);
+      expect(ignored(source)).to.deep.equal(['content/Nav.json']);
     });
 
     // The build loads `**/nav.json` alone, so any other JSON or YAML in the content directory
@@ -1009,28 +1003,28 @@ describe('PortalBuildDirectoryContext', () => {
       write('content/guides/intro.md', '# Intro');
       write('content/guides/nav.yaml', 'pages: [nonsense]');
 
-      const contents = (await resolve())._unsafeUnwrap();
+      const source = (await resolve())._unsafeUnwrap();
 
-      expect(ignored(contents)).to.deep.equal([]);
+      expect(ignored(source)).to.deep.equal([]);
     });
   });
 
   describe('scaffold', () => {
-    let buildDirectory: DirectoryPath;
+    let source: DirectoryPath;
 
-    /** A specification outside the build directory, where the wizard downloads it to. */
+    /** A specification outside the source directory, where the wizard downloads it to. */
     const writeSpec = (info: Record<string, unknown>, name = 'petstore.json'): FilePath => {
       write(path.join('downloads', name), JSON.stringify({ openapi: '3.0.0', info, paths: {} }));
       return new FilePath(new DirectoryPath(root).join('downloads'), new FileName(name));
     };
 
     const scaffold = async (specPath: FilePath) =>
-      (await new PortalBuildDirectoryContext(buildDirectory).scaffold(specPath, APIMATIC_SCHEMA_URL))._unsafeUnwrap();
-    const read = (relative: string) => fs.readFileSync(path.join(buildDirectory.toString(), relative), 'utf8');
+      (await new PortalSourceContext(source).scaffold(specPath, APIMATIC_SCHEMA_URL))._unsafeUnwrap();
+    const read = (relative: string) => fs.readFileSync(path.join(source.toString(), relative), 'utf8');
 
     /** What the user adds by hand before the portal builds: nothing in quickstart writes it yet. */
     const addLanguages = () => {
-      const file = path.join(buildDirectory.toString(), 'apimatic.json');
+      const file = path.join(source.toString(), 'apimatic.json');
       fs.writeFileSync(file, JSON.stringify({ ...JSON.parse(fs.readFileSync(file, 'utf8')), languages: LANGUAGES }));
     };
 
@@ -1041,17 +1035,17 @@ describe('PortalBuildDirectoryContext', () => {
     };
 
     beforeEach(() => {
-      buildDirectory = new DirectoryPath(root).join('project').join('src');
+      source = new DirectoryPath(root).join('project').join('src');
     });
 
-    it('writes a build directory it accepts itself, once a language is named', async () => {
+    it('writes a source directory it accepts itself, once a language is named', async () => {
       await scaffold(writeSpec({ title: 'Petstore', version: '1' }));
 
-      const unnamed = (await new PortalBuildDirectoryContext(buildDirectory).resolve())._unsafeUnwrapErr();
+      const unnamed = (await new PortalSourceContext(source).resolve())._unsafeUnwrapErr();
       expect(unnamed.kind === 'invalidConfig' ? unnamed.errors : []).to.have.lengthOf(1);
       addLanguages();
 
-      const resolved = (await new PortalBuildDirectoryContext(buildDirectory).resolve())._unsafeUnwrap();
+      const resolved = (await new PortalSourceContext(source).resolve())._unsafeUnwrap();
       expect(resolved.config.siteTitle()).to.equal('Petstore');
       expect(resolved.specs.map((spec) => spec.slug)).to.deep.equal(['petstore']);
       expect(resolved.contentDirectory).to.not.be.null;
@@ -1076,10 +1070,10 @@ describe('PortalBuildDirectoryContext', () => {
     it('writes a block that resolves to the portal an empty block makes', async () => {
       await scaffold(writeSpec({ title: 'Petstore', version: '1', description: 'All the pets.' }));
       addLanguages();
-      const scaffolded = (await new PortalBuildDirectoryContext(buildDirectory).resolve())._unsafeUnwrap().config;
+      const scaffolded = (await new PortalSourceContext(source).resolve())._unsafeUnwrap().config;
 
       write('project/src/apimatic.json', JSON.stringify({ portal: {}, languages: LANGUAGES }));
-      const empty = (await new PortalBuildDirectoryContext(buildDirectory).resolve())._unsafeUnwrap().config;
+      const empty = (await new PortalSourceContext(source).resolve())._unsafeUnwrap().config;
 
       expect(scaffolded.toJSON()).to.deep.equal(empty.toJSON());
       expect(scaffolded.identity()).to.deep.equal(empty.identity());
@@ -1097,7 +1091,7 @@ describe('PortalBuildDirectoryContext', () => {
     it('answers with the apimatic.json it wrote', async () => {
       const configFile = await scaffold(writeSpec({ title: 'Petstore', version: '1' }));
 
-      expect(configFile.isEqual(new FilePath(buildDirectory, new FileName('apimatic.json')))).to.be.true;
+      expect(configFile.isEqual(new FilePath(source, new FileName('apimatic.json')))).to.be.true;
       expect(fs.existsSync(configFile.toString())).to.be.true;
     });
 
@@ -1113,8 +1107,8 @@ describe('PortalBuildDirectoryContext', () => {
       await scaffold(writeSpec({ title: 'Petstore', version: '1' }));
       addLanguages();
 
-      const contentFiles = fs.readdirSync(path.join(buildDirectory.toString(), 'content')).sort();
-      const scaffolded = (await new PortalBuildDirectoryContext(buildDirectory).resolve())._unsafeUnwrap();
+      const contentFiles = fs.readdirSync(path.join(source.toString(), 'content')).sort();
+      const scaffolded = (await new PortalSourceContext(source).resolve())._unsafeUnwrap();
 
       expect(contentFiles).to.deep.equal(['index.md', 'nav.json']);
       expect(scaffolded.ignoredNavigationFiles).to.deep.equal([]);
@@ -1133,7 +1127,7 @@ describe('PortalBuildDirectoryContext', () => {
     it('reports a configuration it cannot write into rather than throwing', async () => {
       write('project/src/apimatic.json', '{ not json');
 
-      const scaffolded = await new PortalBuildDirectoryContext(buildDirectory).scaffold(
+      const scaffolded = await new PortalSourceContext(source).scaffold(
         writeSpec({ title: 'Petstore', version: '1' }),
         APIMATIC_SCHEMA_URL
       );
@@ -1141,17 +1135,17 @@ describe('PortalBuildDirectoryContext', () => {
       expect(scaffolded._unsafeUnwrapErr()).to.deep.equal({ kind: 'configUnreadable' });
     });
 
-    it('reports a build directory it cannot write rather than throwing', async () => {
+    it('reports a source directory it cannot write rather than throwing', async () => {
       const failing = sinon.stub(FileService.prototype, 'writeContents').rejects(new Error('EACCES: denied'));
 
       try {
-        const scaffolded = await new PortalBuildDirectoryContext(buildDirectory).scaffold(
+        const scaffolded = await new PortalSourceContext(source).scaffold(
           writeSpec({ title: 'Petstore', version: '1' }),
           APIMATIC_SCHEMA_URL
         );
 
         expect(scaffolded._unsafeUnwrapErr()).to.deep.equal({
-          kind: 'buildDirectoryUnwritable',
+          kind: 'sourceUnwritable',
           reason: 'EACCES: denied'
         });
       } finally {
@@ -1167,8 +1161,8 @@ describe('PortalBuildDirectoryContext', () => {
 
       await scaffold(archive);
 
-      expect(fs.existsSync(path.join(buildDirectory.toString(), 'spec', 'openapi.json'))).to.be.true;
-      expect(fs.existsSync(path.join(buildDirectory.toString(), 'spec', 'paths', 'pets.json'))).to.be.true;
+      expect(fs.existsSync(path.join(source.toString(), 'spec', 'openapi.json'))).to.be.true;
+      expect(fs.existsSync(path.join(source.toString(), 'spec', 'paths', 'pets.json'))).to.be.true;
       // The parts of an archive are left to the build to read, so nothing names the portal yet.
       expect(JSON.parse(read('apimatic.json')).portal.site).to.deep.equal({ name: 'My API' });
     });

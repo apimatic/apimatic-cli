@@ -5,7 +5,7 @@ import { execa } from 'execa';
 import { expect } from 'chai';
 import { PortalBuildService } from '../../src/infrastructure/portal-build-service';
 import { PortalProjectService } from '../../src/infrastructure/portal-project-service';
-import { PortalBuildDirectoryContext } from '../../src/types/portal-build-directory-context';
+import { PortalSourceContext } from '../../src/types/portal-source-context';
 import { PortalContext } from '../../src/types/portal-context';
 import { DirectoryPath } from '../../src/types/file/directoryPath';
 import { CodeSampleCatalog, CodeSampleCatalogs } from '../../src/types/portal/code-samples';
@@ -40,14 +40,14 @@ async function buildFixture(name: string, codeSampleCatalogs = new CodeSampleCat
   const base = await ensurePortalProjectDirectoryBase(fixture);
   const root = fs.mkdtempSync(path.join(base, 'portal-e2e-'));
 
-  const contents = (await new PortalBuildDirectoryContext(fixture).resolve())._unsafeUnwrap();
+  const source = (await new PortalSourceContext(fixture).resolve())._unsafeUnwrap();
 
   const project = new DirectoryPath(root).join('build');
   fs.mkdirSync(project.toString(), { recursive: true });
   const prepared = (
     await new PortalProjectService().prepare(
       project,
-      contents,
+      source,
       new PortalArtifacts(codeSampleCatalogs, new Map(), undefined)
     )
   )._unsafeUnwrap();

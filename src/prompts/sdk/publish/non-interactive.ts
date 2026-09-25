@@ -19,7 +19,7 @@ export class SdkPublishNonInteractivePrompts {
     log.error(message);
   }
 
-  public buildDirectoryDoesNotExist(directory: DirectoryPath) {
+  public srcDirectoryDoesNotExist(directory: DirectoryPath) {
     log.error(`The ${f.var('src')} does not exist at the provided location: ${f.path(directory)}`);
   }
 

@@ -12,18 +12,18 @@ import { DirectoryPath } from '../../src/types/file/directoryPath';
 describe('portalProjectDirectoryBase', () => {
   // A plain string, not a DirectoryPath: that class resolves against the host's own path
   // rules, and this Windows path is checked on every platform.
-  const buildDirectory = 'D:\\work\\my-api\\src';
+  const source = 'D:\\work\\my-api\\src';
 
-  it('uses the system temp directory when it shares the drive with the build directory', () => {
-    expect(portalProjectDirectoryBase(buildDirectory, 'D:\\Temp', 'win32')).to.equal('D:\\Temp');
+  it('uses the system temp directory when it shares the drive with the source', () => {
+    expect(portalProjectDirectoryBase(source, 'D:\\Temp', 'win32')).to.equal('D:\\Temp');
   });
 
   it('compares drive letters without regard to case', () => {
-    expect(portalProjectDirectoryBase(buildDirectory, 'd:\\Temp', 'win32')).to.equal('d:\\Temp');
+    expect(portalProjectDirectoryBase(source, 'd:\\Temp', 'win32')).to.equal('d:\\Temp');
   });
 
-  it('falls back to a folder beside the build directory when the temp directory is on another drive', () => {
-    expect(portalProjectDirectoryBase(buildDirectory, 'C:\\Users\\me\\AppData\\Local\\Temp', 'win32')).to.equal(
+  it('falls back to a folder beside the source when the temp directory is on another drive', () => {
+    expect(portalProjectDirectoryBase(source, 'C:\\Users\\me\\AppData\\Local\\Temp', 'win32')).to.equal(
       path.win32.join('D:\\work\\my-api', PORTAL_PROJECT_DIRECTORY_NAME)
     );
   });
@@ -36,12 +36,10 @@ describe('portalProjectDirectoryBase', () => {
 
 describe('withPortalProjectDirectory', () => {
   it('hands out a directory that exists while the callback runs and is gone afterwards', async () => {
-    const buildDirectory = new DirectoryPath(fs.mkdtempSync(path.join(os.tmpdir(), 'build-buildDirectory-'))).join(
-      'src'
-    );
+    const source = new DirectoryPath(fs.mkdtempSync(path.join(os.tmpdir(), 'build-source-'))).join('src');
     let seen: string | undefined;
 
-    await withPortalProjectDirectory(buildDirectory, async (directory) => {
+    await withPortalProjectDirectory(source, async (directory) => {
       seen = directory.toString();
       expect(fs.existsSync(seen)).to.be.true;
       fs.writeFileSync(path.join(seen, 'marker.txt'), 'x');
@@ -53,15 +51,15 @@ describe('withPortalProjectDirectory', () => {
 
   // Drive letters only exist on Windows, so the fallback can only be exercised for real there.
   (process.platform === 'win32' ? it : it.skip)(
-    'builds beside the build directory when the temp directory is on another drive, and cleans up',
+    'builds beside the source when the temp directory is on another drive, and cleans up',
     async () => {
       const project = fs.mkdtempSync(path.join(os.tmpdir(), 'build-project-'));
-      const buildDirectory = new DirectoryPath(project).join('src');
+      const source = new DirectoryPath(project).join('src');
       const foreignTemp = 'Z:\\Temp';
       const fallback = path.join(project, PORTAL_PROJECT_DIRECTORY_NAME);
 
       await withPortalProjectDirectory(
-        buildDirectory,
+        source,
         async (directory) => {
           expect(directory.toString().toLowerCase().startsWith(fallback.toLowerCase())).to.be.true;
           expect(fs.readFileSync(path.join(fallback, '.gitignore'), 'utf8')).to.equal('*\n');
@@ -77,11 +75,11 @@ describe('withPortalProjectDirectory', () => {
     'leaves the shared folder alone while another run is in it',
     async () => {
       const project = fs.mkdtempSync(path.join(os.tmpdir(), 'build-shared-'));
-      const buildDirectory = new DirectoryPath(project).join('src');
+      const source = new DirectoryPath(project).join('src');
       const fallback = path.join(project, PORTAL_PROJECT_DIRECTORY_NAME);
 
       await withPortalProjectDirectory(
-        buildDirectory,
+        source,
         async () => {
           // Stands in for a second run still building in the same folder.
           fs.mkdirSync(path.join(fallback, 'another-run'), { recursive: true });

@@ -8,7 +8,7 @@ import { FilePath } from '../types/file/filePath.js';
 import { CodeSampleCatalogs } from '../types/portal/code-samples.js';
 import { PortalArtifacts } from '../types/portal/portal-artifacts.js';
 import { PortalConfig } from '../types/portal/portal-config.js';
-import { PortalSettings, PortalBuildDirectoryContents } from '../types/portal/portal-build-directory.js';
+import { PortalSettings, PortalSource } from '../types/portal/portal-source.js';
 import { PortalStylesheet } from '../types/portal/portal-stylesheet.js';
 import { errorMessage } from '../utils/error-utils.js';
 import { envInfo } from './env-info.js';
@@ -83,7 +83,7 @@ export class PortalProjectService {
 
   public async prepare(
     projectDirectory: DirectoryPath,
-    contents: PortalBuildDirectoryContents,
+    source: PortalSource,
     artifacts: PortalArtifacts
   ): Promise<Result<PortalProjectPaths, string>> {
     const template = this.templateDirectory();
@@ -102,15 +102,12 @@ export class PortalProjectService {
     await this.linkDependencies(projectDirectory);
     await this.writeConfiguration(
       projectDirectory,
-      contents,
+      source,
       await this.writeCodeSampleCatalogs(projectDirectory, artifacts.codeSampleCatalogs),
       await this.writeDownloads(projectDirectory, artifacts)
     );
 
-    const pages = await this.pagesService.write(
-      projectDirectory.join(GENERATED_DIRECTORY_NAME),
-      contents.generatedPages
-    );
+    const pages = await this.pagesService.write(projectDirectory.join(GENERATED_DIRECTORY_NAME), source.generatedPages);
     if (pages.isErr()) {
       return err(pages.error);
     }
@@ -211,17 +208,17 @@ export class PortalProjectService {
 
   private async writeConfiguration(
     projectDirectory: DirectoryPath,
-    contents: PortalBuildDirectoryContents,
+    source: PortalSource,
     codeSampleCatalogs: FilePath | null,
     downloads: DirectoryPath | null
   ): Promise<void> {
-    const contentDirectory = contents.contentDirectory ?? projectDirectory.join('content');
-    if (contents.contentDirectory === null) {
+    const contentDirectory = source.contentDirectory ?? projectDirectory.join('content');
+    if (source.contentDirectory === null) {
       await this.fileService.createDirectoryIfNotExists(contentDirectory);
     }
 
     const specs: Record<string, string> = {};
-    for (const spec of contents.specs) {
+    for (const spec of source.specs) {
       specs[spec.slug] = this.toPosix(spec.file.toString());
     }
 
@@ -232,7 +229,7 @@ export class PortalProjectService {
       codeSampleCatalogs: codeSampleCatalogs === null ? null : this.toPosix(codeSampleCatalogs.toString()),
       contentDir: this.toPosix(contentDirectory.toString()),
       generatedDir: this.toPosix(projectDirectory.join(GENERATED_DIRECTORY_NAME).toString()),
-      staticDir: contents.staticDirectory === null ? null : this.toPosix(contents.staticDirectory.toString()),
+      staticDir: source.staticDirectory === null ? null : this.toPosix(source.staticDirectory.toString()),
       downloadsDir: downloads === null ? null : this.toPosix(downloads.toString())
     };
 
@@ -241,7 +238,7 @@ export class PortalProjectService {
       JSON.stringify(configuration, null, 2)
     );
 
-    await this.writeAppearance(projectDirectory, contents.config);
+    await this.writeAppearance(projectDirectory, source.config);
 
     // A literal because Fumadocs' `defineDocs` macro rejects anything it cannot read at
     // compile time. Tailwind needs the same path to scan the user's pages: its automatic

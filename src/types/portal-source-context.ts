@@ -18,11 +18,11 @@ import {
   MissingStaticFile,
   PortalScaffoldProblem,
   PortalSettings,
-  PortalBuildDirectoryContents,
-  PortalBuildDirectoryProblem,
+  PortalSource,
+  PortalSourceProblem,
   PortalSpec,
   ReservedAddressPage
-} from './portal/portal-build-directory.js';
+} from './portal/portal-source.js';
 import { SpecContext } from './spec-context.js';
 
 const SPEC_EXTENSIONS = ['.json', '.yaml', '.yml'];
@@ -53,7 +53,7 @@ const PAGE_EXTENSIONS = ['.md', '.mdx'];
 /** A `(group)` folder, which the content source leaves out of a page's address. */
 const GROUP_FOLDER = /^\(.+\)$/;
 
-/** What one walk of the content tree found: see `PortalBuildDirectoryContext.navigation`. */
+/** What one walk of the content tree found: see `PortalSourceContext.navigation`. */
 interface NavigationScan {
   errors: string[];
   ignoredFiles: FilePath[];
@@ -73,31 +73,31 @@ interface DirectoryScan {
 }
 
 /**
- * The build directory: the `portal` block of `apimatic.json`, the OpenAPI
+ * The `src/` directory of a portal project: the `portal` block of `apimatic.json`, the OpenAPI
  * documents in `spec/`, and the optional `content/` and `static/` directories.
  */
-export class PortalBuildDirectoryContext {
+export class PortalSourceContext {
   private readonly fileService = new FileService();
   private readonly configContext: ApimaticConfigContext;
 
-  constructor(private readonly buildDirectory: DirectoryPath) {
-    this.configContext = new ApimaticConfigContext(buildDirectory);
+  constructor(private readonly sourceDirectory: DirectoryPath) {
+    this.configContext = new ApimaticConfigContext(sourceDirectory);
   }
 
   private get specDirectory(): DirectoryPath {
-    return this.buildDirectory.join('spec');
+    return this.sourceDirectory.join('spec');
   }
 
   private get contentDirectory(): DirectoryPath {
-    return this.buildDirectory.join('content');
+    return this.sourceDirectory.join('content');
   }
 
   private get staticDirectory(): DirectoryPath {
-    return this.buildDirectory.join('static');
+    return this.sourceDirectory.join('static');
   }
 
-  /** Reads and validates the whole build directory, or reports the first problem found. */
-  public async resolve(): Promise<Result<PortalBuildDirectoryContents, PortalBuildDirectoryProblem>> {
+  /** Reads and validates the whole source directory, or reports the first problem found. */
+  public async resolve(): Promise<Result<PortalSource, PortalSourceProblem>> {
     const document = await this.readConfigDocument();
     if (document.isErr()) {
       return err(document.error);
@@ -136,12 +136,12 @@ export class PortalBuildDirectoryContext {
       }
     }
 
-    const contentPages = contentTree === null ? [] : PortalBuildDirectoryContext.contentPages(contentTree);
+    const contentPages = contentTree === null ? [] : PortalSourceContext.contentPages(contentTree);
 
     // Refused before the navigation scan, which would otherwise answer an entry naming such a
     // page as if it were an ordinary one. In the build, the user's page and the generated one
     // would compete for the address.
-    const reserved = PortalBuildDirectoryContext.reservedAddressPages(contentPages);
+    const reserved = PortalSourceContext.reservedAddressPages(contentPages);
     if (reserved.length > 0) {
       return err({ kind: 'reservedAddresses', pages: reserved });
     }
@@ -160,7 +160,7 @@ export class PortalBuildDirectoryContext {
       contentDirectory,
       staticDirectory,
       shadowedFiles: staticDirectory === null ? [] : await this.shadowedFiles(staticDirectory),
-      hiddenPages: PortalBuildDirectoryContext.hiddenPages(contentPages, specs),
+      hiddenPages: PortalSourceContext.hiddenPages(contentPages, specs),
       ignoredNavigationFiles: navigation.ignoredFiles
     });
   }
@@ -170,9 +170,7 @@ export class PortalBuildDirectoryContext {
    * is accepted exactly when a build would accept it. `suggested` is what `resolve` found in the
    * specifications, which are not read again; changing them needs a restart anyway.
    */
-  public async resolveSettings(
-    suggested: SuggestedSite | null
-  ): Promise<Result<PortalSettings, PortalBuildDirectoryProblem>> {
+  public async resolveSettings(suggested: SuggestedSite | null): Promise<Result<PortalSettings, PortalSourceProblem>> {
     const document = await this.readConfigDocument();
     if (document.isErr()) {
       return err(document.error);
@@ -183,8 +181,8 @@ export class PortalBuildDirectoryContext {
   private async settingsFrom(
     document: ApimaticConfigDocument,
     suggested: SuggestedSite | null
-  ): Promise<Result<PortalSettings, PortalBuildDirectoryProblem>> {
-    const settings = PortalBuildDirectoryContext.parseSettings(document, suggested);
+  ): Promise<Result<PortalSettings, PortalSourceProblem>> {
+    const settings = PortalSourceContext.parseSettings(document, suggested);
     if (settings.isErr()) {
       return err(settings.error);
     }
@@ -197,7 +195,7 @@ export class PortalBuildDirectoryContext {
     return ok(settings.value);
   }
 
-  private async readConfigDocument(): Promise<Result<ApimaticConfigDocument, PortalBuildDirectoryProblem>> {
+  private async readConfigDocument(): Promise<Result<ApimaticConfigDocument, PortalSourceProblem>> {
     const state = await this.configContext.read();
     if (state.state === 'missing') {
       return err({ kind: 'missingConfig' });
@@ -217,7 +215,7 @@ export class PortalBuildDirectoryContext {
   private static parseSettings(
     document: ApimaticConfigDocument,
     suggested: SuggestedSite | null
-  ): Result<PortalSettings, PortalBuildDirectoryProblem> {
+  ): Result<PortalSettings, PortalSourceProblem> {
     const block = document.portal();
     const config = PortalConfig.fromBlock(block, suggested);
     const languages = PortalLanguages.fromBlock(document.languages(), document.findingsFor('languages'));
@@ -238,8 +236,8 @@ export class PortalBuildDirectoryContext {
   private async missingStaticFiles(config: PortalConfig): Promise<MissingStaticFile[]> {
     const missing: MissingStaticFile[] = [];
     for (const asset of config.staticFiles()) {
-      const file = asset.resolveIn(this.buildDirectory);
-      const found = await this.fileService.spelledOnDisk(this.buildDirectory, file);
+      const file = asset.resolveIn(this.sourceDirectory);
+      const found = await this.fileService.spelledOnDisk(this.sourceDirectory, file);
       if (!found?.isEqual(file)) {
         missing.push({ setting: asset.settingPath(), file, foundAs: found });
       }
@@ -255,13 +253,13 @@ export class PortalBuildDirectoryContext {
    */
   public async scaffold(specPath: FilePath, schemaUrl: string): Promise<Result<FilePath, PortalScaffoldProblem>> {
     try {
-      return await this.writeBuildDirectory(specPath, schemaUrl);
+      return await this.writeSourceTree(specPath, schemaUrl);
     } catch (error) {
-      return err({ kind: 'buildDirectoryUnwritable', reason: errorMessage(error) });
+      return err({ kind: 'sourceUnwritable', reason: errorMessage(error) });
     }
   }
 
-  private async writeBuildDirectory(
+  private async writeSourceTree(
     specPath: FilePath,
     schemaUrl: string
   ): Promise<Result<FilePath, PortalScaffoldProblem>> {
@@ -302,7 +300,7 @@ export class PortalBuildDirectoryContext {
       new FilePath(this.contentDirectory, new FileName(NAVIGATION_FILE_NAME)),
       JSON.stringify({ pages: ['index', '...'] }, null, 2) + '\n'
     );
-    return ok(new FilePath(this.buildDirectory, new FileName(APIMATIC_CONFIG_FILE_NAME)));
+    return ok(new FilePath(this.sourceDirectory, new FileName(APIMATIC_CONFIG_FILE_NAME)));
   }
 
   // A split specification arrives as an archive, whose parts are left to the build to read.
@@ -371,7 +369,7 @@ export class PortalBuildDirectoryContext {
         }
         // An entry addresses a page by the name it is reached at, which is the file name
         // without its extension -- the same way the content source derives a slug.
-        const pageName = PortalBuildDirectoryContext.pageName(item.fileName);
+        const pageName = PortalSourceContext.pageName(item.fileName);
         if (pageName !== undefined) {
           childNames.push(pageName);
           pageNames.add(pageName);
@@ -382,8 +380,8 @@ export class PortalBuildDirectoryContext {
       // The reference is mounted at `content/api` whether or not a directory is there to see,
       // so it is a child of the content root in every portal. Listed unconditionally, so one
       // entry gets one answer whatever else shares the directory: without this, the same
-      // mistake read as "not a page or folder" in a build directory with no such directory and as the
-      // mount point in one with it. A page of that name is a second child, and the
+      // mistake read as "not a page or folder" in a project with no such directory and as the
+      // mount point in a project with one. A page of that name is a second child, and the
       // clash is what says it can never be positioned.
       if (isContentRoot) {
         childNames.push(API_REFERENCE_NAME);
@@ -404,7 +402,7 @@ export class PortalBuildDirectoryContext {
       const errors: string[] = [];
       if (navigationFile !== undefined) {
         const file = new FilePath(directory.directoryPath, navigationFile);
-        const label = file.relativeTo(this.buildDirectory);
+        const label = file.relativeTo(this.sourceDirectory);
         // Read inside the walk, so one unreadable file is reported rather than thrown out of
         // `resolve`, which always answers with a Result.
         let contents: string | undefined;
@@ -482,7 +480,7 @@ export class PortalBuildDirectoryContext {
           return false;
         }
         const isFolderIndex =
-          rest.length <= 2 && PortalBuildDirectoryContext.pageName(new FileName(rest[rest.length - 1])) === INDEX_NAME;
+          rest.length <= 2 && PortalSourceContext.pageName(new FileName(rest[rest.length - 1])) === INDEX_NAME;
         return !isFolderIndex;
       })
       .map(({ file }) => file);
@@ -496,7 +494,7 @@ export class PortalBuildDirectoryContext {
    */
   private static reservedAddressPages(pages: ContentPage[]): ReservedAddressPage[] {
     return pages.flatMap(({ file, segments }) => {
-      const slugs = PortalBuildDirectoryContext.slugs(segments);
+      const slugs = PortalSourceContext.slugs(segments);
       const section = GENERATED_SECTIONS.find((candidate) => candidate.folder === slugs[0]);
       return section === undefined ? [] : [{ file, address: `/${slugs.join('/')}`, section }];
     });
@@ -504,20 +502,20 @@ export class PortalBuildDirectoryContext {
 
   private static slugs(segments: string[]): string[] {
     const folders = segments.slice(0, -1).filter((segment) => !GROUP_FOLDER.test(segment));
-    const name = PortalBuildDirectoryContext.pageName(new FileName(segments[segments.length - 1]));
+    const name = PortalSourceContext.pageName(new FileName(segments[segments.length - 1]));
     return name === undefined || name === INDEX_NAME ? folders : [...folders, name];
   }
 
   private static contentPages(contentTree: Directory): ContentPage[] {
     return contentTree
       .getAllFiles()
-      .filter((file) => PortalBuildDirectoryContext.pageName(file.name()) !== undefined)
+      .filter((file) => PortalSourceContext.pageName(file.name()) !== undefined)
       .map((file) => ({ file, segments: file.relativeTo(contentTree.directoryPath).split('/') }));
   }
 
   // With several specifications there is no suggested site: no one of them speaks for the portal.
   private async specs(): Promise<
-    Result<{ specs: PortalSpec[]; suggested: SuggestedSite | null }, PortalBuildDirectoryProblem>
+    Result<{ specs: PortalSpec[]; suggested: SuggestedSite | null }, PortalSourceProblem>
   > {
     const specs: PortalSpec[] = [];
     // Only the first is kept: it is the one that speaks for the portal when it is alone, and

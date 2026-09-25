@@ -47,7 +47,7 @@ export class GenerateAction {
 
     const rootBuildContext = new BuildContext(buildDirectory);
     if (!(await rootBuildContext.exists())) {
-      this.prompts.buildDirectoryEmpty(buildDirectory);
+      this.prompts.srcDirectoryEmpty(buildDirectory);
       return ActionResult.failed();
     }
 

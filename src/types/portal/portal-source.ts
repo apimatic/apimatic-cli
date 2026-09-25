@@ -20,8 +20,8 @@ export interface PortalSettings {
   generatedPages: GeneratedPages;
 }
 
-/** A validated build directory, ready to be built. */
-export interface PortalBuildDirectoryContents extends PortalSettings {
+/** A validated portal source directory, ready to be built. */
+export interface PortalSource extends PortalSettings {
   /**
    * What the only specification says about itself, or null with several. Kept so `portal serve`
    * can judge an edited config without reading the specifications again.
@@ -43,12 +43,12 @@ export interface PortalBuildDirectoryContents extends PortalSettings {
   ignoredNavigationFiles: FilePath[];
 }
 
-/** Why a build directory could not be written; each variant maps to its own message. */
+/** Why a source directory could not be written; each variant maps to its own message. */
 export type PortalScaffoldProblem =
   | { kind: 'configUnreadable' }
   | { kind: 'configUnwritable' }
   // `reason` is the message of whatever the file service raised, which nothing here can narrow.
-  | { kind: 'buildDirectoryUnwritable'; reason: string };
+  | { kind: 'sourceUnwritable'; reason: string };
 
 export interface MissingStaticFile {
   setting: string;
@@ -68,8 +68,8 @@ export interface ReservedAddressPage {
   section: GeneratedSection;
 }
 
-/** Why a build directory cannot be built; each variant maps to its own message. */
-export type PortalBuildDirectoryProblem =
+/** Why a source directory cannot be built; each variant maps to its own message. */
+export type PortalSourceProblem =
   | { kind: 'missingConfig' }
   // `missingPortal`: the block itself is absent, which is what quickstart sets up.
   | { kind: 'invalidConfig'; errors: string[]; missingPortal: boolean }

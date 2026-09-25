@@ -3,14 +3,14 @@ import { expect } from 'chai';
 import sinon from 'sinon';
 import { log } from '@clack/prompts';
 import { PortalServePrompts } from '../../../src/prompts/portal/serve.js';
-import { reportBuildDirectoryProblem } from '../../../src/prompts/portal/build-directory.js';
+import { reportSourceProblem } from '../../../src/prompts/portal/source.js';
 import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
 import { FileName } from '../../../src/types/file/fileName.js';
 import { FilePath } from '../../../src/types/file/filePath.js';
 import { PLUGIN_SECTION, SDK_SECTION } from '../../../src/types/portal/generated-pages.js';
 
-describe('reportBuildDirectoryProblem', () => {
-  const buildDirectory = new DirectoryPath('project').join('src');
+describe('reportSourceProblem', () => {
+  const source = new DirectoryPath('project').join('src');
   let error: sinon.SinonStub;
   let message: sinon.SinonStub;
 
@@ -31,36 +31,36 @@ describe('reportBuildDirectoryProblem', () => {
   });
 
   it('points at quickstart for a directory with no apimatic.json', () => {
-    reportBuildDirectoryProblem({ kind: 'missingConfig' }, buildDirectory);
+    reportSourceProblem({ kind: 'missingConfig' }, source);
 
     expect(printed()).to.contain('quickstart');
   });
 
   // Quickstart refuses a directory that is not empty, which a running preview's is.
   it('does not point at quickstart for a file removed while the preview runs', () => {
-    new PortalServePrompts().configRejected({ kind: 'missingConfig' }, buildDirectory);
+    new PortalServePrompts().configRejected({ kind: 'missingConfig' }, source);
     new PortalServePrompts().configRejected(
       { kind: 'invalidConfig', errors: ["'portal' is required."], missingPortal: true },
-      buildDirectory
+      source
     );
 
     expect(printed()).to.not.contain('quickstart');
   });
 
   it('names a file spelt in another case on disk, and why that matters', () => {
-    const images = buildDirectory.join('static').join('images');
-    reportBuildDirectoryProblem(
+    const images = source.join('static').join('images');
+    reportSourceProblem(
       {
         kind: 'missingStaticFiles',
         files: [
           {
             setting: 'portal.brand.logo',
-            file: new FilePath(buildDirectory.join('static').join('Images'), new FileName('Logo.PNG')),
+            file: new FilePath(source.join('static').join('Images'), new FileName('Logo.PNG')),
             foundAs: new FilePath(images, new FileName('logo.png'))
           }
         ]
       },
-      buildDirectory
+      source
     );
 
     expect(printed()).to.contain("'static/Images/Logo.PNG'");
@@ -70,18 +70,18 @@ describe('reportBuildDirectoryProblem', () => {
   });
 
   it('says nothing of spelling for a file that is not there at all', () => {
-    reportBuildDirectoryProblem(
+    reportSourceProblem(
       {
         kind: 'missingStaticFiles',
         files: [
           {
             setting: 'portal.brand.favicon',
-            file: new FilePath(buildDirectory.join('static'), new FileName('favicon.ico')),
+            file: new FilePath(source.join('static'), new FileName('favicon.ico')),
             foundAs: null
           }
         ]
       },
-      buildDirectory
+      source
     );
 
     expect(printed()).to.contain("'static/favicon.ico'");
@@ -89,10 +89,10 @@ describe('reportBuildDirectoryProblem', () => {
   });
 
   describe('a page at an address kept for the generated pages', () => {
-    const content = buildDirectory.join('content');
+    const content = source.join('content');
 
     it('names the page, where it would be served, and what the address is kept for', () => {
-      reportBuildDirectoryProblem(
+      reportSourceProblem(
         {
           kind: 'reservedAddresses',
           pages: [
@@ -103,7 +103,7 @@ describe('reportBuildDirectoryProblem', () => {
             }
           ]
         },
-        buildDirectory
+        source
       );
 
       const [heading, ...rest] = printed().split('\n');
@@ -116,7 +116,7 @@ describe('reportBuildDirectoryProblem', () => {
     });
 
     it('says which section a deeper page falls under, for every page and section', () => {
-      reportBuildDirectoryProblem(
+      reportSourceProblem(
         {
           kind: 'reservedAddresses',
           pages: [
@@ -132,7 +132,7 @@ describe('reportBuildDirectoryProblem', () => {
             }
           ]
         },
-        buildDirectory
+        source
       );
 
       expect(printed()).to.contain('Pages in ');

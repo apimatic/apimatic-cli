@@ -10,7 +10,7 @@ import { DirectoryPath } from '../../src/types/file/directoryPath';
 
 describe('ApimaticConfigContext', () => {
   let root: string;
-  let buildDirectory: DirectoryPath;
+  let sourceDirectory: DirectoryPath;
   let context: ApimaticConfigContext;
 
   const CSHARP_ENTRY = { source: { repositoryUrl: 'https://github.com/acme/acme-csharp' }, codegenVersion: 'v3' };
@@ -18,7 +18,7 @@ describe('ApimaticConfigContext', () => {
   /** What Notepad and PowerShell redirection leave at the front of a file, spelled out so it shows in a diff. */
   const BOM = String.fromCodePoint(0xfeff);
 
-  const configPath = () => path.join(buildDirectory.toString(), 'apimatic.json');
+  const configPath = () => path.join(sourceDirectory.toString(), 'apimatic.json');
   const withFile = (text: string) => fs.writeFileSync(configPath(), text);
   const withConfig = (config: object) => withFile(JSON.stringify(config, null, 2) + '\n');
   const written = () => fs.readFileSync(configPath(), 'utf-8');
@@ -38,9 +38,9 @@ describe('ApimaticConfigContext', () => {
   // directory removes it first.
   beforeEach(() => {
     root = fs.mkdtempSync(path.join(os.tmpdir(), 'apimatic-config-context-'));
-    buildDirectory = new DirectoryPath(path.join(root, 'src'));
-    fs.mkdirSync(buildDirectory.toString(), { recursive: true });
-    context = new ApimaticConfigContext(buildDirectory);
+    sourceDirectory = new DirectoryPath(path.join(root, 'src'));
+    fs.mkdirSync(sourceDirectory.toString(), { recursive: true });
+    context = new ApimaticConfigContext(sourceDirectory);
   });
 
   afterEach(() => {
@@ -186,7 +186,7 @@ describe('ApimaticConfigContext', () => {
       });
 
       it('creates the input directory when it is not there yet', async () => {
-        fs.rmSync(buildDirectory.toString(), { recursive: true });
+        fs.rmSync(sourceDirectory.toString(), { recursive: true });
 
         expect((await context.merge(['portal'], (document) => document.with('portal', { title: 'Calc' }))).isOk()).to.be
           .true;

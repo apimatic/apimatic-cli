@@ -24,20 +24,20 @@ export class GenerateAction {
   }
 
   public readonly execute = async (
-    buildDirectory: DirectoryPath,
+    sourceDirectory: DirectoryPath,
     portalDirectory: DirectoryPath,
     force: boolean,
     zipPortal: boolean
   ): Promise<ActionResult> => {
-    if (buildDirectory.isEqual(portalDirectory)) {
+    if (sourceDirectory.isEqual(portalDirectory)) {
       this.prompts.directoryCannotBeSame(portalDirectory);
       return ActionResult.failed();
     }
 
     // The destination is emptied before the site is written, so a destination that holds
-    // the build directory would delete the very files being built from.
-    if (portalDirectory.contains(buildDirectory)) {
-      this.prompts.destinationContainsBuildDirectory(buildDirectory, portalDirectory);
+    // the source would delete the very files being built from.
+    if (portalDirectory.contains(sourceDirectory)) {
+      this.prompts.destinationContainsSource(sourceDirectory, portalDirectory);
       return ActionResult.failed();
     }
 
@@ -60,7 +60,7 @@ export class GenerateAction {
     const portalContext = new PortalContext(portalDirectory);
 
     return await new PreparePortalProjectAction(this.configDir, this.commandMetadata, this.authKey).execute(
-      buildDirectory,
+      sourceDirectory,
       async (project) => {
         if (!force && (await portalContext.exists()) && !(await this.prompts.overwritePortal(portalDirectory))) {
           this.prompts.portalDirectoryNotEmpty();

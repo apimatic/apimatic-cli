@@ -4,8 +4,8 @@ import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { FileName } from '../../types/file/fileName.js';
 import { ActionResult } from '../action-result.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
-import { PortalBuildDirectoryContext } from '../../types/portal-build-directory-context.js';
-import { PortalBuildDirectoryContents } from '../../types/portal/portal-build-directory.js';
+import { PortalSourceContext } from '../../types/portal-source-context.js';
+import { PortalSource } from '../../types/portal/portal-source.js';
 import { PreviewConfig } from '../../types/portal/preview-config.js';
 import { FileWatch, FileWatchService } from '../../infrastructure/file-watch-service.js';
 import { NetworkService } from '../../infrastructure/network-service.js';
@@ -37,7 +37,7 @@ export class PortalServeAction {
   }
 
   public readonly execute = async (
-    buildDirectory: DirectoryPath,
+    sourceDirectory: DirectoryPath,
     port: number,
     openInBrowser: boolean
   ): Promise<ActionResult> => {
@@ -65,8 +65,8 @@ export class PortalServeAction {
     }
 
     return await new PreparePortalProjectAction(this.configDir, this.commandMetadata, this.authKey).execute(
-      buildDirectory,
-      async (project, contents) => {
+      sourceDirectory,
+      async (project, source) => {
         const server = await this.prompts.startPreview(this.devServerService.start(project, servePort));
 
         if (server.isErr()) {
@@ -74,12 +74,12 @@ export class PortalServeAction {
           return ActionResult.failed();
         }
 
-        this.prompts.portalServed(server.value.url, buildDirectory);
+        this.prompts.portalServed(server.value.url, sourceDirectory);
         if (openInBrowser) {
           await this.launcherService.openUrlInBrowser(server.value.url);
         }
 
-        const configWatch = this.watchConfig(contents, project.projectDirectory, buildDirectory);
+        const configWatch = this.watchConfig(source, project.projectDirectory, sourceDirectory);
 
         this.clearStandardInput();
 
@@ -113,25 +113,25 @@ export class PortalServeAction {
    * generate` would report it, and the preview keeps what it last accepted.
    */
   private watchConfig(
-    contents: PortalBuildDirectoryContents,
+    source: PortalSource,
     projectDirectory: DirectoryPath,
-    buildDirectory: DirectoryPath
+    sourceDirectory: DirectoryPath
   ): FileWatch | undefined {
-    const buildDirectoryContext = new PortalBuildDirectoryContext(buildDirectory);
-    const preview = new PreviewConfig(contents.config, contents.staticDirectory !== null);
+    const sourceContext = new PortalSourceContext(sourceDirectory);
+    const preview = new PreviewConfig(source.config, source.staticDirectory !== null);
 
     const applyEdit = async () => {
-      const reloaded = await buildDirectoryContext.resolveSettings(contents.suggestedSite);
+      const reloaded = await sourceContext.resolveSettings(source.suggestedSite);
       if (reloaded.isErr()) {
         preview.refuse();
-        this.prompts.configRejected(reloaded.error, buildDirectory);
+        this.prompts.configRejected(reloaded.error, sourceDirectory);
         return;
       }
       const settings = reloaded.value;
       const { config } = settings;
 
       if (preview.staticDirectoryNotServed(config)) {
-        this.prompts.staticDirectoryNotServed(buildDirectory);
+        this.prompts.staticDirectoryNotServed(sourceDirectory);
       }
 
       const applied = await this.projectService.applyConfig(projectDirectory, settings);
@@ -156,7 +156,7 @@ export class PortalServeAction {
     };
 
     const watch = this.fileWatchService.watch(
-      buildDirectory,
+      sourceDirectory,
       new FileName(APIMATIC_CONFIG_FILE_NAME),
       reapply,
       (reason) => this.prompts.configWatchFailed(reason)

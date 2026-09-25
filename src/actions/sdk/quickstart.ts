@@ -176,7 +176,7 @@ export class SdkQuickstartAction {
         break;
       }
 
-      // Setup build directory with the spec folder
+      // Setup source directory with the spec folder
       const apimaticMetaFile = await this.prompts.downloadMetadataFile(
         this.fileDownloadService.downloadFile(this.metadataFileUrl)
       );
@@ -195,17 +195,17 @@ export class SdkQuickstartAction {
         await this.fileService.copyToDir(specPath, tempSpecDirectory);
       }
 
-      const buildDirectory = inputDirectory.join('src');
-      const specDirectory = buildDirectory.join('spec');
+      const sourceDirectory = inputDirectory.join('src');
+      const specDirectory = sourceDirectory.join('spec');
       await this.fileService.copyDirectoryContents(tempSpecDirectory, specDirectory);
 
-      const buildDirectoryStructure = await this.fileService.getDirectory(buildDirectory);
-      this.prompts.printDirectoryStructure(inputDirectory, buildDirectoryStructure);
+      const srcDirectoryStructure = await this.fileService.getDirectory(sourceDirectory);
+      this.prompts.printDirectoryStructure(inputDirectory, srcDirectoryStructure);
 
       const sdkDirectory = inputDirectory.join('sdk');
       const sdkGenerateAction = new GenerateAction(this.configDir, this.commandMetadata);
       const result = await sdkGenerateAction.execute(
-        buildDirectory,
+        sourceDirectory,
         sdkDirectory,
         language as Language,
         true,

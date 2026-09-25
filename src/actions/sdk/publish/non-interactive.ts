@@ -43,7 +43,7 @@ export class SdkPublishNonInteractiveAction {
 
     const buildContext = new BuildContext(buildDirectory);
     if (!(await buildContext.exists())) {
-      this.prompts.buildDirectoryDoesNotExist(buildDirectory);
+      this.prompts.srcDirectoryDoesNotExist(buildDirectory);
       return ActionResult.failed();
     }
 
@@ -114,9 +114,7 @@ export class SdkPublishNonInteractiveAction {
       publishType: publishTypes,
       codegenOption
     });
-    const outputDir = dryRun
-      ? await this.fileService.getAvailableDirectoryPath(getDownloadsDirectory('apimatic-sdk'))
-      : sdkDirectory;
+    const outputDir = dryRun ? await this.fileService.getAvailableDirectoryPath(getDownloadsDirectory('apimatic-sdk')) : sdkDirectory;
     const publishResult = await new SdkPublishAction(this.configDir, this.commandMetadata).execute(
       buildDirectory,
       outputDir,

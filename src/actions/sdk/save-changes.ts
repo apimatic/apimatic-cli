@@ -1,11 +1,11 @@
-import { DirectoryPath } from '../../types/file/directoryPath.js';
-import { ActionResult } from '../action-result.js';
-import { withDirPath } from '../../infrastructure/tmp-extensions.js';
-import { Language } from '../../types/sdk/generate.js';
-import { SaveChangesPrompts } from '../../prompts/sdk/save-changes.js';
-import { SaveChangesContext } from '../../types/save-changes-context.js';
-import { BuildContext } from '../../types/build-context.js';
-import { LauncherService } from '../../infrastructure/launcher-service.js';
+import { DirectoryPath } from "../../types/file/directoryPath.js";
+import { ActionResult } from "../action-result.js";
+import { withDirPath } from "../../infrastructure/tmp-extensions.js";
+import { Language } from "../../types/sdk/generate.js";
+import { SaveChangesPrompts } from "../../prompts/sdk/save-changes.js";
+import { SaveChangesContext } from "../../types/save-changes-context.js";
+import { BuildContext } from "../../types/build-context.js";
+import { LauncherService } from "../../infrastructure/launcher-service.js";
 
 export class SaveChangesAction {
   private readonly prompts = new SaveChangesPrompts();
@@ -20,12 +20,12 @@ export class SaveChangesAction {
   ): Promise<ActionResult> => {
     const rootBuildContext = new BuildContext(buildDirectory);
     if (!(await rootBuildContext.exists())) {
-      this.prompts.buildDirectoryEmpty(buildDirectory);
+      this.prompts.srcDirectoryEmpty(buildDirectory);
       return ActionResult.failed();
     }
 
     const versionedContextGetter = async () => {
-      if (!(await rootBuildContext.isVersionedBuild())) {
+      if (!await rootBuildContext.isVersionedBuild()) {
         if (apiVersion) this.prompts.apiVersionOnlyApplicableWithVersionedBuild();
         return { version: undefined, buildContext: rootBuildContext };
       }
@@ -57,7 +57,7 @@ export class SaveChangesAction {
         buildContext: new BuildContext(selectedVersionedBuildDirectory)
       };
     };
-
+    
     const versionedContext = await versionedContextGetter();
     if (versionedContext instanceof ActionResult) {
       return versionedContext;
@@ -92,7 +92,7 @@ export class SaveChangesAction {
 
       this.prompts.modifiedFilesDetected(updatedFilesDirectory);
 
-      if (!(await this.prompts.confirmReviewChanges())) {
+      if (!await this.prompts.confirmReviewChanges()) {
         await saveChangesContext.saveSourceTree();
         this.prompts.changesSaved(sdkSourceTree);
         return ActionResult.success();
@@ -101,7 +101,7 @@ export class SaveChangesAction {
       if (await this.launcherService.isIdeAvailable()) {
         this.prompts.openingDirectoryToReviewChanges();
         const nonDeletedFilesDirectory = await updatedFilesDirectory.mapFilesInDirectory(async (_, fileItem) => {
-          return fileItem.description === '# Deleted' ? undefined : fileItem;
+          return fileItem.description === "# Deleted" ? undefined : fileItem;
         });
         await this.launcherService.openFolderInIdeWithWait(sdkReviewDirectory, nonDeletedFilesDirectory.getAllFiles());
       } else {
@@ -114,7 +114,7 @@ export class SaveChangesAction {
         await saveChangesContext.cleanUpSdkReviewDirectory(() => this.prompts.directoryStillOpen(sdkReviewDirectory));
         return ActionResult.success();
       }
-
+      
       this.prompts.operationCancelled();
       return ActionResult.cancelled();
     });

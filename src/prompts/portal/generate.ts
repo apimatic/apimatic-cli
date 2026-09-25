@@ -46,10 +46,10 @@ export class PortalGeneratePrompts {
     log.error('Please enter a different destination folder or remove the existing files and try again.');
   }
 
-  public destinationContainsBuildDirectory(buildDirectory: DirectoryPath, portalDirectory: DirectoryPath) {
+  public destinationContainsSource(sourceDirectory: DirectoryPath, portalDirectory: DirectoryPath) {
     const message =
       `The destination ${f.path(portalDirectory)} contains your source directory ` +
-      `${f.path(buildDirectory)}, and everything in the destination is replaced by the ` +
+      `${f.path(sourceDirectory)}, and everything in the destination is replaced by the ` +
       `generated portal. Choose a destination outside it, such as ` +
       `${f.flag('destination', './portal')}.`;
     log.error(message);
