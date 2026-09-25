@@ -8,6 +8,7 @@ describe('PortalNavigation', () => {
     isTopLevel: false,
     isApiDirectory: false,
     becomesFolder: true,
+    servesHomePage: false,
     childNames: ['index', 'authentication', 'guides'],
     ...overrides
   });
@@ -297,6 +298,16 @@ describe('PortalNavigation', () => {
     it('makes a folder directly under the content root a tab', () => {
       expect(rootErrors(true, tutorials)._unsafeUnwrap().isTab).to.be.true;
       expect(rootErrors(false, tutorials)._unsafeUnwrap().isTab).to.be.false;
+    });
+
+    // The home page belongs to the Home tab, which opens on it.
+    it('refuses to make a tab of a folder that serves the home page', () => {
+      const start = { ...tutorials, label: 'content/(start)/nav.json', servesHomePage: true };
+
+      expect(rootErrors(true, start)._unsafeUnwrapErr()).to.deep.equal([
+        "content/(start)/nav.json: 'root' makes a folder a tab of its own, but a page in it is served at '/', " +
+          'the home page, which the Home tab holds. Move the page out of the folder, or remove the setting.'
+      ]);
     });
 
     it('answers that the API reference is a tab without the setting', () => {

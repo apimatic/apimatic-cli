@@ -88,6 +88,8 @@ interface ContentPage {
 interface DirectoryScan {
   /** Whether a page sits anywhere beneath it, which is what makes it a folder in the sidebar. */
   holdsPage: boolean;
+  /** Whether a page beneath it is served at its own address: its index page, or a `(group)`'s. */
+  servesOwnAddress: boolean;
   errors: string[];
 }
 
@@ -358,6 +360,7 @@ export class PortalSourceContext {
       const pageNames = new Set<string>();
       const childErrors: string[] = [];
       let holdsPage = false;
+      let groupServesOwnAddress = false;
       let navigationFile: FileName | undefined;
       let indexPage: FilePath | undefined;
 
@@ -369,6 +372,9 @@ export class PortalSourceContext {
           const isApiChild = isContentRoot && item.directoryPath.leafName() === API_REFERENCE_NAME;
           const child = await visit(item, false, isApiChild, isContentRoot);
           childErrors.push(...child.errors);
+          if (child.servesOwnAddress && GROUP_FOLDER.test(item.directoryPath.leafName())) {
+            groupServesOwnAddress = true;
+          }
           if (child.holdsPage) {
             holdsPage = true;
             // The reference's own directory is listed below instead: it is a child of the
@@ -424,6 +430,7 @@ export class PortalSourceContext {
         }
       }
 
+      const servesOwnAddress = indexPage !== undefined || groupServesOwnAddress;
       const errors: string[] = [];
       let navigation: CheckedNavigation | undefined;
       if (navigationFile !== undefined) {
@@ -449,6 +456,7 @@ export class PortalSourceContext {
             isTopLevel,
             isApiDirectory,
             becomesFolder,
+            servesHomePage: isTopLevel && servesOwnAddress && GROUP_FOLDER.test(directory.directoryPath.leafName()),
             childNames
           });
           if (checked.isErr()) {
@@ -464,7 +472,7 @@ export class PortalSourceContext {
         tabs.push(tab);
       }
 
-      return { holdsPage, errors: [...errors, ...childErrors] };
+      return { holdsPage, servesOwnAddress, errors: [...errors, ...childErrors] };
     };
 
     const root = await visit(contentTree, true, false, false);

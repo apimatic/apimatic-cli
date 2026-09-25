@@ -533,6 +533,7 @@ describe('navigationTransformer', () => {
         isTopLevel: false,
         isApiDirectory: false,
         becomesFolder: true,
+        servesHomePage: false,
         childNames: ['index', 'authentication']
       }).isOk();
 

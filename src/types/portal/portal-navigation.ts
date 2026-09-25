@@ -49,6 +49,8 @@ export interface NavigationContext {
    * `nav.json`, so a title here would name nothing.
    */
   becomesFolder: boolean;
+  /** Whether a page in or below it is served at `/`, which only one in a `(group)` folder can be. */
+  servesHomePage: boolean;
   /** Pages and subfolders in the same directory; page names carry no extension. */
   childNames: string[];
 }
@@ -297,6 +299,12 @@ export class PortalNavigation {
           `Add a page, or remove the setting.`
       ];
     }
+    if (context.servesHomePage) {
+      return [
+        `${setting}, but a page in it is served at '/', the home page, which the Home tab holds. ` +
+          `Move the page out of the folder, or remove the setting.`
+      ];
+    }
     if (typeof root !== 'boolean') {
       return [`${context.label}: 'root' must be true or false.`];
     }
@@ -308,7 +316,7 @@ export class PortalNavigation {
   }
 
   private static mayBeTab(context: NavigationContext): boolean {
-    return context.isTopLevel && !context.isApiDirectory && context.becomesFolder;
+    return context.isTopLevel && !context.isApiDirectory && context.becomesFolder && !context.servesHomePage;
   }
 
   private static describeUnknownField(field: string, context: NavigationContext): string {

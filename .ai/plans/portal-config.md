@@ -70,7 +70,7 @@ Delivered as **one PR** (section 11).
 | Content tabs | A folder directly under `content/` becomes its own tab when its own `nav.json` sets `"root": true` — Fumadocs' own key for the same thing. Otherwise it stays a group in the Guides sidebar. *(Amended 2026-09-25: in the Home tab's sidebar, section 5.)* |
 | Tab labels | Fixed for the three tabs no folder backs: "Home", "Guides", "SDKs". A folder tab takes its `nav.json` `title`, then its index page's title, then the folder name; the API tab takes `content/api/nav.json`'s `title`, then a `content/api/index` page, then "API Reference" — both as `dev` already does. Only root-level tabs are affected; nothing nested changes. *(Amended 2026-09-24: SDKs is now a generated folder rather than a tab no folder backs, and "Context Plugin" joins it; both labels stay fixed, set by the generated folders' `nav.json` titles. `.ai/plans/generated-pages.md`.)* *(Amended 2026-09-25: there is no Guides tab, and the root `nav.json` `title` renames Home, section 5.)* |
 | Tokens | `apimatic:api` stays and places the API tab. `apimatic:pages` is renamed `apimatic:sdks` and places the SDKs tab; the old name is reported as an unknown entry. A later AI section gets its own token rather than sharing a group, because each generated section is its own tab. *(Amended 2026-09-24: `apimatic:plugin` places the Context Plugin tab, a generated section given its own token by this rule; the AI section is still to come.)* |
-| Home | `content/index.md` rendered in the docs layout, in its own Home tab. The Home tab is first unless the root `nav.json` names `index` explicitly, in which case it sits where `index` sits. *(Amended 2026-09-25: Home also holds every page and folder that is no tab of its own, the index page first.)* |
+| Home | `content/index.md` rendered in the docs layout, in its own Home tab. The Home tab is first unless the root `nav.json` names `index` explicitly, in which case it sits where `index` sits. *(Amended 2026-09-25: Home also holds every page and folder that is no tab of its own, in the file's order, and opens on the home page.)* |
 | `languages` | The shared top-level block `sdk publish` writes. Required for the portal: at least one entry, each keyed by a `Language` enum value and holding an object. Its `publishing` record (#350) is optional: an entry without one is a language that is wanted but not yet published, and counts. An unknown language key is an error on the portal path (the plugin path stays lenient and preserves it). |
 | Layout | Fumadocs' notebook layout with the tabs in the header, fixed (section 15). |
 | Primary colour | Overrides `--color-fd-primary`, a contrast-picked `--color-fd-primary-foreground`, and `--color-fd-ring`. Fumadocs' neutral theme supplies every other token (section 15). |
@@ -278,13 +278,16 @@ API, and the unnamed sections keep that order before the API.
 folder called `guides/` sat inside the Guides tab as Guides › Guides, giving it
 `"root": true` made two tabs named Guides, the Guides tab opened on whichever
 loose page came first, and Home held a single page. Now the index page and
-every other loose node make up Home, which lists the node serving `/` first --
-the index page, a `(group)` folder holding one, or the fallback node -- so the
-tab opens on the home page. The root `nav.json`'s `title`, refused until now,
-names the tab, and "Home" does otherwise; the tree itself is still not renamed.
-Home keeps its placement rule, the other rows of the table are unchanged, and
-`/tab/home` is the only fixed id left. No `nav.json` at all gives Home, SDKs,
-Context Plugin, API.
+every other loose node make up Home, in the order the root `nav.json` gives,
+and the tab opens on the home page wherever it sits (`src/lib/tabs.ts`); the
+fallback node, when there is no index page, leads. A top-level folder that
+serves `/` -- a `(group)` folder's index page -- is never a tab, so Home always
+holds the home page: the CLI refuses `"root": true` there and the template
+ignores it. The root `nav.json`'s `title`, refused until now, names the tab,
+and "Home" does otherwise; the tree itself is still not renamed. Home keeps its
+placement rule, the other rows of the table are unchanged, and `/tab/home` is
+the only fixed id left. No `nav.json` at all gives Home, SDKs, Context Plugin,
+API.
 
 ### Mechanism
 

@@ -148,11 +148,10 @@ describe('tabsTransformer', () => {
     expect(tabNames({ docs, openapi: API })).to.deep.equal(['API Reference', 'Home']);
   });
 
-  // The tab opens on its first page, which has to be the home page for the tab to be Home.
-  it('lists the index page first in Home, wherever the file puts it', () => {
+  it('keeps the order the file gives in Home, and opens Home on the home page wherever it sits', () => {
     const docs = [...CONTENT, meta('nav.json', { pages: ['authentication', 'index'] })];
 
-    expect(tabsOf({ docs }).Home).to.deep.equal(['Welcome', 'Authentication']);
+    expect(tabsOf({ docs }).Home).to.deep.equal(['Authentication', 'Welcome']);
     expect(portalTabs(treeOf({ docs }))[0]).to.include({ title: 'Home', url: '/' });
   });
 
@@ -397,18 +396,31 @@ describe('tabsTransformer', () => {
     });
 
     // The same URL may appear only once in a page tree.
-    it('opens on a folder that serves the home page, with no node of its own', () => {
+    it('opens on the home page a `(group)` folder serves, with no node of its own', () => {
       const docs = [page('(start)/index.mdx', 'Welcome'), page('authentication.mdx', 'Authentication')];
-      const ids = flattenTree(treeOf({ docs }).children).map((node) => node.$id);
+      const tree = treeOf({ docs });
 
-      expect(tabsOf({ docs })).to.deep.equal({ Home: ['Welcome', 'Authentication'] });
-      expect(ids).to.not.include('/page/home');
+      expect(tabsOf({ docs })).to.deep.equal({ Home: ['Authentication', 'Welcome'] });
+      expect(flattenTree(tree.children).map((node) => node.$id)).to.not.include('/page/home');
+      expect(portalTabs(tree)[0]).to.include({ title: 'Home', url: '/' });
     });
 
-    it('is not made when a tab of its own serves the home page and nothing else is loose', () => {
-      const docs = [page('(start)/index.mdx', 'Welcome'), meta('(start)/nav.json', { title: 'Start', root: true })];
+    it('opens on the home page however deep in `(group)` folders it sits', () => {
+      const docs = [page('(start)/a.mdx', 'A'), page('(start)/(inner)/index.mdx', 'Welcome')];
 
-      expect(tabNames({ docs, openapi: API })).to.deep.equal(['Start', 'API Reference']);
+      expect(portalTabs(treeOf({ docs }))[0]).to.include({ title: 'Home', url: '/' });
+    });
+
+    // The CLI refuses the setting, since the home page is the Home tab's.
+    it('keeps a folder that serves the home page, whatever its nav.json says', () => {
+      const docs = [
+        page('(start)/index.mdx', 'Welcome'),
+        meta('(start)/nav.json', { title: 'Start', root: true }),
+        page('authentication.mdx', 'Authentication')
+      ];
+
+      expect(tabsOf({ docs, openapi: API })).to.deep.include({ Home: ['Authentication', 'Start'] });
+      expect(tabNames({ docs, openapi: API })).to.deep.equal(['Home', 'API Reference']);
     });
   });
 
@@ -498,6 +510,14 @@ describe('portalTabs', () => {
     );
 
     expect(portalTabs({ name: 'Docs', children: [tutorials] })[0].url).to.equal('/deep-home');
+  });
+
+  it('opens a tab that holds the home page on it, wherever it is listed', () => {
+    const home = folder('Home', [pageNode('/authentication'), folder('Start', [pageNode('/a'), pageNode('/')])], {
+      root: true
+    });
+
+    expect(portalTabs({ name: 'Docs', children: [home] })[0].url).to.equal('/');
   });
 
   it('passes over a link that leaves the portal', () => {

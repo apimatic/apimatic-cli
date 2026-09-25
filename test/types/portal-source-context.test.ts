@@ -955,6 +955,24 @@ describe('PortalSourceContext', () => {
       expect(errors).to.deep.equal(["content/nav.json: 'guides' is not a page or folder in this directory."]);
     });
 
+    it('refuses to make a tab of a (group) folder that serves the home page, however deep', async () => {
+      fs.rmSync(path.join(root, 'content/index.md'));
+      write('content/(start)/(welcome)/index.md', '# Welcome');
+      write('content/(start)/nav.json', JSON.stringify({ root: true }));
+
+      const errors = navigationErrors((await resolve())._unsafeUnwrapErr());
+
+      expect(errors).to.have.lengthOf(1);
+      expect(errors[0]).to.match(/^content\/\(start\)\/nav\.json: 'root' makes a folder a tab of its own, but a page/);
+    });
+
+    it('makes a tab of a (group) folder that does not serve the home page', async () => {
+      write('content/(start)/intro/index.md', '# Intro');
+      write('content/(start)/nav.json', JSON.stringify({ root: true }));
+
+      expect((await resolve()).isOk()).to.be.true;
+    });
+
     it('accepts a directory whose pages are nested below it', async () => {
       write('content/guides/deep/intro.md', '# Intro');
       write('content/nav.json', JSON.stringify({ pages: ['index', 'guides'] }));

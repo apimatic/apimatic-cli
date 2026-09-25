@@ -1,3 +1,4 @@
+import type * as PageTree from 'fumadocs-core/page-tree';
 import { createGetUrl } from 'fumadocs-core/source';
 
 export const docsRoute = '/';
@@ -10,6 +11,16 @@ export const docsRoute = '/';
 export const apiBaseDir = 'api';
 
 const getDocsUrl = createGetUrl(docsRoute);
+
+/** Whether a page at `url` sits among these nodes, at any depth. */
+export function containsUrl(nodes: PageTree.Node[], url: string): boolean {
+  return nodes.some((node) => {
+    if (node.type === 'page') {
+      return node.url === url;
+    }
+    return node.type === 'folder' && (node.index?.url === url || containsUrl(node.children, url));
+  });
+}
 
 export function getPageMarkdownUrl(page: { slugs: string[]; locale?: string }) {
   const segments = [...page.slugs];

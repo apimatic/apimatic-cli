@@ -1,7 +1,7 @@
 import { PathUtils } from 'fumadocs-core/source';
 import type { ContentStorage, PageTreeTransformer } from 'fumadocs-core/source';
 import type { Folder, Node } from 'fumadocs-core/page-tree';
-import { apiBaseDir, docsRoute } from './shared';
+import { apiBaseDir, containsUrl, docsRoute } from './shared';
 
 /**
  * Only what this file needs of the builder context. `loader()` infers a storage type from
@@ -45,18 +45,13 @@ const API_REFERENCE_TITLE = 'API Reference';
 /** Where the home page is served, which is how its node is told apart from every other page. */
 const HOME_URL = docsRoute;
 
-/**
- * The id of the one tab no folder backs, which the transformer assembles from the loose nodes.
- * It is fixed: React keys and the tree context's tab matching both go by id, and the tree is
- * serialised and rebuilt on its way to the browser. Fumadocs ids a node by its path relative to
- * the content directory, which never starts with a slash, so no directory can take it.
- */
+/** Fixed, as tab matching goes by id after serialisation; Fumadocs' ids never start with a slash. */
 const HOME_TAB_ID = '/tab/home';
 
 /** The Home tab's name when the root `nav.json` gives none, and the fallback home page's. */
 const HOME_NAME = 'Home';
 
-/** The node the fallback home page gets when there is no index page; see `withHomePageFirst`. */
+/** The node the fallback home page gets when there is no index page; see `withFallbackHomePage`. */
 const SYNTHETIC_HOME_ID = '/page/home';
 
 /**
@@ -124,7 +119,8 @@ export function navigationTransformer<S extends ContentStorage>(): PageTreeTrans
  *
  * Fumadocs never reads `root` itself: it takes a folder's metadata from `meta.json`, which the
  * content collection does not load. So only this decides which folders become tabs, which is
- * also what keeps a `root` the CLI refuses, on a nested folder or the reference, from making one.
+ * also what keeps a `root` the CLI refuses -- on a nested folder, the reference, or a folder that
+ * serves the home page -- from making one.
  */
 export function tabsTransformer<S extends ContentStorage>(): PageTreeTransformer<S> {
   return {
@@ -168,7 +164,13 @@ function readSettings(context: NavigationContext, folderPath: string): Navigatio
 
 function isTabFolder(context: NavigationContext, folder: Folder): boolean {
   const folderPath = folder.$ref?.folder;
-  return folderPath !== undefined && folderPath !== apiBaseDir && readSettings(context, folderPath)?.root === true;
+  return (
+    folderPath !== undefined &&
+    folderPath !== apiBaseDir &&
+    readSettings(context, folderPath)?.root === true &&
+    // The home page is the Home tab's, whichever `(group)` folder serves it.
+    !containsUrl([folder], HOME_URL)
+  );
 }
 
 function groupIntoTabs(context: NavigationContext, children: Node[]): Node[] {
@@ -198,18 +200,13 @@ function groupIntoTabs(context: NavigationContext, children: Node[]): Node[] {
     delete tab.$ref;
   }
 
-  const homeChildren = withHomePageFirst(loose, children);
-  if (homeChildren.length === 0) {
-    return tabs;
-  }
-
   const settings = readSettings(context, '');
   const home: Folder = {
     type: 'folder',
     $id: HOME_TAB_ID,
     name: settings?.title ?? HOME_NAME,
     root: true,
-    children: homeChildren
+    children: withFallbackHomePage(loose)
   };
   // The home page opens the site, so its tab leads unless the file placed the page itself --
   // which it can only do when there is an index page: without one, an `index` entry names a
@@ -218,18 +215,9 @@ function groupIntoTabs(context: NavigationContext, children: Node[]): Node[] {
   return [...tabs.slice(0, at), home, ...tabs.slice(at)];
 }
 
-/**
- * The loose nodes with the one that serves the home page first, so the tab opens on it. A
- * project without an index page still gets a home page, rendered by the route, and a node here
- * to reach it -- unless a tab of its own serves the address, since the same URL may appear only
- * once in the tree.
- */
-function withHomePageFirst(loose: Node[], children: Node[]): Node[] {
-  const holder = loose.find((node) => containsUrl([node], HOME_URL));
-  if (holder !== undefined) {
-    return [holder, ...loose.filter((node) => node !== holder)];
-  }
-  if (containsUrl(children, HOME_URL)) {
+/** Without an index page the route still renders a home page, which needs a node to be in a tab. */
+function withFallbackHomePage(loose: Node[]): Node[] {
+  if (containsUrl(loose, HOME_URL)) {
     return loose;
   }
   return [{ type: 'page', $id: SYNTHETIC_HOME_ID, name: HOME_NAME, url: HOME_URL }, ...loose];
@@ -251,15 +239,6 @@ function asTab(folder: Folder): Folder {
 
 function namesIndex(settings: NavigationSettings | undefined): boolean {
   return settings?.pages?.some((entry) => entry.trim() === INDEX_STEM) ?? false;
-}
-
-function containsUrl(nodes: Node[], url: string): boolean {
-  return nodes.some((node) => {
-    if (node.type === 'page') {
-      return node.url === url;
-    }
-    return node.type === 'folder' && (node.index?.url === url || containsUrl(node.children, url));
-  });
 }
 
 /**
