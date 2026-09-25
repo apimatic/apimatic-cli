@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import path from 'node:path';
 import { err, ok, Result } from 'neverthrow';
 import { DirectoryPath } from '../types/file/directoryPath.js';
 import { FileName } from '../types/file/fileName.js';
@@ -25,6 +26,9 @@ export interface FileWatch {
   close(): Promise<void>;
 }
 
+/** Starts the platform's watch, reporting each event through `notify`; answers with what stops it. */
+type StartWatch = (notify: () => void, fail: (error: unknown) => void) => () => void;
+
 export class FileWatchService {
   /**
    * Calls `onChange` once each save of the file has settled, and never twice at once. Saves
@@ -40,83 +44,155 @@ export class FileWatchService {
     onChange: () => Promise<void>,
     onFailed: (reason: string) => void
   ): Result<FileWatch, string> {
-    // Some platforms leave the name out of an event; one without it may be this file.
-    const isWatched = (changed: string | null) => changed === null || fileName.is(changed);
-    return this.watchDirectory(directory, false, isWatched, onChange, onFailed);
+    return settledWatch(onChange, onFailed, (notify, fail) => {
+      const watcher = fs.watch(realPath(directory), (_event, changed) => {
+        // Some platforms leave the name out of an event; one without it may be this file.
+        if (changed === null || fileName.is(changed.toString())) {
+          notify();
+        }
+      });
+      watcher.on('error', fail);
+      return () => watcher.close();
+    });
   }
 
   /** As `watch`, for a save of any file at any depth below `directory`. */
   public watchTree(
     directory: DirectoryPath,
     onChange: () => Promise<void>,
-    onFailed: (reason: string) => void
+    onFailed: (reason: string) => void,
+    platform: NodeJS.Platform = process.platform
   ): Result<FileWatch, string> {
-    return this.watchDirectory(directory, true, () => true, onChange, onFailed);
+    return settledWatch(onChange, onFailed, (notify, fail) => {
+      const root = realPath(directory);
+      // Node watches a tree natively only here; elsewhere it watches each file, and loses one
+      // that an editor saves by renaming a new file over it.
+      if (platform === 'win32' || platform === 'darwin') {
+        const watcher = fs.watch(root, { recursive: true }, notify);
+        watcher.on('error', fail);
+        return () => watcher.close();
+      }
+      return watchEachDirectory(root, notify, fail);
+    });
+  }
+}
+
+// On Windows, libuv aborts the whole process at the first event under a directory named by
+// its 8.3 short name, as a TEMP of C:\Users\RUNNER~1\... is, so the real path is watched.
+function realPath(directory: DirectoryPath): string {
+  return fs.realpathSync.native(directory.toString());
+}
+
+function settledWatch(
+  onChange: () => Promise<void>,
+  onFailed: (reason: string) => void,
+  start: StartWatch
+): Result<FileWatch, string> {
+  let stop: () => void = () => undefined;
+  let timer: NodeJS.Timeout | undefined;
+  let closed = false;
+  let waiting = false;
+  let running: Promise<void> = Promise.resolve();
+
+  const report = () => {
+    timer = undefined;
+    if (waiting) {
+      return;
+    }
+    waiting = true;
+    running = running.then(async () => {
+      waiting = false;
+      if (!closed) {
+        await onChange().catch(() => undefined);
+      }
+    });
+  };
+  const notify = () => {
+    if (closed) {
+      return;
+    }
+    clearTimeout(timer);
+    timer = setTimeout(report, SETTLE_MS);
+  };
+  const fail = (error: unknown) => {
+    if (closed) {
+      return;
+    }
+    closed = true;
+    clearTimeout(timer);
+    stop();
+    onFailed(errorMessage(error));
+  };
+
+  try {
+    stop = start(notify, fail);
+  } catch (error) {
+    return err(errorMessage(error));
   }
 
-  private watchDirectory(
-    directory: DirectoryPath,
-    recursive: boolean,
-    isWatched: (changed: string | null) => boolean,
-    onChange: () => Promise<void>,
-    onFailed: (reason: string) => void
-  ): Result<FileWatch, string> {
-    let watcher: fs.FSWatcher;
-    let timer: NodeJS.Timeout | undefined;
-    let closed = false;
-    let waiting = false;
-    let running: Promise<void> = Promise.resolve();
-
-    const report = () => {
-      timer = undefined;
-      if (waiting) {
-        return;
+  return ok({
+    recheck: () => {
+      if (!closed) {
+        report();
       }
-      waiting = true;
-      running = running.then(async () => {
-        waiting = false;
-        if (!closed) {
-          await onChange().catch(() => undefined);
-        }
-      });
-    };
-
-    try {
-      // On Windows, libuv aborts the whole process at the first event under a directory named by
-      // its 8.3 short name, as a TEMP of C:\Users\RUNNER~1\... is, so the real path is watched.
-      const watched = fs.realpathSync.native(directory.toString());
-      watcher = fs.watch(watched, { recursive }, (_event, changed) => {
-        if (closed || !isWatched(changed === null ? null : changed.toString())) {
-          return;
-        }
-        clearTimeout(timer);
-        timer = setTimeout(report, SETTLE_MS);
-      });
-    } catch (error) {
-      return err(errorMessage(error));
-    }
-    watcher.on('error', (error) => {
-      if (closed) {
-        return;
-      }
+    },
+    close: async () => {
       closed = true;
       clearTimeout(timer);
-      watcher.close();
-      onFailed(errorMessage(error));
-    });
+      stop();
+      await running;
+    }
+  });
+}
 
-    return ok({
-      recheck: () => {
-        if (!closed) {
-          report();
+/**
+ * One watch per directory, as `watch` keeps on its one: a directory's watch hears a file renamed
+ * over another in it. A directory made later is watched once its parent reports it, and the
+ * watch of one taken away is closed, since Windows would otherwise report it without end.
+ */
+function watchEachDirectory(root: string, notify: () => void, fail: (error: unknown) => void): () => void {
+  const watchers = new Map<string, fs.FSWatcher>();
+
+  const unwatch = (directory: string) => {
+    watchers.get(directory)?.close();
+    watchers.delete(directory);
+  };
+
+  const watchDirectory = (directory: string) => {
+    const watcher = fs.watch(directory, (_event, changed) => {
+      try {
+        if (!fs.existsSync(directory)) {
+          unwatch(directory);
+        } else if (changed !== null) {
+          watchTreeBelow(path.join(directory, changed.toString()));
         }
-      },
-      close: async () => {
-        closed = true;
-        clearTimeout(timer);
-        watcher.close();
-        await running;
+      } catch (error) {
+        fail(error);
+        return;
       }
+      notify();
     });
+    watcher.on('error', (error) => (directory === root ? fail(error) : unwatch(directory)));
+    watchers.set(directory, watcher);
+  };
+
+  const watchTreeBelow = (directory: string) => {
+    if (watchers.has(directory) || !fs.lstatSync(directory, { throwIfNoEntry: false })?.isDirectory()) {
+      return;
+    }
+    watchDirectory(directory);
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+      if (entry.isDirectory()) {
+        watchTreeBelow(path.join(directory, entry.name));
+      }
+    }
+  };
+
+  try {
+    watchTreeBelow(root);
+  } catch (error) {
+    [...watchers.keys()].forEach(unwatch);
+    throw error;
   }
+  return () => [...watchers.keys()].forEach(unwatch);
 }

@@ -94,14 +94,14 @@ export class PortalServeAction {
           const interrupted = this.prompts.blockExecution().then(() => ({ kind: 'interrupted' as const }));
           const stopped = server.value.exited.then((output) => ({ kind: 'exited' as const, output }));
           const outcome = await Promise.race([interrupted, stopped]);
+          // First, so a save still being handled is not reported after the preview says it stops.
+          await closeWatches();
 
           if (outcome.kind === 'exited') {
             this.prompts.previewStopped(outcome.output);
             return ActionResult.failed();
           }
 
-          // First, so a save still being handled is not reported after the preview says it stops.
-          await closeWatches();
           this.prompts.stopping();
           await server.value.stop();
           return ActionResult.stopped();
@@ -197,8 +197,16 @@ export class PortalServeAction {
         this.prompts.contentAccepted(sourceDirectory);
       }
     };
+    // As for `apimatic.json`: the watch drops whatever its handler throws.
+    const onSave = async () => {
+      try {
+        await check();
+      } catch (error) {
+        this.prompts.contentNotChecked(errorMessage(error), sourceDirectory);
+      }
+    };
 
-    const watch = this.fileWatchService.watchTree(source.contentDirectory, check, (reason) =>
+    const watch = this.fileWatchService.watchTree(source.contentDirectory, onSave, (reason) =>
       this.prompts.contentWatchFailed(reason, sourceDirectory)
     );
     if (watch.isErr()) {

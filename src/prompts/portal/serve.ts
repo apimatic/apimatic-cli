@@ -112,6 +112,10 @@ export class PortalServePrompts {
     );
   }
 
+  public contentNotChecked(reason: string, sourceDirectory: DirectoryPath) {
+    log.warn(`The changes to ${f.path(sourceDirectory.join('content'))} could not be checked: ${reason}`);
+  }
+
   public contentAccepted(sourceDirectory: DirectoryPath) {
     log.success(`${f.path(sourceDirectory.join('content'))} is fixed; a build would accept it again.`);
   }

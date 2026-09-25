@@ -184,15 +184,10 @@ describe('PortalServeAction', () => {
     expect(stop.called).to.be.false;
   });
 
-  /**
-   * Edits to `apimatic.json` while the preview runs. The watcher is stood in for, so a save is
-   * a call the test makes; everything behind it -- reading the file, the rules, writing the
-   * preview's files -- is the real thing, on a copy of the fixture.
-   */
   // The preview reloads the content itself; the CLI's part is saying what a build would refuse.
   describe('checking a save in the content directory', () => {
     let source: DirectoryPath;
-    let onChange: Promise<() => Promise<void>>;
+    let watched: Promise<{ onChange: () => Promise<void>; onFailed: (reason: string) => void }>;
     let closeWatch: sinon.SinonStub;
     let recheck: sinon.SinonStub;
 
@@ -202,11 +197,11 @@ describe('PortalServeAction', () => {
     /** Runs the preview until `body` is done with it, then stops it as CTRL+C would. */
     const whileServing = async (body: (save: (contents: string) => Promise<void>) => Promise<void>) => {
       const running = execute(source);
-      const check = await onChange;
+      const { onChange } = await watched;
       try {
         await body(async (contents) => {
           writeNavigation(contents);
-          await check();
+          await onChange();
         });
       } finally {
         interrupt();
@@ -220,16 +215,18 @@ describe('PortalServeAction', () => {
 
       closeWatch = sinon.stub().resolves();
       recheck = sinon.stub();
-      onChange = new Promise((resolve) => {
-        watchTree.callsFake((directory: DirectoryPath, change: () => Promise<void>) => {
-          expect(directory.toString()).to.equal(source.join('content').toString());
-          resolve(change);
-          return ok({ close: closeWatch, recheck });
-        });
+      watched = new Promise((resolve) => {
+        watchTree.callsFake(
+          (directory: DirectoryPath, onChange: () => Promise<void>, onFailed: (reason: string) => void) => {
+            expect(directory.toString()).to.equal(source.join('content').toString());
+            resolve({ onChange, onFailed });
+            return ok({ close: closeWatch, recheck });
+          }
+        );
       });
     });
 
-    // What `portal serve` showed before: every page a raw HTTP 500, and nothing in the terminal.
+    // The preview itself turns every page into an HTTP 500 and says nothing.
     it('reports a nav.json saved half typed, as a build would', async () => {
       await whileServing(async (save) => {
         await save('{ "pages": ["intro", ');
@@ -286,8 +283,50 @@ describe('PortalServeAction', () => {
       expect(prompts.contentNotWatched.calledOnceWith('EMFILE: too many open files')).to.be.true;
       expect(result.isCancelled()).to.be.true;
     });
+
+    it('tells the user when the content stops being watched', async () => {
+      await whileServing(async () => {
+        (await watched).onFailed('EPERM: operation not permitted');
+
+        expect(prompts.contentWatchFailed.calledOnceWith('EPERM: operation not permitted')).to.be.true;
+      });
+    });
+
+    it('says when a save could not be checked, rather than dropping it', async () => {
+      sinon.stub(PortalSourceContext.prototype, 'resolveContent').rejects(new Error('EIO: i/o error'));
+
+      await whileServing(async (save) => {
+        await save(JSON.stringify({ pages: ['intro'] }));
+
+        expect(prompts.contentNotChecked.calledOnceWith('EIO: i/o error')).to.be.true;
+      });
+    });
+
+    // A check still running would otherwise report after the terminal says the preview stopped.
+    it('stops watching before saying that the preview stopped on its own', async () => {
+      const running = execute(source);
+      await watched;
+      exit('Error: out of memory');
+
+      expect((await running).isFailed()).to.be.true;
+      expect(closeWatch.calledBefore(prompts.previewStopped)).to.be.true;
+    });
+
+    it('watches nothing when there is no content directory', async () => {
+      fs.rmSync(path.join(source.toString(), 'content'), { recursive: true });
+      interrupt();
+
+      await execute(source);
+
+      expect(watchTree.called).to.be.false;
+    });
   });
 
+  /**
+   * Edits to `apimatic.json` while the preview runs. The watcher is stood in for, so a save is
+   * a call the test makes; everything behind it -- reading the file, the rules, writing the
+   * preview's files -- is the real thing, on a copy of the fixture.
+   */
   describe('re-applying apimatic.json', () => {
     let source: DirectoryPath;
     let save: (config: object) => Promise<void>;
