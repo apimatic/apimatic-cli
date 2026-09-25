@@ -11,7 +11,7 @@ The user's `src/` directory — `apimatic.json`, `spec/`, `content/`, `static/` 
 _Avoid_: Project, workspace, source folder
 
 **Spec**:
-One OpenAPI document in `spec/`, which becomes one section of reference pages in the portal.
+One API description in `spec/`, in any format APIMatic can transform (OpenAPI 3.x, Swagger, Postman Collections, RAML, API Blueprint, etc.), which becomes one section of reference pages in the portal.
 _Avoid_: Specification file, API definition
 
 **Endpoint**:
