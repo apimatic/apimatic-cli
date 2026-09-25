@@ -7,6 +7,7 @@ import { Directory } from './file/directory.js';
 import { DirectoryPath } from './file/directoryPath.js';
 import { FileName } from './file/fileName.js';
 import { FilePath } from './file/filePath.js';
+import { NOT_FOUND_FILE_NAME, SHELL_FILE_NAME } from './portal-context.js';
 import { PLACEHOLDER_SITE, SuggestedSite } from './portal/config/site-config.js';
 import { AcceptedContent, ContentFile, ContentTree } from './portal/content-tree.js';
 import { Endpoint } from './portal/endpoint.js';
@@ -42,13 +43,13 @@ const GENERATED_ROOT_FILES = [
   'llms.txt',
   'llms-full.txt',
   'index.html',
-  '404.html',
-  '_shell.html'
+  NOT_FOUND_FILE_NAME,
+  SHELL_FILE_NAME
 ];
 
 /**
- * The `src/` directory of a portal project: the `portal` block of `apimatic.json`, the OpenAPI
- * documents in `spec/`, and the optional `content/` and `static/` directories.
+ * The source directory, as a portal run reads it: the `portal` block of `apimatic.json`, the
+ * OpenAPI documents in `spec/`, and the optional `content/` and `static/` directories.
  */
 export class PortalSourceContext {
   private readonly fileService = new FileService();

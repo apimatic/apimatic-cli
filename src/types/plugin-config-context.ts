@@ -2,6 +2,7 @@ import { Result, ResultAsync } from 'neverthrow';
 import { FileService } from '../infrastructure/file-service.js';
 import { ApimaticConfigContext, ApimaticConfigWriteFailure } from './apimatic-config-context.js';
 import { ApimaticConfigDocument, ConfigBlockName, findingClause } from './apimatic-config/document.js';
+import { isPublished, languagesOf, PluginLanguageEntry, PluginLanguages } from './apimatic-config/languages-block.js';
 import { DirectoryPath } from './file/directoryPath.js';
 import { FilePath } from './file/filePath.js';
 import {
@@ -9,18 +10,12 @@ import {
   PluginAuthor,
   PluginConfigData,
   PluginIdentityData,
-  PluginLanguageEntry,
-  PluginLanguages,
   PluginMetadata
 } from './plugin/plugin-config.js';
 import { SemVersion } from './publish/version.js';
 import { AVAILABLE_LANGUAGES, isAvailableLanguage, Language } from './sdk/generate.js';
 
 export type PluginReleaseData = { pluginId: string; version: SemVersion };
-
-/** Published means a reader can reach the SDK: a repository, a registry, or both. */
-const isPublished = (entry: PluginLanguageEntry<Language> | undefined): boolean =>
-  Boolean(entry?.publishing?.source ?? entry?.publishing?.package);
 
 export type PluginConfigState =
   | { state: 'missing' }
@@ -105,11 +100,9 @@ const recorded = (
   languages: readonly Language[],
   keep: (language: string, entry: PluginLanguageEntry<Language> | undefined) => boolean
 ): Record<string, unknown> => {
-  const existing = document.languages() ?? {};
+  const existing = languagesOf(document);
   const covered = new Set<string>(languages);
-  const kept = Object.entries(existing).filter(
-    ([language, entry]) => covered.has(language) || keep(language, entry as PluginLanguageEntry<Language>)
-  );
+  const kept = Object.entries(existing).filter(([language, entry]) => covered.has(language) || keep(language, entry));
   const added = languages.filter((language) => !(language in existing)).map((language) => [language, {}]);
 
   return Object.fromEntries([...kept, ...added]);
@@ -200,7 +193,7 @@ export class PluginConfigContext {
   private static configOf(document: ApimaticConfigDocument): PluginConfigData {
     return {
       ...(document.plugin() as PluginIdentityData | undefined),
-      languages: (document.languages() ?? {}) as PluginLanguages
+      languages: languagesOf(document)
     };
   }
 }

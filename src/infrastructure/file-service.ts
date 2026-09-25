@@ -332,10 +332,6 @@ export class FileService {
     await fsExtra.copyFile(source.toString(), source.replaceDirectory(destination).toString());
   }
 
-  public async readFile(filePath: FilePath): Promise<string> {
-    return await fsExtra.readFile(filePath.toString(), 'utf-8');
-  }
-
   public async isZipFile(filePath: FilePath): Promise<boolean> {
     try {
       const buffer = await fsExtra.readFile(filePath.toString());
@@ -349,10 +345,6 @@ export class FileService {
     } catch {
       return false;
     }
-  }
-
-  public async hasContent(file: FilePath, content: string): Promise<boolean> {
-    return (await this.fileExists(file)) && (await this.readFile(file)).includes(content);
   }
 
   public async getAvailableDirectoryPath(currentPath: DirectoryPath): Promise<DirectoryPath> {

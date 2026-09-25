@@ -1,9 +1,8 @@
 import { RecordPublishedSdkPrompts } from '../../prompts/sdk/record-published-sdk.js';
 import { ApimaticConfigContext } from '../../types/apimatic-config-context.js';
-import { ApimaticConfigDocument, ConfigBlockName, findingClause } from '../../types/apimatic-config/document.js';
+import { ConfigBlockName, findingClause } from '../../types/apimatic-config/document.js';
+import { buildLanguageEntry, languagesOf, withLanguage } from '../../types/apimatic-config/languages-block.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
-import { buildLanguageEntry } from '../../types/plugin/language-entry.js';
-import { PluginLanguageEntry, PluginLanguages } from '../../types/plugin/plugin-config.js';
 import { PublishType } from '../../types/publish-api/publishing-profile-item.js';
 import { PublishingProfile } from '../../types/publish/publishing-profile.js';
 import { SemVersion } from '../../types/publish/version.js';
@@ -12,32 +11,6 @@ import { ActionResult } from '../action-result.js';
 
 /** A publish writes where its SDK went, and nothing else in the file is its business. */
 const RECORDED_BLOCKS: readonly ConfigBlockName[] = ['languages'];
-
-const languagesOf = (document: ApimaticConfigDocument): PluginLanguages =>
-  (document.languages() ?? {}) as PluginLanguages;
-
-/**
- * What a run published is added to what the entry already holds: a package-only run leaves the
- * repository a previous source publish recorded, and the other way about.
- */
-function withLanguage<L extends Language>(
-  languages: PluginLanguages,
-  language: L,
-  entry: PluginLanguageEntry<L>
-): PluginLanguages {
-  const existingEntry = languages[language];
-  const existingPublishing = existingEntry?.publishing;
-  const publishing = entry.publishing
-    ? {
-        ...existingPublishing,
-        ...entry.publishing,
-        source: entry.publishing.source ?? existingPublishing?.source,
-        package: entry.publishing.package ?? existingPublishing?.package
-      }
-    : existingPublishing;
-
-  return { ...languages, [language]: { ...existingEntry, ...entry, ...(publishing ? { publishing } : {}) } };
-}
 
 /**
  * Callers discard the result: this runs after a publish that already succeeded, and no outcome here

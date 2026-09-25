@@ -2,7 +2,6 @@ import axios from 'axios';
 import FormData from 'form-data';
 import { err, ok, Result } from 'neverthrow';
 import { AuthInfo, getAuthInfo } from '../../client-utils/auth-manager.js';
-import { REQUEST_TIMEOUT_MS } from '../../config/axios-config.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { FileName } from '../../types/file/fileName.js';
@@ -20,24 +19,13 @@ import { discardStreamBody } from '../../utils/utils.js';
 import { envInfo } from '../env-info.js';
 import { FileService } from '../file-service.js';
 import {
-  GENERATION_TIMEOUT_MS,
+  GenerationTimings,
   pollUntilCompleted,
-  STATUS_POLL_INTERVAL_MS,
+  TIMING_DEFAULTS,
   ValidationErrorFormatter
 } from '../generation-status-poller.js';
 import { mapRequestError, mapTransportError, ServiceError } from '../service-error.js';
 import { ZipService } from '../zip-service.js';
-
-const TIMING_DEFAULTS = {
-  pollIntervalMs: STATUS_POLL_INTERVAL_MS,
-  // The server gives a run 25 minutes and reports the overrun itself. This sits clear of that so
-  // the message a user reads is the server's, which names what actually ran long.
-  generationTimeoutMs: GENERATION_TIMEOUT_MS,
-  requestTimeoutMs: REQUEST_TIMEOUT_MS
-};
-
-/** Overridable so tests are not paced by the production defaults; nothing else overrides them. */
-export type GenerationTimings = Partial<typeof TIMING_DEFAULTS>;
 
 /** The entries the portal artifacts zip is made of, as the endpoint lays them out. */
 const ARTIFACTS_ZIP = {
@@ -245,8 +233,7 @@ export class PortalArtifactsService {
     }
 
     for (const fileName of await this.fileService.getFileNames(directory)) {
-      const name = fileName.toString();
-      if (!name.endsWith('.json')) {
+      if (!fileName.hasExactExtension('.json')) {
         continue;
       }
       let json: unknown;
@@ -258,7 +245,7 @@ export class PortalArtifactsService {
       if (!isJsonObject(json) || typeof json.gettingStarted !== 'string') {
         return err(ServiceError.InvalidResponse);
       }
-      docs.set(name.slice(0, -'.json'.length), json.gettingStarted);
+      docs.set(fileName.withoutExtension().toString(), json.gettingStarted);
     }
     return ok(docs);
   }
@@ -274,9 +261,8 @@ export class PortalArtifactsService {
 
     const sdks = new Map<string, FilePath>();
     for (const fileName of await this.fileService.getFileNames(directory)) {
-      const name = fileName.toString();
-      if (name.endsWith('.zip')) {
-        sdks.set(name.slice(0, -'.zip'.length), new FilePath(directory, fileName));
+      if (fileName.hasExactExtension('.zip')) {
+        sdks.set(fileName.withoutExtension().toString(), new FilePath(directory, fileName));
       }
     }
     return sdks;
@@ -295,12 +281,11 @@ export class PortalArtifactsService {
     const catalogs: CodeSampleCatalog[] = [];
 
     for (const fileName of await this.fileService.getFileNames(directory)) {
-      const name = fileName.toString();
-      if (!name.endsWith('.json')) {
+      if (!fileName.hasExactExtension('.json')) {
         continue;
       }
 
-      const language = name.slice(0, -'.json'.length);
+      const language = fileName.withoutExtension().toString();
       if (!languages.includes(language)) {
         return err(ServiceError.InvalidResponse);
       }

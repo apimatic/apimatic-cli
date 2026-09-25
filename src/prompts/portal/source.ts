@@ -3,6 +3,7 @@ import { APIMATIC_CONFIG_FILE_NAME } from '../../types/apimatic-config/document.
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { listedInProse } from '../../utils/string-utils.js';
 import { ContentNotices } from '../../types/portal/content-notices.js';
+import { NAVIGATION_FILE_NAME } from '../../types/portal/portal-navigation.js';
 import {
   ContentProblem,
   PortalSourceProblem,
@@ -201,7 +202,9 @@ export function reportIgnoredNavigationFiles(files: FilePath[], sourceDirectory:
   const verb = files.length === 1 ? 'is' : 'are';
   // Not "rename it": on a case-sensitive filesystem a correctly named file may already sit
   // beside it, and the two would then need merging rather than renaming.
-  log.warn(`${names} ${verb} not read. Only a file named ${f.var('nav.json')}, in lower case, orders the pages.`);
+  log.warn(
+    `${names} ${verb} not read. Only a file named ${f.var(NAVIGATION_FILE_NAME)}, in lower case, orders the pages.`
+  );
 }
 
 export function reportContentNotices(notices: ContentNotices, sourceDirectory: DirectoryPath): void {
@@ -244,9 +247,9 @@ export function reportSharedTabNames(shared: SharedTabName[], sourceDirectory: D
   log.warn('More than one tab has the same name, or one that differs only in case, so readers cannot tell them apart:');
   log.message(shared.map(({ tabs }) => `  • ${spellings(tabs)}: ${listedInProse(tabs.map(describe))}`).join('\n'));
   log.message(
-    `Rename all but one tab of each name with a ${f.var('title')} in its folder's ${f.var('nav.json')}, or in ` +
-      `${f.var('content/nav.json')} for the Home tab; the tabs of the SDK pages and the context plugin keep ` +
-      `their names.`
+    `Rename all but one tab of each name with a ${f.var('title')} in its folder's ` +
+      `${f.var(NAVIGATION_FILE_NAME)}, or in ${f.var('content/nav.json')} for the Home tab; the tabs of the ` +
+      `SDK pages and the context plugin keep their names.`
   );
 }
 

@@ -1,34 +1,34 @@
-import { log } from "@clack/prompts";
-import { replaceHTML } from "../../utils/utils.js";
-import { ValidationMessages } from "../../types/utils.js";
-import { Result } from "neverthrow";
-import {  ValidationEntry, ValidationSummary } from "@apimatic/sdk";
-import { ServiceError } from "../../infrastructure/service-error.js";
-import { FilePath } from "../../types/file/filePath.js";
-import { format as f } from "../format.js";
-import { withSpinner } from "../prompt.js";
-import { ValidateApiResponse } from "../../infrastructure/services/validation-service.js";
+import { log } from '@clack/prompts';
+import { replaceHTML } from '../../utils/utils.js';
+import { ValidationMessages } from '../../types/utils.js';
+import { Result } from 'neverthrow';
+import { ValidationEntry, ValidationSummary } from '@apimatic/sdk';
+import { ServiceError } from '../../infrastructure/service-error.js';
+import { FilePath } from '../../types/file/filePath.js';
+import { format as f } from '../format.js';
+import { withSpinner } from '../prompt.js';
+import { ValidateApiResponse } from '../../infrastructure/services/validation-service.js';
 
 export class ApiValidatePrompts {
   public async validateApi(fn: Promise<Result<ValidateApiResponse, string>>) {
-    return withSpinner("Validating API", "API validation completed", "API validation failed", fn);
+    return withSpinner('Validating API', 'API validation completed', 'API validation failed', fn);
   }
 
   displayValidationMessages({ warnings, errors, messages }: ValidationMessages): void {
     if (messages.length > 0) {
-      log.info("Messages");
+      log.info('Messages');
       messages.forEach((msg) => {
         log.message(`${replaceHTML(msg)}`);
       });
     }
     if (warnings.length > 0) {
-      log.warning("Warnings");
+      log.warn('Warnings');
       warnings.forEach((war) => {
         log.message(`${replaceHTML(war)}`);
       });
     }
     if (errors.length > 0) {
-      log.error("Errors");
+      log.error('Errors');
       errors.forEach((err) => {
         log.message(`${replaceHTML(err)}`);
       });
@@ -51,28 +51,28 @@ export class ApiValidatePrompts {
 
   public displayValidationSummary(summary: ValidationSummary): void {
     if (summary.blocking.length > 0) {
-      log.error("Blocking");
+      log.error('Blocking');
       for (const entry of summary.blocking) {
         log.message(this.formatValidationEntry(entry));
       }
     }
 
     if (summary.errors.length > 0) {
-      log.error("Errors");
+      log.error('Errors');
       for (const entry of summary.errors) {
         log.message(this.formatValidationEntry(entry));
       }
     }
 
     if (summary.warnings.length > 0) {
-      log.warning("Warnings");
+      log.warn('Warnings');
       for (const entry of summary.warnings) {
         log.message(this.formatValidationEntry(entry));
       }
     }
 
     if (summary.information.length > 0) {
-      log.info("Information");
+      log.info('Information');
       for (const entry of summary.information) {
         log.message(this.formatValidationEntry(entry));
       }

@@ -1,4 +1,4 @@
-import { Language, LANGUAGE_CHOICES } from '../sdk/generate.js';
+import { Language, languageLabel } from '../sdk/generate.js';
 import { isJsonObject } from '../../utils/json-utils.js';
 import { Endpoint } from './endpoint.js';
 
@@ -82,10 +82,6 @@ export class CodeSampleCatalogs {
 
 function toCodeSample(language: Language, sources: Sources): CodeSample {
   return { lang: language, label: languageLabel(language), sources };
-}
-
-function languageLabel(language: Language): string {
-  return LANGUAGE_CHOICES.find((choice) => choice.value === language)?.label ?? language;
 }
 
 function isSources(value: unknown): value is Sources {

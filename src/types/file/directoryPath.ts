@@ -1,4 +1,5 @@
 import * as path from 'path';
+import { removeQuotes } from '../../utils/string-utils.js';
 
 /** How a reader standing in `from` would type `target`: `./sdk` beside them, else the full path. */
 export function asTypedFrom(target: string, from: DirectoryPath): string {
@@ -32,6 +33,11 @@ export class DirectoryPath {
       return DirectoryPath.default;
     }
     return new DirectoryPath(input);
+  }
+
+  /** A path typed at a prompt, trimmed and out of the quotes a path pasted from a file manager carries. */
+  public static fromUserInput(input: string): DirectoryPath {
+    return new DirectoryPath(removeQuotes(input.trim()));
   }
 
   public toString(): string {

@@ -12,7 +12,6 @@ import {
 import { PublishingProfile } from '../../../types/publish/publishing-profile.js';
 import { AVAILABLE_LANGUAGES, Language, languageLabel, Stability } from '../../../types/sdk/generate.js';
 import { SemVersion } from '../../../types/publish/version.js';
-import { removeQuotes } from '../../../utils/string-utils.js';
 import { SDK_PUBLISHING_OVERVIEW_URL } from '../../publishing/links.js';
 
 export class SdkPublishInteractivePrompts {
@@ -31,7 +30,7 @@ export class SdkPublishInteractivePrompts {
       return undefined;
     }
 
-    return new DirectoryPath(removeQuotes((value as string).trim()));
+    return DirectoryPath.fromUserInput(value);
   }
 
   public async noInputDirectoryProvided() {
@@ -53,7 +52,7 @@ export class SdkPublishInteractivePrompts {
       return undefined;
     }
 
-    return new DirectoryPath(removeQuotes((value as string).trim()));
+    return DirectoryPath.fromUserInput(value);
   }
 
   public sdkDirectoryCannotBeSameAsSourceDirectory() {

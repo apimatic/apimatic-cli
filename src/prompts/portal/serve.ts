@@ -6,6 +6,7 @@ import { UrlPath } from '../../types/file/urlPath.js';
 import { PortalAuthorizationFailure } from '../../infrastructure/services/portal-authorization-service.js';
 import { ContentNotices } from '../../types/portal/content-notices.js';
 import { MissingArtifacts } from '../../types/portal/generated-pages.js';
+import { NAVIGATION_FILE_NAME } from '../../types/portal/portal-navigation.js';
 import { ContentProblem, PortalSourceProblem } from '../../types/portal/portal-source.js';
 import { PortalDevServer, PortalDevServerFailure } from '../../infrastructure/portal-dev-server-service.js';
 import { Result } from 'neverthrow';
@@ -50,15 +51,15 @@ export class PortalServePrompts {
     noteWrapped(
       [
         `Edits to the Markdown pages in ${f.path(sourceDirectory.join('content'))}, to the order, tabs and ` +
-          `titles in a ${f.var('nav.json')}, and to the ${f.var('portal')} block of ${f.var(
-            'apimatic.json'
+          `titles in a ${f.var(NAVIGATION_FILE_NAME)}, and to the ${f.var('portal')} block of ${f.var(
+            APIMATIC_CONFIG_FILE_NAME
           )} appear in the browser automatically, and so does a language removed from its ${f.var(
             'languages'
           )} block, which updates the SDK pages, or its ${f.var(
             'plugin'
           )} block removed, which removes the Context Plugin tab. A mistake in ${f.var(
-            'apimatic.json'
-          )}, a page or a ${f.var('nav.json')} is reported when you save it, and the preview keeps what it ` +
+            APIMATIC_CONFIG_FILE_NAME
+          )}, a page or a ${f.var(NAVIGATION_FILE_NAME)} is reported when you save it, and the preview keeps what it ` +
           `last accepted.`,
         '',
         `Adding a language or a ${f.var('plugin')} block, whose SDK or plugin is fetched when the preview ` +
@@ -146,14 +147,14 @@ export class PortalServePrompts {
   public contentNotWatched(reason: string, sourceDirectory: DirectoryPath) {
     log.warn(
       `${f.path(sourceDirectory.join('content'))} cannot be watched (${reason}), so a mistake in a page or a ` +
-        `${f.var('nav.json')} is only reported when the preview is restarted.`
+        `${f.var(NAVIGATION_FILE_NAME)} is only reported when the preview is restarted.`
     );
   }
 
   public contentWatchFailed(reason: string, sourceDirectory: DirectoryPath) {
     log.warn(
       `${f.path(sourceDirectory.join('content'))} is no longer watched (${reason}), so a mistake in a page or ` +
-        `a ${f.var('nav.json')} is only reported when the preview is restarted.`
+        `a ${f.var(NAVIGATION_FILE_NAME)} is only reported when the preview is restarted.`
     );
   }
 
