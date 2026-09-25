@@ -14,7 +14,7 @@ import {
   PluginMetadata
 } from './plugin/plugin-config.js';
 import { SemVersion } from './publish/version.js';
-import { isPluginLanguage, Language, PLUGIN_LANGUAGES } from './sdk/generate.js';
+import { AVAILABLE_LANGUAGES, isAvailableLanguage, Language } from './sdk/generate.js';
 
 export type PluginReleaseData = { pluginId: string; version: SemVersion };
 
@@ -42,7 +42,7 @@ export class PluginConfig {
     const unsupported: string[] = [];
 
     for (const [language, entry] of Object.entries(config.languages)) {
-      if (isPluginLanguage(language)) {
+      if (isAvailableLanguage(language)) {
         entries.push([language, entry as PluginLanguages[Language]]);
       } else {
         unsupported.push(language);
@@ -60,7 +60,7 @@ export class PluginConfig {
   public initialLanguages(): readonly Language[] {
     const requested = this.entries.map(([language]) => language);
 
-    return requested.length > 0 ? requested : PLUGIN_LANGUAGES;
+    return requested.length > 0 ? requested : AVAILABLE_LANGUAGES;
   }
 
   public unsupportedLanguages(): readonly string[] {
@@ -117,10 +117,9 @@ const recorded = (
 
 /** In the user's file a cleared language goes, unless its entry records where an SDK was published. */
 const keepsRecord = (language: string, entry: PluginLanguageEntry<Language> | undefined): boolean =>
-  !isPluginLanguage(language) || isPublished(entry);
+  !isAvailableLanguage(language) || isPublished(entry);
 
-/** In the upload only the covered languages remain, beside the ones a plugin never carries. */
-const isNotPluginLanguage = (language: string): boolean => !isPluginLanguage(language);
+const isUnavailableLanguage = (language: string): boolean => !isAvailableLanguage(language);
 
 export class PluginConfigContext {
   private readonly configContext: ApimaticConfigContext;
@@ -183,33 +182,12 @@ export class PluginConfigContext {
 
     const config = new ApimaticConfigContext(staged);
     const covered = await config.merge(OWNED_BLOCKS, (document) =>
-      document.with('languages', recorded(document, languages, isNotPluginLanguage))
+      document.with('languages', recorded(document, languages, isUnavailableLanguage))
     );
 
     // The merge writes nothing when it changes nothing, so a mark on the copy can outlive it —
     // and the service reads this file with a parser that will not look past one.
     return await covered.asyncAndThen(() => new ResultAsync(config.removeByteOrderMark())).map(() => staged);
-  }
-
-  public async upsertLanguage<L extends Language>(
-    language: L,
-    entry: PluginLanguageEntry<L>
-  ): Promise<Result<PluginConfig, PluginConfigWriteFailure>> {
-    return await this.merge((document) => {
-      const languages: PluginLanguages = { ...(document.languages() as PluginLanguages | undefined) };
-      const existingEntry = languages[language];
-      const existingPublishing = existingEntry?.publishing;
-      const publishing = entry.publishing
-        ? {
-            ...existingPublishing,
-            ...entry.publishing,
-            source: entry.publishing.source ?? existingPublishing?.source,
-            package: entry.publishing.package ?? existingPublishing?.package
-          }
-        : existingPublishing;
-      languages[language] = { ...existingEntry, ...entry, ...(publishing ? { publishing } : {}) };
-      return document.with('languages', languages);
-    });
   }
 
   private async merge(

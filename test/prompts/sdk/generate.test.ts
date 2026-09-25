@@ -1,38 +1,51 @@
-import { expect } from "chai";
-import sinon from "sinon";
-import { log } from "@clack/prompts";
-import { SdkGeneratePrompts } from "../../../src/prompts/sdk/generate.js";
-import { CodeGenerationVersion, CodegenOption, Stability } from "../../../src/types/sdk/generate.js";
+import { expect } from 'chai';
+import sinon from 'sinon';
+import { log } from '@clack/prompts';
+import { SdkGeneratePrompts } from '../../../src/prompts/sdk/generate.js';
+import { Language } from '../../../src/types/sdk/generate.js';
 
-const v4 = CodegenOption.create(CodeGenerationVersion.V4, Stability.BETA);
-
-describe("SdkGeneratePrompts.warnIfStabilityIgnored", () => {
+describe('SdkGeneratePrompts.languageNotAvailable', () => {
   const prompts = new SdkGeneratePrompts();
-  let warn: sinon.SinonStub;
+  let error: sinon.SinonStub;
 
   beforeEach(() => {
-    warn = sinon.stub(log, "warn");
+    error = sinon.stub(log, 'error');
   });
 
   afterEach(() => {
-    warn.restore();
+    error.restore();
   });
 
-  it("warns when the flag was typed alongside codegen version v3", () => {
-    prompts.warnIfStabilityIgnored(CodegenOption.v3, true);
+  const messageFor = (language: Language): string => {
+    prompts.languageNotAvailable(language);
+    return error.firstCall.args[0] as string;
+  };
 
-    expect(warn.calledOnce).to.equal(true);
+  // The language the user asked for, under the name the rest of the CLI shows it by — not the
+  // flag value they typed, which is how every other list in this CLI would render it.
+  it('names the language that was asked for', () => {
+    expect(messageFor(Language.RUBY)).to.contain("Ruby isn't available yet.");
   });
 
-  it("stays silent when the flag was only filled in from its default", () => {
-    prompts.warnIfStabilityIgnored(CodegenOption.v3, false);
+  it('lists the three that can be generated now', () => {
+    const message = messageFor(Language.JAVA);
 
-    expect(warn.called).to.equal(false);
+    expect(message).to.contain('Available now: C#, TypeScript, Python');
   });
 
-  it("stays silent on v4, where stability reaches the generation service", () => {
-    prompts.warnIfStabilityIgnored(v4, true);
+  // Naming them is the difference between "not yet" and "not ever", and the four that left with
+  // v3 are coming back.
+  it('lists the four that are on their way', () => {
+    const message = messageFor(Language.GO);
 
-    expect(warn.called).to.equal(false);
+    expect(message).to.contain('Coming soon: Ruby, Java, PHP, Go');
+  });
+
+  // There is no version to fall back to any more, so nothing may suggest one.
+  it('offers no code generator to fall back to', () => {
+    const message = messageFor(Language.PHP);
+
+    expect(message).to.not.contain('v3');
+    expect(message).to.not.contain('codegen-version');
   });
 });

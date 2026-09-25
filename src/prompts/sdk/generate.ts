@@ -4,17 +4,22 @@ import { format as f } from '../format.js';
 import { Result } from 'neverthrow';
 import { withSpinner } from '../prompt.js';
 import { ServiceError } from '../../infrastructure/service-error.js';
-import { GeneratedSdkResult } from '../../infrastructure/services/sdk-generation-service.js';
-import { CodeGenerationVersion, CodegenOption } from '../../types/sdk/generate.js';
+import { AVAILABLE_LANGUAGES, Language, languageLabel, UPCOMING_LANGUAGES } from '../../types/sdk/generate.js';
+
+const names = (languages: readonly Language[]) => languages.map(languageLabel).join(', ');
 
 export class SdkGeneratePrompts {
-  public warnIfStabilityIgnored(codegenOption: CodegenOption, stabilityWasProvided: boolean) {
-    if (stabilityWasProvided && codegenOption.isV3()) {
-      log.warn(
-        `${f.flag('stability')} has no effect with ${f.flag('codegen-version', CodeGenerationVersion.V3)}. ` +
-          `The V3 code generator always produces a stable SDK.`
-      );
-    }
+  /**
+   * Named rather than listed as flag values: a user whose language is on its way back reads
+   * something different from one who mistyped, and neither is told to reach for a generator
+   * version that no longer exists.
+   */
+  public languageNotAvailable(language: Language) {
+    log.error(
+      `${languageLabel(language)} isn't available yet.\n` +
+        `Available now: ${names(AVAILABLE_LANGUAGES)}\n` +
+        `Coming soon: ${names(UPCOMING_LANGUAGES)}`
+    );
   }
 
   public async overwriteSdk(directory: DirectoryPath): Promise<boolean> {
@@ -51,11 +56,7 @@ export class SdkGeneratePrompts {
     log.error(message);
   }
 
-  public generateSDK(fn: Promise<Result<GeneratedSdkResult, ServiceError>>) {
-    return withSpinner('Generating SDK', 'SDK generated successfully.', 'SDK Generation failed.', fn);
-  }
-
-  public generateV4SDK(fn: Promise<Result<NodeJS.ReadableStream, ServiceError>>) {
+  public generateSdk(fn: Promise<Result<NodeJS.ReadableStream, ServiceError>>) {
     return withSpinner('Generating SDK', 'SDK generated successfully.', 'SDK Generation failed.', fn);
   }
 
@@ -91,10 +92,6 @@ export class SdkGeneratePrompts {
   }
 
   public sdkGenerated(sdk: DirectoryPath) {
-    log.info(`The generated SDK can be found at ${f.path(sdk)}.`);
-  }
-
-  public sdkCustomizationsNotSupportedForV4() {
-    log.warn(`The V4 Code Generator does not currently support SDK customizations.`);
+    log.info(`The generated SDK can be found at ${f.relativePath(sdk)}.`);
   }
 }

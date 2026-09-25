@@ -53,18 +53,6 @@ export class BuildContext {
     return new SpecContext(this.sourceDirectory.join('spec'));
   }
 
-  public async hasSdkSourceTree(language: string): Promise<boolean> {
-    const sourceTreePath = FilePath.create(this.sourceDirectory.join('sdk-source-tree').join(`.${language}`).toString());
-    if (!sourceTreePath) {
-      return false;
-    }
-    return await this.fileService.fileExists(sourceTreePath);
-  }
-
-  public getSdkSourceTree(language: string): FilePath {
-    return FilePath.create(this.sourceDirectory.join('sdk-source-tree').join(`.${language}`).toString())!;
-  }
-
   public async isVersionedBuild(): Promise<boolean> {
     if (!(await this.validate())) {
       return false;

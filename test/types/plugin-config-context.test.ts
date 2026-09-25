@@ -4,15 +4,8 @@ import path from 'path';
 import { expect } from 'chai';
 import { PluginConfigContext, PluginConfigState } from '../../src/types/plugin-config-context';
 import { DirectoryPath } from '../../src/types/file/directoryPath';
-import {
-  LanguagePublishingEntry,
-  PluginIdentityData,
-  PluginLanguages
-} from '../../src/types/plugin/plugin-config';
-import {
-  CSharpPackageConfiguration,
-  TypeScriptPackageConfiguration
-} from '../../src/types/publish/package-settings-configuration';
+import { LanguagePublishingEntry, PluginIdentityData, PluginLanguages } from '../../src/types/plugin/plugin-config';
+import { CSharpPackageConfiguration } from '../../src/types/publish/package-settings-configuration';
 import { Language } from '../../src/types/sdk/generate';
 
 /** The file as written back, read whole: the plugin blocks and whatever sits around them. */
@@ -299,7 +292,6 @@ describe('PluginConfigContext', () => {
     });
   });
 
-
   describe('upsertMetadata', () => {
     it('creates the file with the plugin block, the metadata and a default licence', async () => {
       expect((await context.upsertMetadata(METADATA)).isOk()).to.be.true;
@@ -407,138 +399,6 @@ describe('PluginConfigContext', () => {
 
       expect(state.hasMetadata()).to.be.true;
       expect(state.publishedLanguages()).to.be.empty;
-    });
-
-    it('reports the language it just wrote, alongside metadata written earlier', async () => {
-      withConfig({ plugin: METADATA, languages: {} });
-
-      const state = (await context.upsertLanguage(Language.CSHARP, CSHARP_ENTRY))._unsafeUnwrap();
-
-      expect(state.publishedLanguages()).to.not.be.empty;
-      expect(state.hasMetadata()).to.be.true;
-      expect(state.hasNoSourceRepository(Language.CSHARP)).to.be.false;
-    });
-  });
-
-  describe('upsertLanguage', () => {
-    it('creates the file with the languages block and no plugin block at all', async () => {
-      expect((await context.upsertLanguage(Language.CSHARP, CSHARP_ENTRY)).isOk()).to.be.true;
-      expect(writtenDocument()).to.deep.equal({
-        schemaVersion: 1,
-        languages: { csharp: CSHARP_ENTRY }
-      });
-    });
-
-    it('adds a second language beside the first', async () => {
-      withConfig({ languages: { csharp: CSHARP_ENTRY } });
-
-      const typescriptEntry = {
-        publishing: {
-          source: { repositoryUrl: 'https://github.com/acme/acme-payments-typescript' },
-          package: { version: '1.2.3' }, packageConfiguration: { name: '@acme/payments-sdk' } as TypeScriptPackageConfiguration
-        }
-      } satisfies NonNullable<PluginLanguages['typescript']>;
-      await context.upsertLanguage(Language.TYPESCRIPT, typescriptEntry);
-
-      expect(writtenDocument().languages).to.deep.equal({ csharp: CSHARP_ENTRY, typescript: typescriptEntry });
-    });
-
-    it('replaces both halves when the run published both', async () => {
-      withConfig({ languages: { csharp: { publishing: { source: { repositoryUrl: 'https://old' } } } } });
-
-      await context.upsertLanguage(Language.CSHARP, CSHARP_ENTRY);
-
-      expect(writtenDocument().languages).to.deep.equal({ csharp: CSHARP_ENTRY });
-    });
-
-    describe('keeps the half the run did not publish', () => {
-      it('carries the recorded package over a source-only publish', async () => {
-        withConfig({ languages: { csharp: CSHARP_ENTRY } });
-
-        await context.upsertLanguage(Language.CSHARP, {
-          publishing: {
-            source: { repositoryUrl: 'https://github.com/acme/renamed' }
-          }
-        });
-
-        expect(writtenDocument().languages?.csharp).to.deep.equal({
-          publishing: {
-            source: { repositoryUrl: 'https://github.com/acme/renamed' },
-            package: CSHARP_PUBLISHING.package,
-            packageConfiguration: CSHARP_CONFIGURATION
-          }
-        });
-      });
-
-      it('carries the recorded source over a package-only publish', async () => {
-        withConfig({ languages: { csharp: CSHARP_ENTRY } });
-
-        await context.upsertLanguage(Language.CSHARP, {
-          publishing: {
-            package: { version: '2.0.0' }, packageConfiguration: { packageId: 'Acme.Payments.Sdk' } as CSharpPackageConfiguration
-          }
-        });
-
-        expect(writtenDocument().languages?.csharp).to.deep.equal({
-          publishing: {
-            source: CSHARP_PUBLISHING.source,
-            package: { version: '2.0.0' }, packageConfiguration: { packageId: 'Acme.Payments.Sdk' } as CSharpPackageConfiguration
-          }
-        });
-      });
-
-      it('records the entry as it stands when the language is new to the config', async () => {
-        withConfig({ languages: {} });
-
-        await context.upsertLanguage(Language.CSHARP, {
-          publishing: {
-            package: { version: '2.0.0' }, packageConfiguration: { packageId: 'Acme.Payments.Sdk' } as CSharpPackageConfiguration
-          }
-        });
-
-        expect(writtenDocument().languages?.csharp).to.deep.equal({
-          publishing: {
-            package: { version: '2.0.0' }, packageConfiguration: { packageId: 'Acme.Payments.Sdk' } as CSharpPackageConfiguration
-          }
-        });
-      });
-
-      it('still takes the codegen version from the run that just published', async () => {
-        withConfig({ languages: { csharp: CSHARP_ENTRY } });
-
-        await context.upsertLanguage(Language.CSHARP, {
-          publishing: {
-            package: { version: '2.0.0' }, packageConfiguration: { packageId: 'Acme.Payments.Sdk' } as CSharpPackageConfiguration
-          }
-        });
-
-        expect(writtenDocument().languages?.csharp?.publishing?.package).to.deep.equal({ version: '2.0.0' });
-      });
-    });
-
-    it('leaves the existing plugin block untouched', async () => {
-      withConfig({ plugin: { ...METADATA, license: 'MIT' }, languages: {} });
-
-      await context.upsertLanguage(Language.CSHARP, CSHARP_ENTRY);
-
-      expect(writtenDocument().plugin).to.deep.equal({ ...METADATA, license: 'MIT' });
-    });
-
-    // A publish that succeeded is recorded whatever state the portal is in.
-    it('records past a portal block it cannot read, leaving it as written', async () => {
-      withConfig({ portal: 'not a portal', languages: {} });
-
-      expect((await context.upsertLanguage(Language.CSHARP, CSHARP_ENTRY)).isOk()).to.be.true;
-      expect(writtenDocument().portal).to.equal('not a portal');
-      expect(writtenDocument().languages).to.deep.equal({ csharp: CSHARP_ENTRY });
-    });
-
-    it('refuses a languages block it cannot merge rather than spreading it into the file', async () => {
-      const original = JSON.stringify({ languages: 'csharp' });
-      withFile(original);
-
-      expect((await context.upsertLanguage(Language.CSHARP, CSHARP_ENTRY))._unsafeUnwrapErr()).to.equal('unreadable');
-      expect(written()).to.equal(original);
     });
   });
 

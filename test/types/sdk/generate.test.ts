@@ -1,21 +1,21 @@
 import { expect } from 'chai';
 import {
-  isPluginLanguage,
+  AVAILABLE_LANGUAGES,
+  isAvailableLanguage,
   Language,
   LANGUAGE_CHOICES,
-  PLUGIN_LANGUAGES,
   UPCOMING_LANGUAGES
 } from '../../../src/types/sdk/generate';
 
 // `UPCOMING_LANGUAGES` is derived from the two lists above it. These are the properties that
 // derivation buys, and the reason neither list is maintained by hand.
-describe('the languages a plugin can carry', () => {
+describe('the languages a generator renders', () => {
   it('accounts for every language exactly once', () => {
-    expect([...PLUGIN_LANGUAGES, ...UPCOMING_LANGUAGES]).to.have.members(Object.values(Language));
+    expect([...AVAILABLE_LANGUAGES, ...UPCOMING_LANGUAGES]).to.have.members(Object.values(Language));
   });
 
-  it('names no language as both carried and upcoming', () => {
-    const both = UPCOMING_LANGUAGES.filter((language) => PLUGIN_LANGUAGES.includes(language));
+  it('names no language as both available and upcoming', () => {
+    const both = UPCOMING_LANGUAGES.filter((language) => AVAILABLE_LANGUAGES.includes(language));
 
     expect(both).to.be.empty;
   });
@@ -30,8 +30,8 @@ describe('the languages a plugin can carry', () => {
   });
 
   it('answers for a language named in a config file, not just one already typed', () => {
-    expect(isPluginLanguage('typescript')).to.be.true;
-    expect(isPluginLanguage('java')).to.be.false;
-    expect(isPluginLanguage('cobol')).to.be.false;
+    expect(isAvailableLanguage('typescript')).to.be.true;
+    expect(isAvailableLanguage('java')).to.be.false;
+    expect(isAvailableLanguage('cobol')).to.be.false;
   });
 });
