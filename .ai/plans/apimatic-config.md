@@ -151,6 +151,8 @@ Rejected:
   bundled SDK.
   `codegenVersion` stays, inside `publishing`, because the mismatch check
   in `PluginConfig.assertNoCodegenVersionMismatch` depends on it.
+  *(Superseded: the service decides the generator, so the field and its check
+  both left in the v3 retirement. An older file keeps it; nothing reads it.)*
   `packageConfiguration` and `source.repositoryType` from the design sketch are
   not modelled in this release. A hand-written file carrying `packageConfiguration`
   keeps it, because unknown fields in these blocks are preserved. A hand-written
