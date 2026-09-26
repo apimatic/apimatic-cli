@@ -102,8 +102,14 @@ Let's get started!`);
     return useDefaultSpec === 'yes';
   }
 
+  /**
+   * Said wherever the wizard gives up on a specification, so the reader always leaves with the
+   * one tool that fixes these interactively rather than with good wishes.
+   */
   public fixYourSpec() {
-    const message = `Good luck fixing your API Definition! Feel free to run this command again once you're done.`;
+    const message =
+      `Fix the issues above, then run ${f.cmdAlt('apimatic', 'quickstart')} again.\n` +
+      `APIMatic's VS Code extension fixes them interactively: ${f.link(vscodeExtensionUrl)}`;
     log.info(message);
   }
 
@@ -111,8 +117,12 @@ Let's get started!`);
     log.info(`Step 2 of 3: Validate and Lint your OpenAPI Definition`);
   }
 
+  /** Said under the errors themselves, so it names what they mean rather than that they exist. */
   public specValidationFailed() {
-    log.error(`Oops, it looks like there are some errors in your API Definition`);
+    const message =
+      `A portal cannot be built from this API Definition until the errors above are fixed. ` +
+      `Run ${f.cmdAlt('apimatic', 'api', 'validate')} to see the warnings as well.`;
+    log.error(message);
   }
 
   public createPortalStep() {

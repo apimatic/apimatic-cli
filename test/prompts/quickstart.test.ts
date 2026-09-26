@@ -37,4 +37,24 @@ describe('QuickstartPrompts', () => {
 
     expect(printed()[0]).to.contain(fix);
   });
+
+  // The wizard prints what refused the document; this says what that means and where the rest is.
+  it('says the errors stop a portal being built, and where to see the warnings too', () => {
+    prompts.specValidationFailed();
+
+    expect(printed()[0]).to.contain('A portal cannot be built from this API Definition');
+    expect(printed()[0]).to.contain('api validate');
+  });
+
+  // The one tool that fixes these interactively, on whichever path the wizard gave up.
+  it('names the VS Code extension when it gives up on a specification', () => {
+    const info = sinon.stub(log, 'info');
+
+    prompts.fixYourSpec();
+
+    const said = stripVTControlCharacters(String(info.firstCall.args[0]));
+    expect(said).to.contain('VS Code extension');
+    expect(said).to.contain('marketplace.visualstudio.com');
+    expect(said).to.contain('quickstart');
+  });
 });

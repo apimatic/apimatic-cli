@@ -154,14 +154,20 @@ describe('QuickstartAction', () => {
     // holds the document the portal would be built from. Offering it would promise a swap the
     // wizard cannot make.
     it('does not offer the sample when the specification it found fails validation', async () => {
-      const failed = { isSuccess: false, blocking: [], errors: ['bad'], warnings: [], information: [] };
+      const errors = [{ message: 'Simple style cannot be used with the current parameter type.' }];
+      const failed = { isSuccess: false, blocking: [], errors, warnings: [], information: [] };
       (ValidationService.prototype.validateViaFile as sinon.SinonStub).resolves(
         ok({ validation: failed, linting: PASSED } as never)
       );
 
+      const blocking = sinon.stub(ApiValidatePrompts.prototype, 'displayBlockingIssues');
+
       expect((await execute(downloaded)).isCancelled()).to.be.true;
       expect(prompts.useDefaultSpecPrompt.called, 'offered to replace a specification it cannot replace').to.be.false;
       expect(prompts.fixYourSpec.calledOnce).to.be.true;
+      // The path that offers no sample is the one that most needs to say what is wrong.
+      expect(blocking.called, 'said what stops the build').to.be.true;
+      expect(blocking.firstCall.args[0]).to.equal(failed);
     });
   });
 });

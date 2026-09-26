@@ -91,6 +91,6 @@ export class SdkGeneratePrompts {
   }
 
   public sdkGenerated(sdk: DirectoryPath) {
-    log.info(`The generated SDK can be found at ${f.relativePath(sdk)}.`);
+    log.info(`The generated SDK can be found at ${f.path(sdk)}.`);
   }
 }

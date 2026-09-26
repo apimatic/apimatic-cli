@@ -206,7 +206,7 @@ export class QuickstartAction {
     adopted: boolean
   ): Promise<Result<FilePath, ActionResult>> {
     this.prompts.validateSpecStep();
-    const validation = await new ValidateAction(this.configDir, this.commandMetadata).execute(specPath, false);
+    const validation = await new ValidateAction(this.configDir, this.commandMetadata).execute(specPath, 'whatStopsTheBuild');
 
     let checked = specPath;
     if (validation.isFailed()) {

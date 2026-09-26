@@ -47,18 +47,19 @@ export class PortalServePrompts {
     log.message(`The portal is running at ${f.link(url.toString())}`);
     noteWrapped(
       [
-        `Edits to the Markdown pages in ${contentPath(sourceDirectory)}, to the order, tabs and titles in a ` +
-          `${f.var(NAVIGATION_FILE_NAME)}, and to the ${f.var('portal')} block of ` +
-          `${f.var(APIMATIC_CONFIG_FILE_NAME)} appear in the browser automatically, and so does a language ` +
-          `removed from its ${f.var('languages')} block, which updates the SDK pages, or its ${f.var('plugin')} ` +
-          `block removed, which removes the Context Plugin tab. A mistake in ${f.var(APIMATIC_CONFIG_FILE_NAME)}, ` +
-          `a page or a ${f.var(NAVIGATION_FILE_NAME)} is reported when you save it, and the preview keeps what it ` +
-          `last accepted.`,
+        'These reach the browser as you save:',
+        `  - Markdown pages in ${contentPath(sourceDirectory)}`,
+        `  - the order, tabs and titles in a ${f.var(NAVIGATION_FILE_NAME)}`,
+        `  - the ${f.var('portal')} block of ${f.var(APIMATIC_CONFIG_FILE_NAME)}`,
+        `  - a language taken out of ${f.var('languages')}, or the ${f.var('plugin')} block taken out`,
         '',
-        `Adding a language or a ${f.var('plugin')} block, whose SDK or plugin is fetched when the preview ` +
-          `starts, adding or removing a page in ${contentPath(sourceDirectory)}, creating ` +
-          `${staticPath(sourceDirectory)}, or changing which documents are in ${specPath(sourceDirectory)} ` +
-          `needs the preview restarted.`,
+        'These need the preview restarted:',
+        `  - adding a language or a ${f.var('plugin')} block, whose SDK or plugin is fetched at startup`,
+        `  - adding or removing a page, or creating ${staticPath(sourceDirectory)}`,
+        `  - changing which documents are in ${specPath(sourceDirectory)}`,
+        '',
+        `A mistake in ${f.var(APIMATIC_CONFIG_FILE_NAME)}, a page or a ${f.var(NAVIGATION_FILE_NAME)} is ` +
+          'reported when you save it, and the preview keeps what it last accepted.',
         '',
         'Press CTRL+C to stop the server.'
       ].join('\n'),
