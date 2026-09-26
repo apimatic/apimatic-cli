@@ -95,27 +95,22 @@ export class PluginGenerateAction {
       return ActionResult.cancelled();
     }
 
-    const written = await configContext.recordLanguages(selection);
-    const generated = await written.asyncAndThen(
-      () =>
-        new ResultAsync(
-          withDirPath(async (tempDirectory) => {
-            const tempContext = new TempContext(tempDirectory);
-            const staged = await configContext.stageUpload(tempDirectory, selection);
-            return await staged
-              .asyncMap((directory) => tempContext.zip(directory))
-              .andThen(
-                (upload) =>
-                  new ResultAsync(
-                    this.prompts.generatePlugin(
-                      this.pluginService.generatePlugin(upload, this.configDir, this.commandMetadata, this.authKey)
-                    )
-                  )
+    const generated = await withDirPath(async (tempDirectory) => {
+      const tempContext = new TempContext(tempDirectory);
+      const written = await configContext.recordLanguages(selection);
+      return await written
+        .asyncAndThen(() => new ResultAsync(configContext.stageUpload(tempDirectory, selection)))
+        .map((staged) => tempContext.zip(staged))
+        .andThen(
+          (upload) =>
+            new ResultAsync(
+              this.prompts.generatePlugin(
+                this.pluginService.generatePlugin(upload, this.configDir, this.commandMetadata, this.authKey)
               )
-              .map(async (stream) => pluginContext.save(await tempContext.save(stream)));
-          })
+            )
         )
-    );
+        .map(async (stream) => pluginContext.save(await tempContext.save(stream)));
+    });
     if (generated.isErr()) {
       this.reportGenerationProblem(generated.error, sourceDirectory);
       return ActionResult.failed();
