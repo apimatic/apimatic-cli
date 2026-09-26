@@ -7,9 +7,13 @@ import { FilePath } from '../types/file/filePath.js';
 export const format = {
   // Core element types
   var: (text: string) => pc.magenta(`'${text}'`),
-  path: (text: DirectoryPath | FilePath) => pc.cyan(`'${text}'`),
+  /**
+   * As a reader standing in the working directory would type it: `./src/content` for somewhere
+   * inside it, the full path for anywhere else. They read these to find a file, and mostly they
+   * are already standing in the project the message is about.
+   */
+  path: (target: DirectoryPath | FilePath) => pc.cyan(`'${format.relative(target)}'`),
   relative: (target: DirectoryPath | FilePath) => target.asTypedFrom(DirectoryPath.workingDirectory()),
-  relativePath: (target: DirectoryPath | FilePath) => pc.cyan(`'${format.relative(target)}'`),
   cmd: (cmd: string, ...args: string[]) => `${pc.blueBright(cmd)} ${args.map((arg) => pc.dim(arg)).join(' ')}`,
   cmdAlt: (cmd: string, ...args: string[]) =>
     `${pc.dim(pc.blueBright(cmd))} ${args.map((arg) => pc.blueBright(arg)).join(' ')}`,

@@ -69,7 +69,7 @@ function reportSpecConversion({ file, format, converted, others }: SpecConversio
   log.message(
     `${convert} it with:\n` +
       `  ${command}\n` +
-      `then move ${f.relativePath(converted)} up into ${specPath(sourceDirectory)}, which is the only folder read.` +
+      `then move ${f.path(converted)} up into ${specPath(sourceDirectory)}, which is the only folder read.` +
       (others === 0 ? '' : ` Convert the other ${documents} the same way.`)
   );
 }

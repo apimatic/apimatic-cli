@@ -74,7 +74,7 @@ describe('SdkGeneratePrompts.noVersionToBuild', () => {
 
   it('names the source directory when it holds no versions', () => {
     expect(messageFor('noVersions')).to.equal(
-      `The 'versioned_docs' directory is either empty or invalid: '${sourceDirectory}'`
+      "The 'versioned_docs' directory is either empty or invalid: './project/src'"
     );
   });
 

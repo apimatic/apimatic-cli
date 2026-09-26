@@ -33,15 +33,27 @@ describe('PortalServePrompts', () => {
     it('says a language or the plugin block removed from apimatic.json follows without a restart', () => {
       const note = printed();
 
-      expect(note).to.contain("and so does a language removed from its 'languages' block, which updates the SDK pages");
-      expect(note).to.contain("its 'plugin' block removed, which removes the Context Plugin tab");
+      expect(note).to.contain('These reach the browser as you save:');
+      expect(note).to.contain("a language taken out of 'languages', or the 'plugin' block taken out");
     });
 
     // The artifacts are fetched once, so what they would have to carry anew waits for a restart.
     it('says which additions need the preview restarted', () => {
-      expect(printed()).to.match(
-        /Adding a language or a 'plugin' block, whose SDK or plugin is fetched when the preview starts, adding or removing a page in '.*content', creating .* needs the preview restarted\./
-      );
+      const note = printed();
+
+      expect(note).to.contain('These need the preview restarted:');
+      expect(note).to.contain("adding a language or a 'plugin' block, whose SDK or plugin is fetched at startup");
+      expect(note).to.contain('adding or removing a page, or creating');
+      expect(note).to.contain('changing which documents are in');
+    });
+
+    // Every path in the box is inside the directory the reader is standing in.
+    it('names the source directories the way a reader standing in the project would type them', () => {
+      const note = printed();
+
+      expect(note).to.contain('./src/content');
+      expect(note).to.contain('./src/static');
+      expect(note).to.contain('./src/spec');
     });
 
     it('says a mistake in a page or a nav.json is reported when it is saved, and kept from the preview', () => {

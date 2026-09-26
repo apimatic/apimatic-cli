@@ -8,6 +8,9 @@ import { withDirPath } from '../../infrastructure/tmp-extensions.js';
 import { ResourceContext } from '../../types/resource-context.js';
 import { ValidationSummary } from '@apimatic/sdk';
 
+/** `whatStopsTheBuild` leaves out warnings and information, which a wizard has no room for. */
+export type ValidationReport = 'everything' | 'whatStopsTheBuild';
+
 export class ValidateAction {
   private readonly prompts: ApiValidatePrompts = new ApiValidatePrompts();
   private readonly validationService: ValidationService;
@@ -22,7 +25,7 @@ export class ValidateAction {
 
   public readonly execute = async (
     resourcePath: ResourceInput,
-    displayValidationSummary = true
+    report: ValidationReport = 'everything'
   ): Promise<ActionResult> => {
     return await withDirPath(async (tempDirectory) => {
       const resourceContext = new ResourceContext(tempDirectory);
@@ -44,12 +47,12 @@ export class ValidateAction {
         return ActionResult.failed();
       }
       const { validation, linting } = validationSummaryResult.value;
-      if (displayValidationSummary) {
-        if (this.hasValidationIssues(validation)) {
-          this.prompts.displayValidationSummary(validation);
+      for (const summary of [validation, linting]) {
+        if (report === 'everything' && this.hasValidationIssues(summary)) {
+          this.prompts.displayValidationSummary(summary);
         }
-        if (this.hasValidationIssues(linting)) {
-          this.prompts.displayValidationSummary(linting);
+        if (report === 'whatStopsTheBuild') {
+          this.prompts.displayBlockingIssues(summary);
         }
       }
       if (!validation.isSuccess || !linting.isSuccess) {

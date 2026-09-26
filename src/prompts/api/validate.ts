@@ -48,6 +48,21 @@ export class ApiValidatePrompts {
     return formatted;
   }
 
+  /** What refused the document, and nothing else: the rest is a `api validate` away. */
+  public displayBlockingIssues(summary: ValidationSummary): void {
+    for (const [heading, entries] of [
+      ['Blocking', summary.blocking],
+      ['Errors', summary.errors]
+    ] as const) {
+      if (entries.length > 0) {
+        log.error(heading);
+        for (const entry of entries) {
+          log.message(this.formatValidationEntry(entry));
+        }
+      }
+    }
+  }
+
   public displayValidationSummary(summary: ValidationSummary): void {
     if (summary.blocking.length > 0) {
       log.error('Blocking');
