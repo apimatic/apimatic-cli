@@ -22,6 +22,14 @@ export type PluginConfigState =
   | { state: 'unreadable'; reason: string; path: FilePath }
   | PluginConfig;
 
+/** The config of a project set up for a plugin, whose identity is recorded so it is generated unasked; else null. */
+export const setUpConfig = (state: PluginConfigState): PluginConfig | null =>
+  state.state === 'present' && state.hasMetadata() ? state : null;
+
+/** The languages a set-up project is generated from without a question; none while any is still to be recorded. */
+export const unattendedLanguages = (state: PluginConfigState): readonly Language[] =>
+  setUpConfig(state)?.recordedLanguages() ?? [];
+
 export class PluginConfig {
   public readonly state = 'present' as const;
 
@@ -51,11 +59,16 @@ export class PluginConfig {
     return this.entries.filter(([, entry]) => isPublished(entry)).map(([language]) => language);
   }
 
+  /** What `languages` names that a plugin can carry. */
+  public recordedLanguages(): readonly Language[] {
+    return this.entries.map(([language]) => language);
+  }
+
   // A config naming none has not chosen against any: covering everything is what one Enter gives.
   public initialLanguages(): readonly Language[] {
-    const requested = this.entries.map(([language]) => language);
+    const recorded = this.recordedLanguages();
 
-    return requested.length > 0 ? requested : AVAILABLE_LANGUAGES;
+    return recorded.length > 0 ? recorded : AVAILABLE_LANGUAGES;
   }
 
   public unsupportedLanguages(): readonly string[] {

@@ -317,11 +317,4 @@ describe('GenerateAction', () => {
     expect(notices.folderTabs.map((folder) => folder.leafName())).to.deep.equal(['guides']);
     expect(notices.sharedTabNames).to.deep.equal([]);
   });
-
-  // The copy is the preview's, for showing what it last accepted while an edit is half done.
-  it('builds from content/ where it is, not from a copy', async () => {
-    await execute();
-
-    expect(shared.prepare.firstCall.args[3]).to.equal('source');
-  });
 });

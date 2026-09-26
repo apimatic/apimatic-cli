@@ -13,10 +13,9 @@ export const PORTAL_PROJECT_DIRECTORY_NAME = '.apimatic-build';
 
 /**
  * Where a portal project may live for a source directory. The system temp directory,
- * unless it sits on a different Windows drive from the source: Vite's `import.meta.glob`
- * needs a relative path from the project to the content directory, and `path.relative`
- * cannot express one across drives, so the content pages would silently go missing.
- * GitHub's Windows runners (workspace on D:, temp on C:) are the common case.
+ * unless it sits on a different Windows drive from the source: a page imports an image from
+ * the static directory by a path relative to the page, and `path.relative` cannot express one
+ * across drives. GitHub's Windows runners (workspace on D:, temp on C:) are the common case.
  */
 export function portalProjectDirectoryBase(
   sourceDirectory: string,

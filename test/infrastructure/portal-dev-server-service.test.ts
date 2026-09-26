@@ -18,7 +18,11 @@ describe('PortalDevServerService', () => {
     return new FilePath(new DirectoryPath(root), new FileName(name));
   };
 
-  const project = (viteBinary: FilePath) => ({ projectDirectory: new DirectoryPath(root), viteBinary });
+  const project = (viteBinary: FilePath) => ({
+    projectDirectory: new DirectoryPath(root),
+    viteBinary,
+    contentSource: null
+  });
 
   beforeEach(() => {
     root = fs.mkdtempSync(path.join(os.tmpdir(), 'dev-server-'));

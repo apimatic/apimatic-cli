@@ -5,7 +5,7 @@ import { FileName } from '../types/file/fileName.js';
 import { FilePath } from '../types/file/filePath.js';
 import { SHELL_FILE_NAME } from '../types/portal-context.js';
 import { FileService } from './file-service.js';
-import { PortalProjectPaths, PortalProjectService } from './portal-project-service.js';
+import { CONTENT_COPY_DIRECTORY_NAME, PortalProjectPaths, PortalProjectService } from './portal-project-service.js';
 
 export interface PortalBuildFailure {
   message: string;
@@ -36,7 +36,7 @@ export class PortalBuildService {
       reject: false
     });
 
-    const log = result.all ?? '';
+    const log = namingSource(result.all ?? '', project);
     if (result.exitCode !== 0) {
       return err({ message: 'The portal build failed.', log });
     }
@@ -66,4 +66,13 @@ export class PortalBuildService {
       return null;
     }
   }
+}
+
+// The build reads a copy of the pages, in a temporary directory; a reader knows each page by its place in the source.
+function namingSource(log: string, { projectDirectory, contentSource }: PortalProjectPaths): string {
+  if (contentSource === null) {
+    return log;
+  }
+  const copy = projectDirectory.join(CONTENT_COPY_DIRECTORY_NAME);
+  return log.replaceAll(copy.toString(), contentSource.toString()).replaceAll(copy.toPosix(), contentSource.toPosix());
 }

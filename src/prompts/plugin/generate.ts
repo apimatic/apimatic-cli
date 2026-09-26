@@ -9,6 +9,7 @@ import { withSpinner } from '../prompt.js';
 import { APIMATIC_CONFIG_FILE_NAME } from '../../types/apimatic-config/document.js';
 import { PluginConfig, PluginConfigWriteFailure } from '../../types/plugin-config-context.js';
 import { AVAILABLE_LANGUAGES, Language, languageLabel } from '../../types/sdk/generate.js';
+import { listedInProse } from '../../utils/string-utils.js';
 
 export class PluginGeneratePrompts {
   // The spinner covers the service call only; until the save has run there is no path to name.
@@ -76,6 +77,29 @@ export class PluginGeneratePrompts {
     log.error(message);
   }
 
+  // Without a terminal a prompt never answers, and Node exits with nothing said.
+  public canAsk(): boolean {
+    return process.stdin.isTTY === true;
+  }
+
+  public setupNeedsTerminal(sourceDirectory: DirectoryPath) {
+    log.error(
+      `A project's first plugin asks for its name and languages, and there is no terminal to ask in. Run ` +
+        `'${f.cmdAlt('apimatic', 'plugin', 'generate')}' in a terminal once; later runs read both from ` +
+        `${f.var(APIMATIC_CONFIG_FILE_NAME)} in ${f.path(sourceDirectory)}.`
+    );
+  }
+
+  public recordedLanguagesIncluded(languages: readonly Language[]) {
+    if (languages.length === 0) {
+      return;
+    }
+    log.info(
+      `The plugin covers ${listedInProse(languages.map(languageLabel))}, as ${f.var(APIMATIC_CONFIG_FILE_NAME)} ` +
+        `records them. Edit its ${f.var('languages')} block to change that.`
+    );
+  }
+
   public async selectLanguages(config: PluginConfig): Promise<Language[] | undefined> {
     const published = config.publishedLanguages();
 
@@ -112,12 +136,15 @@ export class PluginGeneratePrompts {
     );
   }
 
-  // A recommendation and a confirm, never a fork: having a profile is not wanting to publish now.
-  public async confirmLocalPlugin(): Promise<boolean> {
+  // A recommendation, then a confirm, never a fork; a set-up project, asked nothing, gets the recommendation alone.
+  public async confirmLocalPlugin(unattended: boolean): Promise<boolean> {
     log.warn(
       `You have a publishing profile set up.\n` +
         `We recommend publishing your SDK first for a better plugin experience.`
     );
+    if (unattended) {
+      return true;
+    }
 
     const proceed = await confirm({
       message: 'Do you still want to continue with a local plugin?',

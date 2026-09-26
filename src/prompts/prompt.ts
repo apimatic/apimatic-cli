@@ -1,9 +1,9 @@
 import type { Writable } from 'node:stream';
+import { stripVTControlCharacters } from 'node:util';
 import pc from 'picocolors';
 import { getColumns } from '@clack/core';
 import { log, note, NoteOptions, S_BAR_H, S_CONNECT_LEFT, spinner } from '@clack/prompts';
 import { Result } from 'neverthrow';
-import { stripAnsi } from '../utils/string-utils.js';
 
 /** A fixed message, or one built from what the operation returned. */
 type SpinnerMessage<T> = string | ((value: T) => string);
@@ -40,7 +40,7 @@ export const noteWrapped = (message: string, title: string) => {
   const columns = getColumns(output) || 80;
   const messages = message.split('\n');
   const messageHasOverFlow = messages.some((msg) => {
-    const clean = stripAnsi(msg);
+    const clean = stripVTControlCharacters(msg);
     return clean.length + 6 > columns;
   });
   if (messageHasOverFlow) {
@@ -74,7 +74,8 @@ function buildTable(headers: string[], rows: string[][], rowSeparators = false, 
   const coloredHeaders = headers.map((h) => pc.bold(pc.white(h)));
 
   let widths = headers.map(
-    (h, i) => Math.max(stripAnsi(h).length, ...rows.map((r) => stripAnsi(r[i]).length)) + COL_PAD
+    (h, i) =>
+      Math.max(stripVTControlCharacters(h).length, ...rows.map((r) => stripVTControlCharacters(r[i]).length)) + COL_PAD
   );
 
   const terminalColumns = getColumns(process.stdout) || 80;
@@ -113,7 +114,7 @@ function buildTable(headers: string[], rows: string[][], rowSeparators = false, 
 
 /** Pad `text` to `width` visible characters (ANSI-safe). */
 function pad(text: string, width: number): string {
-  return text + ' '.repeat(Math.max(0, width - stripAnsi(text).length));
+  return text + ' '.repeat(Math.max(0, width - stripVTControlCharacters(text).length));
 }
 
 /** Last lines of a failed build, enough to show the cause without flooding the terminal. */
@@ -124,11 +125,16 @@ const LOG_TAIL_LINES = 15;
 // dropped first; they also carry the store paths of the CLI's own dependencies.
 const INTERNAL_FRAME = /^\s+at\s.*(?:[\\/]node_modules[\\/]|\(node:)/;
 
+// Vite's report of a failed build opens with this and the error, and ends with the import chain a plain tail shows.
+const BUILD_ERROR = 'error during build:';
+
 /** The part of a child process's output worth putting in front of the user. */
 export function logTail(output: string): string {
-  const lines = output.trimEnd().split('\n');
+  const lines = stripVTControlCharacters(output).trimEnd().split('\n');
   const meaningful = lines.filter((line) => !INTERNAL_FRAME.test(line));
   // Some failures are nothing but frames; showing them beats showing nothing.
   const source = meaningful.some((line) => line.trim().length > 0) ? meaningful : lines;
-  return source.slice(-LOG_TAIL_LINES).join('\n').trim();
+  const error = source.findIndex((line) => line.trimStart().startsWith(BUILD_ERROR));
+  const excerpt = error === -1 ? source.slice(-LOG_TAIL_LINES) : source.slice(error, error + LOG_TAIL_LINES);
+  return excerpt.join('\n').trim();
 }

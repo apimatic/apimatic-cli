@@ -12,7 +12,8 @@ import {
 import { portalTabs } from '../../portal-template/src/lib/tabs';
 import { frontmatter } from 'fumadocs-core/content/md/frontmatter';
 import { DirectoryPath } from '../../src/types/file/directoryPath';
-import { parsePageFrontMatter } from '../../src/types/portal/page-front-matter';
+import { FileName } from '../../src/types/file/fileName';
+import { parsePage } from '../../src/types/portal/page';
 import { untitledTabName } from '../../src/types/portal/portal-tabs';
 
 /**
@@ -472,7 +473,8 @@ describe('tabsTransformer', () => {
         listing('index', 'tutorials')
       ];
 
-      const { title } = (await parsePageFrontMatter(markdown, 'tutorials/index.mdx'))._unsafeUnwrap();
+      const parsed = await parsePage(markdown, new FileName('index.mdx'), 'tutorials/index.mdx');
+      const { title } = parsed.frontMatter._unsafeUnwrap();
 
       expect(tabNames({ docs })).to.include(title);
     });

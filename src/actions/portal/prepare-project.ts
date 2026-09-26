@@ -1,8 +1,4 @@
-import {
-  PortalProjectPaths,
-  PortalProjectService,
-  ProjectContent
-} from '../../infrastructure/portal-project-service.js';
+import { PortalProjectPaths, PortalProjectService } from '../../infrastructure/portal-project-service.js';
 import { PortalArtifactsService } from '../../infrastructure/services/portal-artifacts-service.js';
 import { PortalAuthorizationService } from '../../infrastructure/services/portal-authorization-service.js';
 import { withPortalProjectDirectory, withDirPath } from '../../infrastructure/tmp-extensions.js';
@@ -18,8 +14,6 @@ import { ActionResult } from '../action-result.js';
 export interface PreparationSteps {
   /** Asked once the source is read, before the artifacts are fetched; false cancels the run. */
   confirm?: () => Promise<boolean>;
-  /** A preview reads a copy of `content/`, which it updates only with what a build would accept. */
-  content?: ProjectContent;
   onPrepared: (
     portalProject: PortalProjectPaths,
     source: PortalSource,
@@ -42,7 +36,7 @@ export class PreparePortalProjectAction {
   /** Takes the caller's next step rather than returning, because its temporary directories must outlive this call. */
   public readonly execute = async (
     project: ProjectContext,
-    { confirm = async () => true, content = 'source', onPrepared }: PreparationSteps
+    { confirm = async () => true, onPrepared }: PreparationSteps
   ): Promise<ActionResult> => {
     const sourceDirectory = project.sourceDirectory();
 
@@ -102,7 +96,7 @@ export class PreparePortalProjectAction {
       }
 
       return await withPortalProjectDirectory(sourceDirectory, async (tempDirectory) => {
-        const portalProject = await this.projectService.prepare(tempDirectory, source.value, artifacts.value, content);
+        const portalProject = await this.projectService.prepare(tempDirectory, source.value, artifacts.value);
         if (portalProject.isErr()) {
           this.prompts.runtimeUnsupported(portalProject.error);
           return ActionResult.failed();

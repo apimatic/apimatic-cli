@@ -1,9 +1,13 @@
 import * as path from 'path';
 import stripTags from 'striptags';
 
-export const replaceHTML = (string: string) => {
-  return stripTags(string);
-};
+// A link keeps its address, which is all the terminal can show of it, and a line break its line.
+export const replaceHTML = (html: string): string =>
+  stripTags(html.replace(/<a\s[^>]*?href="([^"]*)"[^>]*>.*?<\/a>/gis, '$1').replace(/<br\s*\/?>/gi, '\n'))
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .join('\n');
 
 export const getFileNameFromPath = (filePath: string) => {
   return path.basename(filePath).split('.')[0];

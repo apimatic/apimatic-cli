@@ -187,7 +187,7 @@ describe('PortalProjectService', () => {
       expect(readIdentity().siteUrl).to.equal('https://docs.example.com');
     });
 
-    // The browser bundle imports the file whole, so a path from this machine in it would be
+    // The browser bundle imports these whole, so a path from this machine in one would be
     // published to every visitor.
     it('keeps every path from this machine out of what the browser is told', async () => {
       const contentDirectory = new DirectoryPath(root).join('content');
@@ -195,10 +195,12 @@ describe('PortalProjectService', () => {
 
       (await service.prepare(project, sourceFor({ contentDirectory }), NO_ARTIFACTS))._unsafeUnwrap();
 
-      const identity = fs.readFileSync(path.join(project.toString(), 'portal.identity.json'), 'utf8');
-      expect(identity).to.not.contain(root.split(path.sep).join('/'));
-      expect(identity).to.not.contain(JSON.stringify(root).slice(1, -1));
-      expect(identity).to.not.contain('specs');
+      for (const file of ['portal.identity.json', 'src/lib/source.ts', 'src/styles/app.css']) {
+        const contents = fs.readFileSync(path.join(project.toString(), file), 'utf8');
+        expect(contents, file).to.not.contain(root.split(path.sep).join('/'));
+        expect(contents, file).to.not.contain(JSON.stringify(root).slice(1, -1));
+      }
+      expect(fs.readFileSync(path.join(project.toString(), 'portal.identity.json'), 'utf8')).to.not.contain('specs');
     });
 
     it('writes the stylesheet the block describes beside the one that imports it', async () => {
@@ -226,28 +228,6 @@ describe('PortalProjectService', () => {
       (await service.prepare(project, sourceFor(), NO_ARTIFACTS))._unsafeUnwrap();
 
       expect(readConfig().staticDir).to.be.null;
-    });
-
-    it('substitutes the content directory placeholder, which the Fumadocs macro needs as a literal', async () => {
-      const contentDirectory = new DirectoryPath(root).join('content');
-      fs.mkdirSync(contentDirectory.toString(), { recursive: true });
-
-      (await service.prepare(project, sourceFor({ contentDirectory }), NO_ARTIFACTS))._unsafeUnwrap();
-
-      const module = fs.readFileSync(path.join(project.toString(), 'src/lib/source.ts'), 'utf8');
-      expect(module).to.not.contain('__APIMATIC_CONTENT_DIR__');
-      expect(module).to.contain(JSON.stringify(contentDirectory.toString().split(path.sep).join('/')));
-    });
-
-    it('substitutes the content directory into the stylesheet Tailwind scans', async () => {
-      const contentDirectory = new DirectoryPath(root).join('content');
-      fs.mkdirSync(contentDirectory.toString(), { recursive: true });
-
-      (await service.prepare(project, sourceFor({ contentDirectory }), NO_ARTIFACTS))._unsafeUnwrap();
-
-      const stylesheet = fs.readFileSync(path.join(project.toString(), 'src/styles/app.css'), 'utf8');
-      expect(stylesheet).to.not.contain('__APIMATIC_CONTENT_DIR__');
-      expect(stylesheet).to.contain(contentDirectory.toString().split(path.sep).join('/'));
     });
 
     it('creates an empty content directory when the project has none, so the build has one to read', async () => {
@@ -369,9 +349,8 @@ describe('PortalProjectService', () => {
     });
   });
 
-  // What `portal serve` does with an edited block: the dev server reloads whatever changes.
-  // `portal serve` shows a copy, which it brings in line with each save a build would accept.
-  describe('the copy of content/ a preview reads', () => {
+  // `portal serve` brings the copy in line with each save a build would accept.
+  describe('the copy of content/ the project reads', () => {
     let content: DirectoryPath;
     const copy = () => project.join('content');
 
@@ -401,7 +380,7 @@ describe('PortalProjectService', () => {
     });
 
     const prepareCopy = async () =>
-      (await service.prepare(project, sourceFor({ contentDirectory: content }), NO_ARTIFACTS, 'copy'))._unsafeUnwrap();
+      (await service.prepare(project, sourceFor({ contentDirectory: content }), NO_ARTIFACTS))._unsafeUnwrap();
 
     // The dev server lists the pages once, when it starts, so the copy has to be whole by then.
     it('is made while the project is prepared, of every file but those the build never reads', async () => {
@@ -409,13 +388,6 @@ describe('PortalProjectService', () => {
 
       expect(readConfig().contentDir).to.equal(copy().toString().split(path.sep).join('/'));
       expect(filesIn(copy())).to.deep.equal(['guides/intro.md', 'index.md', 'logo.png']);
-    });
-
-    it('is not made for a build, which reads content/ where it is', async () => {
-      (await service.prepare(project, sourceFor({ contentDirectory: content }), NO_ARTIFACTS))._unsafeUnwrap();
-
-      expect(readConfig().contentDir).to.equal(content.toString().split(path.sep).join('/'));
-      expect(fs.existsSync(copy().toString())).to.be.false;
     });
 
     // A save after the check was not checked, and could be the half-typed one the copy exists to keep out.

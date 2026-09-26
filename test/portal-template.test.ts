@@ -4,6 +4,7 @@ import { execFileSync } from 'child_process';
 import { createRequire } from 'node:module';
 import { expect } from 'chai';
 import {
+  CONTENT_COPY_DIRECTORY_NAME,
   COPIED_DEPENDENCIES,
   LINKED_DEPENDENCIES,
   PortalBuildPaths,
@@ -134,19 +135,21 @@ describe('portal template packaging', () => {
     expect(pageTemplateFiles().sort()).to.deep.equal(PAGE_TEMPLATES.map((name) => `${name}.mdx`).sort());
   });
 
-  it('keeps the content directory placeholder the CLI substitutes', () => {
+  // Each literal reaches the browser bundle as its collection's base, so it must stay relative;
+  // each must also be the directory the CLI writes those pages into.
+  it('compiles the pages from the directories the CLI writes them to, by relative names', () => {
     const source = fs.readFileSync(path.join(templateRoot, 'src/lib/source.ts'), 'utf8');
 
-    // Without this the build would read whatever path the template was authored with.
-    expect(source).to.contain("'__APIMATIC_CONTENT_DIR__'");
+    for (const directory of [CONTENT_COPY_DIRECTORY_NAME, GENERATED_DIRECTORY_NAME]) {
+      expect(source).to.match(new RegExp(`defineDocs\\(\\{\\s*dir: '${directory}',`));
+    }
   });
 
-  // The literal reaches the browser bundle as the collection's base, so it must stay relative;
-  // it must also be the directory the CLI writes the generated pages into.
-  it('compiles the generated pages from the directory the CLI writes them to, by a relative name', () => {
-    const source = fs.readFileSync(path.join(templateRoot, 'src/lib/source.ts'), 'utf8');
+  // Named to Tailwind from `src/styles/`; a rename that missed it would cost every utility class in a page, silently.
+  it('has Tailwind scan the copy of the pages, by its relative name', () => {
+    const stylesheet = fs.readFileSync(path.join(templateRoot, 'src/styles/app.css'), 'utf8');
 
-    expect(source).to.match(new RegExp(`defineDocs\\(\\{\\s*dir: '${GENERATED_DIRECTORY_NAME}',`));
+    expect(stylesheet).to.contain(`@source '../../${CONTENT_COPY_DIRECTORY_NAME}';`);
   });
 
   it('registers the plugin that reloads the generated pages under portal serve', () => {

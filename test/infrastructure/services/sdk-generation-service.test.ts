@@ -121,7 +121,7 @@ describe('SdkGenerationService generation status polling', () => {
       expect(statusRequests.map((request) => request.url)).to.deep.equal([`/sdk/v2/${GENERATION_ID}/status`]);
     });
 
-    it('passes through the HTML sdk generation embeds in messages', async () => {
+    it('turns the HTML sdk generation embeds in messages into lines under their bullet', async () => {
       const message =
         'Main API definition file could not be identified as provided file(s) are either invalid or are in an ' +
         'unrecognized/unsupported format.  (<a href="https://docs.apimatic.io/rulesets/input-file-validation/' +
@@ -131,7 +131,13 @@ describe('SdkGenerationService generation status polling', () => {
 
       const result = await generateSdk();
 
-      expect(errorFrom(result).errorMessage).to.equal('One or more validation errors occurred.\n- ' + message);
+      expect(errorFrom(result).errorMessage).to.equal(
+        'One or more validation errors occurred.\n' +
+          '- Main API definition file could not be identified as provided file(s) are either invalid or are in an ' +
+          'unrecognized/unsupported format.  (https://docs.apimatic.io/rulesets/input-file-validation/' +
+          'main-file-known-format)\n' +
+          '  Error: Directory does not contain any valid API description file..'
+      );
     });
   });
   // The timeout message names the flow it came from, so its wiring is pinned here.

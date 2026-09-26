@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react';
+import { asMarkdown } from 'fumadocs-core/server';
 import { CodeBlock, Pre } from 'fumadocs-ui/components/codeblock';
 import { installCommand } from '@/lib/install-command';
 import { portal } from '@/lib/portal';
@@ -8,6 +9,10 @@ const noSubscribe = () => () => {};
 
 /** The prerender cannot know where the portal is hosted, so the browser swaps in its own origin. */
 export function PluginInstall({ path }: Readonly<{ path: string }>) {
+  // Ahead of the hook, which only React may call; either branch is taken in every render of one environment.
+  if (asMarkdown()) {
+    return `\`\`\`bash\n${installCommand(path, portal.siteUrl)}\n\`\`\``;
+  }
   const origin = useSyncExternalStore(
     noSubscribe,
     () => window.location.origin,

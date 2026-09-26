@@ -1,6 +1,9 @@
 import * as path from 'path';
 import { removeQuotes } from '../../utils/string-utils.js';
 
+/** The path with `/` between its segments, which a shell, a log and a file the build reads all take. */
+export const posix = (value: string): string => value.split(path.sep).join('/');
+
 /** How a reader standing in `from` would type `target`: `./sdk` beside them, else the full path. */
 export function asTypedFrom(target: string, from: DirectoryPath): string {
   const here = path.relative(from.toString(), target);
@@ -11,7 +14,7 @@ export function asTypedFrom(target: string, from: DirectoryPath): string {
   if (path.isAbsolute(here) || here === '..' || here.startsWith(`..${path.sep}`)) {
     return target;
   }
-  return `./${here.split(path.sep).join('/')}`;
+  return `./${posix(here)}`;
 }
 
 export class DirectoryPath {
@@ -41,6 +44,10 @@ export class DirectoryPath {
 
   public toString(): string {
     return this.directoryPath;
+  }
+
+  public toPosix(): string {
+    return posix(this.directoryPath);
   }
 
   public asTypedFrom(from: DirectoryPath): string {
@@ -76,8 +83,6 @@ export class DirectoryPath {
   public relativeTo(base: DirectoryPath): string {
     const here = path.relative(base.directoryPath, this.directoryPath);
 
-    return here === '' || here.startsWith('..') || path.isAbsolute(here)
-      ? this.directoryPath
-      : `./${here.split(path.sep).join('/')}`;
+    return here === '' || here.startsWith('..') || path.isAbsolute(here) ? this.directoryPath : `./${posix(here)}`;
   }
 }

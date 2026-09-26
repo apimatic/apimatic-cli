@@ -19,6 +19,7 @@ import { discardStreamBody } from '../../utils/utils.js';
 import { envInfo } from '../env-info.js';
 import { FileService } from '../file-service.js';
 import {
+  bulleted,
   GenerationTimings,
   pollUntilCompleted,
   TIMING_DEFAULTS,
@@ -319,10 +320,13 @@ export class PortalArtifactsService {
   }
 }
 
+/** The key a problem with the specification itself arrives under, named as the user knows it. */
+const SUBJECTS: Partial<Record<string, string>> = { validationSummary: 'API definition' };
+
 /**
  * A run is all or nothing, and it reports every reason at once: one key per language that failed,
- * plus `plugin`. Listing them under their own names is the only way a user learns that two things
- * went wrong rather than one.
+ * plus `plugin` and the specification's. Listing them under their own names is the only way a user
+ * learns that two things went wrong rather than one.
  */
 const formatPortalArtifactsError: ValidationErrorFormatter = (errors) => {
   const entries = Object.entries(errors);
@@ -330,6 +334,8 @@ const formatPortalArtifactsError: ValidationErrorFormatter = (errors) => {
     return 'Portal artifacts generation failed.';
   }
 
-  const lines = entries.flatMap(([subject, messages]) => messages.map((message) => `${subject}: ${message}`));
-  return 'Portal artifacts could not be generated.\n- ' + lines.join('\n- ');
+  const lines = entries.flatMap(([subject, messages]) =>
+    messages.map((message) => `${SUBJECTS[subject] ?? subject}: ${message}`)
+  );
+  return 'Portal artifacts could not be generated.\n' + bulleted(lines);
 };

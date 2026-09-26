@@ -47,10 +47,12 @@ export function stubPreparePortalProject(): PreparePortalProjectStubs {
     prompts,
     artifacts: sinon.stub(PortalArtifactsService.prototype, 'generate').resolves(ok(completeArtifacts())),
     runtimeProblem: sinon.stub(PortalProjectService.prototype, 'runtimeProblem').returns(null),
-    prepare: sinon
-      .stub(PortalProjectService.prototype, 'prepare')
-      .callsFake(async (projectDirectory) =>
-        ok({ projectDirectory, viteBinary: new FilePath(projectDirectory, new FileName('vite.js')) })
-      )
+    prepare: sinon.stub(PortalProjectService.prototype, 'prepare').callsFake(async (projectDirectory, source) =>
+      ok({
+        projectDirectory,
+        viteBinary: new FilePath(projectDirectory, new FileName('vite.js')),
+        contentSource: source.contentDirectory
+      })
+    )
   };
 }
