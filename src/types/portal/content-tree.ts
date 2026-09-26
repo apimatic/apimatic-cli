@@ -6,7 +6,7 @@ import { FileName } from '../file/fileName.js';
 import { FilePath } from '../file/filePath.js';
 import { ContentNotices } from './content-notices.js';
 import { GENERATED_SECTIONS, GeneratedPages } from './generated-pages.js';
-import { parsePageFrontMatter } from './page-front-matter.js';
+import { ParsedPage } from './page.js';
 import {
   API_REFERENCE_NAME,
   GROUP_FOLDER,
@@ -16,7 +16,7 @@ import {
   NavigationSettings,
   PortalNavigation
 } from './portal-navigation.js';
-import { ContentProblem, PortalSpec, ReservedAddressPage, SharedAddress } from './portal-source.js';
+import { ContentProblem, MissingImage, PortalSpec, ReservedAddressPage, SharedAddress } from './portal-source.js';
 import { PortalTab, sharedTabNames, TabOwner, untitledTabName } from './portal-tabs.js';
 
 const NAVIGATION_FILE = new FileName(NAVIGATION_FILE_NAME);
@@ -27,10 +27,26 @@ const PAGE_EXTENSIONS = ['.md', '.mdx'];
 /** Passed over by Vite's `import.meta.glob`, which the build reads the content through. */
 export const isSkippedByGlob = (name: string) => name.startsWith('.') || name === 'node_modules';
 
+/** Whether the glob passes over `file` below `root`, which it does for a path with any such segment. */
+export const isSkippedWithin = (file: FilePath, root: DirectoryPath): boolean =>
+  file.relativeTo(root).split('/').some(isSkippedByGlob);
+
 /** A file of the tree with what it holds, or undefined when it could not be read. */
 export interface ContentFile {
   file: FilePath;
   contents: string | undefined;
+}
+
+/** A page of the tree as read and parsed; `parsed` is undefined exactly where `contents` is. */
+export interface ReadPage extends ContentFile {
+  parsed: ParsedPage | undefined;
+}
+
+/** What `check` is handed, since the tree reads nothing: its files as read, and the images looked for on disk and not found. */
+export interface ContentRead {
+  pages: ReadPage[];
+  navigationFiles: ContentFile[];
+  missingImages: MissingImage[];
 }
 
 /** A page or `nav.json` a build would accept, as the checks read it. */
@@ -105,19 +121,29 @@ export class ContentTree {
       .filter((file) => file.name().compare(NAVIGATION_FILE) === 0 && !this.isSkipped(file));
   }
 
-  /** Every problem a build would refuse the tree for, or what it would warn of, from the files named above. */
-  public async check(
-    read: { pages: ContentFile[]; navigationFiles: ContentFile[] },
+  /** Whether the build would read `file` as part of `content/`: below it, and not passed over. */
+  public holds(file: FilePath): boolean {
+    return this.tree.directoryPath.contains(file.directory()) && !this.isSkipped(file);
+  }
+
+  /** Every problem a build would refuse the tree for, or what it would warn of, from what it is handed. */
+  public check(
+    read: ContentRead,
     specs: PortalSpec[],
     generatedPages: GeneratedPages
-  ): Promise<Result<ContentNotices, ContentProblem[]>> {
+  ): Result<ContentNotices, ContentProblem[]> {
     const pages = this.contentPages();
     const addressProblems = ContentTree.addressProblems(pages);
 
-    // The build fails as a whole, with a stack trace, over one page whose front matter it refuses.
-    const { titled, errors: frontMatterErrors } = await this.titledPages(read.pages);
-    const problems: ContentProblem[] =
-      frontMatterErrors.length > 0 ? [{ kind: 'invalidFrontMatter', errors: frontMatterErrors }] : [];
+    // The build fails as a whole over one page whose front matter it refuses, or one image it cannot import.
+    const { titled, errors: frontMatterErrors } = this.titledPages(read.pages);
+    const problems: ContentProblem[] = [];
+    if (frontMatterErrors.length > 0) {
+      problems.push({ kind: 'invalidFrontMatter', errors: frontMatterErrors });
+    }
+    if (read.missingImages.length > 0) {
+      problems.push({ kind: 'missingImages', images: read.missingImages });
+    }
 
     // The walk takes each page to be served where it sits, so it would misjudge an entry naming one of these.
     if (addressProblems.length > 0) {
@@ -151,19 +177,15 @@ export class ContentTree {
   }
 
   private isSkipped(file: FilePath): boolean {
-    return file.relativeTo(this.tree.directoryPath).split('/').some(isSkippedByGlob);
+    return isSkippedWithin(file, this.tree.directoryPath);
   }
 
   /** Every page the build accepts with its title, and what it would refuse in the front matter of the rest. */
-  private async titledPages(pages: ContentFile[]): Promise<{ titled: TitledPage[]; errors: string[] }> {
-    const read = await Promise.all(
-      pages.map(async ({ file, contents }) => {
-        const label = file.relativeTo(this.sourceDirectory);
-        const frontMatter =
-          contents === undefined ? err([`${label} could not be read.`]) : await parsePageFrontMatter(contents, label);
-        return frontMatter.map(({ title }): TitledPage => ({ file, title }));
-      })
-    );
+  private titledPages(pages: ReadPage[]): { titled: TitledPage[]; errors: string[] } {
+    const read = pages.map(({ file, parsed }) => {
+      const frontMatter = parsed?.frontMatter ?? err([`${file.relativeTo(this.sourceDirectory)} could not be read.`]);
+      return frontMatter.map(({ title }): TitledPage => ({ file, title }));
+    });
     return {
       titled: read.flatMap((page) => (page.isOk() ? [page.value] : [])),
       errors: read.flatMap((page) => (page.isErr() ? page.error : []))

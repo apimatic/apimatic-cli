@@ -1,6 +1,6 @@
 import path from 'path';
 import { FileName } from './fileName.js';
-import { asTypedFrom, DirectoryPath } from './directoryPath.js';
+import { asTypedFrom, DirectoryPath, posix } from './directoryPath.js';
 
 export class FilePath {
   private readonly fileName: FileName;
@@ -38,16 +38,26 @@ export class FilePath {
     return path.join(this.directoryPath.toString(), this.fileName.toString());
   }
 
+  public toPosix(): string {
+    return `${this.directoryPath.toPosix()}/${this.fileName}`;
+  }
+
   /**
    * How a message names this file to someone standing in `directory`: the path from there,
    * with forward slashes whatever the platform, so the same file reads the same everywhere.
    */
   public relativeTo(directory: DirectoryPath): string {
-    return path.relative(directory.toString(), this.toString()).split(path.sep).join('/');
+    return posix(path.relative(directory.toString(), this.toString()));
   }
 
   public asTypedFrom(from: DirectoryPath): string {
     return asTypedFrom(this.toString(), from);
+  }
+
+  /** The file `relativePath` names from `directory`, with `/` between its segments as a page or a setting writes it. */
+  public static resolve(directory: DirectoryPath, relativePath: string): FilePath {
+    const resolved = path.resolve(directory.toString(), relativePath);
+    return new FilePath(new DirectoryPath(path.dirname(resolved)), new FileName(path.basename(resolved)));
   }
 
   public static create(filePath: string): FilePath | undefined {

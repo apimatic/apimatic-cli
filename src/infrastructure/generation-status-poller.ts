@@ -1,6 +1,7 @@
 import { Status } from '@apimatic/sdk';
 import { err, ok, Result } from 'neverthrow';
 import { REQUEST_TIMEOUT_MS } from '../config/axios-config.js';
+import { replaceHTML } from '../utils/utils.js';
 import { ServiceError } from './service-error.js';
 import { sleep } from './timer-extensions.js';
 
@@ -63,7 +64,7 @@ export async function pollUntilCompleted<T extends GenerationStatus>({
     }
     if (status === Status.SubscriptionError) {
       const message = Object.values(asMessages(errors)).flat()[0];
-      return err(ServiceError.forbidden('Access denied to resource.' + (message ? '\n- ' + message : '')));
+      return err(ServiceError.forbidden('Access denied to resource.' + (message ? '\n' + bulleted([message]) : '')));
     }
 
     // Every other status keeps the run alive rather than ending it: an endpoint reporting
@@ -77,9 +78,13 @@ export async function pollUntilCompleted<T extends GenerationStatus>({
   }
 }
 
+/** Each message under a bullet of its own, any further line of it indented beneath. */
+export const bulleted = (messages: string[]): string =>
+  messages.map((message) => `- ${message.replaceAll('\n', '\n  ')}`).join('\n');
+
 export const formatValidationErrors: ValidationErrorFormatter = (errors) => {
   const messages = Object.values(errors).flat();
-  return 'One or more validation errors occurred.' + (messages.length ? '\n- ' + messages.join('\n- ') : '');
+  return 'One or more validation errors occurred.' + (messages.length ? '\n' + bulleted(messages) : '');
 };
 
 const timedOutMessage = (label: string, budgetMs: number): string => {
@@ -90,5 +95,11 @@ const timedOutMessage = (label: string, budgetMs: number): string => {
   return `${label} timed out after ${minutes} ${minutes === 1 ? 'minute' : 'minutes'}.`;
 };
 
+// The server writes its messages as HTML; the terminal gets their text.
 const asMessages = (errors: Record<string, unknown> | undefined): Record<string, string[]> =>
-  (errors ?? {}) as Record<string, string[]>;
+  Object.fromEntries(
+    Object.entries(errors ?? {}).map(([key, messages]) => [
+      key,
+      (Array.isArray(messages) ? messages : [messages]).map((message) => replaceHTML(String(message)))
+    ])
+  );

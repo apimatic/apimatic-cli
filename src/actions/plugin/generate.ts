@@ -1,4 +1,4 @@
-import { err } from 'neverthrow';
+import { ResultAsync } from 'neverthrow';
 import { ServiceError } from '../../infrastructure/service-error.js';
 import { withDirPath } from '../../infrastructure/tmp-extensions.js';
 import { PluginService } from '../../infrastructure/services/plugin-service.js';
@@ -6,7 +6,7 @@ import { PublishingApiService } from '../../infrastructure/services/publishing-a
 import { PluginGeneratePrompts } from '../../prompts/plugin/generate.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
-import { PluginConfigWriteFailure } from '../../types/plugin-config-context.js';
+import { PluginConfigWriteFailure, unattendedLanguages } from '../../types/plugin-config-context.js';
 import { PluginContext } from '../../types/plugin-context.js';
 import { ProjectContext } from '../../types/project-context.js';
 import { PublishingProfiles } from '../../types/publish/publishing-profiles.js';
@@ -57,20 +57,25 @@ export class PluginGenerateAction {
       return ActionResult.failed();
     }
 
-    const identified =
-      configState.state === 'present' && configState.hasMetadata()
-        ? ActionResult.success(configState)
-        : await new PluginRecordMetadataAction(this.configDir, this.commandMetadata, this.authKey).execute(project);
+    const recorded = unattendedLanguages(configState);
+    if (recorded.length === 0 && !this.prompts.canAsk()) {
+      this.prompts.setupNeedsTerminal(sourceDirectory);
+      return ActionResult.failed();
+    }
+
+    const recordMetadata = new PluginRecordMetadataAction(this.configDir, this.commandMetadata, this.authKey);
+    const identified = await recordMetadata.execute(project, configState);
     if (!identified.isSuccess()) {
       return identified.discardValue();
     }
 
     const config = identified.getValue();
-    const selection = await this.prompts.selectLanguages(config);
+    const selection = recorded.length > 0 ? recorded : await this.prompts.selectLanguages(config);
     if (!selection?.length) {
       this.prompts.noLanguagesSelected();
       return ActionResult.cancelled();
     }
+    this.prompts.recordedLanguagesIncluded(recorded);
 
     this.prompts.languagesNotIncluded(config.unsupportedLanguages());
 
@@ -85,34 +90,26 @@ export class PluginGenerateAction {
         .andThen(PublishingProfiles.create)
         .map((profiles) => profiles.getActiveProfiles().length > 0)
         .unwrapOr(false);
-    if (couldPublishInstead && !(await this.prompts.confirmLocalPlugin())) {
+    if (couldPublishInstead && !(await this.prompts.confirmLocalPlugin(recorded.length > 0))) {
       this.prompts.localPluginCancelled();
       return ActionResult.cancelled();
     }
 
-    const recorded = await configContext.recordLanguages(selection);
-    if (recorded.isErr()) {
-      this.prompts.configNotPrepared(recorded.error, sourceDirectory);
-      return ActionResult.failed();
-    }
-
     const generated = await withDirPath(async (tempDirectory) => {
-      const staged = await configContext.stageUpload(tempDirectory, selection);
-      if (staged.isErr()) {
-        return err(staged.error);
-      }
-
       const tempContext = new TempContext(tempDirectory);
-      const response = await this.prompts.generatePlugin(
-        this.pluginService.generatePlugin(
-          await tempContext.zip(staged.value),
-          this.configDir,
-          this.commandMetadata,
-          this.authKey
+      const written = await configContext.recordLanguages(selection);
+      return await written
+        .asyncAndThen(() => new ResultAsync(configContext.stageUpload(tempDirectory, selection)))
+        .map((staged) => tempContext.zip(staged))
+        .andThen(
+          (upload) =>
+            new ResultAsync(
+              this.prompts.generatePlugin(
+                this.pluginService.generatePlugin(upload, this.configDir, this.commandMetadata, this.authKey)
+              )
+            )
         )
-      );
-
-      return await response.asyncMap(async (stream) => pluginContext.save(await tempContext.save(stream)));
+        .map(async (stream) => pluginContext.save(await tempContext.save(stream)));
     });
     if (generated.isErr()) {
       this.reportGenerationProblem(generated.error, sourceDirectory);
@@ -127,7 +124,7 @@ export class PluginGenerateAction {
     return ActionResult.success();
   };
 
-  /** A staging fault and a generation fault land here alike; only the wording differs. */
+  /** A record, a staging and a generation fault land here alike; only the wording differs. */
   private readonly reportGenerationProblem = (
     problem: ServiceError | PluginConfigWriteFailure,
     sourceDirectory: DirectoryPath

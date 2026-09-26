@@ -1,3 +1,4 @@
+import { ExportFormats } from '@apimatic/sdk';
 import { err, ok, Result } from 'neverthrow';
 import { FileService } from '../infrastructure/file-service.js';
 import { errorMessage } from '../utils/error-utils.js';
@@ -10,23 +11,28 @@ import { FilePath } from './file/filePath.js';
 import { NOT_FOUND_FILE_NAME, SHELL_FILE_NAME } from './portal-context.js';
 import { CONTENT_DIRECTORY_NAME, SPEC_DIRECTORY_NAME, STATIC_DIRECTORY_NAME } from './project-layout.js';
 import { PLACEHOLDER_SITE, SuggestedSite } from './portal/config/site-config.js';
-import { AcceptedContent, ContentFile, ContentTree } from './portal/content-tree.js';
+import { AcceptedContent, ContentFile, ContentTree, ReadPage } from './portal/content-tree.js';
 import { Endpoint } from './portal/endpoint.js';
 import { GeneratedPages, PluginSource } from './portal/generated-pages.js';
 import { OpenApiDocument } from './portal/openapi-document.js';
+import { parsePage } from './portal/page.js';
 import { PortalConfig } from './portal/portal-config.js';
 import { PortalLanguages } from './portal/portal-languages.js';
 import { NAVIGATION_FILE_NAME } from './portal/portal-navigation.js';
 import {
   ContentProblem,
+  MissingFile,
+  MissingImage,
   MissingStaticFile,
   PortalScaffoldProblem,
   PortalSettings,
   PortalSource,
   PortalSourceProblem,
-  PortalSpec
+  PortalSpec,
+  SpecConversion
 } from './portal/portal-source.js';
 import { SpecContext } from './spec-context.js';
+import { TRANSFORMATIONS_DIRECTORY_NAME, transformedFileName } from './transform-context.js';
 
 const SPEC_EXTENSIONS = ['.json', '.yaml', '.yml'];
 
@@ -144,18 +150,53 @@ export class PortalSourceContext {
     }
 
     const content = new ContentTree(tree, this.sourceDirectory);
+    const pages = await this.readPages(content.pages());
     const read = {
-      pages: await this.read(content.pages()),
-      navigationFiles: await this.read(content.navigationFiles())
+      pages,
+      navigationFiles: await this.read(content.navigationFiles()),
+      missingImages: await this.missingImages(pages, content)
     };
-    const checked = await content.check(read, specs, generatedPages);
-    return checked.map((notices) => ({
+    return content.check(read, specs, generatedPages).map((notices) => ({
       notices,
       // Each was read, or the check would have refused the page it could not.
       files: [...read.pages, ...read.navigationFiles].flatMap(({ file, contents }) =>
         contents === undefined ? [] : [{ file, contents }]
       )
     }));
+  }
+
+  private async readPages(files: FilePath[]): Promise<ReadPage[]> {
+    const read = await this.read(files);
+    return await Promise.all(
+      read.map(async ({ file, contents }) => ({
+        file,
+        contents,
+        parsed:
+          contents === undefined
+            ? undefined
+            : await parsePage(contents, file.name(), file.relativeTo(this.sourceDirectory))
+      }))
+    );
+  }
+
+  // The build imports each one, and fails as a whole over one it cannot find, naming no page.
+  private async missingImages(pages: ReadPage[], content: ContentTree): Promise<MissingImage[]> {
+    const missing: MissingImage[] = [];
+    for (const { file: page, parsed } of pages) {
+      for (const { url, line, from, path } of parsed?.images ?? []) {
+        const file = FilePath.resolve(from === 'static' ? this.staticDirectory : page.directory(), path);
+        // One beside its page that `content/`'s copy leaves out is never looked for.
+        if (from === 'page' && !content.holds(file)) {
+          missing.push({ page, line, url, missing: null });
+          continue;
+        }
+        const missingFile = await this.missingFile(file);
+        if (missingFile !== null) {
+          missing.push({ page, line, url, missing: missingFile });
+        }
+      }
+    }
+    return missing;
   }
 
   // A file that cannot be read is reported by the check rather than thrown out of `resolve`.
@@ -245,13 +286,18 @@ export class PortalSourceContext {
   private async missingStaticFiles(config: PortalConfig): Promise<MissingStaticFile[]> {
     const missing: MissingStaticFile[] = [];
     for (const asset of config.staticFiles()) {
-      const file = asset.resolveIn(this.sourceDirectory);
-      const found = await this.fileService.spelledOnDisk(this.sourceDirectory, file);
-      if (!found?.isEqual(file)) {
-        missing.push({ setting: asset.settingPath(), file, foundAs: found });
+      const missingFile = await this.missingFile(asset.resolveIn(this.sourceDirectory));
+      if (missingFile !== null) {
+        missing.push({ setting: asset.settingPath(), ...missingFile });
       }
     }
     return missing;
+  }
+
+  /** How the build would miss `file`: not there, or there in another case; null when it is there as spelt. */
+  private async missingFile(file: FilePath): Promise<MissingFile | null> {
+    const found = await this.fileService.spelledOnDisk(this.sourceDirectory, file);
+    return found?.isEqual(file) ? null : { file, foundAs: found };
   }
 
   /**
@@ -283,7 +329,7 @@ export class PortalSourceContext {
    * project someone downloaded rather than asking for a specification the project has.
    */
   public async primarySpec(): Promise<FilePath | null> {
-    const fileName = (await this.specDirectoryFileNames()).find((name) =>
+    const fileName = (await this.specDirectoryListing()).fileNames.find((name) =>
       SPEC_EXTENSIONS.some((extension) => name.hasExtension(extension))
     );
     return fileName === undefined ? null : new FilePath(this.specDirectory, fileName);
@@ -360,11 +406,13 @@ export class PortalSourceContext {
     let first: OpenApiDocument | undefined;
     const usedSlugs = new Set<string>(RESERVED_SPEC_SLUGS);
 
-    const fileNames = await this.specDirectoryFileNames();
+    const { fileNames, folders } = await this.specDirectoryListing();
     if (fileNames.length === 0) {
-      return err({ kind: 'emptySpecDirectory' });
+      return err({ kind: 'emptySpecDirectory', folders });
     }
 
+    // What each one is, for the conversion a directory without an OpenAPI 3.x document is pointed to.
+    const otherFormats: { file: FilePath; format: string }[] = [];
     const documentNames = fileNames.filter((name) => SPEC_EXTENSIONS.some((extension) => name.hasExtension(extension)));
     for (const fileName of documentNames) {
       const file = new FilePath(this.specDirectory, fileName);
@@ -372,7 +420,11 @@ export class PortalSourceContext {
       if (document === undefined) {
         return err({ kind: 'unreadableSpec', fileName });
       }
-      if (!document.format().supported) {
+      const format = document.format();
+      if (!format.supported) {
+        if (format.format !== null) {
+          otherFormats.push({ file, format: format.format });
+        }
         continue;
       }
 
@@ -381,21 +433,36 @@ export class PortalSourceContext {
     }
 
     if (first === undefined) {
-      return err({ kind: 'noOpenApiSpec' });
+      const [convertible] = otherFormats;
+      // No document declares its format: one the portal would read, by extension, is named before any other file.
+      const conversion =
+        convertible === undefined
+          ? this.conversion(new FilePath(this.specDirectory, documentNames[0] ?? fileNames[0]), null, 0)
+          : this.conversion(convertible.file, convertible.format, otherFormats.length - 1);
+      return err({ kind: 'noOpenApiSpec', conversion });
     }
     return ok({ specs, suggested: specs.length === 1 ? first.suggestedSite() : null });
   }
 
-  private async specDirectoryFileNames(): Promise<FileName[]> {
+  private conversion(file: FilePath, format: string | null, others: number): SpecConversion {
+    const into = this.specDirectory.join(TRANSFORMATIONS_DIRECTORY_NAME);
+    const converted = new FilePath(into, transformedFileName(file, ExportFormats.Openapi3Yaml));
+    return { file, format, converted, others };
+  }
+
+  private async specDirectoryListing(): Promise<{ fileNames: FileName[]; folders: DirectoryPath[] }> {
     if (!(await this.fileService.directoryExists(this.specDirectory))) {
-      return [];
+      return { fileNames: [], folders: [] };
     }
     const directory = await this.fileService.getDirectory(this.specDirectory);
-    // Sorted because this order decides which of two names that normalise to the same slug
-    // keeps it, and which document becomes the default server.
-    return directory.items
-      .flatMap((item) => ('fileName' in item ? [item.fileName] : []))
-      .sort((left, right) => left.compare(right));
+    return {
+      // Sorted because this order decides which of two names that normalise to the same slug
+      // keeps it, and which document becomes the default server.
+      fileNames: directory.items
+        .flatMap((item) => ('fileName' in item ? [item.fileName] : []))
+        .sort((left, right) => left.compare(right)),
+      folders: directory.items.flatMap((item) => (item instanceof Directory ? [item.directoryPath] : []))
+    };
   }
 
   // A path item in another file is read from it; one that file refers on to again is not followed.

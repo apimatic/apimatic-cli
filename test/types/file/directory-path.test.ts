@@ -30,6 +30,16 @@ describe('DirectoryPath.relativeTo', () => {
   });
 });
 
+// What a file the build reads, and a log a reader compares to one, spell a path as on every platform.
+describe('DirectoryPath.toPosix', () => {
+  it('keeps the whole path with forward slashes between its segments', () => {
+    const spelt = new DirectoryPath(path.join('/', 'projects', 'petstore-api', 'src')).toPosix();
+
+    expect(spelt.endsWith('/projects/petstore-api/src')).to.equal(true);
+    expect(spelt).to.not.contain('\\');
+  });
+});
+
 describe('DirectoryPath.fromUserInput', () => {
   const typed = path.join('/', 'projects', 'petstore api');
 

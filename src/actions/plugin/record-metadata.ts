@@ -4,7 +4,7 @@ import { SubscriptionInfo } from '../../types/api/account.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { PluginAuthor, PluginMetadata } from '../../types/plugin/plugin-config.js';
-import { PluginConfig } from '../../types/plugin-config-context.js';
+import { PluginConfig, PluginConfigState, setUpConfig } from '../../types/plugin-config-context.js';
 import { ProjectContext } from '../../types/project-context.js';
 import { ActionResult } from '../action-result.js';
 
@@ -35,7 +35,16 @@ export class PluginRecordMetadataAction {
     this.authKey = authKey;
   }
 
-  public readonly execute = async (project: ProjectContext): Promise<ActionResult<PluginConfig>> => {
+  /** Records the identity a project lacks; one set up already is handed back as it is. */
+  public readonly execute = async (
+    project: ProjectContext,
+    configState: PluginConfigState
+  ): Promise<ActionResult<PluginConfig>> => {
+    const setUp = setUpConfig(configState);
+    if (setUp !== null) {
+      return ActionResult.success(setUp);
+    }
+
     const input = await this.prompts.inputPluginMetadata(DEFAULT_METADATA);
     if ('cancelled' in input) {
       this.prompts.metadataCancelled(input.cancelled);

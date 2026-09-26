@@ -42,14 +42,19 @@ export type PortalScaffoldProblem =
   // `reason` is the message of whatever the file service raised, which nothing here can narrow.
   | { kind: 'sourceUnwritable'; reason: string };
 
-export interface MissingStaticFile {
-  setting: string;
+/** A file the build reads and cannot find. */
+export interface MissingFile {
   file: FilePath;
   /**
    * The same file in another case, when there is one. Found here because Windows and macOS
    * ignore case, but a link in it 404s on the hosts portals are published to, which do not.
    */
   foundAs: FilePath | null;
+}
+
+/** A file `apimatic.json` names, by the setting that names it. */
+export interface MissingStaticFile extends MissingFile {
+  setting: string;
 }
 
 /** A page of the user's served at an address the CLI keeps for the pages it generates. */
@@ -66,6 +71,15 @@ export interface SharedAddress {
   pages: FilePath[];
 }
 
+/** A page's Markdown image that the build would import and not find, which fails the whole build. */
+export interface MissingImage {
+  page: FilePath;
+  line: number;
+  url: string;
+  /** Null for an image beside its page that points out of `content/`'s copy, which the build never looks for. */
+  missing: MissingFile | null;
+}
+
 /** Why `content/` cannot be built; each variant maps to its own message. */
 export type ContentProblem =
   | { kind: 'unreadableContent' }
@@ -73,7 +87,18 @@ export type ContentProblem =
   | { kind: 'reservedAddresses'; pages: ReservedAddressPage[] }
   | { kind: 'sharedAddresses'; addresses: SharedAddress[] }
   | { kind: 'invalidFrontMatter'; errors: string[] }
-  | { kind: 'invalidNavigation'; errors: string[] };
+  | { kind: 'invalidNavigation'; errors: string[] }
+  | { kind: 'missingImages'; images: MissingImage[] };
+
+/** How `api transform` would turn the first document in `spec/` into one the portal reads. */
+export interface SpecConversion {
+  file: FilePath;
+  /** What the document is instead, when it says; null for one that names no format. */
+  format: string | null;
+  /** Where `api transform --destination` of `spec/` writes it, which is one folder too deep. */
+  converted: FilePath;
+  others: number;
+}
 
 /** Why a source directory cannot be built; each variant maps to its own message. */
 export type PortalSourceProblem =
@@ -83,6 +108,7 @@ export type PortalSourceProblem =
   // Every problem found in `content/`, so that one run lists all that a build would refuse.
   | { kind: 'invalidContent'; problems: ContentProblem[] }
   | { kind: 'unreadableSpec'; fileName: FileName }
-  | { kind: 'emptySpecDirectory' }
-  | { kind: 'noOpenApiSpec' }
+  // Its `folders` are not read, and `api transform` writes into one of its own.
+  | { kind: 'emptySpecDirectory'; folders: DirectoryPath[] }
+  | { kind: 'noOpenApiSpec'; conversion: SpecConversion }
   | { kind: 'missingStaticFiles'; files: MissingStaticFile[] };

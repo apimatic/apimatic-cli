@@ -20,7 +20,12 @@ export default defineConfig(async () => {
     plugins: [
       generatedPagesReload(),
       downloads(paths.downloadsDir),
-      fumadocsMdx(),
+      // `/images/logo.png` is read from the static directory, and a remote image is never fetched for its size.
+      fumadocsMdx({
+        globalOptions: {
+          mdxOptions: { remarkImageOptions: { publicDir: publicDir || undefined, external: false } }
+        }
+      }),
       specReload(paths.specs),
       tailwindcss(),
       tanstackStart({

@@ -1,6 +1,5 @@
 import { err, ok } from 'neverthrow';
 import { DirectoryPath } from '../../file/directoryPath.js';
-import { FileName } from '../../file/fileName.js';
 import { FilePath } from '../../file/filePath.js';
 import { Parsed } from './fields.js';
 
@@ -42,12 +41,7 @@ export class StaticAsset {
   }
 
   public resolveIn(sourceDirectory: DirectoryPath): FilePath {
-    const names = this.relativePath.split('/');
-    const fileName = new FileName(names.pop() ?? '');
-    return new FilePath(
-      names.reduce((directory, name) => directory.join(name), sourceDirectory),
-      fileName
-    );
+    return FilePath.resolve(sourceDirectory, this.relativePath);
   }
 
   public settingPath(): string {

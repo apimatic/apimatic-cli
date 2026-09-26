@@ -9,33 +9,6 @@ export const removeQuotes = (input: string): string => {
   return input;
 };
 
-export function stripAnsi(str: string) {
-  let result = '';
-  let i = 0;
-
-  while (i < str.length) {
-    const char = str[i];
-    // Detect ESC (0x1B)
-    if (char === '\x1B' && str[i + 1] === '[') {
-      // We’re at the start of an ANSI sequence. Skip until 'm' or end.
-      i += 2; // skip ESC[
-      while (i < str.length && str[i] !== 'm') {
-        i++;
-      }
-      // Skip the 'm' itself
-      i++;
-    } else if (char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127) {
-      // Skip other control chars (optional)
-      i++;
-    } else {
-      // Normal printable char — keep it
-      result += char;
-      i++;
-    }
-  }
-  return result;
-}
-
 // Editors on Windows, and PowerShell redirection, write a byte-order mark. `JSON.parse`
 // rejects it while the YAML parser strips it, so without this the same document is accepted
 // as `.yaml` and refused as `.json`.
