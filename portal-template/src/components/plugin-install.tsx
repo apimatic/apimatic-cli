@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react';
 import { asMarkdown } from 'fumadocs-core/server';
-import { CodeBlock, Pre } from 'fumadocs-ui/components/codeblock';
+import { CommandBlock } from './command-block';
 import { installCommand } from '@/lib/install-command';
 import { portal } from '@/lib/portal';
 
@@ -11,21 +11,12 @@ const noSubscribe = () => () => {};
 export function PluginInstall({ path }: Readonly<{ path: string }>) {
   // Ahead of the hook, which only React may call; either branch is taken in every render of one environment.
   if (asMarkdown()) {
-    return `\`\`\`bash\n${installCommand(path, portal.siteUrl)}\n\`\`\``;
+    return <CommandBlock command={installCommand(path, portal.siteUrl)} />;
   }
   const origin = useSyncExternalStore(
     noSubscribe,
     () => window.location.origin,
     () => portal.siteUrl
   );
-  return (
-    <CodeBlock>
-      <Pre>
-        <code>
-          {/* A highlighted block's lines carry this class, which is what the block pads. */}
-          <span className="line">{installCommand(path, origin)}</span>
-        </code>
-      </Pre>
-    </CodeBlock>
-  );
+  return <CommandBlock command={installCommand(path, origin)} />;
 }

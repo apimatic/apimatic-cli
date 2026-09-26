@@ -30,6 +30,7 @@ describe('PortalSdk', () => {
       expect(release?.package.name).to.equal('@acme/calculator');
       expect(release?.package.registry).to.equal('npm');
       expect(`${release?.package.url}`).to.equal('https://www.npmjs.com/package/@acme/calculator');
+      expect(release?.package.install).to.equal('npm install @acme/calculator');
     });
 
     it('is on PyPI for Python', () => {
@@ -37,6 +38,7 @@ describe('PortalSdk', () => {
 
       expect(release?.package.registry).to.equal('PyPI');
       expect(`${release?.package.url}`).to.equal('https://pypi.org/project/acme-calculator/');
+      expect(release?.package.install).to.equal('pip install acme-calculator');
     });
 
     it('is on NuGet for C#, named by its package id', () => {
@@ -45,6 +47,7 @@ describe('PortalSdk', () => {
       expect(release?.package.name).to.equal('Acme.Calculator');
       expect(release?.package.registry).to.equal('NuGet');
       expect(`${release?.package.url}`).to.equal('https://www.nuget.org/packages/Acme.Calculator');
+      expect(release?.package.install).to.equal('dotnet add package Acme.Calculator');
     });
 
     it('encodes what an address cannot carry as it is', () => {

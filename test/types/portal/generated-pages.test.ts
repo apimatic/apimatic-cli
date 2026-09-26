@@ -67,7 +67,7 @@ describe('GeneratedPages', () => {
         download: '/__downloads/sdk/typescript.zip',
         source: 'https://github.com/acme/calc-ts',
         version: '1.2.0',
-        packageName: '@acme/calc',
+        install: 'npm install @acme/calc',
         packageUrl: 'https://www.npmjs.com/package/@acme/calc',
         registry: 'npm',
         docs: '../../generated-includes/sdk-docs/typescript.md'
@@ -85,7 +85,7 @@ describe('GeneratedPages', () => {
         download: '/__downloads/sdk/csharp.zip',
         source: '',
         version: '',
-        packageName: '',
+        install: '',
         packageUrl: '',
         registry: '',
         docs: '../../generated-includes/sdk-docs/csharp.md'
@@ -117,7 +117,7 @@ describe('GeneratedPages', () => {
       }).pages();
 
       expect(page.data.version).to.equal('1.0&quot;');
-      expect(page.data.packageName).to.equal('calc&amp;amp;co');
+      expect(page.data.install).to.equal('pip install calc&amp;amp;co');
     });
   });
 

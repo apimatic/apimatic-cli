@@ -160,7 +160,7 @@ function card(sdk: PortalSdk): PageRecord {
     download: sdkDownloadAddress(sdk.language),
     source: source === null ? '' : attribute(source),
     version: release === null ? '' : attribute(release.version),
-    packageName: release === null ? '' : attribute(release.package.name),
+    install: release === null ? '' : attribute(release.package.install),
     packageUrl: release === null ? '' : attribute(release.package.url),
     registry: release === null ? '' : release.package.registry
   };
