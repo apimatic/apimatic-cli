@@ -356,6 +356,12 @@ const stylesheetOf = (output: DirectoryPath) => {
     expect(read('sdks/typescript.md')).to.contain('# TypeScript SDK');
   });
 
+  // The cards want the width a table of contents would take; the language pages keep theirs.
+  it('lays the SDKs page out wide, and each language page as any other', () => {
+    expect(read('sdks/index.html')).to.contain('data-full="true"');
+    expect(read('sdks/typescript/index.html')).to.contain('data-full="false"');
+  });
+
   // Included, so MDX reads them as Markdown: their brace and tag render rather than fail the build.
   it("carries each language's SDK docs, with their headings in the table of contents", () => {
     const page = read('sdks/typescript/index.html');
@@ -364,6 +370,14 @@ const stylesheetOf = (output: DirectoryPath) => {
     expect(page).to.match(/<h2[^>]*id="installation"/);
     expect(page).to.contain('href="#quick-start"');
     expect(read('sdks/typescript.md')).to.contain('## Quick Start');
+  });
+
+  // The generated pages' blocks only: a guide's are its author's to title.
+  it("heads each of the SDK docs' code blocks with its language, and leaves a guide's as written", () => {
+    expect(read('sdks/typescript/index.html')).to.match(/<figcaption[^>]*>Terminal<\/figcaption>/);
+    expect(read('sdks/typescript.md')).to.contain('```bash\nnpm install calc\n```');
+    expect(read('guides/intro/index.html')).to.contain('<pre');
+    expect(read('guides/intro/index.html')).to.not.contain('<figcaption');
   });
 
   it("offers each language's SDK from its card, its page and the site", () => {
@@ -446,7 +460,8 @@ const stylesheetOf = (output: DirectoryPath) => {
  * fixture leaves at their defaults: a logo per mode, a favicon, a primary colour, a forced
  * colour mode and header links. Its specification has a deprecated and an internal operation,
  * and it has no content directory, so it also covers the fallback home page and the default
- * order of the tabs. Its `plugin` block covers the context plugin page.
+ * order of the tabs. Its `plugin` block covers the context plugin page, and its TypeScript
+ * release the card of a published SDK.
  */
 (enabled ? describe : describe.skip)('portal build, branded (end to end)', function () {
   this.timeout(10 * 60 * 1000);
@@ -513,6 +528,21 @@ const stylesheetOf = (output: DirectoryPath) => {
     expect(tree).to.contain('/page/home');
   });
 
+  // The default portal's card is an unpublished one's, with the download in the command's place.
+  it("leads a published SDK's card with its install command, and links its package and source", () => {
+    const index = read('sdks/index.html');
+
+    expect(index).to.match(
+      /<span class="line truncate[^"]*" title="npm install @branded\/pets">npm install @branded\/pets</
+    );
+    expect(index).to.contain('href="https://www.npmjs.com/package/@branded/pets"');
+    expect(index).to.contain('href="https://github.com/branded/pets-ts"');
+    expect(read('sdks.md')).to.contain(
+      '- [TypeScript](/sdks/typescript): `npm install @branded/pets` · [Download SDK](/__downloads/sdk/typescript.zip) · ' +
+        '[View source](https://github.com/branded/pets-ts) · [View on npm](https://www.npmjs.com/package/@branded/pets)'
+    );
+  });
+
   it('writes the context plugin page, and its Markdown twin, for the plugin block', () => {
     const twin = read('context-plugin.md');
 
@@ -529,6 +559,7 @@ const stylesheetOf = (output: DirectoryPath) => {
     expect(read('context-plugin/index.html')).to.match(
       /npx context-plugins install (&quot;|")\/__downloads\/plugin\.zip(&quot;|")/
     );
+    expect(read('context-plugin/index.html')).to.match(/<figcaption[^>]*>Terminal<\/figcaption>/);
     expect(read('__downloads/plugin.zip')).to.equal('PK plugin');
   });
 

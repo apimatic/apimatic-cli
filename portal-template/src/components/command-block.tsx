@@ -1,5 +1,6 @@
 import { asMarkdown } from 'fumadocs-core/server';
 import { CodeBlock, Pre } from 'fumadocs-ui/components/codeblock';
+import { CODE_BLOCK_TITLES } from '@/lib/code-titles';
 
 interface CommandBlockProps {
   command: string;
@@ -14,7 +15,7 @@ export function CommandBlock({ command, compact = false }: Readonly<CommandBlock
   }
   if (!compact) {
     return (
-      <CodeBlock>
+      <CodeBlock title={CODE_BLOCK_TITLES.shellscript}>
         <Pre>
           <code>
             {/* A highlighted block's lines carry this class, which is what the block pads. */}
@@ -35,7 +36,8 @@ export function CommandBlock({ command, compact = false }: Readonly<CommandBlock
     >
       <Pre className="w-full">
         <code>
-          <span className="line truncate" title={command}>
+          {/* The block pads a line only as far as the button's edge, so a cut-off command would run up to it. */}
+          <span className="line truncate [--padding-right:calc(var(--spacing)*10)]" title={command}>
             {command}
           </span>
         </code>

@@ -1,9 +1,9 @@
 import type { ReactNode } from 'react';
 import Link from 'fumadocs-core/link';
 import { asMarkdown } from 'fumadocs-core/server';
-import { ArrowRight } from 'lucide-react';
+import { ArrowDownToLine, ArrowRight, ExternalLink as ExternalLinkIcon } from 'lucide-react';
 import { CommandBlock } from './command-block';
-import { LanguageLogo } from './logos';
+import { LanguageLogo, LogoTile } from './logos';
 import { DownloadLink, ExternalLink, LINK, QUIET_LINK, SdkActions, type SdkActionsProps } from './sdk-actions';
 
 interface SdkCardProps extends SdkActionsProps {
@@ -15,12 +15,25 @@ interface SdkCardProps extends SdkActionsProps {
   install: string;
 }
 
-// Three to a row on the widest page, fewer as it narrows; `auto-fill` keeps a lone card at a card's width.
+// The height and look of the compact install command, whose place it takes.
+const DOWNLOAD_SLOT =
+  'flex items-center gap-2 rounded-lg border bg-fd-secondary px-4 py-1.5 text-sm font-medium text-fd-secondary-foreground transition-colors hover:bg-fd-accent hover:text-fd-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fd-ring';
+
+// By the width the page gives the cards, not the screen's, so each keeps room for its install command.
 export function SdkCards({ children }: Readonly<{ children?: ReactNode }>) {
   if (asMarkdown()) {
     return children;
   }
-  return <div className="not-prose my-6 grid grid-cols-[repeat(auto-fill,minmax(17rem,1fr))] gap-4">{children}</div>;
+  return (
+    <div className="not-prose @container my-6">
+      <div className="grid grid-cols-1 gap-4 @2xl:grid-cols-2 @4xl:grid-cols-3">{children}</div>
+    </div>
+  );
+}
+
+/** The card's language, for a screen reader's list of links, where every card's would otherwise read the same. */
+function LinkContext({ name }: Readonly<{ name: string }>) {
+  return <span className="sr-only">, {name}</span>;
 }
 
 // Not a Fumadocs `Card`, which is one link as a whole: the links inside would be links in a link.
@@ -33,18 +46,32 @@ export function SdkCard({ language, name, page, install, ...actions }: Readonly<
     <article className="flex flex-col rounded-xl border bg-fd-card text-fd-card-foreground">
       <div className="flex flex-1 flex-col gap-4 p-4">
         <div className="flex items-center gap-3">
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-fd-muted">
+          <LogoTile>
             <LanguageLogo language={language} className="size-5" />
-          </span>
+          </LogoTile>
           <h2 className="text-base font-semibold">{name}</h2>
         </div>
-        {install ? <CommandBlock command={install} compact /> : null}
-        {/* A button's height whether or not the download is one, so the links line up across cards. */}
-        <div className="mt-auto flex min-h-9 flex-wrap items-center gap-x-5 gap-y-2">
-          {/* With a package to install from, the download is one way in among others; without one, it is the way in. */}
-          <DownloadLink href={download} leads={packageUrl === ''} />
+        {/* The way in: the install command once a package is published, the download until then. */}
+        {install ? (
+          <CommandBlock command={install} compact />
+        ) : (
+          <DownloadLink href={download} className={DOWNLOAD_SLOT}>
+            <ArrowDownToLine className="size-4" />
+            Download SDK
+            <LinkContext name={name} />
+          </DownloadLink>
+        )}
+        <div className="mt-auto flex flex-wrap items-center gap-x-5 gap-y-2">
+          {install ? (
+            <DownloadLink href={download} className={`${QUIET_LINK} font-medium`}>
+              Download SDK
+              <LinkContext name={name} />
+              <ArrowDownToLine className="size-4" />
+            </DownloadLink>
+          ) : null}
           <Link href={page} className={`${LINK} font-medium hover:text-fd-primary`}>
             Overview
+            <LinkContext name={name} />
             <ArrowRight className="size-4" />
           </Link>
         </div>
@@ -54,11 +81,15 @@ export function SdkCard({ language, name, page, install, ...actions }: Readonly<
           {packageUrl ? (
             <ExternalLink href={packageUrl} className={QUIET_LINK}>
               {registry}
+              <LinkContext name={name} />
+              <ExternalLinkIcon className="size-3.5" />
             </ExternalLink>
           ) : null}
           {source ? (
             <ExternalLink href={source} className={QUIET_LINK}>
               Source
+              <LinkContext name={name} />
+              <ExternalLinkIcon className="size-3.5" />
             </ExternalLink>
           ) : null}
         </div>

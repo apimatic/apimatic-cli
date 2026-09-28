@@ -74,6 +74,16 @@ const aliases: Record<string, keyof typeof languages> = {
   gql: 'graphql'
 };
 
+export type BundledLanguage = keyof typeof languages;
+
+/** The grammar a fence's language names, by its own name or an alias; null for one not bundled. */
+export function bundledLanguage(name: string): BundledLanguage | null {
+  if (Object.hasOwn(languages, name)) {
+    return name as BundledLanguage;
+  }
+  return Object.hasOwn(aliases, name) ? aliases[name] : null;
+}
+
 const bundledLanguages = {
   ...languages,
   ...Object.fromEntries(Object.entries(aliases).map(([alias, id]) => [alias, languages[id]]))

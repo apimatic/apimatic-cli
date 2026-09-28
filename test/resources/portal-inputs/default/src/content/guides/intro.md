@@ -4,3 +4,7 @@ description: The first guide.
 ---
 
 A guide from the fixture.
+
+```bash
+npm install calc
+```
