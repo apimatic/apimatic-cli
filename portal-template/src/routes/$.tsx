@@ -161,7 +161,7 @@ function Page() {
   } else if (page.type === 'openapi') {
     content = (
       <DocsPage full>
-        <PageHeader title={page.title} description={page.description} markdownUrl={page.markdownUrl} />
+        <PageHeader title={page.title} markdownUrl={page.markdownUrl} />
         <DocsBody>
           <OpenAPIPage {...page.props} />
         </DocsBody>
