@@ -1,4 +1,4 @@
-import { ResultAsync } from 'neverthrow';
+import { ok, ResultAsync } from 'neverthrow';
 import { ServiceError } from '../../infrastructure/service-error.js';
 import { withDirPath } from '../../infrastructure/tmp-extensions.js';
 import { PluginService } from '../../infrastructure/services/plugin-service.js';
@@ -6,7 +6,13 @@ import { PublishingApiService } from '../../infrastructure/services/publishing-a
 import { PluginGeneratePrompts } from '../../prompts/plugin/generate.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
-import { PluginConfigWriteFailure, unattendedLanguages } from '../../types/plugin-config-context.js';
+import {
+  PluginConfig,
+  PluginConfigWriteFailure,
+  recordedPluginLanguages,
+  setUpConfig,
+  SetupQuestions
+} from '../../types/plugin-config-context.js';
 import { PluginContext } from '../../types/plugin-context.js';
 import { ProjectContext } from '../../types/project-context.js';
 import { PublishingProfiles } from '../../types/publish/publishing-profiles.js';
@@ -57,9 +63,10 @@ export class PluginGenerateAction {
       return ActionResult.failed();
     }
 
-    const recorded = unattendedLanguages(configState);
-    if (recorded.length === 0 && !this.prompts.canAsk()) {
-      this.prompts.setupNeedsTerminal(sourceDirectory);
+    const recorded = recordedPluginLanguages(configState);
+    const asks: SetupQuestions = { identity: setUpConfig(configState) === null, languages: recorded.length === 0 };
+    if ((asks.identity || asks.languages) && !this.prompts.canAsk()) {
+      this.prompts.setupNeedsTerminal(sourceDirectory, asks);
       return ActionResult.failed();
     }
 
@@ -70,7 +77,7 @@ export class PluginGenerateAction {
     }
 
     const config = identified.getValue();
-    const selection = recorded.length > 0 ? recorded : await this.prompts.selectLanguages(config);
+    const selection = asks.languages ? await this.prompts.selectLanguages(config) : recorded;
     if (!selection?.length) {
       this.prompts.noLanguagesSelected();
       return ActionResult.cancelled();
@@ -90,14 +97,16 @@ export class PluginGenerateAction {
         .andThen(PublishingProfiles.create)
         .map((profiles) => profiles.getActiveProfiles().length > 0)
         .unwrapOr(false);
-    if (couldPublishInstead && !(await this.prompts.confirmLocalPlugin(recorded.length > 0))) {
+    if (couldPublishInstead && !(await this.prompts.confirmLocalPlugin(!asks.identity && !asks.languages))) {
       this.prompts.localPluginCancelled();
       return ActionResult.cancelled();
     }
 
     const generated = await withDirPath(async (tempDirectory) => {
       const tempContext = new TempContext(tempDirectory);
-      const written = await configContext.recordLanguages(selection);
+      const written = asks.languages
+        ? await configContext.recordLanguages(selection)
+        : ok<PluginConfig, PluginConfigWriteFailure>(config);
       return await written
         .asyncAndThen(() => new ResultAsync(configContext.stageUpload(tempDirectory, selection)))
         .map((staged) => tempContext.zip(staged))

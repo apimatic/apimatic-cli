@@ -22,13 +22,19 @@ export type PluginConfigState =
   | { state: 'unreadable'; reason: string; path: FilePath }
   | PluginConfig;
 
-/** The config of a project set up for a plugin, whose identity is recorded so it is generated unasked; else null. */
+/** The config of a project whose plugin identity is recorded, so it is not asked for again; else null. */
 export const setUpConfig = (state: PluginConfigState): PluginConfig | null =>
   state.state === 'present' && state.hasMetadata() ? state : null;
 
-/** The languages a set-up project is generated from without a question; none while any is still to be recorded. */
-export const unattendedLanguages = (state: PluginConfigState): readonly Language[] =>
-  setUpConfig(state)?.recordedLanguages() ?? [];
+/** What `languages` names that a plugin can carry, whether or not the plugin's identity is recorded yet. */
+export const recordedPluginLanguages = (state: PluginConfigState): readonly Language[] =>
+  state.state === 'present' ? state.recordedLanguages() : [];
+
+/** What `plugin generate` has to ask before it can generate. */
+export interface SetupQuestions {
+  identity: boolean;
+  languages: boolean;
+}
 
 export class PluginConfig {
   public readonly state = 'present' as const;

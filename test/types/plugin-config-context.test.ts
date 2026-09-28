@@ -2,7 +2,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { expect } from 'chai';
-import { PluginConfigContext, PluginConfigState, unattendedLanguages } from '../../src/types/plugin-config-context';
+import { PluginConfigContext, PluginConfigState, recordedPluginLanguages } from '../../src/types/plugin-config-context';
 import { DirectoryPath } from '../../src/types/file/directoryPath';
 import { LanguagePublishingEntry, PluginLanguages } from '../../src/types/apimatic-config/languages-block';
 import { PluginIdentityData } from '../../src/types/plugin/plugin-config';
@@ -552,18 +552,24 @@ describe('PluginConfigContext', () => {
       expect((await present()).recordedLanguages()).to.deep.equal([]);
     });
 
-    // What `plugin generate` takes without a question, and nothing until the project is set up.
-    it('is generated unattended from its recorded languages only once the plugin block is there', async () => {
+    // What `plugin generate` takes without asking: `sdk publish` records languages before any plugin block exists.
+    it('takes the recorded languages whether or not the plugin block is there', async () => {
       const plugin = { pluginId: 'acme-payments', pluginName: 'Acme Payments' };
+      const recorded = async () => recordedPluginLanguages(await context.getPluginConfigState());
+
+      expect(await recorded()).to.deep.equal([]);
 
       withConfig({ plugin, languages: { python: {} } });
-      expect(unattendedLanguages(await context.getPluginConfigState())).to.deep.equal([Language.PYTHON]);
+      expect(await recorded()).to.deep.equal([Language.PYTHON]);
 
       withConfig({ languages: { python: {} } });
-      expect(unattendedLanguages(await context.getPluginConfigState())).to.deep.equal([]);
+      expect(await recorded()).to.deep.equal([Language.PYTHON]);
 
       withConfig({ plugin, languages: {} });
-      expect(unattendedLanguages(await context.getPluginConfigState())).to.deep.equal([]);
+      expect(await recorded()).to.deep.equal([]);
+
+      withConfig({ languages: { java: {} } });
+      expect(await recorded()).to.deep.equal([]);
     });
   });
 });
