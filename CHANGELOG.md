@@ -1,3 +1,341 @@
+# [2.0.0-beta.1](https://github.com/apimatic/apimatic-cli/compare/v1.5.0...v2.0.0-beta.1) (2026-09-28)
+
+
+* build!: move to Node 24 and TypeScript 7 ([#347](https://github.com/apimatic/apimatic-cli/issues/347)) ([2528d6e](https://github.com/apimatic/apimatic-cli/commit/2528d6e643e29ac110919c4e04f92c99a103f500))
+* feat(quickstart)!: one funnel, and the language question ([#363](https://github.com/apimatic/apimatic-cli/issues/363)) ([c270135](https://github.com/apimatic/apimatic-cli/commit/c270135df0c743baba3bf5e63f16f95260e1302a)), closes [#361](https://github.com/apimatic/apimatic-cli/issues/361)
+* feat(sdk)!: retire v3 generation and let a publish record itself ([#359](https://github.com/apimatic/apimatic-cli/issues/359)) ([c48f91b](https://github.com/apimatic/apimatic-cli/commit/c48f91b548ae4f148449ddf3f010238edaba18a5)), closes [#358](https://github.com/apimatic/apimatic-cli/issues/358) [#358](https://github.com/apimatic/apimatic-cli/issues/358) [apimatic-io#2233](https://github.com/apimatic-io/issues/2233)
+
+
+### Bug Fixes
+
+* **config:** keep the package configuration a publish did not write ([#392](https://github.com/apimatic/apimatic-cli/issues/392)) ([bc52735](https://github.com/apimatic/apimatic-cli/commit/bc5273588af0b8077fe67113dbc5de126ee2d2b3))
+* **config:** nest publishing under the language ([#350](https://github.com/apimatic/apimatic-cli/issues/350)) ([fbacf74](https://github.com/apimatic/apimatic-cli/commit/fbacf74e559fbf175b8853231cd5586197b21973))
+* **deps:** take fumadocs 16.15.15, which fixes bold text in a built portal ([#388](https://github.com/apimatic/apimatic-cli/issues/388)) ([fa178ab](https://github.com/apimatic/apimatic-cli/commit/fa178ab61b22a0bf1e051cf92788b3ca2726aea1))
+* **plugin:** ask only for the plugin's identity when the languages are recorded ([#389](https://github.com/apimatic/apimatic-cli/issues/389)) ([d721819](https://github.com/apimatic/apimatic-cli/commit/d721819fc02a6722480bf9bb65d52c939b82ef69)), closes [apimatic/apimatic-io#2258](https://github.com/apimatic/apimatic-io/issues/2258)
+* **portal:** bundle the Geist fonts instead of loading them from Google Fonts ([#366](https://github.com/apimatic/apimatic-cli/issues/366)) ([95f2f7e](https://github.com/apimatic/apimatic-cli/commit/95f2f7edd48dd3266e4b6622976a6ec6fafa1db5))
+* **portal:** drop the TypeScript definitions panel from operation pages ([#353](https://github.com/apimatic/apimatic-cli/issues/353)) ([042eb89](https://github.com/apimatic/apimatic-cli/commit/042eb89519491ee8203151743ad0c5490ec9c6db))
+* **portal:** give a run the temp directory the filesystem names, not an alias ([#377](https://github.com/apimatic/apimatic-cli/issues/377)) ([d71d23f](https://github.com/apimatic/apimatic-cli/commit/d71d23f63c7b4c9e700b8e3d08fc6c378c04ff03))
+* **portal:** keep the encoding a page slug carries ([#396](https://github.com/apimatic/apimatic-cli/issues/396)) ([0bec5f4](https://github.com/apimatic/apimatic-cli/commit/0bec5f4e88d9749e525405084389676debc064b3)), closes [apimatic/apimatic-io#2270](https://github.com/apimatic/apimatic-io/issues/2270)
+* **portal:** keep the header's links on one line ([#398](https://github.com/apimatic/apimatic-cli/issues/398)) ([40dc472](https://github.com/apimatic/apimatic-cli/commit/40dc472479b65bf5ecb2e949f2281d327f6ff354))
+* **portal:** keep the portal name on one line in the header ([#395](https://github.com/apimatic/apimatic-cli/issues/395)) ([f3d352c](https://github.com/apimatic/apimatic-cli/commit/f3d352c9446fa599904c5195560978f24cecd90e))
+* **portal:** keep the preview starting until its first page answers ([#399](https://github.com/apimatic/apimatic-cli/issues/399)) ([5359442](https://github.com/apimatic/apimatic-cli/commit/5359442013accefc4f3a9ce50d78896fca937fce))
+* **portal:** name the operations a shared page comes from, in words a spec's author knows ([#387](https://github.com/apimatic/apimatic-cli/issues/387)) ([01197a7](https://github.com/apimatic/apimatic-cli/commit/01197a7d994ff9a28eb48efc5a6ef4202bea6b6f))
+* **portal:** offer the page actions on API reference pages ([#382](https://github.com/apimatic/apimatic-cli/issues/382)) ([22f4873](https://github.com/apimatic/apimatic-cli/commit/22f4873607306ba27e0e2c2eb0e69451d6fac359)), closes [apimatic/apimatic-io#2247](https://github.com/apimatic/apimatic-io/issues/2247) [#383](https://github.com/apimatic/apimatic-cli/issues/383)
+* **portal:** refuse tag and operationId names a URL or a Windows folder cannot hold ([#400](https://github.com/apimatic/apimatic-cli/issues/400)) ([0ea01b2](https://github.com/apimatic/apimatic-cli/commit/0ea01b2ce3537e434e95cbe765a59a67d167e16c)), closes [apimatic/apimatic-io#2262](https://github.com/apimatic/apimatic-io/issues/2262) [#396](https://github.com/apimatic/apimatic-cli/issues/396)
+* **portal:** render a request body in a media type Fumadocs has no adapter for ([#386](https://github.com/apimatic/apimatic-cli/issues/386)) ([9f89ad3](https://github.com/apimatic/apimatic-cli/commit/9f89ad3d3f6296130d8178aabca62e56c1babf2e))
+* **portal:** render an operation whose response example has no value ([#373](https://github.com/apimatic/apimatic-cli/issues/373)) ([1dc84ad](https://github.com/apimatic/apimatic-cli/commit/1dc84ad797384e9d7cc55eb55192092b9b587379))
+* **portal:** render split OpenAPI specifications correctly ([#354](https://github.com/apimatic/apimatic-cli/issues/354)) ([d97cda6](https://github.com/apimatic/apimatic-cli/commit/d97cda690e967346fa6493edffb705edfea1fc44))
+* **portal:** stop printing an operation's raw description under its title ([#383](https://github.com/apimatic/apimatic-cli/issues/383)) ([25b9f6e](https://github.com/apimatic/apimatic-cli/commit/25b9f6e677e73df15659f6526f5c8fc3623e2b0b)), closes [apimatic/apimatic-io#2242](https://github.com/apimatic/apimatic-io/issues/2242)
+* **quickstart:** download the sample spec from its new openapi.json path ([#401](https://github.com/apimatic/apimatic-cli/issues/401)) ([ebc6743](https://github.com/apimatic/apimatic-cli/commit/ebc67436b94d5084f0e0b0c502f3b58161a64334))
+* the release test's high and medium findings ([#375](https://github.com/apimatic/apimatic-cli/issues/375)) ([7fe41e1](https://github.com/apimatic/apimatic-cli/commit/7fe41e180230a3d491283fe74f9de9c8f9785939))
+
+
+### Features
+
+* code samples support ([#352](https://github.com/apimatic/apimatic-cli/issues/352)) ([7b82568](https://github.com/apimatic/apimatic-cli/commit/7b82568b228cd665b9f103a0c636ef77c00d7d92))
+* **config:** replace portal.json and plugin-config.json with apimatic.json ([#348](https://github.com/apimatic/apimatic-cli/issues/348)) ([506f67f](https://github.com/apimatic/apimatic-cli/commit/506f67f6e0b9c4ea7b79f356f3db7c5aa4cb96cd))
+* local plugin generation ([#358](https://github.com/apimatic/apimatic-cli/issues/358)) ([5ba70de](https://github.com/apimatic/apimatic-cli/commit/5ba70dedc757e4d1cee05eddc69c1f84d9ea8f07)), closes [#351](https://github.com/apimatic/apimatic-cli/issues/351) [#346](https://github.com/apimatic/apimatic-cli/issues/346) [#348](https://github.com/apimatic/apimatic-cli/issues/348) [#318](https://github.com/apimatic/apimatic-cli/issues/318)
+* **portal:** build the documentation portal locally with Fumadocs ([#343](https://github.com/apimatic/apimatic-cli/issues/343)) ([073d09a](https://github.com/apimatic/apimatic-cli/commit/073d09aee9b0fe40dc9ee4cdae428bf7dc8cf075))
+* **portal:** build the SDK and Context Plugin pages from real templates and the portal artifacts ([#369](https://github.com/apimatic/apimatic-cli/issues/369)) ([0efd7b3](https://github.com/apimatic/apimatic-cli/commit/0efd7b3e4e49d887a621d9888c0944ea420f707f))
+* **portal:** fetch the artifacts from /portal-artifacts ([#361](https://github.com/apimatic/apimatic-cli/issues/361)) ([0e823f3](https://github.com/apimatic/apimatic-cli/commit/0e823f3d1f3fdcb464af13f78bf5c26327dcbd57))
+* **portal:** generate the SDK and context plugin pages ([#360](https://github.com/apimatic/apimatic-cli/issues/360)) ([338b14a](https://github.com/apimatic/apimatic-cli/commit/338b14a1de49b2887f2e08f42a246b99f99496b6))
+* **portal:** give the portal block its v2 shape, with branding and tabs ([#355](https://github.com/apimatic/apimatic-cli/issues/355)) ([d0fb189](https://github.com/apimatic/apimatic-cli/commit/d0fb189da70afcec949bc658287b653a39519306))
+* **portal:** lead each SDK card with its install command ([#376](https://github.com/apimatic/apimatic-cli/issues/376)) ([119e9d6](https://github.com/apimatic/apimatic-cli/commit/119e9d644c25f6465ad65224a47b22adb42e8ee8)), closes [#375](https://github.com/apimatic/apimatic-cli/issues/375)
+* **portal:** let the root nav.json decide the tabs, and fix the nav.json QA findings ([#371](https://github.com/apimatic/apimatic-cli/issues/371)) ([ecf7666](https://github.com/apimatic/apimatic-cli/commit/ecf76668ec6e265c8afc7f36a3203c8687770d3b))
+* **portal:** order the sidebar from nav.json ([#346](https://github.com/apimatic/apimatic-cli/issues/346)) ([306e4f9](https://github.com/apimatic/apimatic-cli/commit/306e4f9a8cfb9fa0be2cd2807abe7f559df644ff))
+* **portal:** point to api transform when src/spec has no OpenAPI 3.x document ([#364](https://github.com/apimatic/apimatic-cli/issues/364)) ([eefc917](https://github.com/apimatic/apimatic-cli/commit/eefc9178d76c5863c5af6fb632463364716a7052))
+* **portal:** the SDK Overview design, on the SDKs, language and plugin pages ([#391](https://github.com/apimatic/apimatic-cli/issues/391)) ([fd3fe34](https://github.com/apimatic/apimatic-cli/commit/fd3fe3463def3c1650e4df658480982c4dfd2624))
+* **quickstart:** suggest validating with an AI agent when a spec fails ([#385](https://github.com/apimatic/apimatic-cli/issues/385)) ([36fd2bb](https://github.com/apimatic/apimatic-cli/commit/36fd2bb258b70cf20212ce64e8bee0cbc55addcd))
+
+
+### Reverts
+
+* **portal:** offer the page actions on API reference pages ([#382](https://github.com/apimatic/apimatic-cli/issues/382)) ([#397](https://github.com/apimatic/apimatic-cli/issues/397)) ([c087ef9](https://github.com/apimatic/apimatic-cli/commit/c087ef927e5e6919b5626dab24d203ebdd1f2fca)), closes [#388](https://github.com/apimatic/apimatic-cli/issues/388) [apimatic/apimatic-io#2247](https://github.com/apimatic/apimatic-io/issues/2247)
+
+
+### BREAKING CHANGES
+
+* `apimatic sdk save-changes` is removed, along with
+`--codegen-version`, `--stability`, `--track-changes` and `--skip-changes`
+on `sdk generate` and `--codegen-version`, `--stability` and
+`--update-plugin-config` on `sdk publish`. Java, Ruby, Go and PHP cannot be
+generated until they reach v4.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+
+* fix(sdk): keep --stability, which outlived the version it came with
+
+Retiring v3 took `--stability` with it on the grounds that there was one
+answer left. There is one answer *today*: v4 renders every language at beta
+and they reach stable one at a time, so the level is a choice that survives
+the version being fixed.
+
+The flag is back on both commands, defaulting to stable as before, and the
+level a language offers is a table rather than a constant — `stableLevels`
+of one is answered without asking, and the interactive flow puts the
+question back the moment a language has two. `sdk publish` names the level
+in its summary only when the user chose it, read from oclif's parse
+metadata, because `--stability stable` and the default are the same string
+and the doc's block has no such row.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+
+* fix(sdk): keep --codegen-version, with one version in it
+
+Retiring v3 removed the flag along with the version, on the grounds that a
+choice of one is not a choice. But the flag is how a caller says which
+generator they want, and there will be a v5: removing it makes that move a
+release that changes what people get, rather than a value they pass.
+
+`CodeGenerationVersion` now holds `V4` alone, and stays an enum so the next
+one is a line in it. The flag is back on both commands, accepting `v4`,
+defaulting to `v4`, and refusing `v3` by name rather than generating
+something else quietly. `sdk publish` names it in its telemetry again.
+
+It is not written down. `codegenVersion` left `apimatic.json` when the
+service took over deciding the generator, so the flag says what to generate
+with and nothing records what was used.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+
+* fix(config): drop codegenVersion from the published schema
+* `apimatic quickstart` no longer offers a choice between a
+portal and an SDK. It always builds a portal, and `apimatic sdk generate`
+is the command for an SDK alone.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+
+* feat(quickstart): ask which languages the portal covers
+
+The one question quickstart asks besides the spec. Every language a plugin
+can carry comes up checked, because a first portal covering everything it
+can is what a single Enter should give, and the four it cannot are named in
+the prompt rather than left out in silence.
+
+The answer is written to `apimatic.json` through `recordLanguages` before
+anything is built, because that file is what says which SDKs a portal
+documents — every command after this one reads it rather than the answer
+that produced it.
+
+`languageLabel` moves to `types/sdk/generate.ts`, where both prompts that
+name a language can reach it, and TypeScript is spelled the way its own
+project spells it.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+
+* feat(quickstart): name the plugin after the folder, without asking
+
+The `plugin` block is what asks the service for a context plugin, so
+quickstart has to write one — and the journey allows it no question about
+plugins. The identity comes from the directory the user is standing in.
+
+A folder name is not a plugin id. `Acme Payments` and `acme_payments` are
+ordinary names and neither is the kebab-case `pluginId` has to be, so the
+id is made from the name while the name itself is kept as typed — the id
+goes to `gh repo create`, the name is what a reader sees. A directory whose
+name survives none of that falls back, because writing an id the config
+would then refuse is worse than not deriving one.
+
+`0.1.0` for the version: every plugin starts somewhere.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+
+* feat(quickstart): keep generated files out of the repository
+
+Every command that builds a portal writes `src/static/sdk/`,
+`src/static/plugin.zip` and an expanded `./plugin` into the project. None
+of it belongs in a repository, and `portal serve` writes it too — so
+without this a preview leaves a clean checkout dirty.
+
+`/plugin/` is the one that matters. `plugin publish` runs `git init` inside
+that directory and pushes it as its own repository; a parent tracking it
+would nest one repository inside another.
+
+Quickstart writes the entries because quickstart is what makes the project.
+It appends what is missing and rewrites nothing, so a `.gitignore` the user
+wrote survives and re-running in an adopted directory stacks no duplicates.
+
+The paths are ignored here before anything on this branch produces them:
+the placement lands with the `/portal-artifacts` call, and a user whose
+first build dirties their tree has already been failed by then.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+
+* fix(quickstart): end in the preview again, and say the coming languages under the answer
+
+Two things, both about where a line belongs.
+
+The rebase onto dev quietly took dev's ending for the wizard -- the one that
+stops at the scaffold because "the wizard does not ask for the project's SDK
+languages yet". It does, three lines above that comment. The handoff to
+`portal serve`, and the `onAfterServe` the serve action took for it, had both
+gone; nothing failed, because no test described the funnel's own ending. One
+does now.
+
+`Next Steps` loses its first two items with them. It told the user to name
+their SDK languages and then start a preview; the wizard has just done both.
+What is left is what to change now that the portal is on screen.
+
+The coming-soon languages move out of the multiselect's message and under the
+answer, in grey. Inside the message they rendered above the languages the user
+had picked, in the green a submitted answer is drawn in, reading like a fourth
+option rather than a footnote to the three.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+
+* feat(portal): give quickstart the api transform hint, with the format it needs
+
+Quickstart checks the spec itself before it writes the project, so the
+transform hint portal generate and portal serve now give never reached it.
+A Postman collection or a RAML file was told only that it was not an
+OpenAPI document, with nothing to do about it.
+
+Both now end on one sentence, which names --format=openapi3yaml: the
+transform refuses to run without a format, so the command as printed
+before would have failed.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+
+* fix(quickstart): ignore only what is still generated into the project
+* engines.node is now >=24.0.0. Node 22 is no longer supported.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+
+* fix(sdk): build the validation service once configDir is assigned
+
+`validationService` was initialised from `this.configDir` in a property
+initialiser, but `configDir` is a constructor parameter property. The code only
+worked because TypeScript's downlevel emit assigns parameter properties before
+property initialisers; under the native class-field semantics that a modern
+target selects, `this.configDir` is still undefined at that point and the
+service would be constructed with no config directory.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+
+* build: compile with TypeScript 7, keeping TypeScript 6 for linting
+
+TypeScript 7 is the native compiler. On this repo it builds `src` in ~1.3s
+against ~4.7s, and type-checks the suite in ~1.0s against ~4.8s. Emitted
+output is unchanged apart from sourcemaps, temp-variable naming and
+declaration ordering.
+
+typescript-eslint cannot run on it: every published version, canary included,
+declares `typescript >=4.8.4 <6.1.0` and throws at module init on TS 7, which
+would take out `lint`, `posttest` and the pre-commit hook. So the two sit side
+by side in Microsoft's documented arrangement — `tsc` is TypeScript 7 and
+builds, bare `typescript` is the TypeScript 6 shim that only the linter loads.
+Naming them this way rather than aliasing TypeScript 7 keeps the compiler each
+script gets written down, and survives `pnpm update --latest`.
+
+TypeScript 6 stopped sweeping node_modules/@types, so the test project names
+the globals the suite needs; the source project resolves its types through
+`node:` imports and needs no list.
+
+`target` moves to es2024 now that the engine floor is Node 24, which also
+selects native class-field semantics. `ts-node` goes: it drives the classic
+compiler API, which TypeScript 7 no longer ships, and the suite runs on tsx.
+`@types/mocha` was six years behind mocha and had to be named explicitly.
+
+The `typescript.tsdk` pin is dropped. It is deprecated in favour of
+`js/ts.tsdk.path`, inert unless a developer opts in by hand, and would now
+point at a TypeScript 6 build within a patch of what VS Code already bundles.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+
+* ci: test on Node 24 and 26, and release on 24
+
+The engine floor is Node 24, so the 22 legs go. The second leg is 26 rather
+than the floor alone: 26 becomes LTS on 2026-10-28, inside this major's life,
+so it is what most developers will be running. The job count is unchanged.
+
+Releasing on Node 24 drops the `npm install -g npm@latest` step, whose only
+purpose was that Node 22 bundles npm 10.9.8 while OIDC trusted publishing
+needs 11.5.1. Node 24 bundles 11.19.0. The constraint moves to a comment on
+the matrix, since pinning that job back to 22 would silently break publishing.
+
+`npm-tag-latest.yml` carried a `node: [ '14' ]` matrix that no step consumed;
+the job never sets up Node at all.
+
+The standalone pnpm in test.yml is kept rather than reverted to corepack. Its
+original reason is gone, but it is a SHA-pinned executable that needs no Node
+of its own, where corepack would resolve pnpm from the registry at run time and
+need the three-step setup-node dance the other workflows use. The comment now
+states the reason that actually holds.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+
+* chore(vscode): repair the CLI debug configuration
+
+`preLaunchTask` named a task the TypeScript extension provides, and that
+provider is not registered when the extension stands down for TypeScript 7, so
+the configuration would fail to start. The npm task provider supplies `build`
+regardless, and still rebuilds before launching.
+
+`program` pointed at `bin/run`, deleted in the ESM migration; it only launched
+because Node appends `.js`. The forty commented-out argument lines carried
+another machine's absolute paths.
+
+`.gitignore` re-ignored `.vscode/launch.json` in its custom section, cancelling
+the allowlist above it. Inert while the file is tracked, but it would have
+refused a re-add.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+
+* docs: record the two-compiler toolchain and how to remove it
+
+The `typescript` dependency no longer being the compiler is surprising enough
+to look like a mistake, so state why it is there, which command gets which
+compiler, and the condition for deleting the arrangement.
+
+Also corrects the build commands, which documented `tsc -b` although the
+project has no references and the scripts call plain `tsc`.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+
+* ci: remove unused action
+
+* fix: broken test
+
+* fix: mock fs broken in node 26
+
+* ci: install pnpm standalone in the build and release workflows
+
+Corepack is not distributed with Node 25 and newer, so the Node 26 leg of
+check_build could not bootstrap pnpm. Also correct the release floor: npm
+11.5.1, which trusted publishing needs, first ships in Node 24.5.0.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+
+* fix(hooks): check the running Node against the declared engine range
+
+Read engines.node from the manifest oclif has already parsed and compare
+with semver, so package.json is the single source of the floor and a
+minor-version floor is honoured. Test the hook's behaviour on both sides
+of the range, and hold the CLI's range to the Node floors the portal
+template's dependencies declare.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+
+* docs: name the e2e test that depends on the two-compiler arrangement
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+
+* chore: untrack launch.json and drop leftover config
+
+launch.json goes back to being a personal, ignored file. mocha.opts named
+ts-node and has been unused since mocha 8. ESLint now skips Claude Code
+worktrees under .claude.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+
+* fix(portal): bind the prerender preview server to 127.0.0.1
+
+The prerender pass fetched pages from a preview server on `localhost`.
+On macOS it listened on `::1` only; a stalled connect under load fell
+back to 127.0.0.1 and was refused, failing the portal build.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+
 # [1.5.0](https://github.com/apimatic/apimatic-cli/compare/v1.4.0...v1.5.0) (2026-09-14)
 
 
