@@ -113,9 +113,9 @@ Let's get started!`);
 
   public specValidationFailed(spec: ResourceInput) {
     log.error(`Oops, it looks like there are some errors in your API Definition`);
-    const validateCommand = `${f.cmdAlt('apimatic', 'api', 'validate')} ${
-      spec instanceof UrlPath ? f.flag('url', spec.toString()) : f.flag('file', spec.toString())
-    }`;
+    // A placeholder rather than the user's own path or URL, which no quoting survives every shell with.
+    const specFlag = spec instanceof UrlPath ? f.flag('url', '<url>') : f.flag('file', '<path>');
+    const validateCommand = `${f.cmdAlt('apimatic', 'api', 'validate')} ${specFlag}`;
     const message = [
       `Ask an AI coding agent to run this command and fix what it reports:`,
       validateCommand,

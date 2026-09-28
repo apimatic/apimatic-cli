@@ -41,36 +41,31 @@ describe('QuickstartPrompts', () => {
 
   describe('specValidationFailed', () => {
     let write: sinon.SinonStub;
-    // The section is boxed or not depending on the terminal's width; either way it reaches stdout.
-    const howToFix = () =>
-      stripVTControlCharacters(write.getCalls().map((call) => String(call.args[0])).join(''))
-        .replace(/[│╮╯├─◇]/g, ' ')
-        .replace(/\s+/g, ' ');
+    // Boxed or not depending on the terminal's width, but each of these stays on a line of its own.
+    const howToFix = () => stripVTControlCharacters(write.args.map(([chunk]) => String(chunk)).join(''));
 
     beforeEach(() => {
       write = sinon.stub(process.stdout, 'write').returns(true);
     });
 
     it('suggests an AI agent run validate on a local spec, or the VS Code extension', () => {
-      const spec = new FilePath(specs, new FileName('petstore.json'));
-      prompts.specValidationFailed(spec);
+      prompts.specValidationFailed(new FilePath(specs, new FileName('petstore.json')));
       write.restore();
 
       expect(howToFix()).to.contain('How to fix');
+      expect(howToFix()).to.contain('Ask an AI coding agent to run this command and fix what it reports:');
+      expect(howToFix()).to.contain('apimatic api validate --file=<path>');
+      expect(howToFix()).to.contain("Or use APIMatic's interactive VS Code Extension:");
       expect(howToFix()).to.contain(
-        `Ask an AI coding agent to run this command and fix what it reports: apimatic api validate --file=${spec}`
-      );
-      expect(howToFix()).to.contain(
-        "Or use APIMatic's interactive VS Code Extension: " +
-          'https://marketplace.visualstudio.com/items?itemName=apimatic-developers.apimatic-for-vscode'
+        'https://marketplace.visualstudio.com/items?itemName=apimatic-developers.apimatic-for-vscode'
       );
     });
 
-    it('names a spec that came from a URL by that URL', () => {
+    it('suggests validating a spec that came from a URL by its URL', () => {
       prompts.specValidationFailed(new UrlPath('https://example.com/openapi.json'));
       write.restore();
 
-      expect(howToFix()).to.contain('apimatic api validate --url=https://example.com/openapi.json');
+      expect(howToFix()).to.contain('apimatic api validate --url=<url>');
     });
   });
 });
