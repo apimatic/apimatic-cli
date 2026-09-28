@@ -23,12 +23,24 @@ export async function openApiSection(slug: string, file: string, codeSamplesFile
     slugify
   });
   refuseSharedPages(section.files, path.basename(file));
+  refuseSharedFolders(section.files, path.basename(file));
   return { files: section.files };
 }
 
-// Fumadocs' default, owned here so the check below names a tag's folder the way Fumadocs does.
+/** What a Windows folder name cannot hold, and what a URL path segment cannot hold unescaped. */
+const UNSAFE_IN_PATH = /[<>:"/\\|?*#%{}[\]^`\p{Cc}]/gu;
+
+/**
+ * A tag's folder, and so its URL. Fumadocs' default only turns whitespace into dashes, so
+ * 'Component: Price Points' became a folder Windows cannot create. An unsafe character is
+ * read as a space, and dots are trimmed: Windows drops a trailing one, and '..' climbs out.
+ */
 function slugify(name: string): string {
-  return name.replace(/\s+/g, '-').toLowerCase();
+  return name
+    .replace(UNSAFE_IN_PATH, ' ')
+    .replace(/^[\s.]+|[\s.]+$/g, '')
+    .replace(/\s+/g, '-')
+    .toLowerCase();
 }
 
 type SectionFile = Awaited<ReturnType<ReturnType<typeof createOpenAPI>['staticSource']>>['files'][number];
@@ -37,7 +49,7 @@ type SectionFile = Awaited<ReturnType<ReturnType<typeof createOpenAPI>['staticSo
  * Fumadocs writes a page per tag an operation lists, in the tag's folder and named after the
  * operationId, so two pages land at one path, and one is left out without a word, when two
  * operations share an operationId (or have none, and paths that read alike), or when one
- * operation lists a tag twice, or two tags that differ only in case or spacing.
+ * operation lists a tag twice, or two tags that differ only in case, spacing or punctuation.
  */
 function refuseSharedPages(files: SectionFile[], specName: string): void {
   const pages = new Map<string, OpenAPIPageData>();
@@ -134,11 +146,72 @@ function sharedTagFolderMessage(folder: string, operation: DocumentedOperation, 
   if (tags.length >= 2) {
     return [
       `The operation ${operation.label} in '${specName}' lists the tags '${tags[0]}' and '${tags[1]}', which the portal shows as one section.`,
-      'Rename one of them so they differ in more than case or spacing.'
+      'Rename one of them so they differ in more than case, spacing or punctuation.'
     ].join('\n');
   }
   return [
     `The operation ${operation.label} in '${specName}' would be documented twice on the same page.`,
     'Give each of its tags a distinct name.'
+  ].join('\n');
+}
+
+/**
+ * Fumadocs groups by a tag's name but names the folder after its slug, so two tags that slugify
+ * alike, on different operations, write two metas into one folder. One replaces the other, and
+ * the operations it listed drop out of the sidebar without a word.
+ */
+function refuseSharedFolders(files: SectionFile[], specName: string): void {
+  const metas = new Set<string>();
+  for (const file of files) {
+    if (file.type !== 'meta') {
+      continue;
+    }
+    if (metas.has(file.path)) {
+      throw new Error(sharedFolderMessage(path.basename(path.dirname(file.path)), tagNames(files), specName));
+    }
+    metas.add(file.path);
+  }
+}
+
+/** The tags the document declares, then those its operations list without declaring them. */
+function tagNames(files: SectionFile[]): string[] {
+  const names = new Set<string>();
+  for (const file of files) {
+    if (file.type === 'meta') {
+      continue;
+    }
+    const { tags } = file.data.getOpenAPIPageProps().payload.bundled as unknown as JsonObject;
+    for (const tag of Array.isArray(tags) ? tags : []) {
+      if (isJsonObject(tag) && typeof tag.name === 'string') {
+        names.add(tag.name);
+      }
+    }
+    for (const tag of documented(file.data).tags) {
+      names.add(tag);
+    }
+  }
+  return [...names];
+}
+
+function sharedFolderMessage(folder: string, tags: string[], specName: string): string {
+  const [first, second] = tags.filter((tag) => slugify(tag) === folder);
+  if (second !== undefined) {
+    return [
+      `The tags '${first}' and '${second}' in '${specName}' would share the folder '${folder}', so the portal would show only one of them.`,
+      'Rename one of them so they differ in more than case, spacing or punctuation.'
+    ].join('\n');
+  }
+  // A tag with an empty slug is filed in its parent's folder, or the section's own.
+  const unnamed = tags.find((tag) => slugify(tag) === '');
+  if (unnamed !== undefined) {
+    return [
+      `The tag '${unnamed}' in '${specName}' has no character the portal can use in a URL or a folder name.`,
+      'Rename it.'
+    ].join('\n');
+  }
+  // Fumadocs files the operations that list no tag under 'unknown'.
+  return [
+    `The tag '${first ?? folder}' in '${specName}' would share the folder '${folder}' with the operations that have no tag.`,
+    'Rename the tag, or tag those operations.'
   ].join('\n');
 }

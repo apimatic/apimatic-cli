@@ -17,7 +17,7 @@
     "/{operation}": {
       "get": {
         "tags": [
-          "Simple Calculator"
+          "Simple: Calculator"
         ],
         "summary": "Calculate",
         "description": "Calculates the expression using the specified operation.",
@@ -97,7 +97,7 @@
   ],
   "tags": [
     {
-      "name": "Simple Calculator",
+      "name": "Simple: Calculator",
       "description": ""
     }
   ]
