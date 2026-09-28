@@ -127,8 +127,7 @@ const STACK_FRAME = /^\s+at\s/;
 // dropped first; they also carry the store paths of the CLI's own dependencies.
 const INTERNAL_FRAME = new RegExp(STACK_FRAME.source + /.*(?:[\\/]node_modules[\\/]|\(node:)/.source);
 
-// Vite's report of a failed build, or of a dev server that failed to start, opens with one of these and the
-// error, after whatever it printed on the way; a build's ends with the import chain a plain tail shows.
+// Where Vite's report of a failed build, or of a dev server that failed to start, begins.
 const ERROR_HEADINGS = ['error during build:', 'error when starting dev server:'];
 
 /** The part of a child process's output worth putting in front of the user. */
@@ -142,7 +141,6 @@ export function logTail(output: string): string {
     return source.slice(-LOG_TAIL_LINES).join('\n').trim();
   }
   // After the heading, the error alone: the CLI already says what failed, and the full log keeps the frames.
-  // A plain `Error: ` prefix says nothing, so it goes; a `TypeError:` and the like stay.
   const [message = '', ...rest] = source.slice(error + 1).filter((line) => !STACK_FRAME.test(line));
   return [message.replace(/^Error: /, ''), ...rest].slice(0, LOG_TAIL_LINES).join('\n').trim();
 }

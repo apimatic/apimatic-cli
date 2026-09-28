@@ -16,21 +16,17 @@ import { apiBaseDir } from './shared';
 export async function openApiSection(slug: string, file: string, codeSamplesFile: string | null) {
   const load = async () =>
     placeCodeSamples(withoutInternalOperations(await bundleSpec(file)), await readCodeSamples(codeSamplesFile));
-  const baseDir = `${apiBaseDir}/${slug}`;
   const section = await createOpenAPI({ input: { [slug]: load } }).staticSource({
-    baseDir,
+    baseDir: `${apiBaseDir}/${slug}`,
     groupBy: 'tag',
     meta: true,
     slugify
   });
-  refuseSharedPages(section.files, baseDir, path.basename(file));
+  refuseSharedPages(section.files, path.basename(file));
   return { files: section.files };
 }
 
-/**
- * The folder a tag's pages go in, and the page of a webhook without an operationId. Fumadocs'
- * own default, kept here so the check below reads a page's folder by the same rule.
- */
+// Fumadocs' default, owned here so the check below names a tag's folder the way Fumadocs does.
 function slugify(name: string): string {
   return name.replace(/\s+/g, '-').toLowerCase();
 }
@@ -43,7 +39,7 @@ type SectionFile = Awaited<ReturnType<ReturnType<typeof createOpenAPI>['staticSo
  * operations share an operationId (or have none, and paths that read alike), or when one
  * operation lists a tag twice, or two tags that differ only in case or spacing.
  */
-function refuseSharedPages(files: SectionFile[], baseDir: string, specName: string): void {
+function refuseSharedPages(files: SectionFile[], specName: string): void {
   const pages = new Map<string, OpenAPIPageData>();
   for (const file of files) {
     if (file.type === 'meta') {
@@ -51,8 +47,8 @@ function refuseSharedPages(files: SectionFile[], baseDir: string, specName: stri
     }
     const earlier = pages.get(file.path);
     if (earlier) {
-      const page = file.path.slice(baseDir.length + 1);
-      throw new Error(sharedPageMessage(page, documented(earlier), documented(file.data), specName));
+      const folder = path.basename(path.dirname(file.path));
+      throw new Error(sharedPageMessage(folder, documented(earlier), documented(file.data), specName));
     }
     pages.set(file.path, file.data);
   }
@@ -61,6 +57,8 @@ function refuseSharedPages(files: SectionFile[], baseDir: string, specName: stri
 /** The operation or webhook a page documents, and what its page is named after. */
 interface DocumentedOperation {
   label: string;
+  /** Where it sits in the document: under `paths` or `webhooks`, at a path or name, under a method. */
+  location: { in: 'paths' | 'webhooks'; key: string | undefined; method: string | undefined };
   operationId: string | undefined;
   tags: string[];
 }
@@ -70,11 +68,13 @@ function documented(page: OpenAPIPageData): DocumentedOperation {
   const document = props.payload.bundled as unknown as JsonObject;
   const [operation] = props.operations ?? [];
   const [webhook] = props.webhooks ?? [];
-  const { operationId, tags } = operation
-    ? operationObject(document.paths, operation.path, operation.method)
-    : operationObject(document.webhooks, webhook?.name, webhook?.method);
+  const location = operation
+    ? { in: 'paths' as const, key: operation.path, method: operation.method }
+    : { in: 'webhooks' as const, key: webhook?.name, method: webhook?.method };
+  const { operationId, tags } = operationObject(document[location.in], location.key, location.method);
   return {
     label: operationLabels(props).join(', '),
+    location,
     operationId: typeof operationId === 'string' ? operationId : undefined,
     tags: Array.isArray(tags) ? tags.filter((tag): tag is string => typeof tag === 'string') : []
   };
@@ -87,13 +87,13 @@ function operationObject(items: unknown, key: string | undefined, method: string
 }
 
 function sharedPageMessage(
-  page: string,
+  folder: string,
   earlier: DocumentedOperation,
   later: DocumentedOperation,
   specName: string
 ): string {
-  if (earlier.label === later.label) {
-    return sharedTagFolderMessage(page, earlier, specName);
+  if (sameLocation(earlier.location, later.location)) {
+    return sharedTagFolderMessage(folder, earlier, specName);
   }
   const labels = [`  ${earlier.label}`, `  ${later.label}`];
   if (earlier.operationId !== undefined && earlier.operationId === later.operationId) {
@@ -117,10 +117,13 @@ function sharedPageMessage(
   ].join('\n');
 }
 
+function sameLocation(a: DocumentedOperation['location'], b: DocumentedOperation['location']): boolean {
+  return a.in === b.in && a.key === b.key && a.method === b.method;
+}
+
 /** One operation lands twice on a page when two of its tags name the page's folder. */
-function sharedTagFolderMessage(page: string, operation: DocumentedOperation, specName: string): string {
-  const folders = page.split(/[\\/]/).slice(0, -1);
-  const tags = operation.tags.filter((tag) => folders.includes(slugify(tag)));
+function sharedTagFolderMessage(folder: string, operation: DocumentedOperation, specName: string): string {
+  const tags = operation.tags.filter((tag) => slugify(tag) === folder);
   const repeated = tags.find((tag, index) => tags.indexOf(tag) !== index);
   if (repeated !== undefined) {
     return [

@@ -481,6 +481,23 @@ describe('openApiSection', () => {
     );
   });
 
+  // A webhook without an operationId is named after its slug, which can be another operation's operationId.
+  it('refuses an operation and a webhook whose page names match, though only one has an operationId', async () => {
+    expect(
+      await failureFor(
+        { '/pets': { post: { operationId: 'new-pet', tags: ['pets'], responses: ok } } },
+        { webhooks: { 'New Pet': { post: { tags: ['pets'], responses: ok } } } }
+      )
+    ).to.equal(
+      [
+        "Two operations in 'api.json' would be documented on the same page:",
+        '  POST /pets',
+        '  POST New Pet (webhook)',
+        'Give each operation a unique operationId.'
+      ].join('\n')
+    );
+  });
+
   // Fumadocs writes a page for each tag an operation lists, the same one twice included.
   it('refuses an operation that lists one tag twice, naming the tag', async () => {
     expect(

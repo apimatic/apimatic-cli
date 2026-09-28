@@ -105,7 +105,7 @@ export async function bundleSpec(file: string): Promise<Document> {
 /**
  * Fumadocs lists a document's operations by reading the methods off each path item without
  * following a `$ref`, so every operation behind one gets no page and no error says so. It does
- * follow a webhook's, but the portal's own readers of the document don't, so those go too.
+ * follow a webhook's, but the portal's own readers of the document don't, so they're inlined too.
  */
 function inlinePathItems(document: JsonObject): void {
   for (const items of [document.paths, document.webhooks]) {
