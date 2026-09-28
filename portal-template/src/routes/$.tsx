@@ -3,7 +3,7 @@ import { createServerFn } from '@tanstack/react-start';
 import { docs, generated } from '@/lib/source';
 import { source } from '@/lib/source.server';
 import { PortalLayout } from '@/lib/layout';
-import { getPageMarkdownUrl } from '@/lib/shared';
+import { getPageMarkdownUrl, slugsFromSplat } from '@/lib/shared';
 import { portal } from '@/lib/portal';
 import { absoluteUrl, canonicalLink } from '@/lib/seo';
 import { useFumadocsLoader } from 'fumadocs-core/source/client';
@@ -33,7 +33,7 @@ const collections = { docs, generated };
 export const Route = createFileRoute('/$')({
   component: Page,
   loader: async ({ params }) => {
-    const slugs = params._splat?.split('/').filter((segment) => segment.length > 0) ?? [];
+    const slugs = slugsFromSplat(params._splat);
     const data = await loadPage(slugs);
 
     if (data.type === 'docs') {
@@ -44,8 +44,7 @@ export const Route = createFileRoute('/$')({
   head: ({ loaderData, params }) => {
     const title = loaderData && loaderData.type !== 'home' ? `${loaderData.title} | ${portal.name}` : portal.name;
     const description = loaderData?.description ?? portal.description;
-    const splat = params._splat?.replace(/\/$/, '') ?? '';
-    const pageUrl = splat.length > 0 ? `/${splat}` : '/';
+    const pageUrl = `/${slugsFromSplat(params._splat).join('/')}`;
     const absolute = absoluteUrl(pageUrl);
     return {
       // Without the og:* pair, a documentation link pasted into Slack, Teams or LinkedIn

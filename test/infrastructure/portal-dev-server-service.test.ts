@@ -1,7 +1,9 @@
 import fs from 'fs';
+import net from 'net';
 import os from 'os';
 import path from 'path';
 import { expect } from 'chai';
+import getPort from 'get-port';
 import { PortalDevServerService } from '../../src/infrastructure/portal-dev-server-service';
 import { DirectoryPath } from '../../src/types/file/directoryPath';
 import { FileName } from '../../src/types/file/fileName';
@@ -11,6 +13,7 @@ import { FilePath } from '../../src/types/file/filePath';
 // standing in for Vite exercises the whole of it without a build.
 describe('PortalDevServerService', () => {
   let root: string;
+  let port: number;
 
   const script = (body: string): FilePath => {
     const name = 'fake-vite.js';
@@ -18,14 +21,21 @@ describe('PortalDevServerService', () => {
     return new FilePath(new DirectoryPath(root), new FileName(name));
   };
 
-  const project = (viteBinary: FilePath) => ({
-    projectDirectory: new DirectoryPath(root),
-    viteBinary,
-    contentSource: null
-  });
+  // Stands in for Vite, which listens before printing its address, and ends itself if a failing test never stops it.
+  const serving = (answer: string, line = `  Local:   http://127.0.0.1:${port}/`) =>
+    `const server = require('http').createServer((request, response) => { ${answer} });\n` +
+    `server.listen(${port}, '127.0.0.1', () => process.stdout.write('${line}\\n'));\n` +
+    `setTimeout(() => process.exit(), 60000).unref();\n`;
 
-  beforeEach(() => {
+  const start = (viteBinary: FilePath) =>
+    new PortalDevServerService().start(
+      { projectDirectory: new DirectoryPath(root), viteBinary, contentSource: null },
+      port
+    );
+
+  beforeEach(async () => {
     root = fs.mkdtempSync(path.join(os.tmpdir(), 'dev-server-'));
+    port = await getPort();
   });
 
   afterEach(() => {
@@ -34,25 +44,68 @@ describe('PortalDevServerService', () => {
 
   it('reports the address the server prints, with the colour codes removed', async () => {
     const binary = script(
-      `process.stdout.write('  \\u001b[32m\\u001b[1mLocal\\u001b[22m\\u001b[39m:   \\u001b[36mhttp://localhost:4321/\\u001b[39m\\n');\n` +
-        `setTimeout(() => {}, 60000);\n`
+      serving(
+        `response.end('page');`,
+        `  \\u001b[32m\\u001b[1mLocal\\u001b[22m\\u001b[39m:   \\u001b[36mhttp://127.0.0.1:${port}/\\u001b[39m`
+      )
     );
 
-    const started = await new PortalDevServerService().start(project(binary), 4321);
+    const started = await start(binary);
 
     expect(started.isOk(), JSON.stringify(started.isErr() ? started.error : '')).to.be.true;
     const server = started._unsafeUnwrap();
-    expect(server.url.toString()).to.equal('http://localhost:4321');
+    expect(server.url.toString()).to.equal(`http://127.0.0.1:${port}`);
     await server.stop();
+  });
+
+  it('reports the server started only once it has answered its first page', async () => {
+    const binary = script(serving(`require('fs').writeFileSync('answered', ''); response.end('page');`));
+
+    const server = (await start(binary))._unsafeUnwrap();
+    const answered = fs.existsSync(path.join(root, 'answered'));
+    await server.stop();
+
+    expect(answered).to.be.true;
+  });
+
+  it('reports a server that crashes on its first page with what it printed after its address', async () => {
+    const binary = script(
+      serving(
+        `process.stderr.write('the server fell over\\n'); process.exitCode = 1; ` +
+          `server.close(); request.socket.destroy();`
+      )
+    );
+
+    const started = await start(binary);
+
+    expect(started.isErr()).to.be.true;
+    const { log } = started._unsafeUnwrapErr();
+    expect(log).to.contain('the server fell over');
+    expect(log).to.not.contain('Local:');
+  });
+
+  it('stops a server that drops its first request rather than leaving it running', async () => {
+    const binary = script(serving(`request.socket.destroy();`));
+
+    const started = await start(binary);
+    const released = await new Promise<boolean>((resolve) => {
+      const probe = net.createServer().once('error', () => resolve(false));
+      probe.listen(port, '127.0.0.1', () => probe.close(() => resolve(true)));
+    });
+
+    expect(started.isErr()).to.be.true;
+    expect(released, 'the port is still held').to.be.true;
   });
 
   it('resolves `exited` with what the server printed when it stops on its own', async () => {
     const binary = script(
-      `process.stdout.write('  Local:   http://localhost:4322/\\n');\n` +
-        `setTimeout(() => { process.stdout.write('the server fell over\\n'); process.exitCode = 1; }, 150);\n`
+      serving(
+        `response.end('page', () => setTimeout(() => { ` +
+          `process.stdout.write('the server fell over\\n'); server.close(); process.exitCode = 1; }, 150));`
+      )
     );
 
-    const server = (await new PortalDevServerService().start(project(binary), 4322))._unsafeUnwrap();
+    const server = (await start(binary))._unsafeUnwrap();
     const output = await server.exited;
 
     expect(output).to.contain('the server fell over');
@@ -63,12 +116,14 @@ describe('PortalDevServerService', () => {
     // No process.exit(): on POSIX a pipe is written asynchronously and exiting discards
     // whatever is still queued, which would truncate the child rather than test the reader.
     const binary = script(
-      `process.stdout.write('  Local:   http://localhost:4323/\\n');\n` +
-        `for (let i = 0; i < 20000; i += 1) process.stdout.write('noisy line ' + i + '\\n');\n` +
-        `process.stdout.write('reached the end\\n');\n`
+      serving(
+        `response.end('page', () => { ` +
+          `for (let i = 0; i < 20000; i += 1) process.stdout.write('noisy line ' + i + '\\n'); ` +
+          `process.stdout.write('reached the end\\n'); server.close(); });`
+      )
     );
 
-    const server = (await new PortalDevServerService().start(project(binary), 4323))._unsafeUnwrap();
+    const server = (await start(binary))._unsafeUnwrap();
     const output = await server.exited;
 
     expect(output).to.contain('reached the end');
@@ -77,9 +132,9 @@ describe('PortalDevServerService', () => {
   });
 
   it('reports a server that exits before printing an address', async () => {
-    const binary = script(`process.stderr.write('Error: Port 4324 is already in use\\n'); process.exitCode = 1;\n`);
+    const binary = script(`process.stderr.write('Error: Port ${port} is already in use\\n'); process.exitCode = 1;\n`);
 
-    const started = await new PortalDevServerService().start(project(binary), 4324);
+    const started = await start(binary);
 
     expect(started.isErr()).to.be.true;
     expect(started._unsafeUnwrapErr().log).to.contain('already in use');

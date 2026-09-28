@@ -4,9 +4,10 @@ import { sleep } from './timer-extensions.js';
 import { execa, ResultPromise } from 'execa';
 import { err, ok, Result } from 'neverthrow';
 import { UrlPath } from '../types/file/urlPath.js';
+import { NetworkService } from './network-service.js';
 import { PortalProjectPaths, PortalProjectService } from './portal-project-service.js';
 
-/** Cold starts spend most of this budget pre-bundling dependencies for the first time. */
+/** A cold start compiles the portal from scratch: its address, and then its first page, each get this long. */
 const STARTUP_TIMEOUT_MS = 3 * 60 * 1000;
 
 /**
@@ -40,6 +41,7 @@ export interface PortalDevServerFailure {
 
 export class PortalDevServerService {
   private readonly projectService = new PortalProjectService();
+  private readonly networkService = new NetworkService();
 
   public async start(
     project: PortalProjectPaths,
@@ -71,9 +73,17 @@ export class PortalDevServerService {
       return err(started.error);
     }
 
+    // Read from here, the log of a failed first page holds what explains it rather than the address banner.
+    const exited = this.watchForExit(subprocess);
+    // Vite compiles the portal on its first request, not at startup, so it is ready only once one is answered.
+    if (!(await this.networkService.answers(started.value, STARTUP_TIMEOUT_MS))) {
+      await this.terminate(subprocess);
+      return err({ message: 'The portal preview did not answer its first page.', log: await exited });
+    }
+
     return ok({
       url: started.value,
-      exited: this.watchForExit(subprocess),
+      exited,
       stop: () => this.terminate(subprocess)
     });
   }
