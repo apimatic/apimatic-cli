@@ -35,7 +35,7 @@ export class QuickstartAction {
   private readonly configDir: DirectoryPath;
   private readonly commandMetadata: CommandMetadata;
   private readonly defaultSpecUrl = new UrlPath(
-    `https://raw.githubusercontent.com/apimatic/sample-docs-as-code-portal/refs/heads/v2/src/spec/petstore.json`
+    `https://raw.githubusercontent.com/apimatic/sample-docs-as-code-portal/refs/heads/v2/src/spec/openapi.json`
   );
 
   constructor(configDir: DirectoryPath, commandMetadata: CommandMetadata) {

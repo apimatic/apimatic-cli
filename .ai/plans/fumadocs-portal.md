@@ -383,8 +383,8 @@ the new-layout branch in the sample repository.
    (section 9) and that generated sites load Geist from Google Fonts.
    *Amended 2026-09-25:* drop the Google Fonts line; the fonts are bundled with the site (PR #366).
 3. **Sample repository** `sample-docs-as-code-portal`: done 2026-09-17. `v2` is a
-   permanent branch for the CLI 2 layout (`54d2cb3`: spec renamed
-   `spec/petstore.json`, deploy workflow pinned to `@apimatic/cli@2`, artifact
+   permanent branch for the CLI 2 layout (`54d2cb3`, `85cf58d`: spec at
+   `spec/openapi.json`, deploy workflow pinned to `@apimatic/cli@2`, artifact
    upload only); `master` stays the CLI 1 sample, its workflow pinned to `@1`
    (`3b148cd`). Both quickstarts download their defaults from `v2`.
 4. **Dependency update policy.** No Renovate or Dependabot configuration exists
