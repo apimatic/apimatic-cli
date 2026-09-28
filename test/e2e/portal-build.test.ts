@@ -22,6 +22,9 @@ import {
 const enabled = process.env.APIMATIC_E2E === '1';
 
 const CALCULATE_SAMPLE = 'const result = await calculator.calculate(OperationType.Sum, 4, 5);';
+const CALCULATE_PAGE = 'api/apimatic-calculator/simple-calculator/Calculate/index.html';
+// The word alone also matches "OpenAPI".
+const OPEN_TRIGGER = /<button[^>]*>Open<svg/;
 const CODE_SAMPLES = new CodeSampleCatalogs([
   CodeSampleCatalog.fromJson(Language.TYPESCRIPT, {
     paths: { '/{operation}': { GET: { Example: CALCULATE_SAMPLE } } }
@@ -180,7 +183,7 @@ const stylesheetOf = (output: DirectoryPath) => {
   // Addresses come from page slugs rather than tree position, so lifting the single
   // specification's section out of the sidebar must leave every operation where it was.
   it('writes a page per operation in the specification', () => {
-    expect(exists('api/apimatic-calculator/simple-calculator/Calculate/index.html')).to.be.true;
+    expect(exists(CALCULATE_PAGE)).to.be.true;
   });
 
   it('ignores files in spec/ that are not specifications', () => {
@@ -312,15 +315,14 @@ const stylesheetOf = (output: DirectoryPath) => {
   });
 
   it('carries the code samples placed on the operation into its page data', () => {
-    const page = read('api/apimatic-calculator/simple-calculator/Calculate/index.html');
+    const page = read(CALCULATE_PAGE);
 
     expect(page).to.contain('x-apimatic-codeSamples');
     expect(page).to.contain('calculator.calculate(OperationType.Sum, 4, 5)');
   });
 
   it('keeps an operation page small', () => {
-    const page = 'api/apimatic-calculator/simple-calculator/Calculate/index.html';
-    expect(fs.statSync(path.join(output.toString(), page)).size).to.be.below(100 * 1024);
+    expect(fs.statSync(path.join(output.toString(), CALCULATE_PAGE)).size).to.be.below(100 * 1024);
   });
 
   it('type-checks against the packages it is built with', async () => {
@@ -408,6 +410,15 @@ const stylesheetOf = (output: DirectoryPath) => {
     expect(full).to.not.contain('```yaml');
   });
 
+  it("offers the page actions on an operation's page, pointed at its twin", () => {
+    const page = read(CALCULATE_PAGE);
+
+    // Quoted, because the page tree's `Calculate.mdx` starts with the same characters.
+    expect(page).to.contain('"/api/apimatic-calculator/simple-calculator/Calculate.md"');
+    expect(page).to.contain('Copy Markdown');
+    expect(page).to.match(OPEN_TRIGGER);
+  });
+
   it('lists each language in the SDKs tab of the sidebar', () => {
     const tree = read(treeCacheFiles()[0]);
 
@@ -455,9 +466,10 @@ const stylesheetOf = (output: DirectoryPath) => {
 /**
  * A second portal, so one more build covers the brand and navigation settings the default
  * fixture leaves at their defaults: a logo per mode, a favicon, a primary colour, a forced
- * colour mode and header links. Its specification has a deprecated and an internal operation,
- * and it has no content directory, so it also covers the fallback home page and the default
- * order of the tabs. Its `plugin` block covers the context plugin page.
+ * colour mode and header links. Its specification has a deprecated operation, an internal one
+ * and one whose body is an image, and it has no content directory, so it also covers the
+ * fallback home page and the default order of the tabs. Its `plugin` block covers the context
+ * plugin page.
  */
 (enabled ? describe : describe.skip)('portal build, branded (end to end)', function () {
   this.timeout(10 * 60 * 1000);
@@ -524,6 +536,15 @@ const stylesheetOf = (output: DirectoryPath) => {
     expect(tree).to.contain('/page/home');
   });
 
+  it('offers the page actions on the generated home page, pointed at its twin', () => {
+    const page = read('index.html');
+
+    expect(page).to.contain('"/index.md"');
+    expect(page).to.contain('Copy Markdown');
+    expect(page).to.match(OPEN_TRIGGER);
+    expect(exists('index.md')).to.be.true;
+  });
+
   it('writes the context plugin page, and its Markdown twin, for the plugin block', () => {
     const twin = read('context-plugin.md');
 
@@ -575,5 +596,10 @@ const stylesheetOf = (output: DirectoryPath) => {
     expect(everything).to.contain('List pets');
     expect(everything).to.contain('Create a pet');
     expect(everything).to.not.contain('Audit the pets');
+  });
+
+  // Fumadocs has no adapter of its own for an image body, and without one the page is only an error screen.
+  it('renders the request body of an operation that uploads an image', () => {
+    expect(read('api/pets/pets/uploadPetPhoto/index.html')).to.contain('id="request-body"');
   });
 });
