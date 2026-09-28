@@ -6,6 +6,7 @@ import tailwindcss from '@tailwindcss/vite';
 import { fumadocsMdx } from 'fumadocs-mdx/vite';
 import { downloads } from './downloads.ts';
 import { generatedPagesReload } from './generated-pages-reload.ts';
+import { oauthClientAuth } from './oauth-client-auth.ts';
 import { readBuildPaths, readPortalIdentity } from './portal-config.ts';
 import { prerenderPages } from './prerender-pages.ts';
 import { specReload } from './spec-reload.ts';
@@ -27,6 +28,7 @@ export default defineConfig(async () => {
         }
       }),
       specReload(paths.specs),
+      oauthClientAuth(),
       tailwindcss(),
       tanstackStart({
         // Without a mask path the shell is rendered at "/" and no index.html is written;
@@ -53,6 +55,7 @@ export default defineConfig(async () => {
     // listens on `::1` alone, a connect that stalls under load falls back to 127.0.0.1 and is
     // refused, failing the build; binding IPv4 leaves the fetch a single address to reach.
     preview: { host: '127.0.0.1' },
+    optimizeDeps: { rolldownOptions: { plugins: [oauthClientAuth()] } },
     resolve: {
       tsconfigPaths: true,
       alias: [

@@ -420,6 +420,13 @@ const stylesheetOf = (output: DirectoryPath) => {
     ).to.deep.equal([]);
   });
 
+  it('ships the playground a token request that sends the client credentials in a header', () => {
+    const requests = scriptsOf(output).filter((script) => script.text.includes('client_credentials'));
+
+    expect(requests).to.not.be.empty;
+    expect(requests.filter((script) => /client_credentials["'`],client_id:/.test(script.text))).to.deep.equal([]);
+  });
+
   it('bundles Geist and loads the neutral theme', () => {
     const css = stylesheetOf(output);
 
