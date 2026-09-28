@@ -1,4 +1,5 @@
 import path from 'node:path';
+import type { DistributiveOmit, OperationOutput, PagesBuilder, WebhookOutput } from 'fumadocs-openapi';
 import { createOpenAPI, type OpenAPIPageData } from 'fumadocs-openapi/server';
 import { bundleSpec } from './openapi-bundle.server';
 import { placeCodeSamples, readCodeSamples } from './code-samples.server';
@@ -21,7 +22,8 @@ export async function openApiSection(slug: string, file: string, codeSamplesFile
     baseDir,
     groupBy: 'tag',
     meta: true,
-    slugify
+    slugify,
+    name: pageName
   });
   refuseUnnamedPages(section.files, path.basename(file));
   refuseSharedPages(section.files, path.basename(file));
@@ -33,30 +35,54 @@ export async function openApiSection(slug: string, file: string, codeSamplesFile
 const UNSAFE_IN_PATH = /[<>:"/\\|?*#%{}[\]^`\p{Cc}]/gu;
 
 /**
- * A tag's folder, and so its URL. Fumadocs' default only turns whitespace into dashes, so
- * 'Component: Price Points' became a folder Windows cannot create. An unsafe character is
+ * A name made fit to be a folder, a page and a part of its URL. Fumadocs takes a name as it is,
+ * so 'Component: Price Points' became a folder Windows cannot create. An unsafe character is
  * read as a space, and dots are trimmed: Windows drops a trailing one, and '..' climbs out.
  */
-function slugify(name: string): string {
+function safeSegment(name: string): string {
   return name
     .replace(UNSAFE_IN_PATH, ' ')
     .replace(/^[\s.]+|[\s.]+$/g, '')
-    .replace(/\s+/g, '-')
-    .toLowerCase();
+    .replace(/\s+/g, '-');
+}
+
+/** A tag's folder, and the page of a webhook without an operationId. */
+function slugify(name: string): string {
+  return safeSegment(name).toLowerCase();
+}
+
+/** Fumadocs' own page name, except that an operationId or a route is made safe as a tag's slug is. */
+function pageName(this: PagesBuilder, output: DistributiveOmit<OperationOutput | WebhookOutput, 'path'>): string {
+  const found =
+    output.type === 'operation' ? this.fromExtractedOperation(output.item) : this.fromExtractedWebhook(output.item);
+  const operationId = found?.operation.operationId;
+  if (operationId) {
+    return safeSegment(operationId);
+  }
+  if (output.type === 'webhook') {
+    return slugify(output.item.name);
+  }
+  const route = this.routePathToFilePath(output.item.path).split('/').map(safeSegment);
+  return path.join(...route, output.item.method.toLowerCase());
 }
 
 type SectionFile = Awaited<ReturnType<ReturnType<typeof createOpenAPI>['staticSource']>>['files'][number];
 
-/** A webhook without an operationId is named after its slug, and an empty one reads as its folder's index. */
+/** A page is named after its operationId, or a webhook's slug, and an empty name reads as its folder's index. */
 function refuseUnnamedPages(files: SectionFile[], specName: string): void {
   for (const file of files) {
     if (file.type !== 'meta' && path.basename(file.path) === '.mdx') {
-      const { location } = documented(file.data);
+      const { label, location, operationId } = documented(file.data);
       throw new Error(
-        [
-          `The webhook '${location.key}' in '${specName}' has no operationId, and no character in its name the portal can use in a URL.`,
-          'Give it an operationId.'
-        ].join('\n')
+        operationId === undefined
+          ? [
+              `The webhook '${location.key}' in '${specName}' has no operationId, and no character in its name the portal can use in a URL.`,
+              'Give it an operationId.'
+            ].join('\n')
+          : [
+              `The operation ${label} in '${specName}' has the operationId '${operationId}', which has no character the portal can use in a URL.`,
+              'Rename the operationId.'
+            ].join('\n')
       );
     }
   }

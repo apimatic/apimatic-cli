@@ -666,6 +666,56 @@ describe('openApiSection', () => {
     );
   });
 
+  // A page is named after its operationId, which keeps its case, so only the unsafe characters go.
+  it('names a page without the characters its operationId holds that are unsafe in a URL or a folder name', async () => {
+    expect(
+      await pagesFor({
+        '/a': { get: { operationId: 'pets#list', tags: ['Pets'], responses: ok } },
+        '/b': { get: { operationId: 'pets:get', tags: ['Pets'], responses: ok } },
+        '/c': { get: { operationId: 'pets/update?', tags: ['Pets'], responses: ok } },
+        '/d': { get: { operationId: 'list pets 100%.', tags: ['Pets'], responses: ok } },
+        '/e': { get: { operationId: 'GetPet', tags: ['Pets'], responses: ok } }
+      })
+    ).to.have.members([
+      'api/pets/pets/pets-list.mdx',
+      'api/pets/pets/pets-get.mdx',
+      'api/pets/pets/pets-update.mdx',
+      'api/pets/pets/list-pets-100.mdx',
+      'api/pets/pets/GetPet.mdx'
+    ]);
+  });
+
+  it('names a page after its route the same way when the operation has no operationId', async () => {
+    expect(await pagesFor({ '/v1/{name}:cancel': { post: { tags: ['Ops'], responses: ok } } })).to.deep.equal([
+      'api/pets/ops/v1/name-cancel/post.mdx'
+    ]);
+  });
+
+  it('refuses two operationIds that are one page once made safe', async () => {
+    expect(
+      await failureFor({
+        '/a': { get: { operationId: 'get:pet', tags: ['Pets'], responses: ok } },
+        '/b': { get: { operationId: 'get-pet', tags: ['Pets'], responses: ok } }
+      })
+    ).to.equal(
+      [
+        "Two operations in 'api.json' would be documented on the same page:",
+        '  GET /a',
+        '  GET /b',
+        'Give each operation a unique operationId.'
+      ].join('\n')
+    );
+  });
+
+  it('refuses an operationId with no character left to name its page', async () => {
+    expect(await failureFor({ '/a': { get: { operationId: '###', tags: ['Pets'], responses: ok } } })).to.equal(
+      [
+        "The operation GET /a in 'api.json' has the operationId '###', which has no character the portal can use in a URL.",
+        'Rename the operationId.'
+      ].join('\n')
+    );
+  });
+
   // Its page would be named '.mdx', which the portal reads as the index of the tag's folder.
   it('refuses a webhook without an operationId whose name leaves nothing to name its page', async () => {
     expect(await failureFor({}, { webhooks: { '::': { post: { tags: ['Orders'], responses: ok } } } })).to.equal(
