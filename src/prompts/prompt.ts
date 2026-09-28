@@ -28,10 +28,13 @@ export async function withSpinner<T, E>(
   });
   s.start(intro);
   const result = await fn;
-  result.match(
-    (value) => s.stop(typeof success === 'function' ? success(value) : success, 0),
-    (error) => s.stop(typeof failure === 'function' ? failure(error) : failure, 1)
-  );
+  // CTRL+C stops the spinner with its cancel message, and a second stop would write another line under it.
+  if (!s.isCancelled) {
+    result.match(
+      (value) => s.stop(typeof success === 'function' ? success(value) : success, 0),
+      (error) => s.stop(typeof failure === 'function' ? failure(error) : failure, 1)
+    );
+  }
   return result;
 }
 

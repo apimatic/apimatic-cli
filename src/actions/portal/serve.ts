@@ -52,9 +52,18 @@ export class PortalServeAction {
           this.prompts.usingFallbackPort(port, servePort);
         }
 
-        const server = await this.prompts.startPreview(this.devServerService.start(portalProject, servePort));
+        this.clearStandardInput();
+        // Listened for from the start: on Windows the terminal's CTRL+C never reaches the preview, which carries on.
+        const interruption = new AbortController();
+        const interrupted = this.prompts.blockExecution().then(() => interruption.abort());
+        const server = await this.prompts.startPreview(
+          this.devServerService.start(portalProject, servePort, interruption.signal)
+        );
 
         if (server.isErr()) {
+          if (interruption.signal.aborted) {
+            return ActionResult.cancelled();
+          }
           this.prompts.startFailed(server.error.log);
           return ActionResult.failed();
         }
@@ -82,13 +91,10 @@ export class PortalServeAction {
           await contentWatch?.close();
         };
 
-        this.clearStandardInput();
-
         try {
           // Raced with the exit too: waiting only on the signal left a crashed server advertised as running.
-          const interrupted = this.prompts.blockExecution().then(() => ({ kind: 'interrupted' as const }));
           const stopped = server.value.exited.then((output) => ({ kind: 'exited' as const, output }));
-          const outcome = await Promise.race([interrupted, stopped]);
+          const outcome = await Promise.race([interrupted.then(() => ({ kind: 'interrupted' as const })), stopped]);
           // First, so a save still being handled is not reported after the preview says it stops.
           await closeWatches();
 

@@ -167,6 +167,19 @@ describe('portal template packaging', () => {
     expect(config).to.contain('generatedPagesReload()');
   });
 
+  it("pre-bundles the runtime that the fumadocs-mdx macro's output imports", () => {
+    const runtime = 'fumadocs-mdx/runtime/macro';
+    const dist = path.dirname(path.dirname(createRequire(import.meta.url).resolve(runtime)));
+    const macroImports = fs
+      .readdirSync(dist, { recursive: true, encoding: 'utf8' })
+      .filter((file) => file.endsWith('.js'))
+      .some((file) => new RegExp(`from\\s*["']${runtime}["']`).test(fs.readFileSync(path.join(dist, file), 'utf8')));
+    const config = fs.readFileSync(path.join(templateRoot, 'vite.config.ts'), 'utf8');
+
+    expect(macroImports).to.be.true;
+    expect(config).to.match(new RegExp(`optimizeDeps:\\s*\\{\\s*include:\\s*\\[[^\\]]*["']${runtime}["']`));
+  });
+
   // The generated primary has the theme's own specificity, so it wins only by coming after it.
   it('imports the neutral theme, and the stylesheet the CLI generates after everything else', () => {
     const stylesheet = fs.readFileSync(path.join(templateRoot, 'src/styles/app.css'), 'utf8');
