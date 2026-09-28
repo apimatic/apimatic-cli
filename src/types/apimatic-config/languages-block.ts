@@ -1,5 +1,9 @@
 import { isJsonObject, JsonObject } from '../../utils/json-utils.js';
-import { GitConfiguration, PackageConfigurationForLanguage } from '../publish/package-settings-configuration.js';
+import {
+  GitConfiguration,
+  PackageConfigurationForLanguage,
+  PackageSettingsState
+} from '../publish/package-settings-configuration.js';
 import { SemVersion, SemVersionString } from '../publish/version.js';
 import { Language } from '../sdk/generate.js';
 import { ApimaticConfigDocument } from './document.js';
@@ -65,7 +69,8 @@ export function buildLanguageEntry<L extends Language>(
 export function withLanguage<L extends Language>(
   languages: PluginLanguages,
   language: L,
-  entry: PluginLanguageEntry<L>
+  entry: PluginLanguageEntry<L>,
+  packageSettings: PackageSettingsState
 ): PluginLanguages {
   const existingEntry = languages[language];
   const existingPublishing = existingEntry?.publishing;
@@ -74,7 +79,12 @@ export function withLanguage<L extends Language>(
         ...existingPublishing,
         ...entry.publishing,
         source: entry.publishing.source ?? existingPublishing?.source,
-        package: entry.publishing.package ?? existingPublishing?.package
+        package: entry.publishing.package ?? existingPublishing?.package,
+        // Only a profile that turned the settings off means to drop what the file already records.
+        packageConfiguration:
+          packageSettings === 'disabled'
+            ? undefined
+            : entry.publishing.packageConfiguration ?? existingPublishing?.packageConfiguration
       }
     : existingPublishing;
 

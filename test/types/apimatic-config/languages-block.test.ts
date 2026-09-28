@@ -1,9 +1,10 @@
 import { expect } from 'chai';
-import { buildLanguageEntry } from '../../../src/types/apimatic-config/languages-block';
+import { buildLanguageEntry, PluginLanguages, withLanguage } from '../../../src/types/apimatic-config/languages-block';
 import {
   CSharpPackageConfiguration,
   GitConfiguration,
-  PackageConfigurationForLanguage
+  PackageConfigurationForLanguage,
+  PackageSettingsState
 } from '../../../src/types/publish/package-settings-configuration';
 import { SemVersion } from '../../../src/types/publish/version';
 import { Language } from '../../../src/types/sdk/generate';
@@ -105,5 +106,55 @@ describe('buildLanguageEntry', () => {
 
       expect(result.publishing?.package).to.be.undefined;
     });
+  });
+});
+
+describe('withLanguage', () => {
+  const recorded: PluginLanguages = {
+    [Language.CSHARP]: {
+      publishing: {
+        source: { repositoryUrl: 'https://github.com/acme/sdk', branch: 'main' },
+        package: { version: '1.0.0' },
+        packageConfiguration: CSHARP_CONFIGURATION
+      }
+    }
+  };
+
+  const publishedWith = (packageSettings: PackageSettingsState, configuration?: CSharpPackageConfiguration) =>
+    withLanguage(
+      recorded,
+      Language.CSHARP,
+      buildLanguageEntry(Language.CSHARP, gitConfig('acme/sdk'), configuration, undefined),
+      packageSettings
+    )[Language.CSHARP]?.publishing;
+
+  // The publish writes what its own run produced; what it did not produce, the file keeps.
+  it('keeps the recorded release a source-only publish did not write', () => {
+    expect(publishedWith('configured', CSHARP_CONFIGURATION)?.package).to.deep.equal({ version: '1.0.0' });
+  });
+
+  it('writes the configuration the profile holds', () => {
+    const renamed = { ...CSHARP_CONFIGURATION, packageId: 'Acme.Payments.Sdk.V2' };
+
+    expect(publishedWith('configured', renamed)?.packageConfiguration).to.deep.equal(renamed);
+  });
+
+  // A profile that never configured the language says nothing about it, so it may not speak for
+  // the file — including for a configuration its author added by hand.
+  it('keeps the recorded configuration when the profile has none', () => {
+    expect(publishedWith('absent')?.packageConfiguration).to.deep.equal(CSHARP_CONFIGURATION);
+  });
+
+  it('drops the recorded configuration when the profile turned the settings off', () => {
+    expect(publishedWith('disabled')?.packageConfiguration).to.be.undefined;
+  });
+
+  it('records a language the file does not yet carry', () => {
+    const entry = buildLanguageEntry(Language.PYTHON, gitConfig('acme/sdk-python'), undefined, VERSION);
+
+    const languages = withLanguage({}, Language.PYTHON, entry, 'absent');
+
+    expect(languages[Language.PYTHON]?.publishing?.package).to.deep.equal({ version: '1.2.3' });
+    expect(languages[Language.CSHARP]).to.be.undefined;
   });
 });

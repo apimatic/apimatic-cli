@@ -18,6 +18,7 @@ import {
   GoPackageConfiguration,
   JavaPackageConfiguration,
   PackageConfigurationForLanguage,
+  PackageSettingsState,
   PhpPackageConfiguration,
   PythonPackageConfiguration,
   RubyPackageConfiguration,
@@ -31,10 +32,14 @@ function enabledOnly<T extends object>(configs: T): Partial<T> {
   return Object.fromEntries(Object.entries(configs).filter(([, config]) => config !== undefined)) as Partial<T>;
 }
 
+const settingsState = (item: { isEnabled: boolean } | null | undefined): PackageSettingsState =>
+  item ? (item.isEnabled ? 'configured' : 'disabled') : 'absent';
+
 export class PublishingProfile {
   private readonly profile: PublishingProfileItem;
   private readonly languageConfigs: { [L in Language]?: PackageConfigurationForLanguage[L] };
   private readonly gitConfigs: Partial<Record<Language, GitConfiguration>>;
+  private readonly packageSettings: Record<Language, PackageSettingsState>;
 
   private constructor(profile: PublishingProfileItem) {
     this.profile = profile;
@@ -47,6 +52,15 @@ export class PublishingProfile {
       [Language.RUBY]: profile.rubyConfiguration?.isEnabled ? PublishingProfile.createRubyConfiguration(profile.rubyConfiguration) : undefined,
       [Language.TYPESCRIPT]: profile.typeScriptConfiguration?.isEnabled ? PublishingProfile.createTypeScriptConfiguration(profile.typeScriptConfiguration) : undefined
     });
+    this.packageSettings = {
+      [Language.CSHARP]: settingsState(profile.cSharpConfiguration),
+      [Language.GO]: settingsState(profile.goConfiguration),
+      [Language.JAVA]: settingsState(profile.javaConfiguration),
+      [Language.PHP]: settingsState(profile.phpConfiguration),
+      [Language.PYTHON]: settingsState(profile.pythonConfiguration),
+      [Language.RUBY]: settingsState(profile.rubyConfiguration),
+      [Language.TYPESCRIPT]: settingsState(profile.typeScriptConfiguration)
+    };
     this.gitConfigs = enabledOnly<Record<Language, GitConfiguration | undefined>>({
       [Language.CSHARP]: profile.cSharpGitConfiguration?.isEnabled ? profile.cSharpGitConfiguration : undefined,
       [Language.GO]: profile.goGitConfiguration?.isEnabled ? profile.goGitConfiguration : undefined,
@@ -113,6 +127,10 @@ export class PublishingProfile {
     language: L
   ): PackageConfigurationForLanguage[L] | undefined {
     return this.languageConfigs[language];
+  }
+
+  public getPackageSettingsStateForLanguage(language: Language): PackageSettingsState {
+    return this.packageSettings[language];
   }
 
   public getGitConfigurationForLanguage(language: Language): GitConfiguration | undefined {

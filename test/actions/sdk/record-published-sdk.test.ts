@@ -13,6 +13,7 @@ import { PluginIdentityData } from '../../../src/types/plugin/plugin-config.js';
 import { ProjectContext } from '../../../src/types/project-context.js';
 import { PublishType } from '../../../src/types/publish-api/publishing-profile-item.js';
 import { PublishingProfile } from '../../../src/types/publish/publishing-profile.js';
+import { PackageSettingsState } from '../../../src/types/publish/package-settings-configuration.js';
 import { SemVersion } from '../../../src/types/publish/version.js';
 import { Language } from '../../../src/types/sdk/generate.js';
 
@@ -20,10 +21,15 @@ const BOTH = [PublishType.SourceCodePublishing, PublishType.PackagePublishing];
 
 const VERSION = SemVersion.tryCreate('1.2.3')._unsafeUnwrap();
 
-const profileWith = (gitConfiguration: object | undefined, packageConfiguration: object | undefined = undefined) =>
+const profileWith = (
+  gitConfiguration: object | undefined,
+  packageConfiguration: object | undefined = undefined,
+  packageSettings: PackageSettingsState = packageConfiguration ? 'configured' : 'absent'
+) =>
   ({
     getGitConfigurationForLanguage: () => gitConfiguration,
-    getPackageConfigurationDataForLanguage: () => packageConfiguration
+    getPackageConfigurationDataForLanguage: () => packageConfiguration,
+    getPackageSettingsStateForLanguage: () => packageSettings
   } as unknown as PublishingProfile);
 
 const RECORDED_SOURCE_ENTRY = {
