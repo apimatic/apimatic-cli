@@ -211,7 +211,7 @@ export class QuickstartAction {
     adopted: boolean
   ): Promise<Result<FilePath, ActionResult>> {
     this.prompts.validateSpecStep();
-    const validation = await new ValidateAction(this.configDir, this.commandMetadata).check(spec.file, false);
+    const validation = await new ValidateAction(this.configDir, this.commandMetadata).execute(spec.file, false);
     // The service's own error is already on screen; the spec may be valid, so there is nothing to fix.
     if (validation === 'unchecked') {
       return err(ActionResult.failed());

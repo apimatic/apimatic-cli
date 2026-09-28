@@ -1,5 +1,4 @@
 import { DirectoryPath } from '../../types/file/directoryPath.js';
-import { ActionResult } from '../action-result.js';
 import { ApiValidatePrompts } from '../../prompts/api/validate.js';
 import { ValidationService } from '../../infrastructure/services/validation-service.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
@@ -26,12 +25,7 @@ export class ValidateAction {
   public readonly execute = async (
     resourcePath: ResourceInput,
     displayValidationSummary = true
-  ): Promise<ActionResult> => {
-    const check = await this.check(resourcePath, displayValidationSummary);
-    return check === 'valid' ? ActionResult.success() : ActionResult.failed();
-  };
-
-  public readonly check = async (resourcePath: ResourceInput, displayValidationSummary = true): Promise<SpecCheck> => {
+  ): Promise<SpecCheck> => {
     return await withDirPath(async (tempDirectory) => {
       const resourceContext = new ResourceContext(tempDirectory);
       const specFileDirResult = await resourceContext.resolveTo(resourcePath);
