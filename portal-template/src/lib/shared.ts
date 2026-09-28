@@ -33,10 +33,6 @@ export function getPageMarkdownUrl(page: { slugs: string[]; locale?: string }) {
   return { segments, url: getDocsUrl(segments, page.locale) };
 }
 
-/**
- * The router hands back a decoded splat, and a page's slugs are `encodeURI`'d segment by segment,
- * so a slug spelt from a space or a non-ASCII character only matches once it is encoded again.
- */
 export function slugsFromSplat(splat: string | undefined): string[] {
   return (splat ?? '')
     .split('/')
