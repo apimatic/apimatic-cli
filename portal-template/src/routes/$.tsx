@@ -3,7 +3,7 @@ import { createServerFn } from '@tanstack/react-start';
 import { docs, generated } from '@/lib/source';
 import { source } from '@/lib/source.server';
 import { PortalLayout } from '@/lib/layout';
-import { encodeSlugs, getPageMarkdownUrl } from '@/lib/shared';
+import { getPageMarkdownUrl, slugsFromSplat } from '@/lib/shared';
 import { portal } from '@/lib/portal';
 import { absoluteUrl, canonicalLink } from '@/lib/seo';
 import { useFumadocsLoader } from 'fumadocs-core/source/client';
@@ -17,9 +17,6 @@ import { slimOpenAPIPageProps } from '@/lib/openapi-slim';
 
 const rootRoute = getRouteApi('__root__');
 
-const pageSlugs = (splat: string | undefined) =>
-  encodeSlugs(splat?.split('/').filter((segment) => segment.length > 0) ?? []);
-
 /**
  * The collections a Markdown page is compiled into, by the loader source it came from. A
  * page's `path` is relative to its own collection's directory, so it is looked up there.
@@ -29,7 +26,7 @@ const collections = { docs, generated };
 export const Route = createFileRoute('/$')({
   component: Page,
   loader: async ({ params }) => {
-    const slugs = pageSlugs(params._splat);
+    const slugs = slugsFromSplat(params._splat);
     const data = await loadPage(slugs);
 
     if (data.type === 'docs') {
@@ -40,7 +37,7 @@ export const Route = createFileRoute('/$')({
   head: ({ loaderData, params }) => {
     const title = loaderData && loaderData.type !== 'home' ? `${loaderData.title} | ${portal.name}` : portal.name;
     const description = loaderData?.description ?? portal.description;
-    const pageUrl = `/${pageSlugs(params._splat).join('/')}`;
+    const pageUrl = `/${slugsFromSplat(params._splat).join('/')}`;
     const absolute = absoluteUrl(pageUrl);
     return {
       // Without the og:* pair, a documentation link pasted into Slack, Teams or LinkedIn

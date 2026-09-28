@@ -33,8 +33,11 @@ export function getPageMarkdownUrl(page: { slugs: string[]; locale?: string }) {
   return { segments, url: getDocsUrl(segments, page.locale) };
 }
 
-export function encodeSlugs(segments: string[]): string[] {
-  return segments.map(encodeURI);
+export function slugsFromSplat(splat: string | undefined): string[] {
+  return (splat ?? '')
+    .split('/')
+    .filter((segment) => segment.length > 0)
+    .map(encodeURI);
 }
 
 /** @returns page slugs */

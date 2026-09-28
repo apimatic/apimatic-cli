@@ -1,7 +1,7 @@
 import { createFileRoute, notFound } from '@tanstack/react-router';
 import { source } from '@/lib/source.server';
 import { renderHome, renderPage } from '@/lib/llms.server';
-import { decodeMarkdownUrl, encodeSlugs } from '@/lib/shared';
+import { decodeMarkdownUrl, slugsFromSplat } from '@/lib/shared';
 
 const headers = { 'Content-Type': 'text/markdown' };
 
@@ -9,7 +9,7 @@ export const Route = createFileRoute('/{$}.md')({
   server: {
     handlers: {
       GET: async ({ params }) => {
-        const slugs = decodeMarkdownUrl(encodeSlugs(params._splat?.split('/') ?? []));
+        const slugs = decodeMarkdownUrl(slugsFromSplat(params._splat));
         const page = source.getPage(slugs);
         if (page) return new Response(await renderPage(page), { headers });
         // Mirrors the generated landing page served at "/" when there is no index page.

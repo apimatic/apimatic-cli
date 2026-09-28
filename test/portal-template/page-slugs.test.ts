@@ -4,19 +4,25 @@ import path from 'path';
 import { expect } from 'chai';
 import { loader } from 'fumadocs-core/source';
 import { openApiSection } from '../../portal-template/src/lib/openapi-section.server';
-import { decodeMarkdownUrl, encodeSlugs } from '../../portal-template/src/lib/shared';
+import { decodeMarkdownUrl, slugsFromSplat } from '../../portal-template/src/lib/shared';
 
 const ok = { 200: { description: 'ok' } };
 
-describe('encodeSlugs', () => {
+describe('slugsFromSplat', () => {
+  it('drops the empty segments a leading or trailing slash leaves behind', () => {
+    expect(slugsFromSplat('guides/getting-started/')).to.deep.equal(['guides', 'getting-started']);
+    expect(slugsFromSplat('')).to.deep.equal([]);
+    expect(slugsFromSplat(undefined)).to.deep.equal([]);
+  });
+
   it('leaves an ordinary slug exactly as it was', () => {
-    expect(encodeSlugs(['api', 'openapi', 'pets', 'listPets'])).to.deep.equal(['api', 'openapi', 'pets', 'listPets']);
+    expect(slugsFromSplat('api/openapi/pets/listPets')).to.deep.equal(['api', 'openapi', 'pets', 'listPets']);
   });
 
   it('encodes each segment the way the page slugs were encoded, and no further', () => {
-    expect(encodeSlugs(['api', 'List All Pets'])).to.deep.equal(['api', 'List%20All%20Pets']);
-    expect(encodeSlugs(['café'])).to.deep.equal(['caf%C3%A9']);
-    expect(encodeSlugs(['pets&cats'])).to.deep.equal(['pets&cats']);
+    expect(slugsFromSplat('api/List All Pets')).to.deep.equal(['api', 'List%20All%20Pets']);
+    expect(slugsFromSplat('café')).to.deep.equal(['caf%C3%A9']);
+    expect(slugsFromSplat('pets&cats')).to.deep.equal(['pets&cats']);
   });
 });
 
@@ -53,11 +59,11 @@ describe('a page whose operationId needs encoding', () => {
   });
 
   it('is found from the splat the router decoded', () => {
-    expect(source.getPage(encodeSlugs(decodedSplatOf(url).split('/')))?.url).to.equal(url);
+    expect(source.getPage(slugsFromSplat(decodedSplatOf(url)))?.url).to.equal(url);
   });
 
   it('is found at its Markdown address too', () => {
-    expect(source.getPage(decodeMarkdownUrl(encodeSlugs(decodedSplatOf(url).split('/'))))?.url).to.equal(url);
+    expect(source.getPage(decodeMarkdownUrl(slugsFromSplat(decodedSplatOf(url))))?.url).to.equal(url);
   });
 
   it('is missed when the splat is looked up as it arrives', () => {
