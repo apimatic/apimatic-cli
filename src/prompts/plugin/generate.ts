@@ -110,7 +110,6 @@ export class PluginGeneratePrompts {
     );
   }
 
-  // Asked only while `languages` names none a plugin can carry, so nothing is recorded to pre-select or mark published.
   public async selectLanguages(): Promise<Language[] | undefined> {
     const selected = await multiselect<Language>({
       message: 'Which languages should your plugin include?',
