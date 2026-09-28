@@ -2,7 +2,6 @@ import fs from 'fs';
 import net from 'net';
 import os from 'os';
 import path from 'path';
-import { setTimeout as delay } from 'timers/promises';
 import { expect } from 'chai';
 import getPort from 'get-port';
 import { PortalDevServerService } from '../../src/infrastructure/portal-dev-server-service';
@@ -28,18 +27,11 @@ describe('PortalDevServerService', () => {
     `server.listen(${port}, '127.0.0.1', () => process.stdout.write('${line}\\n'));\n` +
     `setTimeout(() => process.exit(), 60000).unref();\n`;
 
-  const start = (viteBinary: FilePath, cancel = new AbortController()) =>
+  const start = (viteBinary: FilePath) =>
     new PortalDevServerService().start(
       { projectDirectory: new DirectoryPath(root), viteBinary, contentSource: null },
-      port,
-      cancel.signal
+      port
     );
-
-  const released = () =>
-    new Promise<boolean>((resolve) => {
-      const probe = net.createServer().once('error', () => resolve(false));
-      probe.listen(port, '127.0.0.1', () => probe.close(() => resolve(true)));
-    });
 
   beforeEach(async () => {
     root = fs.mkdtempSync(path.join(os.tmpdir(), 'dev-server-'));
@@ -76,8 +68,7 @@ describe('PortalDevServerService', () => {
     expect(answered).to.be.true;
   });
 
-  // As a crash does, or CTRL+C outside Windows: the server stops with the request unanswered.
-  it('reports a server that stops before answering its first page, with what it printed', async () => {
+  it('reports a server that crashes on its first page with what it printed after its address', async () => {
     const binary = script(
       serving(
         `process.stderr.write('the server fell over\\n'); process.exitCode = 1; ` +
@@ -88,32 +79,22 @@ describe('PortalDevServerService', () => {
     const started = await start(binary);
 
     expect(started.isErr()).to.be.true;
-    expect(started._unsafeUnwrapErr().log).to.contain('the server fell over');
+    const { log } = started._unsafeUnwrapErr();
+    expect(log).to.contain('the server fell over');
+    expect(log).to.not.contain('Local:');
   });
 
   it('stops a server that drops its first request rather than leaving it running', async () => {
     const binary = script(serving(`request.socket.destroy();`));
 
     const started = await start(binary);
+    const released = await new Promise<boolean>((resolve) => {
+      const probe = net.createServer().once('error', () => resolve(false));
+      probe.listen(port, '127.0.0.1', () => probe.close(() => resolve(true)));
+    });
 
     expect(started.isErr()).to.be.true;
-    expect(await released(), 'the port is still held').to.be.true;
-  });
-
-  // As CTRL+C on Windows does, where the terminal's signal reaches the CLI and not the server.
-  it('stops a server whose start is cancelled while it compiles the first page', async () => {
-    const binary = script(serving(`require('fs').writeFileSync('requested', '');`));
-    const cancel = new AbortController();
-
-    const starting = start(binary, cancel);
-    while (!fs.existsSync(path.join(root, 'requested'))) {
-      await delay(20);
-    }
-    cancel.abort();
-    const started = await starting;
-
-    expect(started.isErr()).to.be.true;
-    expect(await released(), 'the port is still held').to.be.true;
+    expect(released, 'the port is still held').to.be.true;
   });
 
   it('resolves `exited` with what the server printed when it stops on its own', async () => {

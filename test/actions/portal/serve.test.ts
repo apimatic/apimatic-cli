@@ -184,26 +184,6 @@ describe('PortalServeAction', () => {
     expect(stop.calledOnce).to.be.true;
   });
 
-  it('cancels a start the user interrupts, without announcing, opening or failing it', async () => {
-    start.callsFake(
-      (_project, _port, cancelSignal: AbortSignal) =>
-        new Promise((resolve) =>
-          cancelSignal.addEventListener('abort', () =>
-            resolve(err({ message: 'The portal preview stopped unexpectedly.', log: 'terminated' }))
-          )
-        )
-    );
-    interrupt();
-
-    const result = await execute(FIXTURE, true);
-
-    expect(result.isCancelled()).to.be.true;
-    expect(result.getMessage()).to.equal('Cancelled');
-    expect(prompts.startFailed.called).to.be.false;
-    expect(prompts.portalServed.called).to.be.false;
-    expect(openUrlInBrowser.called).to.be.false;
-  });
-
   it('reports a preview that stops on its own rather than advertising it', async () => {
     exit('Error: the specification vanished');
 

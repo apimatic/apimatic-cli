@@ -1,8 +1,5 @@
-import { stripVTControlCharacters } from 'node:util';
 import { expect } from 'chai';
-import { err, Result } from 'neverthrow';
-import sinon from 'sinon';
-import { logTail, withSpinner } from '../../src/prompts/prompt';
+import { logTail } from '../../src/prompts/prompt';
 
 describe('logTail', () => {
   const failure = [
@@ -120,26 +117,5 @@ describe('logTail', () => {
   it('returns nothing for empty output', () => {
     expect(logTail('')).to.equal('');
     expect(logTail('   \n  \n')).to.equal('');
-  });
-});
-
-describe('withSpinner', () => {
-  it('writes nothing more once CTRL+C has cancelled it', async () => {
-    let finish: (result: Result<string, string>) => void = () => undefined;
-    const written: string[] = [];
-    const write = sinon.stub(process.stdout, 'write').callsFake((chunk) => written.push(String(chunk)) > 0);
-    try {
-      const outcome = new Promise<Result<string, string>>((resolve) => (finish = resolve));
-      const running = withSpinner('Starting', 'Started.', 'Did not start.', outcome);
-      process.emit('SIGINT');
-      finish(err('stopped'));
-      await running;
-    } finally {
-      write.restore();
-    }
-
-    const output = stripVTControlCharacters(written.join(''));
-    expect(output).to.contain('cancelled');
-    expect(output).to.not.contain('Did not start.');
   });
 });

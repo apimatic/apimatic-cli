@@ -26,7 +26,7 @@ const LOCAL_URL_PATTERN = /Local:\s*(https?:\/\/\S+?)\/?[ \t]*[\r\n]/i;
 export interface PortalDevServer {
   url: UrlPath;
   /**
-   * Resolves with the last of what the server printed if it stops on its own, so the CLI
+   * Resolves with what the server printed after startup if it stops on its own, so the CLI
    * stops advertising an address nothing is listening on.
    */
   exited: Promise<string>;
@@ -45,8 +45,7 @@ export class PortalDevServerService {
 
   public async start(
     project: PortalProjectPaths,
-    port: number,
-    cancelSignal: AbortSignal
+    port: number
   ): Promise<Result<PortalDevServer, PortalDevServerFailure>> {
     // `--strictPort` makes Vite fail instead of silently moving to another port, so the
     // URL reported to the user is always the one that was reserved.
@@ -64,25 +63,22 @@ export class PortalDevServerService {
         buffer: false,
         reject: false,
         // Vite's dev server ignores SIGTERM while it is optimizing dependencies.
-        forceKillAfterDelay: 5000,
-        cancelSignal
+        forceKillAfterDelay: 5000
       }
     );
 
-    const exited = this.watchForExit(subprocess);
-    const fail = async (message: string) => {
-      await this.terminate(subprocess);
-      return err({ message, log: await exited });
-    };
-
     const started = await this.waitForUrl(subprocess);
     if (started.isErr()) {
-      return fail(started.error);
+      await this.terminate(subprocess);
+      return err(started.error);
     }
 
+    // Read from here, the log of a failed first page holds what explains it rather than the address banner.
+    const exited = this.watchForExit(subprocess);
     // Vite compiles the portal on its first request, not at startup, so it is ready only once one is answered.
     if (!(await this.networkService.answers(started.value, STARTUP_TIMEOUT_MS))) {
-      return fail('The portal preview did not answer its first page.');
+      await this.terminate(subprocess);
+      return err({ message: 'The portal preview did not answer its first page.', log: await exited });
     }
 
     return ok({
@@ -93,7 +89,7 @@ export class PortalDevServerService {
   }
 
   /**
-   * Keeps reading the server's output from the moment it starts: detaching lets the pipe fill and block
+   * Keeps reading the server's output after startup: detaching lets the pipe fill and block
    * the server once it has printed enough. Only the tail is kept, so a long session is bounded.
    */
   private watchForExit(subprocess: ResultPromise): Promise<string> {
@@ -137,20 +133,20 @@ export class PortalDevServerService {
     return subprocess.then(collect, collect);
   }
 
-  private waitForUrl(subprocess: ResultPromise): Promise<Result<UrlPath, string>> {
+  private waitForUrl(subprocess: ResultPromise): Promise<Result<UrlPath, PortalDevServerFailure>> {
     return new Promise((resolve) => {
-      let printed = '';
+      let log = '';
       let settled = false;
 
       const onData = (chunk: Buffer) => {
-        printed += stripVTControlCharacters(chunk.toString());
-        const match = LOCAL_URL_PATTERN.exec(printed);
+        log += stripVTControlCharacters(chunk.toString());
+        const match = LOCAL_URL_PATTERN.exec(log);
         if (match) {
           settle(ok(new UrlPath(match[1])));
         }
       };
 
-      const settle = (result: Result<UrlPath, string>) => {
+      const settle = (result: Result<UrlPath, PortalDevServerFailure>) => {
         if (settled) return;
         settled = true;
         clearTimeout(timer);
@@ -161,15 +157,15 @@ export class PortalDevServerService {
       };
 
       const timer = setTimeout(() => {
-        settle(err('The portal preview did not start in time.'));
+        settle(err({ message: 'The portal preview did not start in time.', log }));
       }, STARTUP_TIMEOUT_MS);
 
       subprocess.all?.on('data', onData);
 
       // A failed port bind or a broken config exits before ever printing a URL.
       void subprocess.then(
-        () => settle(err('The portal preview stopped unexpectedly.')),
-        () => settle(err('The portal preview could not be started.'))
+        () => settle(err({ message: 'The portal preview stopped unexpectedly.', log })),
+        () => settle(err({ message: 'The portal preview could not be started.', log }))
       );
     });
   }
