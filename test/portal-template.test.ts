@@ -152,6 +152,15 @@ describe('portal template packaging', () => {
     expect(stylesheet).to.contain(`@source '../../${CONTENT_COPY_DIRECTORY_NAME}';`);
   });
 
+  // Left to itself the popover reads `window.location.href`, so a reader's query string and hash
+  // — tracking and preview parameters among them — reach the AI vendors it links out to.
+  it('sends the AI vendors the page address and nothing the reader carried with them', () => {
+    const header = fs.readFileSync(path.join(templateRoot, 'src/components/page-header.tsx'), 'utf8');
+
+    expect(header).to.match(/<ViewOptionsPopover [^>]*pageUrl=/);
+    expect(header).to.contain('new URL(pathname, window.location.origin)');
+  });
+
   it('registers the plugin that reloads the generated pages under portal serve', () => {
     const config = fs.readFileSync(path.join(templateRoot, 'vite.config.ts'), 'utf8');
 

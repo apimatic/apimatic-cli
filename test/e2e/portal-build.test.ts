@@ -37,7 +37,8 @@ const CODE_SAMPLES = new CodeSampleCatalogs([
  */
 const SDK_DOCS =
   '## Installation\n\nInstall it with npm; its objects look like {id: 1}.<br>Then build it.\n\n' +
-  '```bash\nnpm install calc\n```\n\n## Quick Start\n\nCreate one client and reuse it.\n';
+  '```bash\nnpm install calc\n```\n\n## Quick Start\n\nCreate one client and reuse it.\n\n' +
+  'Use **identical method names**, **(identical)** and *`code`* here.\n';
 
 interface BuiltPortal {
   base: string;
@@ -366,6 +367,16 @@ const stylesheetOf = (output: DirectoryPath) => {
     expect(page).to.match(/<h2[^>]*id="installation"/);
     expect(page).to.contain('href="#quick-start"');
     expect(read('sdks/typescript.md')).to.contain('## Quick Start');
+  });
+
+  // Emphasis reaches these files through a Markdown serializer that has broken on it twice: once
+  // mangling the markers, once looping over one until the stack ran out. It has to read as written.
+  it("keeps the emphasis in a language's SDK docs, in its twin and in llms-full.txt", () => {
+    const written = 'Use **identical method names**, **(identical)** and *`code`* here.';
+
+    expect(read('sdks/typescript.md')).to.contain(written);
+    expect(read('llms-full.txt')).to.contain(written);
+    expect(read('sdks/typescript/index.html')).to.contain('<strong>identical method names</strong>');
   });
 
   it("offers each language's SDK from its card, its page and the site", () => {

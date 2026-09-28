@@ -3,6 +3,11 @@ allowBuilds:
 enablePrePostScripts: true
 minimumReleaseAge: 10080
 minimumReleaseAgeExclude:
+  # Quarantined until 2026-10-04, and taken early: 16.15.15 carries the stringifier fix
+  # for apimatic/apimatic-io#2260, without which no portal page may contain bold text.
+  - 'fumadocs-core'
+  - 'fumadocs-ui'
+  - 'mdast-util-to-markdown'
   - '@apimatic/*'
 blockExoticSubdeps: true
 overrides:
