@@ -3,7 +3,7 @@ import { createServerFn } from '@tanstack/react-start';
 import { docs, generated } from '@/lib/source';
 import { source } from '@/lib/source.server';
 import { PortalLayout } from '@/lib/layout';
-import { getPageMarkdownUrl } from '@/lib/shared';
+import { getPageMarkdownUrl, slugsFromSplat } from '@/lib/shared';
 import { portal } from '@/lib/portal';
 import { absoluteUrl, canonicalLink } from '@/lib/seo';
 import { useFumadocsLoader } from 'fumadocs-core/source/client';
@@ -26,7 +26,7 @@ const collections = { docs, generated };
 export const Route = createFileRoute('/$')({
   component: Page,
   loader: async ({ params }) => {
-    const slugs = params._splat?.split('/').filter((segment) => segment.length > 0) ?? [];
+    const slugs = slugsFromSplat(params._splat);
     const data = await loadPage(slugs);
 
     if (data.type === 'docs') {
