@@ -16,14 +16,16 @@ import { apiBaseDir } from './shared';
 export async function openApiSection(slug: string, file: string, codeSamplesFile: string | null) {
   const load = async () =>
     placeCodeSamples(withoutInternalOperations(await bundleSpec(file)), await readCodeSamples(codeSamplesFile));
+  const baseDir = `${apiBaseDir}/${slug}`;
   const section = await createOpenAPI({ input: { [slug]: load } }).staticSource({
-    baseDir: `${apiBaseDir}/${slug}`,
+    baseDir,
     groupBy: 'tag',
     meta: true,
     slugify
   });
+  refuseUnnamedPages(section.files, path.basename(file));
   refuseSharedPages(section.files, path.basename(file));
-  refuseSharedFolders(section.files, path.basename(file));
+  refuseSharedFolders(section.files, baseDir, path.basename(file));
   return { files: section.files };
 }
 
@@ -44,6 +46,21 @@ function slugify(name: string): string {
 }
 
 type SectionFile = Awaited<ReturnType<ReturnType<typeof createOpenAPI>['staticSource']>>['files'][number];
+
+/** A webhook without an operationId is named after its slug, and an empty one reads as its folder's index. */
+function refuseUnnamedPages(files: SectionFile[], specName: string): void {
+  for (const file of files) {
+    if (file.type !== 'meta' && path.basename(file.path) === '.mdx') {
+      const { location } = documented(file.data);
+      throw new Error(
+        [
+          `The webhook '${location.key}' in '${specName}' has no operationId, and no character in its name the portal can use in a URL.`,
+          'Give it an operationId.'
+        ].join('\n')
+      );
+    }
+  }
+}
 
 /**
  * Fumadocs writes a page per tag an operation lists, in the tag's folder and named after the
@@ -160,22 +177,25 @@ function sharedTagFolderMessage(folder: string, operation: DocumentedOperation, 
  * alike, on different operations, write two metas into one folder. One replaces the other, and
  * the operations it listed drop out of the sidebar without a word.
  */
-function refuseSharedFolders(files: SectionFile[], specName: string): void {
+function refuseSharedFolders(files: SectionFile[], baseDir: string, specName: string): void {
   const metas = new Set<string>();
   for (const file of files) {
     if (file.type !== 'meta') {
       continue;
     }
     if (metas.has(file.path)) {
-      throw new Error(sharedFolderMessage(path.basename(path.dirname(file.path)), tagNames(files), specName));
+      const folder = path.join(path.relative(baseDir, path.dirname(file.path)));
+      const parents = tagParents(files);
+      const tags = [...parents.keys()].filter((tag) => folderOf(tag, parents) === folder);
+      throw new Error(sharedFolderMessage(folder.split(path.sep).join('/'), tags, specName));
     }
     metas.add(file.path);
   }
 }
 
-/** The tags the document declares, then those its operations list without declaring them. */
-function tagNames(files: SectionFile[]): string[] {
-  const names = new Set<string>();
+/** The tags the document declares, then those its operations list without declaring them, each with its parent. */
+function tagParents(files: SectionFile[]): Map<string, string | undefined> {
+  const parents = new Map<string, string | undefined>();
   for (const file of files) {
     if (file.type === 'meta') {
       continue;
@@ -183,30 +203,40 @@ function tagNames(files: SectionFile[]): string[] {
     const { tags } = file.data.getOpenAPIPageProps().payload.bundled as unknown as JsonObject;
     for (const tag of Array.isArray(tags) ? tags : []) {
       if (isJsonObject(tag) && typeof tag.name === 'string') {
-        names.add(tag.name);
+        parents.set(tag.name, typeof tag.parent === 'string' ? tag.parent : undefined);
       }
     }
     for (const tag of documented(file.data).tags) {
-      names.add(tag);
+      if (!parents.has(tag)) {
+        parents.set(tag, undefined);
+      }
     }
   }
-  return [...names];
+  return parents;
+}
+
+/** Where Fumadocs files a tag: its slug, inside its parent's folder. */
+function folderOf(tag: string, parents: Map<string, string | undefined>, seen = new Set<string>()): string {
+  seen.add(tag);
+  const parent = parents.get(tag);
+  const above = parent !== undefined && !seen.has(parent) ? folderOf(parent, parents, seen) : '';
+  return path.join(above, slugify(tag));
 }
 
 function sharedFolderMessage(folder: string, tags: string[], specName: string): string {
-  const [first, second] = tags.filter((tag) => slugify(tag) === folder);
-  if (second !== undefined) {
-    return [
-      `The tags '${first}' and '${second}' in '${specName}' would share the folder '${folder}', so the portal would show only one of them.`,
-      'Rename one of them so they differ in more than case, spacing or punctuation.'
-    ].join('\n');
-  }
   // A tag with an empty slug is filed in its parent's folder, or the section's own.
   const unnamed = tags.find((tag) => slugify(tag) === '');
   if (unnamed !== undefined) {
     return [
       `The tag '${unnamed}' in '${specName}' has no character the portal can use in a URL or a folder name.`,
       'Rename it.'
+    ].join('\n');
+  }
+  const [first, second] = tags;
+  if (second !== undefined) {
+    return [
+      `The tags '${first}' and '${second}' in '${specName}' would share the folder '${folder}', so the portal would show only one of them.`,
+      'Rename one of them so they differ in more than case, spacing or punctuation.'
     ].join('\n');
   }
   // Fumadocs files the operations that list no tag under 'unknown'.

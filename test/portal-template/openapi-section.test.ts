@@ -639,4 +639,40 @@ describe('openApiSection', () => {
       )
     ).to.have.members(['api/pets/billing/rates/a.mdx', 'api/pets/shipping/rates/b.mdx']);
   });
+
+  it('names only the tags in the shared folder when alike slugs sit under different parents', async () => {
+    expect(
+      await failureFor(
+        {
+          '/a': { get: { operationId: 'a', tags: ['Rates:'], responses: ok } },
+          '/b': { get: { operationId: 'b', tags: ['Rates'], responses: ok } },
+          '/c': { get: { operationId: 'c', tags: ['Rates.'], responses: ok } }
+        },
+        {
+          tags: [
+            { name: 'Billing' },
+            { name: 'Shipping' },
+            { name: 'Rates:', parent: 'Billing' },
+            { name: 'Rates', parent: 'Shipping' },
+            { name: 'Rates.', parent: 'Shipping' }
+          ]
+        }
+      )
+    ).to.equal(
+      [
+        "The tags 'Rates' and 'Rates.' in 'api.json' would share the folder 'shipping/rates', so the portal would show only one of them.",
+        'Rename one of them so they differ in more than case, spacing or punctuation.'
+      ].join('\n')
+    );
+  });
+
+  // Its page would be named '.mdx', which the portal reads as the index of the tag's folder.
+  it('refuses a webhook without an operationId whose name leaves nothing to name its page', async () => {
+    expect(await failureFor({}, { webhooks: { '::': { post: { tags: ['Orders'], responses: ok } } } })).to.equal(
+      [
+        "The webhook '::' in 'api.json' has no operationId, and no character in its name the portal can use in a URL.",
+        'Give it an operationId.'
+      ].join('\n')
+    );
+  });
 });
