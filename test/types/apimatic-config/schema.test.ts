@@ -11,6 +11,9 @@ import { COLOR_MODES } from '../../../src/types/portal/config/brand-config';
 import { PortalConfig } from '../../../src/types/portal/portal-config';
 import { PortalLanguages } from '../../../src/types/portal/portal-languages';
 import { Language } from '../../../src/types/sdk/generate';
+import { buildLanguageEntry } from '../../../src/types/apimatic-config/languages-block';
+import { PackageConfigurationForLanguage } from '../../../src/types/publish/package-settings-configuration';
+import { SemVersion } from '../../../src/types/publish/version';
 
 /** As much of a schema object as the walks below read. */
 interface SchemaNode {
@@ -273,9 +276,14 @@ describe('apimatic.schema.json', () => {
         'a published language',
         { python: { publishing: { package: { version: '1.0.0' }, packageConfiguration: { name: 'calc' } } } }
       ],
+      // The record a source-only publish writes. apimatic/apimatic-io#2240.
       [
-        'keys this CLI does not model, beside and inside the record',
-        { csharp: { publishing: { future: 1 }, notes: 'x' } }
+        'a repository with no release',
+        { typescript: { publishing: { source: { repositoryUrl: 'https://github.com/acme/calc', branch: 'main' } } } }
+      ],
+      [
+        'package settings without a release',
+        { csharp: { publishing: { packageConfiguration: { packageId: 'Acme.Calc' } } } }
       ]
     ];
 
@@ -285,6 +293,53 @@ describe('apimatic.schema.json', () => {
       ['an entry that is not an object', { csharp: 'yes' }],
       ['a publishing record that is not an object', { python: { publishing: 1 } }]
     ];
+
+    // The name the SDK card installs is in `packageConfiguration`, so a release without one has no
+    // package to name — the rejection the portal build reports. apimatic/apimatic-io#2240.
+    it('asks for the package settings a release is named by', () => {
+      const languages = { typescript: { publishing: { package: { version: '1.0.0' } } } };
+
+      expect(schemaVerdict({ languages }).valid, 'schema').to.be.false;
+    });
+
+    // Each language names its package in its own field, and the schema asks for the one its
+    // settings reader refuses to map without. Java, PHP, Ruby and Go have no reader, so none.
+    const identity: [string, object][] = [
+      ['csharp', { packageId: 'Acme.Calc' }],
+      ['typescript', { name: '@acme/calc' }],
+      ['python', { name: 'acme-calc' }]
+    ];
+
+    for (const [language, packageConfiguration] of identity) {
+      it(`asks ${language} to name its package`, () => {
+        const release = { package: { version: '1.0.0' } };
+
+        expect(schemaVerdict({ languages: { [language]: { publishing: { ...release, packageConfiguration } } } }).valid)
+          .to.be.true;
+        expect(schemaVerdict({ languages: { [language]: { publishing: { ...release, packageConfiguration: {} } } } })
+          .valid).to.be.false;
+      });
+    }
+
+    // The editor asks for what the portal build requires, as it does for the plugin's identity;
+    // the parser stays lenient, so a file another APIMatic tool wrote is still read.
+    const unknownKey: [string, object][] = [
+      ['an entry', { csharp: { notes: 'x' } }],
+      ['a publishing record', { csharp: { publishing: { future: 1 } } }],
+      ['a source', { csharp: { publishing: { source: { repositoryUrl: 'https://github.com/acme/calc', tag: 'v1' } } } }],
+      ['a release', { csharp: { publishing: { package: { version: '1.0.0', name: 'Acme.Calc' } } } }],
+      [
+        'package settings',
+        { csharp: { publishing: { packageConfiguration: { packageId: 'Acme.Calc', licence: 'MIT' } } } }
+      ]
+    ];
+
+    for (const [label, languages] of unknownKey) {
+      it(`refuses a key this CLI does not write in ${label}, which the file is still read with`, () => {
+        expect(languagesAccepted(languages), 'portal').to.be.true;
+        expect(schemaVerdict({ languages }).valid, 'schema').to.be.false;
+      });
+    }
 
     for (const [label, languages] of valid) {
       it(`accepts ${label}`, () => {
@@ -324,6 +379,111 @@ describe('apimatic.schema.json', () => {
       expect(languagesAccepted(languages)).to.be.true;
       expect(schemaVerdict({ languages }).valid).to.be.false;
     });
+  });
+
+  // What #2253 was: the schema described a shape `sdk publish` never writes, and never described
+  // the one it does. Every field is given, so a field the CLI writes and the schema leaves out
+  // fails here rather than in a user's editor.
+  describe('accepts what `sdk publish` writes', () => {
+    const person = { name: 'Acme', email: 'dev@acme.io', url: null };
+
+    const configurations: { [L in Language]: PackageConfigurationForLanguage[L] } = {
+      [Language.CSHARP]: {
+        packageId: 'Acme.Calc',
+        authors: 'Acme',
+        description: null,
+        title: null,
+        packageTags: null,
+        repositoryUrl: null,
+        repositoryType: null,
+        packageProjectUrl: null,
+        packageIcon: null,
+        packageReleaseNotes: null,
+        copyright: null
+      },
+      [Language.JAVA]: {
+        groupId: 'io.acme',
+        artifactId: 'calc',
+        name: 'Acme Calc',
+        description: 'Calc SDK',
+        url: 'https://acme.io',
+        developers: [{ name: 'Acme', email: 'dev@acme.io', organization: null, organizationUrl: null }],
+        distributionManagement: { snapShotRepository: { id: 'ossrh', name: null, url: null } },
+        scm: { connection: 'scm:git:...', developerConnection: 'scm:git:...', url: 'https://github.com/acme/calc' }
+      },
+      [Language.PHP]: {
+        vendorName: 'acme',
+        projectName: 'calc',
+        description: 'Calc SDK',
+        type: null,
+        keywords: ['sdk'],
+        homepage: null,
+        authors: [{ name: 'Acme', email: null, homepage: null, role: null }],
+        support: {
+          email: null,
+          issues: null,
+          forum: null,
+          wiki: null,
+          irc: null,
+          chat: null,
+          source: null,
+          docs: null,
+          rss: null
+        }
+      },
+      [Language.PYTHON]: {
+        name: 'acme-calc',
+        description: null,
+        authors: [{ email: null, name: 'Acme' }],
+        maintainers: [],
+        keywords: ['sdk'],
+        classifiers: [],
+        urls: { Homepage: 'https://acme.io' }
+      },
+      [Language.RUBY]: {
+        name: 'acme-calc',
+        authors: ['Acme'],
+        summary: 'Calc SDK',
+        description: null,
+        email: ['dev@acme.io'],
+        homepage: null,
+        metadata: { source_code_uri: 'https://github.com/acme/calc' },
+        postInstallMessage: null,
+        requirements: []
+      },
+      [Language.TYPESCRIPT]: {
+        name: '@acme/calc',
+        author: person,
+        description: null,
+        contributors: [person],
+        bugs: { url: null, email: null },
+        keywords: ['sdk'],
+        homepage: null,
+        repository: { type: null, url: null, directory: null }
+      },
+      [Language.GO]: { packageName: 'calc' }
+    };
+
+    const gitConfiguration = { isEnabled: true, credentialsId: 'creds', repositoryName: 'acme/calc', branch: 'main' };
+    const version = SemVersion.tryCreate('1.0.0')._unsafeUnwrap();
+
+    for (const language of Object.values(Language)) {
+      it(`the record a ${language} publish records`, () => {
+        const entry = buildLanguageEntry(language, gitConfiguration, configurations[language], version);
+        const file = JSON.parse(JSON.stringify({ languages: { [language]: entry } }));
+
+        const verdict = schemaVerdict(file);
+        expect(verdict.valid, verdict.errors).to.be.true;
+      });
+
+      it(`the record a ${language} source-only publish records`, () => {
+        const entry = buildLanguageEntry(language, gitConfiguration, undefined, undefined);
+        const file = JSON.parse(JSON.stringify({ languages: { [language]: entry } }));
+
+        const verdict = schemaVerdict(file);
+        expect(verdict.valid, verdict.errors).to.be.true;
+      });
+    }
   });
 
   describe('is lenient where the file is', () => {

@@ -254,197 +254,630 @@
           "$ref": "#/definitions/phpEntry"
         },
         "python": {
-          "$ref": "#/definitions/namedEntry"
+          "$ref": "#/definitions/pythonEntry"
         },
         "ruby": {
-          "$ref": "#/definitions/namedEntry"
+          "$ref": "#/definitions/rubyEntry"
         },
         "typescript": {
-          "$ref": "#/definitions/namedEntry"
+          "$ref": "#/definitions/typescriptEntry"
         },
         "go": {
           "$ref": "#/definitions/goEntry"
         }
+      },
+      "additionalProperties": false
+    },
+    "source": {
+      "type": "object",
+      "description": "The repository 'apimatic sdk publish' published the SDK's source to.",
+      "additionalProperties": false,
+      "properties": {
+        "repositoryUrl": {
+          "type": "string"
+        },
+        "branch": {
+          "type": "string"
+        }
       }
     },
-    "languageEntry": {
+    "release": {
       "type": "object",
-      "additionalProperties": true,
+      "description": "The published release. The package's name is not here: it is read from 'packageConfiguration'.",
+      "additionalProperties": false,
       "properties": {
-        "publishing": {
-          "type": "object",
-          "description": "Where the SDK is published.",
-          "additionalProperties": true,
-          "properties": {
-            "source": {
-              "type": "object",
-              "additionalProperties": true,
-              "properties": {
-                "repositoryUrl": {
-                  "type": "string"
-                },
-                "branch": {
-                  "type": "string"
-                }
-              }
-            },
-            "package": {
-              "type": "object"
-            }
-          }
+        "version": {
+          "$ref": "#/definitions/semver"
         }
       }
     },
     "csharpEntry": {
-      "allOf": [
-        {
-          "$ref": "#/definitions/languageEntry"
-        },
-        {
+      "type": "object",
+      "description": "An SDK language. Without 'publishing', the language is wanted but not published yet.",
+      "additionalProperties": false,
+      "properties": {
+        "publishing": {
           "type": "object",
+          "description": "Where the SDK is published.",
+          "additionalProperties": false,
+          "dependencies": {
+            "package": ["packageConfiguration"]
+          },
           "properties": {
-            "publishing": {
-              "type": "object",
-              "properties": {
-                "package": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "properties": {
-                    "packageId": {
-                      "type": "string"
-                    },
-                    "version": {
-                      "$ref": "#/definitions/semver"
-                    }
-                  }
-                }
-              }
+            "source": {
+              "$ref": "#/definitions/source"
+            },
+            "package": {
+              "$ref": "#/definitions/release"
+            },
+            "packageConfiguration": {
+              "$ref": "#/definitions/csharpPackageConfiguration"
             }
           }
         }
-      ]
+      }
     },
     "javaEntry": {
-      "allOf": [
-        {
-          "$ref": "#/definitions/languageEntry"
-        },
-        {
+      "type": "object",
+      "description": "An SDK language. Without 'publishing', the language is wanted but not published yet.",
+      "additionalProperties": false,
+      "properties": {
+        "publishing": {
           "type": "object",
+          "description": "Where the SDK is published.",
+          "additionalProperties": false,
+          "dependencies": {
+            "package": ["packageConfiguration"]
+          },
           "properties": {
-            "publishing": {
-              "type": "object",
-              "properties": {
-                "package": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "properties": {
-                    "groupId": {
-                      "type": "string"
-                    },
-                    "artifactId": {
-                      "type": "string"
-                    },
-                    "version": {
-                      "$ref": "#/definitions/semver"
-                    }
-                  }
-                }
-              }
+            "source": {
+              "$ref": "#/definitions/source"
+            },
+            "package": {
+              "$ref": "#/definitions/release"
+            },
+            "packageConfiguration": {
+              "$ref": "#/definitions/javaPackageConfiguration"
             }
           }
         }
-      ]
+      }
     },
     "phpEntry": {
-      "allOf": [
-        {
-          "$ref": "#/definitions/languageEntry"
-        },
-        {
+      "type": "object",
+      "description": "An SDK language. Without 'publishing', the language is wanted but not published yet.",
+      "additionalProperties": false,
+      "properties": {
+        "publishing": {
           "type": "object",
+          "description": "Where the SDK is published.",
+          "additionalProperties": false,
+          "dependencies": {
+            "package": ["packageConfiguration"]
+          },
           "properties": {
-            "publishing": {
-              "type": "object",
-              "properties": {
-                "package": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "properties": {
-                    "vendorName": {
-                      "type": "string"
-                    },
-                    "projectName": {
-                      "type": "string"
-                    },
-                    "version": {
-                      "$ref": "#/definitions/semver"
-                    }
-                  }
-                }
-              }
+            "source": {
+              "$ref": "#/definitions/source"
+            },
+            "package": {
+              "$ref": "#/definitions/release"
+            },
+            "packageConfiguration": {
+              "$ref": "#/definitions/phpPackageConfiguration"
             }
           }
         }
-      ]
+      }
     },
-    "namedEntry": {
-      "allOf": [
-        {
-          "$ref": "#/definitions/languageEntry"
-        },
-        {
+    "pythonEntry": {
+      "type": "object",
+      "description": "An SDK language. Without 'publishing', the language is wanted but not published yet.",
+      "additionalProperties": false,
+      "properties": {
+        "publishing": {
           "type": "object",
+          "description": "Where the SDK is published.",
+          "additionalProperties": false,
+          "dependencies": {
+            "package": ["packageConfiguration"]
+          },
           "properties": {
-            "publishing": {
-              "type": "object",
-              "properties": {
-                "package": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "properties": {
-                    "name": {
-                      "type": "string"
-                    },
-                    "version": {
-                      "$ref": "#/definitions/semver"
-                    }
-                  }
-                }
-              }
+            "source": {
+              "$ref": "#/definitions/source"
+            },
+            "package": {
+              "$ref": "#/definitions/release"
+            },
+            "packageConfiguration": {
+              "$ref": "#/definitions/pythonPackageConfiguration"
             }
           }
         }
-      ]
+      }
+    },
+    "rubyEntry": {
+      "type": "object",
+      "description": "An SDK language. Without 'publishing', the language is wanted but not published yet.",
+      "additionalProperties": false,
+      "properties": {
+        "publishing": {
+          "type": "object",
+          "description": "Where the SDK is published.",
+          "additionalProperties": false,
+          "dependencies": {
+            "package": ["packageConfiguration"]
+          },
+          "properties": {
+            "source": {
+              "$ref": "#/definitions/source"
+            },
+            "package": {
+              "$ref": "#/definitions/release"
+            },
+            "packageConfiguration": {
+              "$ref": "#/definitions/rubyPackageConfiguration"
+            }
+          }
+        }
+      }
+    },
+    "typescriptEntry": {
+      "type": "object",
+      "description": "An SDK language. Without 'publishing', the language is wanted but not published yet.",
+      "additionalProperties": false,
+      "properties": {
+        "publishing": {
+          "type": "object",
+          "description": "Where the SDK is published.",
+          "additionalProperties": false,
+          "dependencies": {
+            "package": ["packageConfiguration"]
+          },
+          "properties": {
+            "source": {
+              "$ref": "#/definitions/source"
+            },
+            "package": {
+              "$ref": "#/definitions/release"
+            },
+            "packageConfiguration": {
+              "$ref": "#/definitions/typescriptPackageConfiguration"
+            }
+          }
+        }
+      }
     },
     "goEntry": {
-      "allOf": [
-        {
-          "$ref": "#/definitions/languageEntry"
-        },
-        {
+      "type": "object",
+      "description": "An SDK language. Without 'publishing', the language is wanted but not published yet.",
+      "additionalProperties": false,
+      "properties": {
+        "publishing": {
           "type": "object",
+          "description": "Where the SDK is published.",
+          "additionalProperties": false,
+          "dependencies": {
+            "package": ["packageConfiguration"]
+          },
           "properties": {
-            "publishing": {
+            "source": {
+              "$ref": "#/definitions/source"
+            },
+            "package": {
+              "$ref": "#/definitions/release"
+            },
+            "packageConfiguration": {
+              "$ref": "#/definitions/goPackageConfiguration"
+            }
+          }
+        }
+      }
+    },
+    "csharpPackageConfiguration": {
+      "type": "object",
+      "description": "How the NuGet package is set up. Written by 'apimatic sdk publish' from the publishing profile.",
+      "additionalProperties": false,
+      "required": ["packageId"],
+      "properties": {
+        "packageId": {
+          "type": "string",
+          "description": "The NuGet package id, which the SDK card installs."
+        },
+        "authors": {
+          "type": ["string", "null"]
+        },
+        "description": {
+          "type": ["string", "null"]
+        },
+        "title": {
+          "type": ["string", "null"]
+        },
+        "packageTags": {
+          "type": ["string", "null"]
+        },
+        "repositoryUrl": {
+          "type": ["string", "null"]
+        },
+        "repositoryType": {
+          "type": ["string", "null"]
+        },
+        "packageProjectUrl": {
+          "type": ["string", "null"]
+        },
+        "packageIcon": {
+          "type": ["string", "null"]
+        },
+        "packageReleaseNotes": {
+          "type": ["string", "null"]
+        },
+        "copyright": {
+          "type": ["string", "null"]
+        }
+      }
+    },
+    "javaPackageConfiguration": {
+      "type": "object",
+      "description": "How the Maven package is set up. Written by 'apimatic sdk publish' from the publishing profile.",
+      "additionalProperties": false,
+      "properties": {
+        "groupId": {
+          "type": "string"
+        },
+        "artifactId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "developers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "email": {
+                "type": "string"
+              },
+              "organization": {
+                "type": ["string", "null"]
+              },
+              "organizationUrl": {
+                "type": ["string", "null"]
+              }
+            }
+          }
+        },
+        "distributionManagement": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "snapShotRepository": {
               "type": "object",
+              "additionalProperties": false,
               "properties": {
-                "package": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "properties": {
-                    "packageName": {
-                      "type": "string"
-                    },
-                    "version": {
-                      "$ref": "#/definitions/semver"
-                    }
-                  }
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": ["string", "null"]
+                },
+                "url": {
+                  "type": ["string", "null"]
                 }
               }
             }
           }
+        },
+        "scm": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "connection": {
+              "type": "string"
+            },
+            "developerConnection": {
+              "type": "string"
+            },
+            "url": {
+              "type": "string"
+            }
+          }
         }
-      ]
+      }
+    },
+    "phpPackageConfiguration": {
+      "type": "object",
+      "description": "How the Composer package is set up. Written by 'apimatic sdk publish' from the publishing profile.",
+      "additionalProperties": false,
+      "properties": {
+        "vendorName": {
+          "type": "string"
+        },
+        "projectName": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "type": {
+          "type": ["string", "null"]
+        },
+        "keywords": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "homepage": {
+          "type": ["string", "null"]
+        },
+        "authors": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": ["string", "null"]
+              },
+              "email": {
+                "type": ["string", "null"]
+              },
+              "homepage": {
+                "type": ["string", "null"]
+              },
+              "role": {
+                "type": ["string", "null"]
+              }
+            }
+          }
+        },
+        "support": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "email": {
+              "type": ["string", "null"]
+            },
+            "issues": {
+              "type": ["string", "null"]
+            },
+            "forum": {
+              "type": ["string", "null"]
+            },
+            "wiki": {
+              "type": ["string", "null"]
+            },
+            "irc": {
+              "type": ["string", "null"]
+            },
+            "chat": {
+              "type": ["string", "null"]
+            },
+            "source": {
+              "type": ["string", "null"]
+            },
+            "docs": {
+              "type": ["string", "null"]
+            },
+            "rss": {
+              "type": ["string", "null"]
+            }
+          }
+        }
+      }
+    },
+    "pythonPackageConfiguration": {
+      "type": "object",
+      "description": "How the PyPI distribution is set up. Written by 'apimatic sdk publish' from the publishing profile.",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The PyPI project name, which the SDK card installs."
+        },
+        "description": {
+          "type": ["string", "null"]
+        },
+        "authors": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "email": {
+                "type": ["string", "null"]
+              },
+              "name": {
+                "type": ["string", "null"]
+              }
+            }
+          }
+        },
+        "maintainers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "email": {
+                "type": ["string", "null"]
+              },
+              "name": {
+                "type": ["string", "null"]
+              }
+            }
+          }
+        },
+        "keywords": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "classifiers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "urls": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "rubyPackageConfiguration": {
+      "type": "object",
+      "description": "How the RubyGems gem is set up. Written by 'apimatic sdk publish' from the publishing profile.",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "authors": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "summary": {
+          "type": "string"
+        },
+        "description": {
+          "type": ["string", "null"]
+        },
+        "email": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "homepage": {
+          "type": ["string", "null"]
+        },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "postInstallMessage": {
+          "type": ["string", "null"]
+        },
+        "requirements": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "typescriptPackageConfiguration": {
+      "type": "object",
+      "description": "How the npm package is set up. Written by 'apimatic sdk publish' from the publishing profile.",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The npm package name, which the SDK card installs."
+        },
+        "author": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "name": {
+              "type": ["string", "null"]
+            },
+            "email": {
+              "type": ["string", "null"]
+            },
+            "url": {
+              "type": ["string", "null"]
+            }
+          }
+        },
+        "description": {
+          "type": ["string", "null"]
+        },
+        "contributors": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": ["string", "null"]
+              },
+              "email": {
+                "type": ["string", "null"]
+              },
+              "url": {
+                "type": ["string", "null"]
+              }
+            }
+          }
+        },
+        "bugs": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "url": {
+              "type": ["string", "null"]
+            },
+            "email": {
+              "type": ["string", "null"]
+            }
+          }
+        },
+        "keywords": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "homepage": {
+          "type": ["string", "null"]
+        },
+        "repository": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "type": ["string", "null"]
+            },
+            "url": {
+              "type": ["string", "null"]
+            },
+            "directory": {
+              "type": ["string", "null"]
+            }
+          }
+        }
+      }
+    },
+    "goPackageConfiguration": {
+      "type": "object",
+      "description": "How the Go module is set up. Written by 'apimatic sdk publish' from the publishing profile.",
+      "additionalProperties": false,
+      "properties": {
+        "packageName": {
+          "type": "string"
+        }
+      }
     }
   }
 }
