@@ -37,13 +37,24 @@ const UNSAFE_IN_PATH = /[<>:"/\\|?*#%{}[\]^`\p{Cc}]/gu;
 /**
  * A name made fit to be a folder, a page and a part of its URL. Fumadocs takes a name as it is,
  * so 'Component: Price Points' became a folder Windows cannot create. An unsafe character is
- * read as a space, and dots are trimmed: Windows drops a trailing one, and '..' climbs out.
+ * read as a space.
  */
 function safeSegment(name: string): string {
-  return name
-    .replace(UNSAFE_IN_PATH, ' ')
-    .replace(/^[\s.]+|[\s.]+$/g, '')
-    .replace(/\s+/g, '-');
+  return withoutEndingSpacesOrDots(name.replace(UNSAFE_IN_PATH, ' ')).replace(/\s+/g, '-');
+}
+
+/** Windows drops a trailing dot, and '..' climbs out of the folder. A loop, as a regex ending in `+$` backtracks. */
+function withoutEndingSpacesOrDots(name: string): string {
+  const trimmed = (index: number) => name[index] === '.' || name[index].trim() === '';
+  let start = 0;
+  let end = name.length;
+  while (start < end && trimmed(start)) {
+    start++;
+  }
+  while (end > start && trimmed(end - 1)) {
+    end--;
+  }
+  return name.slice(start, end);
 }
 
 /** A tag's folder, and the page of a webhook without an operationId. */
@@ -221,24 +232,24 @@ function refuseSharedFolders(files: SectionFile[], baseDir: string, specName: st
 
 /** The tags the document declares, then those its operations list without declaring them, each with its parent. */
 function tagParents(files: SectionFile[]): Map<string, string | undefined> {
-  const parents = new Map<string, string | undefined>();
-  for (const file of files) {
-    if (file.type === 'meta') {
-      continue;
-    }
-    const { tags } = file.data.getOpenAPIPageProps().payload.bundled as unknown as JsonObject;
-    for (const tag of Array.isArray(tags) ? tags : []) {
-      if (isJsonObject(tag) && typeof tag.name === 'string') {
-        parents.set(tag.name, typeof tag.parent === 'string' ? tag.parent : undefined);
-      }
-    }
-    for (const tag of documented(file.data).tags) {
-      if (!parents.has(tag)) {
-        parents.set(tag, undefined);
-      }
+  const pages = files.flatMap((file) => (file.type === 'meta' ? [] : [file.data]));
+  const parents = new Map(pages.flatMap(declaredTags));
+  for (const tag of pages.flatMap((page) => documented(page).tags)) {
+    if (!parents.has(tag)) {
+      parents.set(tag, undefined);
     }
   }
   return parents;
+}
+
+/** The tags a page's document declares, each with its parent. */
+function declaredTags(page: OpenAPIPageData): [string, string | undefined][] {
+  const { tags } = page.getOpenAPIPageProps().payload.bundled as unknown as JsonObject;
+  return (Array.isArray(tags) ? tags : []).flatMap((tag): [string, string | undefined][] =>
+    isJsonObject(tag) && typeof tag.name === 'string'
+      ? [[tag.name, typeof tag.parent === 'string' ? tag.parent : undefined]]
+      : []
+  );
 }
 
 /** Where Fumadocs files a tag: its slug, inside its parent's folder. */
