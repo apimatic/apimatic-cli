@@ -10,7 +10,10 @@ import {
 import { COLOR_MODES } from '../../../src/types/portal/config/brand-config';
 import { PortalConfig } from '../../../src/types/portal/portal-config';
 import { PortalLanguages } from '../../../src/types/portal/portal-languages';
-import { Language } from '../../../src/types/sdk/generate';
+import { AVAILABLE_LANGUAGES, Language } from '../../../src/types/sdk/generate';
+import { buildLanguageEntry } from '../../../src/types/apimatic-config/languages-block';
+import { PackageConfigurationForLanguage } from '../../../src/types/publish/package-settings-configuration';
+import { SemVersion } from '../../../src/types/publish/version';
 
 /** As much of a schema object as the walks below read. */
 interface SchemaNode {
@@ -60,7 +63,7 @@ describe('apimatic.schema.json', () => {
 
     const cases: [string, unknown, readonly string[]][] = [
       ['brand.colorMode', brand.colorMode.enum, COLOR_MODES],
-      ['languages', schema.definitions.languages.propertyNames.enum, Object.values(Language)]
+      ['languages', schema.definitions.languages.propertyNames.enum, AVAILABLE_LANGUAGES]
     ];
 
     for (const [setting, offered, accepted] of cases) {
@@ -69,8 +72,10 @@ describe('apimatic.schema.json', () => {
       });
     }
 
-    it('with an entry for every language', () => {
-      expect(Object.keys(schema.definitions.languages.properties)).to.have.members(Object.values(Language));
+    // The schema declares what the CLI can write, so a language joining `CODEGEN_OPTIONS` fails
+    // here until its entry is declared, rather than in the editor of whoever publishes it first.
+    it('with an entry for every language the CLI can generate, and no other', () => {
+      expect(Object.keys(schema.definitions.languages.properties)).to.have.members([...AVAILABLE_LANGUAGES]);
     });
   });
 
@@ -273,9 +278,14 @@ describe('apimatic.schema.json', () => {
         'a published language',
         { python: { publishing: { package: { version: '1.0.0' }, packageConfiguration: { name: 'calc' } } } }
       ],
+      // The record a source-only publish writes. apimatic/apimatic-io#2240.
       [
-        'keys this CLI does not model, beside and inside the record',
-        { csharp: { publishing: { future: 1 }, notes: 'x' } }
+        'a repository with no release',
+        { typescript: { publishing: { source: { repositoryUrl: 'https://github.com/acme/calc', branch: 'main' } } } }
+      ],
+      [
+        'package settings without a release',
+        { csharp: { publishing: { packageConfiguration: { packageId: 'Acme.Calc' } } } }
       ]
     ];
 
@@ -285,6 +295,53 @@ describe('apimatic.schema.json', () => {
       ['an entry that is not an object', { csharp: 'yes' }],
       ['a publishing record that is not an object', { python: { publishing: 1 } }]
     ];
+
+    // The name the SDK card installs is in `packageConfiguration`, so a release without one has no
+    // package to name — the rejection the portal build reports. apimatic/apimatic-io#2240.
+    it('asks for the package settings a release is named by', () => {
+      const languages = { typescript: { publishing: { package: { version: '1.0.0' } } } };
+
+      expect(schemaVerdict({ languages }).valid, 'schema').to.be.false;
+    });
+
+    // Each language names its package in its own field, and the schema asks for the one its
+    // settings reader refuses to map without. Java, PHP, Ruby and Go have no reader, so none.
+    const identity: [string, object][] = [
+      ['csharp', { packageId: 'Acme.Calc' }],
+      ['typescript', { name: '@acme/calc' }],
+      ['python', { name: 'acme-calc' }]
+    ];
+
+    for (const [language, packageConfiguration] of identity) {
+      it(`asks ${language} to name its package`, () => {
+        const release = { package: { version: '1.0.0' } };
+
+        expect(schemaVerdict({ languages: { [language]: { publishing: { ...release, packageConfiguration } } } }).valid)
+          .to.be.true;
+        expect(schemaVerdict({ languages: { [language]: { publishing: { ...release, packageConfiguration: {} } } } })
+          .valid).to.be.false;
+      });
+    }
+
+    // The editor asks for what the portal build requires, as it does for the plugin's identity;
+    // the parser stays lenient, so a file another APIMatic tool wrote is still read.
+    const unknownKey: [string, object][] = [
+      ['an entry', { csharp: { notes: 'x' } }],
+      ['a publishing record', { csharp: { publishing: { future: 1 } } }],
+      ['a source', { csharp: { publishing: { source: { repositoryUrl: 'https://github.com/acme/calc', tag: 'v1' } } } }],
+      ['a release', { csharp: { publishing: { package: { version: '1.0.0', name: 'Acme.Calc' } } } }],
+      [
+        'package settings',
+        { csharp: { publishing: { packageConfiguration: { packageId: 'Acme.Calc', licence: 'MIT' } } } }
+      ]
+    ];
+
+    for (const [label, languages] of unknownKey) {
+      it(`refuses a key this CLI does not write in ${label}, which the file is still read with`, () => {
+        expect(languagesAccepted(languages), 'portal').to.be.true;
+        expect(schemaVerdict({ languages }).valid, 'schema').to.be.false;
+      });
+    }
 
     for (const [label, languages] of valid) {
       it(`accepts ${label}`, () => {
@@ -307,14 +364,16 @@ describe('apimatic.schema.json', () => {
       expect(languagesAccepted({})).to.be.false;
     });
 
-    // The block is shared with the SDK and plugin commands, whose schema entry still lists every
-    // language; the portal refuses those it cannot be generated for yet.
-    it('leaves a language that is not available yet to the portal command', () => {
-      const languages = { java: {} };
+    // Nothing generates these yet, so nothing writes them: `sdk generate` refuses a language
+    // outside `CODEGEN_OPTIONS`, and a publish records only what it generated.
+    for (const language of ['java', 'php', 'ruby', 'go']) {
+      it(`refuses ${language}, which nothing can generate yet`, () => {
+        const languages = { [language]: {} };
 
-      expect(schemaVerdict({ languages }).valid).to.be.true;
-      expect(languagesAccepted(languages)).to.be.false;
-    });
+        expect(schemaVerdict({ languages }).valid, 'schema').to.be.false;
+        expect(languagesAccepted(languages), 'portal').to.be.false;
+      });
+    }
 
     // The portal reads the record leniently, as not recorded where it has the wrong shape; the
     // schema types it for the editor.
@@ -324,6 +383,75 @@ describe('apimatic.schema.json', () => {
       expect(languagesAccepted(languages)).to.be.true;
       expect(schemaVerdict({ languages }).valid).to.be.false;
     });
+  });
+
+  // What #2253 was: the schema described a shape `sdk publish` never writes, and never described
+  // the one it does. Every field is given, so a field the CLI writes and the schema leaves out
+  // fails here rather than in a user's editor.
+  describe('accepts what `sdk publish` writes', () => {
+    const person = { name: 'Acme', email: 'dev@acme.io', url: null };
+
+    const publishable = [Language.CSHARP, Language.TYPESCRIPT, Language.PYTHON] as const;
+
+    it('covers every language the CLI can generate', () => {
+      expect([...publishable]).to.have.members([...AVAILABLE_LANGUAGES]);
+    });
+
+    const configurations: { [L in (typeof publishable)[number]]: PackageConfigurationForLanguage[L] } = {
+      [Language.CSHARP]: {
+        packageId: 'Acme.Calc',
+        authors: 'Acme',
+        description: null,
+        title: null,
+        packageTags: null,
+        repositoryUrl: null,
+        repositoryType: null,
+        packageProjectUrl: null,
+        packageIcon: null,
+        packageReleaseNotes: null,
+        copyright: null
+      },
+      [Language.PYTHON]: {
+        name: 'acme-calc',
+        description: null,
+        authors: [{ email: null, name: 'Acme' }],
+        maintainers: [],
+        keywords: ['sdk'],
+        classifiers: [],
+        urls: { Homepage: 'https://acme.io' }
+      },
+      [Language.TYPESCRIPT]: {
+        name: '@acme/calc',
+        author: person,
+        description: null,
+        contributors: [person],
+        bugs: { url: null, email: null },
+        keywords: ['sdk'],
+        homepage: null,
+        repository: { type: null, url: null, directory: null }
+      }
+    };
+
+    const gitConfiguration = { isEnabled: true, credentialsId: 'creds', repositoryName: 'acme/calc', branch: 'main' };
+    const version = SemVersion.tryCreate('1.0.0')._unsafeUnwrap();
+
+    for (const language of publishable) {
+      it(`the record a ${language} publish records`, () => {
+        const entry = buildLanguageEntry(language, gitConfiguration, configurations[language], version);
+        const file = JSON.parse(JSON.stringify({ languages: { [language]: entry } }));
+
+        const verdict = schemaVerdict(file);
+        expect(verdict.valid, verdict.errors).to.be.true;
+      });
+
+      it(`the record a ${language} source-only publish records`, () => {
+        const entry = buildLanguageEntry(language, gitConfiguration, undefined, undefined);
+        const file = JSON.parse(JSON.stringify({ languages: { [language]: entry } }));
+
+        const verdict = schemaVerdict(file);
+        expect(verdict.valid, verdict.errors).to.be.true;
+      });
+    }
   });
 
   describe('is lenient where the file is', () => {
