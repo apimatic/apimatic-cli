@@ -85,6 +85,7 @@ const serverLoader = createServerFn({
         type: 'openapi' as const,
         title: page.data.title,
         description: page.data.description ?? null,
+        markdownUrl: getPageMarkdownUrl(page).url,
         props: slimOpenAPIPageProps(page.data.getOpenAPIPageProps())
       };
     }
@@ -138,16 +139,22 @@ function Content({
     <DocsPage toc={toc} full={page.full}>
       <DocsTitle>{page.title}</DocsTitle>
       <DocsDescription>{page.description}</DocsDescription>
-      <div className="flex flex-row gap-2 items-center border-b -mt-4 pb-6">
-        <MarkdownCopyButton markdownUrl={markdownUrl} />
-        {/* Sends the reader to an external AI vendor, so a portal published under someone
-            else's brand can turn it off. */}
-        {portal.pageActions ? <ViewOptionsPopover markdownUrl={markdownUrl} /> : null}
-      </div>
+      <PageActions markdownUrl={markdownUrl} />
       <DocsBody>
         <PageBody components={useMDXComponents()} />
       </DocsBody>
     </DocsPage>
+  );
+}
+
+function PageActions({ markdownUrl }: Readonly<{ markdownUrl: string }>) {
+  return (
+    <div className="flex flex-row gap-2 items-center border-b -mt-4 pb-6">
+      <MarkdownCopyButton markdownUrl={markdownUrl} />
+      {/* Sends the reader to an external AI vendor, so a portal published under someone
+          else's brand can turn it off. */}
+      {portal.pageActions ? <ViewOptionsPopover markdownUrl={markdownUrl} /> : null}
+    </div>
   );
 }
 
@@ -175,6 +182,7 @@ function Page() {
       <DocsPage full>
         <DocsTitle>{page.title}</DocsTitle>
         <DocsDescription>{page.description}</DocsDescription>
+        <PageActions markdownUrl={page.markdownUrl} />
         <DocsBody>
           <OpenAPIPage {...page.props} />
         </DocsBody>
