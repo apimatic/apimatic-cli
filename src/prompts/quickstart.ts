@@ -102,9 +102,16 @@ Let's get started!`);
     return useDefaultSpec === 'yes';
   }
 
-  public fixYourSpec() {
+  public fixYourSpec(spec: ResourceInput) {
     const message = `Good luck fixing your API Definition! Feel free to run this command again once you're done.`;
     log.info(message);
+    const validateCommand = `${f.cmdAlt('apimatic', 'api', 'validate')} ${
+      spec instanceof UrlPath ? f.flag('url', spec.toString()) : f.flag('file', spec.toString())
+    }`;
+    log.message(
+      `Tip: ${validateCommand} lists every issue with its file, line and location. ` +
+        `Ask an AI coding agent to run it and fix what it reports until your API Definition passes.`
+    );
   }
 
   public validateSpecStep() {

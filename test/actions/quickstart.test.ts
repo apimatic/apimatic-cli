@@ -164,4 +164,15 @@ describe('QuickstartAction', () => {
       expect(prompts.fixYourSpec.calledOnce).to.be.true;
     });
   });
+
+  it('points the fix at the specification the user named when they decline the sample', async () => {
+    const failed = { isSuccess: false, blocking: [], errors: ['bad'], warnings: [], information: [] };
+    (ValidationService.prototype.validateViaFile as sinon.SinonStub).resolves(
+      ok({ validation: failed, linting: PASSED } as never)
+    );
+    prompts.useDefaultSpecPrompt.resolves(false);
+
+    expect((await execute()).isCancelled()).to.be.true;
+    expect(prompts.fixYourSpec.calledOnceWith(SPEC)).to.be.true;
+  });
 });
