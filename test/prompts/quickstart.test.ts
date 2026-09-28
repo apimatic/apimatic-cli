@@ -7,6 +7,7 @@ import { convertToOpenApi3 } from '../../src/prompts/portal/source.js';
 import { DirectoryPath } from '../../src/types/file/directoryPath.js';
 import { FileName } from '../../src/types/file/fileName.js';
 import { FilePath } from '../../src/types/file/filePath.js';
+import { UrlPath } from '../../src/types/file/urlPath.js';
 
 describe('QuickstartPrompts', () => {
   const prompts = new QuickstartPrompts();
@@ -36,5 +37,35 @@ describe('QuickstartPrompts', () => {
     prompts.specNotRecognised(new FilePath(specs, new FileName('calculator.raml')));
 
     expect(printed()[0]).to.contain(fix);
+  });
+
+  describe('specValidationFailed', () => {
+    let write: sinon.SinonStub;
+    // Boxed or not depending on the terminal's width, but each of these stays on a line of its own.
+    const howToFix = () => stripVTControlCharacters(write.args.map(([chunk]) => String(chunk)).join(''));
+
+    beforeEach(() => {
+      write = sinon.stub(process.stdout, 'write').returns(true);
+    });
+
+    it('suggests an AI agent run validate on a local spec, or the VS Code extension', () => {
+      prompts.specValidationFailed(new FilePath(specs, new FileName('petstore.json')));
+      write.restore();
+
+      expect(howToFix()).to.contain('How to fix');
+      expect(howToFix()).to.contain('Ask an AI coding agent to run this command and fix what it reports:');
+      expect(howToFix()).to.contain('apimatic api validate --file=<path>');
+      expect(howToFix()).to.contain("Or use APIMatic's interactive VS Code Extension:");
+      expect(howToFix()).to.contain(
+        'https://marketplace.visualstudio.com/items?itemName=apimatic-developers.apimatic-for-vscode'
+      );
+    });
+
+    it('suggests validating a spec that came from a URL by its URL', () => {
+      prompts.specValidationFailed(new UrlPath('https://example.com/openapi.json'));
+      write.restore();
+
+      expect(howToFix()).to.contain('apimatic api validate --url=<url>');
+    });
   });
 });

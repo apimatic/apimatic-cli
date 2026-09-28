@@ -23,6 +23,9 @@ export interface ValidateViaFileParams {
   authKey?: string | null;
 }
 
+/** `rejected`: the service refused the document itself (400), so the spec is invalid rather than unchecked. */
+export type ValidationFailure = { kind: 'rejected' | 'unavailable'; message: string };
+
 export class ValidationService {
   constructor(private readonly configDir: DirectoryPath) {}
 
@@ -30,7 +33,7 @@ export class ValidationService {
     file,
     commandMetadata,
     authKey
-  }: ValidateViaFileParams): Promise<Result<ValidateApiResult, string>> {
+  }: ValidateViaFileParams): Promise<Result<ValidateApiResult, ValidationFailure>> {
     const authInfo: AuthInfo | null = await getAuthInfo(this.configDir.toString());
     const authorizationHeader = this.createAuthorizationHeader(authInfo, authKey ?? null);
     const client = apiClientFactory.createApiClient(authorizationHeader, commandMetadata.shell);
@@ -56,13 +59,18 @@ export class ValidationService {
     return `X-Auth-Key ${key ?? ''}`;
   }
 
-  private async handleValidationErrors(error: unknown): Promise<string> {
+  private async handleValidationErrors(error: unknown): Promise<ValidationFailure> {
+    if (error instanceof ApiError && error.statusCode === 400) {
+      return { kind: 'rejected', message: 'Your API Definition is invalid. Please fix the issues and try again.' };
+    }
+    return { kind: 'unavailable', message: this.unavailableMessage(error) };
+  }
+
+  private unavailableMessage(error: unknown): string {
     if (error instanceof ApiError) {
       const apiError = error as ApiError;
 
       switch (apiError.statusCode) {
-        case 400:
-          return 'Your API Definition is invalid. Please fix the issues and try again.';
         case 401:
           return ServiceError.unauthorizedWithHint(null).errorMessage;
         case 403:

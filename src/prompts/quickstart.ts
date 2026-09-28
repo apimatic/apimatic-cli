@@ -91,7 +91,7 @@ Let's get started!`);
       options: [
         {
           value: 'no',
-          label: `1. Fix the issues using APIMatic's interactive VS Code Extension: ${vscodeExtensionUrl}`
+          label: `1. Fix the issues`
         },
         { value: 'yes', label: `2. Use an example API spec instead (recommended)` }
       ]
@@ -111,8 +111,19 @@ Let's get started!`);
     log.info(`Step 2 of 3: Validate and Lint your OpenAPI Definition`);
   }
 
-  public specValidationFailed() {
+  public specValidationFailed(spec: ResourceInput) {
     log.error(`Oops, it looks like there are some errors in your API Definition`);
+    // A placeholder rather than the user's own path or URL, which no quoting survives every shell with.
+    const specFlag = spec instanceof UrlPath ? f.flag('url', '<url>') : f.flag('file', '<path>');
+    const validateCommand = `${f.cmdAlt('apimatic', 'api', 'validate')} ${specFlag}`;
+    const message = [
+      `Ask an AI coding agent to run this command and fix what it reports:`,
+      validateCommand,
+      '',
+      `Or use APIMatic's interactive VS Code Extension:`,
+      f.link(vscodeExtensionUrl)
+    ].join('\n');
+    noteWrapped(message, 'How to fix');
   }
 
   public createPortalStep() {
