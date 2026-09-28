@@ -104,12 +104,14 @@ export async function bundleSpec(file: string): Promise<Document> {
 
 /**
  * Fumadocs lists a document's operations by reading the methods off each path item without
- * following a `$ref`, so every operation behind one gets no page and no error says so.
+ * following a `$ref`, so every operation behind one gets no page and no error says so. It does
+ * follow a webhook's, but the portal's own readers of the document don't, so those go too.
  */
 function inlinePathItems(document: JsonObject): void {
-  const paths = document.paths;
-  if (!isJsonObject(paths)) return;
-  for (const [path, item] of Object.entries(paths)) paths[path] = dereference(document, item, new Set());
+  for (const items of [document.paths, document.webhooks]) {
+    if (!isJsonObject(items)) continue;
+    for (const [key, item] of Object.entries(items)) items[key] = dereference(document, item, new Set());
+  }
 }
 
 // Siblings of a `$ref` override what it points to, as OpenAPI 3.1 has it.

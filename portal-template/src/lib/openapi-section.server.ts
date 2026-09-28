@@ -3,6 +3,7 @@ import { createOpenAPI, type OpenAPIPageData } from 'fumadocs-openapi/server';
 import { bundleSpec } from './openapi-bundle.server';
 import { placeCodeSamples, readCodeSamples } from './code-samples.server';
 import { isJsonObject, type JsonObject } from './json';
+import { operationLabels } from './openapi-labels';
 import { withoutInternalOperations } from './openapi-filter';
 import { apiBaseDir } from './shared';
 
@@ -15,82 +16,126 @@ import { apiBaseDir } from './shared';
 export async function openApiSection(slug: string, file: string, codeSamplesFile: string | null) {
   const load = async () =>
     placeCodeSamples(withoutInternalOperations(await bundleSpec(file)), await readCodeSamples(codeSamplesFile));
+  const baseDir = `${apiBaseDir}/${slug}`;
   const section = await createOpenAPI({ input: { [slug]: load } }).staticSource({
-    baseDir: `${apiBaseDir}/${slug}`,
+    baseDir,
     groupBy: 'tag',
-    meta: true
+    meta: true,
+    slugify
   });
-  refuseSharedPages(section.files, path.basename(file));
+  refuseSharedPages(section.files, baseDir, path.basename(file));
   return { files: section.files };
+}
+
+/**
+ * The folder a tag's pages go in, and the page of a webhook without an operationId. Fumadocs'
+ * own default, kept here so the check below reads a page's folder by the same rule.
+ */
+function slugify(name: string): string {
+  return name.replace(/\s+/g, '-').toLowerCase();
 }
 
 type SectionFile = Awaited<ReturnType<ReturnType<typeof createOpenAPI>['staticSource']>>['files'][number];
 
-/** An operation or webhook as the spec's author knows it. */
-interface Endpoint {
-  label: string;
-  operationId: unknown;
-  tags: unknown[];
-}
-
 /**
- * Fumadocs writes a page per tag an operation lists, named after the tag and the operationId, so
- * two operations sharing an operationId, or one listing a tag twice, would put two pages at one
- * path, and one would be left out without a word.
+ * Fumadocs writes a page per tag an operation lists, in the tag's folder and named after the
+ * operationId, so two pages land at one path, and one is left out without a word, when two
+ * operations share an operationId (or have none, and paths that read alike), or when one
+ * operation lists a tag twice, or two tags that differ only in case or spacing.
  */
-function refuseSharedPages(files: SectionFile[], specName: string): void {
-  const pages = new Map<string, Endpoint>();
+function refuseSharedPages(files: SectionFile[], baseDir: string, specName: string): void {
+  const pages = new Map<string, OpenAPIPageData>();
   for (const file of files) {
     if (file.type === 'meta') {
       continue;
     }
-    const endpoint = endpointOf(file.data);
     const earlier = pages.get(file.path);
     if (earlier) {
-      throw new Error(sharedPageMessage(earlier, endpoint, specName));
+      const page = file.path.slice(baseDir.length + 1);
+      throw new Error(sharedPageMessage(page, documented(earlier), documented(file.data), specName));
     }
-    pages.set(file.path, endpoint);
+    pages.set(file.path, file.data);
   }
 }
 
-function endpointOf(page: OpenAPIPageData): Endpoint {
-  const { payload, operations = [], webhooks = [] } = page.getOpenAPIPageProps();
-  const document = payload.bundled as unknown as JsonObject;
-  const [operation] = operations;
-  if (operation) {
-    return endpoint(document.paths, operation.path, operation.method, `${operation.method.toUpperCase()} ${operation.path}`);
-  }
-  const [webhook] = webhooks;
-  return endpoint(document.webhooks, webhook.name, webhook.method, `${webhook.method.toUpperCase()} ${webhook.name} (webhook)`);
+/** The operation or webhook a page documents, and what its page is named after. */
+interface DocumentedOperation {
+  label: string;
+  operationId: string | undefined;
+  tags: string[];
 }
 
-function endpoint(items: unknown, key: string, method: string, label: string): Endpoint {
-  const item = isJsonObject(items) ? items[key] : undefined;
-  const operation = isJsonObject(item) ? item[method] : undefined;
-  const fields = isJsonObject(operation) ? operation : {};
-  return { label, operationId: fields.operationId, tags: Array.isArray(fields.tags) ? fields.tags : [] };
+function documented(page: OpenAPIPageData): DocumentedOperation {
+  const props = page.getOpenAPIPageProps();
+  const document = props.payload.bundled as unknown as JsonObject;
+  const [operation] = props.operations ?? [];
+  const [webhook] = props.webhooks ?? [];
+  const { operationId, tags } = operation
+    ? operationObject(document.paths, operation.path, operation.method)
+    : operationObject(document.webhooks, webhook?.name, webhook?.method);
+  return {
+    label: operationLabels(props).join(', '),
+    operationId: typeof operationId === 'string' ? operationId : undefined,
+    tags: Array.isArray(tags) ? tags.filter((tag): tag is string => typeof tag === 'string') : []
+  };
 }
 
-function sharedPageMessage(earlier: Endpoint, later: Endpoint, specName: string): string {
-  const repeatedTag = earlier.tags.find((tag, index) => earlier.tags.indexOf(tag) !== index);
-  if (earlier.label === later.label && repeatedTag !== undefined) {
-    return [
-      `The operation ${earlier.label} in '${specName}' lists the tag '${repeatedTag}' more than once.`,
-      'Remove the repeated tag, then run the command again.'
-    ].join('\n');
+function operationObject(items: unknown, key: string | undefined, method: string | undefined): JsonObject {
+  const item = isJsonObject(items) && key !== undefined ? items[key] : undefined;
+  const operation = isJsonObject(item) && method !== undefined ? item[method] : undefined;
+  return isJsonObject(operation) ? operation : {};
+}
+
+function sharedPageMessage(
+  page: string,
+  earlier: DocumentedOperation,
+  later: DocumentedOperation,
+  specName: string
+): string {
+  if (earlier.label === later.label) {
+    return sharedTagFolderMessage(page, earlier, specName);
   }
-  if (earlier.label !== later.label && earlier.operationId !== undefined && earlier.operationId === later.operationId) {
+  const labels = [`  ${earlier.label}`, `  ${later.label}`];
+  if (earlier.operationId !== undefined && earlier.operationId === later.operationId) {
     return [
       `Two operations in '${specName}' have the same operationId '${earlier.operationId}':`,
-      `  ${earlier.label}`,
-      `  ${later.label}`,
-      'Give each operation a unique operationId, then run the command again.'
+      ...labels,
+      'Give each operation a unique operationId.'
+    ].join('\n');
+  }
+  if (earlier.operationId === undefined && later.operationId === undefined) {
+    return [
+      `Two operations in '${specName}' have no operationId, so they would be documented on the same page:`,
+      ...labels,
+      'Give each operation an operationId.'
     ].join('\n');
   }
   return [
     `Two operations in '${specName}' would be documented on the same page:`,
-    `  ${earlier.label}`,
-    `  ${later.label}`,
-    'Give each operation a unique operationId and each tag a distinct name, then run the command again.'
+    ...labels,
+    'Give each operation a unique operationId.'
+  ].join('\n');
+}
+
+/** One operation lands twice on a page when two of its tags name the page's folder. */
+function sharedTagFolderMessage(page: string, operation: DocumentedOperation, specName: string): string {
+  const folders = page.split(/[\\/]/).slice(0, -1);
+  const tags = operation.tags.filter((tag) => folders.includes(slugify(tag)));
+  const repeated = tags.find((tag, index) => tags.indexOf(tag) !== index);
+  if (repeated !== undefined) {
+    return [
+      `The operation ${operation.label} in '${specName}' lists the tag '${repeated}' more than once.`,
+      'Remove the repeated tag.'
+    ].join('\n');
+  }
+  if (tags.length >= 2) {
+    return [
+      `The operation ${operation.label} in '${specName}' lists the tags '${tags[0]}' and '${tags[1]}', which the portal shows as one section.`,
+      'Rename one of them so they differ in more than case or spacing.'
+    ].join('\n');
+  }
+  return [
+    `The operation ${operation.label} in '${specName}' would be documented twice on the same page.`,
+    'Give each of its tags a distinct name.'
   ].join('\n');
 }

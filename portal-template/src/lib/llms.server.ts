@@ -1,6 +1,7 @@
 import { llms } from 'fumadocs-core/source';
 import { stringify } from 'yaml';
 import { getMDXComponents } from '@/components/mdx';
+import { operationLabels } from './openapi-labels';
 import { slimOpenAPIPageProps } from './openapi-slim';
 import { source } from './source.server';
 import { portal } from './portal';
@@ -39,10 +40,7 @@ async function renderContent(page: Exclude<PortalPage, ReferencePage>): Promise<
 /** An operation's page, with the part of its specification that page renders: what an assistant reads best. */
 function renderReference(page: ReferencePage, withSpecification: boolean): string {
   const props = slimOpenAPIPageProps(page.data.getOpenAPIPageProps());
-  const endpoints = [
-    ...(props.operations ?? []).map(({ method, path }) => `\`${method.toUpperCase()} ${path}\``),
-    ...(props.webhooks ?? []).map(({ method, name }) => `\`${method.toUpperCase()} ${name}\` (webhook)`)
-  ];
+  const endpoints = operationLabels(props, (signature) => `\`${signature}\``);
   const sections = [`# ${page.data.title} (${page.url})`, endpoints.join('\n'), page.data.description ?? ''];
   if (withSpecification) {
     // Its tags and the document's description are the portal's to show, and would come with every operation.
