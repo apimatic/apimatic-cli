@@ -22,18 +22,43 @@ export type PluginConfigState =
   | { state: 'unreadable'; reason: string; path: FilePath }
   | PluginConfig;
 
-/** The config of a project whose plugin identity is recorded, so it is not asked for again; else null. */
-export const setUpConfig = (state: PluginConfigState): PluginConfig | null =>
-  state.state === 'present' && state.hasMetadata() ? state : null;
+export type MissingSetup = 'identity' | 'languages' | 'both';
 
-/** What `languages` names that a plugin can carry, whether or not the plugin's identity is recorded yet. */
-export const recordedPluginLanguages = (state: PluginConfigState): readonly Language[] =>
-  state.state === 'present' ? state.recordedLanguages() : [];
+/** Each of `plugin generate`'s two questions is asked only while `apimatic.json` lacks its answer. */
+export class SetupQuestions {
+  private constructor(
+    private readonly identified: PluginConfig | null,
+    private readonly recorded: readonly Language[]
+  ) {}
 
-/** What `plugin generate` has to ask before it can generate. */
-export interface SetupQuestions {
-  identity: boolean;
-  languages: boolean;
+  public static of(state: PluginConfigState): SetupQuestions {
+    const config = state.state === 'present' ? state : null;
+    return new SetupQuestions(config?.hasMetadata() ? config : null, config?.recordedLanguages() ?? []);
+  }
+
+  /** Null while the plugin's identity still has to be asked for. */
+  public identifiedConfig(): PluginConfig | null {
+    return this.identified;
+  }
+
+  public recordedLanguages(): readonly Language[] {
+    return this.recorded;
+  }
+
+  public asksLanguages(): boolean {
+    return this.recorded.length === 0;
+  }
+
+  public asksNothing(): boolean {
+    return this.missing() === null;
+  }
+
+  public missing(): MissingSetup | null {
+    if (this.identified === null) {
+      return this.asksLanguages() ? 'both' : 'identity';
+    }
+    return this.asksLanguages() ? 'languages' : null;
+  }
 }
 
 export class PluginConfig {

@@ -387,7 +387,7 @@ describe('PluginGenerateAction', () => {
         const generatePlugin = sinon.stub(PluginService.prototype, 'generatePlugin');
 
         expect((await execute()).isFailed()).to.be.true;
-        expect(needsTerminal.calledOnceWith(sinon.match.any, { identity: true, languages: true })).to.be.true;
+        expect(needsTerminal.calledOnceWith(sinon.match.any, 'both')).to.be.true;
         expect(inputPluginMetadata.called).to.be.false;
         expect(selectLanguages.called).to.be.false;
         expect(generatePlugin.called).to.be.false;
@@ -400,7 +400,7 @@ describe('PluginGenerateAction', () => {
         const generatePlugin = sinon.stub(PluginService.prototype, 'generatePlugin');
 
         expect((await execute()).isFailed()).to.be.true;
-        expect(needsTerminal.calledOnceWith(sinon.match.any, { identity: true, languages: false })).to.be.true;
+        expect(needsTerminal.calledOnceWith(sinon.match.any, 'identity')).to.be.true;
         expect(generatePlugin.called).to.be.false;
         expect(writtenConfig()).to.deep.equal({ languages: { csharp: {} } });
       });
@@ -412,7 +412,7 @@ describe('PluginGenerateAction', () => {
         const generatePlugin = sinon.stub(PluginService.prototype, 'generatePlugin');
 
         expect((await execute()).isFailed()).to.be.true;
-        expect(needsTerminal.calledOnceWith(sinon.match.any, { identity: false, languages: true })).to.be.true;
+        expect(needsTerminal.calledOnceWith(sinon.match.any, 'languages')).to.be.true;
         expect(generatePlugin.called).to.be.false;
       });
 

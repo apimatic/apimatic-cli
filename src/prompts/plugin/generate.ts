@@ -7,7 +7,7 @@ import { FilePath } from '../../types/file/filePath.js';
 import { format as f } from '../format.js';
 import { withSpinner } from '../prompt.js';
 import { APIMATIC_CONFIG_FILE_NAME } from '../../types/apimatic-config/document.js';
-import { PluginConfigWriteFailure, SetupQuestions } from '../../types/plugin-config-context.js';
+import { MissingSetup, PluginConfigWriteFailure } from '../../types/plugin-config-context.js';
 import { LANGUAGES_EXAMPLE } from '../../types/portal/portal-languages.js';
 import { AVAILABLE_LANGUAGES, Language, languageLabel } from '../../types/sdk/generate.js';
 import { listedInProse } from '../../utils/string-utils.js';
@@ -83,17 +83,17 @@ export class PluginGeneratePrompts {
     return process.stdin.isTTY === true;
   }
 
-  public setupNeedsTerminal(sourceDirectory: DirectoryPath, asks: SetupQuestions) {
+  public setupNeedsTerminal(sourceDirectory: DirectoryPath, missing: MissingSetup) {
     const command = `'${f.cmdAlt('apimatic', 'plugin', 'generate')}'`;
     const config = `${f.var(APIMATIC_CONFIG_FILE_NAME)} in ${f.path(sourceDirectory)}`;
-    if (!asks.identity) {
+    if (missing === 'languages') {
       log.error(
         `${config} names no language the plugin can carry, and there is no terminal to ask which. Add one to its ` +
           `${f.var('languages')} block, for example ${LANGUAGES_EXAMPLE}, or run ${command} in a terminal.`
       );
       return;
     }
-    const [asked, kept] = asks.languages ? ['its name and languages', 'both'] : ['its name', 'it'];
+    const [asked, kept] = missing === 'both' ? ['its name and languages', 'both'] : ['its name', 'it'];
     log.error(
       `A project's first plugin asks for ${asked}, and there is no terminal to ask in. Run ${command} in a ` +
         `terminal once; later runs read ${kept} from ${config}.`
