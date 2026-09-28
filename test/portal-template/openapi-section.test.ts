@@ -410,12 +410,15 @@ describe('openApiSection', () => {
     expect(target).to.deep.equal({ type: 'object', properties: { name: { type: 'string' } } });
   });
 
-  /** The message a section fails with for these paths, or undefined when it builds. */
-  const failureFor = async (paths: Record<string, unknown>, extra: Record<string, unknown> = {}) => {
+  const writeSpec = (paths: Record<string, unknown>, extra: Record<string, unknown>) =>
     fs.writeFileSync(
       path.join(directory, 'api.json'),
       JSON.stringify({ openapi: '3.1.0', info: { title: 'Pets', version: '1' }, paths, ...extra })
     );
+
+  /** The message a section fails with for these paths, or undefined when it builds. */
+  const failureFor = async (paths: Record<string, unknown>, extra: Record<string, unknown> = {}) => {
+    writeSpec(paths, extra);
     try {
       await section();
       return undefined;
@@ -518,6 +521,183 @@ describe('openApiSection', () => {
     ).to.equal(
       [
         "The operation POST /pets in 'api.json' lists the tags 'Pet Store' and 'pet-store', which the portal shows as one section.",
+        'Rename one of them so they differ in more than case or spacing.'
+      ].join('\n')
+    );
+  });
+
+  /** The pages a section builds for these paths. */
+  const pagesFor = async (paths: Record<string, unknown>, extra: Record<string, unknown> = {}) => {
+    writeSpec(paths, extra);
+    return (await filesOf()).filter((file) => file.endsWith('.mdx'));
+  };
+
+  const UNSAFE_NAMES = "Some names in 'api.json' hold what the portal cannot put in a URL or a folder name:";
+  const UNSAFE_FIX =
+    'Remove it from each name. An operation or webhook named after its path or name needs an operationId instead.';
+
+  it('makes a space in a tag or an operationId a hyphen, and keeps everything else that is safe', async () => {
+    expect(
+      await pagesFor({
+        '/a': { get: { operationId: 'List All Pets', tags: ['Pet Store'], responses: ok } },
+        '/b': { get: { operationId: 'GetPet', tags: ['C++ SDK'], responses: ok } },
+        '/c': { get: { operationId: 'c', tags: ['Café & Bar'], responses: ok } },
+        '/d': { get: { operationId: 'd', tags: ['Billing - Invoices'], responses: ok } },
+        '/e': { get: { operationId: 'Advice (Under Development)', tags: ['Pet Store'], responses: ok } }
+      })
+    ).to.have.members([
+      'api/pets/pet-store/List-All-Pets.mdx',
+      'api/pets/c++-sdk/GetPet.mdx',
+      'api/pets/café-&-bar/c.mdx',
+      'api/pets/billing---invoices/d.mdx',
+      'api/pets/pet-store/Advice-(Under-Development).mdx'
+    ]);
+  });
+
+  // The prerender writes a folder per tag and per page, and Windows refuses a colon in a folder name.
+  it('refuses the tags that hold what a URL or a Windows folder name cannot, naming each and what it holds', async () => {
+    expect(
+      await failureFor({
+        '/a': { get: { operationId: 'promote', tags: ['Component: Price Points'], responses: ok } },
+        '/b': { get: { operationId: 'list', tags: ['Rates 100%', 'Version 2.'], responses: ok } },
+        '/c': { get: { operationId: 'c', tags: ['<Beta>', '..'], responses: ok } }
+      })
+    ).to.equal(
+      [
+        UNSAFE_NAMES,
+        "  the tag 'Component: Price Points' holds ':'",
+        "  the tag 'Rates 100%' holds '%'",
+        "  the tag 'Version 2.' holds a trailing dot",
+        "  the tag '<Beta>' holds '<', '>'",
+        "  the tag '..' holds a leading dot, a trailing dot",
+        UNSAFE_FIX
+      ].join('\n')
+    );
+  });
+
+  it('refuses the operationIds that hold what a URL or a Windows folder name cannot', async () => {
+    expect(
+      await failureFor({
+        '/pets': {
+          get: { operationId: 'pets#list', tags: ['Pets'], responses: ok },
+          post: { operationId: 'pets:create', tags: ['Pets'], responses: ok }
+        },
+        '/pets/{id}': { put: { operationId: 'pets/update?', tags: ['Pets'], responses: ok } }
+      })
+    ).to.equal(
+      [
+        UNSAFE_NAMES,
+        "  the operationId 'pets#list' of GET /pets holds '#'",
+        "  the operationId 'pets:create' of POST /pets holds ':'",
+        "  the operationId 'pets/update?' of PUT /pets/{id} holds '/', '?'",
+        UNSAFE_FIX
+      ].join('\n')
+    );
+  });
+
+  // Without an operationId a page is named after its path, and a webhook's after its name.
+  it('refuses an operation or webhook without an operationId whose path or name holds what a page name cannot', async () => {
+    expect(
+      await failureFor(
+        { '/v1/{name}:cancel': { post: { tags: ['Ops'], responses: ok } } },
+        { webhooks: { 'order:created': { post: { tags: ['Orders'], responses: ok } } } }
+      )
+    ).to.equal(
+      [
+        UNSAFE_NAMES,
+        "  POST /v1/{name}:cancel has no operationId, and its path holds '{', '}', ':'",
+        "  the webhook 'order:created' has no operationId, and its name holds ':'",
+        UNSAFE_FIX
+      ].join('\n')
+    );
+  });
+
+  it('refuses two operationIds that are one page once their spaces are hyphens', async () => {
+    expect(
+      await failureFor({
+        '/a': { get: { operationId: 'get pet', tags: ['Pets'], responses: ok } },
+        '/b': { get: { operationId: 'get-pet', tags: ['Pets'], responses: ok } }
+      })
+    ).to.equal(
+      [
+        "Two operations in 'api.json' would be documented on the same page:",
+        '  GET /a',
+        '  GET /b',
+        'Give each operation a unique operationId.'
+      ].join('\n')
+    );
+  });
+
+  // Each writes a meta into the folder, and the one read last would hide the other's operations.
+  it('refuses two tags on different operations that would share a folder, naming both', async () => {
+    expect(
+      await failureFor({
+        '/a': { get: { operationId: 'promote', tags: ['Price Points'], responses: ok } },
+        '/b': { get: { operationId: 'list', tags: ['price points'], responses: ok } }
+      })
+    ).to.equal(
+      [
+        "The tags 'Price Points' and 'price points' in 'api.json' would share the folder 'price-points', so the portal would show only one of them.",
+        'Rename one of them so they differ in more than case or spacing.'
+      ].join('\n')
+    );
+  });
+
+  it('refuses a tag whose folder is the one the operations without a tag are filed under', async () => {
+    expect(
+      await failureFor({
+        '/a': { get: { operationId: 'a', tags: ['Unknown'], responses: ok } },
+        '/b': { get: { operationId: 'b', responses: ok } }
+      })
+    ).to.equal(
+      [
+        "The tag 'Unknown' in 'api.json' would share the folder 'unknown' with the operations that have no tag.",
+        'Rename the tag, or tag those operations.'
+      ].join('\n')
+    );
+  });
+
+  // A tag's folder sits in its parent's, so alike slugs under different parents never meet.
+  it('builds tags that slugify alike under different parents', async () => {
+    expect(
+      await pagesFor(
+        {
+          '/a': { get: { operationId: 'a', tags: ['Rates'], responses: ok } },
+          '/b': { get: { operationId: 'b', tags: ['RATES'], responses: ok } }
+        },
+        {
+          tags: [
+            { name: 'Billing' },
+            { name: 'Shipping' },
+            { name: 'Rates', parent: 'Billing' },
+            { name: 'RATES', parent: 'Shipping' }
+          ]
+        }
+      )
+    ).to.have.members(['api/pets/billing/rates/a.mdx', 'api/pets/shipping/rates/b.mdx']);
+  });
+
+  it('names only the tags in the shared folder when alike slugs sit under different parents', async () => {
+    expect(
+      await failureFor(
+        {
+          '/a': { get: { operationId: 'a', tags: ['rates'], responses: ok } },
+          '/b': { get: { operationId: 'b', tags: ['Rates'], responses: ok } },
+          '/c': { get: { operationId: 'c', tags: ['RATES'], responses: ok } }
+        },
+        {
+          tags: [
+            { name: 'Billing' },
+            { name: 'Shipping' },
+            { name: 'rates', parent: 'Billing' },
+            { name: 'Rates', parent: 'Shipping' },
+            { name: 'RATES', parent: 'Shipping' }
+          ]
+        }
+      )
+    ).to.equal(
+      [
+        "The tags 'Rates' and 'RATES' in 'api.json' would share the folder 'shipping/rates', so the portal would show only one of them.",
         'Rename one of them so they differ in more than case or spacing.'
       ].join('\n')
     );

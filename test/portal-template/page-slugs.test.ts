@@ -44,12 +44,12 @@ describe('a page whose operationId needs encoding', () => {
         openapi: '3.1.0',
         info: { title: 'Pets', version: '1' },
         tags: [{ name: 'pets' }],
-        paths: { '/pets': { get: { operationId: 'List All Pets', tags: ['pets'], responses: ok } } }
+        paths: { '/pets': { get: { operationId: 'listCafés', tags: ['pets'], responses: ok } } }
       })
     );
 
     source = await sectionSource();
-    const page = source.getPages().find((candidate) => candidate.url.includes('%20'));
+    const page = source.getPages().find((candidate) => candidate.url.includes('%C3%A9'));
     expect(page, 'no page slug needed encoding').to.not.equal(undefined);
     url = page!.url;
   });
