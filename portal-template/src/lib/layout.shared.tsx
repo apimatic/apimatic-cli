@@ -12,7 +12,7 @@ export function baseOptions(): BaseLayoutProps {
         </>
       )
     },
-    // From lg the header holds these to a share of its row, where a label of two or more words would wrap.
+    // From lg the header squeezes these into a share of its row; below it they sit in menus, where labels may wrap.
     links: portal.links.map((link) => ({
       text: <span className="lg:text-nowrap">{link.label}</span>,
       url: link.url,
