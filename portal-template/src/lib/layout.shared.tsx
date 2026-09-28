@@ -12,7 +12,12 @@ export function baseOptions(): BaseLayoutProps {
         </>
       )
     },
-    links: portal.links.map((link) => ({ text: link.label, url: link.url, external: link.external })),
+    // From lg the header squeezes these into a share of its row; below it they sit in menus, where labels may wrap.
+    links: portal.links.map((link) => ({
+      text: <span className="lg:text-nowrap">{link.label}</span>,
+      url: link.url,
+      external: link.external
+    })),
     // A portal fixed to one mode has nothing to switch to.
     themeSwitch: { enabled: portal.colorMode === 'both' }
   };
