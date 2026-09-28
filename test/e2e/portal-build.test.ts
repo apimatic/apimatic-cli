@@ -178,8 +178,7 @@ const stylesheetOf = (output: DirectoryPath) => {
   });
 
   // Addresses come from page slugs rather than tree position, so lifting the single
-  // specification's section out of the sidebar must leave every operation where it was. The
-  // tag is 'Simple: Calculator': a colon in the folder this page is written to fails on Windows.
+  // specification's section out of the sidebar must leave every operation where it was.
   it('writes a page per operation in the specification', () => {
     expect(exists('api/apimatic-calculator/simple-calculator/Calculate/index.html')).to.be.true;
   });
@@ -289,7 +288,7 @@ const stylesheetOf = (output: DirectoryPath) => {
 
     // The tag group, which the specification names; and the section, which is named after
     // the specification's file and is the level that should be gone.
-    expect(tree).to.contain('"Simple: Calculator"');
+    expect(tree).to.contain('"Simple Calculator"');
     expect(tree).to.not.contain('"Apimatic calculator"');
   });
 

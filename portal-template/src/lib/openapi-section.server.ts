@@ -17,93 +17,97 @@ import { apiBaseDir } from './shared';
 export async function openApiSection(slug: string, file: string, codeSamplesFile: string | null) {
   const load = async () =>
     placeCodeSamples(withoutInternalOperations(await bundleSpec(file)), await readCodeSamples(codeSamplesFile));
+  const specName = path.basename(file);
   const baseDir = `${apiBaseDir}/${slug}`;
+  const unsafe = new Set<string>();
   const section = await createOpenAPI({ input: { [slug]: load } }).staticSource({
     baseDir,
     groupBy: 'tag',
     meta: true,
-    slugify,
-    name: pageName
+    slugify(tag: string) {
+      const held = unsafeIn(tag);
+      if (held !== undefined) {
+        unsafe.add(`the tag '${tag}' holds ${held}`);
+      }
+      return slugify(tag);
+    },
+    name(this: PagesBuilder, output: PageOutput) {
+      return pageName.call(this, output, unsafe);
+    }
   });
-  refuseUnnamedPages(section.files, path.basename(file));
-  refuseSharedPages(section.files, path.basename(file));
-  refuseSharedFolders(section.files, baseDir, path.basename(file));
+  if (unsafe.size > 0) {
+    throw new Error(unsafeNamesMessage([...unsafe], specName));
+  }
+  refuseSharedPages(section.files, specName);
+  refuseSharedFolders(section.files, baseDir, specName);
   return { files: section.files };
 }
 
 /** What a Windows folder name cannot hold, and what a URL path segment cannot hold unescaped. */
 const UNSAFE_IN_PATH = /[<>:"/\\|?*#%{}[\]^`\p{Cc}]/gu;
 
-/**
- * A name made fit to be a folder, a page and a part of its URL. Fumadocs takes a name as it is,
- * so 'Component: Price Points' became a folder Windows cannot create. An unsafe character is
- * read as a space.
- */
-function safeSegment(name: string): string {
-  return withoutEndingSpacesOrDots(name.replace(UNSAFE_IN_PATH, ' ')).replace(/\s+/g, '-');
+/** What in a name the portal cannot put in a folder or a URL, or undefined when there is none. */
+function unsafeIn(name: string): string | undefined {
+  const characters = [...new Set(name.match(UNSAFE_IN_PATH) ?? [])].map((character) =>
+    /\p{Cc}/u.test(character) ? 'a control character' : `'${character}'`
+  );
+  // Windows drops a trailing dot, and '..' climbs out of the folder.
+  const dots = [...(name.startsWith('.') ? ['a leading dot'] : []), ...(name.endsWith('.') ? ['a trailing dot'] : [])];
+  const held = [...characters, ...dots];
+  return held.length > 0 ? held.join(', ') : undefined;
 }
 
-/** Windows drops a trailing dot, and '..' climbs out of the folder. A loop, as a regex ending in `+$` backtracks. */
-function withoutEndingSpacesOrDots(name: string): string {
-  const trimmed = (index: number) => name[index] === '.' || name[index].trim() === '';
-  let start = 0;
-  let end = name.length;
-  while (start < end && trimmed(start)) {
-    start++;
-  }
-  while (end > start && trimmed(end - 1)) {
-    end--;
-  }
-  return name.slice(start, end);
+function unsafeNamesMessage(unsafe: string[], specName: string): string {
+  return [
+    `Some names in '${specName}' hold what the portal cannot put in a URL or a folder name:`,
+    ...unsafe.map((line) => `  ${line}`),
+    'Remove it from each name. An operation or webhook named after its path or name needs an operationId instead.'
+  ].join('\n');
 }
 
 /** A tag's folder, and the page of a webhook without an operationId. */
 function slugify(name: string): string {
-  return safeSegment(name).toLowerCase();
+  return name.replace(/\s+/g, '-').toLowerCase();
 }
 
-/** Fumadocs' own page name, except that an operationId or a route is made safe as a tag's slug is. */
-function pageName(this: PagesBuilder, output: DistributiveOmit<OperationOutput | WebhookOutput, 'path'>): string {
+type PageOutput = DistributiveOmit<OperationOutput | WebhookOutput, 'path'>;
+
+/** Fumadocs' own page name with its spaces made hyphens, noting in `unsafe` what else it cannot hold. */
+function pageName(this: PagesBuilder, output: PageOutput, unsafe: Set<string>): string {
   const found =
     output.type === 'operation' ? this.fromExtractedOperation(output.item) : this.fromExtractedWebhook(output.item);
   const operationId = found?.operation.operationId;
+  const method = output.item.method.toUpperCase();
   if (operationId) {
-    return safeSegment(operationId);
+    const held = unsafeIn(operationId);
+    const label = output.type === 'operation' ? `${method} ${output.item.path}` : `${method} ${output.item.name} (webhook)`;
+    if (held !== undefined) {
+      unsafe.add(`the operationId '${operationId}' of ${label} holds ${held}`);
+    }
+    return operationId.replace(/\s+/g, '-');
   }
   if (output.type === 'webhook') {
+    const held = unsafeIn(output.item.name);
+    if (held !== undefined) {
+      unsafe.add(`the webhook '${output.item.name}' has no operationId, and its name holds ${held}`);
+    }
     return slugify(output.item.name);
   }
-  const route = this.routePathToFilePath(output.item.path).split('/').map(safeSegment);
-  return path.join(...route, output.item.method.toLowerCase());
+  const route = this.routePathToFilePath(output.item.path);
+  const held = route.split('/').flatMap((segment) => unsafeIn(segment) ?? []);
+  if (held.length > 0) {
+    unsafe.add(`${method} ${output.item.path} has no operationId, and its path holds ${held.join(', ')}`);
+  }
+  return path.join(route, output.item.method.toLowerCase());
 }
 
 type SectionFile = Awaited<ReturnType<ReturnType<typeof createOpenAPI>['staticSource']>>['files'][number];
-
-/** A page is named after its operationId, or a webhook's slug, and an empty name reads as its folder's index. */
-function refuseUnnamedPages(files: SectionFile[], specName: string): void {
-  for (const file of files) {
-    if (file.type !== 'meta' && path.basename(file.path) === '.mdx') {
-      const { label, location, operationId } = documented(file.data);
-      throw new Error(
-        operationId === undefined
-          ? [
-              `The webhook '${location.key}' in '${specName}' has no operationId, and no character in its name the portal can use in a URL.`,
-              'Give it an operationId.'
-            ].join('\n')
-          : [
-              `The operation ${label} in '${specName}' has the operationId '${operationId}', which has no character the portal can use in a URL.`,
-              'Rename the operationId.'
-            ].join('\n')
-      );
-    }
-  }
-}
 
 /**
  * Fumadocs writes a page per tag an operation lists, in the tag's folder and named after the
  * operationId, so two pages land at one path, and one is left out without a word, when two
  * operations share an operationId (or have none, and paths that read alike), or when one
- * operation lists a tag twice, or two tags that differ only in case, spacing or punctuation.
+ * operation lists a tag twice, or two tags that differ only in case or spacing.
  */
 function refuseSharedPages(files: SectionFile[], specName: string): void {
   const pages = new Map<string, OpenAPIPageData>();
@@ -200,7 +204,7 @@ function sharedTagFolderMessage(folder: string, operation: DocumentedOperation, 
   if (tags.length >= 2) {
     return [
       `The operation ${operation.label} in '${specName}' lists the tags '${tags[0]}' and '${tags[1]}', which the portal shows as one section.`,
-      'Rename one of them so they differ in more than case, spacing or punctuation.'
+      'Rename one of them so they differ in more than case or spacing.'
     ].join('\n');
   }
   return [
@@ -261,19 +265,11 @@ function folderOf(tag: string, parents: Map<string, string | undefined>, seen = 
 }
 
 function sharedFolderMessage(folder: string, tags: string[], specName: string): string {
-  // A tag with an empty slug is filed in its parent's folder, or the section's own.
-  const unnamed = tags.find((tag) => slugify(tag) === '');
-  if (unnamed !== undefined) {
-    return [
-      `The tag '${unnamed}' in '${specName}' has no character the portal can use in a URL or a folder name.`,
-      'Rename it.'
-    ].join('\n');
-  }
   const [first, second] = tags;
   if (second !== undefined) {
     return [
       `The tags '${first}' and '${second}' in '${specName}' would share the folder '${folder}', so the portal would show only one of them.`,
-      'Rename one of them so they differ in more than case, spacing or punctuation.'
+      'Rename one of them so they differ in more than case or spacing.'
     ].join('\n');
   }
   // Fumadocs files the operations that list no tag under 'unknown'.
