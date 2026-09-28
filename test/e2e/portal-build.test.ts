@@ -444,9 +444,10 @@ const stylesheetOf = (output: DirectoryPath) => {
 /**
  * A second portal, so one more build covers the brand and navigation settings the default
  * fixture leaves at their defaults: a logo per mode, a favicon, a primary colour, a forced
- * colour mode and header links. Its specification has a deprecated and an internal operation,
- * and it has no content directory, so it also covers the fallback home page and the default
- * order of the tabs. Its `plugin` block covers the context plugin page.
+ * colour mode and header links. Its specification has a deprecated operation, an internal one
+ * and one whose body is an image, and it has no content directory, so it also covers the
+ * fallback home page and the default order of the tabs. Its `plugin` block covers the context
+ * plugin page.
  */
 (enabled ? describe : describe.skip)('portal build, branded (end to end)', function () {
   this.timeout(10 * 60 * 1000);
@@ -564,5 +565,10 @@ const stylesheetOf = (output: DirectoryPath) => {
     expect(everything).to.contain('List pets');
     expect(everything).to.contain('Create a pet');
     expect(everything).to.not.contain('Audit the pets');
+  });
+
+  // Fumadocs has no adapter of its own for an image body, and without one the page is only an error screen.
+  it('renders the request body of an operation that uploads an image', () => {
+    expect(read('api/pets/pets/uploadPetPhoto/index.html')).to.contain('id="request-body"');
   });
 });
