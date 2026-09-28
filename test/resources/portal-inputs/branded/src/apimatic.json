@@ -13,6 +13,14 @@
       "links": [{ "label": "Status", "url": "https://status.example.com" }]
     }
   },
-  "languages": { "typescript": {} },
+  "languages": {
+    "typescript": {
+      "publishing": {
+        "source": { "repositoryUrl": "https://github.com/branded/pets-ts" },
+        "package": { "version": "1.0.0" },
+        "packageConfiguration": { "name": "@branded/pets" }
+      }
+    }
+  },
   "plugin": { "pluginId": "branded-pets", "pluginName": "Branded Pets", "pluginVersion": "0.1.0" }
 }

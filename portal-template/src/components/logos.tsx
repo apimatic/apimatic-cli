@@ -121,3 +121,7 @@ export function LanguageLogo({ language, className }: Readonly<LogoProps & { lan
   const Logo = LANGUAGE_LOGOS[language];
   return Logo === undefined ? null : <Logo className={className} />;
 }
+
+export function LogoTile({ children }: Readonly<{ children: ReactNode }>) {
+  return <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-fd-muted">{children}</span>;
+}

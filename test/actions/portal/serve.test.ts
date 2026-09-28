@@ -567,7 +567,7 @@ describe('PortalServeAction', () => {
         expect(readProject('generated/sdks/typescript.mdx')).to.contain(
           'packageUrl="https://www.npmjs.com/package/calc"'
         );
-        expect(readProject('generated/sdks/index.mdx')).to.contain('version="1.0.0"');
+        expect(readProject('generated/sdks/index.mdx')).to.contain('install="npm install calc"');
         expect(prompts.configApplied.calledOnce).to.be.true;
       });
     });

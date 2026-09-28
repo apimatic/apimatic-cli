@@ -12,8 +12,10 @@ export interface SdkActionsProps {
   registry: string;
 }
 
-const LINK =
-  'inline-flex items-center gap-1.5 text-sm text-fd-muted-foreground transition-colors hover:text-fd-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fd-ring rounded-sm';
+export const LINK =
+  'inline-flex items-center gap-1.5 rounded-sm text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fd-ring';
+
+export const QUIET_LINK = `${LINK} text-fd-muted-foreground hover:text-fd-foreground`;
 
 /** Download, View source and View package: each shown only when there is something behind it. */
 export function SdkActions({ download, source, packageUrl, registry }: Readonly<SdkActionsProps>) {
@@ -30,18 +32,22 @@ export function SdkActions({ download, source, packageUrl, registry }: Readonly<
   const leads = packageUrl === '';
   return (
     <div className="not-prose flex flex-wrap items-center gap-x-5 gap-y-2">
-      {/* A plain link, not a route: the zip is a file the site serves beside its pages. */}
-      <a href={download} download className={leads ? buttonVariants({ color: 'primary', className: 'gap-1.5' }) : LINK}>
+      <DownloadLink
+        href={download}
+        className={leads ? buttonVariants({ color: 'primary', className: 'gap-1.5' }) : QUIET_LINK}
+      >
         <Download className="size-4" />
         Download SDK
-      </a>
+      </DownloadLink>
       {source ? (
-        <ExternalLink href={source} icon={<Code className="size-4" />}>
+        <ExternalLink href={source} className={QUIET_LINK}>
+          <Code className="size-4" />
           View source
         </ExternalLink>
       ) : null}
       {packageUrl ? (
-        <ExternalLink href={packageUrl} icon={<Package className="size-4" />}>
+        <ExternalLink href={packageUrl} className={QUIET_LINK}>
+          <Package className="size-4" />
           View on {registry}
         </ExternalLink>
       ) : null}
@@ -49,10 +55,24 @@ export function SdkActions({ download, source, packageUrl, registry }: Readonly<
   );
 }
 
-function ExternalLink({ href, icon, children }: Readonly<{ href: string; icon: ReactNode; children: ReactNode }>) {
+interface LinkProps {
+  href: string;
+  className: string;
+  children: ReactNode;
+}
+
+/** A plain link, not a route: the zip is a file the site serves beside its pages. */
+export function DownloadLink({ href, className, children }: Readonly<LinkProps>) {
   return (
-    <a href={href} target="_blank" rel="noopener noreferrer" className={LINK}>
-      {icon}
+    <a href={href} download className={className}>
+      {children}
+    </a>
+  );
+}
+
+export function ExternalLink({ href, className, children }: Readonly<LinkProps>) {
+  return (
+    <a href={href} target="_blank" rel="noopener noreferrer" className={className}>
       {children}
     </a>
   );

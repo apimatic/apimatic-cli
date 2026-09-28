@@ -66,7 +66,6 @@ describe('GeneratedPages', () => {
         page: '/sdks/typescript',
         download: '/__downloads/sdk/typescript.zip',
         source: 'https://github.com/acme/calc-ts',
-        version: '1.2.0',
         install: 'npm install @acme/calc',
         packageUrl: 'https://www.npmjs.com/package/@acme/calc',
         registry: 'npm',
@@ -84,7 +83,6 @@ describe('GeneratedPages', () => {
         page: '/sdks/csharp',
         download: '/__downloads/sdk/csharp.zip',
         source: '',
-        version: '',
         install: '',
         packageUrl: '',
         registry: '',
@@ -113,11 +111,10 @@ describe('GeneratedPages', () => {
     // Each value lands in a double-quoted JSX attribute, whose entities MDX decodes.
     it('writes a double quote and an ampersand from the configuration so each reads back as written', () => {
       const [, page] = pagesFor({
-        python: { publishing: { package: { version: '1.0"' }, packageConfiguration: { name: 'calc&amp;co' } } }
+        python: { publishing: { package: { version: '1.0' }, packageConfiguration: { name: 'calc"&amp;co' } } }
       }).pages();
 
-      expect(page.data.version).to.equal('1.0&quot;');
-      expect(page.data.install).to.equal('pip install calc&amp;amp;co');
+      expect(page.data.install).to.equal('pip install calc&quot;&amp;amp;co');
     });
   });
 

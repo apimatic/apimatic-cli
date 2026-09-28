@@ -151,7 +151,7 @@ export class GeneratedPages {
 
 /** Every field is present, empty when nothing is recorded, so a template's attribute list is fixed. */
 function card(sdk: PortalSdk): PageRecord {
-  const release = sdk.release();
+  const published = sdk.publishedPackage();
   const source = sdk.sourceRepository();
   return {
     language: sdk.language,
@@ -159,10 +159,9 @@ function card(sdk: PortalSdk): PageRecord {
     page: `/${SDK_SECTION.folder}/${sdk.language}`,
     download: sdkDownloadAddress(sdk.language),
     source: source === null ? '' : attribute(source),
-    version: release === null ? '' : attribute(release.version),
-    install: release === null ? '' : attribute(release.package.install),
-    packageUrl: release === null ? '' : attribute(release.package.url),
-    registry: release === null ? '' : release.package.registry
+    install: published === null ? '' : attribute(published.install),
+    packageUrl: published === null ? '' : attribute(published.url),
+    registry: published === null ? '' : published.registry
   };
 }
 

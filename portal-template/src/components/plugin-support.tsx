@@ -1,14 +1,23 @@
 import type { ReactNode } from 'react';
 import { asMarkdown } from 'fumadocs-core/server';
-import { LanguageLogo, PLATFORMS } from './logos';
+import { LanguageLogo, LogoTile, PLATFORMS } from './logos';
 
-const CHIP = 'flex items-center gap-2 rounded-full border bg-fd-card px-3 py-1.5 text-sm text-fd-card-foreground';
+const CARD = 'flex items-center gap-3 rounded-xl border bg-fd-card p-3 font-medium text-fd-card-foreground';
+
+// By the width the page gives the list, not the screen's, up to three to a row.
+function CardGrid({ children }: Readonly<{ children: ReactNode }>) {
+  return (
+    <div className="not-prose @container my-4">
+      <ul className="grid grid-cols-1 gap-3 @md:grid-cols-2 @2xl:grid-cols-3">{children}</ul>
+    </div>
+  );
+}
 
 export function PluginLanguages({ children }: Readonly<{ children?: ReactNode }>) {
   if (asMarkdown()) {
     return children;
   }
-  return <ul className="not-prose my-4 flex flex-wrap gap-2">{children}</ul>;
+  return <CardGrid>{children}</CardGrid>;
 }
 
 export function PluginLanguage({ language, name }: Readonly<{ language: string; name: string }>) {
@@ -16,8 +25,10 @@ export function PluginLanguage({ language, name }: Readonly<{ language: string; 
     return `- ${name}`;
   }
   return (
-    <li className={CHIP}>
-      <LanguageLogo language={language} className="size-4" />
+    <li className={CARD}>
+      <LogoTile>
+        <LanguageLogo language={language} className="size-5" />
+      </LogoTile>
       {name}
     </li>
   );
@@ -28,13 +39,15 @@ export function PluginPlatforms() {
     return PLATFORMS.map(({ name }) => `- ${name}`).join('\n');
   }
   return (
-    <ul className="not-prose my-4 flex flex-wrap gap-2">
+    <CardGrid>
       {PLATFORMS.map(({ name, Logo }) => (
-        <li key={name} className={CHIP}>
-          <Logo className="size-4" />
+        <li key={name} className={CARD}>
+          <LogoTile>
+            <Logo className="size-5" />
+          </LogoTile>
           {name}
         </li>
       ))}
-    </ul>
+    </CardGrid>
   );
 }
