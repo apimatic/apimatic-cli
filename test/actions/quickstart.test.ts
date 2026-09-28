@@ -16,6 +16,8 @@ import { FilePath } from '../../src/types/file/filePath';
 import { CommandMetadata } from '../../src/types/common/command-metadata';
 import { Language } from '../../src/types/sdk/generate';
 import { PortalArtifactsService } from '../../src/infrastructure/services/portal-artifacts-service';
+import { FileDownloadService } from '../../src/infrastructure/services/file-download-service';
+import { UrlPath } from '../../src/types/file/urlPath';
 import { completeArtifacts } from './portal/prepare-project-stubs';
 
 const COMMAND_METADATA: CommandMetadata = { commandName: 'portal quickstart', shell: 'test' };
@@ -176,5 +178,43 @@ describe('QuickstartAction', () => {
     expect((await execute()).isCancelled()).to.be.true;
     expect(prompts.specValidationFailed.calledOnceWith(SPEC)).to.be.true;
     expect(prompts.specValidationFailed.calledBefore(prompts.useDefaultSpecPrompt)).to.be.true;
+  });
+
+  it('names a specification from a URL by that URL, not by its download', async () => {
+    const url = new UrlPath('https://example.com/openapi.json');
+    prompts.specPathPrompt.resolves(url);
+    sinon.stub(FileDownloadService.prototype, 'downloadFile').resolves(ok(undefined as never));
+    prompts.downloadSpecFile.resolves(
+      ok({ stream: fs.createReadStream(SPEC.toString()), filename: 'openapi.json' } as never)
+    );
+    const failed = { isSuccess: false, blocking: [], errors: ['bad'], warnings: [], information: [] };
+    (ValidationService.prototype.validateViaFile as sinon.SinonStub).resolves(
+      ok({ validation: failed, linting: PASSED } as never)
+    );
+    prompts.useDefaultSpecPrompt.resolves(false);
+
+    expect((await execute()).isCancelled()).to.be.true;
+    expect(prompts.specValidationFailed.calledOnceWith(url)).to.be.true;
+  });
+
+  it('treats a document the validation service refuses outright as an invalid specification', async () => {
+    (ValidationService.prototype.validateViaFile as sinon.SinonStub).resolves(
+      err({ kind: 'rejected', message: 'Your API Definition is invalid.' })
+    );
+    prompts.useDefaultSpecPrompt.resolves(false);
+
+    expect((await execute()).isCancelled()).to.be.true;
+    expect(prompts.specValidationFailed.calledOnceWith(SPEC)).to.be.true;
+  });
+
+  // The service's error is already shown, and the specification may be valid: there is nothing to fix.
+  it('stops without calling the specification invalid when the validation service fails', async () => {
+    (ValidationService.prototype.validateViaFile as sinon.SinonStub).resolves(
+      err({ kind: 'unavailable', message: 'Service unavailable' })
+    );
+
+    expect((await execute()).isFailed()).to.be.true;
+    expect(prompts.specValidationFailed.called).to.be.false;
+    expect(prompts.useDefaultSpecPrompt.called).to.be.false;
   });
 });

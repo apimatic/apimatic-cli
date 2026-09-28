@@ -23,7 +23,7 @@ import { PLACEHOLDER_METADATA } from '../types/plugin/plugin-config.js';
 import { ProjectContext } from '../types/project-context.js';
 import { DEFAULT_PORTAL_PORT, PortalServeAction } from './portal/serve.js';
 
-/** A URL's `file` is a download in a temporary directory, so only `source` can be shown to the user. */
+/** A URL's `file` is a download in a temporary directory, so only `source` says what the user gave. */
 type ImportedSpec = { file: FilePath; source: ResourceInput };
 
 export class QuickstartAction {
@@ -211,10 +211,14 @@ export class QuickstartAction {
     adopted: boolean
   ): Promise<Result<FilePath, ActionResult>> {
     this.prompts.validateSpecStep();
-    const validation = await new ValidateAction(this.configDir, this.commandMetadata).execute(spec.file, false);
+    const validation = await new ValidateAction(this.configDir, this.commandMetadata).check(spec.file, false);
+    // The service's own error is already on screen; the spec may be valid, so there is nothing to fix.
+    if (validation === 'unchecked') {
+      return err(ActionResult.failed());
+    }
 
     let checked = spec.file;
-    if (validation.isFailed()) {
+    if (validation === 'invalid') {
       this.prompts.specValidationFailed(spec.source);
       if (adopted || !(await this.prompts.useDefaultSpecPrompt())) {
         this.prompts.fixYourSpec();

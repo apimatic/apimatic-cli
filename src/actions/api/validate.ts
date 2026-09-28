@@ -8,6 +8,9 @@ import { withDirPath } from '../../infrastructure/tmp-extensions.js';
 import { ResourceContext } from '../../types/resource-context.js';
 import { ValidationSummary } from '@apimatic/sdk';
 
+/** `unchecked`: the spec could not be fetched or the validation service did not answer, so nothing is known of it. */
+export type SpecCheck = 'valid' | 'invalid' | 'unchecked';
+
 export class ValidateAction {
   private readonly prompts: ApiValidatePrompts = new ApiValidatePrompts();
   private readonly validationService: ValidationService;
@@ -24,12 +27,17 @@ export class ValidateAction {
     resourcePath: ResourceInput,
     displayValidationSummary = true
   ): Promise<ActionResult> => {
+    const check = await this.check(resourcePath, displayValidationSummary);
+    return check === 'valid' ? ActionResult.success() : ActionResult.failed();
+  };
+
+  public readonly check = async (resourcePath: ResourceInput, displayValidationSummary = true): Promise<SpecCheck> => {
     return await withDirPath(async (tempDirectory) => {
       const resourceContext = new ResourceContext(tempDirectory);
       const specFileDirResult = await resourceContext.resolveTo(resourcePath);
       if (specFileDirResult.isErr()) {
         this.prompts.networkError(specFileDirResult.error);
-        return ActionResult.failed();
+        return 'unchecked';
       }
       const validationSummaryResult = await this.prompts.validateApi(
         this.validationService.validateViaFile({
@@ -40,8 +48,8 @@ export class ValidateAction {
       );
 
       if (validationSummaryResult.isErr()) {
-        this.prompts.logValidationError(validationSummaryResult.error);
-        return ActionResult.failed();
+        this.prompts.logValidationError(validationSummaryResult.error.message);
+        return validationSummaryResult.error.kind === 'rejected' ? 'invalid' : 'unchecked';
       }
       const { validation, linting } = validationSummaryResult.value;
       if (displayValidationSummary) {
@@ -52,10 +60,7 @@ export class ValidateAction {
           this.prompts.displayValidationSummary(linting);
         }
       }
-      if (!validation.isSuccess || !linting.isSuccess) {
-        return ActionResult.failed();
-      }
-      return ActionResult.success();
+      return validation.isSuccess && linting.isSuccess ? 'valid' : 'invalid';
     });
   };
 

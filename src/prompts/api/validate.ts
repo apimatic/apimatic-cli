@@ -9,7 +9,7 @@ import { format as f } from '../format.js';
 import { withSpinner } from '../prompt.js';
 
 export class ApiValidatePrompts {
-  public async validateApi(fn: Promise<Result<ValidateApiResult, string>>) {
+  public async validateApi<E>(fn: Promise<Result<ValidateApiResult, E>>) {
     return withSpinner('Validating API', 'API validation completed', 'API validation failed', fn);
   }
 
