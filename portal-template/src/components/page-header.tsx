@@ -3,7 +3,7 @@ import { portal } from '@/lib/portal';
 
 interface PageHeaderProps {
   title?: string;
-  description?: string | null;
+  description?: string;
   markdownUrl: string;
 }
 
@@ -12,8 +12,7 @@ export function PageHeader({ title, description, markdownUrl }: Readonly<PageHea
   return (
     <>
       <DocsTitle>{title}</DocsTitle>
-      {/* Fumadocs leaves the description out only when it is undefined; a reference page's missing one is null. */}
-      <DocsDescription className="mb-4">{description ?? undefined}</DocsDescription>
+      <DocsDescription className="mb-4">{description}</DocsDescription>
       <PageActions markdownUrl={markdownUrl} />
     </>
   );
