@@ -1,3 +1,25 @@
+# [1.5.0](https://github.com/apimatic/apimatic-cli/compare/v1.4.0...v1.5.0) (2026-09-14)
+
+
+### Features
+
+* add Codex docs link to plugin try-it-locally note ([#338](https://github.com/apimatic/apimatic-cli/issues/338)) ([b834469](https://github.com/apimatic/apimatic-cli/commit/b83446937e0d1b94d08f0c04fef226f925788ef2))
+* offer v4 beta codegen for Python and TypeScript ([#341](https://github.com/apimatic/apimatic-cli/issues/341)) ([243ba2d](https://github.com/apimatic/apimatic-cli/commit/243ba2d5662e6b70326950c1a64153e1a787a164))
+
+# [1.4.0](https://github.com/apimatic/apimatic-cli/compare/v1.3.2...v1.4.0) (2026-09-08)
+
+
+### Features
+
+* add Codex docs link to plugin try-it-locally note ([#338](https://github.com/apimatic/apimatic-cli/issues/338)) ([#339](https://github.com/apimatic/apimatic-cli/issues/339)) ([b0a0074](https://github.com/apimatic/apimatic-cli/commit/b0a0074941d15bc3a396a9afaff7f283b0b039e3))
+
+## [1.3.2](https://github.com/apimatic/apimatic-cli/compare/v1.3.1...v1.3.2) (2026-09-02)
+
+
+### Bug Fixes
+
+* drop Claude Code references from plugin generate ([#335](https://github.com/apimatic/apimatic-cli/issues/335)) ([561a92a](https://github.com/apimatic/apimatic-cli/commit/561a92aa8ba5717a80b72fb9b12ad164d0495353))
+
 ## [1.3.1](https://github.com/apimatic/apimatic-cli/compare/v1.3.0...v1.3.1) (2026-08-31)
 
 
