@@ -215,9 +215,9 @@ export class QuickstartAction {
 
     let checked = spec.file;
     if (validation.isFailed()) {
-      this.prompts.specValidationFailed();
+      this.prompts.specValidationFailed(spec.source);
       if (adopted || !(await this.prompts.useDefaultSpecPrompt())) {
-        this.prompts.fixYourSpec(spec.source);
+        this.prompts.fixYourSpec();
         return err(ActionResult.cancelled());
       }
       const downloaded = await this.prompts.downloadSpecFile(

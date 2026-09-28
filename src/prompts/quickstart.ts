@@ -102,9 +102,17 @@ Let's get started!`);
     return useDefaultSpec === 'yes';
   }
 
-  public fixYourSpec(spec: ResourceInput) {
+  public fixYourSpec() {
     const message = `Good luck fixing your API Definition! Feel free to run this command again once you're done.`;
     log.info(message);
+  }
+
+  public validateSpecStep() {
+    log.info(`Step 2 of 3: Validate and Lint your OpenAPI Definition`);
+  }
+
+  public specValidationFailed(spec: ResourceInput) {
+    log.error(`Oops, it looks like there are some errors in your API Definition`);
     const validateCommand = `${f.cmdAlt('apimatic', 'api', 'validate')} ${
       spec instanceof UrlPath ? f.flag('url', spec.toString()) : f.flag('file', spec.toString())
     }`;
@@ -112,14 +120,6 @@ Let's get started!`);
       `Tip: ${validateCommand} lists every issue with its file, line and location. ` +
         `Ask an AI coding agent to run it and fix what it reports until your API Definition passes.`
     );
-  }
-
-  public validateSpecStep() {
-    log.info(`Step 2 of 3: Validate and Lint your OpenAPI Definition`);
-  }
-
-  public specValidationFailed() {
-    log.error(`Oops, it looks like there are some errors in your API Definition`);
   }
 
   public createPortalStep() {

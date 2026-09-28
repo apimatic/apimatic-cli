@@ -165,7 +165,8 @@ describe('QuickstartAction', () => {
     });
   });
 
-  it('points the fix at the specification the user named when they decline the sample', async () => {
+  // Shown with the failure, so it is in view while the user decides how to proceed.
+  it('names the specification the user gave in the failure, before asking how to proceed', async () => {
     const failed = { isSuccess: false, blocking: [], errors: ['bad'], warnings: [], information: [] };
     (ValidationService.prototype.validateViaFile as sinon.SinonStub).resolves(
       ok({ validation: failed, linting: PASSED } as never)
@@ -173,6 +174,7 @@ describe('QuickstartAction', () => {
     prompts.useDefaultSpecPrompt.resolves(false);
 
     expect((await execute()).isCancelled()).to.be.true;
-    expect(prompts.fixYourSpec.calledOnceWith(SPEC)).to.be.true;
+    expect(prompts.specValidationFailed.calledOnceWith(SPEC)).to.be.true;
+    expect(prompts.specValidationFailed.calledBefore(prompts.useDefaultSpecPrompt)).to.be.true;
   });
 });
