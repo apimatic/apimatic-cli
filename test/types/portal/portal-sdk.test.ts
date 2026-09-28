@@ -4,14 +4,16 @@ import { Language } from '../../../src/types/sdk/generate';
 
 describe('PortalSdk', () => {
   const released = (language: Language, packageConfiguration: object) =>
-    PortalSdk.fromEntry(language, { publishing: { package: { version: '2.1.0' }, packageConfiguration } }).release();
+    PortalSdk.fromEntry(language, {
+      publishing: { package: { version: '2.1.0' }, packageConfiguration }
+    }).publishedPackage();
 
   it('reads a wanted language with no publishing record as nothing recorded', () => {
     const sdk = PortalSdk.fromEntry(Language.TYPESCRIPT, {});
 
     expect(sdk.language).to.equal(Language.TYPESCRIPT);
     expect(sdk.sourceRepository()).to.be.null;
-    expect(sdk.release()).to.be.null;
+    expect(sdk.publishedPackage()).to.be.null;
   });
 
   it('keeps the source repository a publish recorded', () => {
@@ -24,34 +26,33 @@ describe('PortalSdk', () => {
 
   describe('the released package, at its public registry', () => {
     it('is on npm for TypeScript, keeping a scoped name as npm addresses it', () => {
-      const release = released(Language.TYPESCRIPT, { name: '@acme/calculator' });
+      const published = released(Language.TYPESCRIPT, { name: '@acme/calculator' });
 
-      expect(release?.version).to.equal('2.1.0');
-      expect(release?.package.name).to.equal('@acme/calculator');
-      expect(release?.package.registry).to.equal('npm');
-      expect(`${release?.package.url}`).to.equal('https://www.npmjs.com/package/@acme/calculator');
-      expect(release?.package.install).to.equal('npm install @acme/calculator');
+      expect(published?.name).to.equal('@acme/calculator');
+      expect(published?.registry).to.equal('npm');
+      expect(`${published?.url}`).to.equal('https://www.npmjs.com/package/@acme/calculator');
+      expect(published?.install).to.equal('npm install @acme/calculator');
     });
 
     it('is on PyPI for Python', () => {
-      const release = released(Language.PYTHON, { name: 'acme-calculator' });
+      const published = released(Language.PYTHON, { name: 'acme-calculator' });
 
-      expect(release?.package.registry).to.equal('PyPI');
-      expect(`${release?.package.url}`).to.equal('https://pypi.org/project/acme-calculator/');
-      expect(release?.package.install).to.equal('pip install acme-calculator');
+      expect(published?.registry).to.equal('PyPI');
+      expect(`${published?.url}`).to.equal('https://pypi.org/project/acme-calculator/');
+      expect(published?.install).to.equal('pip install acme-calculator');
     });
 
     it('is on NuGet for C#, named by its package id', () => {
-      const release = released(Language.CSHARP, { packageId: 'Acme.Calculator', title: 'Calculator' });
+      const published = released(Language.CSHARP, { packageId: 'Acme.Calculator', title: 'Calculator' });
 
-      expect(release?.package.name).to.equal('Acme.Calculator');
-      expect(release?.package.registry).to.equal('NuGet');
-      expect(`${release?.package.url}`).to.equal('https://www.nuget.org/packages/Acme.Calculator');
-      expect(release?.package.install).to.equal('dotnet add package Acme.Calculator');
+      expect(published?.name).to.equal('Acme.Calculator');
+      expect(published?.registry).to.equal('NuGet');
+      expect(`${published?.url}`).to.equal('https://www.nuget.org/packages/Acme.Calculator');
+      expect(published?.install).to.equal('dotnet add package Acme.Calculator');
     });
 
     it('encodes what an address cannot carry as it is', () => {
-      expect(`${released(Language.PYTHON, { name: 'calc tools' })?.package.url}`).to.equal(
+      expect(`${released(Language.PYTHON, { name: 'calc tools' })?.url}`).to.equal(
         'https://pypi.org/project/calc%20tools/'
       );
     });
@@ -63,7 +64,7 @@ describe('PortalSdk', () => {
         publishing: { packageConfiguration: { name: '@acme/calculator' } }
       });
 
-      expect(sdk.release()).to.be.null;
+      expect(sdk.publishedPackage()).to.be.null;
     });
 
     it('when the configuration does not name the package', () => {
@@ -84,7 +85,7 @@ describe('PortalSdk', () => {
     });
 
     expect(sdk.sourceRepository()).to.be.null;
-    expect(sdk.release()).to.be.null;
+    expect(sdk.publishedPackage()).to.be.null;
     expect(
       PortalSdk.fromEntry(Language.TYPESCRIPT, {
         publishing: { source: { repositoryUrl: 'not a url' } }

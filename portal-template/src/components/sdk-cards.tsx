@@ -1,53 +1,68 @@
 import type { ReactNode } from 'react';
 import Link from 'fumadocs-core/link';
 import { asMarkdown } from 'fumadocs-core/server';
-import { ChevronRight } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { CommandBlock } from './command-block';
 import { LanguageLogo } from './logos';
-import { SdkActions, type SdkActionsProps } from './sdk-actions';
+import { DownloadLink, ExternalLink, LINK, QUIET_LINK, SdkActions, type SdkActionsProps } from './sdk-actions';
 
 interface SdkCardProps extends SdkActionsProps {
   language: string;
   name: string;
   /** The language's own page. */
   page: string;
-  /** Empty, as `version` is, until a release is recorded. */
+  /** Empty until a release is recorded. */
   install: string;
-  version: string;
 }
 
-// One card per row, in the configuration's order: the install command wants the width.
+// Three to a row on the widest page, fewer as it narrows; `auto-fill` keeps a lone card at a card's width.
 export function SdkCards({ children }: Readonly<{ children?: ReactNode }>) {
   if (asMarkdown()) {
     return children;
   }
-  return <div className="not-prose my-6 flex flex-col gap-4">{children}</div>;
+  return <div className="not-prose my-6 grid grid-cols-[repeat(auto-fill,minmax(17rem,1fr))] gap-4">{children}</div>;
 }
 
 // Not a Fumadocs `Card`, which is one link as a whole: the links inside would be links in a link.
-export function SdkCard({ language, name, page, install, version, ...actions }: Readonly<SdkCardProps>) {
-  const release = version ? `v${version.replace(/^v/i, '')}` : null;
+export function SdkCard({ language, name, page, install, ...actions }: Readonly<SdkCardProps>) {
   if (asMarkdown()) {
-    return [
-      `- [${name}](${page})${release ? ` ${release}` : ''}: ${install ? `\`${install}\` · ` : ''}`,
-      <SdkActions key="actions" {...actions} />
-    ];
+    return [`- [${name}](${page}): ${install ? `\`${install}\` · ` : ''}`, <SdkActions key="actions" {...actions} />];
   }
+  const { download, source, packageUrl, registry } = actions;
   return (
-    <article className="flex gap-4 rounded-xl border bg-fd-card p-5 text-fd-card-foreground sm:gap-5">
-      <LanguageLogo language={language} className="size-10 shrink-0 sm:size-12" />
-      <div className="flex min-w-0 flex-1 flex-col gap-3">
-        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-          <Link href={page} className="group inline-flex items-center gap-1 text-base font-semibold">
-            <span className="group-hover:underline underline-offset-4">{name}</span>
-            <ChevronRight className="size-4 text-fd-muted-foreground" />
-          </Link>
-          {release ? <span className="text-sm text-fd-muted-foreground">{release}</span> : null}
+    <article className="flex flex-col rounded-xl border bg-fd-card text-fd-card-foreground">
+      <div className="flex flex-1 flex-col gap-4 p-4">
+        <div className="flex items-center gap-3">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-fd-muted">
+            <LanguageLogo language={language} className="size-5" />
+          </span>
+          <h2 className="text-base font-semibold">{name}</h2>
         </div>
-        {/* The one line most readers came for; the rest of the card stays quiet around it. */}
-        {install ? <CommandBlock command={install} className="my-0 rounded-lg bg-fd-secondary shadow-none" /> : null}
-        <SdkActions {...actions} />
+        {install ? <CommandBlock command={install} compact /> : null}
+        {/* A button's height whether or not the download is one, so the links line up across cards. */}
+        <div className="mt-auto flex min-h-9 flex-wrap items-center gap-x-5 gap-y-2">
+          {/* With a package to install from, the download is one way in among others; without one, it is the way in. */}
+          <DownloadLink href={download} leads={packageUrl === ''} />
+          <Link href={page} className={`${LINK} font-medium hover:text-fd-primary`}>
+            Overview
+            <ArrowRight className="size-4" />
+          </Link>
+        </div>
       </div>
+      {packageUrl || source ? (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t px-4 py-2.5">
+          {packageUrl ? (
+            <ExternalLink href={packageUrl} className={QUIET_LINK}>
+              {registry}
+            </ExternalLink>
+          ) : null}
+          {source ? (
+            <ExternalLink href={source} className={QUIET_LINK}>
+              Source
+            </ExternalLink>
+          ) : null}
+        </div>
+      ) : null}
     </article>
   );
 }

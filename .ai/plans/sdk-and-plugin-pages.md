@@ -34,6 +34,19 @@ the card data gains `install` in place of `packageName`, and a `CommandBlock`
 component serves both this and the plugin's install command. Sections 2, 5, 6
 and 7 are updated to match.
 
+**Amended 2026-09-28, the overview grid** (branch
+`saeedjamshaid/sdk-overview-grid`, after the design team's "SDK Overview"
+mock-up): the SDKs page is a wide page (`full: true`, so no table of contents)
+of cards three to a row, fewer as it narrows. A card is the logo in a tile and
+the name; the install command on one line that truncates; Download SDK and
+**Overview** (the language page, the mock-up's "Configure"); then a footer of
+the registry and **Source** links. The version leaves the card and its data, so
+`PortalSdk.release()` becomes `publishedPackage()`. Download SDK still leads
+only while nothing is published. The mock-up's page copy and per-language blurb
+were not taken. The language page's row becomes buttons: Download SDK, then
+View on <registry> and View source. Sections 2, 4, 5, 6 and 7 are updated to
+match.
+
 Follows on from `.ai/plans/generated-pages.md` (PR #360), which shipped the flow
 (three templates in `portal-pages/`, a second Fumadocs collection over
 `generated/`, the SDKs and Context Plugin tabs) with **placeholder** templates,
@@ -89,7 +102,7 @@ primitives.
 | Download SDK | Links to `/__downloads/sdk/<language>.zip`, #361's address (not the `/__downloads/<language>.zip` first given). Always shown: a portal artifacts run delivers everything or nothing (#361), so every configured language has its zip. |
 | View source | Shown when `languages.<language>.publishing.source.repositoryUrl` is recorded; links to it. |
 | View package | Shown when a release is recorded (`publishing.package.version`) and the configuration names the package. Always the public registry: npm, PyPI, NuGet (section 5). |
-| Card contents | Language logo, name linking to `/sdks/<language>`, the version when released, the buttons. No install one-liner on the card; the SDK docs carry it. *(Reversed 2026-09-26: the card leads with the install command when a package is published, and the buttons are a row of links, Download SDK a button only while nothing is published.)* |
+| Card contents | Language logo, name linking to `/sdks/<language>`, the version when released, the buttons. No install one-liner on the card; the SDK docs carry it. *(Reversed 2026-09-26: the card leads with the install command when a package is published, and the buttons are a row of links, Download SDK a button only while nothing is published.)* *(2026-09-28: three to a row on a wide page; logo and name, the command on one line, Download SDK and Overview, then the registry and Source links. No version.)* |
 | Logos | Brand logos as inline SVG, for the three languages and the three platforms, vendored from an MIT or CC0 icon set into small components, with no new dependency. Attribution goes in `portal-template/NOTICE`. |
 | SDKs page text | *Removed 2026-09-25, after review: the page shows no spec description.* Was: the spec's full `info.description`, when the source directory has exactly one spec and it has one; otherwise a fixed sentence that names no portal. This matches the rule `suggestedSite` already follows ("with several specifications … no one of them speaks for the portal"). Its first paragraph goes above the cards and the rest below them. |
 | SDKs page headings | *Removed 2026-09-25, with the description.* Was: shifted so the description's top heading is H2, since spec authors write `# Authentication` and no backend controls it. Done by a remark step in the template, scoped by a `<ShiftHeadings>` wrapper in `sdks.mdx` (section 4). |
@@ -97,7 +110,7 @@ primitives.
 | Template data | Components take plain string attributes, which print cleanly in the `.md` twin and `llms-full.txt`. Lists (the SDK cards, the plugin's languages) are mustache sections, so `PageTemplate` moves onto `mustache` with escaping off (section 4). Decided after step 1 showed JSON props printing as entity-escaped blobs. |
 | Fragments | Written once, when the portal project is prepared, from the artifacts' SDK docs; `applyConfig` leaves them alone. They could only change on a restart anyway: the artifacts are read once, and a language added under `portal serve` is refused (decided after step 2; the spec description's fragments were removed 2026-09-25). |
 | A language added under `portal serve` | Refused like any edit a build would refuse, with a message to restart `portal serve`, since the artifacts (its SDK docs and zip) are fetched once when the preview starts. The preview keeps what it last accepted. Removing a language still applies live. |
-| Language page | Title "<Language> SDK" (so its sidebar row reads the same), the buttons right under the title, then the SDK docs. *(2026-09-26: the same link row as the card; the docs' Installation section carries the command.)* |
+| Language page | Title "<Language> SDK" (so its sidebar row reads the same), the buttons right under the title, then the SDK docs. *(2026-09-26: the same link row as the card; the docs' Installation section carries the command.)* *(2026-09-28: buttons of its own, Download SDK, View on <registry>, View source.)* |
 | `pluginUrl` | `portal.pluginUrl`, exactly as asked: the first top-level key of `portal` outside its four namespaces (`site`, `brand`, `navigation`, `ai`). Optional, absolute, `https://` only, with no whitespace (added after review). |
 | Plugin page condition | A `plugin` block **or** `portal.pluginUrl`. Either one creates the page (today only the block does). |
 | Plugin install address | `pluginUrl` when set; otherwise the fixed relative `/__downloads/plugin.zip`, where #361 places the bundled plugin. The backend skips generating and bundling the plugin when `pluginUrl` is set. |
@@ -181,7 +194,7 @@ the template:
 ```mdx
 <SdkCards>
 {{#sdks}}
-<SdkCard language="{{language}}" page="{{page}}" download="{{download}}" source="{{source}}" install="{{install}}" packageUrl="{{packageUrl}}" registry="{{registry}}" version="{{version}}" />
+<SdkCard language="{{language}}" page="{{page}}" download="{{download}}" source="{{source}}" install="{{install}}" packageUrl="{{packageUrl}}" registry="{{registry}}" />
 {{/sdks}}
 </SdkCards>
 ```
@@ -310,7 +323,6 @@ enum as it was, so the schema test's exception for the portal still stands.
 | `page` | `/sdks/<language>` |
 | `download` | `/__downloads/sdk/<language>.zip`, always |
 | `source` | `publishing.source.repositoryUrl`, when recorded |
-| `version` | `publishing.package.version`, when recorded |
 | `package` | `{ name, registry, url, install }`, when a version is recorded and the configuration names the package |
 
 | Language | Registry | Address | Install | From |
@@ -329,7 +341,7 @@ Every value is a string, and an absent field is `''`.
 
 | Template | Data |
 |---|---|
-| `sdks.mdx` | `sdks`: a list of cards, each `{ language, name, page, download, source, install, packageUrl, registry, version }`, in the block's order |
+| `sdks.mdx` | `sdks`: a list of cards, each `{ language, name, page, download, source, install, packageUrl, registry }`, in the block's order |
 | `sdk.mdx` | the one language's card fields at the top level, and `docs`: the path from the page to its SDK docs, worked out from where each is written |
 | `context-plugin.mdx` | `installPath`; `languages`: a list of `{ language, name }` |
 
@@ -371,15 +383,19 @@ the theme's `fd-*` tokens, so a portal's brand colour reaches them unchanged:
 
 - `logos.tsx`: an inline SVG per language and per platform, with `aria-hidden`
   and the name rendered beside it.
-- `sdk-actions.tsx`: the action row, links since 2026-09-26. Download is a plain
-  `<a download>`, not a router link, since the zip is not a route, and is a
-  button while no package is published. Source and package open in a new tab
-  (`rel="noopener"`), labelled with the registry ("View on npm").
-- `sdk-cards.tsx`: `SdkCards` (one card per row) and `SdkCard` (logo, name → page,
-  the version, the install command in a `CommandBlock`, `SdkActions`).
+- `sdk-actions.tsx`: the language page's buttons (since 2026-09-28): Download
+  SDK, then View on <registry> and View source, each in a new tab
+  (`rel="noopener"`). Download is a plain `<a download>`, not a router link,
+  since the zip is not a route; `DownloadLink` and `ExternalLink` are shared
+  with the card.
+- `sdk-cards.tsx`: `SdkCards` (a grid of tracks at least 17rem wide) and
+  `SdkCard` (logo in a tile, name, the install command in a compact
+  `CommandBlock`, Download SDK, a button only while no package is published,
+  and Overview → page; a footer of the registry and Source links).
 - `command-block.tsx` (2026-09-26): one shell command in a copyable Fumadocs
   `CodeBlock`, plain since an MDX page has no highlighter to hand; a bash fence
-  in the Markdown twin.
+  in the Markdown twin. `compact` (2026-09-28) keeps it to one line that
+  truncates, with the copy button centred on it.
 - `plugin-install.tsx`: the resolved command in a `CommandBlock` (section 4).
 - `plugin-support.tsx`: `PluginLanguages` and `PluginPlatforms`, logo chips.
 
@@ -396,11 +412,12 @@ Sketches; the final copy is reviewed in step 5.
 ---
 title: "SDKs"
 description: "Client libraries for this API."
+full: true
 ---
 
 <SdkCards>
 {{#sdks}}
-<SdkCard language="{{language}}" name="{{name}}" page="{{page}}" download="{{download}}" source="{{source}}" install="{{install}}" packageUrl="{{packageUrl}}" registry="{{registry}}" version="{{version}}" />
+<SdkCard language="{{language}}" name="{{name}}" page="{{page}}" download="{{download}}" source="{{source}}" install="{{install}}" packageUrl="{{packageUrl}}" registry="{{registry}}" />
 {{/sdks}}
 </SdkCards>
 ```

@@ -63,9 +63,9 @@ describe('PortalLanguages', () => {
       .listed();
 
     expect(`${python.sourceRepository()}`).to.equal('https://github.com/acme/calc-py');
-    expect(python.release()?.version).to.equal('1.0.0');
+    expect(python.publishedPackage()?.name).to.equal('calc');
     expect(csharp.sourceRepository()).to.be.null;
-    expect(csharp.release()).to.be.null;
+    expect(csharp.publishedPackage()).to.be.null;
   });
 
   // Only three languages can be generated for today; the rest are named as coming, not as typos.
