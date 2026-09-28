@@ -19,6 +19,16 @@
         "responses": { "201": { "description": "The pet, created." } }
       }
     },
+    "/pets/{petId}/photo": {
+      "put": {
+        "operationId": "uploadPetPhoto",
+        "tags": ["pets"],
+        "summary": "Upload a pet's photo",
+        "parameters": [{ "name": "petId", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "requestBody": { "required": true, "content": { "image/*": { "schema": { "type": "string", "format": "binary" } } } },
+        "responses": { "204": { "description": "The photo, stored." } }
+      }
+    },
     "/pets/audit": {
       "get": {
         "operationId": "auditPets",
