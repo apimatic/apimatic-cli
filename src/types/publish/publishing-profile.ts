@@ -32,8 +32,9 @@ function enabledOnly<T extends object>(configs: T): Partial<T> {
   return Object.fromEntries(Object.entries(configs).filter(([, config]) => config !== undefined)) as Partial<T>;
 }
 
-const settingsState = (item: { isEnabled: boolean } | null | undefined): PackageSettingsState =>
-  item ? (item.isEnabled ? 'configured' : 'disabled') : 'absent';
+function settingsState(item: { isEnabled: boolean } | null | undefined): PackageSettingsState {
+  return item ? (item.isEnabled ? 'configured' : 'disabled') : 'absent';
+}
 
 export class PublishingProfile {
   private readonly profile: PublishingProfileItem;

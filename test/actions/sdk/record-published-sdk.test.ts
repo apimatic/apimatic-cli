@@ -12,8 +12,8 @@ import { PluginLanguages } from '../../../src/types/apimatic-config/languages-bl
 import { PluginIdentityData } from '../../../src/types/plugin/plugin-config.js';
 import { ProjectContext } from '../../../src/types/project-context.js';
 import { PublishType } from '../../../src/types/publish-api/publishing-profile-item.js';
-import { PublishingProfile } from '../../../src/types/publish/publishing-profile.js';
 import { PackageSettingsState } from '../../../src/types/publish/package-settings-configuration.js';
+import { PublishingProfile } from '../../../src/types/publish/publishing-profile.js';
 import { SemVersion } from '../../../src/types/publish/version.js';
 import { Language } from '../../../src/types/sdk/generate.js';
 

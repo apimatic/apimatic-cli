@@ -128,7 +128,6 @@ describe('withLanguage', () => {
       packageSettings
     )[Language.CSHARP]?.publishing;
 
-  // The publish writes what its own run produced; what it did not produce, the file keeps.
   it('keeps the recorded release a source-only publish did not write', () => {
     expect(publishedWith('configured', CSHARP_CONFIGURATION)?.package).to.deep.equal({ version: '1.0.0' });
   });
@@ -139,8 +138,6 @@ describe('withLanguage', () => {
     expect(publishedWith('configured', renamed)?.packageConfiguration).to.deep.equal(renamed);
   });
 
-  // A profile that never configured the language says nothing about it, so it may not speak for
-  // the file — including for a configuration its author added by hand.
   it('keeps the recorded configuration when the profile has none', () => {
     expect(publishedWith('absent')?.packageConfiguration).to.deep.equal(CSHARP_CONFIGURATION);
   });

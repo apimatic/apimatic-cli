@@ -80,7 +80,6 @@ export function withLanguage<L extends Language>(
         ...entry.publishing,
         source: entry.publishing.source ?? existingPublishing?.source,
         package: entry.publishing.package ?? existingPublishing?.package,
-        // Only a profile that turned the settings off means to drop what the file already records.
         packageConfiguration:
           packageSettings === 'disabled'
             ? undefined
