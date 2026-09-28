@@ -91,7 +91,7 @@ Let's get started!`);
       options: [
         {
           value: 'no',
-          label: `1. Fix the issues using APIMatic's interactive VS Code Extension: ${vscodeExtensionUrl}`
+          label: `1. Fix the issues`
         },
         { value: 'yes', label: `2. Use an example API spec instead (recommended)` }
       ]
@@ -116,10 +116,12 @@ Let's get started!`);
     const validateCommand = `${f.cmdAlt('apimatic', 'api', 'validate')} ${
       spec instanceof UrlPath ? f.flag('url', spec.toString()) : f.flag('file', spec.toString())
     }`;
-    log.message(
-      `Tip: ${validateCommand} lists every issue with its file, line and location. ` +
-        `Ask an AI coding agent to run it and fix what it reports until your API Definition passes.`
-    );
+    const message = [
+      `Ask an AI coding agent to run ${validateCommand} and fix what it reports.`,
+      '',
+      `Or use APIMatic's interactive VS Code Extension: ${f.link(vscodeExtensionUrl)}`
+    ].join('\n');
+    noteWrapped(message, 'How to fix');
   }
 
   public createPortalStep() {

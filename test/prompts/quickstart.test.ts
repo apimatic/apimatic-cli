@@ -40,25 +40,35 @@ describe('QuickstartPrompts', () => {
   });
 
   describe('specValidationFailed', () => {
-    let message: sinon.SinonStub;
-    const tip = () => stripVTControlCharacters(String(message.firstCall.args[0]));
+    let write: sinon.SinonStub;
+    // The section is boxed or not depending on the terminal's width; either way it reaches stdout.
+    const howToFix = () =>
+      stripVTControlCharacters(write.getCalls().map((call) => String(call.args[0])).join(''))
+        .replace(/[│╮╯├─◇]/g, ' ')
+        .replace(/\s+/g, ' ');
 
     beforeEach(() => {
-      message = sinon.stub(log, 'message');
+      write = sinon.stub(process.stdout, 'write').returns(true);
     });
 
-    it('suggests validating a local spec by its file with an AI agent', () => {
+    it('suggests an AI agent run validate on a local spec, or the VS Code extension', () => {
       const spec = new FilePath(specs, new FileName('petstore.json'));
       prompts.specValidationFailed(spec);
+      write.restore();
 
-      expect(tip()).to.contain(`apimatic api validate --file=${spec}`);
-      expect(tip()).to.contain('AI coding agent');
+      expect(howToFix()).to.contain('How to fix');
+      expect(howToFix()).to.contain(`Ask an AI coding agent to run apimatic api validate --file=${spec}`);
+      expect(howToFix()).to.contain(
+        "Or use APIMatic's interactive VS Code Extension: " +
+          'https://marketplace.visualstudio.com/items?itemName=apimatic-developers.apimatic-for-vscode'
+      );
     });
 
-    it('suggests validating a spec that came from a URL by that URL', () => {
+    it('names a spec that came from a URL by that URL', () => {
       prompts.specValidationFailed(new UrlPath('https://example.com/openapi.json'));
+      write.restore();
 
-      expect(tip()).to.contain('apimatic api validate --url=https://example.com/openapi.json');
+      expect(howToFix()).to.contain('apimatic api validate --url=https://example.com/openapi.json');
     });
   });
 });
