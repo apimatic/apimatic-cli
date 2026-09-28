@@ -2,7 +2,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { expect } from 'chai';
-import { PluginConfigContext, PluginConfigState, SetupQuestions } from '../../src/types/plugin-config-context';
+import { PluginConfig, PluginConfigContext, PluginConfigState } from '../../src/types/plugin-config-context';
 import { DirectoryPath } from '../../src/types/file/directoryPath';
 import { LanguagePublishingEntry, PluginLanguages } from '../../src/types/apimatic-config/languages-block';
 import { PluginIdentityData } from '../../src/types/plugin/plugin-config';
@@ -525,43 +525,48 @@ describe('PluginConfigContext', () => {
     });
   });
 
-  describe('SetupQuestions', () => {
+  // `plugin generate` asks for the identity and the languages only while `apimatic.json` lacks them.
+  describe('setup', () => {
     const plugin = { pluginId: 'acme-payments', pluginName: 'Acme Payments' };
-    const questions = async () => SetupQuestions.of(await context.getPluginConfigState());
+    const present = async () => {
+      const state = await context.getPluginConfigState();
+      if (state.state !== 'present') {
+        expect.fail(`expected a present config, got ${state.state}`);
+      }
+      return state;
+    };
 
-    // What `plugin generate` takes without asking: `sdk publish` records languages before any plugin block exists.
-    it('takes the recorded languages whether or not the plugin block is there', async () => {
+    // `sdk publish` records languages before any plugin block exists.
+    it('counts the recorded languages whether or not the plugin block is there', async () => {
       withConfig({ plugin, languages: { python: {} } });
-      expect((await questions()).recordedLanguages()).to.deep.equal([Language.PYTHON]);
+      expect((await present()).hasRecordedLanguages()).to.be.true;
 
       withConfig({ languages: { python: {} } });
-      expect((await questions()).recordedLanguages()).to.deep.equal([Language.PYTHON]);
-
-      withConfig({ languages: { java: {} } });
-      expect((await questions()).recordedLanguages()).to.deep.equal([]);
+      expect((await present()).hasRecordedLanguages()).to.be.true;
     });
 
-    it('asks for each answer only while apimatic.json lacks it', async () => {
-      expect((await questions()).missing()).to.equal('both');
+    it('counts no languages when the config names only ones a plugin cannot carry', async () => {
+      withConfig({ plugin, languages: { java: {} } });
+      expect((await present()).hasRecordedLanguages()).to.be.false;
+    });
 
-      withConfig({ languages: { csharp: {} } });
-      expect((await questions()).missing()).to.equal('identity');
-
-      withConfig({ plugin, languages: {} });
-      expect((await questions()).missing()).to.equal('languages');
-
+    it('is set up once the identity and a language are both recorded', async () => {
       withConfig({ plugin, languages: { csharp: {} } });
-      const settled = await questions();
-      expect(settled.missing()).to.equal(null);
-      expect(settled.asksNothing()).to.be.true;
+      expect((await present()).isSetUp()).to.be.true;
     });
 
-    it('hands back the config whose identity is recorded, and nothing before then', async () => {
+    it('is not set up while either is missing', async () => {
       withConfig({ languages: { csharp: {} } });
-      expect((await questions()).identifiedConfig()).to.equal(null);
+      expect((await present()).isSetUp()).to.be.false;
 
       withConfig({ plugin, languages: {} });
-      expect((await questions()).identifiedConfig()?.hasMetadata()).to.be.true;
+      expect((await present()).isSetUp()).to.be.false;
+    });
+
+    it('stands for a project without apimatic.json as a config that records nothing', () => {
+      expect(PluginConfig.empty.hasMetadata()).to.be.false;
+      expect(PluginConfig.empty.hasRecordedLanguages()).to.be.false;
+      expect(PluginConfig.empty.unsupportedLanguages()).to.deep.equal([]);
     });
   });
 });

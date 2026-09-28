@@ -6,7 +6,7 @@ import { PublishingApiService } from '../../infrastructure/services/publishing-a
 import { PluginGeneratePrompts } from '../../prompts/plugin/generate.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
-import { PluginConfig, PluginConfigWriteFailure, SetupQuestions } from '../../types/plugin-config-context.js';
+import { PluginConfig, PluginConfigWriteFailure } from '../../types/plugin-config-context.js';
 import { PluginContext } from '../../types/plugin-context.js';
 import { ProjectContext } from '../../types/project-context.js';
 import { PublishingProfiles } from '../../types/publish/publishing-profiles.js';
@@ -57,26 +57,26 @@ export class PluginGenerateAction {
       return ActionResult.failed();
     }
 
-    const asks = SetupQuestions.of(configState);
-    const missing = asks.missing();
-    if (missing !== null && !this.prompts.canAsk()) {
-      this.prompts.setupNeedsTerminal(sourceDirectory, missing);
+    const recorded = configState.state === 'missing' ? PluginConfig.empty : configState;
+    if (!recorded.isSetUp() && !this.prompts.canAsk()) {
+      this.prompts.setupNeedsTerminal(sourceDirectory, recorded);
       return ActionResult.failed();
     }
 
-    const identified = await this.identify(project, asks);
+    const identified = recorded.hasMetadata()
+      ? ActionResult.success(recorded)
+      : await new PluginRecordMetadataAction(this.configDir, this.commandMetadata, this.authKey).execute(project);
     if (!identified.isSuccess()) {
       return identified.discardValue();
     }
 
     const config = identified.getValue();
-    const recorded = asks.recordedLanguages();
-    const selection = asks.asksLanguages() ? await this.prompts.selectLanguages() : recorded;
+    const selection = config.hasRecordedLanguages() ? config.recordedLanguages() : await this.prompts.selectLanguages();
     if (!selection?.length) {
       this.prompts.noLanguagesSelected();
       return ActionResult.cancelled();
     }
-    this.prompts.recordedLanguagesIncluded(recorded);
+    this.prompts.recordedLanguagesIncluded(config.recordedLanguages());
 
     this.prompts.languagesNotIncluded(config.unsupportedLanguages());
 
@@ -91,7 +91,7 @@ export class PluginGenerateAction {
         .andThen(PublishingProfiles.create)
         .map((profiles) => profiles.getActiveProfiles().length > 0)
         .unwrapOr(false);
-    if (couldPublishInstead && !(await this.prompts.confirmLocalPlugin(asks.asksNothing()))) {
+    if (couldPublishInstead && !(await this.prompts.confirmLocalPlugin(recorded.isSetUp()))) {
       this.prompts.localPluginCancelled();
       return ActionResult.cancelled();
     }
@@ -123,16 +123,6 @@ export class PluginGenerateAction {
     }
 
     return ActionResult.success();
-  };
-
-  private readonly identify = async (
-    project: ProjectContext,
-    asks: SetupQuestions
-  ): Promise<ActionResult<PluginConfig>> => {
-    const identified = asks.identifiedConfig();
-    return identified === null
-      ? await new PluginRecordMetadataAction(this.configDir, this.commandMetadata, this.authKey).execute(project)
-      : ActionResult.success(identified);
   };
 
   /** A record, a staging and a generation fault land here alike; only the wording differs. */

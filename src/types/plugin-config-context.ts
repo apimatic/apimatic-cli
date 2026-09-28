@@ -22,47 +22,11 @@ export type PluginConfigState =
   | { state: 'unreadable'; reason: string; path: FilePath }
   | PluginConfig;
 
-export type MissingSetup = 'identity' | 'languages' | 'both';
-
-/** Each of `plugin generate`'s two questions is asked only while `apimatic.json` lacks its answer. */
-export class SetupQuestions {
-  private constructor(
-    private readonly identified: PluginConfig | null,
-    private readonly recorded: readonly Language[]
-  ) {}
-
-  public static of(state: PluginConfigState): SetupQuestions {
-    const config = state.state === 'present' ? state : null;
-    return new SetupQuestions(config?.hasMetadata() ? config : null, config?.recordedLanguages() ?? []);
-  }
-
-  /** Null while the plugin's identity still has to be asked for. */
-  public identifiedConfig(): PluginConfig | null {
-    return this.identified;
-  }
-
-  public recordedLanguages(): readonly Language[] {
-    return this.recorded;
-  }
-
-  public asksLanguages(): boolean {
-    return this.recorded.length === 0;
-  }
-
-  public asksNothing(): boolean {
-    return this.missing() === null;
-  }
-
-  public missing(): MissingSetup | null {
-    if (this.identified === null) {
-      return this.asksLanguages() ? 'both' : 'identity';
-    }
-    return this.asksLanguages() ? 'languages' : null;
-  }
-}
-
 export class PluginConfig {
   public readonly state = 'present' as const;
+
+  /** What a project without `apimatic.json` has recorded: nothing. */
+  public static readonly empty = PluginConfig.create({ languages: {} });
 
   private constructor(
     private readonly config: PluginConfigData,
@@ -95,6 +59,10 @@ export class PluginConfig {
     return this.entries.map(([language]) => language);
   }
 
+  public hasRecordedLanguages(): boolean {
+    return this.entries.length > 0;
+  }
+
   public unsupportedLanguages(): readonly string[] {
     return this.unsupported;
   }
@@ -104,6 +72,11 @@ export class PluginConfig {
   public hasMetadata(): boolean {
     const isNonBlankString = (value: unknown) => typeof value === 'string' && value.trim() !== '';
     return isNonBlankString(this.config.pluginId) && isNonBlankString(this.config.pluginName);
+  }
+
+  /** Nothing is left for `plugin generate` to ask: the identity and the languages are both recorded. */
+  public isSetUp(): boolean {
+    return this.hasMetadata() && this.hasRecordedLanguages();
   }
 
   public getRelease(): PluginReleaseData | undefined {
