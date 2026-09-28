@@ -120,13 +120,15 @@ function pad(text: string, width: number): string {
 /** Last lines of a failed build, enough to show the cause without flooding the terminal. */
 const LOG_TAIL_LINES = 15;
 
+const STACK_FRAME = /^\s+at\s/;
+
 // A bundler puts the message and the offending file first and its own stack last, so a plain
 // tail of the log shows the least useful part of it. Frames inside installed packages are
 // dropped first; they also carry the store paths of the CLI's own dependencies.
-const INTERNAL_FRAME = /^\s+at\s.*(?:[\\/]node_modules[\\/]|\(node:)/;
+const INTERNAL_FRAME = new RegExp(STACK_FRAME.source + /.*(?:[\\/]node_modules[\\/]|\(node:)/.source);
 
-// Vite's report of a failed build opens with this and the error, and ends with the import chain a plain tail shows.
-const BUILD_ERROR = 'error during build:';
+// Where Vite's report of a failed build, or of a dev server that failed to start, begins.
+const ERROR_HEADINGS = ['error during build:', 'error when starting dev server:'];
 
 /** The part of a child process's output worth putting in front of the user. */
 export function logTail(output: string): string {
@@ -134,7 +136,11 @@ export function logTail(output: string): string {
   const meaningful = lines.filter((line) => !INTERNAL_FRAME.test(line));
   // Some failures are nothing but frames; showing them beats showing nothing.
   const source = meaningful.some((line) => line.trim().length > 0) ? meaningful : lines;
-  const error = source.findIndex((line) => line.trimStart().startsWith(BUILD_ERROR));
-  const excerpt = error === -1 ? source.slice(-LOG_TAIL_LINES) : source.slice(error, error + LOG_TAIL_LINES);
-  return excerpt.join('\n').trim();
+  const error = source.findIndex((line) => ERROR_HEADINGS.some((heading) => line.trimStart().startsWith(heading)));
+  if (error === -1) {
+    return source.slice(-LOG_TAIL_LINES).join('\n').trim();
+  }
+  // After the heading, the error alone: the CLI already says what failed, and the full log keeps the frames.
+  const [message = '', ...rest] = source.slice(error + 1).filter((line) => !STACK_FRAME.test(line));
+  return [message.replace(/^Error: /, ''), ...rest].slice(0, LOG_TAIL_LINES).join('\n').trim();
 }

@@ -61,10 +61,57 @@ describe('logTail', () => {
 
     const tail = logTail(report).split('\n');
 
-    expect(tail[0]).to.equal('error during build:');
+    expect(tail[0]).to.equal('Build failed with 1 error:');
     expect(tail).to.include("[UNRESOLVED_IMPORT] Could not resolve '../static/images/logo.png' in content/index.md");
     expect(tail).to.have.lengthOf(15);
     expect(tail.join('\n')).to.not.contain('modules transformed');
+  });
+
+  // The CLI already says the build failed; the heading, the error's type and the config's own frames only bury the message.
+  it("shows a failed build's error as its message alone", () => {
+    const report = [
+      'error during build:',
+      "Error: Two operations in 'api.json' have the same operationId 'createPet':",
+      '  POST /pets',
+      '  POST /cats',
+      'Give each operation a unique operationId.',
+      '    at refuseSharedPages (file:///C:/Temp/tmp-1/vite.config.ts.timestamp-1.mjs:592:35)',
+      '    at async Promise.all (index 0)'
+    ].join('\n');
+
+    expect(logTail(report)).to.equal(
+      [
+        "Two operations in 'api.json' have the same operationId 'createPet':",
+        '  POST /pets',
+        '  POST /cats',
+        'Give each operation a unique operationId.'
+      ].join('\n')
+    );
+  });
+
+  // `portal serve` reads the same config, and Vite warns about its imports before it fails to load it.
+  it('shows the error a dev server failed to start with as its message alone, and not the warnings before it', () => {
+    const report = [
+      '- import "./shared" without a file extension (src/lib/openapi-section.server.ts:8:28). Add the file extension',
+      '  - import "./json" without a file extension (src/lib/code-samples.ts:1:30). Add the file extension',
+      'Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.',
+      'failed to load config from C:\\Temp\\tmp-1\\vite.config.ts',
+      'error when starting dev server:',
+      "Error: Two operations in 'api.json' have the same operationId 'createPet':",
+      '  POST /pets',
+      '  POST /cats',
+      'Give each operation a unique operationId.',
+      '    at async Promise.all (index 0)'
+    ].join('\n');
+
+    expect(logTail(report)).to.equal(
+      [
+        "Two operations in 'api.json' have the same operationId 'createPet':",
+        '  POST /pets',
+        '  POST /cats',
+        'Give each operation a unique operationId.'
+      ].join('\n')
+    );
   });
 
   it('returns nothing for empty output', () => {

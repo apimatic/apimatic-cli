@@ -411,10 +411,10 @@ describe('openApiSection', () => {
   });
 
   /** The message a section fails with for these paths, or undefined when it builds. */
-  const failureFor = async (paths: Record<string, unknown>) => {
+  const failureFor = async (paths: Record<string, unknown>, extra: Record<string, unknown> = {}) => {
     fs.writeFileSync(
       path.join(directory, 'api.json'),
-      JSON.stringify({ openapi: '3.1.0', info: { title: 'Pets', version: '1' }, paths })
+      JSON.stringify({ openapi: '3.1.0', info: { title: 'Pets', version: '1' }, paths, ...extra })
     );
     try {
       await section();
@@ -424,23 +424,102 @@ describe('openApiSection', () => {
     }
   };
 
-  const SHARED_PAGE =
-    "[OpenAPI] 'pets' would put two pages at api/pets/pets/createPet.mdx, so one would be left out. " +
-    'Give each operation an operationId of its own, and list each of its tags once.';
-
-  it('refuses two operations that one operationId would give one page', async () => {
+  it('refuses two operations that share an operationId, naming both', async () => {
     expect(
       await failureFor({
         '/pets': { post: { operationId: 'createPet', tags: ['pets'], responses: ok } },
         '/cats': { post: { operationId: 'createPet', tags: ['pets'], responses: ok } }
       })
-    ).to.equal(SHARED_PAGE);
+    ).to.equal(
+      [
+        "Two operations in 'api.json' have the same operationId 'createPet':",
+        '  POST /pets',
+        '  POST /cats',
+        'Give each operation a unique operationId.'
+      ].join('\n')
+    );
+  });
+
+  // A webhook's path item is often a $ref to components/pathItems, which the page's document has to have followed.
+  it('refuses two webhooks behind path-item references that share an operationId', async () => {
+    const adopted = { post: { operationId: 'petEvent', tags: ['pets'], responses: ok } };
+    expect(
+      await failureFor(
+        {},
+        {
+          webhooks: {
+            petAdopted: { $ref: '#/components/pathItems/Adopted' },
+            petBorn: { $ref: '#/components/pathItems/Born' }
+          },
+          components: { pathItems: { Adopted: adopted, Born: adopted } }
+        }
+      )
+    ).to.equal(
+      [
+        "Two operations in 'api.json' have the same operationId 'petEvent':",
+        '  POST petAdopted (webhook)',
+        '  POST petBorn (webhook)',
+        'Give each operation a unique operationId.'
+      ].join('\n')
+    );
+  });
+
+  // Without an operationId a page is named after the path, and `{id}` reads as `id`.
+  it('refuses two operations without an operationId whose paths name one page', async () => {
+    expect(
+      await failureFor({
+        '/pets/{id}': { get: { tags: ['pets'], responses: ok } },
+        '/pets/id': { get: { tags: ['pets'], responses: ok } }
+      })
+    ).to.equal(
+      [
+        "Two operations in 'api.json' have no operationId, so they would be documented on the same page:",
+        '  GET /pets/{id}',
+        '  GET /pets/id',
+        'Give each operation an operationId.'
+      ].join('\n')
+    );
+  });
+
+  // A webhook without an operationId is named after its slug, which can be another operation's operationId.
+  it('refuses an operation and a webhook whose page names match, though only one has an operationId', async () => {
+    expect(
+      await failureFor(
+        { '/pets': { post: { operationId: 'new-pet', tags: ['pets'], responses: ok } } },
+        { webhooks: { 'New Pet': { post: { tags: ['pets'], responses: ok } } } }
+      )
+    ).to.equal(
+      [
+        "Two operations in 'api.json' would be documented on the same page:",
+        '  POST /pets',
+        '  POST New Pet (webhook)',
+        'Give each operation a unique operationId.'
+      ].join('\n')
+    );
   });
 
   // Fumadocs writes a page for each tag an operation lists, the same one twice included.
-  it('refuses an operation that lists one tag twice', async () => {
+  it('refuses an operation that lists one tag twice, naming the tag', async () => {
     expect(
       await failureFor({ '/pets': { post: { operationId: 'createPet', tags: ['pets', 'pets'], responses: ok } } })
-    ).to.equal(SHARED_PAGE);
+    ).to.equal(
+      ["The operation POST /pets in 'api.json' lists the tag 'pets' more than once.", 'Remove the repeated tag.'].join(
+        '\n'
+      )
+    );
+  });
+
+  // A tag's folder is its slug, so these two tags share one; the repeated 'x' has a folder of its own.
+  it('names the two tags that share the page’s folder, and no other', async () => {
+    expect(
+      await failureFor({
+        '/pets': { post: { operationId: 'createPet', tags: ['Pet Store', 'pet-store', 'x', 'x'], responses: ok } }
+      })
+    ).to.equal(
+      [
+        "The operation POST /pets in 'api.json' lists the tags 'Pet Store' and 'pet-store', which the portal shows as one section.",
+        'Rename one of them so they differ in more than case or spacing.'
+      ].join('\n')
+    );
   });
 });
