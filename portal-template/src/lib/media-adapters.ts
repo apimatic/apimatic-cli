@@ -24,9 +24,10 @@ const UNADAPTED_MEDIA_TYPES = [
   'image/svg+xml'
 ];
 
-// An object the playground built from the schema would otherwise be sent as "[object Object]".
 const asEntered: MediaAdapter = {
+  // An object the playground built from the schema would otherwise be sent as "[object Object]".
   encode: ({ body }) => (typeof body === 'string' || body instanceof Blob ? body : JSON.stringify(body)),
+  // The portal registers no Fumadocs code generator, so nothing asks for a body example.
   generateExample: () => undefined
 };
 
