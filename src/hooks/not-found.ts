@@ -4,6 +4,10 @@ import { cyan, yellow } from "ansis";
 
 import utils from "./utils.js";
 
+// The hook re-enters through `config.runCommand`, so a suggestion that fails to resolve
+// would prompt forever. Allow a single retry per process, then report the failure.
+let retrying = false;
+
 const hook: Hook.CommandNotFound = async function (opts) {
   const hiddenCommandIds = new Set(opts.config.commands.filter((c) => c.hidden).map((c) => c.id));
 
@@ -15,23 +19,22 @@ const hook: Hook.CommandNotFound = async function (opts) {
 
   let binHelp = `${opts.config.bin} help`;
   const idSplit = opts.id.split(":");
-  if (opts.config.findTopic(idSplit[0])) {
+  // `findTopic` also matches leaf commands, so `help` reports as a topic and yields the
+  // dead-end hint `apimatic help help`. Only a topic that is not itself runnable narrows it.
+  if (opts.config.findTopic(idSplit[0]) && !opts.config.findCommand(idSplit[0])) {
     binHelp = `${binHelp} ${idSplit[0]}`;
   }
 
-  let suggestion: string | null;
-  if (/:?help:?/.test(opts.id)) {
-    suggestion = ["help", ...opts.id.split(":").filter((cmd) => cmd !== "help")].join(":");
-  } else {
-    suggestion = utils.closest(opts.id, commandIDs);
-  }
+  const suggestion = utils.closest(opts.id, commandIDs);
+  const readableSuggestion = suggestion ? toConfiguredId(suggestion, opts.config) : null;
 
-  const readableSuggestion = suggestion ? toConfiguredId(suggestion, this.config) : null;
+  const originalCmd = toConfiguredId(opts.id, opts.config);
+  this.warn(`${yellow(originalCmd)} is not an ${opts.config.bin} command.`);
 
-  const originalCmd = toConfiguredId(opts.id, this.config);
-  this.warn(`${yellow(originalCmd)} is not a ${opts.config.bin} command.`);
+  // A suggestion that does not resolve is worse than none: accepting it only re-enters this hook.
+  const runnable = Boolean(suggestion) && Boolean(opts.config.findCommand(suggestion!));
 
-  if (!process.stdin.isTTY || !suggestion) {
+  if (!process.stdin.isTTY || !runnable || retrying) {
     this.error(`Run ${cyan.bold(binHelp)} for a list of available commands.`, {
       exit: 127
     });
@@ -45,21 +48,17 @@ const hook: Hook.CommandNotFound = async function (opts) {
   }
 
   if (response) {
-    const confirmedSuggestion = suggestion!;
-    let argv = opts.argv ?? [];
-
-    if (confirmedSuggestion.startsWith("help:")) {
-      argv = confirmedSuggestion.split(":").slice(1);
-      suggestion = "help";
+    retrying = true;
+    try {
+      return await opts.config.runCommand(suggestion!, opts.argv ?? []);
+    } finally {
+      retrying = false;
     }
-
-    return this.config.runCommand(confirmedSuggestion, argv);
   }
 
   this.error(`Run ${cyan.bold(binHelp)} for a list of available commands.`, {
     exit: 127
   });
-
 };
 
 export default hook;
