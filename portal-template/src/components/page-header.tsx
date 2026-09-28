@@ -3,28 +3,20 @@ import { portal } from '@/lib/portal';
 
 interface PageHeaderProps {
   title?: string;
-  description?: string;
+  description?: string | null;
   markdownUrl: string;
 }
 
-/** A page's title, its description when it has one, and the actions on its Markdown twin. */
 export function PageHeader({ title, description, markdownUrl }: Readonly<PageHeaderProps>) {
   return (
     <>
       <DocsTitle>{title}</DocsTitle>
-      <DocsDescription className="mb-4">{description}</DocsDescription>
-      <PageActions markdownUrl={markdownUrl} />
+      {description ? <DocsDescription className="mb-0">{description}</DocsDescription> : null}
+      <div className="flex flex-row gap-2 items-center border-b pt-4 pb-6">
+        <MarkdownCopyButton markdownUrl={markdownUrl} />
+        {/* Links to an external AI vendor, so a white-labelled portal can turn it off. */}
+        {portal.pageActions ? <ViewOptionsPopover markdownUrl={markdownUrl} /> : null}
+      </div>
     </>
-  );
-}
-
-function PageActions({ markdownUrl }: Readonly<{ markdownUrl: string }>) {
-  return (
-    <div className="flex flex-row gap-2 items-center border-b pb-6">
-      <MarkdownCopyButton markdownUrl={markdownUrl} />
-      {/* Sends the reader to an external AI vendor, so a portal published under someone
-          else's brand can turn it off. */}
-      {portal.pageActions ? <ViewOptionsPopover markdownUrl={markdownUrl} /> : null}
-    </div>
   );
 }
