@@ -290,6 +290,11 @@
             },
             "package": {
               "type": "object"
+            },
+            "packageConfiguration": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "How the package is set up for its registry: its identity and metadata, shaped for the language. It says how to publish, not that anything was published, so it stands on its own and a language published only to a repository may leave it out."
             }
           }
         }

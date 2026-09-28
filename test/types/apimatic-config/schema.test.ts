@@ -274,6 +274,14 @@ describe('apimatic.schema.json', () => {
         { python: { publishing: { package: { version: '1.0.0' }, packageConfiguration: { name: 'calc' } } } }
       ],
       [
+        'a language published to a repository but not to a registry',
+        {
+          typescript: {
+            publishing: { source: { repositoryUrl: 'https://github.com/acme/petstore-typescript', branch: 'main' } }
+          }
+        }
+      ],
+      [
         'keys this CLI does not model, beside and inside the record',
         { csharp: { publishing: { future: 1 }, notes: 'x' } }
       ]
@@ -293,6 +301,16 @@ describe('apimatic.schema.json', () => {
         expect(verdict.valid, verdict.errors).to.be.true;
       });
     }
+
+    // Each says how the SDK is published, and each stands without the others: a source-only
+    // publish writes no `packageConfiguration`, and one configured but unreleased writes no
+    // `package`. An editor has to offer all three and insist on none.
+    it('describes every part of a publishing record and requires none of them', () => {
+      const publishing = schema.definitions.languageEntry.properties.publishing;
+
+      expect(Object.keys(publishing.properties)).to.have.members(['source', 'package', 'packageConfiguration']);
+      expect(publishing.required, 'a required part would refuse a record the CLI itself writes').to.be.undefined;
+    });
 
     for (const [label, languages] of invalid) {
       it(`refuses ${label}`, () => {
