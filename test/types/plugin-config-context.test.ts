@@ -2,7 +2,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { expect } from 'chai';
-import { PluginConfigContext, PluginConfigState, unattendedLanguages } from '../../src/types/plugin-config-context';
+import { PluginConfig, PluginConfigContext, PluginConfigState } from '../../src/types/plugin-config-context';
 import { DirectoryPath } from '../../src/types/file/directoryPath';
 import { LanguagePublishingEntry, PluginLanguages } from '../../src/types/apimatic-config/languages-block';
 import { PluginIdentityData } from '../../src/types/plugin/plugin-config';
@@ -439,7 +439,7 @@ describe('PluginConfigContext', () => {
 
       const state = (await context.recordLanguages([Language.PYTHON]))._unsafeUnwrap();
 
-      expect(state.initialLanguages()).to.deep.equal([Language.CSHARP, Language.PYTHON]);
+      expect(state.recordedLanguages()).to.deep.equal([Language.CSHARP, Language.PYTHON]);
       expect(state.publishedLanguages()).to.deep.equal([Language.CSHARP]);
     });
 
@@ -473,7 +473,7 @@ describe('PluginConfigContext', () => {
 
       const state = (await context.recordLanguages([Language.PYTHON]))._unsafeUnwrap();
 
-      expect(state.initialLanguages()).to.deep.equal([Language.PYTHON]);
+      expect(state.recordedLanguages()).to.deep.equal([Language.PYTHON]);
     });
   });
 
@@ -494,7 +494,7 @@ describe('PluginConfigContext', () => {
       const state = await present();
 
       expect(state.publishedLanguages()).to.deep.equal([Language.CSHARP, Language.TYPESCRIPT]);
-      expect(state.initialLanguages()).to.deep.equal([Language.CSHARP, Language.TYPESCRIPT, Language.PYTHON]);
+      expect(state.recordedLanguages()).to.deep.equal([Language.CSHARP, Language.TYPESCRIPT, Language.PYTHON]);
     });
 
     // java, php, ruby and go have no v4 renderer, so a plugin cannot carry them whatever the file
@@ -504,7 +504,7 @@ describe('PluginConfigContext', () => {
 
       const state = await present();
 
-      expect(state.initialLanguages()).to.deep.equal([Language.CSHARP]);
+      expect(state.recordedLanguages()).to.deep.equal([Language.CSHARP]);
       expect(state.publishedLanguages()).to.deep.equal([Language.CSHARP]);
       expect(state.unsupportedLanguages()).to.deep.equal(['java', 'go']);
     });
@@ -515,35 +515,7 @@ describe('PluginConfigContext', () => {
       expect((await present()).unsupportedLanguages()).to.deep.equal([]);
     });
 
-    it('offers the languages the config names as the ones already chosen', async () => {
-      withConfig({ languages: { csharp: CSHARP_ENTRY, python: UNPUBLISHED_ENTRY } });
-
-      expect((await present()).initialLanguages()).to.deep.equal([Language.CSHARP, Language.PYTHON]);
-    });
-
-    // A project that has never named a language has not chosen against any of them, and the plugin
-    // covering everything is the answer a single Enter should give.
-    it('offers every language a plugin can carry when the config names none', async () => {
-      withConfig({ languages: {} });
-
-      expect((await present()).initialLanguages()).to.deep.equal([
-        Language.CSHARP,
-        Language.TYPESCRIPT,
-        Language.PYTHON
-      ]);
-    });
-
-    it('offers every language when the config names only ones a plugin cannot carry', async () => {
-      withConfig({ languages: { java: CSHARP_ENTRY } });
-
-      expect((await present()).initialLanguages()).to.deep.equal([
-        Language.CSHARP,
-        Language.TYPESCRIPT,
-        Language.PYTHON
-      ]);
-    });
-
-    // What a set-up project is generated for without a question: no default fills an empty block.
+    // What `plugin generate` takes without asking: no default fills an empty block.
     it('records only the languages the config names that a plugin can carry', async () => {
       withConfig({ languages: { python: UNPUBLISHED_ENTRY, java: CSHARP_ENTRY, csharp: {} } });
       expect((await present()).recordedLanguages()).to.deep.equal([Language.PYTHON, Language.CSHARP]);
@@ -551,19 +523,50 @@ describe('PluginConfigContext', () => {
       withConfig({ languages: {} });
       expect((await present()).recordedLanguages()).to.deep.equal([]);
     });
+  });
 
-    // What `plugin generate` takes without a question, and nothing until the project is set up.
-    it('is generated unattended from its recorded languages only once the plugin block is there', async () => {
-      const plugin = { pluginId: 'acme-payments', pluginName: 'Acme Payments' };
+  // `plugin generate` asks for the identity and the languages only while `apimatic.json` lacks them.
+  describe('setup', () => {
+    const plugin = { pluginId: 'acme-payments', pluginName: 'Acme Payments' };
+    const present = async () => {
+      const state = await context.getPluginConfigState();
+      if (state.state !== 'present') {
+        expect.fail(`expected a present config, got ${state.state}`);
+      }
+      return state;
+    };
 
+    // `sdk publish` records languages before any plugin block exists.
+    it('counts the recorded languages whether or not the plugin block is there', async () => {
       withConfig({ plugin, languages: { python: {} } });
-      expect(unattendedLanguages(await context.getPluginConfigState())).to.deep.equal([Language.PYTHON]);
+      expect((await present()).hasRecordedLanguages()).to.be.true;
 
       withConfig({ languages: { python: {} } });
-      expect(unattendedLanguages(await context.getPluginConfigState())).to.deep.equal([]);
+      expect((await present()).hasRecordedLanguages()).to.be.true;
+    });
+
+    it('counts no languages when the config names only ones a plugin cannot carry', async () => {
+      withConfig({ plugin, languages: { java: {} } });
+      expect((await present()).hasRecordedLanguages()).to.be.false;
+    });
+
+    it('is set up once the identity and a language are both recorded', async () => {
+      withConfig({ plugin, languages: { csharp: {} } });
+      expect((await present()).isSetUp()).to.be.true;
+    });
+
+    it('is not set up while either is missing', async () => {
+      withConfig({ languages: { csharp: {} } });
+      expect((await present()).isSetUp()).to.be.false;
 
       withConfig({ plugin, languages: {} });
-      expect(unattendedLanguages(await context.getPluginConfigState())).to.deep.equal([]);
+      expect((await present()).isSetUp()).to.be.false;
+    });
+
+    it('stands for a project without apimatic.json as a config that records nothing', () => {
+      expect(PluginConfig.empty.hasMetadata()).to.be.false;
+      expect(PluginConfig.empty.hasRecordedLanguages()).to.be.false;
+      expect(PluginConfig.empty.unsupportedLanguages()).to.deep.equal([]);
     });
   });
 });

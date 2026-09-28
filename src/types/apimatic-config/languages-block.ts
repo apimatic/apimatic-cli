@@ -10,6 +10,8 @@ import { ApimaticConfigDocument } from './document.js';
 
 const GITHUB_BASE_URL = 'https://github.com';
 
+export const LANGUAGES_EXAMPLE = '"languages": { "typescript": {} }';
+
 export interface LanguageSource {
   repositoryUrl: string;
   branch?: string;

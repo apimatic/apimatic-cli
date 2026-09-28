@@ -1,5 +1,6 @@
 import { err, ok, Result } from 'neverthrow';
 import { ConfigFinding, findingSentences } from '../apimatic-config/document.js';
+import { LANGUAGES_EXAMPLE } from '../apimatic-config/languages-block.js';
 import { Language, PORTAL_LANGUAGES } from '../sdk/generate.js';
 import { quotedList } from './config/fields.js';
 import { PortalSdk } from './portal-sdk.js';
@@ -7,8 +8,6 @@ import { PortalSdk } from './portal-sdk.js';
 const KNOWN_LANGUAGES: readonly string[] = Object.values(Language);
 
 const SUPPORTED_LANGUAGES: readonly string[] = PORTAL_LANGUAGES;
-
-export const LANGUAGES_EXAMPLE = '"languages": { "typescript": {} }';
 
 // Written out in full so the one-line fix is in the message: nothing in the portal's own
 // commands writes this block yet.

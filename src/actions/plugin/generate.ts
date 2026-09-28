@@ -6,7 +6,7 @@ import { PublishingApiService } from '../../infrastructure/services/publishing-a
 import { PluginGeneratePrompts } from '../../prompts/plugin/generate.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
-import { PluginConfigWriteFailure, unattendedLanguages } from '../../types/plugin-config-context.js';
+import { PluginConfig, PluginConfigWriteFailure } from '../../types/plugin-config-context.js';
 import { PluginContext } from '../../types/plugin-context.js';
 import { ProjectContext } from '../../types/project-context.js';
 import { PublishingProfiles } from '../../types/publish/publishing-profiles.js';
@@ -57,25 +57,26 @@ export class PluginGenerateAction {
       return ActionResult.failed();
     }
 
-    const recorded = unattendedLanguages(configState);
-    if (recorded.length === 0 && !this.prompts.canAsk()) {
-      this.prompts.setupNeedsTerminal(sourceDirectory);
+    const recorded = configState.state === 'missing' ? PluginConfig.empty : configState;
+    if (!recorded.isSetUp() && !this.prompts.canAsk()) {
+      this.prompts.setupNeedsTerminal(sourceDirectory, recorded);
       return ActionResult.failed();
     }
 
-    const recordMetadata = new PluginRecordMetadataAction(this.configDir, this.commandMetadata, this.authKey);
-    const identified = await recordMetadata.execute(project, configState);
+    const identified = recorded.hasMetadata()
+      ? ActionResult.success(recorded)
+      : await new PluginRecordMetadataAction(this.configDir, this.commandMetadata, this.authKey).execute(project);
     if (!identified.isSuccess()) {
       return identified.discardValue();
     }
 
     const config = identified.getValue();
-    const selection = recorded.length > 0 ? recorded : await this.prompts.selectLanguages(config);
+    const selection = config.hasRecordedLanguages() ? config.recordedLanguages() : await this.prompts.selectLanguages();
     if (!selection?.length) {
       this.prompts.noLanguagesSelected();
       return ActionResult.cancelled();
     }
-    this.prompts.recordedLanguagesIncluded(recorded);
+    this.prompts.recordedLanguagesIncluded(config.recordedLanguages());
 
     this.prompts.languagesNotIncluded(config.unsupportedLanguages());
 
@@ -90,7 +91,7 @@ export class PluginGenerateAction {
         .andThen(PublishingProfiles.create)
         .map((profiles) => profiles.getActiveProfiles().length > 0)
         .unwrapOr(false);
-    if (couldPublishInstead && !(await this.prompts.confirmLocalPlugin(recorded.length > 0))) {
+    if (couldPublishInstead && !(await this.prompts.confirmLocalPlugin(recorded.isSetUp()))) {
       this.prompts.localPluginCancelled();
       return ActionResult.cancelled();
     }

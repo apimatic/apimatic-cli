@@ -8,6 +8,7 @@ import { format as f } from '../format.js';
 import { withSpinner } from '../prompt.js';
 import { APIMATIC_CONFIG_FILE_NAME } from '../../types/apimatic-config/document.js';
 import { PluginConfig, PluginConfigWriteFailure } from '../../types/plugin-config-context.js';
+import { LANGUAGES_EXAMPLE } from '../../types/apimatic-config/languages-block.js';
 import { AVAILABLE_LANGUAGES, Language, languageLabel } from '../../types/sdk/generate.js';
 import { listedInProse } from '../../utils/string-utils.js';
 
@@ -82,11 +83,20 @@ export class PluginGeneratePrompts {
     return process.stdin.isTTY === true;
   }
 
-  public setupNeedsTerminal(sourceDirectory: DirectoryPath) {
+  public setupNeedsTerminal(sourceDirectory: DirectoryPath, config: PluginConfig) {
+    const command = `'${f.cmdAlt('apimatic', 'plugin', 'generate')}'`;
+    const configFile = `${f.var(APIMATIC_CONFIG_FILE_NAME)} in ${f.path(sourceDirectory)}`;
+    if (config.hasMetadata()) {
+      log.error(
+        `${configFile} names no language the plugin can carry, and there is no terminal to ask which. Add one to ` +
+          `its ${f.var('languages')} block, for example ${LANGUAGES_EXAMPLE}, or run ${command} in a terminal.`
+      );
+      return;
+    }
+    const [asked, kept] = config.hasRecordedLanguages() ? ['its name', 'it'] : ['its name and languages', 'both'];
     log.error(
-      `A project's first plugin asks for its name and languages, and there is no terminal to ask in. Run ` +
-        `'${f.cmdAlt('apimatic', 'plugin', 'generate')}' in a terminal once; later runs read both from ` +
-        `${f.var(APIMATIC_CONFIG_FILE_NAME)} in ${f.path(sourceDirectory)}.`
+      `A project's first plugin asks for ${asked}, and there is no terminal to ask in. Run ${command} in a ` +
+        `terminal once; later runs read ${kept} from ${configFile}.`
     );
   }
 
@@ -100,17 +110,11 @@ export class PluginGeneratePrompts {
     );
   }
 
-  public async selectLanguages(config: PluginConfig): Promise<Language[] | undefined> {
-    const published = config.publishedLanguages();
-
+  public async selectLanguages(): Promise<Language[] | undefined> {
     const selected = await multiselect<Language>({
       message: 'Which languages should your plugin include?',
-      options: AVAILABLE_LANGUAGES.map((language) => ({
-        value: language,
-        label: languageLabel(language),
-        hint: published.includes(language) ? 'published' : undefined
-      })),
-      initialValues: [...config.initialLanguages()],
+      options: AVAILABLE_LANGUAGES.map((language) => ({ value: language, label: languageLabel(language) })),
+      initialValues: [...AVAILABLE_LANGUAGES],
       required: false
     });
 

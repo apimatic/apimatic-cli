@@ -13,7 +13,7 @@ import {
   PluginMetadata
 } from './plugin/plugin-config.js';
 import { SemVersion } from './publish/version.js';
-import { AVAILABLE_LANGUAGES, isAvailableLanguage, Language } from './sdk/generate.js';
+import { isAvailableLanguage, Language } from './sdk/generate.js';
 
 export type PluginReleaseData = { pluginId: string; version: SemVersion };
 
@@ -22,16 +22,11 @@ export type PluginConfigState =
   | { state: 'unreadable'; reason: string; path: FilePath }
   | PluginConfig;
 
-/** The config of a project set up for a plugin, whose identity is recorded so it is generated unasked; else null. */
-export const setUpConfig = (state: PluginConfigState): PluginConfig | null =>
-  state.state === 'present' && state.hasMetadata() ? state : null;
-
-/** The languages a set-up project is generated from without a question; none while any is still to be recorded. */
-export const unattendedLanguages = (state: PluginConfigState): readonly Language[] =>
-  setUpConfig(state)?.recordedLanguages() ?? [];
-
 export class PluginConfig {
   public readonly state = 'present' as const;
+
+  /** What a project without `apimatic.json` has recorded: nothing. */
+  public static readonly empty = PluginConfig.create({ languages: {} });
 
   private constructor(
     private readonly config: PluginConfigData,
@@ -64,11 +59,8 @@ export class PluginConfig {
     return this.entries.map(([language]) => language);
   }
 
-  // A config naming none has not chosen against any: covering everything is what one Enter gives.
-  public initialLanguages(): readonly Language[] {
-    const recorded = this.recordedLanguages();
-
-    return recorded.length > 0 ? recorded : AVAILABLE_LANGUAGES;
+  public hasRecordedLanguages(): boolean {
+    return this.entries.length > 0;
   }
 
   public unsupportedLanguages(): readonly string[] {
@@ -80,6 +72,11 @@ export class PluginConfig {
   public hasMetadata(): boolean {
     const isNonBlankString = (value: unknown) => typeof value === 'string' && value.trim() !== '';
     return isNonBlankString(this.config.pluginId) && isNonBlankString(this.config.pluginName);
+  }
+
+  /** Nothing is left for `plugin generate` to ask: the identity and the languages are both recorded. */
+  public isSetUp(): boolean {
+    return this.hasMetadata() && this.hasRecordedLanguages();
   }
 
   public getRelease(): PluginReleaseData | undefined {
