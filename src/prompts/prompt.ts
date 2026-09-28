@@ -128,6 +128,8 @@ const INTERNAL_FRAME = /^\s+at\s.*(?:[\\/]node_modules[\\/]|\(node:)/;
 // Vite's report of a failed build opens with this and the error, and ends with the import chain a plain tail shows.
 const BUILD_ERROR = 'error during build:';
 
+const STACK_FRAME = /^\s+at\s/;
+
 /** The part of a child process's output worth putting in front of the user. */
 export function logTail(output: string): string {
   const lines = stripVTControlCharacters(output).trimEnd().split('\n');
@@ -135,6 +137,12 @@ export function logTail(output: string): string {
   // Some failures are nothing but frames; showing them beats showing nothing.
   const source = meaningful.some((line) => line.trim().length > 0) ? meaningful : lines;
   const error = source.findIndex((line) => line.trimStart().startsWith(BUILD_ERROR));
-  const excerpt = error === -1 ? source.slice(-LOG_TAIL_LINES) : source.slice(error, error + LOG_TAIL_LINES);
+  const excerpt = error === -1 ? source.slice(-LOG_TAIL_LINES) : buildError(source.slice(error + 1));
   return excerpt.join('\n').trim();
+}
+
+/** A failed build's error without its type or its frames, which the full log keeps. */
+function buildError(report: string[]): string[] {
+  const [first = '', ...rest] = report.filter((line) => !STACK_FRAME.test(line));
+  return [first.replace(/^Error: /, ''), ...rest].slice(0, LOG_TAIL_LINES);
 }

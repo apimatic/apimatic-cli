@@ -424,23 +424,47 @@ describe('openApiSection', () => {
     }
   };
 
-  const SHARED_PAGE =
-    "[OpenAPI] 'pets' would put two pages at api/pets/pets/createPet.mdx, so one would be left out. " +
-    'Give each operation an operationId of its own, and list each of its tags once.';
-
-  it('refuses two operations that one operationId would give one page', async () => {
+  it('refuses two operations that share an operationId, naming both', async () => {
     expect(
       await failureFor({
         '/pets': { post: { operationId: 'createPet', tags: ['pets'], responses: ok } },
         '/cats': { post: { operationId: 'createPet', tags: ['pets'], responses: ok } }
       })
-    ).to.equal(SHARED_PAGE);
+    ).to.equal(
+      [
+        "Two operations in 'api.json' have the same operationId 'createPet':",
+        '  POST /pets',
+        '  POST /cats',
+        'Give each operation a unique operationId, then run the command again.'
+      ].join('\n')
+    );
   });
 
   // Fumadocs writes a page for each tag an operation lists, the same one twice included.
-  it('refuses an operation that lists one tag twice', async () => {
+  it('refuses an operation that lists one tag twice, naming the tag', async () => {
     expect(
       await failureFor({ '/pets': { post: { operationId: 'createPet', tags: ['pets', 'pets'], responses: ok } } })
-    ).to.equal(SHARED_PAGE);
+    ).to.equal(
+      [
+        "The operation POST /pets in 'api.json' lists the tag 'pets' more than once.",
+        'Remove the repeated tag, then run the command again.'
+      ].join('\n')
+    );
+  });
+
+  // Fumadocs files 'Pet Store' and 'pet-store' in one folder, so neither case above names the cause.
+  it('names the operations when two pages collide some other way', async () => {
+    expect(
+      await failureFor({
+        '/pets': { post: { operationId: 'createPet', tags: ['Pet Store', 'pet-store'], responses: ok } }
+      })
+    ).to.equal(
+      [
+        "Two operations in 'api.json' would be documented on the same page:",
+        '  POST /pets',
+        '  POST /pets',
+        'Give each operation a unique operationId and each tag a distinct name, then run the command again.'
+      ].join('\n')
+    );
   });
 });

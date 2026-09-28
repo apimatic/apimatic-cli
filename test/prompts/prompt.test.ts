@@ -61,10 +61,32 @@ describe('logTail', () => {
 
     const tail = logTail(report).split('\n');
 
-    expect(tail[0]).to.equal('error during build:');
+    expect(tail[0]).to.equal('Build failed with 1 error:');
     expect(tail).to.include("[UNRESOLVED_IMPORT] Could not resolve '../static/images/logo.png' in content/index.md");
     expect(tail).to.have.lengthOf(15);
     expect(tail.join('\n')).to.not.contain('modules transformed');
+  });
+
+  // The CLI already says the build failed; the heading, the error's type and the config's own frames only bury the message.
+  it("shows a failed build's error as its message alone", () => {
+    const report = [
+      'error during build:',
+      "Error: Two operations in 'api.json' have the same operationId 'createPet':",
+      '  POST /pets',
+      '  POST /cats',
+      'Give each operation a unique operationId, then run the command again.',
+      '    at refuseSharedPages (file:///C:/Temp/tmp-1/vite.config.ts.timestamp-1.mjs:592:35)',
+      '    at async Promise.all (index 0)'
+    ].join('\n');
+
+    expect(logTail(report)).to.equal(
+      [
+        "Two operations in 'api.json' have the same operationId 'createPet':",
+        '  POST /pets',
+        '  POST /cats',
+        'Give each operation a unique operationId, then run the command again.'
+      ].join('\n')
+    );
   });
 
   it('returns nothing for empty output', () => {
