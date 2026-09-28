@@ -8,7 +8,7 @@ import { format as f } from '../format.js';
 import { withSpinner } from '../prompt.js';
 import { APIMATIC_CONFIG_FILE_NAME } from '../../types/apimatic-config/document.js';
 import { MissingSetup, PluginConfigWriteFailure } from '../../types/plugin-config-context.js';
-import { LANGUAGES_EXAMPLE } from '../../types/portal/portal-languages.js';
+import { LANGUAGES_EXAMPLE } from '../../types/apimatic-config/languages-block.js';
 import { AVAILABLE_LANGUAGES, Language, languageLabel } from '../../types/sdk/generate.js';
 import { listedInProse } from '../../utils/string-utils.js';
 
