@@ -1,4 +1,4 @@
-import { ok, ResultAsync } from 'neverthrow';
+import { ResultAsync } from 'neverthrow';
 import { ServiceError } from '../../infrastructure/service-error.js';
 import { withDirPath } from '../../infrastructure/tmp-extensions.js';
 import { PluginService } from '../../infrastructure/services/plugin-service.js';
@@ -7,7 +7,6 @@ import { PluginGeneratePrompts } from '../../prompts/plugin/generate.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import {
-  PluginConfig,
   PluginConfigWriteFailure,
   recordedPluginLanguages,
   setUpConfig,
@@ -104,9 +103,7 @@ export class PluginGenerateAction {
 
     const generated = await withDirPath(async (tempDirectory) => {
       const tempContext = new TempContext(tempDirectory);
-      const written = asks.languages
-        ? await configContext.recordLanguages(selection)
-        : ok<PluginConfig, PluginConfigWriteFailure>(config);
+      const written = await configContext.recordLanguages(selection);
       return await written
         .asyncAndThen(() => new ResultAsync(configContext.stageUpload(tempDirectory, selection)))
         .map((staged) => tempContext.zip(staged))
