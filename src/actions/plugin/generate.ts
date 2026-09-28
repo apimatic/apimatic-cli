@@ -77,7 +77,7 @@ export class PluginGenerateAction {
     }
 
     const config = identified.getValue();
-    const selection = asks.languages ? await this.prompts.selectLanguages(config) : recorded;
+    const selection = asks.languages ? await this.prompts.selectLanguages() : recorded;
     if (!selection?.length) {
       this.prompts.noLanguagesSelected();
       return ActionResult.cancelled();

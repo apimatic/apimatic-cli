@@ -7,7 +7,7 @@ import { FilePath } from '../../types/file/filePath.js';
 import { format as f } from '../format.js';
 import { withSpinner } from '../prompt.js';
 import { APIMATIC_CONFIG_FILE_NAME } from '../../types/apimatic-config/document.js';
-import { PluginConfig, PluginConfigWriteFailure, SetupQuestions } from '../../types/plugin-config-context.js';
+import { PluginConfigWriteFailure, SetupQuestions } from '../../types/plugin-config-context.js';
 import { LANGUAGES_EXAMPLE } from '../../types/portal/portal-languages.js';
 import { AVAILABLE_LANGUAGES, Language, languageLabel } from '../../types/sdk/generate.js';
 import { listedInProse } from '../../utils/string-utils.js';
@@ -110,17 +110,12 @@ export class PluginGeneratePrompts {
     );
   }
 
-  public async selectLanguages(config: PluginConfig): Promise<Language[] | undefined> {
-    const published = config.publishedLanguages();
-
+  // Asked only while `languages` names none a plugin can carry, so nothing is recorded to pre-select or mark published.
+  public async selectLanguages(): Promise<Language[] | undefined> {
     const selected = await multiselect<Language>({
       message: 'Which languages should your plugin include?',
-      options: AVAILABLE_LANGUAGES.map((language) => ({
-        value: language,
-        label: languageLabel(language),
-        hint: published.includes(language) ? 'published' : undefined
-      })),
-      initialValues: [...config.initialLanguages()],
+      options: AVAILABLE_LANGUAGES.map((language) => ({ value: language, label: languageLabel(language) })),
+      initialValues: [...AVAILABLE_LANGUAGES],
       required: false
     });
 

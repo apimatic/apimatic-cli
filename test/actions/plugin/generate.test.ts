@@ -22,7 +22,7 @@ import { FileService } from '../../../src/infrastructure/file-service.js';
 import { CommandMetadata } from '../../../src/types/common/command-metadata.js';
 import { PublishingApiService } from '../../../src/infrastructure/services/publishing-api-service.js';
 import { ProjectContext } from '../../../src/types/project-context.js';
-import { Language } from '../../../src/types/sdk/generate.js';
+import { AVAILABLE_LANGUAGES, Language } from '../../../src/types/sdk/generate.js';
 
 const COMMAND_METADATA: CommandMetadata = { commandName: 'plugin generate', shell: 'test' };
 
@@ -91,11 +91,9 @@ describe('PluginGenerateAction', () => {
     sinon.stub(PluginGeneratePrompts.prototype, 'generatePlugin').callsFake((fn) => fn);
 
     // The language prompt and the profile lookup sit on the paths that generate. Both default to
-    // the quiet case — take what the config already names, no profile — so a test that is not
+    // the quiet case — the prompt's own every-language default, no profile — so a test that is not
     // about either says nothing about them. Mocha runs without a terminal, which the prompt needs.
-    selectLanguages = sinon
-      .stub(PluginGeneratePrompts.prototype, 'selectLanguages')
-      .callsFake(async (config) => [...config.initialLanguages()]);
+    selectLanguages = sinon.stub(PluginGeneratePrompts.prototype, 'selectLanguages').resolves([...AVAILABLE_LANGUAGES]);
     canAsk = sinon.stub(PluginGeneratePrompts.prototype, 'canAsk').returns(true);
     getPublishingProfiles = sinon.stub(PublishingApiService.prototype, 'getPublishingProfiles').resolves(ok([]));
 

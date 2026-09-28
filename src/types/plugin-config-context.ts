@@ -13,7 +13,7 @@ import {
   PluginMetadata
 } from './plugin/plugin-config.js';
 import { SemVersion } from './publish/version.js';
-import { AVAILABLE_LANGUAGES, isAvailableLanguage, Language } from './sdk/generate.js';
+import { isAvailableLanguage, Language } from './sdk/generate.js';
 
 export type PluginReleaseData = { pluginId: string; version: SemVersion };
 
@@ -68,13 +68,6 @@ export class PluginConfig {
   /** What `languages` names that a plugin can carry. */
   public recordedLanguages(): readonly Language[] {
     return this.entries.map(([language]) => language);
-  }
-
-  // A config naming none has not chosen against any: covering everything is what one Enter gives.
-  public initialLanguages(): readonly Language[] {
-    const recorded = this.recordedLanguages();
-
-    return recorded.length > 0 ? recorded : AVAILABLE_LANGUAGES;
   }
 
   public unsupportedLanguages(): readonly string[] {
