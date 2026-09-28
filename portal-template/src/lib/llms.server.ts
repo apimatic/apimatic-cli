@@ -14,8 +14,8 @@ export async function renderPage(page: PortalPage): Promise<string> {
   return await render(page, true);
 }
 
-export function renderIndex(): string {
-  return index.index();
+export async function renderIndex(): Promise<string> {
+  return await index.index();
 }
 
 // The specifications stay out: each page's would repeat every schema it shares with the others.
