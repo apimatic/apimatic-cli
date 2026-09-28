@@ -57,7 +57,9 @@ describe('QuickstartPrompts', () => {
       write.restore();
 
       expect(howToFix()).to.contain('How to fix');
-      expect(howToFix()).to.contain(`Ask an AI coding agent to run apimatic api validate --file=${spec}`);
+      expect(howToFix()).to.contain(
+        `Ask an AI coding agent to run this command and fix what it reports: apimatic api validate --file=${spec}`
+      );
       expect(howToFix()).to.contain(
         "Or use APIMatic's interactive VS Code Extension: " +
           'https://marketplace.visualstudio.com/items?itemName=apimatic-developers.apimatic-for-vscode'

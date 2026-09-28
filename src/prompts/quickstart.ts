@@ -117,9 +117,11 @@ Let's get started!`);
       spec instanceof UrlPath ? f.flag('url', spec.toString()) : f.flag('file', spec.toString())
     }`;
     const message = [
-      `Ask an AI coding agent to run ${validateCommand} and fix what it reports.`,
+      `Ask an AI coding agent to run this command and fix what it reports:`,
+      validateCommand,
       '',
-      `Or use APIMatic's interactive VS Code Extension: ${f.link(vscodeExtensionUrl)}`
+      `Or use APIMatic's interactive VS Code Extension:`,
+      f.link(vscodeExtensionUrl)
     ].join('\n');
     noteWrapped(message, 'How to fix');
   }
