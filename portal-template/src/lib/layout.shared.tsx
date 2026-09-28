@@ -7,7 +7,8 @@ export function baseOptions(): BaseLayoutProps {
       title: (
         <>
           <Logo />
-          {portal.name}
+          {/* 45vw is the widest that leaves the rest of the header room at every width from 320px. */}
+          <span className="max-w-[45vw] truncate">{portal.name}</span>
         </>
       )
     },
@@ -17,16 +18,19 @@ export function baseOptions(): BaseLayoutProps {
   };
 }
 
+// Without max-w-none, Tailwind's image reset lets the header size the title as if the logo had no width.
+const LOGO_SIZE = 'h-6 w-auto max-w-none';
+
 // The name sits beside it, so the image itself says nothing a screen reader needs.
 function Logo() {
   const { logo } = portal;
   if (!logo) return null;
-  if (logo.light === logo.dark) return <img src={logo.light} alt="" className="h-6 w-auto" />;
+  if (logo.light === logo.dark) return <img src={logo.light} alt="" className={LOGO_SIZE} />;
   // Both are in the page and CSS shows one, so the right one is there before any script runs.
   return (
     <>
-      <img src={logo.light} alt="" className="h-6 w-auto dark:hidden" />
-      <img src={logo.dark} alt="" className="hidden h-6 w-auto dark:block" />
+      <img src={logo.light} alt="" className={`${LOGO_SIZE} dark:hidden`} />
+      <img src={logo.dark} alt="" className={`hidden ${LOGO_SIZE} dark:block`} />
     </>
   );
 }
