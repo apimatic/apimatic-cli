@@ -10,7 +10,7 @@ import {
 import { COLOR_MODES } from '../../../src/types/portal/config/brand-config';
 import { PortalConfig } from '../../../src/types/portal/portal-config';
 import { PortalLanguages } from '../../../src/types/portal/portal-languages';
-import { Language } from '../../../src/types/sdk/generate';
+import { AVAILABLE_LANGUAGES, Language } from '../../../src/types/sdk/generate';
 import { buildLanguageEntry } from '../../../src/types/apimatic-config/languages-block';
 import { PackageConfigurationForLanguage } from '../../../src/types/publish/package-settings-configuration';
 import { SemVersion } from '../../../src/types/publish/version';
@@ -63,7 +63,7 @@ describe('apimatic.schema.json', () => {
 
     const cases: [string, unknown, readonly string[]][] = [
       ['brand.colorMode', brand.colorMode.enum, COLOR_MODES],
-      ['languages', schema.definitions.languages.propertyNames.enum, Object.values(Language)]
+      ['languages', schema.definitions.languages.propertyNames.enum, AVAILABLE_LANGUAGES]
     ];
 
     for (const [setting, offered, accepted] of cases) {
@@ -72,8 +72,10 @@ describe('apimatic.schema.json', () => {
       });
     }
 
-    it('with an entry for every language', () => {
-      expect(Object.keys(schema.definitions.languages.properties)).to.have.members(Object.values(Language));
+    // The schema declares what the CLI can write, so a language joining `CODEGEN_OPTIONS` fails
+    // here until its entry is declared, rather than in the editor of whoever publishes it first.
+    it('with an entry for every language the CLI can generate, and no other', () => {
+      expect(Object.keys(schema.definitions.languages.properties)).to.have.members([...AVAILABLE_LANGUAGES]);
     });
   });
 
@@ -362,14 +364,16 @@ describe('apimatic.schema.json', () => {
       expect(languagesAccepted({})).to.be.false;
     });
 
-    // The block is shared with the SDK and plugin commands, whose schema entry still lists every
-    // language; the portal refuses those it cannot be generated for yet.
-    it('leaves a language that is not available yet to the portal command', () => {
-      const languages = { java: {} };
+    // Nothing generates these yet, so nothing writes them: `sdk generate` refuses a language
+    // outside `CODEGEN_OPTIONS`, and a publish records only what it generated.
+    for (const language of ['java', 'php', 'ruby', 'go']) {
+      it(`refuses ${language}, which nothing can generate yet`, () => {
+        const languages = { [language]: {} };
 
-      expect(schemaVerdict({ languages }).valid).to.be.true;
-      expect(languagesAccepted(languages)).to.be.false;
-    });
+        expect(schemaVerdict({ languages }).valid, 'schema').to.be.false;
+        expect(languagesAccepted(languages), 'portal').to.be.false;
+      });
+    }
 
     // The portal reads the record leniently, as not recorded where it has the wrong shape; the
     // schema types it for the editor.
@@ -387,7 +391,13 @@ describe('apimatic.schema.json', () => {
   describe('accepts what `sdk publish` writes', () => {
     const person = { name: 'Acme', email: 'dev@acme.io', url: null };
 
-    const configurations: { [L in Language]: PackageConfigurationForLanguage[L] } = {
+    const publishable = [Language.CSHARP, Language.TYPESCRIPT, Language.PYTHON] as const;
+
+    it('covers every language the CLI can generate', () => {
+      expect([...publishable]).to.have.members([...AVAILABLE_LANGUAGES]);
+    });
+
+    const configurations: { [L in (typeof publishable)[number]]: PackageConfigurationForLanguage[L] } = {
       [Language.CSHARP]: {
         packageId: 'Acme.Calc',
         authors: 'Acme',
@@ -401,36 +411,6 @@ describe('apimatic.schema.json', () => {
         packageReleaseNotes: null,
         copyright: null
       },
-      [Language.JAVA]: {
-        groupId: 'io.acme',
-        artifactId: 'calc',
-        name: 'Acme Calc',
-        description: 'Calc SDK',
-        url: 'https://acme.io',
-        developers: [{ name: 'Acme', email: 'dev@acme.io', organization: null, organizationUrl: null }],
-        distributionManagement: { snapShotRepository: { id: 'ossrh', name: null, url: null } },
-        scm: { connection: 'scm:git:...', developerConnection: 'scm:git:...', url: 'https://github.com/acme/calc' }
-      },
-      [Language.PHP]: {
-        vendorName: 'acme',
-        projectName: 'calc',
-        description: 'Calc SDK',
-        type: null,
-        keywords: ['sdk'],
-        homepage: null,
-        authors: [{ name: 'Acme', email: null, homepage: null, role: null }],
-        support: {
-          email: null,
-          issues: null,
-          forum: null,
-          wiki: null,
-          irc: null,
-          chat: null,
-          source: null,
-          docs: null,
-          rss: null
-        }
-      },
       [Language.PYTHON]: {
         name: 'acme-calc',
         description: null,
@@ -439,17 +419,6 @@ describe('apimatic.schema.json', () => {
         keywords: ['sdk'],
         classifiers: [],
         urls: { Homepage: 'https://acme.io' }
-      },
-      [Language.RUBY]: {
-        name: 'acme-calc',
-        authors: ['Acme'],
-        summary: 'Calc SDK',
-        description: null,
-        email: ['dev@acme.io'],
-        homepage: null,
-        metadata: { source_code_uri: 'https://github.com/acme/calc' },
-        postInstallMessage: null,
-        requirements: []
       },
       [Language.TYPESCRIPT]: {
         name: '@acme/calc',
@@ -460,14 +429,13 @@ describe('apimatic.schema.json', () => {
         keywords: ['sdk'],
         homepage: null,
         repository: { type: null, url: null, directory: null }
-      },
-      [Language.GO]: { packageName: 'calc' }
+      }
     };
 
     const gitConfiguration = { isEnabled: true, credentialsId: 'creds', repositoryName: 'acme/calc', branch: 'main' };
     const version = SemVersion.tryCreate('1.0.0')._unsafeUnwrap();
 
-    for (const language of Object.values(Language)) {
+    for (const language of publishable) {
       it(`the record a ${language} publish records`, () => {
         const entry = buildLanguageEntry(language, gitConfiguration, configurations[language], version);
         const file = JSON.parse(JSON.stringify({ languages: { [language]: entry } }));

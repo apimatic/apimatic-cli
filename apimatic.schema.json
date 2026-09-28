@@ -241,29 +241,17 @@
       "type": "object",
       "description": "The project's SDK languages, which 'apimatic sdk publish' adds to. An entry without 'publishing' is a language that is wanted but not yet published.",
       "propertyNames": {
-        "enum": ["csharp", "java", "php", "python", "ruby", "typescript", "go"]
+        "enum": ["csharp", "typescript", "python"]
       },
       "properties": {
         "csharp": {
           "$ref": "#/definitions/csharpEntry"
         },
-        "java": {
-          "$ref": "#/definitions/javaEntry"
-        },
-        "php": {
-          "$ref": "#/definitions/phpEntry"
-        },
-        "python": {
-          "$ref": "#/definitions/pythonEntry"
-        },
-        "ruby": {
-          "$ref": "#/definitions/rubyEntry"
-        },
         "typescript": {
           "$ref": "#/definitions/typescriptEntry"
         },
-        "go": {
-          "$ref": "#/definitions/goEntry"
+        "python": {
+          "$ref": "#/definitions/pythonEntry"
         }
       },
       "additionalProperties": false
@@ -317,58 +305,6 @@
         }
       }
     },
-    "javaEntry": {
-      "type": "object",
-      "description": "An SDK language. Without 'publishing', the language is wanted but not published yet.",
-      "additionalProperties": false,
-      "properties": {
-        "publishing": {
-          "type": "object",
-          "description": "Where the SDK is published.",
-          "additionalProperties": false,
-          "dependencies": {
-            "package": ["packageConfiguration"]
-          },
-          "properties": {
-            "source": {
-              "$ref": "#/definitions/source"
-            },
-            "package": {
-              "$ref": "#/definitions/release"
-            },
-            "packageConfiguration": {
-              "$ref": "#/definitions/javaPackageConfiguration"
-            }
-          }
-        }
-      }
-    },
-    "phpEntry": {
-      "type": "object",
-      "description": "An SDK language. Without 'publishing', the language is wanted but not published yet.",
-      "additionalProperties": false,
-      "properties": {
-        "publishing": {
-          "type": "object",
-          "description": "Where the SDK is published.",
-          "additionalProperties": false,
-          "dependencies": {
-            "package": ["packageConfiguration"]
-          },
-          "properties": {
-            "source": {
-              "$ref": "#/definitions/source"
-            },
-            "package": {
-              "$ref": "#/definitions/release"
-            },
-            "packageConfiguration": {
-              "$ref": "#/definitions/phpPackageConfiguration"
-            }
-          }
-        }
-      }
-    },
     "pythonEntry": {
       "type": "object",
       "description": "An SDK language. Without 'publishing', the language is wanted but not published yet.",
@@ -395,32 +331,6 @@
         }
       }
     },
-    "rubyEntry": {
-      "type": "object",
-      "description": "An SDK language. Without 'publishing', the language is wanted but not published yet.",
-      "additionalProperties": false,
-      "properties": {
-        "publishing": {
-          "type": "object",
-          "description": "Where the SDK is published.",
-          "additionalProperties": false,
-          "dependencies": {
-            "package": ["packageConfiguration"]
-          },
-          "properties": {
-            "source": {
-              "$ref": "#/definitions/source"
-            },
-            "package": {
-              "$ref": "#/definitions/release"
-            },
-            "packageConfiguration": {
-              "$ref": "#/definitions/rubyPackageConfiguration"
-            }
-          }
-        }
-      }
-    },
     "typescriptEntry": {
       "type": "object",
       "description": "An SDK language. Without 'publishing', the language is wanted but not published yet.",
@@ -442,32 +352,6 @@
             },
             "packageConfiguration": {
               "$ref": "#/definitions/typescriptPackageConfiguration"
-            }
-          }
-        }
-      }
-    },
-    "goEntry": {
-      "type": "object",
-      "description": "An SDK language. Without 'publishing', the language is wanted but not published yet.",
-      "additionalProperties": false,
-      "properties": {
-        "publishing": {
-          "type": "object",
-          "description": "Where the SDK is published.",
-          "additionalProperties": false,
-          "dependencies": {
-            "package": ["packageConfiguration"]
-          },
-          "properties": {
-            "source": {
-              "$ref": "#/definitions/source"
-            },
-            "package": {
-              "$ref": "#/definitions/release"
-            },
-            "packageConfiguration": {
-              "$ref": "#/definitions/goPackageConfiguration"
             }
           }
         }
@@ -512,167 +396,6 @@
         },
         "copyright": {
           "type": ["string", "null"]
-        }
-      }
-    },
-    "javaPackageConfiguration": {
-      "type": "object",
-      "description": "How the Maven package is set up. Written by 'apimatic sdk publish' from the publishing profile.",
-      "additionalProperties": false,
-      "properties": {
-        "groupId": {
-          "type": "string"
-        },
-        "artifactId": {
-          "type": "string"
-        },
-        "name": {
-          "type": "string"
-        },
-        "description": {
-          "type": "string"
-        },
-        "url": {
-          "type": "string"
-        },
-        "developers": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "name": {
-                "type": "string"
-              },
-              "email": {
-                "type": "string"
-              },
-              "organization": {
-                "type": ["string", "null"]
-              },
-              "organizationUrl": {
-                "type": ["string", "null"]
-              }
-            }
-          }
-        },
-        "distributionManagement": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "snapShotRepository": {
-              "type": "object",
-              "additionalProperties": false,
-              "properties": {
-                "id": {
-                  "type": "string"
-                },
-                "name": {
-                  "type": ["string", "null"]
-                },
-                "url": {
-                  "type": ["string", "null"]
-                }
-              }
-            }
-          }
-        },
-        "scm": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "connection": {
-              "type": "string"
-            },
-            "developerConnection": {
-              "type": "string"
-            },
-            "url": {
-              "type": "string"
-            }
-          }
-        }
-      }
-    },
-    "phpPackageConfiguration": {
-      "type": "object",
-      "description": "How the Composer package is set up. Written by 'apimatic sdk publish' from the publishing profile.",
-      "additionalProperties": false,
-      "properties": {
-        "vendorName": {
-          "type": "string"
-        },
-        "projectName": {
-          "type": "string"
-        },
-        "description": {
-          "type": "string"
-        },
-        "type": {
-          "type": ["string", "null"]
-        },
-        "keywords": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "homepage": {
-          "type": ["string", "null"]
-        },
-        "authors": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "name": {
-                "type": ["string", "null"]
-              },
-              "email": {
-                "type": ["string", "null"]
-              },
-              "homepage": {
-                "type": ["string", "null"]
-              },
-              "role": {
-                "type": ["string", "null"]
-              }
-            }
-          }
-        },
-        "support": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "email": {
-              "type": ["string", "null"]
-            },
-            "issues": {
-              "type": ["string", "null"]
-            },
-            "forum": {
-              "type": ["string", "null"]
-            },
-            "wiki": {
-              "type": ["string", "null"]
-            },
-            "irc": {
-              "type": ["string", "null"]
-            },
-            "chat": {
-              "type": ["string", "null"]
-            },
-            "source": {
-              "type": ["string", "null"]
-            },
-            "docs": {
-              "type": ["string", "null"]
-            },
-            "rss": {
-              "type": ["string", "null"]
-            }
-          }
         }
       }
     },
@@ -734,52 +457,6 @@
         "urls": {
           "type": "object",
           "additionalProperties": {
-            "type": "string"
-          }
-        }
-      }
-    },
-    "rubyPackageConfiguration": {
-      "type": "object",
-      "description": "How the RubyGems gem is set up. Written by 'apimatic sdk publish' from the publishing profile.",
-      "additionalProperties": false,
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "authors": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "summary": {
-          "type": "string"
-        },
-        "description": {
-          "type": ["string", "null"]
-        },
-        "email": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "homepage": {
-          "type": ["string", "null"]
-        },
-        "metadata": {
-          "type": "object",
-          "additionalProperties": {
-            "type": "string"
-          }
-        },
-        "postInstallMessage": {
-          "type": ["string", "null"]
-        },
-        "requirements": {
-          "type": "array",
-          "items": {
             "type": "string"
           }
         }
@@ -866,16 +543,6 @@
               "type": ["string", "null"]
             }
           }
-        }
-      }
-    },
-    "goPackageConfiguration": {
-      "type": "object",
-      "description": "How the Go module is set up. Written by 'apimatic sdk publish' from the publishing profile.",
-      "additionalProperties": false,
-      "properties": {
-        "packageName": {
-          "type": "string"
         }
       }
     }
