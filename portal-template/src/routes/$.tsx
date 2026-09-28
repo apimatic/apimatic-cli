@@ -7,18 +7,12 @@ import { getPageMarkdownUrl } from '@/lib/shared';
 import { portal } from '@/lib/portal';
 import { absoluteUrl, canonicalLink } from '@/lib/seo';
 import { useFumadocsLoader } from 'fumadocs-core/source/client';
-import {
-  DocsBody,
-  DocsDescription,
-  DocsPage,
-  DocsTitle,
-  MarkdownCopyButton,
-  ViewOptionsPopover
-} from 'fumadocs-ui/layouts/notebook/page';
+import { DocsBody, DocsDescription, DocsPage, DocsTitle } from 'fumadocs-ui/layouts/notebook/page';
 import { staticFunctionMiddleware } from '@tanstack/start-static-server-functions';
 import { Suspense, use, type ReactNode } from 'react';
 import { useMDXComponents } from '@/components/mdx';
 import { OpenAPIPage } from '@/components/api-page';
+import { PageHeader } from '@/components/page-header';
 import { slimOpenAPIPageProps } from '@/lib/openapi-slim';
 
 const rootRoute = getRouteApi('__root__');
@@ -137,24 +131,11 @@ function Content({
 
   return (
     <DocsPage toc={toc} full={page.full}>
-      <DocsTitle>{page.title}</DocsTitle>
-      <DocsDescription>{page.description}</DocsDescription>
-      <PageActions markdownUrl={markdownUrl} />
+      <PageHeader title={page.title} description={page.description} markdownUrl={markdownUrl} />
       <DocsBody>
         <PageBody components={useMDXComponents()} />
       </DocsBody>
     </DocsPage>
-  );
-}
-
-function PageActions({ markdownUrl }: Readonly<{ markdownUrl: string }>) {
-  return (
-    <div className="flex flex-row gap-2 items-center border-b -mt-4 pb-6">
-      <MarkdownCopyButton markdownUrl={markdownUrl} />
-      {/* Sends the reader to an external AI vendor, so a portal published under someone
-          else's brand can turn it off. */}
-      {portal.pageActions ? <ViewOptionsPopover markdownUrl={markdownUrl} /> : null}
-    </div>
   );
 }
 
@@ -180,9 +161,7 @@ function Page() {
   } else if (page.type === 'openapi') {
     content = (
       <DocsPage full>
-        <DocsTitle>{page.title}</DocsTitle>
-        <DocsDescription>{page.description}</DocsDescription>
-        <PageActions markdownUrl={page.markdownUrl} />
+        <PageHeader title={page.title} description={page.description} markdownUrl={page.markdownUrl} />
         <DocsBody>
           <OpenAPIPage {...page.props} />
         </DocsBody>
