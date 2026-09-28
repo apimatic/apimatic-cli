@@ -7,18 +7,12 @@ import { getPageMarkdownUrl } from '@/lib/shared';
 import { portal } from '@/lib/portal';
 import { absoluteUrl, canonicalLink } from '@/lib/seo';
 import { useFumadocsLoader } from 'fumadocs-core/source/client';
-import {
-  DocsBody,
-  DocsDescription,
-  DocsPage,
-  DocsTitle,
-  MarkdownCopyButton,
-  ViewOptionsPopover
-} from 'fumadocs-ui/layouts/notebook/page';
+import { DocsBody, DocsPage } from 'fumadocs-ui/layouts/notebook/page';
 import { staticFunctionMiddleware } from '@tanstack/start-static-server-functions';
 import { Suspense, use, type ReactNode } from 'react';
 import { useMDXComponents } from '@/components/mdx';
 import { OpenAPIPage } from '@/components/api-page';
+import { PageHeader } from '@/components/page-header';
 import { slimOpenAPIPageProps } from '@/lib/openapi-slim';
 
 const rootRoute = getRouteApi('__root__');
@@ -75,16 +69,24 @@ const serverLoader = createServerFn({
     if (!page) {
       // A project without content/index.md(x) still gets a landing page.
       if (slugs.length === 0) {
-        return { type: 'home' as const, title: portal.name, description: portal.description };
+        return {
+          type: 'home' as const,
+          title: portal.name,
+          description: portal.description,
+          markdownUrl: getPageMarkdownUrl({ slugs }).url
+        };
       }
       throw notFound();
     }
+
+    const markdownUrl = getPageMarkdownUrl(page).url;
 
     if (page.type === 'openapi') {
       return {
         type: 'openapi' as const,
         title: page.data.title,
         description: page.data.description ?? null,
+        markdownUrl,
         props: slimOpenAPIPageProps(page.data.getOpenAPIPageProps())
       };
     }
@@ -95,7 +97,7 @@ const serverLoader = createServerFn({
       title: page.data.title,
       description: page.data.description ?? null,
       path: page.path,
-      markdownUrl: getPageMarkdownUrl(page).url
+      markdownUrl
     };
   });
 
@@ -136,14 +138,7 @@ function Content({
 
   return (
     <DocsPage toc={toc} full={page.full}>
-      <DocsTitle>{page.title}</DocsTitle>
-      <DocsDescription>{page.description}</DocsDescription>
-      <div className="flex flex-row gap-2 items-center border-b -mt-4 pb-6">
-        <MarkdownCopyButton markdownUrl={markdownUrl} />
-        {/* Sends the reader to an external AI vendor, so a portal published under someone
-            else's brand can turn it off. */}
-        {portal.pageActions ? <ViewOptionsPopover markdownUrl={markdownUrl} /> : null}
-      </div>
+      <PageHeader title={page.title} description={page.description} markdownUrl={markdownUrl} />
       <DocsBody>
         <PageBody components={useMDXComponents()} />
       </DocsBody>
@@ -151,11 +146,14 @@ function Content({
   );
 }
 
-function Home({ title, description }: Readonly<{ title: string; description: string | null }>) {
+function Home({
+  title,
+  description,
+  markdownUrl
+}: Readonly<{ title: string; description: string | null; markdownUrl: string }>) {
   return (
     <DocsPage>
-      <DocsTitle>{title}</DocsTitle>
-      {description ? <DocsDescription>{description}</DocsDescription> : null}
+      <PageHeader title={title} description={description} markdownUrl={markdownUrl} />
       <DocsBody>
         <p>Use the navigation to browse the API reference and guides.</p>
       </DocsBody>
@@ -169,11 +167,11 @@ function Page() {
   let content: ReactNode;
 
   if (page.type === 'home') {
-    content = <Home title={page.title} description={page.description} />;
+    content = <Home title={page.title} description={page.description} markdownUrl={page.markdownUrl} />;
   } else if (page.type === 'openapi') {
     content = (
       <DocsPage full>
-        <DocsTitle>{page.title}</DocsTitle>
+        <PageHeader title={page.title} markdownUrl={page.markdownUrl} />
         <DocsBody>
           <OpenAPIPage {...page.props} />
         </DocsBody>
