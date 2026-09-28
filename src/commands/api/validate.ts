@@ -5,7 +5,6 @@ import { ValidateAction } from "../../actions/api/validate.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
 import { format, intro, outro } from "../../prompts/format.js";
 import { createResourceInput } from "../../types/file/resource-input.js";
-import { ActionResult } from "../../actions/action-result.js";
 
 export default class Validate extends Command {
   static readonly summary = "Validate API specification for syntactic and semantic correctness";
@@ -39,8 +38,8 @@ export default class Validate extends Command {
     const resourceInput = createResourceInput(file, url);
 
     intro("Validate API");
-    const check = await action.execute(resourceInput);
-    outro(check === "valid" ? ActionResult.success() : ActionResult.failed());
+    const result = await action.execute(resourceInput);
+    outro(result);
   }
 
   private readonly getConfigDir = () => {

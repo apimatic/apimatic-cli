@@ -10,7 +10,7 @@ import { ResourceInput } from '../types/file/resource-input.js';
 import { LoginAction } from './auth/login.js';
 import { ActionResult } from './action-result.js';
 import { CommandMetadata } from '../types/common/command-metadata.js';
-import { ValidateAction } from './api/validate.js';
+import { SpecCheck, ValidateAction } from './api/validate.js';
 import { SpecContext } from '../types/spec-context.js';
 import { OpenApiDocument, SpecFormat } from '../types/portal/openapi-document.js';
 import { PortalScaffoldProblem } from '../types/portal/portal-source.js';
@@ -211,7 +211,10 @@ export class QuickstartAction {
     adopted: boolean
   ): Promise<Result<FilePath, ActionResult>> {
     this.prompts.validateSpecStep();
-    const validation = await new ValidateAction(this.configDir, this.commandMetadata).execute(spec.file, false);
+    let validation = 'unchecked' as SpecCheck;
+    await new ValidateAction(this.configDir, this.commandMetadata).execute(spec.file, false, (check) => {
+      validation = check;
+    });
     // The service's own error is already on screen; the spec may be valid, so there is nothing to fix.
     if (validation === 'unchecked') {
       return err(ActionResult.failed());

@@ -1,4 +1,5 @@
 import { DirectoryPath } from '../../types/file/directoryPath.js';
+import { ActionResult } from '../action-result.js';
 import { ApiValidatePrompts } from '../../prompts/api/validate.js';
 import { ValidationService } from '../../infrastructure/services/validation-service.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
@@ -22,9 +23,20 @@ export class ValidateAction {
     this.commandMetadata = commandMetadata;
   }
 
+  /** `onChecked` hears what the validation found, which the `ActionResult` alone cannot tell apart. */
   public readonly execute = async (
     resourcePath: ResourceInput,
-    displayValidationSummary = true
+    displayValidationSummary = true,
+    onChecked?: (check: SpecCheck) => void
+  ): Promise<ActionResult> => {
+    const check = await this.check(resourcePath, displayValidationSummary);
+    onChecked?.(check);
+    return check === 'valid' ? ActionResult.success() : ActionResult.failed();
+  };
+
+  private readonly check = async (
+    resourcePath: ResourceInput,
+    displayValidationSummary: boolean
   ): Promise<SpecCheck> => {
     return await withDirPath(async (tempDirectory) => {
       const resourceContext = new ResourceContext(tempDirectory);
