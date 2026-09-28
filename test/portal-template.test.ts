@@ -155,10 +155,10 @@ describe('portal template packaging', () => {
   // Left to itself the popover reads `window.location.href`, so a reader's query string and hash
   // — tracking and preview parameters among them — reach the AI vendors it links out to.
   it('sends the AI vendors the page address and nothing the reader carried with them', () => {
-    const header = fs.readFileSync(path.join(templateRoot, 'src/components/page-header.tsx'), 'utf8');
+    const route = fs.readFileSync(path.join(templateRoot, 'src/routes/$.tsx'), 'utf8');
 
-    expect(header).to.match(/<ViewOptionsPopover [^>]*pageUrl=/);
-    expect(header).to.contain('new URL(pathname, window.location.origin)');
+    expect(route).to.match(/<ViewOptionsPopover [^>]*pageUrl=/);
+    expect(route).to.contain('new URL(pathname, window.location.origin)');
   });
 
   it('registers the plugin that reloads the generated pages under portal serve', () => {
