@@ -397,6 +397,10 @@ const stylesheetOf = (output: DirectoryPath) => {
     expect(full).to.not.contain('```yaml');
   });
 
+  it("offers the page actions on an operation's page", () => {
+    expect(read('api/apimatic-calculator/simple-calculator/Calculate/index.html')).to.contain('Copy Markdown');
+  });
+
   it('lists each language in the SDKs tab of the sidebar', () => {
     const tree = read(treeCacheFiles()[0]);
 
