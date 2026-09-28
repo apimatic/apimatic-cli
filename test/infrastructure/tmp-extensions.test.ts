@@ -3,8 +3,10 @@ import os from 'os';
 import path from 'path';
 import { expect } from 'chai';
 import {
+  canonical,
   PORTAL_PROJECT_DIRECTORY_NAME,
   portalProjectDirectoryBase,
+  withDirPath,
   withPortalProjectDirectory
 } from '../../src/infrastructure/tmp-extensions';
 import { DirectoryPath } from '../../src/types/file/directoryPath';
@@ -34,6 +36,24 @@ describe('portalProjectDirectoryBase', () => {
   });
 });
 
+// The portal's dev server resolves its allow-list to real paths and then compares strings, so a
+// temp directory named any other way than its real one has every page under it refused.
+describe('the temp directory a run is given', () => {
+  it('is spelled the way the filesystem spells it', async () => {
+    await withDirPath(async (directory) => {
+      expect(directory.toString()).to.equal(fs.realpathSync.native(directory.toString()));
+    });
+  });
+
+  it('is spelled that way for a portal project too', async () => {
+    const source = new DirectoryPath(fs.mkdtempSync(path.join(os.tmpdir(), 'build-real-'))).join('src');
+
+    await withPortalProjectDirectory(source, async (directory) => {
+      expect(directory.toString()).to.equal(fs.realpathSync.native(directory.toString()));
+    });
+  });
+});
+
 describe('withPortalProjectDirectory', () => {
   it('hands out a directory that exists while the callback runs and is gone afterwards', async () => {
     const source = new DirectoryPath(fs.mkdtempSync(path.join(os.tmpdir(), 'build-source-'))).join('src');
@@ -53,7 +73,7 @@ describe('withPortalProjectDirectory', () => {
   (process.platform === 'win32' ? it : it.skip)(
     'builds beside the source when the temp directory is on another drive, and cleans up',
     async () => {
-      const project = fs.mkdtempSync(path.join(os.tmpdir(), 'build-project-'));
+      const project = canonical(fs.mkdtempSync(path.join(os.tmpdir(), 'build-project-')));
       const source = new DirectoryPath(project).join('src');
       const foreignTemp = 'Z:\\Temp';
       const fallback = path.join(project, PORTAL_PROJECT_DIRECTORY_NAME);
@@ -74,7 +94,7 @@ describe('withPortalProjectDirectory', () => {
   (process.platform === 'win32' ? it : it.skip)(
     'leaves the shared folder alone while another run is in it',
     async () => {
-      const project = fs.mkdtempSync(path.join(os.tmpdir(), 'build-shared-'));
+      const project = canonical(fs.mkdtempSync(path.join(os.tmpdir(), 'build-shared-')));
       const source = new DirectoryPath(project).join('src');
       const fallback = path.join(project, PORTAL_PROJECT_DIRECTORY_NAME);
 
