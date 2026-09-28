@@ -174,7 +174,6 @@ function Page() {
     content = (
       <DocsPage full>
         <DocsTitle>{page.title}</DocsTitle>
-        <DocsDescription>{page.description}</DocsDescription>
         <DocsBody>
           <OpenAPIPage {...page.props} />
         </DocsBody>
