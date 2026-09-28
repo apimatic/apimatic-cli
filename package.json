@@ -85,6 +85,7 @@
         "is-in-ci": "^2.0.0",
         "isomorphic-git": "^1.37.2",
         "lucide-react": "1.43.0",
+        "mdast-util-to-markdown": "2.1.2",
         "mustache": "^4.2.0",
         "neverthrow": "^8.2.0",
         "open": "^8.4.0",
