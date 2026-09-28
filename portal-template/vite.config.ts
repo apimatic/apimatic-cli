@@ -49,6 +49,8 @@ export default defineConfig(async () => {
       }),
       react()
     ],
+    // Only the fumadocs-mdx macro's output imports it, so Vite would find it on the first visit and reload the page.
+    optimizeDeps: { include: ['fumadocs-mdx/runtime/macro'] },
     // The prerender pass fetches every page from a preview server on `localhost`. Where that
     // listens on `::1` alone, a connect that stalls under load falls back to 127.0.0.1 and is
     // refused, failing the build; binding IPv4 leaves the fetch a single address to reach.
