@@ -272,8 +272,8 @@ fence without one, as Fumadocs' `parseCodeBlockAttributes` reads it, from
 `CODE_BLOCK_TITLES` (`src/lib/code-titles.ts`): one entry per grammar the
 trimmed Shiki bundle ships, typed by its keys and reached through its aliases by
 `bundledLanguage`. A language outside the bundle stays untitled, though the
-build highlights it, and so does a block in a `CodeBlockTab`, which its tab
-names. Done in hast, so the Markdown twin's fences stay as written.
+build highlights it, and so does a block in a tab, which the tab names
+(`CodeBlockTab`, or `Tab` or `TabsContent` under an MDX `<Tabs>`). Done in hast, so the Markdown twin's fences stay as written.
 `rehypeCodeOptions` is Fumadocs' defaults with `icon: false`; the preset's type
 wants them all. `code-titles.ts` imports the bundle's type alone: a runtime
 import put the highlighter in every page's up-front scripts (+100 KB, measured

@@ -13,8 +13,8 @@ interface HastNode {
 
 const LANGUAGE_CLASS = 'language-';
 
-/** The element `remarkCodeTab` puts a tabbed block in, whose tab already names it. */
-const CODE_TAB = 'CodeBlockTab';
+/** Where `remarkCodeTab` puts a tabbed block, by its own tabs or an MDX `<Tabs>`: the tab already names it. */
+const CODE_TABS = ['CodeBlockTab', 'Tab', 'TabsContent'];
 
 /** Keeps each fence's meta through `rehype-raw`, which drops `data.meta` and keeps the property `rehypeCode` falls back to. */
 export function rehypeKeepCodeMeta() {
@@ -31,7 +31,7 @@ export function rehypeKeepCodeMeta() {
 /** Titles each fence its author left untitled after its language, once `rehype-raw` has made HTML ones elements too. */
 export function rehypeCodeTitles() {
   const visit = (node: HastNode): void => {
-    if (node.name === CODE_TAB) {
+    if (node.name !== undefined && CODE_TABS.includes(node.name)) {
       return;
     }
     const code = node.tagName === 'pre' ? node.children?.[0] : undefined;

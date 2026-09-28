@@ -14,12 +14,12 @@ export class PortalSdk {
   /** The document checked the shapes down to `publishing`; a wrongly shaped field below it reads as not recorded. */
   public static fromEntry(language: Language, entry: unknown): PortalSdk {
     const { repositoryUrl, version, packageConfiguration } = recordedPublishing(entry);
-    const releasedVersion = version?.trim() ?? '';
+    const hasRelease = (version?.trim() ?? '').length > 0;
 
     return new PortalSdk(
       language,
       repositoryUrl === null ? null : UrlPath.create(repositoryUrl) ?? null,
-      releasedVersion.length > 0 ? publishedPackage(language, packageConfiguration) : null
+      hasRelease ? publishedPackage(language, packageConfiguration) : null
     );
   }
 

@@ -42,7 +42,7 @@ describe('the code block titles of the generated pages', () => {
     return code?.data?.meta ?? code?.properties?.metastring ?? null;
   };
 
-  const tabbed = (block: Node): Node => ({ type: 'mdxJsxFlowElement', name: 'CodeBlockTab', children: [block] });
+  const tabbed = (block: Node, name = 'CodeBlockTab'): Node => ({ type: 'mdxJsxFlowElement', name, children: [block] });
 
   it('titles a block after its language, by any name the highlighter knows it by', () => {
     expect(titled(fence('typescript'))).to.equal('title="TypeScript"');
@@ -77,6 +77,8 @@ describe('the code block titles of the generated pages', () => {
   it('leaves a tabbed block to the tab that names it, keeping its meta', () => {
     expect(titled(tabbed(fence('ts')))).to.be.null;
     expect(titled(tabbed(fence('ts', 'lineNumbers')))).to.equal('lineNumbers');
+    expect(titled(tabbed(fence('ts'), 'Tab'))).to.be.null;
+    expect(titled(tabbed(fence('ts'), 'TabsContent'))).to.be.null;
   });
 
   // The SDK docs may write a block as HTML, which is an element only once `rehype-raw` has run.

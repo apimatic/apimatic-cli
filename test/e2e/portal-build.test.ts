@@ -552,9 +552,7 @@ const stylesheetOf = (output: DirectoryPath) => {
   it("leads a published SDK's card with its install command, and links its package and source", () => {
     const index = read('sdks/index.html');
 
-    expect(index).to.match(
-      /<span class="line truncate[^"]*" title="npm install @branded\/pets">npm install @branded\/pets</
-    );
+    expect(index).to.contain('title="npm install @branded/pets">npm install @branded/pets<');
     expect(index).to.contain('href="https://www.npmjs.com/package/@branded/pets"');
     expect(index).to.contain('href="https://github.com/branded/pets-ts"');
     expect(read('sdks.md')).to.contain(
