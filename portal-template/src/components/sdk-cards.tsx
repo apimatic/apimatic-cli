@@ -39,7 +39,8 @@ function LinkContext({ name }: Readonly<{ name: string }>) {
 // Not a Fumadocs `Card`, which is one link as a whole: the links inside would be links in a link.
 export function SdkCard({ language, name, page, install, ...actions }: Readonly<SdkCardProps>) {
   if (asMarkdown()) {
-    return [`- [${name}](${page}): ${install ? `\`${install}\` · ` : ''}`, <SdkActions key="actions" {...actions} />];
+    const command = install ? `\`${install}\` · ` : '';
+    return [`- [${name}](${page}): ${command}`, <SdkActions key="actions" {...actions} />];
   }
   const { download, source, packageUrl, registry } = actions;
   return (

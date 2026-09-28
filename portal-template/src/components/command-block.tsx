@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { asMarkdown } from 'fumadocs-core/server';
 import { CodeBlock, Pre } from 'fumadocs-ui/components/codeblock';
 import { CODE_BLOCK_TITLES } from '@/lib/code-titles';
@@ -6,6 +7,11 @@ interface CommandBlockProps {
   command: string;
   /** One line that truncates, for a card; the full command is still what the button copies. */
   compact?: boolean;
+}
+
+// Centred on the one line, where the block's own placement pins the button to the top corner.
+function CentredActions({ children }: Readonly<{ children?: ReactNode }>) {
+  return <div className="absolute inset-y-0 end-1.5 z-2 flex items-center text-fd-muted-foreground">{children}</div>;
 }
 
 /** One shell command in a copyable block: an MDX page has no highlighter to hand, so it is plain. */
@@ -29,10 +35,7 @@ export function CommandBlock({ command, compact = false }: Readonly<CommandBlock
     <CodeBlock
       className="my-0 rounded-lg bg-fd-secondary shadow-none"
       viewportProps={{ className: 'py-2 text-xs' }}
-      // Centred on the one line, where the block's own placement pins the button to the top corner.
-      Actions={({ children }) => (
-        <div className="absolute inset-y-0 end-1.5 z-2 flex items-center text-fd-muted-foreground">{children}</div>
-      )}
+      Actions={CentredActions}
     >
       <Pre className="w-full">
         <code>
