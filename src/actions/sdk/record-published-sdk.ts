@@ -57,8 +57,9 @@ export class RecordPublishedSdkAction {
       this.prompts.noSourceRepository(language);
     }
 
+    const packageSettings = publishingProfile.getPackageSettingsStateForLanguage(language);
     const written = await config.merge(RECORDED_BLOCKS, (document) =>
-      document.with('languages', withLanguage(languagesOf(document), language, entry))
+      document.with('languages', withLanguage(languagesOf(document), language, entry, packageSettings))
     );
     if (written.isErr()) {
       switch (written.error) {
