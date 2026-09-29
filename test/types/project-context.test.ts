@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import AdmZip from 'adm-zip';
 import { expect } from 'chai';
 import sinon from 'sinon';
 import { DirectoryPath } from '../../src/types/file/directoryPath';
@@ -97,6 +98,18 @@ describe('ProjectContext', () => {
       expect(fs.existsSync(zip.toString())).to.be.true;
       expect(fs.existsSync(inProject('temp', 'build', 'spec', 'openapi.json'))).to.be.true;
       expect(fs.existsSync(inProject('temp', 'build', 'package-settings', 'package.json'))).to.be.true;
+    });
+
+    it('zips what spec/ holds for validation, and nothing else of the source directory', async () => {
+      write('src/spec/openapi.yaml', 'openapi: 3.0.3');
+      write('src/spec/schemas/pet.yaml', 'type: object');
+      write('src/APIMATIC-BUILD.json', '{}');
+      fs.mkdirSync(inProject('temp'));
+
+      const zip = await project().specZip(new DirectoryPath(inProject('temp')));
+
+      const entries = new AdmZip(zip.toString()).getEntries().map((entry) => entry.entryName);
+      expect(entries).to.have.members(['openapi.yaml', 'schemas/pet.yaml']);
     });
   });
 

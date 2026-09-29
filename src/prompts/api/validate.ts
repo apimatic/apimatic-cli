@@ -5,8 +5,10 @@ import { Result } from 'neverthrow';
 import { ValidateApiResult, ValidationEntry, ValidationSummary } from '@apimatic/sdk';
 import { ServiceError } from '../../infrastructure/service-error.js';
 import { FilePath } from '../../types/file/filePath.js';
+import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { format as f } from '../format.js';
 import { withSpinner } from '../prompt.js';
+import { specPath } from '../portal/source.js';
 
 export class ApiValidatePrompts {
   public async validateApi<E>(fn: Promise<Result<ValidateApiResult, E>>) {
@@ -80,6 +82,13 @@ export class ApiValidatePrompts {
 
   logValidationError(error: string): void {
     log.error(error);
+  }
+
+  public noSpecInProject(sourceDirectory: DirectoryPath): void {
+    log.error(
+      `No API specification found in ${specPath(sourceDirectory)}. Add yours there, point ${f.flag('input')} ` +
+        `at the directory that holds ${f.var('src')}, or give a spec with ${f.flag('file')} or ${f.flag('url')}.`
+    );
   }
 
   public networkError(serviceError: ServiceError): void {

@@ -48,6 +48,10 @@ export class ProjectContext {
     return new FilePath(this.projectDirectory, new FileName(GITIGNORE));
   }
 
+  private get specDirectory(): DirectoryPath {
+    return this.source.join(SPEC_DIRECTORY_NAME);
+  }
+
   public sourceDirectory(): DirectoryPath {
     return this.source;
   }
@@ -82,7 +86,11 @@ export class ProjectContext {
   }
 
   public async specsExist(): Promise<boolean> {
-    return await new SpecContext(this.source.join(SPEC_DIRECTORY_NAME)).validate();
+    return await new SpecContext(this.specDirectory).validate();
+  }
+
+  public async specZip(tempDirectory: DirectoryPath): Promise<FilePath> {
+    return await new TempContext(tempDirectory).zip(this.specDirectory);
   }
 
   public async buildZip(tempDirectory: DirectoryPath, packageSettingsDirectory?: DirectoryPath): Promise<FilePath> {
