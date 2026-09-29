@@ -58,6 +58,21 @@ describe('PortalDevServerService', () => {
     await server.stop();
   });
 
+  // Vite serves a portal mounted under a path at the trailing slash and 404s the address
+  // without it, so dropping the slash would advertise -- and `--open` would open -- a 404.
+  it('keeps the trailing slash of an address that carries a path', async () => {
+    const binary = script(
+      serving(`response.end('page');`, `  Local:   http://127.0.0.1:${port}/docs/`)
+    );
+
+    const started = await start(binary);
+
+    expect(started.isOk(), JSON.stringify(started.isErr() ? started.error : '')).to.be.true;
+    const server = started._unsafeUnwrap();
+    expect(server.url.toString()).to.equal(`http://127.0.0.1:${port}/docs/`);
+    await server.stop();
+  });
+
   it('reports the server started only once it has answered its first page', async () => {
     const binary = script(serving(`require('fs').writeFileSync('answered', ''); response.end('page');`));
 

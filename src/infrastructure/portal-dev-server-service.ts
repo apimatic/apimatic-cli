@@ -21,7 +21,17 @@ const OUTPUT_TAIL_BYTES = 64 * 1024;
 const DRAIN_TIMEOUT_MS = 2000;
 
 // Read after Vite's colour codes are stripped but not the line end, which proves the URL arrived whole.
-const LOCAL_URL_PATTERN = /Local:\s*(https?:\/\/\S+?)\/?[ \t]*[\r\n]/i;
+const LOCAL_URL_PATTERN = /Local:\s*(https?:\/\/\S+?)[ \t]*[\r\n]/i;
+
+/**
+ * Vite prints its address with a trailing slash. A portal mounted under a path answers at that
+ * slash and nowhere else -- `/docs/` is the site, `/docs` is a 404 -- so the slash is dropped
+ * only from a bare origin, which has no path to lose.
+ */
+function servedUrl(printed: string): UrlPath {
+  const parsed = new URL(printed);
+  return new UrlPath(parsed.pathname === '/' ? parsed.origin : printed);
+}
 
 export interface PortalDevServer {
   url: UrlPath;
@@ -142,7 +152,7 @@ export class PortalDevServerService {
         log += stripVTControlCharacters(chunk.toString());
         const match = LOCAL_URL_PATTERN.exec(log);
         if (match) {
-          settle(ok(new UrlPath(match[1])));
+          settle(ok(servedUrl(match[1])));
         }
       };
 
