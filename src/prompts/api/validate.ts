@@ -1,14 +1,14 @@
 import { log } from '@clack/prompts';
 import { replaceHTML } from '../../utils/utils.js';
+import { listedInProse } from '../../utils/string-utils.js';
 import { ValidationMessages } from '../../types/utils.js';
 import { Result } from 'neverthrow';
 import { ValidateApiResult, ValidationEntry, ValidationSummary } from '@apimatic/sdk';
 import { ServiceError } from '../../infrastructure/service-error.js';
 import { FilePath } from '../../types/file/filePath.js';
-import { DirectoryPath } from '../../types/file/directoryPath.js';
+import { SpecZipProblem } from '../../types/project-context.js';
 import { format as f } from '../format.js';
 import { withSpinner } from '../prompt.js';
-import { specPath } from '../portal/source.js';
 
 export class ApiValidatePrompts {
   public async validateApi<E>(fn: Promise<Result<ValidateApiResult, E>>) {
@@ -84,16 +84,36 @@ export class ApiValidatePrompts {
     log.error(error);
   }
 
-  public noSpecInProject(sourceDirectory: DirectoryPath): void {
-    log.error(
-      `No API specification found in ${specPath(sourceDirectory)}. Add yours there, point ${f.flag('input')} ` +
-        `at the directory that holds ${f.var('src')}, or give a spec with ${f.flag('file')} or ${f.flag('url')}.`
-    );
-  }
-
-  public networkError(serviceError: ServiceError): void {
-    const message = serviceError.errorMessage;
-    log.error(message);
+  public specUnavailable(problem: ServiceError | SpecZipProblem): void {
+    if (problem instanceof ServiceError) {
+      log.error(problem.errorMessage);
+      return;
+    }
+    switch (problem.kind) {
+      case 'noSpec': {
+        const message =
+          `No API specification found in ${f.path(problem.specDirectory)}. Add yours there, point ` +
+          `${f.flag('input')} at the directory that holds ${f.var('src')}, or give a spec with ` +
+          `${f.flag('file')} or ${f.flag('url')}.`;
+        log.error(message);
+        return;
+      }
+      case 'unreadable': {
+        log.error(`${f.path(problem.specDirectory)} could not be read: ${problem.reason}`);
+        return;
+      }
+      case 'symlinks': {
+        const names = listedInProse(
+          problem.symlinks.map((symlink) => f.var(symlink.relativeTo(problem.specDirectory)))
+        );
+        const one = problem.symlinks.length === 1;
+        const message =
+          `${names} in ${f.path(problem.specDirectory)} ${one ? 'is a symlink' : 'are symlinks'}, which cannot ` +
+          `be uploaded for validation. Replace ${one ? 'it' : 'each'} with a copy of the files it points to.`;
+        log.error(message);
+        return;
+      }
+    }
   }
 
   public transformedApiSaved(filePath: FilePath): void {

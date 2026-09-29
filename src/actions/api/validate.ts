@@ -6,11 +6,9 @@ import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { ResourceInput } from '../../types/file/resource-input.js';
 import { withDirPath } from '../../infrastructure/tmp-extensions.js';
 import { ResourceContext } from '../../types/resource-context.js';
-import { ProjectContext } from '../../types/project-context.js';
-import { FilePath } from '../../types/file/filePath.js';
 import { ValidationSummary } from '@apimatic/sdk';
 
-/** `unchecked`: the spec could not be found or fetched, or the validation service did not answer, so nothing is known of it. */
+/** `unchecked`: the spec never reached the validation service, or the service did not answer, so nothing is known of it. */
 export type SpecCheck = 'valid' | 'invalid' | 'unchecked';
 
 export class ValidateAction {
@@ -27,7 +25,7 @@ export class ValidateAction {
 
   /** `onChecked` hears what the validation found, which the `ActionResult` alone cannot tell apart. */
   public readonly execute = async (
-    spec: ResourceInput | ProjectContext,
+    spec: ResourceInput,
     displayValidationSummary = true,
     onChecked?: (check: SpecCheck) => void
   ): Promise<ActionResult> => {
@@ -36,18 +34,16 @@ export class ValidateAction {
     return check === 'valid' ? ActionResult.success() : ActionResult.failed();
   };
 
-  private readonly check = async (
-    spec: ResourceInput | ProjectContext,
-    displayValidationSummary: boolean
-  ): Promise<SpecCheck> => {
+  private readonly check = async (spec: ResourceInput, displayValidationSummary: boolean): Promise<SpecCheck> => {
     return await withDirPath(async (tempDirectory) => {
-      const specFile = await this.stage(spec, tempDirectory);
-      if (specFile === null) {
+      const specFile = await new ResourceContext(tempDirectory).resolveTo(spec);
+      if (specFile.isErr()) {
+        this.prompts.specUnavailable(specFile.error);
         return 'unchecked';
       }
       const validationSummaryResult = await this.prompts.validateApi(
         this.validationService.validateViaFile({
-          file: specFile,
+          file: specFile.value,
           commandMetadata: this.commandMetadata,
           authKey: this.authKey
         })
@@ -68,26 +64,6 @@ export class ValidateAction {
       }
       return validation.isSuccess && linting.isSuccess ? 'valid' : 'invalid';
     });
-  };
-
-  // A project's specs are zipped whole, so a document split across files keeps the files it references.
-  private readonly stage = async (
-    spec: ResourceInput | ProjectContext,
-    tempDirectory: DirectoryPath
-  ): Promise<FilePath | null> => {
-    if (spec instanceof ProjectContext) {
-      if (!(await spec.specsExist())) {
-        this.prompts.noSpecInProject(spec.sourceDirectory());
-        return null;
-      }
-      return await spec.specZip(tempDirectory);
-    }
-    const specFile = await new ResourceContext(tempDirectory).resolveTo(spec);
-    if (specFile.isErr()) {
-      this.prompts.networkError(specFile.error);
-      return null;
-    }
-    return specFile.value;
   };
 
   private hasValidationIssues(summary: ValidationSummary): boolean {

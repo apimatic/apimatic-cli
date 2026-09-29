@@ -5,7 +5,6 @@ import { ValidateAction } from '../../actions/api/validate.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { format, intro, outro } from '../../prompts/format.js';
 import { createResourceInput } from '../../types/file/resource-input.js';
-import { ProjectContext } from '../../types/project-context.js';
 
 export default class Validate extends Command {
   static readonly summary = 'Validate API specification for syntactic and semantic correctness';
@@ -36,7 +35,7 @@ export default class Validate extends Command {
       flags: { file, url, input, 'auth-key': authKey }
     } = await this.parse(Validate);
 
-    const spec = file === undefined && url === undefined ? ProjectContext.at(input) : createResourceInput(file, url);
+    const spec = createResourceInput(file, url, input);
 
     const commandMetadata: CommandMetadata = {
       commandName: Validate.id,

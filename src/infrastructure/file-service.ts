@@ -4,11 +4,13 @@ import fsExtra from 'fs-extra';
 import * as path from 'node:path';
 import { pipeline } from 'node:stream';
 import { promisify } from 'node:util';
+import { err, ok, Result } from 'neverthrow';
 import { FilePath } from '../types/file/filePath.js';
 import { DirectoryPath } from '../types/file/directoryPath.js';
 import { Directory, DirectoryItem } from '../types/file/directory.js';
 import { FileName } from '../types/file/fileName.js';
 import { sleep } from './timer-extensions.js';
+import { errorMessage } from '../utils/error-utils.js';
 
 /** `stat` follows a link, so a link to nothing fails as though the entry were not there. */
 function isDanglingLink(error: unknown): boolean {
@@ -71,6 +73,28 @@ export class FileService {
     } catch (error) {
       return error instanceof Error && 'code' in error && error.code === 'ENOENT';
     }
+  }
+
+  public async findSymlinks(dir: DirectoryPath): Promise<Result<FilePath[], string>> {
+    try {
+      return ok(await this.symlinksUnder(dir));
+    } catch (error) {
+      return err(errorMessage(error));
+    }
+  }
+
+  private async symlinksUnder(dir: DirectoryPath): Promise<FilePath[]> {
+    const symlinks: FilePath[] = [];
+    for (const name of await fsExtra.readdir(dir.toString())) {
+      const entry = new FilePath(dir, new FileName(name));
+      const stat = await fsExtra.lstat(entry.toString());
+      if (stat.isSymbolicLink()) {
+        symlinks.push(entry);
+      } else if (stat.isDirectory()) {
+        symlinks.push(...(await this.symlinksUnder(dir.join(name))));
+      }
+    }
+    return symlinks;
   }
 
   public async cleanDirectory(dir: DirectoryPath): Promise<void> {

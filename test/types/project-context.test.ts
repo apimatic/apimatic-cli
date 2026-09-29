@@ -100,16 +100,58 @@ describe('ProjectContext', () => {
       expect(fs.existsSync(inProject('temp', 'build', 'package-settings', 'package.json'))).to.be.true;
     });
 
-    it('zips what spec/ holds for validation, and nothing else of the source directory', async () => {
+    it('zips all of spec/ for validation, so a spec split across files keeps the ones it references', async () => {
       write('src/spec/openapi.yaml', 'openapi: 3.0.3');
       write('src/spec/schemas/pet.yaml', 'type: object');
       write('src/APIMATIC-BUILD.json', '{}');
       fs.mkdirSync(inProject('temp'));
 
-      const zip = await project().specZip(new DirectoryPath(inProject('temp')));
+      const zip = (await project().specZip(new DirectoryPath(inProject('temp'))))._unsafeUnwrap();
 
       const entries = new AdmZip(zip.toString()).getEntries().map((entry) => entry.entryName);
       expect(entries).to.have.members(['openapi.yaml', 'schemas/pet.yaml']);
+    });
+
+    it('zips nothing when spec/ is empty, and names the directory it looked in', async () => {
+      fs.mkdirSync(inProject('src', 'spec'), { recursive: true });
+      fs.mkdirSync(inProject('temp'));
+
+      const problem = (await project().specZip(new DirectoryPath(inProject('temp'))))._unsafeUnwrapErr();
+
+      expect(problem.kind).to.equal('noSpec');
+      expect(problem.kind === 'noSpec' && problem.specDirectory.toString()).to.equal(inProject('src', 'spec'));
+      expect(fs.readdirSync(inProject('temp'))).to.be.empty;
+    });
+
+    it('zips nothing when spec/ cannot be read, and says why', async () => {
+      write('src/spec', 'a file where the directory should be');
+      fs.mkdirSync(inProject('temp'));
+
+      const problem = (await project().specZip(new DirectoryPath(inProject('temp'))))._unsafeUnwrapErr();
+
+      expect(problem.kind).to.equal('unreadable');
+      expect(problem.kind === 'unreadable' && problem.specDirectory.toString()).to.equal(inProject('src', 'spec'));
+      expect(problem.kind === 'unreadable' && problem.reason).to.contain('ENOTDIR');
+      expect(fs.readdirSync(inProject('temp'))).to.be.empty;
+    });
+
+    it('zips nothing when spec/ holds symlinks at any depth, and names every one', async () => {
+      write('src/spec/openapi.yaml', 'openapi: 3.0.3');
+      write('shared/pet.yaml', 'type: object');
+      fs.mkdirSync(inProject('src', 'spec', 'schemas'));
+      const symlinks = [inProject('src', 'spec', 'common'), inProject('src', 'spec', 'schemas', 'shared')];
+      for (const symlink of symlinks) {
+        fs.symlinkSync(inProject('shared'), symlink, process.platform === 'win32' ? 'junction' : 'dir');
+      }
+      fs.mkdirSync(inProject('temp'));
+
+      const problem = (await project().specZip(new DirectoryPath(inProject('temp'))))._unsafeUnwrapErr();
+
+      expect(problem.kind).to.equal('symlinks');
+      expect(problem.kind === 'symlinks' && problem.symlinks.map((symlink) => symlink.toString())).to.have.members(
+        symlinks
+      );
+      expect(fs.readdirSync(inProject('temp'))).to.be.empty;
     });
   });
 

@@ -38,7 +38,7 @@ Let's get started!`);
   }
 
   /** `defaultSpecUrl` is null once the sample has failed to download; it is not offered again. */
-  public async specPathPrompt(defaultSpecUrl: UrlPath | null): Promise<ResourceInput | undefined> {
+  public async specPathPrompt(defaultSpecUrl: UrlPath | null): Promise<FilePath | UrlPath | undefined> {
     const spec = await text({
       message: `Provide a local path or a public URL for your OpenAPI Definition file:`,
       placeholder: defaultSpecUrl

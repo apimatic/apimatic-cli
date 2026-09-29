@@ -1,14 +1,15 @@
-import { DirectoryPath } from "../../types/file/directoryPath.js";
-import { ActionResult } from "../action-result.js";
-import { ApiTransformPrompts } from "../../prompts/api/transform.js";
-import { withDirPath } from "../../infrastructure/tmp-extensions.js";
-import { TransformationService } from "../../infrastructure/services/transformation-service.js";
-import { ExportFormats } from "@apimatic/sdk";
-import { ApiValidatePrompts } from "../../prompts/api/validate.js";
-import { CommandMetadata } from "../../types/common/command-metadata.js";
-import { TransformContext } from "../../types/transform-context.js";
-import { ResourceInput } from "../../types/file/resource-input.js";
-import { ResourceContext } from "../../types/resource-context.js";
+import { DirectoryPath } from '../../types/file/directoryPath.js';
+import { ActionResult } from '../action-result.js';
+import { ApiTransformPrompts } from '../../prompts/api/transform.js';
+import { withDirPath } from '../../infrastructure/tmp-extensions.js';
+import { TransformationService } from '../../infrastructure/services/transformation-service.js';
+import { ExportFormats } from '@apimatic/sdk';
+import { ApiValidatePrompts } from '../../prompts/api/validate.js';
+import { CommandMetadata } from '../../types/common/command-metadata.js';
+import { TransformContext } from '../../types/transform-context.js';
+import { FilePath } from '../../types/file/filePath.js';
+import { UrlPath } from '../../types/file/urlPath.js';
+import { ResourceContext } from '../../types/resource-context.js';
 
 export class TransformAction {
   private readonly prompts: ApiTransformPrompts = new ApiTransformPrompts();
@@ -25,7 +26,7 @@ export class TransformAction {
   }
 
   public readonly execute = async (
-    resourcePath: ResourceInput,
+    resourcePath: FilePath | UrlPath,
     format: ExportFormats,
     destination: DirectoryPath,
     force: boolean

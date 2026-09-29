@@ -23,6 +23,11 @@ export type GitignoreFailure = 'unreadable' | 'unwritable';
 
 export type VersionProblem = 'noVersions' | 'versionNotFound';
 
+export type SpecZipProblem =
+  | { kind: 'noSpec'; specDirectory: DirectoryPath }
+  | { kind: 'unreadable'; specDirectory: DirectoryPath; reason: string }
+  | { kind: 'symlinks'; specDirectory: DirectoryPath; symlinks: FilePath[] };
+
 export class ProjectContext {
   private readonly fileService = new FileService();
 
@@ -89,8 +94,18 @@ export class ProjectContext {
     return await new SpecContext(this.specDirectory).validate();
   }
 
-  public async specZip(tempDirectory: DirectoryPath): Promise<FilePath> {
-    return await new TempContext(tempDirectory).zip(this.specDirectory);
+  public async specZip(tempDirectory: DirectoryPath): Promise<Result<FilePath, SpecZipProblem>> {
+    if (!(await this.specsExist())) {
+      return err({ kind: 'noSpec', specDirectory: this.specDirectory });
+    }
+    const symlinks = await this.fileService.findSymlinks(this.specDirectory);
+    if (symlinks.isErr()) {
+      return err({ kind: 'unreadable', specDirectory: this.specDirectory, reason: symlinks.error });
+    }
+    if (symlinks.value.length > 0) {
+      return err({ kind: 'symlinks', specDirectory: this.specDirectory, symlinks: symlinks.value });
+    }
+    return ok(await new TempContext(tempDirectory).zip(this.specDirectory));
   }
 
   public async buildZip(tempDirectory: DirectoryPath, packageSettingsDirectory?: DirectoryPath): Promise<FilePath> {

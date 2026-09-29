@@ -4,7 +4,7 @@ import { FlagsProvider } from '../../types/flags-provider.js';
 import { TransformAction } from '../../actions/api/transform.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { format, intro, outro } from '../../prompts/format.js';
-import { createResourceInput } from '../../types/file/resource-input.js';
+import { createFileOrUrlInput } from '../../types/file/resource-input.js';
 import { TransformationFormats } from '../../types/api/transform.js';
 import { TRANSFORMATIONS_DIRECTORY_NAME } from '../../types/transform-context.js';
 import { ExportFormats } from '@apimatic/sdk';
@@ -56,7 +56,7 @@ Supports multiple formats including OpenAPI/Swagger, RAML, WSDL, and Postman Col
 
     const workingDirectory = DirectoryPath.createInput(destination);
     const transformedApiDirectory = workingDirectory.join(TRANSFORMATIONS_DIRECTORY_NAME);
-    const specFile = createResourceInput(file, url);
+    const specFile = createFileOrUrlInput(file, url);
     // Directly map the format flag to ExportFormats using TransformationFormats
     const key = format as keyof typeof TransformationFormats;
     const transformationFormat = TransformationFormats[key] as keyof typeof ExportFormats;

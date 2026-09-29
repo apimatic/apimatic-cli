@@ -1,19 +1,8 @@
 import { expect } from 'chai';
-import { Parser } from '@oclif/core';
 import ApiValidate from '../../../src/commands/api/validate.js';
+import { flagParser } from '../flag-parser.js';
 
-const parse = (argv: string[]) => Parser.parse(argv, { flags: ApiValidate.flags as never, strict: true } as never);
-
-const rejects = async (argv: string[]): Promise<Error> => {
-  let thrown: unknown;
-  try {
-    await parse(argv);
-  } catch (error) {
-    thrown = error;
-  }
-  expect(thrown, `expected ${argv.join(' ')} to be rejected`).to.be.an('error');
-  return thrown as Error;
-};
+const { rejects } = flagParser(ApiValidate);
 
 describe('api validate flags', () => {
   it('takes the specification from one place only: a file, a URL, or a project directory', async () => {
