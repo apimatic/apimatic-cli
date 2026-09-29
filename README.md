@@ -48,12 +48,23 @@ Documentation portals are now built on your machine from a `src/` directory, and
 - Page order comes from a `nav.json` beside your pages, listing them by file name, and a
   `title` there names the folder it sits in. A folder links to its `index.md`; without one it
   is only a heading.
-- The top level of the portal is shown as tabs, which `src/content/nav.json` decides. Home
-  comes first and holds `index.md`, every other page at the top level and the folders the
-  file does not list, in the file's order, and opens on `index.md`; the file's `title` names
-  it. Each folder the file lists becomes a tab of its own after Home, in the file's order,
-  and so do the tabs the CLI makes, placed with `apimatic:sdks`, `apimatic:plugin` and
-  `apimatic:api`.
+- The top level of the portal is shown as tabs, which `src/content/nav.json` decides with two
+  lists. `tabs` names the tabs after Home, in order: a folder directly under `src/content/`,
+  and the sections the CLI makes, placed with `apimatic:sdks`, `apimatic:plugin` and
+  `apimatic:api`. Home comes first, opens on `index.md`, and holds every page at the top level
+  and every folder `tabs` does not name; its `pages` orders that sidebar as any other
+  `nav.json` orders its folder, and the file's `title` names it. A token in `pages` places its
+  section inside Home instead of in a tab of its own, at the same address; a section named in
+  neither list is a tab before the API reference. With every section in Home there is no tab
+  bar. A root file from 2.0.0-beta.1, which made a tab of each folder and token in `pages`, is
+  refused until it says which list they belong in.
+  ```json
+  {
+    "title": "Overview",
+    "tabs": ["tutorials", "apimatic:sdks", "apimatic:api"],
+    "pages": ["index", "authentication", "guides", "apimatic:plugin", "..."]
+  }
+  ```
 - The SDKs tab lists a card per language in the `languages` block, offering its download and,
   once `sdk publish` records a release, its install command, source repository and package, and
   gives each language a page carrying its SDK's getting-started docs. The Context Plugin tab,

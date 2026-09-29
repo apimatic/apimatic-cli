@@ -611,3 +611,122 @@ const stylesheetOf = (output: DirectoryPath) => {
     expect(read('api/pets/pets/uploadPetPhoto/index.html')).to.contain('id="request-body"');
   });
 });
+
+/**
+ * A third portal, whose root `nav.json` places the API reference and both generated sections
+ * in Home with `pages`, and names no tab. Home is then the only tab, so the header shows no tab
+ * bar, and each section is a folder in Home's sidebar served where it always is. Built from the
+ * default fixture's specification with a `plugin` block, so every section the CLI generates is
+ * placed.
+ */
+(enabled ? describe : describe.skip)('portal build, every section in Home (end to end)', function () {
+  this.timeout(10 * 60 * 1000);
+
+  let built: BuiltPortal | undefined;
+  let output: DirectoryPath;
+
+  before(async () => {
+    built = await buildFixture('sections-in-home', { plugin: true });
+    ({ output } = built);
+  });
+
+  after(async () => {
+    await removeBuilt(built);
+  });
+
+  const read = (relative: string) => fs.readFileSync(path.join(output.toString(), relative), 'utf8');
+  const exists = (relative: string) => fs.existsSync(path.join(output.toString(), relative));
+
+  interface TreeNode {
+    $id?: string;
+    name?: unknown;
+    children?: TreeNode[];
+  }
+
+  /** The top-level nodes of the prerendered sidebar tree: the array holding the Home tab. */
+  const rootNodes = (): TreeNode[] => {
+    const cache = path.join(output.toString(), '__tsr/staticServerFnCache');
+    const carrying = fs
+      .readdirSync(cache)
+      .map((name) => fs.readFileSync(path.join(cache, name), 'utf8'))
+      .find((text) => text.includes('"pageTree"'));
+    expect(carrying, 'no page tree').to.not.be.undefined;
+
+    // The entry is seroval's encoding, as the start plugin writes it: an object is `{t:10,p:{k,v}}`
+    // with keys and values in step, an array `{t:9,a}`, a string `{t:1,s}`; anything else here
+    // is a constant the walk does not need.
+    const decode = (value: unknown): unknown => {
+      if (typeof value !== 'object' || value === null) return value;
+      const node = value as { t?: number; s?: unknown; a?: unknown[]; p?: { k: string[]; v: unknown[] } };
+      if (node.t === 1) return node.s;
+      if (node.t === 9) return (node.a ?? []).map(decode);
+      if (node.t === 10 && node.p !== undefined) {
+        return Object.fromEntries(node.p.k.map((key, index) => [key, decode(node.p?.v[index])]));
+      }
+      // A constant or a back-reference, which the walk does not need; or the plain wrapper around the root.
+      if (typeof node.t === 'number') return undefined;
+      return Object.fromEntries(Object.entries(node).map(([key, item]) => [key, decode(item)]));
+    };
+
+    const holdingHome = (value: unknown): TreeNode[] | undefined => {
+      if (Array.isArray(value)) {
+        if (value.some((item) => (item as TreeNode)?.$id === '/tab/home')) return value as TreeNode[];
+        for (const item of value) {
+          const found = holdingHome(item);
+          if (found !== undefined) return found;
+        }
+      } else if (typeof value === 'object' && value !== null) {
+        for (const item of Object.values(value)) {
+          const found = holdingHome(item);
+          if (found !== undefined) return found;
+        }
+      }
+      return undefined;
+    };
+    const found = holdingHome(decode(JSON.parse(carrying ?? '')));
+    expect(found, 'no Home tab in the tree').to.not.be.undefined;
+    return found ?? [];
+  };
+
+  const names = (nodes: TreeNode[]) => nodes.map((node) => (typeof node.name === 'string' ? node.name : '?'));
+
+  // The sections keep the CLI's order among the user's pages, and the reference keeps its title.
+  it('lists the API reference and each generated section in Home’s sidebar, where pages names them', () => {
+    const roots = rootNodes();
+    const home = roots[0];
+
+    expect(roots.map((node) => node.$id)).to.deep.equal(['/tab/home']);
+    expect(names(home.children ?? [])).to.deep.equal([
+      'Welcome',
+      'API Reference',
+      'Developer Guides',
+      'SDKs',
+      'Authentication',
+      'Context Plugin'
+    ]);
+    // The single specification is lifted away inside Home as it is in a tab of its own.
+    const reference = home.children?.find((node) => node.name === 'API Reference');
+    expect(names(reference?.children ?? [])).to.deep.equal(['Simple Calculator']);
+  });
+
+  it('serves each section where it always is, whatever the sidebar says', () => {
+    expect(exists('api/apimatic-calculator/simple-calculator/Calculate/index.html')).to.be.true;
+    expect(exists('sdks/index.html')).to.be.true;
+    expect(exists('sdks/typescript/index.html')).to.be.true;
+    expect(exists('context-plugin/index.html')).to.be.true;
+  });
+
+  // A switcher with one choice switches nothing, so the header carries none; the other builds
+  // prove the same markup is there whenever there is more than one tab.
+  it('renders no tab bar over Home alone', () => {
+    const page = read('index.html');
+    const tab = (href: string, name: string) =>
+      page.search(new RegExp(`href="${href}"[^>]*><span[^>]*>${name}</span></a>`));
+
+    expect(page).to.contain('Every section sits in Home.');
+    expect(tab('/', 'Docs')).to.equal(-1);
+    expect(tab('/sdks', 'SDKs')).to.equal(-1);
+    expect(tab('/context-plugin', 'Context Plugin')).to.equal(-1);
+    expect(tab('/api/[^"]+', 'API Reference')).to.equal(-1);
+  });
+});
