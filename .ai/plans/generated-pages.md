@@ -24,6 +24,12 @@ it, not through `"root": true`, which is gone (`.ai/plans/portal-config.md`
 section 5). Where this plan compares a generated folder with a `root: true`
 folder, read "a folder the root `nav.json` lists".
 
+**Amended 2026-09-29**, proposed (`.ai/plans/portal-config.md` sections 5 and
+16): a generated folder is a tab unless the root `nav.json`'s `pages` names its
+token, which places it in Home's sidebar instead; its address does not move.
+Where this plan says each generated folder at the root becomes a tab, read "by
+default".
+
 ## 1. Goal and scope
 
 Three kinds of page the CLI generates and injects into the portal, none of which
