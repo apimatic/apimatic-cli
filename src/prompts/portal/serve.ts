@@ -47,18 +47,16 @@ export class PortalServePrompts {
     log.message(`The portal is running at ${f.link(url.toString())}`);
     noteWrapped(
       [
-        `Edits to the Markdown pages in ${contentPath(sourceDirectory)}, to the order, tabs and titles in a ` +
-          `${f.var(NAVIGATION_FILE_NAME)}, and to the ${f.var('portal')} block of ` +
-          `${f.var(APIMATIC_CONFIG_FILE_NAME)} appear in the browser automatically, and so does a language ` +
-          `removed from its ${f.var('languages')} block, which updates the SDK pages, or its ${f.var('plugin')} ` +
-          `block removed, which removes the Context Plugin tab. A mistake in ${f.var(APIMATIC_CONFIG_FILE_NAME)}, ` +
-          `a page or a ${f.var(NAVIGATION_FILE_NAME)} is reported when you save it, and the preview keeps what it ` +
-          `last accepted.`,
+        `Saving a Markdown page in ${contentPath(sourceDirectory)}, a ${f.var(NAVIGATION_FILE_NAME)} ` +
+          `(order, tabs, titles) or the ${f.var('portal')} block of ${f.var(APIMATIC_CONFIG_FILE_NAME)} ` +
+          `updates the preview.`,
+        `So does removing a language from ${f.var('languages')} (updates the SDK pages) or the ` +
+          `${f.var('plugin')} block (removes the Context Plugin tab).`,
+        'Mistakes in these files are reported on save, and the preview keeps what it last accepted.',
         '',
-        `Adding a language or a ${f.var('plugin')} block, whose SDK or plugin is fetched when the preview ` +
-          `starts, adding or removing a page in ${contentPath(sourceDirectory)}, creating ` +
-          `${staticPath(sourceDirectory)}, or changing which documents are in ${specPath(sourceDirectory)} ` +
-          `needs the preview restarted.`,
+        `Restart the preview after adding a language or a ${f.var('plugin')} block (its SDK or plugin is ` +
+          `fetched at startup), adding or removing a page, creating ${staticPath(sourceDirectory)}, or ` +
+          `changing which documents are in ${specPath(sourceDirectory)}.`,
         '',
         'Press CTRL+C to stop the server.'
       ].join('\n'),

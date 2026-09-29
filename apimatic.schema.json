@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://cdn.jsdelivr.net/npm/@apimatic/cli@2/apimatic.schema.json",
+  "$id": "https://cdn.jsdelivr.net/npm/@apimatic/cli@beta/apimatic.schema.json",
   "title": "apimatic.json",
   "description": "The APIMatic CLI's project file, src/apimatic.json: the documentation portal, the context plugin's identity, and the project's SDK languages.",
   "type": "object",

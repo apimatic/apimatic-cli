@@ -142,7 +142,7 @@ Rejected, with reasons:
 
 ```json
 {
-  "$schema": "https://cdn.jsdelivr.net/npm/@apimatic/cli@2/apimatic.schema.json",
+  "$schema": "https://cdn.jsdelivr.net/npm/@apimatic/cli@beta/apimatic.schema.json",
   "schemaVersion": 1,
   "portal": {
     "site": {
@@ -578,13 +578,12 @@ Following `.ai/instructions.md` and the skills in `.ai/skills/`.
   `codegenVersion` as no mismatch. *(Superseded: `codegenVersion` and its
   check have both since left; the field is no longer typed in the schema.)* `languages` is optional in the schema: the "at least one"
   rule is the portal command's, and a file `sdk publish` alone created is
-  valid. The `$schema` URL
-  is `https://cdn.jsdelivr.net/npm/@apimatic/cli@2/apimatic.schema.json`.
+  valid. The `$schema` URL, and the schema's `$id`,
+  is `https://cdn.jsdelivr.net/npm/@apimatic/cli@beta/apimatic.schema.json`.
   *As reviewed:* jsDelivr resolves a major range to its newest stable release
-  and never to a prerelease, so `@2` leads nowhere until 2.0.0 ships. A
-  prerelease scaffold names its own version instead
-  (`@apimatic/cli@2.0.0-beta.3/…`), which jsDelivr serves exactly
-  (`schemaUrlFor`, decided 2026-09-23). The schema's `$id` stays `@2`.
+  and never to a prerelease, so `@2` leads nowhere until 2.0.0 ships. The
+  `beta` dist-tag reaches the newest prerelease, so every scaffold names it
+  (decided 2026-09-29, replacing the per-version `schemaUrlFor` of 2026-09-23).
 - **Prompts.** New source problems: a missing dark logo or favicon named with
   its key; `site.name` required for several specs; the languages errors; the
   serve watcher's re-applied and rejected messages.
