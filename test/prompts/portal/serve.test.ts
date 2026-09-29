@@ -12,7 +12,7 @@ describe('PortalServePrompts', () => {
     sinon.restore();
   });
 
-  // The note's first paragraph is wider than any terminal, so it is printed through
+  // The note's first line is wider than the test's 80 columns, so it is printed through
   // `log.message`, which is what this reads.
   describe('the live preview note', () => {
     const printed = () => {
@@ -31,23 +31,22 @@ describe('PortalServePrompts', () => {
     };
 
     it('says a language or the plugin block removed from apimatic.json follows without a restart', () => {
-      const note = printed();
-
-      expect(note).to.contain("and so does a language removed from its 'languages' block, which updates the SDK pages");
-      expect(note).to.contain("its 'plugin' block removed, which removes the Context Plugin tab");
+      expect(printed()).to.contain(
+        "So does removing a language from 'languages' (updates the SDK pages) or the 'plugin' block " +
+          '(removes the Context Plugin tab).'
+      );
     });
 
     // The artifacts are fetched once, so what they would have to carry anew waits for a restart.
     it('says which additions need the preview restarted', () => {
       expect(printed()).to.match(
-        /Adding a language or a 'plugin' block, whose SDK or plugin is fetched when the preview starts, adding or removing a page in '.*content', creating .* needs the preview restarted\./
+        /Restart the preview after adding a language or a 'plugin' block \(its SDK or plugin is fetched at startup\), adding or removing a page, creating '.*static', or changing which documents are in '.*spec'\./
       );
     });
 
     it('says a mistake in a page or a nav.json is reported when it is saved, and kept from the preview', () => {
       expect(printed()).to.contain(
-        "A mistake in 'apimatic.json', a page or a 'nav.json' is reported when you save it, and the preview " +
-          'keeps what it last accepted.'
+        'Mistakes in these files are reported on save, and the preview keeps what it last accepted.'
       );
     });
   });

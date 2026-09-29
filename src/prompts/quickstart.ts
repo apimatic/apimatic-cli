@@ -20,7 +20,6 @@ import { convertToOpenApi3 } from './portal/source.js';
 
 const vscodeExtensionUrl =
   'https://marketplace.visualstudio.com/items?itemName=apimatic-developers.apimatic-for-vscode';
-const referenceDocumentationUrl = 'https://docs.apimatic.io/cli-getting-started/advanced-portal-setup';
 
 export class QuickstartPrompts {
   public welcomeMessage() {
@@ -196,15 +195,10 @@ Let's get started!`);
   public nextSteps(configFile: FilePath): void {
     const message = [
       `Change the name, logo and colours in the ${f.var('portal')} block of ${f.path(configFile)}; ` +
-        `your editor completes and checks it. Set ${f.var('portal.site.url')} to the address you will ` +
-        `host the portal at, for canonical links and a sitemap.`,
-      '',
-      `Add Markdown pages under ${f.var('src/content')} and more OpenAPI documents under ` +
-        `${f.var('src/spec')}. The preview reloads as you edit.`,
-      '',
-      `Run ${f.cmdAlt('apimatic', 'portal', 'generate')} to produce static files you can host.`,
-      '',
-      f.link(referenceDocumentationUrl)
+        `your editor completes and checks it.`,
+      `Set ${f.var('portal.site.url')} to your hosting address for canonical links and a sitemap.`,
+      `Add Markdown pages under ${f.var('src/content')}; the preview reloads as you edit them.`,
+      `Run ${f.cmdAlt('apimatic', 'portal', 'generate')} to produce static files you can host.`
     ].join('\n');
     noteWrapped(message, 'Next Steps');
   }
