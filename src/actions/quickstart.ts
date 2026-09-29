@@ -6,7 +6,6 @@ import { QuickstartPrompts } from '../prompts/quickstart.js';
 import { DirectoryPath } from '../types/file/directoryPath.js';
 import { FilePath } from '../types/file/filePath.js';
 import { UrlPath } from '../types/file/urlPath.js';
-import { ResourceInput } from '../types/file/resource-input.js';
 import { LoginAction } from './auth/login.js';
 import { ActionResult } from './action-result.js';
 import { CommandMetadata } from '../types/common/command-metadata.js';
@@ -22,9 +21,6 @@ import { schemaUrlFor } from '../types/apimatic-config/document.js';
 import { PLACEHOLDER_METADATA } from '../types/plugin/plugin-config.js';
 import { ProjectContext } from '../types/project-context.js';
 import { DEFAULT_PORTAL_PORT, PortalServeAction } from './portal/serve.js';
-
-/** A URL's `file` is a download in a temporary directory, so only `source` says what the user gave. */
-type ImportedSpec = { file: FilePath; source: ResourceInput };
 
 export class QuickstartAction {
   private readonly prompts: QuickstartPrompts = new QuickstartPrompts();
@@ -92,7 +88,7 @@ export class QuickstartAction {
     tempDirectory: DirectoryPath
   ): Promise<ActionResult> {
     this.prompts.importSpecStepAdopted(project.sourceDirectory());
-    const validated = await this.validate({ file: specPath, source: specPath }, tempDirectory, true);
+    const validated = await this.validate(specPath, tempDirectory, true);
     if (validated.isErr()) {
       return validated.error;
     }
@@ -169,7 +165,7 @@ export class QuickstartAction {
     return result.isFailed() ? ActionResult.failed() : ActionResult.success();
   }
 
-  private async importSpec(tempDirectory: DirectoryPath): Promise<ImportedSpec | undefined> {
+  private async importSpec(tempDirectory: DirectoryPath): Promise<FilePath | undefined> {
     // Dropped once the CLI's own sample has failed: re-offering the address the user just
     // watched fail, pre-filled, is the one suggestion that cannot work.
     let sampleUrl: UrlPath | null = this.defaultSpecUrl;
@@ -189,12 +185,11 @@ export class QuickstartAction {
           }
           continue;
         }
-        const file = await new SpecContext(tempDirectory).save(downloaded.value.stream, downloaded.value.filename);
-        return { file, source: inputPath };
+        return await new SpecContext(tempDirectory).save(downloaded.value.stream, downloaded.value.filename);
       }
 
       if (await this.fileService.fileExists(inputPath)) {
-        return { file: inputPath, source: inputPath };
+        return inputPath;
       }
       this.prompts.specFileDoesNotExist();
     }
@@ -206,13 +201,13 @@ export class QuickstartAction {
    * portal would be built from, and nothing here moves the sample into it.
    */
   private async validate(
-    spec: ImportedSpec,
+    specPath: FilePath,
     tempDirectory: DirectoryPath,
     adopted: boolean
   ): Promise<Result<FilePath, ActionResult>> {
     this.prompts.validateSpecStep();
     let validation = 'unchecked' as SpecCheck;
-    await new ValidateAction(this.configDir, this.commandMetadata).execute(spec.file, false, (check) => {
+    await new ValidateAction(this.configDir, this.commandMetadata).execute(specPath, false, (check) => {
       validation = check;
     });
     // The service's own error is already on screen; the spec may be valid, so there is nothing to fix.
@@ -220,9 +215,9 @@ export class QuickstartAction {
       return err(ActionResult.failed());
     }
 
-    let checked = spec.file;
+    let checked = specPath;
     if (validation === 'invalid') {
-      this.prompts.specValidationFailed(spec.source);
+      this.prompts.specValidationFailed();
       if (adopted || !(await this.prompts.useDefaultSpecPrompt())) {
         this.prompts.fixYourSpec();
         return err(ActionResult.cancelled());

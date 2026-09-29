@@ -6,7 +6,7 @@ import { DirectoryPath } from '../types/file/directoryPath.js';
 import { FilePath } from '../types/file/filePath.js';
 import { ServiceError } from '../infrastructure/service-error.js';
 import { Directory } from '../types/file/directory.js';
-import { createResourceInputFromInput, ResourceInput } from '../types/file/resource-input.js';
+import { createResourceInputFromInput } from '../types/file/resource-input.js';
 import { FileDownloadResponse } from '../infrastructure/services/file-download-service.js';
 import { PortalAuthorizationFailure } from '../infrastructure/services/portal-authorization-service.js';
 import { APIMATIC_CONFIG_FILE_NAME } from '../types/apimatic-config/document.js';
@@ -110,14 +110,11 @@ Let's get started!`);
     log.info(`Step 2 of 3: Validate and Lint your OpenAPI Definition`);
   }
 
-  public specValidationFailed(spec: ResourceInput) {
+  public specValidationFailed() {
     log.error(`Oops, it looks like there are some errors in your API Definition`);
-    // A placeholder rather than the user's own path or URL, which no quoting survives every shell with.
-    const specFlag = spec instanceof UrlPath ? f.flag('url', '<url>') : f.flag('file', '<path>');
-    const validateCommand = `${f.cmdAlt('apimatic', 'api', 'validate')} ${specFlag}`;
     const message = [
       `Ask an AI coding agent to run this command and fix what it reports:`,
-      validateCommand,
+      f.cmdAlt('apimatic', 'api', 'validate'),
       '',
       `Or use APIMatic's interactive VS Code Extension:`,
       f.link(vscodeExtensionUrl)
