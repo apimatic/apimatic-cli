@@ -154,26 +154,36 @@ export class PortalNavigation {
 
     for (const [list, entries] of lists) {
       for (const entry of entries) {
-        const node = context.isContentRoot && entry === API_REFERENCE_NAME ? API_REFERENCE_TOKEN : entry;
-        const earlier = seen.get(node);
-        // The rest entry stands for whatever neither list names, so it is no node named twice
-        // across them; `tabs` refuses it on its own account below.
-        if (earlier !== undefined && (earlier.list === list || entry !== REST_TOKEN)) {
-          errors.push(PortalNavigation.namedTwice(earlier, { list, entry }, context));
-          continue;
-        }
-        seen.set(node, { list, entry });
-
-        const checked =
-          list === TABS_FIELD
-            ? PortalNavigation.checkTabEntry(entry, context)
-            : PortalNavigation.checkEntry(entry, context);
-        if (checked.isErr()) {
-          errors.push(checked.error);
+        const error = PortalNavigation.listEntryError(list, entry, seen, context);
+        if (error !== undefined) {
+          errors.push(error);
         }
       }
     }
     return errors;
+  }
+
+  /** What is wrong with one entry of `list`, if anything, recording the node it positions in `seen`. */
+  private static listEntryError(
+    list: string,
+    entry: string,
+    seen: Map<string, { list: string; entry: string }>,
+    context: NavigationContext
+  ): string | undefined {
+    const node = context.isContentRoot && entry === API_REFERENCE_NAME ? API_REFERENCE_TOKEN : entry;
+    const earlier = seen.get(node);
+    // The rest entry stands for whatever neither list names, so it is no node named twice
+    // across them; `tabs` refuses it on its own account below.
+    if (earlier !== undefined && (earlier.list === list || entry !== REST_TOKEN)) {
+      return PortalNavigation.namedTwice(earlier, { list, entry }, context);
+    }
+    seen.set(node, { list, entry });
+
+    const checked =
+      list === TABS_FIELD
+        ? PortalNavigation.checkTabEntry(entry, context)
+        : PortalNavigation.checkEntry(entry, context);
+    return checked.isErr() ? checked.error : undefined;
   }
 
   private static namedTwice(

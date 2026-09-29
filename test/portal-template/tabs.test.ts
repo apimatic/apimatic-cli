@@ -120,47 +120,38 @@ describe('tabsTransformer', () => {
 
   // The defaults `pages` gave the root before `tabs` existed, read from `tabs` instead.
   describe('the tabs that tabs does not name', () => {
-    it('leave the generated sections before the API reference, SDKs first, after the named folders', () => {
-      const docs = [...CONTENT, ...TUTORIALS, root(['tutorials'])];
+    const defaults: { rule: string; file: File; generated: File[]; tabs: string[] }[] = [
+      {
+        rule: 'leave the generated sections before the API reference, SDKs first, after the named folders',
+        file: root(['tutorials']),
+        generated: GENERATED,
+        tabs: ['Home', 'Tutorials', 'SDKs', 'Context Plugin', 'API Reference']
+      },
+      {
+        rule: 'put the generated sections after the last folder when the file puts the API reference before one',
+        file: root(['apimatic:api', 'tutorials']),
+        generated: GENERATED,
+        tabs: ['Home', 'API Reference', 'Tutorials', 'SDKs', 'Context Plugin']
+      },
+      {
+        rule: 'put an unnamed API reference last, after a named section',
+        file: root(['apimatic:plugin', 'tutorials']),
+        generated: GENERATED,
+        tabs: ['Home', 'Context Plugin', 'Tutorials', 'SDKs', 'API Reference']
+      },
+      {
+        rule: 'put an unnamed section last when pages places the API reference in Home',
+        file: root(['tutorials'], ['index', 'apimatic:api']),
+        generated: SDKS,
+        tabs: ['Home', 'Tutorials', 'SDKs']
+      }
+    ];
 
-      expect(tabNames({ docs, generated: GENERATED, openapi: API })).to.deep.equal([
-        'Home',
-        'Tutorials',
-        'SDKs',
-        'Context Plugin',
-        'API Reference'
-      ]);
-    });
-
-    it('put the generated sections after the last folder when the file puts the API reference before one', () => {
-      const docs = [...CONTENT, ...TUTORIALS, root(['apimatic:api', 'tutorials'])];
-
-      expect(tabNames({ docs, generated: GENERATED, openapi: API })).to.deep.equal([
-        'Home',
-        'API Reference',
-        'Tutorials',
-        'SDKs',
-        'Context Plugin'
-      ]);
-    });
-
-    it('put an unnamed API reference last, after a named section', () => {
-      const docs = [...CONTENT, ...TUTORIALS, root(['apimatic:plugin', 'tutorials'])];
-
-      expect(tabNames({ docs, generated: GENERATED, openapi: API })).to.deep.equal([
-        'Home',
-        'Context Plugin',
-        'Tutorials',
-        'SDKs',
-        'API Reference'
-      ]);
-    });
-
-    it('put an unnamed section last when pages places the API reference in Home', () => {
-      const docs = [...CONTENT, ...TUTORIALS, root(['tutorials'], ['index', 'apimatic:api'])];
-
-      expect(tabNames({ docs, generated: SDKS, openapi: API })).to.deep.equal(['Home', 'Tutorials', 'SDKs']);
-    });
+    for (const { rule, file, generated, tabs } of defaults) {
+      it(rule, () => {
+        expect(tabNames({ docs: [...CONTENT, ...TUTORIALS, file], generated, openapi: API })).to.deep.equal(tabs);
+      });
+    }
   });
 
   describe('a section placed in Home', () => {
