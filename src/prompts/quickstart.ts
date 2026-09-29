@@ -113,8 +113,7 @@ Let's get started!`);
   public specValidationFailed() {
     log.error(`Oops, it looks like there are some errors in your API Definition`);
     const message = [
-      `Ask an AI coding agent to run this command and fix what it reports:`,
-      f.cmdAlt('apimatic', 'api', 'validate'),
+      `Ask an AI coding agent to run ${f.cmdAlt('apimatic', 'api', 'validate')} and fix what it reports.`,
       '',
       `Or use APIMatic's interactive VS Code Extension:`,
       f.link(vscodeExtensionUrl)
