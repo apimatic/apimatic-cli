@@ -3,6 +3,7 @@ import { applyMdxPreset } from 'fumadocs-mdx/config';
 import { rehypeCodeDefaultOptions } from 'fumadocs-core/mdx-plugins';
 import rehypeRaw from 'rehype-raw';
 import { rehypeCodeTitles, rehypeKeepCodeMeta } from './rehype-code-titles';
+import { navigationSchema } from './navigation-schema';
 
 // What `rehype-raw` must hand on untouched, being MDX's own nodes rather than HTML.
 const MDX_NODE_TYPES = ['mdxFlowExpression', 'mdxJsxFlowElement', 'mdxJsxTextElement', 'mdxTextExpression', 'mdxjsEsm'];
@@ -19,7 +20,10 @@ export const docs = defineDocs({
   // content directory. Without it a leftover `meta.json` is loaded as a folder's metadata
   // and applied before the transformer runs -- and since a metadata file hides whatever it
   // does not name, the transformer could not put those pages back.
-  meta: { files: ['**/nav.json'] }
+  //
+  // The schema keeps the root file's `tabs`, which Fumadocs' own would strip. Only this
+  // collection needs it: the CLI writes the generated folders' files, and none holds `tabs`.
+  meta: { files: ['**/nav.json'], schema: navigationSchema }
 });
 
 // The pages the CLI writes into this project, resolved against the Vite root like `content`.

@@ -1,7 +1,7 @@
 import { PathUtils } from 'fumadocs-core/source';
 import type { ContentStorage, PageTreeTransformer } from 'fumadocs-core/source';
 import type { Folder, Node } from 'fumadocs-core/page-tree';
-import { apiBaseDir, containsUrl, docsRoute } from './shared';
+import { apiBaseDir, containsUrl, docsRoute, HOME_TAB_ID } from './shared';
 
 /**
  * Only what this file needs of the builder context. `loader()` infers a storage type from
@@ -27,9 +27,10 @@ const REST_TOKEN = '...';
 const API_REFERENCE_TOKEN = 'apimatic:api';
 
 /**
- * The folders the CLI generates, each a tab of its own, by the token that positions it and in
- * the order they take when the root `nav.json` names none of them. The CLI's
- * `GENERATED_SECTIONS` lists the same, and a test holds the two together.
+ * The folders the CLI generates, by the token that positions each and in the order they take
+ * when the root `nav.json` names none of them. Each is a tab of its own unless that file's
+ * `pages` names its token, which places it in Home. The CLI's `GENERATED_SECTIONS` lists the
+ * same, and a test holds the two together.
  */
 export const GENERATED_SECTIONS = [
   { token: 'apimatic:sdks', folder: 'sdks' },
@@ -42,9 +43,6 @@ const API_REFERENCE_TITLE = 'API Reference';
 
 /** Where the home page is served, which is how its node is told apart from every other page. */
 const HOME_URL = docsRoute;
-
-/** Fixed, as tab matching goes by id after serialisation; Fumadocs' ids never start with a slash. */
-const HOME_TAB_ID = '/tab/home';
 
 /** The Home tab's name when the root `nav.json` gives none, and the fallback home page's. */
 const HOME_NAME = 'Home';
@@ -105,7 +103,10 @@ export function navigationTransformer<S extends ContentStorage>(): PageTreeTrans
   };
 }
 
-/** A tab per folder the root `nav.json` lists, the API reference and each generated folder; the rest is Home. */
+/**
+ * A tab per folder the root `nav.json`'s `tabs` lists, and one for the API reference and each
+ * generated folder unless its `pages` places them in Home; the rest is Home.
+ */
 export function tabsTransformer<S extends ContentStorage>(): PageTreeTransformer<S> {
   return {
     root(root) {
@@ -119,6 +120,8 @@ export function tabsTransformer<S extends ContentStorage>(): PageTreeTransformer
 interface NavigationSettings {
   pages: string[] | undefined;
   title: string | undefined;
+  /** The root file's list of the tabs after Home; below the root the CLI refuses it, and nothing reads it. */
+  tabs: string[] | undefined;
 }
 
 function readSettings(context: NavigationContext, folderPath: string): NavigationSettings | undefined {
@@ -130,15 +133,20 @@ function readSettings(context: NavigationContext, folderPath: string): Navigatio
     return undefined;
   }
 
-  const { pages, title } = file.data as { pages?: unknown; title?: unknown };
+  const { pages, tabs, title } = file.data as { pages?: unknown; tabs?: unknown; title?: unknown };
   // A half-typed title reloads to here as an empty string, which would blank the folder in
   // the sidebar with nothing to click. The CLI refuses one; the preview keeps the default
   // name until the file is worth reading again.
   const named = typeof title === 'string' ? title.trim() : '';
   return {
-    pages: Array.isArray(pages) ? pages.filter((entry): entry is string => typeof entry === 'string') : undefined,
+    pages: stringsOf(pages),
+    tabs: stringsOf(tabs),
     title: named.length > 0 ? named : undefined
   };
+}
+
+function stringsOf(entries: unknown): string[] | undefined {
+  return Array.isArray(entries) ? entries.filter((entry): entry is string => typeof entry === 'string') : undefined;
 }
 
 function isTabFolder(rootSettings: NavigationSettings | undefined, folder: Folder): boolean {
@@ -146,27 +154,49 @@ function isTabFolder(rootSettings: NavigationSettings | undefined, folder: Folde
   return (
     folderPath !== undefined &&
     folderPath !== apiBaseDir &&
-    lists(rootSettings, folderPath) &&
+    lists(rootSettings?.tabs, folderPath) &&
     // The home page is the Home tab's, whichever `(group)` folder serves it.
     !containsUrl([folder], HOME_URL)
   );
 }
 
+/**
+ * Whether a top-level folder is a tab of its own. The API reference and a generated section
+ * are, unless the root file's `pages` places them in Home; a folder of the user's is when its
+ * `tabs` lists it. A node in both lists is refused by the CLI; here Home keeps the section and
+ * `tabs` keeps the folder, each the rule its own list states.
+ */
+function isTab(context: NavigationContext, settings: NavigationSettings | undefined, folder: Folder): boolean {
+  if (isApiReference(folder)) {
+    // The folder's name and the token reach the same node, as the CLI rules for `pages`.
+    return !lists(settings?.pages, apiBaseDir) && !lists(settings?.pages, API_REFERENCE_TOKEN);
+  }
+  if (isInjected(context, folder)) {
+    const section = GENERATED_SECTIONS.find((candidate) => isSectionFolder(folder, candidate));
+    return section === undefined || !lists(settings?.pages, section.token);
+  }
+  return isTabFolder(settings, folder);
+}
+
 function groupIntoTabs(context: NavigationContext, children: Node[]): Node[] {
   const settings = readSettings(context, '');
-  const tabs: Folder[] = [];
+  const candidates: Folder[] = [];
   const loose: Node[] = [];
 
   for (const child of children) {
-    if (
-      child.type === 'folder' &&
-      (isApiReference(child) || isTabFolder(settings, child) || isInjected(context, child))
-    ) {
-      tabs.push(asTab(child));
+    if (child.type === 'folder' && isTab(context, settings, child)) {
+      candidates.push(child);
     } else {
       loose.push(child);
     }
   }
+
+  // `tabs` orders the tabs as `pages` orders a directory's nodes, with the same defaults for
+  // what it leaves unnamed: a generated section before the API reference, SDKs first, never
+  // above a folder the file named, and an unnamed reference last. Run while the folders still
+  // carry their `$ref`, through which a folder entry is matched.
+  const ordered = reorder(context, { type: 'folder', name: '', children: candidates }, '', settings?.tabs ?? []);
+  const tabs = ordered.flatMap((node) => (node.type === 'folder' ? [asTab(node)] : []));
 
   // Fumadocs points a tab at the page with the same path inside the tab being left, when
   // there is one, and finds it through the folders' `$ref`. Between tabs that is the wrong
@@ -184,6 +214,7 @@ function groupIntoTabs(context: NavigationContext, children: Node[]): Node[] {
     children: withFallbackHomePage(loose)
   };
   // Home opens the site, so it leads wherever the file lists its pages; `index` orders them only.
+  // With every section placed in Home it stands alone, and the layout then shows no tab bar.
   return [home, ...tabs];
 }
 
@@ -209,8 +240,8 @@ function asTab(folder: Folder): Folder {
   return folder;
 }
 
-function lists(settings: NavigationSettings | undefined, name: string): boolean {
-  return settings?.pages?.some((entry) => entry.trim() === name) ?? false;
+function lists(entries: string[] | undefined, name: string): boolean {
+  return entries?.some((entry) => entry.trim() === name) ?? false;
 }
 
 /**

@@ -10,6 +10,12 @@ export const docsRoute = '/';
  */
 export const apiBaseDir = 'api';
 
+/**
+ * The Home tab's id. Fixed, as tab matching goes by id after serialisation; Fumadocs' ids never
+ * start with a slash. Shared so the layout can tell Home alone from any other single tab.
+ */
+export const HOME_TAB_ID = '/tab/home';
+
 const getDocsUrl = createGetUrl(docsRoute);
 
 /** Whether a page at `url` sits among these nodes, at any depth. */
