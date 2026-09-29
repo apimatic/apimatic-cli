@@ -4,6 +4,7 @@ import { mediaAdapters } from '@/lib/media-adapters';
 import { CodeBlock } from './code-block';
 import { renderExampleLayout } from './example-layout';
 import { renderUsageTabs } from './usage-tabs';
+import { ResultDisplay } from './result-display';
 
 export const OpenAPIPage = createOpenAPIPage({
   // Without a registry of its own, Fumadocs registers and bundles every request generator it has.
@@ -11,5 +12,6 @@ export const OpenAPIPage = createOpenAPIPage({
   generateTypeScriptDefinitions: false,
   components: { CodeBlock },
   content: { renderAPIExampleLayout: renderExampleLayout, renderAPIExampleUsageTabs: renderUsageTabs },
-  mediaAdapters
+  mediaAdapters,
+  playground: { components: { ResultDisplay } }
 });
