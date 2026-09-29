@@ -16,6 +16,7 @@ export default [
         clearTimeout: 'readonly',
         URL: 'readonly',
         Blob: 'readonly',
+        Headers: 'readonly',
         AbortController: 'readonly',
         AbortSignal: 'readonly',
         NodeJS: true
