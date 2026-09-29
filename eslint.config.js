@@ -17,6 +17,7 @@ export default [
         URL: 'readonly',
         Blob: 'readonly',
         Headers: 'readonly',
+        File: 'readonly',
         AbortController: 'readonly',
         AbortSignal: 'readonly',
         NodeJS: true

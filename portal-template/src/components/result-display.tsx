@@ -2,44 +2,37 @@ import { useEffect, useMemo, useState } from 'react';
 import { DefaultResultDisplay, type ResultDisplayProps } from 'fumadocs-openapi/playground/client';
 import { buttonVariants } from 'fumadocs-ui/components/ui/button';
 import { Download } from 'lucide-react';
-import { downloadName, isBinaryBody, mediaTypeOf } from '@/lib/binary-download';
+import { responseFileOf } from '@/lib/response-file';
 
-// Fumadocs' own result panel, with a way to save a binary body it can only count the bytes of.
-export function ResultDisplay(props: Readonly<ResultDisplayProps>) {
+export function ResultDisplayWithDownload(props: Readonly<ResultDisplayProps>) {
   const { data } = props;
-  const binary = data.type !== 'client_error' ? data : undefined;
-  const mediaType = binary ? mediaTypeOf(binary.headers.get('Content-Type')) : '';
+  const file = useMemo(() => (data.type === 'response' ? responseFileOf(data) : undefined), [data]);
 
-  if (!binary || !isBinaryBody(mediaType, binary.body.byteLength)) return <DefaultResultDisplay {...props} />;
+  if (!file) return <DefaultResultDisplay {...props} />;
   return (
     <div>
       <DefaultResultDisplay {...props} />
-      <BinaryDownload body={binary.body} headers={binary.headers} mediaType={mediaType} />
+      <DownloadRow file={file} />
     </div>
   );
 }
 
-function BinaryDownload({
-  body,
-  headers,
-  mediaType
-}: Readonly<{ body: ArrayBuffer; headers: Headers; mediaType: string }>) {
+function DownloadRow({ file }: Readonly<{ file: File }>) {
   const [href, setHref] = useState<string | null>(null);
-  const filename = useMemo(() => downloadName(headers, mediaType), [headers, mediaType]);
 
   useEffect(() => {
-    const url = URL.createObjectURL(new Blob([body], { type: mediaType }));
+    const url = URL.createObjectURL(file);
     setHref(url);
     return () => URL.revokeObjectURL(url);
-  }, [body, mediaType]);
+  }, [file]);
 
   if (!href) return null;
   return (
     <div className="flex items-center gap-2 px-3 py-2 border-b bg-fd-secondary text-fd-secondary-foreground">
-      <span className="min-w-0 me-auto truncate text-xs font-mono text-fd-muted-foreground">{filename}</span>
+      <span className="min-w-0 me-auto truncate text-xs font-mono text-fd-muted-foreground">{file.name}</span>
       <a
         href={href}
-        download={filename}
+        download={file.name}
         className={buttonVariants({ size: 'sm', variant: 'outline', className: 'gap-1.5 shrink-0' })}
       >
         <Download className="size-3.5" />
