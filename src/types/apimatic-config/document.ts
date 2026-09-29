@@ -6,19 +6,12 @@ import { SemVersion } from '../publish/version.js';
 
 export const APIMATIC_CONFIG_FILE_NAME = 'apimatic.json';
 
-/** Where editors find the file's schema: the copy the published package carries, for this major. */
-export const APIMATIC_SCHEMA_URL = 'https://cdn.jsdelivr.net/npm/@apimatic/cli@2/apimatic.schema.json';
-
 /**
- * The schema address a file written by this version of the CLI carries. jsDelivr resolves a
- * major range to its newest stable release and never to a prerelease, so `@2` leads nowhere
- * until 2.0.0 ships; a prerelease names its own version instead, which jsDelivr serves exactly.
+ * Where editors find the file's schema: the copy the published package carries, under the `beta`
+ * dist-tag. jsDelivr resolves a major range such as `@2` to its newest stable release and never to
+ * a prerelease, so `@2` leads nowhere until 2.0.0 ships; `@beta` reaches the newest prerelease.
  */
-export function schemaUrlFor(cliVersion: string): string {
-  return /^\d+\.\d+\.\d+-\S+$/.test(cliVersion)
-    ? `https://cdn.jsdelivr.net/npm/@apimatic/cli@${cliVersion}/apimatic.schema.json`
-    : APIMATIC_SCHEMA_URL;
-}
+export const APIMATIC_SCHEMA_URL = 'https://cdn.jsdelivr.net/npm/@apimatic/cli@beta/apimatic.schema.json';
 
 /** The one format this CLI reads. A file naming another is refused rather than misread. */
 export const SCHEMA_VERSION = 1;
