@@ -1,4 +1,5 @@
 import fs from 'fs';
+import os from 'node:os';
 import path from 'path';
 import { createRequire } from 'node:module';
 import { execa } from 'execa';
@@ -67,9 +68,27 @@ function deliveredInto(
   );
 }
 
+/** A copy of a fixture whose portal block is rewritten, for a case one setting apart from it. */
+function fixtureWith(name: string, change: (block: Record<string, any>) => void): DirectoryPath {
+  const source = path.join(process.cwd(), 'test/resources/portal-inputs', name);
+  const copy = fs.mkdtempSync(path.join(os.tmpdir(), 'portal-fixture-'));
+  fs.cpSync(source, copy, { recursive: true });
+
+  const file = path.join(copy, 'src', 'apimatic.json');
+  const config = JSON.parse(fs.readFileSync(file, 'utf8'));
+  change(config.portal);
+  fs.writeFileSync(file, JSON.stringify(config, null, 2));
+  return new DirectoryPath(copy).join('src');
+}
+
 /** Resolves, prepares, builds and saves a fixture as `portal generate` does. */
-async function buildFixture(name: string, delivered: Delivered = {}): Promise<BuiltPortal> {
-  const fixture = new DirectoryPath(process.cwd()).join('test/resources/portal-inputs').join(name).join('src');
+async function buildFixture(
+  name: string,
+  delivered: Delivered = {},
+  fixtureDirectory?: DirectoryPath
+): Promise<BuiltPortal> {
+  const fixture =
+    fixtureDirectory ?? new DirectoryPath(process.cwd()).join('test/resources/portal-inputs').join(name).join('src');
   const base = await ensurePortalProjectDirectoryBase(fixture);
   const root = fs.mkdtempSync(path.join(base, 'portal-e2e-'));
 
@@ -609,5 +628,105 @@ const stylesheetOf = (output: DirectoryPath) => {
   // Fumadocs has no adapter of its own for an image body, and without one the page is only an error screen.
   it('renders the request body of an operation that uploads an image', () => {
     expect(read('api/pets/pets/uploadPetPhoto/index.html')).to.contain('id="request-body"');
+  });
+});
+
+// A portal whose address carries a path is mounted under it: every address the build emits has
+// to lead there, while the files themselves stay at the root of the output the host serves at it.
+(enabled ? describe : describe.skip)('portal build, mounted under a path (end to end)', function () {
+  this.timeout(10 * 60 * 1000);
+
+  let built: BuiltPortal | undefined;
+  let fixture: DirectoryPath | undefined;
+  let output: DirectoryPath;
+
+  before(async () => {
+    fixture = fixtureWith('default', (portal) => (portal.site.url = 'https://docs.test/docs'));
+    built = await buildFixture('default', { codeSampleCatalogs: CODE_SAMPLES }, fixture);
+    ({ output } = built);
+  });
+
+  after(async () => {
+    await removeBuilt(built);
+    if (fixture) fs.rmSync(path.dirname(fixture.toString()), { recursive: true, force: true });
+  });
+
+  const read = (relative: string) => fs.readFileSync(path.join(output.toString(), relative), 'utf8');
+  const exists = (relative: string) => fs.existsSync(path.join(output.toString(), relative));
+
+  // The host serves this directory at the path, so a second copy of it inside would answer at
+  // /docs/docs and nothing at /docs itself.
+  it('writes each page at the root of the output, not inside a folder named for the path', () => {
+    expect(exists('index.html')).to.be.true;
+    expect(exists('api/apimatic-calculator/simple-calculator/Calculate/index.html')).to.be.true;
+    expect(exists('docs')).to.be.false;
+  });
+
+  it('loads every script and stylesheet through the path', () => {
+    const index = read('index.html');
+
+    expect(index).to.match(/<script[^>]+src="\/docs\/assets\//);
+    expect(index).to.match(/<link[^>]+href="\/docs\/assets\/[^"]+\.css"/);
+    expect(index).to.not.match(/(src|href)="\/assets\//);
+  });
+
+  it('marks each page canonical under the path, and names it in the sitemap and robots file', () => {
+    expect(read('index.html')).to.contain('<link rel="canonical" href="https://docs.test/docs/"');
+    expect(read('sitemap.xml')).to.contain(
+      'https://docs.test/docs/api/apimatic-calculator/simple-calculator/Calculate'
+    );
+    expect(read('robots.txt')).to.contain('Sitemap: https://docs.test/docs/sitemap.xml');
+  });
+
+  it('points the favicon and the logo through the path', () => {
+    const index = read('index.html');
+
+    expect(index).to.match(/<link rel="icon" href="\/docs\/images\/logo\.png"/);
+    expect(index).to.contain('src="/docs/images/logo.png"');
+  });
+
+  // The search index is fetched, not linked, so the browser resolves the address itself: it is
+  // built from the base at run time rather than emitted as a literal, and what can be held here
+  // is that it goes through that call instead of reaching the bundle site-relative.
+  it('fetches the search index through the path', () => {
+    const search = scriptsOf(output).filter((script) => script.text.includes('/api/search.json'));
+
+    expect(search).to.have.lengthOf.at.least(1);
+    for (const script of search) {
+      expect(script.text, script.name).to.match(/from:\s*\w+\(\s*[`'"]\/api\/search\.json[`'"]\s*\)/);
+    }
+    expect(exists('api/search.json')).to.be.true;
+  });
+
+  // The embedded identity keeps the static files at their root-relative addresses, so the base
+  // has to be applied where they are read -- in the code that renders them, which runs in the
+  // browser as well. Rewriting only the prerendered HTML leaves the client putting the root
+  // address back on hydration, where it reaches whatever the host serves there instead.
+  it('prefixes the logo and favicon in the browser bundle, not only in the prerendered HTML', () => {
+    const scripts = scriptsOf(output);
+
+    const identity = scripts.filter((script) => script.text.includes('favicon:{url:'));
+    expect(identity, 'the embedded identity').to.have.lengthOf.at.least(1);
+    for (const script of identity) {
+      expect(script.text, `${script.name} keeps the address the CLI wrote`).to.contain('/images/logo.png');
+    }
+
+    const icon = scripts.filter((script) => /rel:[`'"]icon[`'"]/.test(script.text));
+    expect(icon, 'the script carrying the icon link').to.have.lengthOf.at.least(1);
+    for (const script of icon) {
+      expect(script.text, script.name).to.match(/href:\s*\w+\(\s*\w+\.favicon\.url\s*\)/);
+    }
+
+    const header = scripts.filter((script) => script.text.includes('dark:hidden'));
+    expect(header, 'the script carrying the header logo').to.have.lengthOf.at.least(1);
+    for (const script of header) {
+      expect(script.text, script.name).to.match(/src:\s*\w+\(\s*\w+\.light\s*\)/);
+      expect(script.text, script.name).to.match(/src:\s*\w+\(\s*\w+\.dark\s*\)/);
+    }
+  });
+
+  it('offers each SDK download through the path', () => {
+    expect(read('sdks/typescript/index.html')).to.contain('href="/docs/__downloads/sdk/typescript.zip"');
+    expect(read('__downloads/sdk/typescript.zip')).to.equal('PK typescript');
   });
 });

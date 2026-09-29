@@ -36,17 +36,19 @@ describe('downloads', () => {
   });
 
   describe('in the preview', () => {
-    const middlewareFor = async (downloadsDirectory: string | null): Promise<Middleware | undefined> => {
+    const middlewareFor = async (downloadsDirectory: string | null, basePath = ''): Promise<Middleware | undefined> => {
       let middleware: Middleware | undefined;
       const server = { middlewares: { use: (handler: Middleware) => (middleware = handler) } };
-      const configureServer = downloads(downloadsDirectory).configureServer as (server: ViteDevServer) => Promise<void>;
+      const configureServer = downloads(downloadsDirectory, basePath).configureServer as (
+        server: ViteDevServer
+      ) => Promise<void>;
       await configureServer(server as unknown as ViteDevServer);
       return middleware;
     };
 
     /** The body served for `url`, or `undefined` when the request is passed on. */
-    const request = async (url: string): Promise<string | undefined> => {
-      const middleware = (await middlewareFor(directory))!;
+    const request = async (url: string, basePath = ''): Promise<string | undefined> => {
+      const middleware = (await middlewareFor(directory, basePath))!;
       const response = Object.assign(new PassThrough(), { setHeader: () => {} });
       let passedOn = false;
       middleware({ url }, response, () => (passedOn = true));
@@ -74,6 +76,17 @@ describe('downloads', () => {
       expect(await request('/__downloads/../plugin.zip')).to.be.undefined;
     });
 
+    // This runs ahead of Vite's own middlewares, so a request still carries the base a portal
+    // mounted under a path is served from.
+    it('serves each download under the path the portal is mounted at', async () => {
+      expect(await request('/docs/__downloads/sdk/python.zip', '/docs')).to.equal('PK python');
+      expect(await request('/docs/__downloads/plugin.zip', '/docs')).to.equal('PK plugin');
+    });
+
+    it('passes on an address under a base that is not the portal’s', async () => {
+      expect(await request('/other/__downloads/plugin.zip', '/docs')).to.be.undefined;
+    });
+
     it('adds nothing when the run carried no downloads', async () => {
       expect(await middlewareFor(null)).to.be.undefined;
     });
@@ -81,13 +94,14 @@ describe('downloads', () => {
 
   describe('in the build', () => {
     const writeBundle = async (environment: string, downloadsDirectory: string | null, dir: string) => {
-      const hook = downloads(downloadsDirectory).writeBundle as (
+      const hook = downloads(downloadsDirectory, '/docs').writeBundle as (
         this: { environment: { name: string } },
         options: { dir: string }
       ) => Promise<void>;
       await hook.call({ environment: { name: environment } }, { dir });
     };
 
+    // Written without the base: the host serves the whole output directory at it.
     it('copies the downloads under __downloads/ in the site the browser is served', async () => {
       const output = path.join(root, 'client');
 

@@ -6,6 +6,7 @@ import { PortalLayout } from '@/lib/layout';
 import { getPageMarkdownUrl, slugsFromSplat } from '@/lib/shared';
 import { portal } from '@/lib/portal';
 import { absoluteUrl, canonicalLink } from '@/lib/seo';
+import { withBasePath } from '@/lib/base-path';
 import { useFumadocsLoader } from 'fumadocs-core/source/client';
 import { usePathname } from 'fumadocs-core/framework';
 import {
@@ -135,7 +136,8 @@ function Content({
   const PageBody = page.body;
   const pathname = usePathname();
   // Named, or the popover reads `window.location.href` and sends the reader's query and hash on.
-  const pageUrl = typeof window === 'undefined' ? pathname : new URL(pathname, window.location.origin).toString();
+  const pageUrl =
+    typeof window === 'undefined' ? pathname : new URL(withBasePath(pathname), window.location.origin).toString();
 
   return (
     <DocsPage toc={toc} full={page.full}>
@@ -145,7 +147,8 @@ function Content({
         <MarkdownCopyButton markdownUrl={markdownUrl} />
         {/* Sends the reader to an external AI vendor, so a portal published under someone
             else's brand can turn it off. */}
-        {portal.pageActions ? <ViewOptionsPopover markdownUrl={markdownUrl} pageUrl={pageUrl} /> : null}
+        {/* Unlike the copy button beside it, the popover links to this address as given. */}
+        {portal.pageActions ? <ViewOptionsPopover markdownUrl={withBasePath(markdownUrl)} pageUrl={pageUrl} /> : null}
       </div>
       <DocsBody>
         <PageBody components={useMDXComponents()} />

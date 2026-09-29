@@ -196,7 +196,7 @@ Let's get started!`);
     const message = [
       `Change the name, logo and colours in the ${f.var('portal')} block of ${f.path(configFile)}; ` +
         `your editor completes and checks it.`,
-      `Set ${f.var('portal.site.url')} to your hosting address for canonical links and a sitemap.`,
+      `Set ${f.var('portal.site.url')} to your hosting address, path and all, for canonical links and a sitemap.`,
       `Add Markdown pages under ${f.var('src/content')}; the preview reloads as you edit them.`,
       `Run ${f.cmdAlt('apimatic', 'portal', 'generate')} to produce static files you can host.`
     ].join('\n');

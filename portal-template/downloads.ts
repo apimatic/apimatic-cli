@@ -10,14 +10,16 @@ export const DOWNLOADS_ADDRESS = '__downloads';
  * Adds the SDKs and the context plugin the CLI downloaded to the site, which Vite's one
  * `publicDir` cannot, since that is the user's static directory.
  */
-export function downloads(directory: string | null): Plugin {
+export function downloads(directory: string | null, basePath: string): Plugin {
   return {
     name: 'apimatic:downloads',
     async configureServer(server) {
       if (directory === null) return;
       const files = await filesByAddress(directory);
       server.middlewares.use((request, response, next) => {
-        const file = files.get(decodeURIComponent(new URL(request.url ?? '/', 'http://localhost').pathname));
+        const pathname = decodeURIComponent(new URL(request.url ?? '/', 'http://localhost').pathname);
+        // This runs ahead of Vite's own middlewares, so the request still carries the base.
+        const file = files.get(pathname.startsWith(basePath) ? pathname.slice(basePath.length) : pathname);
         if (file === undefined) return next();
         response.setHeader('Content-Type', 'application/zip');
         createReadStream(file).pipe(response);

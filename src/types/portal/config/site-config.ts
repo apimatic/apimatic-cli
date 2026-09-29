@@ -1,5 +1,6 @@
 import { err, ok, Result } from 'neverthrow';
 import { UrlPath } from '../../file/urlPath.js';
+import { BasePath } from './base-path.js';
 import { allOf, isWebAddress, namespace, nonEmptyString, Parsed, unknownKeys } from './fields.js';
 
 /** What a specification says about itself, which is what a portal is called until the block says otherwise. */
@@ -12,10 +13,17 @@ export const PLACEHOLDER_SITE: Readonly<SuggestedSite> = Object.freeze({ name: '
 
 const KNOWN = ['name', 'url', 'description'];
 
+/** An address the portal answers at, split into the two halves its consumers need. */
+interface SiteAddress {
+  url: UrlPath;
+  base: BasePath;
+}
+
 export class SiteConfig {
   private constructor(
     private readonly name: string,
     private readonly url: UrlPath | null,
+    private readonly base: BasePath,
     private readonly description: string | null
   ) {}
 
@@ -32,12 +40,15 @@ export class SiteConfig {
           SiteConfig.validUrl(data.url, `${path}.url`),
           SiteConfig.validDescription(data.description, `${path}.description`, suggested)
         ])
-      ).map(([name, url, description]) => new SiteConfig(name, url, description))
+      ).map(
+        ([name, address, description]) =>
+          new SiteConfig(name, address?.url ?? null, address?.base ?? BasePath.root, description)
+      )
     );
   }
 
   public static suggested(site: SuggestedSite): SiteConfig {
-    return new SiteConfig(site.name, null, site.description);
+    return new SiteConfig(site.name, null, BasePath.root, site.description);
   }
 
   public siteName(): string {
@@ -48,8 +59,12 @@ export class SiteConfig {
     return this.description;
   }
 
-  public origin(): UrlPath | null {
+  public address(): UrlPath | null {
     return this.url;
+  }
+
+  public basePath(): BasePath {
+    return this.base;
   }
 
   public toJSON(): { name: string; url?: string; description?: string } {
@@ -85,28 +100,29 @@ export class SiteConfig {
     return ok(trimmed.length > 0 ? trimmed : null);
   }
 
-  // Only the origin is accepted: the portal is hosted at the root of its host, so a path,
-  // query or fragment would produce canonical links that do not resolve.
-  private static validUrl(url: unknown, path: string): Parsed<UrlPath | null> {
+  // A query or fragment is refused: both are prefixed onto every canonical link and asset
+  // address, and neither survives that with a URL a browser resolves.
+  private static validUrl(url: unknown, path: string): Parsed<SiteAddress | null> {
     if (url === undefined) {
       return ok(null);
     }
-    const origin = typeof url === 'string' ? SiteConfig.parseOrigin(url.trim()) : null;
-    return origin === null
+    const address = typeof url === 'string' ? SiteConfig.parseAddress(url.trim()) : null;
+    return address === null
       ? err([
-          `'${path}' must be the address the portal is hosted at, without a path, for example 'https://docs.example.com'.`
+          `'${path}' must be the address the portal is hosted at, with no query or fragment, for example 'https://docs.example.com' or 'https://example.com/docs'.`
         ])
-      : ok(origin);
+      : ok(address);
   }
 
-  private static parseOrigin(value: string): UrlPath | null {
+  private static parseAddress(value: string): SiteAddress | null {
     if (!isWebAddress(value)) {
       return null;
     }
     const parsed = new URL(value);
-    if (parsed.pathname !== '/' || parsed.search !== '' || parsed.hash !== '') {
+    if (parsed.search !== '' || parsed.hash !== '') {
       return null;
     }
-    return new UrlPath(parsed.origin);
+    const mountedAt = parsed.pathname.replace(/\/+$/, '');
+    return { url: new UrlPath(`${parsed.origin}${mountedAt}`), base: BasePath.of(mountedAt) };
   }
 }

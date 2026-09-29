@@ -25,8 +25,10 @@ export interface PortalFavicon {
 export interface Portal {
   name: string;
   description: string | null;
-  /** Origin only, with no trailing slash. */
+  /** The whole address, with no trailing slash, including the path the portal is mounted under. */
   siteUrl: string | null;
+  /** That path on its own, empty at the root of a host, for prefixing onto site-relative addresses. */
+  basePath: string;
   logo: PortalLogo | null;
   favicon: PortalFavicon | null;
   colorMode: PortalColorMode;

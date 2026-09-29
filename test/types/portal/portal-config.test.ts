@@ -89,7 +89,7 @@ describe('PortalConfig', () => {
     it('reports them alongside every invalid setting, so one edit fixes the file', () => {
       const errors = errorsOf({
         theme: {},
-        site: { name: '', url: 'https://x.test/docs' },
+        site: { name: '', url: 'https://x.test/#top' },
         brand: { colorMode: 'sepia' },
         ai: { pageActions: 'no' }
       });
@@ -138,7 +138,7 @@ describe('PortalConfig', () => {
       expect(errorsOf({ site: { description: 5 } })).to.deep.equal(["'portal.site.description' must be a string."]);
     });
 
-    it('keeps only the origin of the address, dropping a trailing slash and keeping a port', () => {
+    it('drops a trailing slash from the address and keeps a port', () => {
       expect(config({ site: { url: 'https://docs.example.com/' } }).identity().siteUrl).to.equal(
         'https://docs.example.com'
       );
@@ -147,11 +147,26 @@ describe('PortalConfig', () => {
       );
     });
 
-    it('refuses an address carrying a path, query or fragment, or one that is not http', () => {
+    // A portal mounted under a path needs it on both: its canonical links, and the base every
+    // asset and route the build emits is served from.
+    it('keeps a path the address carries, reporting it as the base path too', () => {
+      const identity = config({ site: { url: 'https://example.com/docs/' } }).identity();
+
+      expect(identity.siteUrl).to.equal('https://example.com/docs');
+      expect(identity.basePath).to.equal('/docs');
+    });
+
+    it('has no base path for an address mounted at the root of its host', () => {
+      for (const url of ['https://docs.example.com', 'https://docs.example.com/']) {
+        expect(config({ site: { url } }).identity().basePath, url).to.equal('');
+      }
+    });
+
+    it('refuses an address carrying a query or fragment, or one that is not http', () => {
       for (const url of [
-        'https://x.test/docs',
         'https://x.test/?a=1',
         'https://x.test/#top',
+        'https://x.test/docs?a=1',
         'ftp://x.test',
         'x.test',
         'https:x.test',
@@ -456,7 +471,7 @@ describe('PortalConfig', () => {
   });
 
   describe('identity', () => {
-    it('resolves every file to its site URL and the address to its origin', () => {
+    it('resolves every file to its site URL, and the address to what the browser is told', () => {
       const portal = config({
         site: { name: 'My API', url: 'https://docs.example.com/', description: 'Docs' },
         brand: {
@@ -477,6 +492,7 @@ describe('PortalConfig', () => {
         name: 'My API',
         description: 'Docs',
         siteUrl: 'https://docs.example.com',
+        basePath: '',
         logo: { light: '/images/logo.png', dark: '/images/logo-dark.png' },
         favicon: { url: '/favicon.svg', type: 'image/svg+xml' },
         colorMode: 'dark',
@@ -493,6 +509,7 @@ describe('PortalConfig', () => {
         name: 'My API',
         description: null,
         siteUrl: null,
+        basePath: '',
         logo: null,
         favicon: null,
         colorMode: 'both',

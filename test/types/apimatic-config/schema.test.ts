@@ -103,6 +103,8 @@ describe('apimatic.schema.json', () => {
         }
       ],
       ['an address with a port', { site: { url: 'https://docs.example.com:8443' } }],
+      ['an address with the path a portal is mounted under', { site: { url: 'https://example.com/docs' } }],
+      ['an address whose path ends with a slash', { site: { url: 'https://example.com/docs/' } }],
       ['one logo for both modes', { brand: { logo: 'static/images/logo.png' } }],
       ['a logo path with its dots inside a name', { brand: { logo: 'static/..hidden/logo.png' } }],
       ['a three-digit hex primary', { brand: { colors: { primary: ' #FFF ' } } }],
@@ -122,8 +124,8 @@ describe('apimatic.schema.json', () => {
       ['a blank name', { site: { name: '   ' } }],
       ['a name that is not a string', { site: { name: 7 } }],
       ['an unknown site key', { site: { title: 'Calc' } }],
-      ['an address with a path', { site: { url: 'https://x.test/docs' } }],
       ['an address with a query', { site: { url: 'https://x.test/?a=1' } }],
+      ['an address with a query after its path', { site: { url: 'https://x.test/docs?a=1' } }],
       ['an address with a fragment', { site: { url: 'https://x.test/#top' } }],
       ['an address that is not http', { site: { url: 'ftp://x.test' } }],
       ['an address without a scheme', { site: { url: 'x.test' } }],
@@ -318,8 +320,9 @@ describe('apimatic.schema.json', () => {
 
         expect(schemaVerdict({ languages: { [language]: { publishing: { ...release, packageConfiguration } } } }).valid)
           .to.be.true;
-        expect(schemaVerdict({ languages: { [language]: { publishing: { ...release, packageConfiguration: {} } } } })
-          .valid).to.be.false;
+        expect(
+          schemaVerdict({ languages: { [language]: { publishing: { ...release, packageConfiguration: {} } } } }).valid
+        ).to.be.false;
       });
     }
 
@@ -328,7 +331,10 @@ describe('apimatic.schema.json', () => {
     const unknownKey: [string, object][] = [
       ['an entry', { csharp: { notes: 'x' } }],
       ['a publishing record', { csharp: { publishing: { future: 1 } } }],
-      ['a source', { csharp: { publishing: { source: { repositoryUrl: 'https://github.com/acme/calc', tag: 'v1' } } } }],
+      [
+        'a source',
+        { csharp: { publishing: { source: { repositoryUrl: 'https://github.com/acme/calc', tag: 'v1' } } } }
+      ],
       ['a release', { csharp: { publishing: { package: { version: '1.0.0', name: 'Acme.Calc' } } } }],
       [
         'package settings',

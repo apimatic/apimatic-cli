@@ -13,6 +13,7 @@ import {
 import { useDocsSearch } from 'fumadocs-core/search/client';
 import { staticClient } from 'fumadocs-core/search/client/orama-static';
 import { useI18n } from 'fumadocs-ui/contexts/i18n';
+import { withBasePath } from '@/lib/base-path';
 
 export default function DefaultSearchDialog(props: SharedProps) {
   const { locale } = useI18n();
@@ -20,7 +21,7 @@ export default function DefaultSearchDialog(props: SharedProps) {
     // Served with an extension so hosts and CDNs give it a JSON content type; without one
     // it went out as application/octet-stream, which some of them attach or refuse.
     client: staticClient({
-      from: '/api/search.json',
+      from: withBasePath('/api/search.json'),
       locale
     })
   });

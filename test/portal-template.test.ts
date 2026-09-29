@@ -158,7 +158,7 @@ describe('portal template packaging', () => {
     const route = fs.readFileSync(path.join(templateRoot, 'src/routes/$.tsx'), 'utf8');
 
     expect(route).to.match(/<ViewOptionsPopover [^>]*pageUrl=/);
-    expect(route).to.contain('new URL(pathname, window.location.origin)');
+    expect(route).to.contain('new URL(withBasePath(pathname), window.location.origin)');
   });
 
   it('registers the plugin that reloads the generated pages under portal serve', () => {

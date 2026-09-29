@@ -24,8 +24,10 @@ export interface PortalLink {
 export interface PortalIdentity {
   name: string;
   description: string | null;
-  /** Origin only, with no trailing slash. */
+  /** The whole address, with no trailing slash, including the path the portal is mounted under. */
   siteUrl: string | null;
+  /** That path on its own, empty at the root of a host, for prefixing onto site-relative addresses. */
+  basePath: string;
   /** Site-relative, one per colour mode; the same URL twice when one image serves both. */
   logo: { light: string; dark: string } | null;
   /** Site-relative, with the image type its extension names, when it names one. */
@@ -108,13 +110,14 @@ export class PortalConfig {
   }
 
   public identity(): PortalIdentity {
-    const origin = this.site.origin();
+    const address = this.site.address();
     const logo = this.brand.logoImages();
     const favicon = this.brand.faviconImage();
     return {
       name: this.site.siteName(),
       description: this.site.siteDescription(),
-      siteUrl: origin === null ? null : origin.toString(),
+      siteUrl: address === null ? null : address.toString(),
+      basePath: this.site.basePath().toString(),
       logo: logo === null ? null : { light: logo.light().siteUrl(), dark: logo.dark().siteUrl() },
       favicon: favicon === null ? null : { url: favicon.siteUrl(), type: favicon.imageType() },
       colorMode: this.brand.mode(),

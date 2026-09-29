@@ -14,12 +14,16 @@ export default defineConfig(async () => {
   const [paths, identity] = await Promise.all([readBuildPaths(), readPortalIdentity()]);
   const pages = await prerenderPages(paths, identity.siteUrl);
   const publicDir: string | false = paths.staticDir ?? false;
+  // TanStack Start derives the router's basepath from this, so every route and asset the
+  // build emits is mounted where `portal.site.url` says the portal answers.
+  const base = `${identity.basePath}/`;
 
   return {
+    base,
     publicDir,
     plugins: [
       generatedPagesReload(),
-      downloads(paths.downloadsDir),
+      downloads(paths.downloadsDir, identity.basePath),
       // `/images/logo.png` is read from the static directory, and a remote image is never fetched for its size.
       fumadocsMdx({
         globalOptions: {

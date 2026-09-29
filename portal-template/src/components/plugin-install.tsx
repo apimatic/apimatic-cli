@@ -2,6 +2,7 @@ import { useSyncExternalStore } from 'react';
 import { asMarkdown } from 'fumadocs-core/server';
 import { CommandBlock } from './command-block';
 import { installCommand } from '@/lib/install-command';
+import { basePath } from '@/lib/base-path';
 import { portal } from '@/lib/portal';
 
 // The origin never changes while the page is open, so there is nothing to subscribe to.
@@ -15,7 +16,7 @@ export function PluginInstall({ path }: Readonly<{ path: string }>) {
   }
   const origin = useSyncExternalStore(
     noSubscribe,
-    () => window.location.origin,
+    () => `${window.location.origin}${basePath}`,
     () => portal.siteUrl
   );
   return <CommandBlock command={installCommand(path, origin)} />;
