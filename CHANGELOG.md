@@ -1,3 +1,11 @@
+# [2.0.0-beta.2](https://github.com/apimatic/apimatic-cli/compare/v2.0.0-beta.1...v2.0.0-beta.2) (2026-09-29)
+
+
+### Bug Fixes
+
+* **config:** point apimatic.json's $schema at the beta dist-tag ([#406](https://github.com/apimatic/apimatic-cli/issues/406)) ([74ad5d2](https://github.com/apimatic/apimatic-cli/commit/74ad5d2eb30a5f888abbb4209be445c846b50118))
+* **quickstart:** shorten the live preview and next steps notes ([#403](https://github.com/apimatic/apimatic-cli/issues/403)) ([45fcca1](https://github.com/apimatic/apimatic-cli/commit/45fcca1ad3c1a93803b67a9a0f9b0e93e3bb7db9))
+
 # [2.0.0-beta.1](https://github.com/apimatic/apimatic-cli/compare/v1.5.0...v2.0.0-beta.1) (2026-09-28)
 
 
