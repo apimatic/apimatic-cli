@@ -20,7 +20,7 @@ describe('prerenderPages', () => {
   const urlsFor = async (siteUrl: string | null = null, specs: Record<string, string> = {}) => {
     const pages = await prerenderPages(
       { specs, codeSamples: null, contentDir, generatedDir, staticDir: null, downloadsDir: null },
-      siteUrl
+      { siteUrl }
     );
     return pages.map((page) => page.path);
   };
@@ -150,6 +150,35 @@ describe('prerenderPages', () => {
       '/api/pets/pets/listPets',
       '/api/pets/pets/listPets.md'
     ]);
+  });
+
+  it('lists portal-relative paths for a portal at the root of its host', async () => {
+    write('index.md');
+    write('guides.md');
+
+    expect(await urlsFor('https://docs.test')).to.include.members(['/', '/guides', '/api/search.json']);
+  });
+
+  // TanStack prefixes a listed path with the base only when it does not already start with it,
+  // so `/api/search.json` under `/api` would otherwise be fetched as `/search.json`.
+  it('lists served paths for a portal under a path, the colliding ones included', async () => {
+    write('index.md');
+    write('guides.md');
+    write('api/overview.md');
+
+    const urls = await urlsFor('https://docs.test/api');
+
+    expect(urls).to.include.members([
+      '/api/',
+      '/api/guides',
+      '/api/guides.md',
+      '/api/index.md',
+      '/api/api/search.json',
+      '/api/api/overview',
+      '/api/llms.txt',
+      '/api/sitemap.xml'
+    ]);
+    expect(urls.filter((url) => !url.startsWith('/api/'))).to.be.empty;
   });
 
   it('suffixes each page once, however many pages there are', async () => {

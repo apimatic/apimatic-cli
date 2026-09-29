@@ -611,3 +611,62 @@ const stylesheetOf = (output: DirectoryPath) => {
     expect(read('api/pets/pets/uploadPetPhoto/index.html')).to.contain('id="request-body"');
   });
 });
+
+/**
+ * A portal whose address carries a path, `/api`, that its API reference's own pages start with:
+ * the case where a page could be taken for one already under the path and written without it.
+ */
+(enabled ? describe : describe.skip)('portal build, under a path (end to end)', function () {
+  this.timeout(10 * 60 * 1000);
+
+  let built: BuiltPortal | undefined;
+  let output: DirectoryPath;
+
+  before(async () => {
+    built = await buildFixture('subpath', { plugin: true });
+    ({ output } = built);
+  });
+
+  after(async () => {
+    await removeBuilt(built);
+  });
+
+  const read = (relative: string) => fs.readFileSync(path.join(output.toString(), relative), 'utf8');
+  const exists = (relative: string) => fs.existsSync(path.join(output.toString(), relative));
+
+  // The host serves the output's root at the path, so the path itself is no folder in it.
+  it('writes each page once, laid out as it would be at the root', () => {
+    for (const page of [
+      'index.html',
+      'index.md',
+      'authentication/index.html',
+      'api/search.json',
+      'api/apimatic-calculator/simple-calculator/Calculate/index.html'
+    ]) {
+      expect(exists(page), page).to.be.true;
+    }
+    expect(exists('api/api')).to.be.false;
+    expect(exists('api/authentication')).to.be.false;
+  });
+
+  it('points the page at its scripts, styles and the other pages under the path', () => {
+    const page = read('index.html');
+    const assets = [...page.matchAll(/\s(?:src|href)="([^"]*\/assets\/[^"]*)"/g)].map((match) => match[1]);
+
+    expect(assets).to.not.be.empty;
+    expect(assets.filter((asset) => !asset.startsWith('/api/assets/'))).to.deep.equal([]);
+    expect(page).to.contain('href="/api/authentication"');
+    expect(page).to.contain('href="/api/api/apimatic-calculator/');
+    expect(page).to.not.contain('href="/authentication"');
+  });
+
+  it('gives the path in canonical links, og:url and the sitemap', () => {
+    const page = read('index.html');
+    const locations = [...read('sitemap.xml').matchAll(/<loc>([^<]*)<\/loc>/g)].map((match) => match[1]);
+
+    expect(page).to.contain('<link rel="canonical" href="https://docs.test/api/"');
+    expect(page).to.contain('<meta property="og:url" content="https://docs.test/api/"');
+    expect(locations).to.include('https://docs.test/api/api/apimatic-calculator/simple-calculator/Calculate');
+    expect(locations.filter((location) => !location.startsWith('https://docs.test/api/'))).to.deep.equal([]);
+  });
+});

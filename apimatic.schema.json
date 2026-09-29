@@ -77,8 +77,8 @@
             },
             "url": {
               "type": "string",
-              "description": "The address the portal is hosted at, without a path, for example 'https://docs.example.com'.",
-              "pattern": "^\\s*[hH][tT][tT][pP][sS]?://[^\\s/?#]+/?\\s*$"
+              "description": "The address the portal is hosted at, for example 'https://docs.example.com' or 'https://example.com/docs'.",
+              "pattern": "^\\s*[hH][tT][tT][pP][sS]?://[^\\s/?#\\\\]+(?:/(?!\\.{1,2}(?:/|\\s*$))[A-Za-z0-9._~-]+)*/?\\s*$"
             },
             "description": {
               "type": "string",

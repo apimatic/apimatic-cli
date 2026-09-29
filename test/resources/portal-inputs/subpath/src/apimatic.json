@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "portal": {
+    "site": {
+      "name": "Calculator API",
+      "url": "https://docs.test/api"
+    },
+    "brand": {
+      "logo": "static/images/logo.png"
+    }
+  },
+  "languages": {
+    "typescript": {}
+  },
+  "plugin": { "pluginId": "calculator", "pluginName": "Calculator", "pluginVersion": "0.1.0" }
+}

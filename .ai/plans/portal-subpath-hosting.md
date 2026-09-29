@@ -447,8 +447,9 @@ follow-up.
 
 **The CLI/template contract (`test/portal-template.test.ts`)**, beside the `Equal<>` checks
 already there: for every accepted row of the shared table, `viteBase` given
-`identity().siteUrl` equals `siteAddress().path()`. The CLI and the template each derive the
-path from the address, so this holds them to one answer.
+`identity().siteUrl` equals `SiteAddress.parse(url).path()`. The CLI and the template each derive
+the path from the address, so this holds them to one answer. It parses the address itself because
+`PortalConfig.siteAddress()`, like `hasPath()`, arrives in step 4 with Next Steps, its one caller.
 
 **Template unit tests (`test/portal-template/`):**
 - `base-path.test.ts` (new): the root, a base, an explicit base.
@@ -476,7 +477,8 @@ It holds:
 
 It is built with `{ plugin: true }` for the bundled plugin. It is the third real build in the
 file, after `default` and `branded`, and `test.yml` runs the e2e suite on
-every platform in the matrix. That adds roughly 45–60 s to each job. It stays on every platform,
+every platform in the matrix. The three builds took about a minute together locally (step 1,
+2026-09-29), so this adds some 20 s to each job, more on slower runners. It stays on every platform,
 because the cache writer's `path.join` is where Windows would differ. It lands in step 1, and
 each step extends its assertions:
 - **Step 1:**

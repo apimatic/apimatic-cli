@@ -6,16 +6,18 @@ import tailwindcss from '@tailwindcss/vite';
 import { fumadocsMdx } from 'fumadocs-mdx/vite';
 import { downloads } from './downloads.ts';
 import { generatedPagesReload } from './generated-pages-reload.ts';
-import { readBuildPaths, readPortalIdentity } from './portal-config.ts';
+import { readBuildPaths, readPortalIdentity, viteBase } from './portal-config.ts';
 import { prerenderPages } from './prerender-pages.ts';
 import { specReload } from './spec-reload.ts';
 
 export default defineConfig(async () => {
   const [paths, identity] = await Promise.all([readBuildPaths(), readPortalIdentity()]);
-  const pages = await prerenderPages(paths, identity.siteUrl);
+  const pages = await prerenderPages(paths, identity);
   const publicDir: string | false = paths.staticDir ?? false;
 
   return {
+    // TanStack Start derives the router's basepath and every asset URL from it.
+    base: viteBase(identity),
     publicDir,
     plugins: [
       generatedPagesReload(),
