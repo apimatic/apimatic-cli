@@ -369,10 +369,10 @@ export class PortalSourceContext {
         ''
       ].join('\n')
     );
-    // Orders the sidebar: named pages first, then everything else alphabetically.
+    // Orders the sidebar: named pages first, then everything else alphabetically; no tab after Home until one is listed.
     await this.fileService.writeContents(
       new FilePath(this.contentDirectory, new FileName(NAVIGATION_FILE_NAME)),
-      JSON.stringify({ pages: ['index', '...'] }, null, 2) + '\n'
+      JSON.stringify({ tabs: [], pages: ['index', '...'] }, null, 2) + '\n'
     );
     return ok(new FilePath(this.sourceDirectory, new FileName(APIMATIC_CONFIG_FILE_NAME)));
   }

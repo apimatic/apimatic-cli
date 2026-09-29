@@ -192,7 +192,7 @@ describe('PortalNavigation', () => {
 
     it('names an unknown setting and lists the settings there are', () => {
       expect(PortalNavigation.validate('{"colour":"red"}', contextFor())._unsafeUnwrapErr()).to.deep.equal([
-        "content/nav.json: 'colour' is not a nav.json setting. The settings are 'pages' and 'title'."
+        "content/nav.json: 'colour' is not a nav.json setting. The settings are 'pages', 'title' and 'tabs'."
       ]);
     });
   });
@@ -437,14 +437,20 @@ describe('PortalNavigation', () => {
       });
     });
 
+    it('lists tabs among the settings at the root, so a misspelt one is pointed at it', () => {
+      expect(fileErrors({ tab: ['guides'], pages: ['index'] })).to.deep.equal([
+        "content/nav.json: 'tab' is not a nav.json setting. The settings are 'pages', 'title' and 'tabs'."
+      ]);
+    });
+
     // Read under today's rule, that file would put its tabs in Home's sidebar without a word.
     describe('a root file written for 2.0.0-beta.1, with no tabs', () => {
       it('is refused when pages names a folder, api or a token, each a tab then', () => {
         expect(fileErrors({ pages: ['index', 'guides', 'apimatic:api', 'authentication'] })).to.deep.equal([
-          "content/nav.json has no 'tabs', so it lists 'guides' and 'apimatic:api' for Home's sidebar, where 2.0.0-beta.1 made them tabs. Move the ones meant as tabs to 'tabs', or add \"tabs\": [] to keep them in Home."
+          "content/nav.json has no 'tabs', so it does not say whether 'guides' and 'apimatic:api' are tabs or in Home's sidebar (a 2.0.0-beta.1 file made them tabs). List the ones meant as tabs in 'tabs', or add \"tabs\": [] to keep them in Home."
         ]);
         expect(fileErrors({ pages: ['api'] }, { childNames: ['index', 'api'] })).to.deep.equal([
-          "content/nav.json has no 'tabs', so it lists 'api' for Home's sidebar, where 2.0.0-beta.1 made them tabs. Move the ones meant as tabs to 'tabs', or add \"tabs\": [] to keep them in Home."
+          "content/nav.json has no 'tabs', so it does not say whether 'api' is a tab or in Home's sidebar (a 2.0.0-beta.1 file made them tabs). List the ones meant as tabs in 'tabs', or add \"tabs\": [] to keep them in Home."
         ]);
         expect(fileErrors({ pages: ['index', 'apimatic:sdks'] })).to.have.lengthOf(1);
       });
@@ -499,7 +505,7 @@ describe('PortalNavigation', () => {
         const errors = PortalNavigation.validate(`{"${field}":"x"}`, contextFor())._unsafeUnwrapErr();
 
         expect(errors).to.deep.equal([
-          `content/nav.json: '${field}' is not a nav.json setting. The settings are 'pages' and 'title'.`
+          `content/nav.json: '${field}' is not a nav.json setting. The settings are 'pages', 'title' and 'tabs'.`
         ]);
         expect(errors[0]).to.not.contain('native code');
       });

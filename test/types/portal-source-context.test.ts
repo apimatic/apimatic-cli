@@ -1330,7 +1330,7 @@ describe('PortalSourceContext', () => {
       const errors = navigationErrors((await resolve())._unsafeUnwrapErr());
 
       expect(errors).to.deep.equal([
-        "content/nav.json has no 'tabs', so it lists 'tutorials' and 'apimatic:api' for Home's sidebar, where 2.0.0-beta.1 made them tabs. Move the ones meant as tabs to 'tabs', or add \"tabs\": [] to keep them in Home."
+        "content/nav.json has no 'tabs', so it does not say whether 'tutorials' and 'apimatic:api' are tabs or in Home's sidebar (a 2.0.0-beta.1 file made them tabs). List the ones meant as tabs in 'tabs', or add \"tabs\": [] to keep them in Home."
       ]);
     });
 
@@ -1794,7 +1794,7 @@ describe('PortalSourceContext', () => {
     it('orders the sidebar with the welcome page first', async () => {
       await scaffold(writeSpec({ title: 'Petstore', version: '1' }));
 
-      expect(JSON.parse(read('content/nav.json'))).to.deep.equal({ pages: ['index', '...'] });
+      expect(JSON.parse(read('content/nav.json'))).to.deep.equal({ tabs: [], pages: ['index', '...'] });
     });
 
     // A freshly scaffolded project must not carry a file the build never reads, such as a

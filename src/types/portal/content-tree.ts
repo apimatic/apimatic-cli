@@ -394,12 +394,13 @@ class NavigationWalk {
     // A directory with no page anywhere beneath it becomes no node in the page tree, so naming it
     // would resolve to nothing. Fumadocs would build one for a directory that holds only a
     // `nav.json`, but the template drops it again to keep to this rule.
-    const folderNames = folders.filter(({ scan, isApiChild }) => scan.holdsPage && !isApiChild).map(({ name }) => name);
+    const isFolder = ({ scan, isApiChild }: WalkedFolder): boolean => scan.holdsPage && !isApiChild;
+    const folderNames = folders.filter(isFolder).map(({ name }) => name);
     const childNames = entries.flatMap((entry) => {
       if ('page' in entry) {
         return [entry.page];
       }
-      return folderNames.includes(entry.name) ? [entry.name] : [];
+      return isFolder(entry) ? [entry.name] : [];
     });
     const { errors, navigation } = this.checkedNavigation(listing.navigationFile, {
       isContentRoot,

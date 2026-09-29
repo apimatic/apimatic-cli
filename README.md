@@ -55,9 +55,10 @@ Documentation portals are now built on your machine from a `src/` directory, and
   and every folder `tabs` does not name; its `pages` orders that sidebar as any other
   `nav.json` orders its folder, and the file's `title` names it. A token in `pages` places its
   section inside Home instead of in a tab of its own, at the same address; a section named in
-  neither list is a tab before the API reference. With every section in Home there is no tab
-  bar. A root file from 2.0.0-beta.1, which made a tab of each folder and token in `pages`, is
-  refused until it says which list they belong in.
+  neither list is a tab after the folders `tabs` names, before an API reference that is not
+  named ahead of them. With every section in Home there is no tab bar. A root file with no
+  `tabs` that names a folder or token in `pages`, which 2.0.0-beta.1 made tabs, is refused until
+  it says which list they belong in.
   ```json
   {
     "title": "Overview",

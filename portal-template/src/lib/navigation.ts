@@ -153,19 +153,13 @@ function isTabFolder(rootSettings: NavigationSettings | undefined, folder: Folde
   const folderPath = folder.$ref?.folder;
   return (
     folderPath !== undefined &&
-    folderPath !== apiBaseDir &&
     lists(rootSettings?.tabs, folderPath) &&
     // The home page is the Home tab's, whichever `(group)` folder serves it.
     !containsUrl([folder], HOME_URL)
   );
 }
 
-/**
- * Whether a top-level folder is a tab of its own. The API reference and a generated section
- * are, unless the root file's `pages` places them in Home; a folder of the user's is when its
- * `tabs` lists it. A node in both lists is refused by the CLI; here Home keeps the section and
- * `tabs` keeps the folder, each the rule its own list states.
- */
+/** The API reference and a generated section are tabs unless the root `pages` places them in Home; a folder is when `tabs` lists it. */
 function isTab(context: NavigationContext, settings: NavigationSettings | undefined, folder: Folder): boolean {
   if (isApiReference(folder)) {
     // The folder's name and the token reach the same node, as the CLI rules for `pages`.
@@ -191,10 +185,7 @@ function groupIntoTabs(context: NavigationContext, children: Node[]): Node[] {
     }
   }
 
-  // `tabs` orders the tabs as `pages` orders a directory's nodes, with the same defaults for
-  // what it leaves unnamed: a generated section before the API reference, SDKs first, never
-  // above a folder the file named, and an unnamed reference last. Run while the folders still
-  // carry their `$ref`, through which a folder entry is matched.
+  // Before the tabs lose their `$ref`, through which `reorder` matches a folder entry.
   const ordered = reorder(context, { type: 'folder', name: '', children: candidates }, '', settings?.tabs ?? []);
   const tabs = ordered.flatMap((node) => (node.type === 'folder' ? [asTab(node)] : []));
 

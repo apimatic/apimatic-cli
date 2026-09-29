@@ -144,13 +144,10 @@ export class PortalNavigation {
     // both lists, since a node is either a tab or in Home's sidebar: `api` in one and
     // `apimatic:api` in the other is the same node named twice.
     const seen = new Map<string, { list: string; entry: string }>();
-    const lists: [string, string[]][] =
-      tabs === undefined
-        ? [['pages', pages]]
-        : [
-            ['pages', pages],
-            [TABS_FIELD, tabs]
-          ];
+    const lists: [string, string[]][] = [
+      ['pages', pages],
+      ...(tabs === undefined ? [] : [[TABS_FIELD, tabs] as [string, string[]]])
+    ];
 
     for (const [list, entries] of lists) {
       for (const entry of entries) {
@@ -270,14 +267,7 @@ export class PortalNavigation {
     );
   }
 
-  /**
-   * 2.0.0-beta.1 had no `tabs`: the root file's `pages` made a tab of each folder and token it
-   * named. Read under today's rule, such a file would put them all in Home's sidebar, the
-   * quietly wrong sidebar this validation exists to refuse, and a warning would let an
-   * unattended `portal generate` do it. A folder serving the home page does not count: beta.1
-   * refused an entry naming one, so no beta.1 file holds it. Only beta users wrote that form,
-   * so this check goes when 2.0.0 ships.
-   */
+  /** A root file with no `tabs` that names a folder or token in `pages` meant a tab in 2.0.0-beta.1, so it is not read as Home's order without a word. */
   private static betaOneErrors(
     pages: string[] | undefined,
     tabs: string[] | undefined,
@@ -295,10 +285,11 @@ export class PortalNavigation {
     if (wereTabs.length === 0) {
       return [];
     }
+    const are = wereTabs.length === 1 ? 'is a tab' : 'are tabs';
     return [
-      `${context.label} has no '${TABS_FIELD}', so it lists ${quotedList(wereTabs)} for Home's sidebar, where ` +
-        `2.0.0-beta.1 made them tabs. Move the ones meant as tabs to '${TABS_FIELD}', or add "${TABS_FIELD}": [] ` +
-        `to keep them in Home.`
+      `${context.label} has no '${TABS_FIELD}', so it does not say whether ${quotedList(wereTabs)} ${are} or in ` +
+        `Home's sidebar (a 2.0.0-beta.1 file made them tabs). List the ones meant as tabs in '${TABS_FIELD}', or ` +
+        `add "${TABS_FIELD}": [] to keep them in Home.`
     ];
   }
 
@@ -452,8 +443,7 @@ export class PortalNavigation {
   }
 
   private static describeUnknownField(field: string, context: NavigationContext): string {
-    // The settings every file has; `tabs`, the root's alone, is answered on its own above.
-    const settings = quotedList([...KNOWN_FIELDS]);
+    const settings = quotedList([...(context.isContentRoot ? ROOT_FIELDS : KNOWN_FIELDS)]);
     return `${context.label}: '${field}' is not a ${NAVIGATION_FILE_NAME} setting. The settings are ${settings}.`;
   }
 
