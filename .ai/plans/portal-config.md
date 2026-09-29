@@ -287,9 +287,9 @@ root file's `pages`, and it opens on the home page wherever `index` sits (`src/l
 The other tabs follow in the order `tabs` lists them. A generated section named in neither
 list sits just before the API tab, SDKs first, unless `tabs` puts the API ahead of a folder,
 when it follows the last folder, or `pages` places the API in Home, when it comes last; an API
-named in neither comes last. These are the defaults
-`dev` gives the root `pages` today, read from `tabs` instead. No `nav.json` at all gives Home,
-SDKs, Context Plugin (with a plugin) and API, as it does today.
+named in neither comes last. These are the defaults `dev` gives the root `pages` today, read
+from `tabs` instead. No `nav.json` at all gives Home, SDKs, Context Plugin (with a plugin) and
+API, as it does today.
 
 A folder `tabs` does not list stays a group in Home's sidebar, where `pages` or `...` puts it,
 so no tab appears unasked when a folder is added under the scaffold's `["index", "..."]`. A
@@ -415,9 +415,11 @@ is the one layout since section 15.
   says so in its own name.
 - *(Added 2026-09-29.)* A root file with no `tabs` whose `pages` names a
   top-level folder, `api` or a token is refused, as 2.0.0-beta.1 made tabs of
-  those entries: "`content/nav.json` has no `tabs`, so it lists `guides` and
-  `apimatic:api` for Home's sidebar, where 2.0.0-beta.1 made them tabs. Move the
-  ones meant as tabs to `tabs`, or add `"tabs": []` to keep them in Home." A
+  those entries. A folder serving `/` does not count: beta.1 refused an entry
+  naming one, so no beta.1 file holds it. The sentence: "`content/nav.json` has
+  no `tabs`, so it lists `guides` and `apimatic:api` for Home's sidebar, where
+  2.0.0-beta.1 made them tabs. Move the ones meant as tabs to `tabs`, or add
+  `"tabs": []` to keep them in Home." A
   warning would let an unattended `portal generate` move a beta.1 portal's API
   reference into Home, the quietly wrong sidebar this validation exists to
   refuse. Before 2.0.0 only beta users wrote that form, so the check is removed
@@ -435,7 +437,7 @@ accept is applied to it -- the pages and `nav.json` files as the checks read the
 every other file as it is on disk -- while a save it would refuse leaves the copy,
 and so the browser, on what it last accepted. The warnings above are given on the
 save that brings them about, and an edit to `apimatic.json` that adds or removes
-a generated tab checks the content again. `portal generate` reads `content/`
+a generated section checks the content again. `portal generate` reads `content/`
 where it is.
 
 ### History
@@ -458,9 +460,9 @@ where it is.
   ordered inside Home without becoming a tab. Unnamed, the folders fell
   together where `...` stood, in alphabetical order, and the only way to order
   them among themselves was a parent folder, which moves every address below
-  it. `tabs` took the first decision; `pages` means at the
-  root what it means everywhere else. The tokens became placeable in Home in the
-  same change, since with `tabs` a generated section is one more top-level node,
+  it. `tabs` took the first decision; `pages` means at the root what it means
+  everywhere else. The tokens became placeable in Home in the same change,
+  since with `tabs` a generated section is one more top-level node,
   in `tabs` or in Home. Below the root they stay refused: a subfolder's
   `nav.json` could not claim a node that lives at the root without the
   transformer moving nodes between folders, which is what makes losing a page
@@ -1104,8 +1106,11 @@ touches.
   keeps listing `pages` and `title`; `NavigationSettings.tabs`; the `tabs`
   entry rules and the node-in-both check; `pages` loses its refusal of a
   folder serving `/`, which moves to `tabs`; the below-root token sentence
-  names both places; and the refusal of a beta.1 root file, which needs only
-  what `NavigationContext` already carries.
+  names both places; and the refusal of a beta.1 root file.
+  `NavigationContext` gains the names of the subfolders with a page in or
+  below them, which the `tabs` refusal of a page and the beta.1 refusal need:
+  `childNames` mixes pages and folders, and `emptyFolders` lists only the
+  others. `content-tree.ts`'s `visit` already holds them.
 - **`src/types/portal/content-tree.ts`**: `tabs()` takes folder tabs from
   `tabs`, and leaves out the API and a generated section the root `pages`
   places in Home.
@@ -1117,6 +1122,10 @@ touches.
   checks the content again. `GeneratedPages.makesSameTabsAs` becomes
   `makesSameSectionsAs`, and `serve.ts`'s `tabsChanged` and the comment above
   it follow: a section can now sit in Home, so what they compare is sections.
+- **Doc comments that state the old rule** follow in the step that changes
+  it: `generated-pages.ts`'s `GeneratedSection`, its `token` and
+  `GeneratedNavigation`, which call every section a tab, and in the template
+  `GENERATED_SECTIONS` and `tabsTransformer` in `navigation.ts`.
 
 ### Docs, fixtures, other plans
 
@@ -1136,8 +1145,8 @@ touches.
 - `test/types/portal/portal-navigation.test.ts`: each `tabs` rule and refusal,
   `api` and `apimatic:api` split across the two lists, `tabs` below the root,
   tokens in the root `pages`, the reworded below-root sentence, a folder
-  serving `/` accepted in `pages`, and the beta.1 refusal with the file that
-  `"tabs": []` makes valid.
+  serving `/` accepted in `pages` with no `tabs`, and the beta.1 refusal with
+  the file that `"tabs": []` makes valid.
 - `test/types/portal/content-tree.test.ts`: tabs from `tabs`, and sections
   placed in Home left out of the tabs and out of the shared-name check.
 - `test/types/portal/preview-content.test.ts` and
@@ -1151,8 +1160,15 @@ touches.
   folder ordered among Home's pages, tab order from `tabs` with the defaults,
   the API and the plugin in Home, an unnamed SDKs tab last when the API is in
   Home, and no tab for Home alone. One case holds the two halves together:
-  `navigation-schema.ts` parses `tabs` rather than stripping it, since the CLI
-  would otherwise validate a key the template never sees.
+  `navigation-schema.ts` keeps every setting the CLI accepts, `tabs` among
+  them, rather than stripping it, since the CLI would otherwise validate a key
+  the template never sees.
+- Every existing test whose root `nav.json` lists a folder, `api` or a token in
+  `pages` and means it as a tab moves those entries to `tabs` in the step whose
+  rules it tests: `test/portal-template/navigation.test.ts` and `tabs.test.ts`
+  in step 1, `test/types/portal/portal-navigation.test.ts`,
+  `test/types/portal-source-context.test.ts` and the default fixture in step 2,
+  as the beta.1 refusal would reject them otherwise.
 - `test/e2e/portal-build.test.ts`: the moved fixture, and one build with a
   generated section in Home, checked in the rendered sidebar.
 
@@ -1165,6 +1181,12 @@ One PR against `dev`, `feat(portal)`, three steps, each stopped at for review:
    tests, and the default fixture's move to `tabs`, which the beta.1 refusal
    would otherwise reject.
 3. **E2e, README.** The Home-placement build and the README bullet.
+
+Each step leaves the build, lint on touched files and its unit tests green. The
+e2e suite is green again from step 2: after step 1 the template reads `tabs`
+while the CLI still refuses the key, so the default fixture can neither keep
+its old form nor take the new one. Neither order of the two halves avoids
+that, and they stay separate steps to keep each review to one side.
 
 No `BREAKING CHANGE:` footer: `nav.json` is new since 1.x, so against the last
 stable release this breaks nothing. The next beta's release notes say what
