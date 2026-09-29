@@ -3,12 +3,7 @@ import { expect } from 'chai';
 import sinon from 'sinon';
 import { log } from '@clack/prompts';
 import { PortalServePrompts } from '../../../src/prompts/portal/serve.js';
-import {
-  reportFolderTabs,
-  reportShadowedFiles,
-  reportSharedTabNames,
-  reportSourceProblem
-} from '../../../src/prompts/portal/source.js';
+import { reportShadowedFiles, reportSharedTabNames, reportSourceProblem } from '../../../src/prompts/portal/source.js';
 import { ContentProblem } from '../../../src/types/portal/portal-source.js';
 import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
 import { FileName } from '../../../src/types/file/fileName.js';
@@ -349,34 +344,6 @@ describe('reportShadowedFiles', () => {
 
     expect(printed()).to.equal(
       "'robots.txt', 'sitemap.xml' and 'llms.txt' in 'static' replace the files the portal would have generated."
-    );
-  });
-});
-
-describe('reportFolderTabs', () => {
-  let info: sinon.SinonStub;
-
-  beforeEach(() => {
-    info = sinon.stub(log, 'info');
-  });
-
-  afterEach(() => {
-    sinon.restore();
-  });
-
-  it('says nothing when the root nav.json lists no folder', () => {
-    reportFolderTabs([]);
-
-    expect(info.called).to.be.false;
-  });
-
-  // Listing a folder is all it takes to make a tab, so the output names each one it made.
-  it('names each folder the root nav.json makes a tab of, in its order', () => {
-    const content = new DirectoryPath('project', 'src', 'content');
-    reportFolderTabs([content.join('tutorials'), content.join('guides')]);
-
-    expect(stripVTControlCharacters(String(info.firstCall.args[0]))).to.equal(
-      "'content/nav.json' makes a tab of each folder it lists: 'tutorials' and 'guides'."
     );
   });
 });

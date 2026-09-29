@@ -12,7 +12,7 @@ describe('PreviewContent', () => {
   const page = (name: string) => new FilePath(content.join('api').join('api'), new FileName(name));
   const folder = (name: string) => content.join(name);
 
-  const NONE: ContentNotices = { hiddenPages: [], ignoredNavigationFiles: [], folderTabs: [], sharedTabNames: [] };
+  const NONE: ContentNotices = { hiddenPages: [], ignoredNavigationFiles: [], sharedTabNames: [] };
   const notices = (overrides: Partial<ContentNotices>): ContentNotices => ({ ...NONE, ...overrides });
 
   const home: PortalTab = { owner: { kind: 'home' }, name: 'Guides', namedBy: null };
@@ -39,7 +39,7 @@ describe('PreviewContent', () => {
   });
 
   it('gives every notice the first time', () => {
-    const current = notices({ hiddenPages: [page('notes.md')], folderTabs: [folder('guides')] });
+    const current = notices({ hiddenPages: [page('notes.md')], sharedTabNames: [shared('Guides', [home, guides])] });
 
     expect(noticesAfter(current, NONE)).to.deep.equal(current);
   });
@@ -48,13 +48,11 @@ describe('PreviewContent', () => {
     const current = notices({
       hiddenPages: [page('notes.md')],
       ignoredNavigationFiles: [new FilePath(content, new FileName('Nav.json'))],
-      folderTabs: [folder('guides')],
       sharedTabNames: [shared('Guides', [home, guides])]
     });
     const again = notices({
       hiddenPages: [page('notes.md')],
       ignoredNavigationFiles: [new FilePath(content, new FileName('Nav.json'))],
-      folderTabs: [folder('guides')],
       sharedTabNames: [shared('Guides', [{ ...guides, namedBy: null }, home])]
     });
 
@@ -63,15 +61,21 @@ describe('PreviewContent', () => {
 
   // The whole list, so the notice still says all that is true of the content.
   it('gives a kind of notice in full when it holds something new, and leaves the others out', () => {
-    const before = notices({ hiddenPages: [page('notes.md')], folderTabs: [folder('guides')] });
-    const after = notices({ hiddenPages: [page('notes.md'), page('faq.md')], folderTabs: [folder('guides')] });
+    const before = notices({ hiddenPages: [page('notes.md')], sharedTabNames: [shared('Guides', [home, guides])] });
+    const after = notices({
+      hiddenPages: [page('notes.md'), page('faq.md')],
+      sharedTabNames: [shared('Guides', [home, guides])]
+    });
 
     expect(noticesAfter(after, before)).to.deep.equal(notices({ hiddenPages: [page('notes.md'), page('faq.md')] }));
   });
 
-  it('gives nothing for a notice that went away, or for the same folders in another order', () => {
-    const before = notices({ hiddenPages: [page('notes.md')], folderTabs: [folder('guides'), folder('concepts')] });
-    const after = notices({ folderTabs: [folder('concepts'), folder('guides')] });
+  it('gives nothing for a notice that went away, or for the same pages in another order', () => {
+    const before = notices({
+      hiddenPages: [page('notes.md'), page('faq.md')],
+      sharedTabNames: [shared('Guides', [home, guides])]
+    });
+    const after = notices({ hiddenPages: [page('faq.md'), page('notes.md')] });
 
     expect(noticesAfter(after, before)).to.deep.equal(NONE);
   });

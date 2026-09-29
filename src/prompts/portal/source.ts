@@ -284,16 +284,7 @@ export function reportIgnoredNavigationFiles(files: FilePath[], sourceDirectory:
 export function reportContentNotices(notices: ContentNotices, sourceDirectory: DirectoryPath): void {
   reportHiddenPages(notices.hiddenPages, sourceDirectory);
   reportIgnoredNavigationFiles(notices.ignoredNavigationFiles, sourceDirectory);
-  reportFolderTabs(notices.folderTabs);
   reportSharedTabNames(notices.sharedTabNames, sourceDirectory);
-}
-
-export function reportFolderTabs(folders: DirectoryPath[]): void {
-  if (folders.length === 0) {
-    return;
-  }
-  const names = listedInProse(folders.map((folder) => f.var(folder.leafName())));
-  log.info(`${f.var(ROOT_NAVIGATION_FILE)} makes a tab of each folder it lists: ${names}.`);
 }
 
 export function reportSharedTabNames(shared: SharedTabName[], sourceDirectory: DirectoryPath): void {

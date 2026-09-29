@@ -526,12 +526,13 @@ describe('navigationTransformer', () => {
    */
   describe('the token vocabulary both halves share', () => {
     const accepts = (entry: string) =>
-      PortalNavigation.validate(JSON.stringify({ pages: [entry, 'index'] }), {
+      PortalNavigation.validate(JSON.stringify({ tabs: [], pages: [entry, 'index'] }), {
         label: 'content/nav.json',
         isContentRoot: true,
         isApiDirectory: false,
         becomesFolder: true,
         childNames: ['index', 'authentication'],
+        folderNames: [],
         emptyFolders: [],
         homePageFolders: []
       }).isOk();

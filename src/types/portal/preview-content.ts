@@ -34,7 +34,6 @@ export class PreviewContent {
         previous.ignoredNavigationFiles,
         (left, right) => left.isEqual(right)
       ),
-      folderTabs: whenAnyNew(current.folderTabs, previous.folderTabs, (left, right) => left.isEqual(right)),
       sharedTabNames: whenAnyNew(current.sharedTabNames, previous.sharedTabNames, isSameSharedName)
     };
   }

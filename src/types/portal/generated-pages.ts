@@ -12,11 +12,14 @@ import { PortalSdk } from './portal-sdk.js';
 // `src/lib/source.ts` names it as a relative literal, so the browser bundle never carries the project's location.
 export const GENERATED_DIRECTORY_NAME = 'generated';
 
-/** A set of pages the CLI writes into the portal, which the portal shows as a tab of its own. */
+/**
+ * A set of pages the CLI writes into the portal, shown as a tab of its own unless the root
+ * `nav.json`'s `pages` places it in Home's sidebar; its address is the same either way.
+ */
 export interface GeneratedSection {
   /** The folder the pages are written to, and so the address they are served at. */
   folder: string;
-  /** The root `nav.json` entry that positions the tab. */
+  /** The root `nav.json` entry that positions the section: in `tabs` as a tab, in `pages` inside Home. */
   token: string;
   title: string;
   /** What a message says the address is kept for. */
@@ -39,7 +42,7 @@ export const PLUGIN_SECTION: GeneratedSection = {
   description: 'the context plugin page'
 };
 
-/** Every section, in the order the tabs take when the root `nav.json` names none of them. */
+/** Every section, in the order they take when the root `nav.json` names none of them. */
 export const GENERATED_SECTIONS: readonly GeneratedSection[] = [SDK_SECTION, PLUGIN_SECTION];
 
 /** The templates in the package's `portal-pages/` directory, by the name of their file. */
@@ -68,7 +71,7 @@ export interface MissingArtifacts {
   plugin: boolean;
 }
 
-/** A section's `nav.json`, which names its tab and orders its pages. */
+/** A section's `nav.json`, which names the section and orders its pages. */
 export interface GeneratedNavigation {
   section: GeneratedSection;
   contents: string;
@@ -89,8 +92,8 @@ export class GeneratedPages {
     return this.plugin === null ? [SDK_SECTION] : [SDK_SECTION, PLUGIN_SECTION];
   }
 
-  /** Whatever pages the tabs hold, which the languages decide. */
-  public makesSameTabsAs(other: GeneratedPages): boolean {
+  /** Whatever pages the sections hold, which the languages decide. */
+  public makesSameSectionsAs(other: GeneratedPages): boolean {
     const theirs = other.sections();
     const mine = this.sections();
     return mine.length === theirs.length && mine.every((section, index) => section === theirs[index]);
