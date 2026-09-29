@@ -25,3 +25,11 @@ const PROSE_LISTS = {
 export function listedInProse(items: readonly string[], joiner: keyof typeof PROSE_LISTS = 'and'): string {
   return PROSE_LISTS[joiner].format(items);
 }
+
+// A loop rather than `/\/+$/`, which retries its quantifier from every slash and so runs
+// quadratically over a long run of them.
+export function withoutTrailingSlashes(path: string): string {
+  let end = path.length;
+  while (end > 0 && path[end - 1] === '/') end--;
+  return path.slice(0, end);
+}

@@ -1,5 +1,6 @@
 import { err, ok, Result } from 'neverthrow';
 import { UrlPath } from '../../file/urlPath.js';
+import { withoutTrailingSlashes } from '../../../utils/string-utils.js';
 import { BasePath } from './base-path.js';
 import { allOf, isWebAddress, namespace, nonEmptyString, Parsed, unknownKeys } from './fields.js';
 
@@ -122,7 +123,7 @@ export class SiteConfig {
     if (parsed.search !== '' || parsed.hash !== '') {
       return null;
     }
-    const mountedAt = parsed.pathname.replace(/\/+$/, '');
+    const mountedAt = withoutTrailingSlashes(parsed.pathname);
     return { url: new UrlPath(`${parsed.origin}${mountedAt}`), base: BasePath.of(mountedAt) };
   }
 }
