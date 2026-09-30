@@ -6,7 +6,7 @@ import { DirectoryPath } from '../types/file/directoryPath.js';
 import { FilePath } from '../types/file/filePath.js';
 import { ServiceError } from '../infrastructure/service-error.js';
 import { Directory } from '../types/file/directory.js';
-import { createResourceInputFromInput } from '../types/file/resource-input.js';
+import { createFileOrUrlFromInput } from '../types/file/resource-input.js';
 import { FileDownloadResponse } from '../infrastructure/services/file-download-service.js';
 import { PortalAuthorizationFailure } from '../infrastructure/services/portal-authorization-service.js';
 import { APIMATIC_CONFIG_FILE_NAME } from '../types/apimatic-config/document.js';
@@ -50,7 +50,7 @@ Let's get started!`);
         if (!value && defaultSpecUrl === null) {
           return 'Please enter a file path or URL.';
         }
-        if (value && !createResourceInputFromInput(value)) {
+        if (value && !createFileOrUrlFromInput(value)) {
           return 'Please enter a valid file path or URL.';
         }
       }
@@ -58,7 +58,7 @@ Let's get started!`);
     if (isCancel(spec)) {
       return undefined;
     }
-    return createResourceInputFromInput(spec);
+    return createFileOrUrlFromInput(spec);
   }
 
   public specFormatUnsupported(specPath: FilePath, format: string) {

@@ -37,7 +37,7 @@ export const createFileOrUrlInput = (file?: string, url?: string): FilePath | Ur
   throw new Error('Must specify either file or url.');
 };
 
-export function createResourceInputFromInput(path: string): FilePath | UrlPath | undefined {
+export function createFileOrUrlFromInput(path: string): FilePath | UrlPath | undefined {
   const sanitizedPath = removeQuotes(path.trim() ?? '');
   const urlPath = UrlPath.create(sanitizedPath);
   if (urlPath) {
