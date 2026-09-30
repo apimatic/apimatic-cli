@@ -1,4 +1,5 @@
 import type { BaseLayoutProps } from 'fumadocs-ui/layouts/shared';
+import { withBasePath } from './base-path';
 import { portal } from './portal';
 
 export function baseOptions(): BaseLayoutProps {
@@ -30,12 +31,13 @@ const LOGO_SIZE = 'h-6 w-auto max-w-none';
 function Logo() {
   const { logo } = portal;
   if (!logo) return null;
-  if (logo.light === logo.dark) return <img src={logo.light} alt="" className={LOGO_SIZE} />;
+  const [light, dark] = [withBasePath(logo.light), withBasePath(logo.dark)];
+  if (light === dark) return <img src={light} alt="" className={LOGO_SIZE} />;
   // Both are in the page and CSS shows one, so the right one is there before any script runs.
   return (
     <>
-      <img src={logo.light} alt="" className={`${LOGO_SIZE} dark:hidden`} />
-      <img src={logo.dark} alt="" className={`hidden ${LOGO_SIZE} dark:block`} />
+      <img src={light} alt="" className={`${LOGO_SIZE} dark:hidden`} />
+      <img src={dark} alt="" className={`hidden ${LOGO_SIZE} dark:block`} />
     </>
   );
 }

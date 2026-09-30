@@ -611,3 +611,135 @@ const stylesheetOf = (output: DirectoryPath) => {
     expect(read('api/pets/pets/uploadPetPhoto/index.html')).to.contain('id="request-body"');
   });
 });
+
+/**
+ * A portal whose address carries a path, `/api`, that its API reference's own pages start with:
+ * the case where a page could be taken for one already under the path and written without it.
+ */
+(enabled ? describe : describe.skip)('portal build, under a path (end to end)', function () {
+  this.timeout(10 * 60 * 1000);
+
+  let built: BuiltPortal | undefined;
+  let output: DirectoryPath;
+
+  before(async () => {
+    built = await buildFixture('subpath', { plugin: true });
+    ({ output } = built);
+  });
+
+  after(async () => {
+    await removeBuilt(built);
+  });
+
+  const read = (relative: string) => fs.readFileSync(path.join(output.toString(), relative), 'utf8');
+  const exists = (relative: string) => fs.existsSync(path.join(output.toString(), relative));
+
+  // The host serves the output's root at the path, so the path itself is no folder in it.
+  it('writes each page once, laid out as it would be at the root', () => {
+    for (const page of [
+      'index.html',
+      'index.md',
+      'authentication/index.html',
+      'api/search.json',
+      'api/apimatic-calculator/simple-calculator/Calculate/index.html'
+    ]) {
+      expect(exists(page), page).to.be.true;
+    }
+    expect(exists('api/api')).to.be.false;
+    expect(exists('api/authentication')).to.be.false;
+  });
+
+  it('points the page at its scripts, styles and the other pages under the path', () => {
+    const page = read('index.html');
+    const assets = [...page.matchAll(/\s(?:src|href)="([^"]*\/assets\/[^"]*)"/g)].map((match) => match[1]);
+
+    expect(assets).to.not.be.empty;
+    expect(assets.filter((asset) => !asset.startsWith('/api/assets/'))).to.deep.equal([]);
+    expect(page).to.contain('href="/api/authentication"');
+    expect(page).to.contain('href="/api/api/apimatic-calculator/');
+    expect(page).to.not.contain('href="/authentication"');
+  });
+
+  // Everything the page itself names on this host, the logo and favicon among them.
+  it('names nothing on its host outside the path', () => {
+    for (const page of [
+      'index.html',
+      'authentication/index.html',
+      'api/apimatic-calculator/simple-calculator/Calculate/index.html',
+      'sdks/index.html',
+      'sdks/typescript/index.html',
+      'context-plugin/index.html'
+    ]) {
+      const addresses = [...read(page).matchAll(/\s(?:src|href)="(\/[^"]*)"/g)].map((match) => match[1]);
+
+      expect(addresses, page).to.not.be.empty;
+      expect(
+        addresses.filter((address) => !address.startsWith('/api/')),
+        page
+      ).to.deep.equal([]);
+    }
+    expect(read('index.html')).to.match(/<img src="\/api\/images\/logo\.png"/);
+    expect(read('index.html')).to.match(/<link rel="icon" href="\/api\/images\/logo\.png"/);
+    expect(read('sdks/index.html')).to.contain('href="/api/__downloads/sdk/typescript.zip"');
+  });
+
+  // Bundled, so it carries the base; a linked `/images/diagram.png` would be fetched from the host's
+  // root. The image is over Vite's 4 KiB inline limit, or it would be a data: URI and prove nothing.
+  it('bundles a Markdown image, under the path', () => {
+    expect(read('index.html')).to.match(/<img[^>]* src="\/api\/assets\/diagram[^"]*\.png"/);
+  });
+
+  it('links the pages under the path in llms.txt and llms-full.txt', () => {
+    const links = [...read('llms.txt').matchAll(/\]\(([^)]*)\)/g)].map((match) => match[1]);
+
+    expect(links).to.include.members(['/api/authentication']);
+    expect(links.some((link) => link.startsWith('/api/api/apimatic-calculator/'))).to.be.true;
+    expect(links.filter((link) => !link.startsWith('/api/'))).to.deep.equal([]);
+    expect(read('llms-full.txt')).to.contain('# Authentication (/api/authentication)');
+  });
+
+  it('writes no robots file, which crawlers read only at the root of a host', () => {
+    expect(exists('robots.txt')).to.be.false;
+    expect(exists('sitemap.xml')).to.be.true;
+  });
+
+  it('writes the path into the links and install command the Markdown twins carry', () => {
+    const sdks = read('sdks.md');
+
+    expect(sdks).to.contain('[TypeScript](/api/sdks/typescript)');
+    expect(sdks).to.contain('[Download SDK](/api/__downloads/sdk/typescript.zip)');
+    expect(read('context-plugin.md')).to.contain(
+      'npx context-plugins install "https://docs.test/api/__downloads/plugin.zip"'
+    );
+  });
+
+  // The prerender knows the configured address, which carries the path; the browser swaps in its own.
+  it('installs the bundled plugin from under the path', () => {
+    expect(read('context-plugin/index.html')).to.match(
+      /npx context-plugins install (&quot;|")https:\/\/docs\.test\/api\/__downloads\/plugin\.zip(&quot;|")/
+    );
+  });
+
+  // Without it every page reached by a link is the not-found page: the browser looks for the
+  // page's data at the host's root, while the build writes it where the host serves the path.
+  it('fetches the pages’ prerendered data from under the path, where the build writes it', () => {
+    const scripts = scriptsOf(output);
+    const fetchingFrom = (address: RegExp) =>
+      scripts.filter((script) => address.test(script.text)).map((script) => script.name);
+
+    expect(fetchingFrom(/[`'"]\/api\/__tsr\/staticServerFnCache\//)).to.not.be.empty;
+    expect(fetchingFrom(/[`'"]\/__tsr\/staticServerFnCache\//)).to.deep.equal([]);
+    expect(fs.readdirSync(path.join(output.toString(), '__tsr/staticServerFnCache'))).to.not.be.empty;
+    expect(exists('api/__tsr')).to.be.false;
+  });
+
+  it('gives the path in canonical links, og:url and the sitemap', () => {
+    const page = read('index.html');
+    const locations = [...read('sitemap.xml').matchAll(/<loc>([^<]*)<\/loc>/g)].map((match) => match[1]);
+
+    expect(page).to.contain('<link rel="canonical" href="https://docs.test/api/"');
+    expect(page).to.contain('<meta property="og:url" content="https://docs.test/api/"');
+    expect(locations).to.include('https://docs.test/api/api/apimatic-calculator/simple-calculator/Calculate');
+    expect(locations.filter((location) => !location.startsWith('https://docs.test/api/'))).to.deep.equal([]);
+  });
+});

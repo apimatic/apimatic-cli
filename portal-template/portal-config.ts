@@ -27,6 +27,11 @@ export async function readPortalIdentity(): Promise<BuildIdentity> {
   return (await readJson('./portal.identity.json')) as BuildIdentity;
 }
 
+/** Vite's `base`: the path of the site address, which every page and asset is served under. */
+export function viteBase(identity: BuildIdentity): string {
+  return identity.siteUrl === null ? '/' : `${new URL(identity.siteUrl).pathname.replace(/\/$/, '')}/`;
+}
+
 async function readJson(relative: string): Promise<unknown> {
   return JSON.parse(await readFile(new URL(relative, import.meta.url), 'utf8'));
 }

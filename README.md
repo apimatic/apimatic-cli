@@ -30,6 +30,8 @@ Documentation portals are now built on your machine from a `src/` directory, and
   and description), `brand` (logo, favicon, primary colour and colour mode), `navigation`
   (header links) and `ai` (the page actions). Running `apimatic quickstart` scaffolds the block
   with every default spelled out, and the file's `$schema` lets your editor complete and check it.
+  The address may carry a path, such as `https://acme.github.io/docs`, and the portal is then
+  built to be served there.
 - A portal also needs the project's SDK languages, at least one, in the same file's
   `languages` block, for example `"languages": { "typescript": {} }`; `csharp`, `python` and
   `typescript` are available for now. `plugin generate` and `sdk publish` both write to it, and
