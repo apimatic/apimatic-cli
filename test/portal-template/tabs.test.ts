@@ -144,6 +144,24 @@ describe('tabsTransformer', () => {
         file: root(['tutorials'], ['index', 'apimatic:api']),
         generated: SDKS,
         tabs: ['Home', 'Tutorials', 'SDKs']
+      },
+      {
+        rule: 'follow a named API reference rather than jumping ahead of it',
+        file: root(['apimatic:api']),
+        generated: GENERATED,
+        tabs: ['Home', 'API Reference', 'SDKs', 'Context Plugin']
+      },
+      {
+        rule: 'follow every named tab when tabs names only the reference and a section',
+        file: root(['apimatic:api', 'apimatic:sdks']),
+        generated: GENERATED,
+        tabs: ['Home', 'API Reference', 'SDKs', 'Context Plugin']
+      },
+      {
+        rule: 'follow a named API reference that comes after a folder too',
+        file: root(['tutorials', 'apimatic:api']),
+        generated: GENERATED,
+        tabs: ['Home', 'Tutorials', 'API Reference', 'SDKs', 'Context Plugin']
       }
     ];
 

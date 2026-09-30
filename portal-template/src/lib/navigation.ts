@@ -186,7 +186,13 @@ function groupIntoTabs(context: NavigationContext, children: Node[]): Node[] {
   }
 
   // Before the tabs lose their `$ref`, through which `reorder` matches a folder entry.
-  const ordered = reorder(context, { type: 'folder', name: '', children: candidates }, '', settings?.tabs ?? []);
+  const ordered = reorder(
+    context,
+    { type: 'folder', name: '', children: candidates },
+    '',
+    settings?.tabs ?? [],
+    'afterEveryNamed'
+  );
   const tabs = ordered.flatMap((node) => (node.type === 'folder' ? [asTab(node)] : []));
 
   // Fumadocs points a tab at the page with the same path inside the tab being left, when
@@ -290,7 +296,13 @@ function firstPageIn(folder: Folder): Node | undefined {
   return undefined;
 }
 
-function reorder(context: NavigationContext, node: Folder, folderPath: string, order: string[]): Node[] {
+function reorder(
+  context: NavigationContext,
+  node: Folder,
+  folderPath: string,
+  order: string[],
+  unnamedSections: 'beforeApiReference' | 'afterEveryNamed' = 'beforeApiReference'
+): Node[] {
   const remaining = new Set(node.children);
   // Asked once per child: the token, both bands and the anchor all want to know, and each
   // answer is a storage read.
@@ -347,8 +359,10 @@ function reorder(context: NavigationContext, node: Folder, folderPath: string, o
   const ordered = [...named.slice(0, at), ...content, ...named.slice(at)];
 
   // Before the API reference, but never above the user's own pages: when the file puts the
-  // reference first, the band follows the content instead.
-  const anchor = Math.max(anchorIn(ordered), at + content.length);
+  // reference first, the band follows the content instead. In the tab bar every folder is
+  // named, so the band follows everything `tabs` names, a named reference included.
+  const anchor =
+    unnamedSections === 'afterEveryNamed' ? ordered.length : Math.max(anchorIn(ordered), at + content.length);
   return [...ordered.slice(0, anchor), ...injected, ...ordered.slice(anchor), ...api];
 }
 
