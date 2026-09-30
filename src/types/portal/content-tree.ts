@@ -171,7 +171,10 @@ export class ContentTree {
       noTabsListed:
         rootNavigation?.settings.tabs === undefined
           ? { file: rootNavigation?.file, sections: generatedPages.sections() }
-          : undefined
+          : undefined,
+      // Home's name shows only in a tab bar, and one tab draws none.
+      unseenHomeTitle:
+        rootNavigation?.settings.title !== undefined && tabs.length === 1 ? rootNavigation.file : undefined
     });
   }
 

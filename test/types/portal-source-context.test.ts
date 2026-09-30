@@ -1604,6 +1604,16 @@ describe('PortalSourceContext', () => {
 
       expect((await notices()).noTabsListed).to.be.undefined;
     });
+
+    it('says a Home title shows nowhere while Home is the only tab', async () => {
+      write('content/nav.json', JSON.stringify({ title: 'Docs', tabs: [], pages: ['index'] }));
+
+      expect((await notices()).unseenHomeTitle).to.deep.equal(rootNavigation());
+
+      write('content/nav.json', JSON.stringify({ title: 'Docs', tabs: ['apimatic:api'], pages: ['index'] }));
+
+      expect((await notices()).unseenHomeTitle).to.be.undefined;
+    });
   });
 
   describe('tab names', () => {

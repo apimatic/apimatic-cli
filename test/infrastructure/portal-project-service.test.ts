@@ -66,7 +66,8 @@ describe('PortalProjectService', () => {
       hiddenPages: [],
       ignoredNavigationFiles: [],
       sharedTabNames: [],
-      noTabsListed: undefined
+      noTabsListed: undefined,
+      unseenHomeTitle: undefined
     },
     ...overrides
   });

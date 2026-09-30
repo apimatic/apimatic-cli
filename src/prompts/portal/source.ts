@@ -286,6 +286,7 @@ export function reportContentNotices(notices: ContentNotices, sourceDirectory: D
   reportIgnoredNavigationFiles(notices.ignoredNavigationFiles, sourceDirectory);
   reportSharedTabNames(notices.sharedTabNames, sourceDirectory);
   reportNoTabsListed(notices.noTabsListed, sourceDirectory);
+  reportUnseenHomeTitle(notices.unseenHomeTitle, sourceDirectory);
 }
 
 /** A 2.0.0-beta.1 portal had the sections as tabs with no `tabs` at all, so losing them is said once per build. */
@@ -301,6 +302,16 @@ export function reportNoTabsListed(notice: NoTabsListed | undefined, sourceDirec
   log.warn(
     `${cause}, so nothing is a tab: the header shows no tab bar, and ${names} are folders in Home's sidebar. ` +
       `${add} ${f.var(`"tabs": ${tokens}`)} to show them as tabs, or ${f.var('"tabs": []')} to keep this sidebar.`
+  );
+}
+
+export function reportUnseenHomeTitle(file: FilePath | undefined, sourceDirectory: DirectoryPath): void {
+  if (file === undefined) {
+    return;
+  }
+  log.warn(
+    `${relative(file, sourceDirectory)} names the Home tab with ${f.var('title')}, but Home is the only tab ` +
+      `and one tab draws no tab bar, so the name shows nowhere. Name a tab in ${f.var('tabs')}, or remove the setting.`
   );
 }
 

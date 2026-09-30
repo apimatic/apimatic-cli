@@ -7,7 +7,8 @@ import {
   reportNoTabsListed,
   reportShadowedFiles,
   reportSharedTabNames,
-  reportSourceProblem
+  reportSourceProblem,
+  reportUnseenHomeTitle
 } from '../../../src/prompts/portal/source.js';
 import { ContentProblem } from '../../../src/types/portal/portal-source.js';
 import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
@@ -494,6 +495,37 @@ describe('reportNoTabsListed', () => {
       "There is no 'content/nav.json', so nothing is a tab: the header shows no tab bar, and SDKs and the API " +
         'reference are folders in Home\'s sidebar. Add the file with \'"tabs": ["apimatic:sdks","apimatic:api"]\' ' +
         'to show them as tabs, or \'"tabs": []\' to keep this sidebar.'
+    ]);
+  });
+});
+
+describe('reportUnseenHomeTitle', () => {
+  const source = new DirectoryPath('project').join('src');
+  let lines: string[];
+
+  beforeEach(() => {
+    lines = [];
+    sinon.stub(log, 'warn').callsFake((text?: string | string[]) => {
+      lines.push(stripVTControlCharacters(String(text)));
+    });
+  });
+
+  afterEach(() => {
+    sinon.restore();
+  });
+
+  it('says nothing when the title has a tab bar to show in', () => {
+    reportUnseenHomeTitle(undefined, source);
+
+    expect(lines).to.deep.equal([]);
+  });
+
+  it('says the title shows nowhere while Home is the only tab', () => {
+    reportUnseenHomeTitle(new FilePath(source.join('content'), new FileName('nav.json')), source);
+
+    expect(lines).to.deep.equal([
+      "'content/nav.json' names the Home tab with 'title', but Home is the only tab and one tab draws no tab bar, " +
+        "so the name shows nowhere. Name a tab in 'tabs', or remove the setting."
     ]);
   });
 });

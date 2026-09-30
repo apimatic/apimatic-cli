@@ -16,7 +16,8 @@ describe('PreviewContent', () => {
     hiddenPages: [],
     ignoredNavigationFiles: [],
     sharedTabNames: [],
-    noTabsListed: undefined
+    noTabsListed: undefined,
+    unseenHomeTitle: undefined
   };
   const notices = (overrides: Partial<ContentNotices>): ContentNotices => ({ ...NONE, ...overrides });
 
@@ -96,6 +97,13 @@ describe('PreviewContent', () => {
     expect(noticesAfter(same, before).noTabsListed).to.be.undefined;
     expect(noticesAfter(withPlugin, before).noTabsListed).to.deep.equal(withPlugin.noTabsListed);
     expect(noticesAfter(NONE, before).noTabsListed).to.be.undefined;
+  });
+
+  it('gives the unseen Home title once', () => {
+    const titled = notices({ unseenHomeTitle: new FilePath(content, new FileName('nav.json')) });
+
+    expect(noticesAfter(titled, NONE).unseenHomeTitle).to.deep.equal(titled.unseenHomeTitle);
+    expect(noticesAfter(titled, titled).unseenHomeTitle).to.be.undefined;
   });
 
   it('gives a name shared by another tab than before', () => {

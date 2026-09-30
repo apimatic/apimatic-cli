@@ -714,7 +714,7 @@ const stylesheetOf = (output: DirectoryPath) => {
     expect(page).to.contain('Every section sits in Home.');
     expect(
       tabPositions(page, [
-        ['/', 'Docs'],
+        ['/', 'Home'],
         ['/sdks', 'SDKs'],
         ['/context-plugin', 'Context Plugin'],
         ['/api/[^"]+', 'API Reference']

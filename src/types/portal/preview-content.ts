@@ -36,7 +36,8 @@ export class PreviewContent {
         (left, right) => left.isEqual(right)
       ),
       sharedTabNames: whenAnyNew(current.sharedTabNames, previous.sharedTabNames, isSameSharedName),
-      noTabsListed: whenNew(current.noTabsListed, previous.noTabsListed, isSameNoTabs)
+      noTabsListed: whenNew(current.noTabsListed, previous.noTabsListed, isSameNoTabs),
+      unseenHomeTitle: whenNew(current.unseenHomeTitle, previous.unseenHomeTitle, isSameFile)
     };
   }
 }

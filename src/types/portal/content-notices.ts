@@ -27,4 +27,6 @@ export interface ContentNotices {
    * the sections as tabs, and would otherwise lose them on upgrade without a word.
    */
   noTabsListed: NoTabsListed | undefined;
+  /** The root `nav.json` that titles Home while Home is the only tab, so no tab bar shows the name. */
+  unseenHomeTitle: FilePath | undefined;
 }
