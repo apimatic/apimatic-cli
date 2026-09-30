@@ -13,12 +13,12 @@ import { CONTENT_DIRECTORY_NAME, SPEC_DIRECTORY_NAME, STATIC_DIRECTORY_NAME } fr
 import { PLACEHOLDER_SITE, SuggestedSite } from './portal/config/site-config.js';
 import { AcceptedContent, ContentFile, ContentTree, ReadPage } from './portal/content-tree.js';
 import { Endpoint } from './portal/endpoint.js';
-import { GENERATED_SECTIONS, GeneratedPages, PluginSource } from './portal/generated-pages.js';
+import { GeneratedPages, PluginSource } from './portal/generated-pages.js';
 import { OpenApiDocument } from './portal/openapi-document.js';
 import { parsePage } from './portal/page.js';
 import { PortalConfig } from './portal/portal-config.js';
 import { PortalLanguages } from './portal/portal-languages.js';
-import { API_REFERENCE_TOKEN, NAVIGATION_FILE_NAME } from './portal/portal-navigation.js';
+import { NAVIGATION_FILE_NAME, TOKENS } from './portal/portal-navigation.js';
 import {
   ContentProblem,
   MissingFile,
@@ -369,16 +369,10 @@ export class PortalSourceContext {
         ''
       ].join('\n')
     );
-    // A tab for each section the CLI generates, as the sample portal has, and Home's sidebar with
-    // the welcome page first and everything else alphabetically. A folder added beside the page
-    // lands in Home until the file names it in `tabs`.
+    // Each section a tab, as the sample portal has; Home's sidebar leads with the welcome page.
     await this.fileService.writeContents(
       new FilePath(this.contentDirectory, new FileName(NAVIGATION_FILE_NAME)),
-      JSON.stringify(
-        { tabs: [...GENERATED_SECTIONS.map((section) => section.token), API_REFERENCE_TOKEN], pages: ['index', '...'] },
-        null,
-        2
-      ) + '\n'
+      JSON.stringify({ tabs: TOKENS, pages: ['index', '...'] }, null, 2) + '\n'
     );
     return ok(new FilePath(this.sourceDirectory, new FileName(APIMATIC_CONFIG_FILE_NAME)));
   }
