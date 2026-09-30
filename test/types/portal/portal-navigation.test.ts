@@ -389,6 +389,17 @@ describe('PortalNavigation', () => {
       expect(fileErrors({ tabs: ['apimatic:sdk'] })[0]).to.contain("'apimatic:sdk' is not a nav.json token");
     });
 
+    // `content/api.md` is a second child at the root, so the entry could position only the reference.
+    it('refuses api when a page of that name is a second child, as pages does', () => {
+      const withApiPage = { childNames: ['index', 'api', 'api'], folderNames: [] };
+
+      expect(fileErrors({ tabs: ['api'], pages: ['index'] }, withApiPage)).to.deep.equal([
+        "content/nav.json: 'api' is where the API reference is mounted, so the entry positions the " +
+          'reference rather than the page of that name. Rename the page to position it.'
+      ]);
+      expect(validateFile({ tabs: ['api'], pages: ['index'] }, { childNames: ['index', 'api'] }).isOk()).to.be.true;
+    });
+
     it('refuses a repeated entry, however the API reference is spelled', () => {
       expect(fileErrors({ tabs: ['guides', 'guides'] })).to.deep.equal([
         "content/nav.json: 'guides' is listed more than once."

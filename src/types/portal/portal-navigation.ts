@@ -231,7 +231,9 @@ export class PortalNavigation {
 
     // The reference is mounted at `content/api`, so the name and the token reach one node, as in `pages`.
     if (entry === API_REFERENCE_NAME) {
-      return ok(undefined);
+      return PortalNavigation.isSharedName(entry, context)
+        ? err(PortalNavigation.apiSharedNameError(context))
+        : ok(undefined);
     }
 
     // The home page belongs to the Home tab, which opens on it.
@@ -352,8 +354,7 @@ export class PortalNavigation {
       // user looking for one.
       return err(
         context.isContentRoot && entry === API_REFERENCE_NAME
-          ? `${context.label}: '${entry}' is where the API reference is mounted, so the entry positions ` +
-              `the reference rather than the page of that name. Rename the page to position it.`
+          ? PortalNavigation.apiSharedNameError(context)
           : `${context.label}: '${entry}' is both a page and a folder in this directory, and the entry ` +
               `positions the folder. Rename the page to position it.`
       );
@@ -418,6 +419,14 @@ export class PortalNavigation {
   /** Whether a page and a folder in this directory both answer to the name. */
   private static isSharedName(entry: string, context: NavigationContext): boolean {
     return context.childNames.filter((name) => name === entry).length > 1;
+  }
+
+  /** A page named `api` beside the mount point could never be positioned, in `pages` or in `tabs`. */
+  private static apiSharedNameError(context: NavigationContext): string {
+    return (
+      `${context.label}: '${API_REFERENCE_NAME}' is where the API reference is mounted, so the entry positions ` +
+      `the reference rather than the page of that name. Rename the page to position it.`
+    );
   }
 
   /**
