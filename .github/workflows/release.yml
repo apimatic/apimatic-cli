@@ -4,12 +4,6 @@ on:
   push:
     branches: [ beta, main, "1.x" ]
 
-permissions:
-  id-token: write  # Required for OIDC
-  contents: write       # pushes the release tag and its note, and creates the GitHub release
-  issues: write         # needed by @semantic-release/github
-  pull-requests: write  # needed if semantic-release comments on PRs
-
 # A second merge into the same branch waits for this run instead of racing it for the version.
 concurrency:
   group: release-${{ github.ref_name }}
@@ -24,6 +18,11 @@ jobs:
         # npm >= 11.5.1, and Node 24.5.0 is the first release whose bundled npm clears that.
         node: [ '24' ]
     name: Release with Node version ${{ matrix.node }}
+    permissions:
+      id-token: write       # Required for OIDC
+      contents: write       # pushes the release tag and its note, and creates the GitHub release
+      issues: write         # needed by @semantic-release/github
+      pull-requests: write  # needed if semantic-release comments on PRs
     steps:
       - name: Checkout CLI
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0

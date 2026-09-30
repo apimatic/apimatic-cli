@@ -73,6 +73,6 @@ describe('release.config.cjs', () => {
         'Merge pull request #404 from apimatic/dev\n\nRelease',
         'docs: add the CONTEXT.md glossary (#365)'
       )
-    ).to.equal(null);
+    ).to.be.null;
   });
 });

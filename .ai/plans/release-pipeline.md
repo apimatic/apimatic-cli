@@ -366,7 +366,10 @@ Branch `saeedjamshaid/release-pipeline` → `dev`, titled
      - **Without the key** (before 7.3's setup): it writes the compare link
        into the run summary, with the PR title filled in, for a person to open.
        So this PR can merge before the key exists.
-   - The `contents: write` comment (line 9) stops mentioning "version commits".
+   - The `permissions` block moves from the workflow to the `release` job, so
+     each job states its own token, and the `contents: write` comment stops
+     mentioning "version commits". SonarCloud fails the gate on a
+     workflow-level write permission (S8233).
    - `actions/checkout` and `actions/setup-node` are pinned by commit, as in
      `test.yml`.
    - `alpha` leaves the `push` triggers (D9); `test.yml` drops it from its
