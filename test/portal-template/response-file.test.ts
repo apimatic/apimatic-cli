@@ -57,6 +57,16 @@ describe('responseFileOf', () => {
       expect(nameOf('application/zip', 'attachment; filename=build.zip')).to.equal('build.zip');
     });
 
+    it('unescapes the quotes inside a quoted `filename`', () => {
+      expect(nameOf('application/zip', 'attachment; filename="a \\"quoted\\" name.zip"')).to.equal(
+        'a "quoted" name.zip'
+      );
+    });
+
+    it('reads `filename` itself, not a parameter whose name ends in it', () => {
+      expect(nameOf('application/zip', 'attachment; myfilename="decoy.zip"; filename="real.zip"')).to.equal('real.zip');
+    });
+
     it('prefers the RFC 5987 `filename*` over plain `filename`, in either order', () => {
       expect(
         nameOf('application/zip', 'attachment; filename="fallback.zip"; filename*=UTF-8\'\'r%C3%A9sum%C3%A9.zip')
@@ -66,10 +76,18 @@ describe('responseFileOf', () => {
       ).to.equal('résumé.zip');
     });
 
+    it('decodes an RFC 5987 `filename*` in ISO-8859-1 as well as UTF-8', () => {
+      expect(nameOf('application/zip', "attachment; filename*=ISO-8859-1''%E9t%E9.zip")).to.equal('été.zip');
+    });
+
     it('falls back to `filename` when `filename*` is malformed', () => {
       expect(
         nameOf('application/zip', 'attachment; filename="fallback.zip"; filename*=UTF-8\'\'%E0%A4%A.zip')
       ).to.equal('fallback.zip');
+    });
+
+    it('falls back to the type when the only `filename*` is quoted, which RFC 5987 does not allow', () => {
+      expect(nameOf('application/zip', 'attachment; filename*="UTF-8\'\'report.zip"')).to.equal('response.zip');
     });
 
     it('keeps only the basename of a path the server sends', () => {
