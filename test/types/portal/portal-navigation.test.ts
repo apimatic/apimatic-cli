@@ -378,15 +378,30 @@ describe('PortalNavigation', () => {
       expect(fileErrors({ tabs: [1] })[0]).to.contain("'tabs' must be an array of strings.");
     });
 
-    it('refuses a folder with no page in it, and a name that is no folder with the hint pages gives', () => {
+    it('refuses a folder with no page in it, and a name that is no folder with a hint tabs accepts', () => {
       expect(fileErrors({ tabs: ['drafts'] }, { emptyFolders: ['drafts'] })[0]).to.contain(
         "'drafts' is a folder with no page in it or below it"
       );
       expect(fileErrors({ tabs: ['Guides'] })).to.deep.equal([
         "content/nav.json: 'Guides' is not a folder in this directory. Did you mean 'guides'?"
       ]);
-      expect(fileErrors({ tabs: ['sdks'] })[0]).to.contain("'apimatic:sdks' positions the SDK pages.");
+      expect(fileErrors({ tabs: ['sdks'] })[0]).to.contain("'apimatic:sdks' makes the SDK pages a tab.");
       expect(fileErrors({ tabs: ['apimatic:sdk'] })[0]).to.contain("'apimatic:sdk' is not a nav.json token");
+    });
+
+    // The pages hint would send the user to an entry tabs then refuses, one error later.
+    it('answers a page near miss with where a page can go, in one message', () => {
+      expect(fileErrors({ tabs: ['Authentication'] })).to.deep.equal([
+        "content/nav.json: 'Authentication' is not a folder in this directory. 'authentication' is a page; " +
+          "order it in Home's sidebar with 'pages'."
+      ]);
+    });
+
+    it('names both accepted spellings of the reference for a near miss of api', () => {
+      expect(fileErrors({ tabs: ['API'] })).to.deep.equal([
+        "content/nav.json: 'API' is not a folder in this directory. The API reference is a tab as 'api' " +
+          "or 'apimatic:api'."
+      ]);
     });
 
     // `content/api.md` is a second child at the root, so the entry could position only the reference.

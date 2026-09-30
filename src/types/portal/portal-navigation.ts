@@ -265,8 +265,29 @@ export class PortalNavigation {
     }
 
     return err(
-      `${context.label}: '${entry}' is not a folder in this directory.${PortalNavigation.suggestion(entry, context)}`
+      `${context.label}: '${entry}' is not a folder in this directory.${PortalNavigation.tabSuggestion(entry, context)}`
     );
+  }
+
+  /** The near miss a tab entry was meant as; a page's name is answered with where a page can go. */
+  private static tabSuggestion(entry: string, context: NavigationContext): string {
+    const lowered = entry.toLowerCase();
+    const withoutExtension = lowered.replace(/\.mdx?$/i, '');
+    if (withoutExtension === API_REFERENCE_NAME) {
+      return ` The API reference is a tab as '${API_REFERENCE_NAME}' or '${API_REFERENCE_TOKEN}'.`;
+    }
+    const section = PortalNavigation.sectionGuessed(withoutExtension);
+    if (section !== undefined) {
+      return ` '${section.token}' makes ${section.description} a tab.`;
+    }
+    const folder = context.folderNames.find((name) => name.toLowerCase() === lowered);
+    if (folder !== undefined) {
+      return ` Did you mean '${folder}'?`;
+    }
+    const page = context.childNames.find(
+      (name) => name.toLowerCase() === lowered || name.toLowerCase() === withoutExtension
+    );
+    return page === undefined ? '' : ` '${page}' is a page; order it in Home's sidebar with 'pages'.`;
   }
 
   /** A root file with no `tabs` that names a folder or token in `pages` meant a tab in 2.0.0-beta.1, so it is not read as Home's order without a word. */
