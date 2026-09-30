@@ -1,8 +1,8 @@
 # Plan: a release is a merge
 
 Status: 7.2 implemented on this branch and code-reviewed, then extended with
-the automatic back-merge (D8); 7.1 and 7.3 onward are admin and release-day
-steps, not yet taken. The plan was reviewed once before implementation
+the automatic back-merge (D8) and narrowed to `main` and `beta` (D9); 7.1 and
+7.3 onward are admin and release-day steps, not yet taken. The plan was reviewed once before implementation
 (section 10). Grounded in
 `dev` at `74ad5d2e`, `beta` at `8581f9e8` and `main` at `c199698a`, and in the
 repository settings and rulesets as read on 2026-09-29. Every version number in
@@ -14,8 +14,7 @@ configuration, against a local copy of the repository (section 10).
 Merging a pull request is the whole release:
 
 - into `main`, it publishes a stable version to the npm `latest` dist-tag;
-- into `beta`, a prerelease to `beta`;
-- into `alpha`, a prerelease to `alpha`.
+- into `beta`, a prerelease to `beta`.
 
 No ruleset is switched off, no branch is deleted and recreated, no file is
 edited by hand, and the generated notes can be published as they are. The
@@ -117,7 +116,9 @@ approval count wins. That leaves:
 - `beta` with all three, so a squashed or rebased promotion into `beta` is one
   click away.
 
-`alpha` and `1.x` do not exist, and no ruleset names them.
+`alpha` and `1.x` do not exist, and no ruleset names them. Nothing has been
+published from an `alpha` branch since 1.1.0-alpha.22, on 2025-09-05, though
+`release.config.cjs`, `release.yml` and `test.yml` all still name it.
 
 ### 2.7 A tag sits on a commit only its release branch has
 
@@ -158,20 +159,20 @@ the beta line. The CLI never fetches the URL; only editors use it.
 | # | Decision | Rejected, and why |
 |---|---|---|
 | D1 | Release notes live in GitHub Releases only. `@semantic-release/git` and `@semantic-release/changelog` go, so a release pushes no commit. semantic-release itself pushes only tags (`git push --tags`) and `refs/notes/semantic-release-*` (its `lib/git.js`), and branch rulesets do not cover either. | Keeping `CHANGELOG.md` on `main` only needs a GitHub App on the bypass list, a secret, a token step, and the commit merged back every time. Keeping it on every branch is today's drift (2.2), with the toggle swapped for the App. `CHANGELOG.md` is not in `package.json` `files`, so npm users never saw it. |
-| D2 | `alpha` and `beta` take PRs only from `dev`; `main` takes only `beta` and hotfix branches. A required check enforces it (7.2, item 4). | dev → alpha → beta → main adds a PR to every beta for no extra safety. Allowing dev → main means a stable can ship code no beta tester ran, as 1.2 to 1.5 did. |
+| D2 | `beta` takes PRs only from `dev`; `main` takes only `beta` and hotfix branches. A required check enforces it (7.2, item 4). | A longer chain, with an alpha stage before beta, adds a PR to every beta for no extra safety. Allowing dev → main means a stable can ship code no beta tester ran, as 1.2 to 1.5 did. |
 | D3 | A squash commit into `dev` is the PR title plus the PR description. Only the title decides the version and the notes line: a breaking change takes `!` in the title, and the parser ignores notes and issue references in the body (7.2, item 1). | Title only drops the why from `git log` and `git blame`; it survives only on the PR. Commit messages (today) cause 2.3. Asking authors to avoid footer-like wording fails silently, because of the pattern described in 2.3. |
 | D4 | Both semantic-release plugins use the `conventionalcommits` preset. | `angular` (2.4). |
 | D5 | A PR into a release branch needs 1 approval, from anyone with write access, and a green Tests matrix. | Without a gate, a red build can publish. |
 | D6 | Workflows can no longer open or approve PRs. | Requiring a code owner's approval instead: only two owners in `.github/CODEOWNERS` resolve, and one of them approved none of the last 60 merged PRs, so most promotions would need the admin bypass. Keeping the setting with a plain approval: a PR could approve itself (2.9). |
 | D7 | `1.x` is created only if a 1.x patch is ever needed, from `v1.5.0`. | Creating it now: nothing ships on it yet, and it needs the bootstrap PR in 7.6 either way. |
-| D8 | After every push to `main`, the release run merges `main` into `dev` with a merge commit and pushes it. It pushes with a deploy key, the only bypass actor on dev's ruleset, kept in a `back-merge` environment that admits only `main`. `dev → alpha` and `dev → beta` are refused while `dev` lacks `main`. | A manual back-merge: the one step anyone could forget, and a forgotten one ships a mis-numbered beta. A GitHub App: more to create and maintain for the same bypass. `@saithodev/semantic-release-backmerge`: it rebases by default, which loses the tag, and it puts the push credential inside the publishing job. A fast-forward promotion that would make the back-merge unnecessary: GitHub cannot fast-forward a PR merge. |
+| D8 | After every push to `main`, the release run merges `main` into `dev` with a merge commit and pushes it. It pushes with a deploy key, the only bypass actor on dev's ruleset, kept in a `back-merge` environment that admits only `main`. `dev → beta` is refused while `dev` lacks `main`. | A manual back-merge: the one step anyone could forget, and a forgotten one ships a mis-numbered beta. A GitHub App: more to create and maintain for the same bypass. `@saithodev/semantic-release-backmerge`: it rebases by default, which loses the tag, and it puts the push credential inside the publishing job. A fast-forward promotion that would make the back-merge unnecessary: GitHub cannot fast-forward a PR merge. |
+| D9 | No `alpha` branch: `main` and `beta` are the release branches, and `release.config.cjs`, `release.yml` and `test.yml` stop naming `alpha`. | Keeping it: nothing has shipped on it since 1.1.0-alpha.22, and a second prerelease line costs a promotion PR, a ruleset entry and a gate case each time. Keeping it dormant in the config: an `alpha` branch created by accident would publish on its first push. |
 
 ## 4. The model
 
 | Branch | Takes PRs from | Merge method | Publishes |
 |---|---|---|---|
 | `dev` | feature and fix branches; the release run's back-merge from `main`, or a `<name>/merge-main` branch when it conflicts | squash for branches; **merge commit** for a back-merge | nothing |
-| `alpha` | `dev` | merge commit | `x.y.z-alpha.N` → `alpha` |
 | `beta` | `dev` | merge commit | `x.y.z-beta.N` → `beta` |
 | `main` | `beta`; hotfix branches cut from `main` | merge commit | `x.y.z` → `latest` |
 | `1.x` | fix branches cut from `1.x` | merge commit | `1.x.y` → `release-1.x` |
@@ -188,11 +189,11 @@ the beta line. The CLI never fetches the URL; only editors use it.
 3. **After every push to `main`, stable release or hotfix, `main` is merged
    into `dev` with a merge commit, and the release run does it (D8).** The
    `v2.0.0` tag sits on main's merge commit. Until `dev` can reach it, the
-   betas and alphas cut from `dev` can't either, and the next beta comes out as
-   `2.0.0-beta.4` instead of `2.1.0-beta.1` (section 5). So `dev → alpha` and
-   `dev → beta` are refused while `dev` lacks `main`. A squashed back-merge
-   brings the content but not the tag. Beta and alpha releases need no
-   back-merge: no other branch's next version depends on their tags.
+   betas cut from `dev` can't either, and the next beta comes out as
+   `2.0.0-beta.4` instead of `2.1.0-beta.1` (section 5). So `dev → beta` is
+   refused while `dev` lacks `main`. A squashed back-merge brings the content
+   but not the tag. A beta release needs no back-merge: no other branch's next
+   version depends on beta's tags.
 4. **`beta` contains `main` before it is promoted.** After a hotfix, the
    back-merge and one dev → beta promotion come before the next beta → main, so
    that PR cannot conflict. Its "Resolve conflicts" button would commit to
@@ -215,9 +216,7 @@ release rules.
 | beta → main | `2.0.0` on `latest` |
 | a `feat` on `dev`, dev → beta **without** the back-merge | `2.0.0-beta.4`, the failure rule 3 prevents; `Promotion source` now refuses that promotion |
 | back-merge, then the same dev → beta | `2.1.0-beta.1` |
-| `alpha` cut from `dev` after 2.0.0 | `2.1.0-alpha.1` |
-| `alpha` cut from `dev` **before** 2.0.0 | `2.0.0-alpha.1`, which sorts below the `2.0.0-beta.*` already published |
-| hotfix → main | `2.0.1`; after the back-merge, beta and alpha continue at `2.1.0-beta.2` and `2.1.0-alpha.2` |
+| hotfix → main | `2.0.1`; after the back-merge, beta continues at `2.1.0-beta.2` |
 | `1.x` from `v1.5.0` with the bootstrap PR (7.6), then a `fix` | `1.5.1` on `release-1.x` |
 | `1.x` from `v1.5.0` **without** the bootstrap PR | nothing: 1.5.0's `release.config.cjs` has no `1.x` entry, and 1.5.0's `release.yml` does not trigger on `1.x` |
 | a promotion with no new `feat`, `fix`, `perf` or `revert` commit and nothing marked `!` | nothing ("no relevant changes") |
@@ -282,14 +281,14 @@ Branch `saeedjamshaid/release-pipeline` → `dev`, titled
 `ci(release): publish from the merge commit, without a release commit`. A
 `ci` commit releases nothing by itself.
 
-1. `release.config.cjs` keeps its branches and becomes:
+1. `release.config.cjs` drops `alpha` from its branches (D9) and becomes:
 
    ```js
    // A squash commit's body is its PR description; only the header may decide a version or a notes line.
    const headerOnly = { noteKeywords: null, issuePrefixes: null, fieldPattern: null };
 
    module.exports = {
-     branches: [ /* unchanged */ ],
+     branches: [ "1.x", "main", { name: "beta", prerelease: true } ],
      plugins: [
        [
          "@semantic-release/commit-analyzer",
@@ -370,8 +369,10 @@ Branch `saeedjamshaid/release-pipeline` → `dev`, titled
    - The `contents: write` comment (line 9) stops mentioning "version commits".
    - `actions/checkout` and `actions/setup-node` are pinned by commit, as in
      `test.yml`.
+   - `alpha` leaves the `push` triggers (D9); `test.yml` drops it from its
+     `pull_request` triggers as well.
 4. `.github/workflows/pull-requests.yml`, new, on `pull_request` (opened,
-   edited, synchronize, reopened) into `dev`, `alpha`, `beta` and `main`, with
+   edited, synchronize, reopened) into `dev`, `beta` and `main`, with
    one concurrency group per PR that cancels a superseded run. The job names
    are the required checks of 7.3, which a comment in the file says.
    - **`Commit messages`**, one job with one install, for the two subjects a
@@ -394,10 +395,10 @@ Branch `saeedjamshaid/release-pipeline` → `dev`, titled
    - **`Promotion source`**, for every PR, enforcing D2 and rules 3 to 5:
      - into `dev`: the head must not be `1.x`;
      - into a release branch: the head must be a branch of this repository;
-     - into `alpha` or `beta`: the head must be `dev`, and `dev` must contain
+     - into `beta`: the head must be `dev`, and `dev` must contain
        `main`. A back-merge that didn't happen (a conflict, or no key yet)
        blocks the next prerelease instead of mis-numbering it;
-     - into `main`: the head must not be `dev`, `alpha` or `1.x`;
+     - into `main`: the head must not be `dev` or `1.x`;
      - into `main` from `beta`: `beta` must contain `main`
        (`git merge-base --is-ancestor`). That enforces rule 4, and rule 3's
        back-merge along with it;
@@ -492,7 +493,7 @@ Verification:
 | Ruleset | Targets | Rules | Bypass |
 |---|---|---|---|
 | `dev` (rename `dev branch merge method`) | `refs/heads/dev` | require a pull request; allowed merge methods: **squash and merge commit**; 1 approval (what `no-direct-commits` enforced); required checks `Commit messages` and `Promotion source`; up to date off; block force pushes and deletion | **deploy keys**, mode **always**: the back-merge key below is the only one |
-| `release branches` (replaces `main branch merge method`) | `refs/heads/main`, `refs/heads/beta`; `alpha` joins in 7.5 | require a pull request; allowed merge method: **merge commit** only; 1 approval; required checks `ubuntu-latest / Node 24`, `ubuntu-latest / Node 26`, `windows-latest / Node 24`, `windows-latest / Node 26`, `macos-latest / Node 24`, `macos-latest / Node 26`, `Commit messages`, `Promotion source`; **require branches to be up to date: off**; block force pushes and deletion | repository admin, mode **pull requests only** |
+| `release branches` (replaces `main branch merge method`) | `refs/heads/main`, `refs/heads/beta` | require a pull request; allowed merge method: **merge commit** only; 1 approval; required checks `ubuntu-latest / Node 24`, `ubuntu-latest / Node 26`, `windows-latest / Node 24`, `windows-latest / Node 26`, `macos-latest / Node 24`, `macos-latest / Node 26`, `Commit messages`, `Promotion source`; **require branches to be up to date: off**; block force pushes and deletion | repository admin, mode **pull requests only** |
 | `release tags` (new, targets tags) | `refs/tags/v*` | restrict updates; restrict deletions. Creations stay allowed, because semantic-release creates the tags. | repository admin, mode **always** (a tag cannot be deleted through a PR) |
 | `no-direct-commits` | | deleted last, once the three above are active, so no branch is ever unprotected | |
 
@@ -502,10 +503,9 @@ Verification:
 - **A PR into `dev` opened before 7.2 merged reports the two checks only after
   its next event.** Editing its title once is enough; the workflow runs on
   `edited`.
-- **`alpha` and `1.x` join a ruleset only after they exist.** A ruleset with
-  required checks blocks creating a branch it targets, and no commit on `dev`
-  carries those checks. So each is created first and protected minutes later
-  (7.5, 7.6).
+- **`1.x` joins a ruleset only after it exists.** A ruleset with required
+  checks blocks creating a branch it targets, and no commit on `dev` carries
+  those checks. So it is created first and protected minutes later (7.6).
 - **It is safe to switch before any promotion.** A release run reads
   `release.config.cjs` from the commit it releases, so the first promotion that
   carries 7.2 already pushes no commit. A run that somehow still had the old
@@ -586,14 +586,6 @@ tags stay behind rulesets that list no deploy keys.
 
 ### 7.5 After 2.0.0
 
-1. Create `alpha` from `dev` when an early build is wanted. Creating the branch
-   in the web UI fires `release.yml`. It publishes only if `dev` has a `feat`,
-   `fix`, `perf` or `!` commit since 2.0.0.
-2. Add `refs/heads/alpha` to `release branches`.
-
-This is alpha's first publish under trusted publishing (its last was
-1.1.0-alpha.22, on 2025-09-05), so watch that run.
-
 The `beta` dist-tag stays on `2.0.0-beta.3` until the next beta, so
 `npm install @apimatic/cli@beta` installs an older build than `latest` in the
 meantime. No action is needed.
@@ -640,8 +632,7 @@ It has no `test.yml` and no `pull-requests.yml`. Its lockfile resolves
 - **Feature or fix:** branch from `dev` → PR → **Squash and merge**. Title it
   `type(scope): summary`, with `!` if it breaks something, and explain the
   change in the description.
-- **Alpha or beta:** PR `dev → alpha` or `dev → beta` → **Create a merge
-  commit**.
+- **Beta:** PR `dev → beta` → **Create a merge commit**.
 - **Stable:** PR `beta → main` → **Create a merge commit**. The release run
   then merges `main` back into `dev` by itself.
 - **Hotfix:**
@@ -651,8 +642,7 @@ It has no `test.yml` and no `pull-requests.yml`. Its lockfile resolves
   3. Promote dev → beta before the next beta → main (rule 4).
 - **A back-merge the run could not make** (its `back-merge` job failed on a
   conflict): GitHub's "Resolve conflicts" button would commit to `main`, which
-  the ruleset blocks. Until this is done, `dev → alpha` and `dev → beta` are
-  refused. Instead:
+  the ruleset blocks. Until this is done, `dev → beta` is refused. Instead:
   1. Cut a `<name>/merge-main` branch from `dev`.
   2. Merge `origin/main` into it and resolve the conflicts.
   3. Merge that PR into `dev` with a merge commit.
@@ -660,7 +650,7 @@ It has no `test.yml` and no `pull-requests.yml`. Its lockfile resolves
 When something goes wrong:
 
 - **A hand-made back-merge was squashed.** `dev` still lacks main's commit, so
-  the next `dev → alpha` or `dev → beta` is refused. Make the back-merge again
+  the next `dev → beta` is refused. Make the back-merge again
   with a merge commit; the content is already there, so only the ancestry
   changes.
 - **The back-merge push was refused.** A ruleset that requires a pull request
@@ -671,7 +661,7 @@ When something goes wrong:
   publishes.
   - **No tag:** re-run the job.
   - **Tag, but no `refs/notes/semantic-release-<tag>`:** the tag reads as
-    channel `null`, so beta and alpha ignore it and the next run tries to
+    channel `null`, so beta ignores it and the next run tries to
     create the same tag again. Add the note by hand and push it:
     `git notes --ref semantic-release-<tag> add -m '{"channels":["beta"]}' <tag>`,
     then `git push origin refs/notes/semantic-release-<tag>`. Use the branch's
@@ -696,6 +686,8 @@ When something goes wrong:
 - Stale branches: `master`, `v3`, the `v3-*` family, and merged topic branches.
   The README's License badge links `blob/master`, so deleting `master` needs
   that link changed first.
+- The npm `alpha` dist-tag still points at 1.1.0-alpha.22, and nothing will
+  publish there again (D9). `npm dist-tag rm @apimatic/cli alpha` retires it.
 - `default_workflow_permissions` is `write`. `release.yml` declares its own
   permissions, so the default could be `read`. That is hygiene only; 7.1's
   setting is what stops workflows approving PRs.
@@ -771,8 +763,7 @@ When something goes wrong:
 - **The back-merge, automated (D8).** Asked for because it was the one step
   that could be forgotten. Two changes:
   - the release run makes the back-merge with a deploy key;
-  - `Promotion source` refuses `dev → alpha` and `dev → beta` while `dev` lacks
-    `main`.
+  - `Promotion source` refuses `dev → beta` while `dev` lacks `main`.
 
   The job's script ran against a throwaway repository in its four cases. The
   gate ran against a `dev` that lacks `main` (`v1.3.0-beta.2`), and was refused.
@@ -784,3 +775,7 @@ When something goes wrong:
   commitlint rule tripping on a body line such as `* Breaking change: none`;
   that rule guarded by no test in the repository; and unpinned actions in the
   release job.
+- **`alpha` dropped (D9, 2026-09-30).** The simulation re-ran without its alpha
+  steps against this configuration: every `beta` and `main` row of section 5
+  came out the same, and no branch moved. The promotion harness lost its three
+  alpha cases.

@@ -9,10 +9,6 @@ module.exports = {
     {
       name: "beta",
       prerelease: true
-    },
-    {
-      name: "alpha",
-      prerelease: true
     }
   ],
   plugins: [

@@ -2,7 +2,7 @@ name: Release
 
 on:
   push:
-    branches: [ alpha, beta, main, "1.x" ]
+    branches: [ beta, main, "1.x" ]
 
 permissions:
   id-token: write  # Required for OIDC
@@ -62,7 +62,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: pnpm exec semantic-release
 
-  # The release tag sits on main's merge commit, and a beta or alpha cut from a dev that cannot reach it gets the wrong version.
+  # The release tag sits on main's merge commit, and a beta cut from a dev that cannot reach it gets the wrong version.
   back-merge:
     name: Merge main back into dev
     needs: release
@@ -100,7 +100,7 @@ jobs:
               git merge --abort
               {
                 echo "### main conflicts with dev, so it was not merged back"
-                echo "Cut \`<name>/merge-main\` from dev, merge origin/main into it, resolve the conflicts, and merge that PR into dev with **Create a merge commit**. Until then, dev → alpha and dev → beta are refused."
+                echo "Cut \`<name>/merge-main\` from dev, merge origin/main into it, resolve the conflicts, and merge that PR into dev with **Create a merge commit**. Until then, dev → beta is refused."
               } >> "$GITHUB_STEP_SUMMARY"
               exit 1
             fi

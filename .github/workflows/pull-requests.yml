@@ -3,7 +3,7 @@ name: Pull request rules
 on:
   pull_request:
     types: [opened, edited, synchronize, reopened]
-    branches: [dev, alpha, beta, main]
+    branches: [dev, beta, main]
 
 permissions:
   contents: read
@@ -82,13 +82,13 @@ jobs:
           fi
           [ "$SOURCE_REPO" = "$REPO" ] || refuse "$TARGET takes pull requests only from branches in $REPO, not from $SOURCE_REPO."
           case "$TARGET" in
-            alpha|beta)
+            beta)
               [ "$SOURCE" = dev ] || refuse "$TARGET takes pull requests only from dev, not from $SOURCE."
               git merge-base --is-ancestor origin/main "$SOURCE_SHA" ||
                 refuse "dev does not contain main yet, so this release would miss main's tag: merge main into dev first (the last release run on main says how)." ;;
             main)
               case "$SOURCE" in
-                dev|alpha|1.x) refuse "main takes beta or a hotfix branch cut from main, not $SOURCE." ;;
+                dev|1.x) refuse "main takes beta or a hotfix branch cut from main, not $SOURCE." ;;
                 beta)
                   git merge-base --is-ancestor origin/main "$SOURCE_SHA" ||
                     refuse "beta does not contain main yet: merge main into dev, promote dev to beta, then promote beta." ;;
