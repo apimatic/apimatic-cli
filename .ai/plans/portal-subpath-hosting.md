@@ -144,6 +144,21 @@ planned plugin was verified afterwards (see the next list).
   - clicking a search result;
   - a deep link through `404.html`.
 
+**Measured with step 3 in place (2026-09-30):** the `subpath` fixture built and served at
+`/api`, with `404.html` for missing paths, and driven in headless Chrome. All of these work:
+- first load, with the logo, the Markdown image and the favicon;
+- a click to a content page and to a colliding `/api/api/…` reference page, and back. Their
+  cached data comes from `/api/__tsr/…`, with status 200;
+- the popover's "View as Markdown" (`http://…/api/authentication.md`, 200), the prompt's page
+  address, and the copy button's fetch;
+- search, and a click on a result landing on the colliding page;
+- the SDK download (200), the plugin page's install command with `/api`, a direct load of a
+  reference page, and a missing page shown as the not-found page with `/api/` links.
+
+The only console output was also there on the root-hosted `default` build, driven the same way:
+- headless Chrome refusing the clipboard to an unfocused document;
+- the not-found page's own failed data lookup.
+
 **Measured, other builds and runs:**
 - `base: './'` writes script URLs as `/./assets/…` (the host's root), CSS links relative to the
   page, and a router basepath of `.`.
@@ -174,8 +189,9 @@ planned plugin was verified afterwards (see the next list).
   `getPageTree`, `getNodePage`, `getNodeMeta` and `_i18n`; `getNodePage` goes by `$ref`
   (`dynamic-CSrl9w26.js:756`).
 - `MarkdownCopyButton` prefixes its URL (`page-actions.js:17`). `ViewOptionsPopover` renders plain
-  `<a>` tags and stopped prefixing in ui 16.15.13 (fuma-nama/fumadocs PR #3572). That is still true
-  in 16.15.15 and on `main`.
+  `<a>` tags and stopped prefixing in ui 16.15.13 (fuma-nama/fumadocs PR #3572), still so in the
+  16.15.15 we install. Fixed in 16.15.17 (fuma-nama/fumadocs#3620, commit `6791d6f`) with the same
+  `withBasePath`, which leaves an address with a scheme as it is (`/^\w+:/`).
 - The search clients default to `join(BASE_PATH, '/api/search')` (core 16.10.6), but our explicit
   `from` overrides that.
 - The search dialog's results are buttons that call `router.push(item.url)`
@@ -338,8 +354,8 @@ no other place that describes `site`.
     - `markdownUrl` goes to both components as a full address because Fumadocs' own
       `withBasePath` leaves a full address alone (`page-actions.js:197`). So it is right whether
       Fumadocs adds the base or not:
-      - `ViewOptionsPopover` stopped adding it in ui 16.15.13, and would double a prefixed path
-        once that is fixed;
+      - `ViewOptionsPopover` stopped adding it in ui 16.15.13 and adds it again from 16.15.17
+        (fuma-nama/fumadocs#3620), which would have doubled a prefixed path;
       - `MarkdownCopyButton` still adds it, and would lose it if it went the popover's way.
     - An earlier draft prefixed the popover's URL and passed the copy button the bare one. That
       was right only for today's Fumadocs, and an upgrade that fixed the popover would have
@@ -391,6 +407,11 @@ follow-up.
   `` `/__tsr/staticServerFnCache/ `` into
   `withBasePath('/__tsr/staticServerFnCache/', config.base)`. `config.base` is the resolved base,
   read in `configResolved`.
+  - As built in step 3, it runs `enforce: 'pre'` and uses a transform hook filter (by package id
+    and by the literal). TanStack builds with `sharedPlugins: true`, so `applyToEnvironment`
+    is what keeps it out of the server build.
+  - The literal is in `dist/esm/staticFunctionMiddleware.js` today. The unit guard scans the
+    package's `dist` for it rather than naming that file.
 - **Why the `ssr` environment is left alone:** its writer joins the same URL onto the client
   output directory, and a prefixed URL would write `dist/client/docs/__tsr/…`.
 - **Why build-only:** dev never reads the cache.
@@ -581,8 +602,8 @@ after each one. In all, roughly 400 lines of source and 500 of tests.
      - It names `robots.txt` (and `sitemap.xml`) even where none is generated: without
        `site.url`, and now under a path. `GENERATED_ROOT_FILES` lists them unconditionally.
      - Pre-existing, so not fixed here.
-   - the TanStack comment of section 10, once the user has read it. The Fumadocs issue does not
-     wait for this step: it can be posted as soon as the user approves it.
+   - the TanStack comment of section 10, once the user has read it. The Fumadocs issue was filed
+     by the user as fuma-nama/fumadocs#3620 and fixed in fumadocs-ui 16.15.17 (section 10).
 
 ## 8. Risks
 
@@ -652,14 +673,13 @@ with the MDX components, but not in its copy.
 | Item | State (2026-09-29) | What it means for us |
 |---|---|---|
 | TanStack/router#6152, PR #5970 | Both open. A maintainer (2026-07-17): the cache URL "should follow Start's public asset base"; the PR builds the URL with `path.join` and needs an e2e served from a sub-path. | When it ships, delete 5.6. |
-| fuma-nama/fumadocs PR #3572 (ui 16.15.13) | The popover lost `withBasePath`; still so on `main`, and nobody has reported it | Nothing to undo: the full address we pass is right either way (5.2). Reporting it helps other Fumadocs users |
+| fuma-nama/fumadocs#3620, from PR #3572 (ui 16.15.13) | Fixed 2026-09-29 in fumadocs-ui 16.15.17 (commit `6791d6f`): the popover prefixes `markdownUrl` with `withBasePath` again, in both `radix-ui` and `base-ui` | Nothing to undo. The full address we pass goes through that `withBasePath` unchanged, so it is right on 16.15.15 and on 16.15.17 (5.2). An upgrade needs no change here |
 | TanStack/router#4888, docs PR #7882 | Docs only | None |
 
-**The fixes, drafted, not posted:**
-- **Fumadocs:** an issue at `C:\repos\fumadocs-issue-view-as-markdown-base-path.md`. The fix it
-  proposes is `href: withBasePath(markdownUrl)` in `ViewOptionsPopover`, in both
-  `packages/radix-ui` and `packages/base-ui`.
-- **TanStack:** first a comment on #6152, with our repro and a fix that prefixes only the client
+**The fixes:**
+- **Fumadocs:** filed by the user as fuma-nama/fumadocs#3620, from the draft at
+  `C:\repos\fumadocs-issue-view-as-markdown-base-path.md`, and fixed as it proposed.
+- **TanStack** (drafted, not posted): first a comment on #6152, with our repro and a fix that prefixes only the client
   fetch in `fetchItem`: `fetch(import.meta.env.BASE_URL.replace(/\/$/, '') + url)`.
   - `getStaticCacheUrl` is left alone, since the writer joins it onto the client output directory.
   - It uses the Vite base rather than the router basepath, as the maintainer asked.
@@ -810,3 +830,7 @@ path relied on would have broken silently on an upgrade, and a fourth was untest
 - The e2e check that nothing points outside the path also covers a content page and an API
   reference page (it passed).
 - The contract test's wording says it has its own list of addresses (section 6).
+
+**Step 3** (2026-09-30): the plugin as built runs `enforce: 'pre'` with a transform hook filter,
+and its unit guard scans the package's `dist` for the literal (5.6). The build probe passed under
+`/api` and at the root (section 3).

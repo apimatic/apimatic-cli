@@ -720,6 +720,19 @@ const stylesheetOf = (output: DirectoryPath) => {
     );
   });
 
+  // Without it every page reached by a link is the not-found page: the browser looks for the
+  // page's data at the host's root, while the build writes it where the host serves the path.
+  it('fetches the pages’ prerendered data from under the path, where the build writes it', () => {
+    const scripts = scriptsOf(output);
+    const fetchingFrom = (address: RegExp) =>
+      scripts.filter((script) => address.test(script.text)).map((script) => script.name);
+
+    expect(fetchingFrom(/[`'"]\/api\/__tsr\/staticServerFnCache\//)).to.not.be.empty;
+    expect(fetchingFrom(/[`'"]\/__tsr\/staticServerFnCache\//)).to.deep.equal([]);
+    expect(fs.readdirSync(path.join(output.toString(), '__tsr/staticServerFnCache'))).to.not.be.empty;
+    expect(exists('api/__tsr')).to.be.false;
+  });
+
   it('gives the path in canonical links, og:url and the sitemap', () => {
     const page = read('index.html');
     const locations = [...read('sitemap.xml').matchAll(/<loc>([^<]*)<\/loc>/g)].map((match) => match[1]);

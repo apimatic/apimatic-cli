@@ -9,6 +9,7 @@ import { generatedPagesReload } from './generated-pages-reload.ts';
 import { readBuildPaths, readPortalIdentity, viteBase } from './portal-config.ts';
 import { prerenderPages } from './prerender-pages.ts';
 import { specReload } from './spec-reload.ts';
+import { staticFunctionsBase } from './static-functions-base.ts';
 
 export default defineConfig(async () => {
   const [paths, identity] = await Promise.all([readBuildPaths(), readPortalIdentity()]);
@@ -22,6 +23,7 @@ export default defineConfig(async () => {
     plugins: [
       generatedPagesReload(),
       downloads(paths.downloadsDir),
+      staticFunctionsBase(),
       // `/images/logo.png` is read from the static directory, and a remote image is never fetched for its size.
       // Imported, the default written out: a bundled image carries Vite's base, a linked one would not.
       fumadocsMdx({
