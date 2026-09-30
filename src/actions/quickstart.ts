@@ -6,6 +6,7 @@ import { QuickstartPrompts } from '../prompts/quickstart.js';
 import { DirectoryPath } from '../types/file/directoryPath.js';
 import { FilePath } from '../types/file/filePath.js';
 import { UrlPath } from '../types/file/urlPath.js';
+import { ResourceInput } from '../types/file/resource-input.js';
 import { LoginAction } from './auth/login.js';
 import { ActionResult } from './action-result.js';
 import { CommandMetadata } from '../types/common/command-metadata.js';
@@ -21,6 +22,9 @@ import { schemaUrlFor } from '../types/apimatic-config/document.js';
 import { PLACEHOLDER_METADATA } from '../types/plugin/plugin-config.js';
 import { ProjectContext } from '../types/project-context.js';
 import { DEFAULT_PORTAL_PORT, PortalServeAction } from './portal/serve.js';
+
+/** A URL's `file` is a download in a temporary directory, so only `source` says what the user gave. */
+type ImportedSpec = { file: FilePath; source: ResourceInput };
 
 export class QuickstartAction {
   private readonly prompts: QuickstartPrompts = new QuickstartPrompts();
@@ -88,7 +92,7 @@ export class QuickstartAction {
     tempDirectory: DirectoryPath
   ): Promise<ActionResult> {
     this.prompts.importSpecStepAdopted(project.sourceDirectory());
-    const validated = await this.validate(specPath, tempDirectory, true);
+    const validated = await this.validate({ file: specPath, source: project }, tempDirectory);
     if (validated.isErr()) {
       return validated.error;
     }
@@ -104,7 +108,7 @@ export class QuickstartAction {
     if (imported === undefined) {
       return ActionResult.cancelled();
     }
-    const validated = await this.validate(imported, tempDirectory, false);
+    const validated = await this.validate(imported, tempDirectory);
     if (validated.isErr()) {
       return validated.error;
     }
@@ -165,7 +169,7 @@ export class QuickstartAction {
     return result.isFailed() ? ActionResult.failed() : ActionResult.success();
   }
 
-  private async importSpec(tempDirectory: DirectoryPath): Promise<FilePath | undefined> {
+  private async importSpec(tempDirectory: DirectoryPath): Promise<ImportedSpec | undefined> {
     // Dropped once the CLI's own sample has failed: re-offering the address the user just
     // watched fail, pre-filled, is the one suggestion that cannot work.
     let sampleUrl: UrlPath | null = this.defaultSpecUrl;
@@ -185,39 +189,42 @@ export class QuickstartAction {
           }
           continue;
         }
-        return await new SpecContext(tempDirectory).save(downloaded.value.stream, downloaded.value.filename);
+        const file = await new SpecContext(tempDirectory).save(downloaded.value.stream, downloaded.value.filename);
+        return { file, source: inputPath };
       }
 
       if (await this.fileService.fileExists(inputPath)) {
-        return inputPath;
+        return { file: inputPath, source: inputPath };
       }
       this.prompts.specFileDoesNotExist();
     }
   }
 
   /**
-   * `adopted` decides what a failure offers. The sample can replace a specification the user
-   * named, but not one their project carries: an adopted `spec/` already holds the document the
-   * portal would be built from, and nothing here moves the sample into it.
+   * An adopted project is validated as the whole of its `spec/`, as `apimatic api validate` reads
+   * it, and its failure offers no sample. The sample can replace a specification the user named,
+   * but not one their project carries: an adopted `spec/` already holds the document the portal
+   * would be built from, and nothing here moves the sample into it.
    */
-  private async validate(
-    specPath: FilePath,
-    tempDirectory: DirectoryPath,
-    adopted: boolean
-  ): Promise<Result<FilePath, ActionResult>> {
+  private async validate(spec: ImportedSpec, tempDirectory: DirectoryPath): Promise<Result<FilePath, ActionResult>> {
     this.prompts.validateSpecStep();
+    const adopted = spec.source instanceof ProjectContext;
     let validation = 'unchecked' as SpecCheck;
-    await new ValidateAction(this.configDir, this.commandMetadata).execute(specPath, false, (check) => {
-      validation = check;
-    });
+    await new ValidateAction(this.configDir, this.commandMetadata).execute(
+      adopted ? spec.source : spec.file,
+      false,
+      (check) => {
+        validation = check;
+      }
+    );
     // The service's own error is already on screen; the spec may be valid, so there is nothing to fix.
     if (validation === 'unchecked') {
       return err(ActionResult.failed());
     }
 
-    let checked = specPath;
+    let checked = spec.file;
     if (validation === 'invalid') {
-      this.prompts.specValidationFailed();
+      this.prompts.specValidationFailed(spec.source);
       if (adopted || !(await this.prompts.useDefaultSpecPrompt())) {
         this.prompts.fixYourSpec();
         return err(ActionResult.cancelled());

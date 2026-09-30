@@ -6,13 +6,13 @@ import { DirectoryPath } from '../types/file/directoryPath.js';
 import { FilePath } from '../types/file/filePath.js';
 import { ServiceError } from '../infrastructure/service-error.js';
 import { Directory } from '../types/file/directory.js';
-import { createFileOrUrlFromInput } from '../types/file/resource-input.js';
+import { createFileOrUrlFromInput, ResourceInput } from '../types/file/resource-input.js';
 import { FileDownloadResponse } from '../infrastructure/services/file-download-service.js';
 import { PortalAuthorizationFailure } from '../infrastructure/services/portal-authorization-service.js';
 import { APIMATIC_CONFIG_FILE_NAME } from '../types/apimatic-config/document.js';
 import { PluginConfigWriteFailure } from '../types/plugin-config-context.js';
 import { PortalScaffoldProblem } from '../types/portal/portal-source.js';
-import { GENERATED, GITIGNORE, GitignoreFailure } from '../types/project-context.js';
+import { GENERATED, GITIGNORE, GitignoreFailure, ProjectContext } from '../types/project-context.js';
 import { AVAILABLE_LANGUAGES, Language, languageLabel, UPCOMING_LANGUAGES } from '../types/sdk/generate.js';
 import { noteWrapped, withSpinner } from './prompt.js';
 import { reportAuthorizationFailure } from './portal/authorization.js';
@@ -110,15 +110,25 @@ Let's get started!`);
     log.info(`Step 2 of 3: Validate and Lint your OpenAPI Definition`);
   }
 
-  public specValidationFailed() {
+  public specValidationFailed(spec: ResourceInput) {
     log.error(`Oops, it looks like there are some errors in your API Definition`);
     const message = [
-      `Ask an AI coding agent to run ${f.cmdAlt('apimatic', 'api', 'validate')} and fix what it reports.`,
+      ...this.validateWithAgent(spec),
       '',
       `Or use APIMatic's interactive VS Code Extension:`,
       f.link(vscodeExtensionUrl)
     ].join('\n');
     noteWrapped(message, 'How to fix');
+  }
+
+  // A placeholder rather than the user's own path or URL, which no quoting survives every shell with.
+  private validateWithAgent(spec: ResourceInput): string[] {
+    const validate = f.cmdAlt('apimatic', 'api', 'validate');
+    if (spec instanceof ProjectContext) {
+      return [`Ask an AI coding agent to run ${validate} and fix what it reports.`];
+    }
+    const specFlag = spec instanceof UrlPath ? f.flag('url', '<url>') : f.flag('file', '<path>');
+    return [`Ask an AI coding agent to run this command and fix what it reports:`, `${validate} ${specFlag}`];
   }
 
   public createPortalStep() {
