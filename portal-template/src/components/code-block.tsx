@@ -1,5 +1,5 @@
 import { DynamicCodeBlock } from 'fumadocs-ui/components/dynamic-codeblock.core';
-import { useRenderContext } from 'fumadocs-openapi/ui';
+import { useRenderContext } from 'fumadocs-openapi';
 
 // Fumadocs passes `JSON.stringify(example.value)`, which is undefined for an example with no `value`.
 export function CodeBlock({ lang, code }: Readonly<{ lang: string; code: string | undefined }>) {

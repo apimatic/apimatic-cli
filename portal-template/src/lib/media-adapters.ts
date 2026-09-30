@@ -1,6 +1,6 @@
 import type { MediaAdapter } from 'fumadocs-openapi';
 
-// Fumadocs throws on a request body type it has no adapter for, and matches a wildcard type only as written.
+// Fumadocs will not send a request body type it has no adapter for, and matches a wildcard type only as written.
 const UNADAPTED_MEDIA_TYPES = [
   '*/*',
   'application/*',

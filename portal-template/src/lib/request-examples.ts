@@ -1,10 +1,7 @@
-import type { useOperationContext } from 'fumadocs-openapi/ui';
+import type { ExampleRequest } from 'fumadocs-openapi/operation';
 import { isJsonObject } from './json';
 
-export type RequestExample = Pick<
-  ReturnType<typeof useOperationContext>['examples'][number],
-  'id' | 'name' | 'description'
->;
+export type RequestExample = Pick<ExampleRequest, 'id' | 'name' | 'description'>;
 type Location = 'path' | 'query' | 'header' | 'cookie';
 type Resolve = (node: unknown) => unknown;
 

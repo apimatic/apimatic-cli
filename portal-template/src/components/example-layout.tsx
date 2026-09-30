@@ -1,6 +1,7 @@
 import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@fumadocs/api-docs/components/select';
-import { useOperationContext, useRenderContext } from 'fumadocs-openapi/ui';
+import { useOpenAPI } from 'fumadocs-openapi';
+import { useExampleRequests, useOperation } from 'fumadocs-openapi/operation';
 import { CodeSample } from '@/lib/code-samples';
 import { Parameter, requestExamples, type RequestExample } from '@/lib/request-examples';
 
@@ -32,17 +33,16 @@ export function renderExampleLayout(slots: Readonly<LayoutSlots>): ReactNode {
 
 // Fumadocs passes a null selector for an operation with `x-exclusiveCodeSample`.
 function ExampleLayout({ selector, usageTabs, responseTabs }: Readonly<LayoutSlots>) {
-  const { schema } = useRenderContext();
-  const { route, examples: bodyExamples, example: defaultId, setExample } = useOperationContext();
-  const pathItem = schema.resolve(schema.dereferenced.paths?.[route]);
-  const operation = pathItem?.[bodyExamples[0].data.method];
+  const { resolve } = useOpenAPI().doc;
+  const { operation, pathItem } = useOperation();
+  const { items: bodyExamples, selected: defaultId, select: setExample } = useExampleRequests();
   // Only SDK samples follow a parameter's example ids; fumadocs' cURL and playground ignore them.
   const examples = useMemo(
     () =>
       CodeSample.listIn(operation).length === 0
         ? bodyExamples
-        : requestExamples(bodyExamples, Parameter.listIn(operation, pathItem, schema.resolve)),
-    [bodyExamples, operation, pathItem, schema]
+        : requestExamples(bodyExamples, Parameter.listIn(operation, pathItem, resolve)),
+    [bodyExamples, operation, pathItem, resolve]
   );
   const [selectedId, setSelectedId] = useState(defaultId);
 

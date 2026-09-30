@@ -8,6 +8,9 @@ minimumReleaseAgeExclude:
   - 'fumadocs-core'
   - 'fumadocs-ui'
   - 'mdast-util-to-markdown'
+  # Quarantined until 2026-10-06, and taken early: 12.1.0 renders security scheme descriptions
+  # in the playground as Markdown, for apimatic/apimatic-io#2249.
+  - 'fumadocs-openapi'
   - '@apimatic/*'
 blockExoticSubdeps: true
 overrides:
