@@ -51,7 +51,7 @@ export class PortalServePrompts {
           `(order, tabs, titles) or the ${f.var('portal')} block of ${f.var(APIMATIC_CONFIG_FILE_NAME)} ` +
           `updates the preview.`,
         `So does removing a language from ${f.var('languages')} (updates the SDK pages) or the ` +
-          `${f.var('plugin')} block (removes the Context Plugin tab).`,
+          `${f.var('plugin')} block (removes the Context Plugin pages).`,
         'Mistakes in these files are reported on save, and the preview keeps what it last accepted.',
         '',
         `Restart the preview after adding a language or a ${f.var('plugin')} block (its SDK or plugin is ` +

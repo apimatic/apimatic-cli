@@ -340,8 +340,8 @@ export function reportSharedTabNames(shared: SharedTabName[], sourceDirectory: D
   log.message(shared.map(({ tabs }) => `  • ${spellings(tabs)}: ${listedInProse(tabs.map(describe))}`).join('\n'));
   log.message(
     `Rename all but one tab of each name with a ${f.var('title')} in its folder's ` +
-      `${f.var(NAVIGATION_FILE_NAME)}, or in ${f.var(ROOT_NAVIGATION_FILE)} for the Home tab; the tabs of the ` +
-      `SDK pages and the context plugin keep their names.`
+      `${f.var(NAVIGATION_FILE_NAME)}, or in ${f.var(ROOT_NAVIGATION_FILE)} for the Home tab; the SDKs and ` +
+      `Context Plugin sections keep their names.`
   );
 }
 

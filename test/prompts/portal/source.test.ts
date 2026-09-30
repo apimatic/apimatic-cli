@@ -449,7 +449,7 @@ describe('reportSharedTabNames', () => {
         'SDK pages',
       "  • 'Home': the Home tab and the tab of the 'home' folder (named after the folder)",
       "Rename all but one tab of each name with a 'title' in its folder's 'nav.json', or in " +
-        "'content/nav.json' for the Home tab; the tabs of the SDK pages and the context plugin keep their names."
+        "'content/nav.json' for the Home tab; the SDKs and Context Plugin sections keep their names."
     ]);
   });
 });
