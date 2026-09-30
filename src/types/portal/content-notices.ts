@@ -1,5 +1,12 @@
 import { FilePath } from '../file/filePath.js';
+import { GeneratedSection } from './generated-pages.js';
 import { SharedTabName } from './portal-tabs.js';
+
+/** The root `nav.json` has no `tabs`, or there is no such file, with the sections that are then in Home. */
+export interface NoTabsListed {
+  file: FilePath | undefined;
+  sections: GeneratedSection[];
+}
 
 /** What a build accepts in `content/`, but the user should hear of. */
 export interface ContentNotices {
@@ -15,4 +22,9 @@ export interface ContentNotices {
   ignoredNavigationFiles: FilePath[];
   /** Names more than one tab would show, which the build accepts and a reader cannot tell apart. */
   sharedTabNames: SharedTabName[];
+  /**
+   * Nothing is a tab because no `tabs` says so. A portal from before the setting existed had
+   * the sections as tabs, and would otherwise lose them on upgrade without a word.
+   */
+  noTabsListed: NoTabsListed | undefined;
 }

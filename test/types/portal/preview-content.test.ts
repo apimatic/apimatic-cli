@@ -12,7 +12,12 @@ describe('PreviewContent', () => {
   const page = (name: string) => new FilePath(content.join('api').join('api'), new FileName(name));
   const folder = (name: string) => content.join(name);
 
-  const NONE: ContentNotices = { hiddenPages: [], ignoredNavigationFiles: [], sharedTabNames: [] };
+  const NONE: ContentNotices = {
+    hiddenPages: [],
+    ignoredNavigationFiles: [],
+    sharedTabNames: [],
+    noTabsListed: undefined
+  };
   const notices = (overrides: Partial<ContentNotices>): ContentNotices => ({ ...NONE, ...overrides });
 
   const home: PortalTab = { owner: { kind: 'home' }, name: 'Guides', namedBy: null };
@@ -78,6 +83,19 @@ describe('PreviewContent', () => {
     const after = notices({ hiddenPages: [page('faq.md'), page('notes.md')] });
 
     expect(noticesAfter(after, before)).to.deep.equal(NONE);
+  });
+
+  // A project that lost its tabs hears it once; adding the plugin block changes what it is told.
+  it('gives the missing tabs once, and again when the sections in Home change', () => {
+    const rootNavigation = new FilePath(content, new FileName('nav.json'));
+    const before = notices({ noTabsListed: { file: rootNavigation, sections: [SDK_SECTION] } });
+    const same = notices({ noTabsListed: { file: rootNavigation, sections: [SDK_SECTION] } });
+    const withPlugin = notices({ noTabsListed: { file: rootNavigation, sections: [SDK_SECTION, PLUGIN_SECTION] } });
+
+    expect(noticesAfter(before, NONE).noTabsListed).to.deep.equal(before.noTabsListed);
+    expect(noticesAfter(same, before).noTabsListed).to.be.undefined;
+    expect(noticesAfter(withPlugin, before).noTabsListed).to.deep.equal(withPlugin.noTabsListed);
+    expect(noticesAfter(NONE, before).noTabsListed).to.be.undefined;
   });
 
   it('gives a name shared by another tab than before', () => {

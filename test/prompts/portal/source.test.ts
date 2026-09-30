@@ -3,7 +3,12 @@ import { expect } from 'chai';
 import sinon from 'sinon';
 import { log } from '@clack/prompts';
 import { PortalServePrompts } from '../../../src/prompts/portal/serve.js';
-import { reportShadowedFiles, reportSharedTabNames, reportSourceProblem } from '../../../src/prompts/portal/source.js';
+import {
+  reportNoTabsListed,
+  reportShadowedFiles,
+  reportSharedTabNames,
+  reportSourceProblem
+} from '../../../src/prompts/portal/source.js';
 import { ContentProblem } from '../../../src/types/portal/portal-source.js';
 import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
 import { FileName } from '../../../src/types/file/fileName.js';
@@ -444,6 +449,51 @@ describe('reportSharedTabNames', () => {
       "  • 'Home': the Home tab and the tab of the 'home' folder (named after the folder)",
       "Rename all but one tab of each name with a 'title' in its folder's 'nav.json', or in " +
         "'content/nav.json' for the Home tab; the tabs of the SDK pages and the context plugin keep their names."
+    ]);
+  });
+});
+
+describe('reportNoTabsListed', () => {
+  const source = new DirectoryPath('project').join('src');
+  const rootNavigation = new FilePath(source.join('content'), new FileName('nav.json'));
+  let lines: string[];
+
+  beforeEach(() => {
+    lines = [];
+    sinon.stub(log, 'warn').callsFake((text?: string | string[]) => {
+      lines.push(stripVTControlCharacters(String(text)));
+    });
+  });
+
+  afterEach(() => {
+    sinon.restore();
+  });
+
+  it('says nothing when the root file lists its tabs, empty or not', () => {
+    reportNoTabsListed(undefined, source);
+
+    expect(lines).to.deep.equal([]);
+  });
+
+  // The word a 2.0.0-beta.1 project gets for the tabs it had, with the line that brings them back.
+  it('names the file, the sections now in Home, and both ways to say so on purpose', () => {
+    reportNoTabsListed({ file: rootNavigation, sections: [SDK_SECTION, PLUGIN_SECTION] }, source);
+
+    expect(lines).to.deep.equal([
+      "'content/nav.json' has no 'tabs', so nothing is a tab: the header shows no tab bar, and SDKs, Context " +
+        "Plugin and the API reference are folders in Home's sidebar. Add " +
+        '\'"tabs": ["apimatic:sdks","apimatic:plugin","apimatic:api"]\' to show them as tabs, or \'"tabs": []\' ' +
+        'to keep this sidebar.'
+    ]);
+  });
+
+  it('says there is no root file when there is none, and names only the sections there are', () => {
+    reportNoTabsListed({ file: undefined, sections: [SDK_SECTION] }, source);
+
+    expect(lines).to.deep.equal([
+      "There is no 'content/nav.json', so nothing is a tab: the header shows no tab bar, and SDKs and the API " +
+        'reference are folders in Home\'s sidebar. Add the file with \'"tabs": ["apimatic:sdks","apimatic:api"]\' ' +
+        'to show them as tabs, or \'"tabs": []\' to keep this sidebar.'
     ]);
   });
 });

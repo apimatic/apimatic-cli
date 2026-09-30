@@ -161,10 +161,17 @@ export class ContentTree {
     }
 
     const tabs = ContentTree.tabs(navigation.root, titled, generatedPages);
+    const rootNavigation = navigation.root.navigation;
     return ok({
       hiddenPages: ContentTree.hiddenPages(pages, specs),
       ignoredNavigationFiles: navigation.ignoredFiles,
-      sharedTabNames: sharedTabNames(tabs)
+      sharedTabNames: sharedTabNames(tabs),
+      // Before `tabs` existed every section was a tab, so a project from then loses its tabs
+      // on upgrade; said once rather than silently. `"tabs": []` says the same on purpose.
+      noTabsListed:
+        rootNavigation?.settings.tabs === undefined
+          ? { file: rootNavigation?.file, sections: generatedPages.sections() }
+          : undefined
     });
   }
 

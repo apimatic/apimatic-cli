@@ -20,6 +20,7 @@ import { PortalTab } from '../../src/types/portal/portal-tabs';
 import { DirectoryPath } from '../../src/types/file/directoryPath';
 import { FileName } from '../../src/types/file/fileName';
 import { FilePath } from '../../src/types/file/filePath';
+import { PLUGIN_SECTION, SDK_SECTION } from '../../src/types/portal/generated-pages';
 import { ZipService } from '../../src/infrastructure/zip-service';
 
 const OPENAPI = JSON.stringify({ openapi: '3.0.0', info: { title: 'Calc', version: '1' }, paths: {} });
@@ -1570,6 +1571,38 @@ describe('PortalSourceContext', () => {
       const source = (await resolve())._unsafeUnwrap();
 
       expect(ignored(source)).to.deep.equal([]);
+    });
+  });
+
+  describe('the tab bar notices', () => {
+    beforeEach(() => {
+      writeConfig({ site: { name: 'Calc' } });
+      write('spec/api.json', OPENAPI);
+      write('content/index.md', page('Welcome'));
+    });
+
+    const rootNavigation = () => new FilePath(new DirectoryPath(root).join('content'), new FileName('nav.json'));
+    const notices = async () => (await resolve())._unsafeUnwrap().contentNotices;
+
+    // A 2.0.0-beta.1 project had the sections as tabs with no `tabs` at all.
+    it('says once that a root file with no tabs makes no tab, naming the sections then in Home', async () => {
+      write('content/nav.json', JSON.stringify({ pages: ['index', '...'] }));
+
+      expect((await notices()).noTabsListed).to.deep.equal({ file: rootNavigation(), sections: [SDK_SECTION] });
+
+      write('apimatic.json', JSON.stringify({ portal: { site: { name: 'Calc' } }, languages: LANGUAGES, plugin: {} }));
+
+      expect((await notices()).noTabsListed?.sections).to.deep.equal([SDK_SECTION, PLUGIN_SECTION]);
+    });
+
+    it('says the same of a project with no root file, which had them too', async () => {
+      expect((await notices()).noTabsListed).to.deep.equal({ file: undefined, sections: [SDK_SECTION] });
+    });
+
+    it('takes an empty tabs as said on purpose', async () => {
+      write('content/nav.json', JSON.stringify({ tabs: [], pages: ['index', '...'] }));
+
+      expect((await notices()).noTabsListed).to.be.undefined;
     });
   });
 
