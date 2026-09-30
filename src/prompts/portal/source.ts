@@ -295,13 +295,15 @@ export function reportNoTabsListed(notice: NoTabsListed | undefined, sourceDirec
     return;
   }
   const names = listedInProse([...notice.sections.map(({ title }) => title), 'the API reference']);
-  const tokens = JSON.stringify([...notice.sections.map(({ token }) => token), API_REFERENCE_TOKEN]);
+  const listing = f.var(
+    `"tabs": ${JSON.stringify([...notice.sections.map(({ token }) => token), API_REFERENCE_TOKEN])}`
+  );
   const file = notice.file === undefined ? undefined : relative(notice.file, sourceDirectory);
   const cause = file === undefined ? `There is no ${f.var(ROOT_NAVIGATION_FILE)}` : `${file} has no ${f.var('tabs')}`;
   const add = file === undefined ? 'Add the file with' : 'Add';
   log.warn(
     `${cause}, so nothing is a tab: the header shows no tab bar, and ${names} are folders in Home's sidebar. ` +
-      `${add} ${f.var(`"tabs": ${tokens}`)} to show them as tabs, or ${f.var('"tabs": []')} to keep this sidebar.`
+      `${add} ${listing} to show them as tabs, or ${f.var('"tabs": []')} to keep this sidebar.`
   );
 }
 

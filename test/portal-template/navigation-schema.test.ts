@@ -28,9 +28,7 @@ describe('navigationSchema', () => {
 
   // The CLI would otherwise validate a setting the template never sees.
   it('keeps every setting the CLI accepts in the root file', () => {
-    for (const field of ROOT_FIELDS) {
-      expect(navigationSchema.shape, field).to.have.property(field);
-    }
+    expect(Object.keys(navigationSchema.shape)).to.include.members([...ROOT_FIELDS]);
   });
 
   it('adds nothing beyond those to Fumadocs’ own schema', () => {
