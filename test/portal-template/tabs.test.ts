@@ -81,7 +81,7 @@ describe('tabsTransformer', () => {
   const GENERATED = [...SDKS, ...PLUGIN];
 
   it('makes every top-level node part of exactly one tab, each a root folder', () => {
-    const docs = [...CONTENT, ...TUTORIALS, root(['tutorials'], ['index', 'authentication'])];
+    const docs = [...CONTENT, ...TUTORIALS, root(['tutorials', 'apimatic:api'], ['index', 'authentication'])];
     const tree = treeOf({ docs, openapi: API });
 
     expect(tree.children.every((child) => child.type === 'folder' && child.root === true)).to.be.true;
@@ -113,63 +113,63 @@ describe('tabsTransformer', () => {
     const docs = [...CONTENT, page('guides/intro.mdx', 'Intro'), root([], ['index', 'guides', 'authentication'])];
 
     expect(tabsOf({ docs, openapi: API })).to.deep.equal({
-      Home: ['Welcome', 'Guides', 'Authentication'],
-      'API Reference': ['Pet', 'Store']
+      Home: ['Welcome', 'Guides', 'Authentication', 'API Reference']
     });
   });
 
-  // The defaults `pages` gave the root before `tabs` existed, read from `tabs` instead.
-  describe('the tabs that tabs does not name', () => {
-    const defaults: { rule: string; file: File; generated: File[]; tabs: string[] }[] = [
+  // `tabs` is the whole tab bar after Home: a section it does not name is a folder in Home.
+  describe('the sections tabs does not name', () => {
+    const cases: { rule: string; file: File; generated: File[]; tabs: string[] }[] = [
       {
-        rule: 'leave the generated sections before the API reference, SDKs first, after the named folders',
+        rule: 'are no tabs when tabs names a folder alone',
         file: root(['tutorials']),
         generated: GENERATED,
-        tabs: ['Home', 'Tutorials', 'SDKs', 'Context Plugin', 'API Reference']
+        tabs: ['Home', 'Tutorials']
       },
       {
-        rule: 'put the generated sections after the last folder when the file puts the API reference before one',
+        rule: 'leave the tab bar to what tabs names, in its order',
         file: root(['apimatic:api', 'tutorials']),
         generated: GENERATED,
-        tabs: ['Home', 'API Reference', 'Tutorials', 'SDKs', 'Context Plugin']
+        tabs: ['Home', 'API Reference', 'Tutorials']
       },
       {
-        rule: 'put an unnamed API reference last, after a named section',
+        rule: 'stay out of the tab bar when tabs names another section',
         file: root(['apimatic:plugin', 'tutorials']),
         generated: GENERATED,
-        tabs: ['Home', 'Context Plugin', 'Tutorials', 'SDKs', 'API Reference']
+        tabs: ['Home', 'Context Plugin', 'Tutorials']
       },
       {
-        rule: 'put an unnamed section last when pages places the API reference in Home',
+        rule: 'are no tabs whether or not pages places them',
         file: root(['tutorials'], ['index', 'apimatic:api']),
         generated: SDKS,
-        tabs: ['Home', 'Tutorials', 'SDKs']
+        tabs: ['Home', 'Tutorials']
       },
       {
-        rule: 'follow a named API reference rather than jumping ahead of it',
-        file: root(['apimatic:api']),
-        generated: GENERATED,
-        tabs: ['Home', 'API Reference', 'SDKs', 'Context Plugin']
-      },
-      {
-        rule: 'follow every named tab when tabs names only the reference and a section',
+        rule: 'leave a tab for every token named, and for nothing else',
         file: root(['apimatic:api', 'apimatic:sdks']),
         generated: GENERATED,
-        tabs: ['Home', 'API Reference', 'SDKs', 'Context Plugin']
-      },
-      {
-        rule: 'follow a named API reference that comes after a folder too',
-        file: root(['tutorials', 'apimatic:api']),
-        generated: GENERATED,
-        tabs: ['Home', 'Tutorials', 'API Reference', 'SDKs', 'Context Plugin']
+        tabs: ['Home', 'API Reference', 'SDKs']
       }
     ];
 
-    for (const { rule, file, generated, tabs } of defaults) {
+    for (const { rule, file, generated, tabs } of cases) {
       it(rule, () => {
         expect(tabNames({ docs: [...CONTENT, ...TUTORIALS, file], generated, openapi: API })).to.deep.equal(tabs);
       });
     }
+
+    // By path, as Fumadocs sorts folders: `api`, `context-plugin`, `sdks`, after every page.
+    it('sit in Home’s sidebar, in Fumadocs’ order', () => {
+      const docs = [...CONTENT, ...TUTORIALS, root(['tutorials'])];
+
+      expect(tabsOf({ docs, generated: GENERATED, openapi: API }).Home).to.deep.equal([
+        'Welcome',
+        'Authentication',
+        'API Reference',
+        'Context Plugin',
+        'SDKs'
+      ]);
+    });
   });
 
   describe('a section placed in Home', () => {
@@ -177,8 +177,7 @@ describe('tabsTransformer', () => {
       const docs = [...CONTENT, root([], ['index', 'apimatic:api', 'authentication', 'apimatic:plugin'])];
 
       expect(tabsOf({ docs, generated: GENERATED, openapi: API })).to.deep.equal({
-        Home: ['Welcome', 'API Reference', 'Authentication', 'Context Plugin'],
-        SDKs: ['All the SDKs', 'TypeScript', 'Python']
+        Home: ['Welcome', 'API Reference', 'Authentication', 'Context Plugin', 'SDKs']
       });
     });
 
@@ -217,17 +216,23 @@ describe('tabsTransformer', () => {
     });
 
     // A switcher with one choice switches nothing, so the layout is given no tabs at all.
-    it('leaves Home alone, with no tab for the layout, once every section is placed there', () => {
-      const docs = [...CONTENT, root([], ['index', 'apimatic:api', 'apimatic:sdks', 'apimatic:plugin'])];
-      const tree = treeOf({ docs, generated: GENERATED, openapi: API });
+    it('leaves Home alone, with no tab for the layout, when tabs names nothing', () => {
+      for (const file of [
+        root([], ['index', 'apimatic:api', 'apimatic:sdks', 'apimatic:plugin']),
+        root([], ['index', '...']),
+        meta('nav.json', { pages: ['index', '...'] }),
+        meta('nav.json', {})
+      ]) {
+        const tree = treeOf({ docs: [...CONTENT, file], generated: GENERATED, openapi: API });
 
-      expect(tree.children.map(nameOf)).to.deep.equal(['Home']);
-      expect(tree.children[0]).to.include({ type: 'folder', root: true });
-      expect(portalTabs(tree)).to.be.empty;
+        expect(tree.children.map(nameOf)).to.deep.equal(['Home']);
+        expect(tree.children[0]).to.include({ type: 'folder', root: true });
+        expect(portalTabs(tree)).to.be.empty;
+      }
     });
 
     it('still gives the layout its tabs while any section is a tab', () => {
-      const docs = [...CONTENT, root([], ['index', 'apimatic:api'])];
+      const docs = [...CONTENT, root(['apimatic:sdks'], ['index', 'apimatic:api'])];
 
       expect(portalTabs(treeOf({ docs, generated: SDKS, openapi: API })).map((each) => each.title)).to.deep.equal([
         'Home',
@@ -236,34 +241,34 @@ describe('tabsTransformer', () => {
     });
 
     // The CLI refuses a node in both lists; the template still has to do one thing with it.
-    it('stays in Home when tabs names it too, while a folder in both lists is a tab', () => {
+    it('is a tab when tabs names it, whatever pages says of it, the reference and a folder alike', () => {
       const docs = [...CONTENT, ...TUTORIALS, root(['apimatic:api', 'tutorials'], ['index', 'api', 'tutorials'])];
 
-      expect(tabNames({ docs, openapi: API })).to.deep.equal(['Home', 'Tutorials']);
+      expect(tabNames({ docs, openapi: API })).to.deep.equal(['Home', 'API Reference', 'Tutorials']);
     });
   });
 
-  it('gives the defaults with no nav.json at all: Home, then the API reference', () => {
-    expect(tabNames({ docs: CONTENT, openapi: API })).to.deep.equal(['Home', 'API Reference']);
+  it('makes Home the only tab with no nav.json at all, the API reference inside it', () => {
+    expect(tabsOf({ docs: CONTENT, openapi: API })).to.deep.equal({
+      Home: ['Welcome', 'Authentication', 'API Reference']
+    });
   });
 
-  it('keeps the generated tabs before the API reference, SDKs first, when no token is named', () => {
-    expect(tabNames({ docs: CONTENT, generated: GENERATED, openapi: API })).to.deep.equal([
-      'Home',
-      'SDKs',
-      'Context Plugin',
-      'API Reference'
-    ]);
+  it('puts every section in Home, in Fumadocs’ order, when no file makes a tab of one', () => {
+    expect(tabsOf({ docs: CONTENT, generated: GENERATED, openapi: API })).to.deep.equal({
+      Home: ['Welcome', 'Authentication', 'API Reference', 'Context Plugin', 'SDKs']
+    });
   });
 
   // The label is the CLI's, from the folder's nav.json, and the index page opens the tab.
   it('makes each generated folder a tab named by its nav.json, listing its index page first', () => {
-    const tabs = tabsOf({ docs: CONTENT, generated: GENERATED, openapi: API });
+    const docs = [...CONTENT, root(['apimatic:sdks', 'apimatic:plugin'], ['index'])];
+    const tabs = tabsOf({ docs, generated: GENERATED, openapi: API });
 
     expect(tabs.SDKs).to.deep.equal(['All the SDKs', 'TypeScript', 'Python']);
     expect(tabs['Context Plugin']).to.deep.equal(['Install the plugin']);
     expect(
-      portalTabs(treeOf({ docs: CONTENT, generated: GENERATED, openapi: API })).map((each) => [each.title, each.url])
+      portalTabs(treeOf({ docs, generated: GENERATED, openapi: API })).map((each) => [each.title, each.url])
     ).to.deep.include.members([
       ['SDKs', '/sdks'],
       ['Context Plugin', '/context-plugin']
@@ -297,7 +302,7 @@ describe('tabsTransformer', () => {
   });
 
   it('keeps the order the file gives in Home, and opens Home on the home page wherever it sits', () => {
-    const docs = [...CONTENT, root([], ['authentication', 'index'])];
+    const docs = [...CONTENT, root(['apimatic:api'], ['authentication', 'index'])];
 
     expect(tabsOf({ docs, openapi: API }).Home).to.deep.equal(['Authentication', 'Welcome']);
     expect(portalTabs(treeOf({ docs, openapi: API }))[0]).to.include({ title: 'Home', url: '/' });
@@ -309,7 +314,7 @@ describe('tabsTransformer', () => {
       ...CONTENT,
       ...TUTORIALS,
       page('changelog.mdx', 'Changelog'),
-      root(['tutorials'], ['index', 'authentication', 'changelog'])
+      root(['tutorials', 'apimatic:api'], ['index', 'authentication', 'changelog'])
     ];
 
     expect(tabNames({ docs, openapi: API })).to.deep.equal(['Home', 'Tutorials', 'API Reference']);
@@ -319,24 +324,32 @@ describe('tabsTransformer', () => {
   it('keeps a folder the root nav.json does not list inside Home', () => {
     const docs = [...CONTENT, page('guides/intro.mdx', 'Intro')];
 
-    expect(tabsOf({ docs, openapi: API }).Home).to.deep.equal(['Welcome', 'Authentication', 'Guides']);
+    expect(tabsOf({ docs, openapi: API }).Home).to.deep.equal(['Welcome', 'Authentication', 'API Reference', 'Guides']);
   });
 
   it('keeps the folders the rest entry gathers inside Home, and makes tabs of the ones tabs lists', () => {
-    const docs = [...CONTENT, ...TUTORIALS, page('guides/intro.mdx', 'Intro'), root(['tutorials'], ['index', '...'])];
+    const docs = [
+      ...CONTENT,
+      ...TUTORIALS,
+      page('guides/intro.mdx', 'Intro'),
+      root(['tutorials', 'apimatic:api'], ['index', '...'])
+    ];
 
     expect(tabNames({ docs, openapi: API })).to.deep.equal(['Home', 'Tutorials', 'API Reference']);
     expect(tabsOf({ docs, openapi: API }).Home).to.deep.equal(['Welcome', 'Authentication', 'Guides']);
   });
 
   it('makes no tab for a section that is not generated', () => {
-    expect(tabNames({ docs: CONTENT, openapi: API })).to.deep.equal(['Home', 'API Reference']);
-    expect(tabNames({ docs: CONTENT, generated: SDKS, openapi: API })).to.deep.equal(['Home', 'SDKs', 'API Reference']);
+    const docs = [...CONTENT, root(['apimatic:sdks', 'apimatic:plugin'])];
+
+    expect(tabNames({ docs, openapi: API })).to.deep.equal(['Home']);
+    expect(tabNames({ docs, generated: SDKS, openapi: API })).to.deep.equal(['Home', 'SDKs']);
   });
 
   // Matching tabs to folders goes by id on the client, after the tree has been serialised.
   it('gives the tab no folder backs a fixed id', () => {
-    const ids = treeOf({ docs: CONTENT, generated: GENERATED, openapi: API }).children.map((child) => child.$id);
+    const docs = [...CONTENT, root(['apimatic:sdks', 'apimatic:api'])];
+    const ids = treeOf({ docs, generated: GENERATED, openapi: API }).children.map((child) => child.$id);
 
     expect(ids[0]).to.equal('/tab/home');
     expect(ids.slice(1).filter((id) => id?.startsWith('/tab/'))).to.be.empty;
@@ -360,7 +373,7 @@ describe('tabsTransformer', () => {
       ...TUTORIALS,
       page('tutorials/overview.mdx', 'Overview'),
       page('api/overview.mdx', 'API overview'),
-      root(['tutorials'], ['index', '...'])
+      root(['tutorials', 'apimatic:api'], ['index', '...'])
     ];
     const tree = treeOf({ docs, generated: GENERATED, openapi: API });
     const reading = flattenTree(tab(tree, 'Tutorials').children).find((node) => node.url === '/tutorials/overview');
@@ -383,7 +396,7 @@ describe('tabsTransformer', () => {
       page('tutorials/deep/more.mdx', 'More'),
       page('guides/intro.mdx', 'Intro'),
       page('api/index.mdx', 'Reference'),
-      root(['tutorials'], ['index', '...'])
+      root(['tutorials', 'apimatic:sdks', 'apimatic:plugin', 'apimatic:api'], ['index', '...'])
     ];
     const tree = treeOf({ docs, generated: GENERATED, openapi: API });
     const tabs = portalTabs(tree);
@@ -516,7 +529,7 @@ describe('tabsTransformer', () => {
 
   describe('the API reference tab', () => {
     it('takes its name from content/api/nav.json', () => {
-      const docs = [...CONTENT, meta('api/nav.json', { title: 'REST API' })];
+      const docs = [...CONTENT, meta('api/nav.json', { title: 'REST API' }), root(['apimatic:api'])];
 
       expect(tabNames({ docs, openapi: API })).to.include('REST API');
     });
@@ -524,7 +537,7 @@ describe('tabsTransformer', () => {
     // A root folder's own link is not listed in its sidebar, and Fumadocs does not look there
     // when it decides which tab is active, so the page moves in among the reference pages.
     it('lists a content/api index page first among its pages, and takes its name', () => {
-      const docs = [...CONTENT, page('api/index.mdx', 'Reference')];
+      const docs = [...CONTENT, page('api/index.mdx', 'Reference'), root(['apimatic:api'])];
       const reference = tab(treeOf({ docs, openapi: API }), 'Reference');
 
       expect(reference.index).to.be.undefined;
@@ -536,7 +549,9 @@ describe('tabsTransformer', () => {
     it('takes its name from the root nav.json title', () => {
       const docs = [...CONTENT, meta('nav.json', { title: 'Overview', pages: ['index', '...'] })];
 
-      expect(tabsOf({ docs, openapi: API })).to.deep.include({ Overview: ['Welcome', 'Authentication'] });
+      expect(tabsOf({ docs, openapi: API })).to.deep.include({
+        Overview: ['Welcome', 'Authentication', 'API Reference']
+      });
     });
 
     // The CLI refuses one, but under `portal serve` a half-typed file reloads straight to here.
@@ -552,12 +567,16 @@ describe('tabsTransformer', () => {
       const tree = treeOf({ docs: [page('authentication.mdx', 'Authentication')], openapi: API });
       const home = tab(tree, 'Home');
 
-      expect(tree.children.map(nameOf)).to.deep.equal(['Home', 'API Reference']);
-      expect(home.children.map((child) => child.type === 'page' && child.url)).to.deep.equal(['/', '/authentication']);
+      expect(tree.children.map(nameOf)).to.deep.equal(['Home']);
+      expect(home.children.map((child) => child.type === 'page' && child.url)).to.deep.equal([
+        '/',
+        '/authentication',
+        false
+      ]);
     });
 
     it('is made even when there is no content at all', () => {
-      expect(tabNames({ openapi: API })).to.deep.equal(['Home', 'API Reference']);
+      expect(tabNames({ openapi: API })).to.deep.equal(['Home']);
     });
 
     // Without an index page, an `index` entry names a folder of that name, a tab when tabs lists it.
@@ -574,7 +593,11 @@ describe('tabsTransformer', () => {
 
     // The same URL may appear only once in a page tree.
     it('opens on the home page a `(group)` folder serves, with no node of its own', () => {
-      const docs = [page('(start)/index.mdx', 'Welcome'), page('authentication.mdx', 'Authentication')];
+      const docs = [
+        page('(start)/index.mdx', 'Welcome'),
+        page('authentication.mdx', 'Authentication'),
+        root(['apimatic:api'])
+      ];
       const tree = treeOf({ docs, openapi: API });
 
       expect(tabsOf({ docs, openapi: API }).Home).to.deep.equal(['Authentication', 'Welcome']);
@@ -583,7 +606,7 @@ describe('tabsTransformer', () => {
     });
 
     it('opens on the home page however deep in `(group)` folders it sits', () => {
-      const docs = [page('(start)/a.mdx', 'A'), page('(start)/(inner)/index.mdx', 'Welcome')];
+      const docs = [page('(start)/a.mdx', 'A'), page('(start)/(inner)/index.mdx', 'Welcome'), root(['apimatic:api'])];
 
       expect(portalTabs(treeOf({ docs, openapi: API }))[0]).to.include({ title: 'Home', url: '/' });
     });
@@ -597,8 +620,8 @@ describe('tabsTransformer', () => {
         root(['(start)'])
       ];
 
-      expect(tabsOf({ docs, openapi: API })).to.deep.include({ Home: ['Authentication', 'Start'] });
-      expect(tabNames({ docs, openapi: API })).to.deep.equal(['Home', 'API Reference']);
+      expect(tabsOf({ docs, openapi: API })).to.deep.include({ Home: ['Authentication', 'Start', 'API Reference'] });
+      expect(tabNames({ docs, openapi: API })).to.deep.equal(['Home']);
     });
 
     it('orders a folder that serves the home page among its pages when pages lists it', () => {
@@ -606,7 +629,7 @@ describe('tabsTransformer', () => {
         page('(start)/index.mdx', 'Welcome'),
         meta('(start)/nav.json', { title: 'Start' }),
         page('authentication.mdx', 'Authentication'),
-        root([], ['authentication', '(start)'])
+        root(['apimatic:api'], ['authentication', '(start)'])
       ];
 
       expect(tabsOf({ docs, openapi: API })).to.deep.include({ Home: ['Authentication', 'Start'] });
@@ -620,7 +643,7 @@ describe('tabsTransformer', () => {
       untitledTabName({ kind: 'folder', directory: new DirectoryPath('content', directory) });
 
     it('gives the tabs no title names the names the CLI gives them', () => {
-      expect(tabNames({ docs: CONTENT, openapi: API })).to.deep.equal([
+      expect(tabNames({ docs: [...CONTENT, root(['apimatic:api'])], openapi: API })).to.deep.equal([
         untitledTabName({ kind: 'home' }),
         untitledTabName({ kind: 'apiReference' })
       ]);

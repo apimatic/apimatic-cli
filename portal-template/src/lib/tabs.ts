@@ -9,9 +9,9 @@ import { containsUrl, docsRoute, HOME_TAB_ID } from './shared';
  * reference does whenever its operations are grouped. Each stays bound to its folder, which is
  * how the active tab is found.
  *
- * None when Home is the only tab, as it is once the root `nav.json`'s `pages` places the API
- * reference and every generated section in it: a switcher with one choice switches nothing,
- * and the layout renders no tab bar over an empty list.
+ * None when Home is the only tab, as it is whenever the root `nav.json`'s `tabs` names nothing,
+ * or there is no such file: a switcher with one choice switches nothing, and the layout renders
+ * no tab bar over an empty list.
  */
 export function portalTabs(tree: PageTree.Root): LayoutTab[] {
   const roots = tree.children.filter((node): node is PageTree.Folder => node.type === 'folder' && node.root === true);
