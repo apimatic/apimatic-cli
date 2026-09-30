@@ -1,4 +1,5 @@
 import { expect } from 'chai';
+import { SDK_SECTION } from '../../../src/types/portal/generated-pages';
 import { NavigationContext, PortalNavigation } from '../../../src/types/portal/portal-navigation';
 
 describe('PortalNavigation', () => {
@@ -111,9 +112,12 @@ describe('PortalNavigation', () => {
       expect(errorsFor([1])[0]).to.contain("'pages' must be an array of strings.");
     });
 
-    it('points api at the token, since that is where the reference is mounted', () => {
-      expect(errorsFor(['api'])).to.deep.equal([
-        "content/nav.json: 'api' is not a page or folder in this directory. The API reference is positioned with 'apimatic:api'."
+    // The reference is mounted at the root of every portal, so `api` positions it whether or not
+    // a directory is there to see; a near miss of the name is pointed at the token.
+    it('positions the reference with api, and points a near miss of it at the token', () => {
+      expect(validate(['api']).isOk()).to.be.true;
+      expect(errorsFor(['Api'])).to.deep.equal([
+        "content/nav.json: 'Api' is not a page or folder in this directory. The API reference is positioned with 'apimatic:api'."
       ]);
     });
 
@@ -309,15 +313,26 @@ describe('PortalNavigation', () => {
     const fileErrors = (file: Record<string, unknown>, overrides: Partial<NavigationContext> = {}) =>
       validateFile(file, overrides)._unsafeUnwrapErr();
 
-    // The template reads both lists again; the CLI answers with them to name the tabs as it does.
-    it('answers with both lists, trimmed, and with empty lists for what the file leaves out', () => {
-      const settings = validateFile({ tabs: [' guides ', 'apimatic:api'], pages: ['  index ', 'authentication'] });
+    // The CLI names the tabs from what it resolved each entry to, in the order the tab bar shows them.
+    it('answers with the pages trimmed, and the tabs resolved, in order', () => {
+      const settings = validateFile({
+        tabs: [' guides ', 'apimatic:api', 'apimatic:sdks'],
+        pages: ['  index ', 'authentication']
+      });
 
       expect(settings._unsafeUnwrap()).to.deep.include({
-        tabs: ['guides', 'apimatic:api'],
+        tabs: [
+          { kind: 'folder', name: 'guides' },
+          { kind: 'apiReference' },
+          { kind: 'generated', section: SDK_SECTION }
+        ],
         pages: ['index', 'authentication']
       });
-      expect(PortalNavigation.validate('{}', contextFor())._unsafeUnwrap()).to.deep.include({ pages: [], tabs: [] });
+      expect(validateFile({ tabs: ['api'] })._unsafeUnwrap().tabs).to.deep.equal([{ kind: 'apiReference' }]);
+      expect(PortalNavigation.validate('{}', contextFor())._unsafeUnwrap()).to.deep.include({
+        pages: [],
+        tabs: undefined
+      });
     });
 
     it('accepts a folder, api or its token, and each section’s token as a tab', () => {
@@ -374,6 +389,9 @@ describe('PortalNavigation', () => {
       expect(fileErrors({ tabs: ['guides/deep'] })[0]).to.contain("'guides/deep' addresses another directory");
       expect(fileErrors({ tabs: 'guides' })[0]).to.contain("'tabs' must be an array of strings.");
       expect(fileErrors({ tabs: [1] })[0]).to.contain("'tabs' must be an array of strings.");
+      // One edit fixes the file: the other list's entries are still checked.
+      expect(fileErrors({ tabs: 'guides', pages: ['nope'] })).to.have.lengthOf(2);
+      expect(fileErrors({ tabs: ['nope'], pages: 'index' })).to.have.lengthOf(2);
     });
 
     it('refuses a folder with no page in it, and a name that is no folder with a hint tabs accepts', () => {
@@ -397,8 +415,8 @@ describe('PortalNavigation', () => {
     // The pages hint would send the user to an entry tabs then refuses, one error later.
     it('answers a page near miss with where a page can go, in one message', () => {
       expect(fileErrors({ tabs: ['Authentication'] })).to.deep.equal([
-        "content/nav.json: 'Authentication' is not a folder in this directory. 'authentication' is a page; " +
-          "order it in Home's sidebar with 'pages'."
+        "content/nav.json: 'Authentication' is not a folder in this directory. 'authentication' is a page, and a " +
+          "tab is a folder. Order it in Home's sidebar with 'pages' instead."
       ]);
     });
 
@@ -410,13 +428,15 @@ describe('PortalNavigation', () => {
     });
 
     // `content/api.md` is a second child at the root, so the entry could position only the reference.
-    it('refuses api when a page of that name is a second child, as pages does', () => {
+    it('refuses api when a page of that name is a second child, as pages does, however it is spelled', () => {
       const withApiPage = { childNames: ['index', 'api', 'api'], folderNames: [] };
-
-      expect(fileErrors({ tabs: ['api'], pages: ['index'] }, withApiPage)).to.deep.equal([
+      const sentence =
         "content/nav.json: 'api' is where the API reference is mounted, so the entry positions the " +
-          'reference rather than the page of that name. Rename the page to position it.'
-      ]);
+        'reference rather than the page of that name. Rename the page to position it.';
+
+      expect(fileErrors({ tabs: ['api'], pages: ['index'] }, withApiPage)).to.deep.equal([sentence]);
+      expect(fileErrors({ tabs: ['apimatic:api'], pages: ['index'] }, withApiPage)).to.deep.equal([sentence]);
+      expect(fileErrors({ tabs: [], pages: ['index', 'apimatic:api'] }, withApiPage)).to.deep.equal([sentence]);
       expect(validateFile({ tabs: ['api'], pages: ['index'] }, { childNames: ['index', 'api'] }).isOk()).to.be.true;
     });
 
@@ -474,12 +494,13 @@ describe('PortalNavigation', () => {
       ]);
     });
 
-    // `tabs` is the whole tab bar after Home, so a file without it makes no tab, whatever `pages` names.
-    it('reads a root file with no tabs as one with an empty list', () => {
+    // `tabs` is the whole tab bar after Home, so a file without it makes no tab, whatever `pages`
+    // names; it answers with no list, so the content tree can say so once.
+    it('accepts a root file with no tabs, whatever pages names, and answers with no list', () => {
       const settings = validateFile({ pages: ['index', 'guides', 'apimatic:api', 'authentication'] });
 
       expect(settings._unsafeUnwrap()).to.deep.include({
-        tabs: [],
+        tabs: undefined,
         pages: ['index', 'guides', 'apimatic:api', 'authentication']
       });
       expect(validateFile({ pages: ['api'] }, { childNames: ['index', 'api'] }).isOk()).to.be.true;

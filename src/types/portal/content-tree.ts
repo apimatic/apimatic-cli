@@ -9,7 +9,6 @@ import { GENERATED_SECTIONS, GeneratedPages } from './generated-pages.js';
 import { ParsedPage } from './page.js';
 import {
   API_REFERENCE_NAME,
-  API_REFERENCE_TOKEN,
   GROUP_FOLDER,
   INDEX_NAME,
   NAVIGATION_FILE_NAME,
@@ -204,27 +203,30 @@ export class ContentTree {
 
   /**
    * Every tab, named as the template names it, in the order the tab bar shows them: Home, then
-   * the entries of the root `nav.json`'s `tabs`. A section or the reference it does not name is
-   * a folder in Home's sidebar rather than a tab, so its name is compared with no tab's.
+   * what the root `nav.json`'s `tabs` names. Nothing else is a tab, so nothing else is compared.
    */
   private static tabs(root: DirectoryScan, pages: TitledPage[], generatedPages: GeneratedPages): PortalTab[] {
     const named = (owner: TabOwner, scan: DirectoryScan | undefined): PortalTab =>
       ContentTree.namedTab(owner, scan?.navigation, scan?.indexPage, pages);
-    const sections = generatedPages.sections();
 
     // The home page is the content root's index page, which names no tab.
     const home = ContentTree.namedTab({ kind: 'home' }, root.navigation, undefined, pages);
-    // A token for a section that is not generated names no tab, as it resolves to no node.
-    const listed = (root.navigation?.settings.tabs ?? []).flatMap((entry): PortalTab[] => {
-      if (entry === API_REFERENCE_NAME || entry === API_REFERENCE_TOKEN) {
-        return [named({ kind: 'apiReference' }, root.subfolders.get(API_REFERENCE_NAME)?.scan)];
+    const listed = (root.navigation?.settings.tabs ?? []).flatMap((tab): PortalTab[] => {
+      switch (tab.kind) {
+        case 'apiReference':
+          return [named({ kind: 'apiReference' }, root.subfolders.get(API_REFERENCE_NAME)?.scan)];
+        case 'generated':
+          // A token for a section that is not generated names no tab, as it resolves to no node.
+          return generatedPages.sections().includes(tab.section)
+            ? [named({ kind: 'generated', section: tab.section }, undefined)]
+            : [];
+        case 'folder': {
+          const subfolder = root.subfolders.get(tab.name);
+          return subfolder === undefined
+            ? []
+            : [named({ kind: 'folder', directory: subfolder.directory }, subfolder.scan)];
+        }
       }
-      const section = sections.find((candidate) => candidate.token === entry);
-      if (section !== undefined) {
-        return [named({ kind: 'generated', section }, undefined)];
-      }
-      const subfolder = root.subfolders.get(entry);
-      return subfolder === undefined ? [] : [named({ kind: 'folder', directory: subfolder.directory }, subfolder.scan)];
     });
     return [home, ...listed];
   }
