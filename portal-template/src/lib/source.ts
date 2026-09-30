@@ -19,10 +19,7 @@ export const docs = defineDocs({
   // Restricted to our own file, replacing the default of every .json and .yaml in the
   // content directory. Without it a leftover `meta.json` is loaded as a folder's metadata
   // and applied before the transformer runs -- and since a metadata file hides whatever it
-  // does not name, the transformer could not put those pages back.
-  //
-  // The schema keeps the root file's `tabs`, which Fumadocs' own would strip. Only this
-  // collection needs it: the CLI writes the generated folders' files, and none holds `tabs`.
+  // does not name, the transformer could not put those pages back. The schema keeps `tabs`.
   meta: { files: ['**/nav.json'], schema: navigationSchema }
 });
 

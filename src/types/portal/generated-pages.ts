@@ -12,15 +12,11 @@ import { PortalSdk } from './portal-sdk.js';
 // `src/lib/source.ts` names it as a relative literal, so the browser bundle never carries the project's location.
 export const GENERATED_DIRECTORY_NAME = 'generated';
 
-/**
- * A set of pages the CLI writes into the portal: a tab of its own when the root `nav.json`'s
- * `tabs` names its token, and otherwise a folder in Home's sidebar; its address is the same
- * either way.
- */
+/** A set of pages the CLI writes into the portal, served at `folder` wherever the root `nav.json` puts it. */
 export interface GeneratedSection {
   /** The folder the pages are written to, and so the address they are served at. */
   folder: string;
-  /** The root `nav.json` entry that positions the section: in `tabs` as a tab, in `pages` inside Home. */
+  /** The root `nav.json` entry that positions the section. */
   token: string;
   title: string;
   /** What a message says the address is kept for. */
