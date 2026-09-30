@@ -13,7 +13,7 @@ concurrency:
   group: pull-request-rules-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
-# The job names are required status checks of the `release branches` ruleset; renaming one blocks every merge there.
+# The job names are required status checks of the `dev` and `release branches` rulesets; renaming one blocks every merge.
 jobs:
   commits:
     name: Commit messages
@@ -61,7 +61,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: checkout cli
-        if: github.base_ref == 'main'
+        if: github.base_ref != 'dev'
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
@@ -83,7 +83,9 @@ jobs:
           [ "$SOURCE_REPO" = "$REPO" ] || refuse "$TARGET takes pull requests only from branches in $REPO, not from $SOURCE_REPO."
           case "$TARGET" in
             alpha|beta)
-              [ "$SOURCE" = dev ] || refuse "$TARGET takes pull requests only from dev, not from $SOURCE." ;;
+              [ "$SOURCE" = dev ] || refuse "$TARGET takes pull requests only from dev, not from $SOURCE."
+              git merge-base --is-ancestor origin/main "$SOURCE_SHA" ||
+                refuse "dev does not contain main yet, so this release would miss main's tag: merge main into dev first (the last release run on main says how)." ;;
             main)
               case "$SOURCE" in
                 dev|alpha|1.x) refuse "main takes beta or a hotfix branch cut from main, not $SOURCE." ;;

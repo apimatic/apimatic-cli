@@ -117,14 +117,14 @@ A merge into a release branch is the release: `main` publishes to the npm `lates
 
 | Branch | Takes pull requests from | Merge with |
 |---|---|---|
-| `dev` | feature and fix branches; `main`, or a `<name>/merge-main` branch when the back-merge conflicts | squash; a **merge commit** for a back-merge |
+| `dev` | feature and fix branches; `main` when the release run could not push the back-merge, or a `<name>/merge-main` branch when that back-merge conflicts | squash; a **merge commit** for a back-merge |
 | `alpha`, `beta` | `dev` only | merge commit |
 | `main` | `beta`; hotfix branches cut from `main` | merge commit |
 | `1.x` | fix branches cut from `1.x` | merge commit |
 
 - Never squash or rebase into a release branch: semantic-release reads every commit there, and a copy of a commit shows up in the notes twice.
-- After every merge into `main`, merge `main` into `dev` with a merge commit (the release run links it). The release tag sits on main's merge commit, and a beta cut from a `dev` that cannot reach it gets the wrong version. When that merge conflicts, cut `<name>/merge-main` from `dev`, merge `origin/main` into it, resolve, and merge that PR with a merge commit too.
-- `beta` must contain `main` before `beta → main`: after a hotfix, do the back-merge and a `dev → beta` first.
+- After every push to `main`, the release run merges `main` back into `dev` with a merge commit. The release tag sits on main's merge commit, and a beta cut from a `dev` that cannot reach it gets the wrong version, so `dev → alpha` and `dev → beta` are refused until `dev` contains `main`. When the run cannot push the back-merge, its summary says what to do: without the back-merge key, open the `main → dev` PR it links; on a conflict, cut `<name>/merge-main` from `dev`, merge `origin/main` into it, resolve, and open that PR. Either one is merged into `dev` with a merge commit, never a squash.
+- `beta` must contain `main` before `beta → main`: after a hotfix, promote `dev → beta` (once the back-merge is in `dev`) first.
 - Never merge `1.x` into `main` or `dev`; a fix both lines need is made on each.
 - Never name an npm dist-tag in code: a promotion ships the same commits to every channel.
 

@@ -26,7 +26,7 @@ jobs:
     name: Release with Node version ${{ matrix.node }}
     steps:
       - name: Checkout CLI
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           repository: apimatic/apimatic-cli
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -42,7 +42,7 @@ jobs:
           standalone: true
 
       - name: setup node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: ${{ matrix.node }}
           cache: 'pnpm'
@@ -62,9 +62,66 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: pnpm exec semantic-release
 
-      # Also after a failed run: the tag may already be on main.
-      - name: Link the main → dev back-merge
-        if: ${{ !cancelled() && github.ref_name == 'main' }}
+  # The release tag sits on main's merge commit, and a beta or alpha cut from a dev that cannot reach it gets the wrong version.
+  back-merge:
+    name: Merge main back into dev
+    needs: release
+    # Also after a failed release: the tag may already be on main.
+    if: ${{ !cancelled() && github.ref_name == 'main' }}
+    runs-on: ubuntu-latest
+    # Holds the deploy key that dev's ruleset lets push; the environment admits only main.
+    environment: back-merge
+    permissions:
+      contents: read
+    steps:
+      - name: look for the back-merge key
+        id: key
+        env:
+          KEY: ${{ secrets.BACK_MERGE_DEPLOY_KEY }}
+        run: echo "present=$([ -n "$KEY" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
+      - name: checkout dev
+        if: steps.key.outputs.present == 'true'
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: dev
+          fetch-depth: 0
+          ssh-key: ${{ secrets.BACK_MERGE_DEPLOY_KEY }}
+
+      - name: merge main into dev
+        if: steps.key.outputs.present == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          for _ in 1 2 3; do
+            git fetch --quiet origin dev main
+            git reset --quiet --hard origin/dev
+            if ! git merge --no-ff --no-edit -m "chore: merge main into dev" origin/main; then
+              git merge --abort
+              {
+                echo "### main conflicts with dev, so it was not merged back"
+                echo "Cut \`<name>/merge-main\` from dev, merge origin/main into it, resolve the conflicts, and merge that PR into dev with **Create a merge commit**. Until then, dev → alpha and dev → beta are refused."
+              } >> "$GITHUB_STEP_SUMMARY"
+              exit 1
+            fi
+            if rejection=$(git push --quiet origin HEAD:dev 2>&1); then exit 0; fi
+            echo "$rejection"
+            # Only a push that lost a race with another merge into dev is worth another try.
+            case "$rejection" in
+              *"(fetch first)"*|*"(non-fast-forward)"*) ;;
+              *)
+                {
+                  echo "### dev refused the back-merge push"
+                  echo "Every ruleset that requires a pull request on dev must list deploy keys as a bypass actor (\`.ai/plans/release-pipeline.md\`, 7.3); then re-run this job."
+                } >> "$GITHUB_STEP_SUMMARY"
+                exit 1 ;;
+            esac
+          done
+          echo "### main was merged into dev, but dev kept moving and the push failed three times; re-run this job." >> "$GITHUB_STEP_SUMMARY"
+          exit 1
+
+      - name: link the back-merge
+        if: steps.key.outputs.present != 'true'
         run: |
           {
             echo "### Next: merge main back into dev"
