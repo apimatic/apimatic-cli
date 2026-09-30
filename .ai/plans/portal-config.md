@@ -82,10 +82,10 @@ Delivered as **one PR** (section 11).
 | Topic | Decision |
 |---|---|
 | Where navigation lives | The root `src/content/nav.json`. Its entries, in order, decide the tabs and their order (section 5). `apimatic.json` carries no tab order and no section list. *(Amended 2026-09-29: its `tabs` decides the tabs and their order, and its `pages` orders Home's sidebar.)* |
-| Tabs | Always on. Each top-level node belongs to exactly one tab; there is no flat-sidebar mode. *(Amended 2026-09-29: Home is always a tab, a folder is one when `tabs` lists it, and a generated section is one unless `pages` places it in Home. A portal that places the API and every generated section in Home has Home alone and shows no tab bar.)* |
+| Tabs | Always on. Each top-level node belongs to exactly one tab; there is no flat-sidebar mode. *(Amended 2026-09-29: Home is always a tab, a folder is one when `tabs` lists it, and a generated section is one unless `pages` places it in Home. A portal that places the API and every generated section in Home has Home alone and shows no tab bar.)* *(Amended 2026-09-30: a generated section and the API reference are tabs when `tabs` names them, like a folder; `tabs` is the whole tab bar after Home. A file with no `tabs`, or no file, has Home alone and shows no tab bar.)* |
 | Content tabs | A folder directly under `content/` becomes its own tab when the root `nav.json` lists it; otherwise it stays a group in Home's sidebar (section 5). *(Amended 2026-09-29: when its `tabs` lists it; its `pages` orders it inside Home.)* |
 | Tab labels | Home takes the root `nav.json`'s `title`, then "Home". A folder tab takes its `nav.json` `title`, then its index page's title, then the folder name; the API tab takes `content/api/nav.json`'s `title`, then a `content/api/index` page, then "API Reference" — both as `dev` already does. "SDKs" and "Context Plugin" are fixed, set by the generated folders' `nav.json` titles (`.ai/plans/generated-pages.md`). Only root-level tabs are affected; nothing nested changes. |
-| Tokens | `apimatic:api` stays and places the API tab. `apimatic:pages` is renamed `apimatic:sdks` and places the SDKs tab; the old name is reported as an unknown entry. A later AI section gets its own token rather than sharing a group, because each generated section is its own tab. *(Amended 2026-09-24: `apimatic:plugin` places the Context Plugin tab, a generated section given its own token by this rule; the AI section is still to come.)* *(Amended 2026-09-29: a token in `tabs` places the section's tab, in `pages` places the section inside Home, and in neither leaves it a tab at its default place. Still valid only in the root file.)* |
+| Tokens | `apimatic:api` stays and places the API tab. `apimatic:pages` is renamed `apimatic:sdks` and places the SDKs tab; the old name is reported as an unknown entry. A later AI section gets its own token rather than sharing a group, because each generated section is its own tab. *(Amended 2026-09-24: `apimatic:plugin` places the Context Plugin tab, a generated section given its own token by this rule; the AI section is still to come.)* *(Amended 2026-09-29: a token in `tabs` places the section's tab, in `pages` places the section inside Home, and in neither leaves it a tab at its default place. Still valid only in the root file.)* *(Amended 2026-09-30: in neither, the section is a folder in Home, in Fumadocs' order.)* |
 | Home | `content/index.md` rendered in the docs layout, in the Home tab, which always comes first and also holds every page and folder that is no tab of its own, in the file's order, opening on the home page (section 5). |
 | `languages` | The shared top-level block `sdk publish` writes. Required for the portal: at least one entry, each keyed by a `Language` enum value and holding an object. Its `publishing` record (#350) is optional: an entry without one is a language that is wanted but not yet published, and counts. An unknown language key is an error on the portal path (the plugin path stays lenient and preserves it). |
 | Layout | Fumadocs' notebook layout with the tabs in the header, fixed (section 15). |
@@ -277,19 +277,20 @@ After `navigationTransformer` has ordered the root, each top-level node is assig
 | Node | Tab | Label |
 |---|---|---|
 | a folder the root file's `tabs` lists, other than one serving `/` | its own | its `nav.json` `title`, then its index page's title, then the folder name |
-| the `api` folder, unless the root file's `pages` names it | API | `content/api/nav.json` `title`, then `content/api/index` title, then "API Reference" |
-| a generated folder, unless the root file's `pages` names its token | its own | its generated `nav.json` `title`: "SDKs", "Context Plugin" |
+| the `api` folder, when the root file's `tabs` names it as `api` or `apimatic:api` | API | `content/api/nav.json` `title`, then `content/api/index` title, then "API Reference" |
+| a generated folder, when the root file's `tabs` names its token | its own | its generated `nav.json` `title`: "SDKs", "Context Plugin" |
 | any other page or folder, and the synthetic fallback-home node | Home | the root `nav.json` `title`, then "Home" |
 
 Home always comes first: it opens the site, and it holds every loose page, so where one of
 them is listed says nothing about where the tab belongs. Its sidebar keeps the order of the
 root file's `pages`, and it opens on the home page wherever `index` sits (`src/lib/tabs.ts`).
-The other tabs follow in the order `tabs` lists them. A generated section named in neither
-list sits just before the API tab, SDKs first, unless `tabs` puts the API ahead of a folder,
-when it follows the last folder, or `pages` places the API in Home, when it comes last; an API
-named in neither comes last. These are the defaults `dev` gives the root `pages` today, read
-from `tabs` instead. No `nav.json` at all gives Home, SDKs, Context Plugin (with a plugin) and
-API, as it does today.
+The other tabs follow in the order `tabs` lists them, and there are no others. *(Amended
+2026-09-30, second review; until then a section or API named in neither list kept a tab at a
+default place, before or after what `tabs` named.)* A section or the API reference that `tabs`
+does not name is a folder in Home's sidebar, where `pages` puts it or, unnamed, in Fumadocs'
+order among the other folders (section 10, Default order). No `nav.json` at all, or one with
+no `tabs`, gives Home alone and no tab bar. So that a fresh portal looks as it did, the
+scaffold and the sample repository's root file name the three sections in `tabs`.
 
 A folder `tabs` does not list stays a group in Home's sidebar, where `pages` or `...` puts it,
 so no tab appears unasked when a folder is added under the scaffold's `["index", "..."]`. A
@@ -316,14 +317,16 @@ hook), and regroups the children into one `Folder` per tab with `root: true`:
   entries, read through `readSettings`. No slug is reserved for this. *(Amended
   2026-09-29: folder tabs by the entries of `tabs`; the API and a generated
   folder are tabs unless `pages` names them. `readSettings` returns `tabs`
-  beside `pages` and `title`.)*
+  beside `pages` and `title`.)* *(Amended 2026-09-30: every tab by the entries
+  of `tabs`, the API and a generated folder by their tokens.)*
 - *(Added 2026-09-29.)* The folder hook at `''` orders Home's nodes by `pages`,
   as it orders every directory; a token there claims its section into that
-  place. `groupIntoTabs` then orders the tabs by `tabs`, with the defaults
-  above for a section or API named in neither list. Both order one list of
-  nodes against entries, with the same defaults for what is unnamed, so
-  `reorder` is expected to serve both, run before the tabs lose their `$ref`,
-  through which it matches a folder entry.
+  place. `groupIntoTabs` then orders the tabs by `tabs`. Both order one list of
+  nodes against entries, so `reorder` serves both, run before the tabs lose
+  their `$ref`, through which it matches a folder entry. *(Amended 2026-09-30:
+  `reorder` has no defaults of its own any more. What an order does not name
+  keeps Fumadocs' order, at the root as below it, and a directory with no
+  `pages` is not reordered at all.)*
 - *(Added 2026-09-29.)* The content collection in `src/lib/source.ts` passes
   `metaSchema.extend({ tabs: metaSchema.shape.pages })` as `meta.schema`, so the
   key survives Fumadocs' validation, typed as `pages` is. The schema lives in a
@@ -372,7 +375,8 @@ hook), and regroups the children into one `Folder` per tab with `root: true`:
   The single-tab inlining rule of the 2026-09-21 draft is dropped. *(Amended
   2026-09-29: a portal whose root `pages` places the API and every generated
   section in Home has Home alone. `portalTabs` then returns no tab, so no
-  switcher renders over a single choice.)*
+  switcher renders over a single choice.)* *(Amended 2026-09-30: Home alone
+  whenever `tabs` names nothing.)*
 
 The switcher renders in the top bar, the notebook layout's `navbar` mode, which
 is the one layout since section 15.
@@ -413,17 +417,12 @@ is the one layout since section 15.
   *(Amended 2026-09-29:)* the notice naming the folders the file made tabs of
   goes. It existed because listing a folder in `pages` was all it took; `tabs`
   says so in its own name.
-- *(Added 2026-09-29.)* A root file with no `tabs` whose `pages` names a
-  top-level folder, `api` or a token is refused, as 2.0.0-beta.1 made tabs of
-  those entries. A folder serving `/` does not count: beta.1 refused an entry
-  naming one, so no beta.1 file holds it. The sentence: "`content/nav.json` has
-  no `tabs`, so it lists `guides` and `apimatic:api` for Home's sidebar, where
-  2.0.0-beta.1 made them tabs. Move the ones meant as tabs to `tabs`, or add
-  `"tabs": []` to keep them in Home." A
-  warning would let an unattended `portal generate` move a beta.1 portal's API
-  reference into Home, the quietly wrong sidebar this validation exists to
-  refuse. Before 2.0.0 only beta users wrote that form, so the check is removed
-  when 2.0.0 ships (section 16, Delivery).
+- *(Added 2026-09-29, removed 2026-09-30.)* A root file with no `tabs` whose
+  `pages` named a top-level folder, `api` or a token was refused for a day, as
+  2.0.0-beta.1 made tabs of those entries and the file then had two readings.
+  The second review made `tabs` the whole tab bar, so a file with no `tabs`
+  has one reading, no tab, and there is nothing left to ask: it is read as
+  `"tabs": []`.
 - Every problem in `content/` is reported in one run, the front matter and the
   `nav.json` files together; the `nav.json` entries are judged only once no two
   pages would be served at one address, since an entry naming one of them would
@@ -471,6 +470,14 @@ where it is.
   back `root`'s refusals, scatters the tab bar across files, and still orders
   tabs and Home's nodes in one list. A review the same day turned the beta.1
   file's warning into a refusal, for the reason its rule gives.
+- 2026-09-30, second review: a section or the API reference that `tabs` did
+  not name kept a tab at a default place, so `{}` and `"tabs": []` gave Home
+  and three tabs while every folder went into Home, and the tab bar was not
+  what `tabs` said. Now `tabs` is the whole tab bar after Home; a section it
+  does not name is a folder in Home in Fumadocs' order, as any folder is; and
+  a file with no `tabs` reads as `"tabs": []`, so the beta.1 refusal goes with
+  the ambiguity it guarded. The scaffold and the sample repository name the
+  three sections in `tabs`, so a fresh portal keeps the tabs it had.
 
 ## 6. Template changes
 
@@ -1091,10 +1098,10 @@ touches.
   **`src/lib/source.ts`** passing it as the `docs` collection's `meta.schema`
   (section 5, Mechanism). The `generated` collection is unchanged.
 - **`src/lib/navigation.ts`**: `readSettings` returns `tabs`. `isTabFolder`
-  reads `tabs` instead of `pages`. `groupIntoTabs` keeps the API and each
-  generated folder in Home when the root `pages` names them (`api` or
-  `apimatic:api`, a section's token), and orders the tabs by `tabs` through
-  `reorder`, with today's defaults for what neither list names.
+  reads `tabs` instead of `pages`. `groupIntoTabs` makes a tab of what `tabs`
+  names, the API by `api` or `apimatic:api` and a section by its token, and
+  orders them by `tabs` through `reorder`, which keeps Fumadocs' order for
+  what an order does not name *(as amended 2026-09-30)*.
   `GENERATED_SECTIONS` and `apiBaseDir` are unchanged.
 - **`src/lib/tabs.ts`**: `portalTabs` returns no tab when Home is the only root
   folder.
@@ -1106,17 +1113,16 @@ touches.
   keeps listing `pages` and `title`; `NavigationSettings.tabs`; the `tabs`
   entry rules and the node-in-both check; `pages` loses its refusal of a
   folder serving `/`, which moves to `tabs`; the below-root token sentence
-  names both places; and the refusal of a beta.1 root file.
+  names both places. *(The refusal of a beta.1 root file, added here on
+  2026-09-29, went the next day; section 5, Validation.)*
   `NavigationContext` gains the names of the subfolders with a page in or
-  below them, which the `tabs` refusal of a page and the beta.1 refusal need:
+  below them, which the `tabs` refusal of a page needs:
   `childNames` mixes pages and folders, and `emptyFolders` lists only the
   others. `content-tree.ts`'s `visit` already holds them.
-- **`src/types/portal/content-tree.ts`**: `tabs()` takes folder tabs from
-  `tabs`, and leaves out the API and a generated section the root `pages`
-  places in Home.
+- **`src/types/portal/content-tree.ts`**: `tabs()` takes every tab from
+  `tabs`, and nothing else is one.
 - **`content-notices.ts`, `preview-content.ts`, `src/prompts/portal/source.ts`**:
-  `folderTabs` and `reportFolderTabs` go. The beta.1 refusal is a `nav.json`
-  error like any other, so it needs no notice or prompt of its own.
+  `folderTabs` and `reportFolderTabs` go.
 - **`portal serve`**: no new behaviour. A `nav.json` save already runs every
   check, and an `apimatic.json` edit that adds or removes the plugin already
   checks the content again. `GeneratedPages.makesSameTabsAs` becomes
@@ -1135,8 +1141,9 @@ touches.
   `guides`, `apimatic:api` and `apimatic:sdks` in `pages` today. They move to
   `tabs`, so the e2e build keeps its tabs, and `authentication` stays in `pages`.
 - **The sample repository**: its `v2` root file is `{ "pages": ["index", "..."] }`
-  (checked 2026-09-29), which reads the same under both rules, so neither it nor
-  the quickstart that downloads it changes.
+  (checked 2026-09-29). *(Amended 2026-09-30: with no `tabs` making no tab,
+  that file gives Home alone, so it names the three sections in `tabs` to keep
+  the tabs it had; the scaffold writes the same.)*
 - **`.ai/plans/portal-navigation.md` and `.ai/plans/generated-pages.md`** carry
   an amendment note pointing here, added with this section.
 
@@ -1145,8 +1152,8 @@ touches.
 - `test/types/portal/portal-navigation.test.ts`: each `tabs` rule and refusal,
   `api` and `apimatic:api` split across the two lists, `tabs` below the root,
   tokens in the root `pages`, the reworded below-root sentence, a folder
-  serving `/` accepted in `pages` with no `tabs`, and the beta.1 refusal with
-  the file that `"tabs": []` makes valid.
+  serving `/` accepted in `pages` with no `tabs`, and a root file with no
+  `tabs` read as an empty list.
 - `test/types/portal/content-tree.test.ts`: tabs from `tabs`, and sections
   placed in Home left out of the tabs and out of the shared-name check.
 - `test/types/portal/preview-content.test.ts` and
@@ -1168,7 +1175,7 @@ touches.
   rules it tests: `test/portal-template/navigation.test.ts` and `tabs.test.ts`
   in step 1, `test/types/portal/portal-navigation.test.ts`,
   `test/types/portal-source-context.test.ts` and the default fixture in step 2,
-  as the beta.1 refusal would reject them otherwise.
+  since `pages` no longer makes one.
 - `test/e2e/portal-build.test.ts`: the moved fixture, and one build with a
   generated section in Home, checked in the rendered sidebar.
 
@@ -1178,8 +1185,7 @@ One PR against `dev`, `feat(portal)`, three steps, each stopped at for review:
 
 1. **Template.** The schema, the navigation and tabs changes, their unit tests.
 2. **CLI.** Validation, the content tree, the notices and prompts, their unit
-   tests, and the default fixture's move to `tabs`, which the beta.1 refusal
-   would otherwise reject.
+   tests, and the default fixture's move to `tabs`.
 3. **E2e, README.** The Home-placement build and the README bullet.
 
 Each step leaves the build, lint on touched files and its unit tests green. The
@@ -1190,9 +1196,9 @@ that, and they stay separate steps to keep each review to one side.
 
 No `BREAKING CHANGE:` footer: `nav.json` is new since 1.x, so against the last
 stable release this breaks nothing. The next beta's release notes say what
-changed for a beta.1 root file, and the refusal of section 5 says it in the
-terminal. That refusal is temporary: a ticket opened when this PR merges
-removes it, its test and its sentence before 2.0.0 ships.
+changed for a beta.1 root file: a folder or token its `pages` named is in Home
+until `tabs` names it. *(2026-09-30: the refusal that said so in the terminal,
+and the ticket to remove it, went with the second review.)*
 
 ### To verify during implementation
 

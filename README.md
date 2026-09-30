@@ -49,16 +49,15 @@ Documentation portals are now built on your machine from a `src/` directory, and
   `title` there names the folder it sits in. A folder links to its `index.md`; without one it
   is only a heading.
 - The top level of the portal is shown as tabs, which `src/content/nav.json` decides with two
-  lists. `tabs` names the tabs after Home, in order: a folder directly under `src/content/`,
-  and the sections the CLI makes, placed with `apimatic:sdks`, `apimatic:plugin` and
-  `apimatic:api`. Home comes first, opens on `index.md`, and holds every page at the top level
-  and every folder `tabs` does not name; its `pages` orders that sidebar as any other
-  `nav.json` orders its folder, and the file's `title` names it. A token in `pages` places its
-  section inside Home instead of in a tab of its own, at the same address; a section named in
-  neither list is a tab after everything `tabs` names, before an API reference named in
-  neither list. With every section in Home there is no tab bar. A root file with no
-  `tabs` that names a folder or token in `pages`, which 2.0.0-beta.1 made tabs, is refused until
-  it says which list they belong in.
+  lists. `tabs` names the tabs after Home, in order, and nothing else is one: a folder directly
+  under `src/content/`, and the sections the CLI makes, placed with `apimatic:sdks`,
+  `apimatic:plugin` and `apimatic:api`. Home comes first, opens on `index.md`, and holds
+  everything `tabs` does not name: every page at the top level, every other folder, and every
+  section not named as a tab, each at the address it always has. Its `pages` orders that sidebar
+  as any other `nav.json` orders its folder, a token standing for its section, and the file's
+  `title` names it; what `pages` does not name follows in alphabetical order, pages before
+  folders. A file with no `tabs`, or no file at all, makes no tab, so Home stands alone and
+  there is no tab bar. A new portal starts with the three sections as tabs.
   ```json
   {
     "title": "Overview",

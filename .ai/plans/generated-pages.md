@@ -587,8 +587,9 @@ Nothing changes in `apimatic.schema.json`, `PortalConfig`, `PortalLanguages`,
   and asserts `context-plugin/index.html` and `context-plugin.md`, and header
   tabs in the default order Home, SDKs, Context Plugin, API Reference: the
   band order in a real build, where Fumadocs' own order would put Context
-  Plugin first. The existing sidebar-order and tab-order assertions gain the
-  SDKs entries.
+  Plugin first. *(Amended 2026-09-30: no `nav.json` now means no tab, so that
+  build asserts no tab bar instead; portal-config section 5.)* The existing
+  sidebar-order and tab-order assertions gain the SDKs entries.
 
 ## 9. Verified
 

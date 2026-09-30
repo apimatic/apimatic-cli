@@ -167,7 +167,9 @@ order now also orders the tabs. *(Amended 2026-09-25: `root` is gone; each
 folder the root file lists is a tab, and its `title` names Home.)* *(Amended
 2026-09-29, proposed: the root file gains `tabs`, a third setting beside
 `pages` and `title` now that `root` is gone, which lists and orders the tabs;
-its `pages` orders Home's sidebar only. Portal-config section 5.)*
+its `pages` orders Home's sidebar only. Portal-config section 5.)* *(2026-09-30:
+built; `tabs` is the whole tab bar after Home, and a section it does not name
+is a folder in Home.)*
 
 *Amended 2026-09-24* (`.ai/plans/generated-pages.md`, sections 2 and 5): the
 generated pages are two folders, each a tab of its own, and each token claims
