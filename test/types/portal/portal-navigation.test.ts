@@ -389,6 +389,13 @@ describe('PortalNavigation', () => {
       expect(fileErrors({ tabs: ['apimatic:sdk'] })[0]).to.contain("'apimatic:sdk' is not a nav.json token");
     });
 
+    // The page lookup strips a stray extension, and the folder lookup has to answer the same way.
+    it('matches a folder near miss with a stray extension too', () => {
+      expect(fileErrors({ tabs: ['Guides.md'] })).to.deep.equal([
+        "content/nav.json: 'Guides.md' is not a folder in this directory. Did you mean 'guides'?"
+      ]);
+    });
+
     // The pages hint would send the user to an entry tabs then refuses, one error later.
     it('answers a page near miss with where a page can go, in one message', () => {
       expect(fileErrors({ tabs: ['Authentication'] })).to.deep.equal([

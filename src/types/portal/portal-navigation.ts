@@ -41,6 +41,13 @@ const KNOWN_FIELDS = new Set(['pages', 'title']);
 const TABS_FIELD = 'tabs';
 const ROOT_FIELDS = new Set([...KNOWN_FIELDS, TABS_FIELD]);
 
+/** What a misspelled entry was most likely meant as, which each list answers in its own words. */
+type NearMiss =
+  | { kind: 'apiReference' }
+  | { kind: 'section'; section: GeneratedSection }
+  | { kind: 'folder'; name: string }
+  | { kind: 'page'; name: string };
+
 /** Where a `nav.json` sits, and what its entries are allowed to address. */
 export interface NavigationContext {
   /** The file's path relative to `src/`, as messages name it. */
@@ -269,25 +276,21 @@ export class PortalNavigation {
     );
   }
 
-  /** The near miss a tab entry was meant as; a page's name is answered with where a page can go. */
+  /** A tab entry's near miss, in the words of what `tabs` accepts; a page is answered with where a page can go. */
   private static tabSuggestion(entry: string, context: NavigationContext): string {
-    const lowered = entry.toLowerCase();
-    const withoutExtension = lowered.replace(/\.mdx?$/i, '');
-    if (withoutExtension === API_REFERENCE_NAME) {
-      return ` The API reference is a tab as '${API_REFERENCE_NAME}' or '${API_REFERENCE_TOKEN}'.`;
+    const miss = PortalNavigation.nearMiss(entry, context);
+    switch (miss?.kind) {
+      case 'apiReference':
+        return ` The API reference is a tab as '${API_REFERENCE_NAME}' or '${API_REFERENCE_TOKEN}'.`;
+      case 'section':
+        return ` '${miss.section.token}' makes ${miss.section.description} a tab.`;
+      case 'folder':
+        return ` Did you mean '${miss.name}'?`;
+      case 'page':
+        return ` '${miss.name}' is a page; order it in Home's sidebar with 'pages'.`;
+      default:
+        return '';
     }
-    const section = PortalNavigation.sectionGuessed(withoutExtension);
-    if (section !== undefined) {
-      return ` '${section.token}' makes ${section.description} a tab.`;
-    }
-    const folder = context.folderNames.find((name) => name.toLowerCase() === lowered);
-    if (folder !== undefined) {
-      return ` Did you mean '${folder}'?`;
-    }
-    const page = context.childNames.find(
-      (name) => name.toLowerCase() === lowered || name.toLowerCase() === withoutExtension
-    );
-    return page === undefined ? '' : ` '${page}' is a page; order it in Home's sidebar with 'pages'.`;
   }
 
   /** A root file with no `tabs` that names a folder or token in `pages` meant a tab in 2.0.0-beta.1, so it is not read as Home's order without a word. */
@@ -477,23 +480,42 @@ export class PortalNavigation {
     return `${context.label}: '${field}' is not a ${NAVIGATION_FILE_NAME} setting. The settings are ${settings}.`;
   }
 
-  /** A near miss is nearly always a typo or a forgotten extension, so name the candidate. */
+  /** A `pages` entry's near miss; a folder and a page are both children here, so one sentence names either. */
   private static suggestion(entry: string, context: NavigationContext): string {
+    const miss = PortalNavigation.nearMiss(entry, context);
+    switch (miss?.kind) {
+      case 'apiReference':
+        return ` The API reference is positioned with '${API_REFERENCE_TOKEN}'.`;
+      case 'section':
+        return ` '${miss.section.token}' positions ${miss.section.description}.`;
+      case 'folder':
+      case 'page':
+        return ` Did you mean '${miss.name}'?`;
+      default:
+        return '';
+    }
+  }
+
+  /** A near miss is nearly always a typo or a forgotten extension, so find what it names. */
+  private static nearMiss(entry: string, context: NavigationContext): NearMiss | undefined {
     const lowered = entry.toLowerCase();
-    const withoutExtension = lowered.replace(/\.mdx?$/i, '');
     // Matched without the extension too, so `api.md` is answered like `api` rather than
     // pointed at a name that is refused the moment they write it.
-    if (withoutExtension === API_REFERENCE_NAME && context.isContentRoot) {
-      return ` The API reference is positioned with '${API_REFERENCE_TOKEN}'.`;
+    const stripped = lowered.replace(/\.mdx?$/i, '');
+    if (stripped === API_REFERENCE_NAME && context.isContentRoot) {
+      return { kind: 'apiReference' };
     }
-    const section = context.isContentRoot ? PortalNavigation.sectionGuessed(withoutExtension) : undefined;
+    const section = context.isContentRoot ? PortalNavigation.sectionGuessed(stripped) : undefined;
     if (section !== undefined) {
-      return ` '${section.token}' positions ${section.description}.`;
+      return { kind: 'section', section };
     }
-    const candidate = context.childNames.find(
-      (name) => name.toLowerCase() === lowered || name.toLowerCase() === withoutExtension
-    );
-    return candidate === undefined ? '' : ` Did you mean '${candidate}'?`;
+    const matches = (name: string): boolean => name.toLowerCase() === lowered || name.toLowerCase() === stripped;
+    const folder = context.folderNames.find(matches);
+    if (folder !== undefined) {
+      return { kind: 'folder', name: folder };
+    }
+    const page = context.childNames.find(matches);
+    return page === undefined ? undefined : { kind: 'page', name: page };
   }
 
   /**
