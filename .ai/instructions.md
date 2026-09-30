@@ -103,17 +103,38 @@ Supporting: **Types** (`src/types/`) for value objects, context objects, and dom
 
 ## Branching
 
-Always start work from `dev` — never from `main`. This applies to branches and worktrees alike.
+Always start work from `dev`, the default branch. This applies to branches and worktrees alike.
 
 - Make sure `dev` is current (`git fetch origin dev`) and branch from `origin/dev`.
 - Open pull requests against `dev`.
-- Never commit to, branch from, or target `main` directly. If a task appears to require it, stop and ask.
+- Never commit to `main`, and never branch from or target it unless the task is a hotfix you were asked for. If a task appears to require it otherwise, stop and ask.
 
-**Worktrees** — a new worktree starts from this repo's default branch, `beta`, so move it onto `dev` before making any changes: `git fetch origin dev && git reset --hard origin/dev` (fresh, clean worktrees only). Confirm with `git log --oneline -1` that HEAD matches the `origin/dev` tip.
+**Worktrees** — a new worktree may not start at the `origin/dev` tip, so move it there before making any changes: `git fetch origin dev && git reset --hard origin/dev` (fresh, clean worktrees only). Confirm with `git log --oneline -1` that HEAD matches the `origin/dev` tip.
+
+## Releases
+
+A merge into a release branch is the release: `main` publishes to the npm `latest` dist-tag, `beta` to `beta`, `alpha` to `alpha`, and `1.x` to `release-1.x`. semantic-release picks the version from the commits and publishes the notes as a GitHub release; it commits nothing back. The full model is `.ai/plans/release-pipeline.md`.
+
+| Branch | Takes pull requests from | Merge with |
+|---|---|---|
+| `dev` | feature and fix branches; `main`, or a `<name>/merge-main` branch when the back-merge conflicts | squash; a **merge commit** for a back-merge |
+| `alpha`, `beta` | `dev` only | merge commit |
+| `main` | `beta`; hotfix branches cut from `main` | merge commit |
+| `1.x` | fix branches cut from `1.x` | merge commit |
+
+- Never squash or rebase into a release branch: semantic-release reads every commit there, and a copy of a commit shows up in the notes twice.
+- After every merge into `main`, merge `main` into `dev` with a merge commit (the release run links it). The release tag sits on main's merge commit, and a beta cut from a `dev` that cannot reach it gets the wrong version. When that merge conflicts, cut `<name>/merge-main` from `dev`, merge `origin/main` into it, resolve, and merge that PR with a merge commit too.
+- `beta` must contain `main` before `beta → main`: after a hotfix, do the back-merge and a `dev → beta` first.
+- Never merge `1.x` into `main` or `dev`; a fix both lines need is made on each.
+- Never name an npm dist-tag in code: a promotion ships the same commits to every channel.
 
 ## Commit Conventions
 
 Uses [Conventional Commits](https://www.conventionalcommits.org/) enforced by commitlint + husky. Pre-commit runs lint-staged (ESLint + Prettier).
+
+Pull requests into `dev` are squash-merged, and the squash commit is the PR title plus the PR description. The title alone decides the release and its line in the notes, so write it for users as a Conventional Commit header, and title a revert `revert(scope): <what it reverts>` (it releases a patch); the title check refuses GitHub's `Revert "…"`. The description stays in `git log` and never reaches the notes, and the issues its `Fixes #N` closes are closed but not listed.
+
+A release reads only commit headers, so mark a breaking change with `!` in the header (`feat(sdk)!: retire v3 generation`), in a PR title and in any commit alike. commitlint refuses a `BREAKING CHANGE:` footer without the `!`.
 
 **Do not commit or push automatically.** Always wait for explicit instruction from the user before running `git commit` or `git push`.
 

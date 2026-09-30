@@ -6,9 +6,14 @@ on:
 
 permissions:
   id-token: write  # Required for OIDC
-  contents: write       # needed by @semantic-release/github to needed to push tags/version commits
+  contents: write       # pushes the release tag and its note, and creates the GitHub release
   issues: write         # needed by @semantic-release/github
   pull-requests: write  # needed if semantic-release comments on PRs
+
+# A second merge into the same branch waits for this run instead of racing it for the version.
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: false
 
 jobs:
   release:
@@ -56,3 +61,12 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: pnpm exec semantic-release
+
+      # Also after a failed run: the tag may already be on main.
+      - name: Link the main → dev back-merge
+        if: ${{ !cancelled() && github.ref_name == 'main' }}
+        run: |
+          {
+            echo "### Next: merge main back into dev"
+            echo "Open $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/compare/dev...main?expand=1&title=chore%3A%20merge%20main%20into%20dev and merge it with **Create a merge commit**; a squash leaves the release tag out of dev."
+          } >> "$GITHUB_STEP_SUMMARY"
