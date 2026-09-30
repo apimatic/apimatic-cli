@@ -113,6 +113,34 @@ describe('ContentTree', () => {
     expect(relative(notices.ignoredNavigationFiles)).to.deep.equal(['content/Nav.json']);
   });
 
+  // The shared-name warning describes the tabs, so it lists them as the tab bar shows them.
+  it('names the tabs in the order the tab bar shows them, tokens interleaved with folders', () => {
+    const navigationFiles = handed(
+      [
+        inContent('nav.json'),
+        JSON.stringify({ title: 'Home', tabs: ['apimatic:sdks', 'guides', 'apimatic:api'], pages: ['index'] })
+      ],
+      [inContent('guides', 'nav.json'), JSON.stringify({ title: 'Guides' })]
+    );
+
+    const notices = tree.check({ pages, navigationFiles, missingImages: [] }, [], GENERATED)._unsafeUnwrap();
+
+    expect(notices.sharedTabNames).to.deep.equal([]);
+  });
+
+  it('lists a tab named like Home after it, however early its token comes', () => {
+    const navigationFiles = handed(
+      [inContent('nav.json'), JSON.stringify({ title: 'SDKs', tabs: ['apimatic:sdks', 'guides'], pages: ['index'] })],
+      [inContent('guides', 'nav.json'), JSON.stringify({ title: 'Guides' })]
+    );
+
+    const notices = tree.check({ pages, navigationFiles, missingImages: [] }, [], GENERATED)._unsafeUnwrap();
+
+    expect(notices.sharedTabNames.map(({ name, tabs }) => [name, tabs.map(({ owner }) => owner.kind)])).to.deep.equal([
+      ['SDKs', ['home', 'generated']]
+    ]);
+  });
+
   // A folder in Home's sidebar is no tab, so its name clashes with no tab's.
   it('leaves a section the root nav.json places in Home out of the tabs, and out of the shared names', () => {
     const sharedWith = (root: Record<string, unknown>) =>

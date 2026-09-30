@@ -203,33 +203,41 @@ export class ContentTree {
   }
 
   /**
-   * Every tab, named as the template names it, in the order a report lists them: Home, the
-   * folders the root `nav.json`'s `tabs` lists, the generated sections, then the API reference.
-   * A section or the reference that its `pages` places in Home is a folder in Home's sidebar
-   * rather than a tab, so it is left out, and its name is compared with no tab's.
+   * Every tab, named as the template names it, in the order the tab bar shows them: Home, the
+   * entries of the root `nav.json`'s `tabs` where it puts them, then the unnamed sections and
+   * an unnamed API reference. A section or the reference that its `pages` places in Home is a
+   * folder in Home's sidebar rather than a tab, so it is left out, and its name is compared
+   * with no tab's.
    */
   private static tabs(root: DirectoryScan, pages: TitledPage[], generatedPages: GeneratedPages): PortalTab[] {
     const named = (owner: TabOwner, scan: DirectoryScan | undefined): PortalTab =>
       ContentTree.namedTab(owner, scan?.navigation, scan?.indexPage, pages);
     const settings = root.navigation?.settings;
+    const tabs = settings?.tabs ?? [];
     const inHome = (entry: string): boolean => settings?.pages.includes(entry) ?? false;
+    const sections = generatedPages.sections();
+    const isReference = (entry: string): boolean => entry === API_REFERENCE_NAME || entry === API_REFERENCE_TOKEN;
+    const reference = (): PortalTab => named({ kind: 'apiReference' }, root.subfolders.get(API_REFERENCE_NAME)?.scan);
 
     // The home page is the content root's index page, which names no tab.
     const home = ContentTree.namedTab({ kind: 'home' }, root.navigation, undefined, pages);
-    // A token or `api` in `tabs` names no subfolder, and is placed below.
-    const folders = (settings?.tabs ?? []).flatMap((entry) => {
-      const subfolder = entry === API_REFERENCE_NAME ? undefined : root.subfolders.get(entry);
+    // A token for a section that is not generated names no tab, as it resolves to no node.
+    const listed = tabs.flatMap((entry): PortalTab[] => {
+      if (isReference(entry)) {
+        return [reference()];
+      }
+      const section = sections.find((candidate) => candidate.token === entry);
+      if (section !== undefined) {
+        return [named({ kind: 'generated', section }, undefined)];
+      }
+      const subfolder = root.subfolders.get(entry);
       return subfolder === undefined ? [] : [named({ kind: 'folder', directory: subfolder.directory }, subfolder.scan)];
     });
-    const generated = generatedPages
-      .sections()
-      .filter((section) => !inHome(section.token))
+    const unnamedSections = sections
+      .filter((section) => !tabs.includes(section.token) && !inHome(section.token))
       .map((section) => named({ kind: 'generated', section }, undefined));
-    const reference =
-      inHome(API_REFERENCE_NAME) || inHome(API_REFERENCE_TOKEN)
-        ? []
-        : [named({ kind: 'apiReference' }, root.subfolders.get(API_REFERENCE_NAME)?.scan)];
-    return [home, ...folders, ...generated, ...reference];
+    const referencePlaced = tabs.some(isReference) || inHome(API_REFERENCE_NAME) || inHome(API_REFERENCE_TOKEN);
+    return [home, ...listed, ...unnamedSections, ...(referencePlaced ? [] : [reference()])];
   }
 
   /** A tab by the name the template gives it: its `nav.json` title, else its index page's. */
