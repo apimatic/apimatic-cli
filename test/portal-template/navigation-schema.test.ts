@@ -1,6 +1,7 @@
 import { expect } from 'chai';
 import { metaSchema } from 'fumadocs-core/source/schema';
 import { navigationSchema } from '../../portal-template/src/lib/navigation-schema';
+import { ROOT_FIELDS } from '../../src/types/portal/portal-navigation';
 
 /**
  * The schema the `docs` collection validates every `nav.json` against. Fumadocs strips what
@@ -25,7 +26,16 @@ describe('navigationSchema', () => {
     expect(navigationSchema.parse({ tab: ['tutorials'], pages: ['index'] })).to.deep.equal({ pages: ['index'] });
   });
 
-  it('adds nothing but tabs to Fumadocs’ own schema', () => {
-    expect(Object.keys(navigationSchema.shape).sort()).to.deep.equal([...Object.keys(metaSchema.shape), 'tabs'].sort());
+  // The CLI would otherwise validate a setting the template never sees.
+  it('keeps every setting the CLI accepts in the root file', () => {
+    for (const field of ROOT_FIELDS) {
+      expect(navigationSchema.shape, field).to.have.property(field);
+    }
+  });
+
+  it('adds nothing beyond those to Fumadocs’ own schema', () => {
+    expect(Object.keys(navigationSchema.shape).sort()).to.deep.equal(
+      [...new Set([...Object.keys(metaSchema.shape), ...ROOT_FIELDS])].sort()
+    );
   });
 });
