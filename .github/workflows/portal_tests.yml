@@ -98,8 +98,6 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           repository: apimatic/v4-test-automation
-          token: ${{ secrets.ACTIONS_PAT }}
-          persist-credentials: false
           path: tests
 
       - name: install test dependencies
