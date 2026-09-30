@@ -1,29 +1,24 @@
 import type * as PageTree from 'fumadocs-core/page-tree';
 import type { LayoutTab } from 'fumadocs-ui/layouts/shared';
-import { containsUrl, docsRoute, HOME_TAB_ID } from './shared';
+import { containsUrl, docsRoute } from './shared';
 
 /**
  * One tab per root folder at the top of the tree, which is every top-level node once the tabs
  * transformer has run. Given to the layout rather than left to Fumadocs, which links a tab to
  * its folder's first direct page and so leaves out a tab holding only folders -- as the API
  * reference does whenever its operations are grouped. Each stays bound to its folder, which is
- * how the active tab is found.
- *
- * None when Home is the only tab, as it is whenever the root `nav.json`'s `tabs` names nothing,
- * or there is no such file: a switcher with one choice switches nothing, and the layout renders
- * no tab bar over an empty list.
+ * how the active tab is found. A switcher with one choice switches nothing, so one tab is none.
  */
 export function portalTabs(tree: PageTree.Root): LayoutTab[] {
-  const roots = tree.children.filter((node): node is PageTree.Folder => node.type === 'folder' && node.root === true);
-  if (roots.length === 1 && roots[0].$id === HOME_TAB_ID) return [];
-
-  return roots.flatMap((node) => {
+  const tabs = tree.children.flatMap((node) => {
+    if (node.type !== 'folder' || node.root !== true) return [];
     // Home keeps the order the root nav.json gives, which need not put the home page first.
     const url = containsUrl([node], docsRoute) ? docsRoute : firstPageUrl(node);
     return url === undefined
       ? []
       : [{ title: node.name, description: node.description, icon: node.icon, url, $folder: node }];
   });
+  return tabs.length > 1 ? tabs : [];
 }
 
 /**

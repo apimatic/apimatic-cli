@@ -1,7 +1,7 @@
 import { PathUtils } from 'fumadocs-core/source';
 import type { ContentStorage, PageTreeTransformer } from 'fumadocs-core/source';
 import type { Folder, Node } from 'fumadocs-core/page-tree';
-import { apiBaseDir, containsUrl, docsRoute, HOME_TAB_ID } from './shared';
+import { apiBaseDir, containsUrl, docsRoute } from './shared';
 
 /**
  * Only what this file needs of the builder context. `loader()` infers a storage type from
@@ -48,6 +48,9 @@ const HOME_NAME = 'Home';
 
 /** The node the fallback home page gets when there is no index page; see `withFallbackHomePage`. */
 const SYNTHETIC_HOME_ID = '/page/home';
+
+/** The Home tab's id. Fixed, as tab matching goes by id after serialisation; Fumadocs' ids never start with a slash. */
+const HOME_TAB_ID = '/tab/home';
 
 /**
  * The key the generated pages are passed to `loader()` under, which the storage stamps onto

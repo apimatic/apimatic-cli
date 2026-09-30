@@ -701,6 +701,9 @@ describe('portalTabs', () => {
     expect(tabs[0].$folder).to.equal(home);
   });
 
+  /** A second tab, so the one under test is not alone: one tab is no tab bar. */
+  const other = folder('Other', [pageNode('/other')], { root: true });
+
   // Fumadocs' own list looks at direct pages only, and the reference has none.
   it('opens a tab of folders on the first page found beneath them, depth first', () => {
     const api = folder(
@@ -709,7 +712,7 @@ describe('portalTabs', () => {
       { root: true }
     );
 
-    expect(portalTabs({ name: 'Docs', children: [api] })[0].url).to.equal('/api/petstore/pet/addPet');
+    expect(portalTabs({ name: 'Docs', children: [api, other] })[0].url).to.equal('/api/petstore/pet/addPet');
   });
 
   it('opens on a folder’s own index page ahead of its children', () => {
@@ -721,7 +724,7 @@ describe('portalTabs', () => {
       }
     );
 
-    expect(portalTabs({ name: 'Docs', children: [tutorials] })[0].url).to.equal('/deep-home');
+    expect(portalTabs({ name: 'Docs', children: [tutorials, other] })[0].url).to.equal('/deep-home');
   });
 
   it('opens a tab that holds the home page on it, wherever it is listed', () => {
@@ -729,7 +732,7 @@ describe('portalTabs', () => {
       root: true
     });
 
-    expect(portalTabs({ name: 'Docs', children: [home] })[0].url).to.equal('/');
+    expect(portalTabs({ name: 'Docs', children: [home, other] })[0].url).to.equal('/');
   });
 
   it('passes over a link that leaves the portal', () => {
@@ -739,27 +742,28 @@ describe('portalTabs', () => {
       { root: true }
     );
 
-    expect(portalTabs({ name: 'Docs', children: [home] })[0].url).to.equal('/start');
+    expect(portalTabs({ name: 'Docs', children: [home, other] })[0].url).to.equal('/start');
   });
 
-  it('lists nothing when Home is the only tab, so the layout draws no switcher over one choice', () => {
+  // A switcher with one choice switches nothing, whichever tab it is.
+  it('lists nothing for a single tab, so the layout draws no switcher over one choice', () => {
     const home = folder('Home', [pageNode('/'), folder('API Reference', [pageNode('/api/x')])], {
       root: true,
       $id: '/tab/home'
     });
 
     expect(portalTabs({ name: 'Docs', children: [home] })).to.be.empty;
-    expect(
-      portalTabs({ name: 'Docs', children: [home, folder('SDKs', [pageNode('/sdks')], { root: true })] })
-    ).to.have.lengthOf(2);
+    expect(portalTabs({ name: 'Docs', children: [other] })).to.be.empty;
+    expect(portalTabs({ name: 'Docs', children: [home, other] })).to.have.lengthOf(2);
   });
 
-  it('leaves out a folder that is no tab, and a tab with no page to open', () => {
-    const tabs = portalTabs({
-      name: 'Docs',
-      children: [folder('Plain', [pageNode('/plain')]), folder('Empty', [], { root: true }), pageNode('/loose')]
-    });
+  it('leaves out a folder that is no tab, and a tab with no page to open, before counting the tabs', () => {
+    const noTabs = [folder('Plain', [pageNode('/plain')]), folder('Empty', [], { root: true }), pageNode('/loose')];
 
-    expect(tabs).to.be.empty;
+    expect(portalTabs({ name: 'Docs', children: [...noTabs, other] })).to.be.empty;
+    expect(portalTabs({ name: 'Docs', children: [...noTabs, other, other] }).map((tab) => tab.title)).to.deep.equal([
+      'Other',
+      'Other'
+    ]);
   });
 });
