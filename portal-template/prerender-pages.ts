@@ -16,11 +16,13 @@ const isSkippedByGlob = (segment: string) => segment.startsWith('.') || segment 
  * the list is computed here from the same sources the site is built from.
  */
 export async function prerenderPages(config: BuildPaths, identity: BuildIdentity): Promise<{ path: string }[]> {
+  const base = viteBase(identity);
   const urls = new Set<string>(['/', '/api/search.json', '/llms.txt', '/llms-full.txt']);
   // Both need absolute URLs, so they are only emitted for a portal that declares its address.
   if (identity.siteUrl) {
     urls.add('/sitemap.xml');
-    urls.add('/robots.txt');
+    // Crawlers read it only at the root of a host.
+    if (base === '/') urls.add('/robots.txt');
   }
 
   for (const url of await contentUrls(config.contentDir)) urls.add(url);
@@ -38,7 +40,6 @@ export async function prerenderPages(config: BuildPaths, identity: BuildIdentity
   }
 
   // Served paths, or TanStack takes a page starting like the base (`/api/…` under `/api`) as already under it.
-  const base = viteBase(identity);
   return [...urls].map((url) => ({ path: withBasePath(url, base) }));
 }
 

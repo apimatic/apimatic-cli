@@ -181,6 +181,16 @@ describe('prerenderPages', () => {
     expect(urls.filter((url) => !url.startsWith('/api/'))).to.be.empty;
   });
 
+  // A robots.txt anywhere but the root of a host is never read.
+  it('emits no robots file for a portal under a path', async () => {
+    write('index.md');
+
+    const urls = await urlsFor('https://docs.test/api');
+
+    expect(urls).to.include('/api/sitemap.xml');
+    expect(urls.filter((url) => url.endsWith('robots.txt'))).to.be.empty;
+  });
+
   it('suffixes each page once, however many pages there are', async () => {
     write('index.md');
     write('guides.md');

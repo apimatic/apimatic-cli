@@ -7,3 +7,8 @@ const BASE = typeof import.meta.env === 'undefined' ? '/' : import.meta.env.BASE
 export function withBasePath(path: string, base: string = BASE): string {
   return `${base.replace(/\/$/, '')}${path}`;
 }
+
+/** A portal-relative path's full address as the browser sees it; the path itself where there is no window. */
+export function fullAddress(path: string): string {
+  return typeof window === 'undefined' ? path : new URL(withBasePath(path), window.location.origin).toString();
+}

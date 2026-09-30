@@ -660,6 +660,66 @@ const stylesheetOf = (output: DirectoryPath) => {
     expect(page).to.not.contain('href="/authentication"');
   });
 
+  // Everything the page itself names on this host, the logo and favicon among them.
+  it('names nothing on its host outside the path', () => {
+    for (const page of [
+      'index.html',
+      'authentication/index.html',
+      'api/apimatic-calculator/simple-calculator/Calculate/index.html',
+      'sdks/index.html',
+      'sdks/typescript/index.html',
+      'context-plugin/index.html'
+    ]) {
+      const addresses = [...read(page).matchAll(/\s(?:src|href)="(\/[^"]*)"/g)].map((match) => match[1]);
+
+      expect(addresses, page).to.not.be.empty;
+      expect(
+        addresses.filter((address) => !address.startsWith('/api/')),
+        page
+      ).to.deep.equal([]);
+    }
+    expect(read('index.html')).to.match(/<img src="\/api\/images\/logo\.png"/);
+    expect(read('index.html')).to.match(/<link rel="icon" href="\/api\/images\/logo\.png"/);
+    expect(read('sdks/index.html')).to.contain('href="/api/__downloads/sdk/typescript.zip"');
+  });
+
+  // Bundled, so it carries the base; a linked `/images/diagram.png` would be fetched from the host's
+  // root. The image is over Vite's 4 KiB inline limit, or it would be a data: URI and prove nothing.
+  it('bundles a Markdown image, under the path', () => {
+    expect(read('index.html')).to.match(/<img[^>]* src="\/api\/assets\/diagram[^"]*\.png"/);
+  });
+
+  it('links the pages under the path in llms.txt and llms-full.txt', () => {
+    const links = [...read('llms.txt').matchAll(/\]\(([^)]*)\)/g)].map((match) => match[1]);
+
+    expect(links).to.include.members(['/api/authentication']);
+    expect(links.some((link) => link.startsWith('/api/api/apimatic-calculator/'))).to.be.true;
+    expect(links.filter((link) => !link.startsWith('/api/'))).to.deep.equal([]);
+    expect(read('llms-full.txt')).to.contain('# Authentication (/api/authentication)');
+  });
+
+  it('writes no robots file, which crawlers read only at the root of a host', () => {
+    expect(exists('robots.txt')).to.be.false;
+    expect(exists('sitemap.xml')).to.be.true;
+  });
+
+  it('writes the path into the links and install command the Markdown twins carry', () => {
+    const sdks = read('sdks.md');
+
+    expect(sdks).to.contain('[TypeScript](/api/sdks/typescript)');
+    expect(sdks).to.contain('[Download SDK](/api/__downloads/sdk/typescript.zip)');
+    expect(read('context-plugin.md')).to.contain(
+      'npx context-plugins install "https://docs.test/api/__downloads/plugin.zip"'
+    );
+  });
+
+  // The prerender knows the configured address, which carries the path; the browser swaps in its own.
+  it('installs the bundled plugin from under the path', () => {
+    expect(read('context-plugin/index.html')).to.match(
+      /npx context-plugins install (&quot;|")https:\/\/docs\.test\/api\/__downloads\/plugin\.zip(&quot;|")/
+    );
+  });
+
   it('gives the path in canonical links, og:url and the sitemap', () => {
     const page = read('index.html');
     const locations = [...read('sitemap.xml').matchAll(/<loc>([^<]*)<\/loc>/g)].map((match) => match[1]);

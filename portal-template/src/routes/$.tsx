@@ -3,6 +3,7 @@ import { createServerFn } from '@tanstack/react-start';
 import { docs, generated } from '@/lib/source';
 import { source } from '@/lib/source.server';
 import { PortalLayout } from '@/lib/layout';
+import { fullAddress } from '@/lib/base-path';
 import { getPageMarkdownUrl, slugsFromSplat } from '@/lib/shared';
 import { portal } from '@/lib/portal';
 import { absoluteUrl, canonicalLink } from '@/lib/seo';
@@ -135,17 +136,19 @@ function Content({
   const PageBody = page.body;
   const pathname = usePathname();
   // Named, or the popover reads `window.location.href` and sends the reader's query and hash on.
-  const pageUrl = typeof window === 'undefined' ? pathname : new URL(pathname, window.location.origin).toString();
+  const pageUrl = fullAddress(pathname);
+  // Full, which Fumadocs passes through as it is, whether it adds the base to a path or not.
+  const markdownAddress = fullAddress(markdownUrl);
 
   return (
     <DocsPage toc={toc} full={page.full}>
       <DocsTitle>{page.title}</DocsTitle>
       <DocsDescription>{page.description}</DocsDescription>
       <div className="flex flex-row gap-2 items-center border-b -mt-4 pb-6">
-        <MarkdownCopyButton markdownUrl={markdownUrl} />
+        <MarkdownCopyButton markdownUrl={markdownAddress} />
         {/* Sends the reader to an external AI vendor, so a portal published under someone
             else's brand can turn it off. */}
-        {portal.pageActions ? <ViewOptionsPopover markdownUrl={markdownUrl} pageUrl={pageUrl} /> : null}
+        {portal.pageActions ? <ViewOptionsPopover markdownUrl={markdownAddress} pageUrl={pageUrl} /> : null}
       </div>
       <DocsBody>
         <PageBody components={useMDXComponents()} />

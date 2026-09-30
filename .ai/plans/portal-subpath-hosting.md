@@ -298,6 +298,10 @@ no other place that describes `site`.
   `SiteAddress.path()`.
 - `vite.config.ts` sets `base: viteBase(identity)`, and passes `identity` to `prerenderPages`,
   which needs it for the served paths and the robots rule (5.7).
+- `vite.config.ts` also sets `useImport: true` in `remarkImageOptions` (step 2). It is
+  Fumadocs' default today, and it is what gives a Markdown image the base: the image is
+  bundled, not linked. Written out, a changed default in an upgrade cannot quietly drop the base
+  from every Markdown image.
 
 ### 5.2 `withBasePath`: `src/lib/base-path.ts` (new)
 
@@ -315,7 +319,9 @@ no other place that describes `site`.
   - `components/search.tsx`:
     - `from: withBasePath('/api/search.json')`;
     - the results given to `SearchDialogList` carry `url: withBasePath(item.url)`, so the dialog's
-      `router.push` strips the base exactly once, whatever the page's path (decision 6).
+      `router.push` strips the base exactly once, whatever the page's path (decision 6). They are
+      memoised on `query.data`: the list moves its highlight to the top whenever it gets a new
+      array.
   - `routes/__root.tsx`: the favicon `href`.
   - `lib/layout.shared.tsx`: the light and dark logos, in its three `<img src>`s (lines 33, 37,
     38).
@@ -324,13 +330,22 @@ no other place that describes `site`.
     - the Markdown branch's `[Download SDK](…)` (line 25).
   - `components/sdk-cards.tsx`: the Markdown branch's `[${name}](${page})` (line 43). The HTML
     branch is a router `Link` and is left alone.
-  - `routes/$.tsx`:
-    - `ViewOptionsPopover`'s `markdownUrl`. `MarkdownCopyButton` prefixes its own and is passed the
-      bare one, since the same prefixed URL doubled.
-    - `pageUrl` (line 138) becomes `new URL(withBasePath(pathname), window.location.origin)`, since
-      the router's pathname has the base stripped.
+  - `routes/$.tsx`: in the browser, `pageUrl` and the `markdownUrl` both page actions get are full
+    addresses, from `fullAddress(path)` beside `withBasePath` in `base-path.ts`:
+    `new URL(withBasePath(path), window.location.origin)`. On the server they stay paths, as
+    `pageUrl` is today; neither component renders them until it is used.
+    - `pageUrl` (line 138) needs the base because the router's pathname has it stripped.
+    - `markdownUrl` goes to both components as a full address because Fumadocs' own
+      `withBasePath` leaves a full address alone (`page-actions.js:197`). So it is right whether
+      Fumadocs adds the base or not:
+      - `ViewOptionsPopover` stopped adding it in ui 16.15.13, and would double a prefixed path
+        once that is fixed;
+      - `MarkdownCopyButton` still adds it, and would lose it if it went the popover's way.
+    - An earlier draft prefixed the popover's URL and passed the copy button the bare one. That
+      was right only for today's Fumadocs, and an upgrade that fixed the popover would have
+      doubled the path with nothing to catch it.
   - `lib/llms.server.ts`: the page headings' `(${page.url})`, and the index (5.4).
-  - `components/plugin-install.tsx`: `withBasePath('/')` in the browser's snapshot (5.3).
+  - `components/plugin-install.tsx`: `fullAddress('/')` in the browser's snapshot (5.3).
 - **Users in Node, which pass the base:**
   - `prerender-pages.ts`, with `viteBase(identity)` (5.7). It already imports from `src/lib/`.
   - `downloads.ts`'s dev keys, with `server.config.base` (5.8).
@@ -340,7 +355,6 @@ no other place that describes `site`.
 - **Never through it:**
   - the page tree the pages render, and every Fumadocs or router link. The `llms.txt` index
     renders from a prefixed copy (5.4);
-  - `MarkdownCopyButton`;
   - canonical, `og:url` and the sitemap (through `siteUrl`);
   - header links, which are portal-relative router links.
 
@@ -349,8 +363,8 @@ no other place that describes `site`.
 - **The shape today:** one call, `installCommand(path, origin)`. The `origin` comes from
   `useSyncExternalStore`: `portal.siteUrl` in the server snapshot, `window.location.origin` in
   the browser's. The Markdown branch calls `installCommand(path, portal.siteUrl)`.
-- **The change:** the browser's snapshot becomes `window.location.origin + withBasePath('/')`,
-  the address the browser sees the portal at. Nothing else changes:
+- **The change:** the browser's snapshot becomes `fullAddress('/')`, the address the browser
+  sees the portal at, built as the page actions' is (5.2). Nothing else changes:
   - `path` is not prefixed. The call is shared with the server snapshot, whose `siteUrl` already
     carries the path, so prefixing it would print `/docs/docs/__downloads/…` in the
     prerendered page.
@@ -446,13 +460,15 @@ follow-up.
   the root and under a path.
 
 **The CLI/template contract (`test/portal-template.test.ts`)**, beside the `Equal<>` checks
-already there: for every accepted row of the shared table, `viteBase` given
-`identity().siteUrl` equals `SiteAddress.parse(url).path()`. The CLI and the template each derive
+already there: for a list of accepted addresses of its own (the root with and without a slash, a
+path, a deep path in mixed case, a segment of dots), `viteBase` given `identity().siteUrl` equals
+`SiteAddress.parse(url).path()`. The CLI and the template each derive
 the path from the address, so this holds them to one answer. It parses the address itself because
 `PortalConfig.siteAddress()`, like `hasPath()`, arrives in step 4 with Next Steps, its one caller.
 
 **Template unit tests (`test/portal-template/`):**
-- `base-path.test.ts` (new): the root, a base, an explicit base.
+- `base-path.test.ts` (new): the root, a base, an explicit base; `fullAddress` with a window and
+  without one.
 - `prerender-pages.test.ts`:
   - served paths under a base, including one that collides with it;
   - portal-relative paths at the root;
@@ -465,6 +481,15 @@ the path from the address, so this holds them to one answer. It parses the addre
   - it leaves other modules alone;
   - it fails when nothing matched;
   - the installed module still holds the literal.
+- `search-navigation.test.ts` (new, step 2). Search results under a colliding base rely on how
+  Fumadocs and TanStack navigate, which only a browser would otherwise show. So an upgrade that
+  changes any of it fails here, naming the mapping in `search.tsx` to revisit:
+  - Fumadocs' search dialog navigates with `router.push(item.url)`, read from the installed
+    `fumadocs-ui`;
+  - Fumadocs' TanStack adapter pushes with `router.navigate({ href })`, read from the installed
+    `fumadocs-core`;
+  - the router, created in Node with a memory history and basepath `/api`, takes
+    `href: '/api/api/x'` to the route `/api/x`. It runs in Node (tried 2026-09-29).
 
 **End to end:** `test/e2e/portal-build.test.ts` gets a `subpath` fixture with
 `site.url: 'https://docs.test/api'`. It is a colliding base on purpose: it guards the reliance on
@@ -473,7 +498,10 @@ The fixture lives at `test/resources/portal-inputs/subpath/src`, beside `default
 It holds:
 - a spec, so the API reference's `/api/…` pages really collide with the base;
 - a content page linking `/authentication`, and that page;
-- a logo in `static/`.
+- a logo in `static/`;
+- a Markdown image in the content page (step 2), which guards `useImport` (5.1). It is over
+  Vite's 4 KiB inline limit, since an inlined `data:` URI would carry no base to check; the logo
+  is 3.9 KB, so the image is a generated 12 KB `diagram.png`.
 
 It is built with `{ plugin: true }` for the bundled plugin. It is the third real build in the
 file, after `default` and `branded`, and `test.yml` runs the e2e suite on
@@ -491,7 +519,8 @@ each step extends its assertions:
   - logo, favicon and SDK download links start at `/api/`;
   - `llms.txt` links start at `/api/`, and there is no `robots.txt`;
   - the plugin page's Markdown command carries `/api`;
-  - `sdks.md` links carry `/api`.
+  - `sdks.md` links carry `/api`;
+  - the Markdown image's `src` starts at `/api/`.
 - **Step 3:**
   - a client chunk contains `` `/api/__tsr/staticServerFnCache/ ``, and none contains
     `` `/__tsr/staticServerFnCache/ `` (the literal with its opening backtick);
@@ -503,8 +532,9 @@ step 3, the `portal serve` probe with step 4. Both use the `subpath` fixture. `p
 under a colliding base has only been read (Start's dev middleware takes `req.originalUrl`, so it
 strips the base once), not run. Some fixes are checked only here, because they exist only in the
 browser and no automated test reaches them:
-- the search results' served URLs, which make a colliding base navigate;
-- the popover's prefix and the copy button's bare URL;
+- the search results' served URLs, which make a colliding base navigate. What they rely on is
+  guarded by `search-navigation.test.ts`;
+- the page actions' full addresses;
 - `pageUrl`;
 - the plugin install command's browser snapshot (5.3).
 
@@ -535,8 +565,8 @@ after each one. In all, roughly 400 lines of source and 500 of tests.
      - `base-path.test.ts` and the contract test;
      - the `subpath` e2e fixture with step 1's assertions.
 2. **The template's portal-relative strings.** Every other user in 5.2 and 5.3 (search results
-   included), `llms.txt`, the robots rule, and the dev downloads middleware. With unit and e2e
-   assertions.
+   included), `llms.txt`, the robots rule, and the dev downloads middleware. Also `useImport`
+   (5.1). With unit and e2e assertions, and `search-navigation.test.ts`.
 3. **The static-cache plugin (5.6).** With its tests and e2e assertions, and the build probe:
    client navigation first works under a path in this step.
 4. **`portal serve`, `portal generate` and the README (4.5–4.7).** With their tests, and the
@@ -559,10 +589,20 @@ after each one. In all, roughly 400 lines of source and 500 of tests.
 - **TanStack's prerender stops treating an already-prefixed path as prefixed.** Every page would
   then be fetched with the base twice and 404, failing the build. The colliding `subpath` fixture
   would catch that on the upgrade that brings it.
-- **Fumadocs fixing the popover regression** would make our popover prefix a double. The version
-  is pinned; an upgrade re-checks `ViewOptionsPopover` in `page-actions.js`.
-- **A TanStack upgrade that moves the cache literal** fails the build and the unit guard (5.6).
-  That is intended.
+- **Dependency upgrades.** Nothing here pins, patches or copies a Fumadocs or TanStack module.
+  Every behaviour the path relies on either cannot break on an upgrade or fails CI when it does:
+
+  | Relied on | On an upgrade that changes it |
+  |---|---|
+  | The page actions' Markdown URL | Cannot break: a full address is right whether Fumadocs adds the base or not (5.2) |
+  | Markdown images are bundled | Cannot break: `useImport` is written out (5.1); the e2e image checks it |
+  | Fumadocs links are router links | The e2e fails (step 1's link assertions) |
+  | `llms()` reads the loader methods we wrap | The e2e fails (`llms.txt` links) |
+  | Search navigates by `href`, stripped once | `search-navigation.test.ts` fails |
+  | TanStack prefixes only an unprefixed listed path | The colliding e2e fixture fails |
+  | TanStack's cache literal | The build fails, and the unit guard (5.6) |
+
+  A failure is a stop on that upgrade, not a broken portal, and it names what to change.
 - **A base of `/spa-shell` exactly.** TanStack's own prefixing of the shell path would leave it
   alone, and the shell would be prerendered from the home page. Deep links would briefly show the
   home page before hydrating. Not refused, since no one names a docs path after an internal route.
@@ -612,7 +652,7 @@ with the MDX components, but not in its copy.
 | Item | State (2026-09-29) | What it means for us |
 |---|---|---|
 | TanStack/router#6152, PR #5970 | Both open. A maintainer (2026-07-17): the cache URL "should follow Start's public asset base"; the PR builds the URL with `path.join` and needs an e2e served from a sub-path. | When it ships, delete 5.6. |
-| fuma-nama/fumadocs PR #3572 (ui 16.15.13) | The popover lost `withBasePath`; still so on `main`, and nobody has reported it | When it is restored, drop our popover prefix |
+| fuma-nama/fumadocs PR #3572 (ui 16.15.13) | The popover lost `withBasePath`; still so on `main`, and nobody has reported it | Nothing to undo: the full address we pass is right either way (5.2). Reporting it helps other Fumadocs users |
 | TanStack/router#4888, docs PR #7882 | Docs only | None |
 
 **The fixes, drafted, not posted:**
@@ -695,7 +735,7 @@ host's root until JavaScript runs:
   - colliding base paths (decision 6);
   - `llms.txt` links (5.4);
   - the SDK pages' Markdown copy links (5.2);
-  - the popover and `pageUrl` (5.2);
+  - the page actions' full addresses and `pageUrl` (5.2);
   - search results (5.2);
   - `robots.txt` and the sitemap note (decision 7, 4.6);
   - the README line (4.7);
@@ -753,3 +793,20 @@ CLI stays host-neutral (section 11).
   fixture.
 - Also specified: the Next Steps wording (4.6), the cache plugin's failure check (5.6), the
   fixture's location (section 6) and the `://` check (4.1).
+
+**After checking the dependency upgrade path** (before step 2): three Fumadocs behaviours the
+path relied on would have broken silently on an upgrade, and a fourth was untested.
+- The page actions get a full address, right whether Fumadocs adds the base or not (5.2). This
+  replaces the popover prefix and the bare URL for the copy button.
+- `search-navigation.test.ts` guards how search navigates (section 6).
+- `useImport` is written out, and the fixture gains a Markdown image (5.1, section 6).
+- Section 8 lists every behaviour relied on, and what happens on an upgrade that changes it.
+
+**After reviewing steps 1 and 2** (before step 2's commit):
+- The search results are memoised (5.2). A new array each render moved the highlight to the
+  top, on root portals too.
+- `fullAddress` moves into `base-path.ts`, and the plugin install command's snapshot uses it
+  (5.2, 5.3), so the browser's address of a path is built in one place.
+- The e2e check that nothing points outside the path also covers a content page and an API
+  reference page (it passed).
+- The contract test's wording says it has its own list of addresses (section 6).

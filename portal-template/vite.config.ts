@@ -23,9 +23,10 @@ export default defineConfig(async () => {
       generatedPagesReload(),
       downloads(paths.downloadsDir),
       // `/images/logo.png` is read from the static directory, and a remote image is never fetched for its size.
+      // Imported, the default written out: a bundled image carries Vite's base, a linked one would not.
       fumadocsMdx({
         globalOptions: {
-          mdxOptions: { remarkImageOptions: { publicDir: publicDir || undefined, external: false } }
+          mdxOptions: { remarkImageOptions: { publicDir: publicDir || undefined, external: false, useImport: true } }
         }
       }),
       specReload(paths.specs),
