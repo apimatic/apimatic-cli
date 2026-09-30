@@ -423,6 +423,22 @@ is the one layout since section 15.
   The second review made `tabs` the whole tab bar, so a file with no `tabs`
   has one reading, no tab, and there is nothing left to ask: it is read as
   `"tabs": []`.
+- *(Added 2026-09-30, third review.)* Two notices, given as the shared-name
+  warning is: the build succeeds. A root file with no `tabs`, or no root file,
+  makes no tab, and a 2.0.0-beta.1 project had the sections as tabs, so the
+  CLI says so once, naming the sections now in Home and both ways to settle
+  it: `"tabs"` listing their tokens to have them back, `"tabs": []` to keep
+  the sidebar and say so on purpose. And a root `title` while Home is the only
+  tab names nothing a reader sees, since one tab draws no tab bar, so the CLI
+  says that too rather than accept a setting that does nothing.
+- *(Added 2026-09-30, third review.)* Every entry is resolved once, to what it
+  names -- the rest entry, an `apimatic:` string that positions nothing here,
+  the API reference, a section, a folder, a page, an empty folder or nothing
+  -- and the duplicate check, each list's rules, the tabs the CLI names and
+  the near-miss hint all read that one answer. `api` and `apimatic:api` being
+  one node is ruled on there alone on the CLI side; the template keeps its own
+  copy, as it keeps everything. A page named `api` beside the mount point is
+  refused under either spelling, since it could be positioned under neither.
 - Every problem in `content/` is reported in one run, the front matter and the
   `nav.json` files together; the `nav.json` entries are judged only once no two
   pages would be served at one address, since an entry naming one of them would
@@ -478,6 +494,17 @@ where it is.
   a file with no `tabs` reads as `"tabs": []`, so the beta.1 refusal goes with
   the ambiguity it guarded. The scaffold and the sample repository name the
   three sections in `tabs`, so a fresh portal keeps the tabs it had.
+- 2026-09-30, third review: the upgrade was silent, so a root file with no
+  `tabs` is now told once what it lost and how to have it back, and a Home
+  `title` with no tab bar to show in is told it shows nowhere. An unnamed
+  section's alphabetical place among the folders is kept on purpose: the
+  bands that put it last existed so that a release adding a section left a
+  sidebar alone, but the scaffold and the sample name the sections as tabs,
+  so few portals see the default, and a section that is one more folder in
+  Home is the rule `tabs` promises. The CLI resolves each entry once for
+  every rule; the template claims the tabs the way `reorder` claims an entry,
+  rather than matching folders to entries and entries to folders in turn; and
+  `portalTabs` draws no tab bar for one tab, whichever it is.
 
 ## 6. Template changes
 
@@ -1122,7 +1149,8 @@ touches.
 - **`src/types/portal/content-tree.ts`**: `tabs()` takes every tab from
   `tabs`, and nothing else is one.
 - **`content-notices.ts`, `preview-content.ts`, `src/prompts/portal/source.ts`**:
-  `folderTabs` and `reportFolderTabs` go.
+  `folderTabs` and `reportFolderTabs` go. *(2026-09-30: `noTabsListed` and
+  `unseenHomeTitle` come, given once under `portal serve` like the others.)*
 - **`portal serve`**: no new behaviour. A `nav.json` save already runs every
   check, and an `apimatic.json` edit that adds or removes the plugin already
   checks the content again. `GeneratedPages.makesSameTabsAs` becomes
