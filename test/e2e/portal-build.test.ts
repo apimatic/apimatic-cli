@@ -490,8 +490,8 @@ const stylesheetOf = (output: DirectoryPath) => {
  * fixture leaves at their defaults: a logo per mode, a favicon, a primary colour, a forced
  * colour mode and header links. Its specification has a deprecated operation, an internal one
  * and one whose body is an image, and it has no content directory, so it also covers the
- * fallback home page and the default order of the tabs. Its `plugin` block covers the context
- * plugin page, and its TypeScript release the card of a published SDK.
+ * fallback home page and a portal with no `nav.json`, which has Home alone. Its `plugin` block
+ * covers the context plugin page, and its TypeScript release the card of a published SDK.
  */
 (enabled ? describe : describe.skip)('portal build, branded (end to end)', function () {
   this.timeout(10 * 60 * 1000);
@@ -579,15 +579,19 @@ const stylesheetOf = (output: DirectoryPath) => {
     expect(read('__downloads/plugin.zip')).to.equal('PK plugin');
   });
 
-  // No nav.json, so the defaults: the generated tabs before the reference, in the CLI's order,
-  // where Fumadocs' own, by path, would put the context plugin's folder first.
-  it('puts the generated tabs before the API reference, SDKs first, when nothing orders them', () => {
-    expectTabsInOrder(read('index.html'), [
-      ['/', 'Home'],
-      ['/sdks', 'SDKs'],
-      ['/context-plugin', 'Context Plugin'],
-      ['/api/[^"]+', 'API Reference']
-    ]);
+  // No nav.json, so no `tabs`, so no tab: every section is a folder in Home, and the header
+  // renders no tab bar over a single choice. Home is not looked for: the fallback home page's
+  // own sidebar link is `/` and reads Home too, so it would match whether or not a tab bar is there.
+  it('renders no tab bar when no nav.json names a tab, every section being in Home', () => {
+    expect(
+      tabPositions(read('index.html'), [
+        ['/sdks', 'SDKs'],
+        ['/context-plugin', 'Context Plugin'],
+        ['/api/[^"]+', 'API Reference']
+      ])
+    ).to.deep.equal([-1, -1, -1]);
+    expect(exists('sdks/index.html')).to.be.true;
+    expect(exists('context-plugin/index.html')).to.be.true;
   });
 
   it('documents the deprecated operation and leaves the internal one out, pages and sidebar alike', () => {

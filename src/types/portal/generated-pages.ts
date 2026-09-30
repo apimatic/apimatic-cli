@@ -13,8 +13,9 @@ import { PortalSdk } from './portal-sdk.js';
 export const GENERATED_DIRECTORY_NAME = 'generated';
 
 /**
- * A set of pages the CLI writes into the portal, shown as a tab of its own unless the root
- * `nav.json`'s `pages` places it in Home's sidebar; its address is the same either way.
+ * A set of pages the CLI writes into the portal: a tab of its own when the root `nav.json`'s
+ * `tabs` names its token, and otherwise a folder in Home's sidebar; its address is the same
+ * either way.
  */
 export interface GeneratedSection {
   /** The folder the pages are written to, and so the address they are served at. */
@@ -42,7 +43,7 @@ export const PLUGIN_SECTION: GeneratedSection = {
   description: 'the context plugin page'
 };
 
-/** Every section, in the order they take when the root `nav.json` names none of them. */
+/** Every section, in the order the CLI writes them. */
 export const GENERATED_SECTIONS: readonly GeneratedSection[] = [SDK_SECTION, PLUGIN_SECTION];
 
 /** The templates in the package's `portal-pages/` directory, by the name of their file. */

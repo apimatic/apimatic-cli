@@ -141,8 +141,8 @@ describe('ContentTree', () => {
     ]);
   });
 
-  // A folder in Home's sidebar is no tab, so its name clashes with no tab's.
-  it('leaves a section the root nav.json places in Home out of the tabs, and out of the shared names', () => {
+  // A section `tabs` does not name is a folder in Home's sidebar, so its name clashes with no tab's.
+  it('leaves a section tabs does not name out of the tabs, and out of the shared names', () => {
     const sharedWith = (root: Record<string, unknown>) =>
       tree
         .check(
@@ -166,7 +166,8 @@ describe('ContentTree', () => {
     expect(sharedWith({ title: 'SDKs', tabs: [], pages: ['index', 'apimatic:sdks'] })).to.deep.equal([]);
     expect(sharedWith({ title: 'API Reference', tabs: [], pages: ['index', 'api'] })).to.deep.equal([]);
     expect(sharedWith({ title: 'API Reference', tabs: [], pages: ['index', 'apimatic:api'] })).to.deep.equal([]);
-    expect(sharedWith({ title: 'API Reference', tabs: [], pages: ['index'] })).to.deep.equal([
+    expect(sharedWith({ title: 'API Reference', tabs: [], pages: ['index'] })).to.deep.equal([]);
+    expect(sharedWith({ title: 'API Reference', tabs: ['api'], pages: ['index'] })).to.deep.equal([
       ['API Reference', ['home', 'apiReference']]
     ]);
   });

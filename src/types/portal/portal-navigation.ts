@@ -54,7 +54,7 @@ export interface NavigationContext {
   label: string;
   /** Every `apimatic:` token resolves to a node that lives at the content root. */
   isContentRoot: boolean;
-  /** `content/api/`, where the reference is mounted, which is always a tab. */
+  /** `content/api/`, where the reference is mounted, a tab when the root file's `tabs` names it. */
   isApiDirectory: boolean;
   /**
    * Whether this directory becomes a folder in the sidebar at all. A directory with no page
@@ -78,7 +78,7 @@ export interface NavigationSettings {
   title: string | undefined;
   /** Its entries, trimmed, which order the folder's pages; at the content root, Home's sidebar. */
   pages: string[];
-  /** At the content root, the tabs after Home in order; empty when the file gives none, and below the root. */
+  /** At the content root, the tabs after Home in order, and the only ones; empty when the file gives none, and below the root. */
   tabs: string[];
 }
 
@@ -119,11 +119,7 @@ export class PortalNavigation {
 
     // Every bad entry is reported at once rather than stopping at the first, so one edit
     // fixes the file.
-    const errors = [
-      ...settingErrors,
-      ...PortalNavigation.entryErrors(pages.value ?? [], tabs.value, context),
-      ...PortalNavigation.betaOneErrors(pages.value, tabs.value, context)
-    ];
+    const errors = [...settingErrors, ...PortalNavigation.entryErrors(pages.value ?? [], tabs.value, context)];
     return errors.length > 0 ? err(errors) : ok({ title, pages: pages.value ?? [], tabs: tabs.value ?? [] });
   }
 
@@ -291,32 +287,6 @@ export class PortalNavigation {
       default:
         return '';
     }
-  }
-
-  /** A root file with no `tabs` that names a folder or token in `pages` meant a tab in 2.0.0-beta.1, so it is not read as Home's order without a word. */
-  private static betaOneErrors(
-    pages: string[] | undefined,
-    tabs: string[] | undefined,
-    context: NavigationContext
-  ): string[] {
-    if (!context.isContentRoot || tabs !== undefined || pages === undefined) {
-      return [];
-    }
-    const wereTabs = pages.filter(
-      (entry) =>
-        entry === API_REFERENCE_NAME ||
-        TOKENS.includes(entry) ||
-        (context.folderNames.includes(entry) && !context.homePageFolders.includes(entry))
-    );
-    if (wereTabs.length === 0) {
-      return [];
-    }
-    const are = wereTabs.length === 1 ? 'is a tab' : 'are tabs';
-    return [
-      `${context.label} has no '${TABS_FIELD}', so it does not say whether ${quotedList(wereTabs)} ${are} or in ` +
-        `Home's sidebar (a 2.0.0-beta.1 file made them tabs). List the ones meant as tabs in '${TABS_FIELD}', or ` +
-        `add "${TABS_FIELD}": [] to keep them in Home.`
-    ];
   }
 
   /** The tabs are decided at the top of the content directory, and nothing reads the setting anywhere else. */

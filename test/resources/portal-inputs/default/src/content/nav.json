@@ -1,5 +1,5 @@
 {
   "title": "Overview",
-  "tabs": ["guides", "apimatic:api", "apimatic:sdks"],
+  "tabs": ["guides", "apimatic:api", "apimatic:sdks", "apimatic:plugin"],
   "pages": ["index", "authentication"]
 }

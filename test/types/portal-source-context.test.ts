@@ -1006,7 +1006,7 @@ describe('PortalSourceContext', () => {
     it('names the tabs against the generated pages it is given', async () => {
       write('content/extensions/first.md', page('First'));
       write('content/extensions/nav.json', JSON.stringify({ title: 'Context Plugin' }));
-      write('content/nav.json', JSON.stringify({ tabs: ['extensions'], pages: ['index'] }));
+      write('content/nav.json', JSON.stringify({ tabs: ['extensions', 'apimatic:plugin'], pages: ['index'] }));
       const { specs, generatedPages: withoutPlugin } = (await resolve())._unsafeUnwrap();
       write('apimatic.json', JSON.stringify({ portal: { site: { name: 'Calc' } }, languages: LANGUAGES, plugin: {} }));
       const { generatedPages: withPlugin } = (await resolve())._unsafeUnwrap();
@@ -1241,7 +1241,7 @@ describe('PortalSourceContext', () => {
       expect((await resolve()).isOk()).to.be.true;
     });
 
-    // A token in `pages` places its section in Home's sidebar; `tabs` has to be there to say so.
+    // A token in `pages` places its section in Home's sidebar.
     it('accepts the tokens in pages beside an empty tabs, which places the sections in Home', async () => {
       write(
         'content/nav.json',
@@ -1322,16 +1322,12 @@ describe('PortalSourceContext', () => {
       expect((await resolve()).isOk()).to.be.true;
     });
 
-    // Read under today's rule, the file would put them in Home's sidebar without a word.
-    it('refuses a root file with no tabs that lists a folder or a token, which 2.0.0-beta.1 made tabs', async () => {
+    // With no `tabs` there is no tab, so the file has one reading: every entry orders Home's sidebar.
+    it('accepts a root file with no tabs that lists a folder or a token in pages', async () => {
       write('content/tutorials/first-call.md', page('First call'));
       write('content/nav.json', JSON.stringify({ pages: ['index', 'tutorials', 'apimatic:api'] }));
 
-      const errors = navigationErrors((await resolve())._unsafeUnwrapErr());
-
-      expect(errors).to.deep.equal([
-        "content/nav.json has no 'tabs', so it does not say whether 'tutorials' and 'apimatic:api' are tabs or in Home's sidebar (a 2.0.0-beta.1 file made them tabs). List the ones meant as tabs in 'tabs', or add \"tabs\": [] to keep them in Home."
-      ]);
+      expect((await resolve()).isOk()).to.be.true;
     });
 
     it('refuses tabs below the content root', async () => {
@@ -1605,11 +1601,15 @@ describe('PortalSourceContext', () => {
       }
     };
 
-    /** The root `nav.json`, making a tab of each of these folders, and naming Home if given a title. */
+    /** The root `nav.json`, making a tab of each of these folders and of every section, and naming Home if given a title. */
     const listFolders = (folders: string[], title?: string) =>
       write(
         'content/nav.json',
-        JSON.stringify({ ...(title === undefined ? {} : { title }), tabs: folders, pages: ['index'] })
+        JSON.stringify({
+          ...(title === undefined ? {} : { title }),
+          tabs: [...folders, 'apimatic:sdks', 'apimatic:plugin', 'apimatic:api'],
+          pages: ['index']
+        })
       );
 
     it('finds none when every tab has a name of its own', async () => {
@@ -1791,10 +1791,13 @@ describe('PortalSourceContext', () => {
       expect(fs.existsSync(configFile.toString())).to.be.true;
     });
 
-    it('orders the sidebar with the welcome page first', async () => {
+    it('keeps a tab for each generated section, and orders the sidebar with the welcome page first', async () => {
       await scaffold(writeSpec({ title: 'Petstore', version: '1' }));
 
-      expect(JSON.parse(read('content/nav.json'))).to.deep.equal({ tabs: [], pages: ['index', '...'] });
+      expect(JSON.parse(read('content/nav.json'))).to.deep.equal({
+        tabs: ['apimatic:sdks', 'apimatic:plugin', 'apimatic:api'],
+        pages: ['index', '...']
+      });
     });
 
     // A freshly scaffolded project must not carry a file the build never reads, such as a

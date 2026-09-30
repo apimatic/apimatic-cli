@@ -14,11 +14,9 @@ describe('PortalNavigation', () => {
     ...overrides
   });
 
-  /** A file ordering with `pages` alone. At the content root it carries `"tabs": []` too, since a root file without it is read as 2.0.0-beta.1's (see the tabs). */
-  const validate = (pages: unknown, overrides: Partial<NavigationContext> = {}) => {
-    const context = contextFor(overrides);
-    return PortalNavigation.validate(JSON.stringify(context.isContentRoot ? { tabs: [], pages } : { pages }), context);
-  };
+  /** A file ordering with `pages` alone. */
+  const validate = (pages: unknown, overrides: Partial<NavigationContext> = {}) =>
+    PortalNavigation.validate(JSON.stringify({ pages }), contextFor(overrides));
 
   const errorsFor = (pages: unknown, overrides: Partial<NavigationContext> = {}) =>
     validate(pages, overrides)._unsafeUnwrapErr();
@@ -347,7 +345,7 @@ describe('PortalNavigation', () => {
       ]);
     });
 
-    // In Home, the folder is one more node to order; and beta.1 refused the entry, so no beta.1 file holds it.
+    // In Home, the folder is one more node to order.
     it('accepts a folder that serves the home page in pages, with or without tabs', () => {
       const withStart = { childNames: ['index', '(start)'], folderNames: ['(start)'], homePageFolders: ['(start)'] };
 
@@ -476,41 +474,16 @@ describe('PortalNavigation', () => {
       ]);
     });
 
-    // Read under today's rule, that file would put its tabs in Home's sidebar without a word.
-    describe('a root file written for 2.0.0-beta.1, with no tabs', () => {
-      it('is refused when pages names a folder, api or a token, each a tab then', () => {
-        expect(fileErrors({ pages: ['index', 'guides', 'apimatic:api', 'authentication'] })).to.deep.equal([
-          "content/nav.json has no 'tabs', so it does not say whether 'guides' and 'apimatic:api' are tabs or in Home's sidebar (a 2.0.0-beta.1 file made them tabs). List the ones meant as tabs in 'tabs', or add \"tabs\": [] to keep them in Home."
-        ]);
-        expect(fileErrors({ pages: ['api'] }, { childNames: ['index', 'api'] })).to.deep.equal([
-          "content/nav.json has no 'tabs', so it does not say whether 'api' is a tab or in Home's sidebar (a 2.0.0-beta.1 file made them tabs). List the ones meant as tabs in 'tabs', or add \"tabs\": [] to keep them in Home."
-        ]);
-        expect(fileErrors({ pages: ['index', 'apimatic:sdks'] })).to.have.lengthOf(1);
-      });
+    // `tabs` is the whole tab bar after Home, so a file without it makes no tab, whatever `pages` names.
+    it('reads a root file with no tabs as one with an empty list', () => {
+      const settings = validateFile({ pages: ['index', 'guides', 'apimatic:api', 'authentication'] });
 
-      it('is accepted once tabs is there, empty or not', () => {
-        expect(validateFile({ tabs: [], pages: ['index', 'guides', 'apimatic:api', 'authentication'] }).isOk()).to.be
-          .true;
-        expect(validateFile({ tabs: ['guides', 'apimatic:api'], pages: ['index', 'authentication'] }).isOk()).to.be
-          .true;
+      expect(settings._unsafeUnwrap()).to.deep.include({
+        tabs: [],
+        pages: ['index', 'guides', 'apimatic:api', 'authentication']
       });
-
-      it('is accepted when pages names only pages and the rest entry, as the scaffold’s does', () => {
-        expect(validateFile({ pages: ['index', '...'] }).isOk()).to.be.true;
-        expect(validateFile({ pages: ['authentication', 'index'] }).isOk()).to.be.true;
-        expect(validateFile({ title: 'Overview' }).isOk()).to.be.true;
-      });
-
-      it('does not count an entry that is no folder, which is refused on its own account', () => {
-        const errors = fileErrors({ pages: ['index', 'nonsense'] });
-
-        expect(errors).to.have.lengthOf(1);
-        expect(errors[0]).to.contain("'nonsense' is not a page or folder");
-      });
-
-      it('is reported alongside the other errors of the file', () => {
-        expect(fileErrors({ pages: ['guides', 'nonsense'] })).to.have.lengthOf(2);
-      });
+      expect(validateFile({ pages: ['api'] }, { childNames: ['index', 'api'] }).isOk()).to.be.true;
+      expect(validateFile({ title: 'Overview' }).isOk()).to.be.true;
     });
 
     // Fumadocs' own key for a tab; here, listing the folder in the content root's tabs makes one.
