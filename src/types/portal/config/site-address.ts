@@ -46,6 +46,10 @@ export class SiteAddress {
     return `${this.basePath}/`;
   }
 
+  public hasPath(): boolean {
+    return this.basePath !== '';
+  }
+
   /** With no trailing slash, so a portal-relative path appends to it. */
   public toString(): string {
     return `${this.origin}${this.basePath}`;

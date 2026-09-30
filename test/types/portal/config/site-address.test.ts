@@ -11,6 +11,7 @@ describe('SiteAddress', () => {
     it('reads an address at the root of its host', () => {
       for (const value of ['https://docs.example.com', 'https://docs.example.com/', ' http://docs.example.com:8443 ']) {
         expect(address(value).path(), value).to.equal('/');
+        expect(address(value).hasPath(), value).to.be.false;
       }
       expect(address('https://Docs.Example.com/').toString()).to.equal('https://docs.example.com');
     });
@@ -29,6 +30,7 @@ describe('SiteAddress', () => {
       for (const [value, site, path] of cases) {
         expect(address(value).toString(), value).to.equal(site);
         expect(address(value).path(), value).to.equal(path);
+        expect(address(value).hasPath(), value).to.be.true;
       }
     });
 

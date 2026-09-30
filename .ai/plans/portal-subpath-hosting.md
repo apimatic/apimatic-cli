@@ -159,6 +159,22 @@ The only console output was also there on the root-hosted `default` build, drive
 - headless Chrome refusing the clipboard to an unfocused document;
 - the not-found page's own failed data lookup.
 
+**Measured with step 4 in place (2026-09-30):** `portal serve` on the `subpath` fixture, run as
+the action runs with only the account check and the artifacts stubbed, and driven in headless
+Chrome. It printed `http://127.0.0.1:<port>/api/`, and the restart list named the path. All of
+these work, with no failed request and no console output:
+- the printed link, with the logo, the Markdown image and the favicon;
+- a click to a content page and to a colliding `/api/api/…` reference page, and back, their data
+  from `/api/_serverFn/…`;
+- search, and a click on a result landing on the colliding page;
+- the SDK download and the plugin's (200, both under `/api/__downloads/`), and the install
+  command's address;
+- a missing page, shown as the not-found page.
+
+Moving the path to `/v2` in the running preview applied the edit (canonical links then carry
+`/v2`), while `/api/` went on being served and `/v2/` answered 404, as the restart list says.
+Stopping it the way CTRL+C does left no project directory behind.
+
 **Measured, other builds and runs:**
 - `base: './'` writes script URLs as `/./assets/…` (the host's root), CSS links relative to the
   page, and a router basepath of `.`.
@@ -550,8 +566,8 @@ each step extends its assertions:
 **By hand, in a browser** (the 2026-09-29 headless Chrome probes). Each runs with the step that
 completes what it checks, so a bug is fixed in the commit that made it: the build probe with
 step 3, the `portal serve` probe with step 4. Both use the `subpath` fixture. `portal serve`
-under a colliding base has only been read (Start's dev middleware takes `req.originalUrl`, so it
-strips the base once), not run. Some fixes are checked only here, because they exist only in the
+under a colliding base was only read (Start's dev middleware takes `req.originalUrl`, so it
+strips the base once) until step 4 ran it (section 3). Some fixes are checked only here, because they exist only in the
 browser and no automated test reaches them:
 - the search results' served URLs, which make a colliding base navigate. What they rely on is
   guarded by `search-navigation.test.ts`;
@@ -834,3 +850,6 @@ path relied on would have broken silently on an upgrade, and a fourth was untest
 **Step 3** (2026-09-30): the plugin as built runs `enforce: 'pre'` with a transform hook filter,
 and its unit guard scans the package's `dist` for the literal (5.6). The build probe passed under
 `/api` and at the root (section 3).
+
+**Step 4** (2026-09-30): as specified in 4.5–4.7. The `portal serve` probe passed under `/api`,
+path edit included (section 3).

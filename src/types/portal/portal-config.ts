@@ -6,6 +6,7 @@ import { BrandConfig, ColorMode } from './config/brand-config.js';
 import { allOf, optional, Parsed, unknownKeys } from './config/fields.js';
 import { Link } from './config/link.js';
 import { NavigationConfig } from './config/navigation-config.js';
+import { SiteAddress } from './config/site-address.js';
 import { SiteConfig, SuggestedSite } from './config/site-config.js';
 import { StaticAsset } from './config/static-asset.js';
 
@@ -92,6 +93,11 @@ export class PortalConfig {
 
   public siteTitle(): string {
     return this.site.siteName();
+  }
+
+  /** Where the portal is hosted, or null when `site.url` is left out. */
+  public siteAddress(): SiteAddress | null {
+    return this.site.address();
   }
 
   /** Where the context plugin is hosted when it is not bundled into the portal, or null when it is. */

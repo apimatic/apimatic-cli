@@ -150,6 +150,13 @@ describe('PortalConfig', () => {
       );
     });
 
+    it('hands over the address it parsed, or none without one', () => {
+      const address = config({ site: { url: 'https://acme.github.io/docs/' } }).siteAddress();
+
+      expect(address?.path()).to.equal('/docs/');
+      expect(config({}).siteAddress()).to.be.null;
+    });
+
     it('refuses an address carrying a query or fragment, or one that is not http', () => {
       for (const url of ['https://x.test/?a=1', 'https://x.test/#top', 'ftp://x.test', 'x.test', 'https:x.test', '']) {
         expect(errorsOf({ site: { url } }), url).to.have.lengthOf(1);

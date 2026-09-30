@@ -3,6 +3,7 @@ import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { FilePath } from '../../types/file/filePath.js';
 import { PortalBuildFailure, PortalBuildResult } from '../../infrastructure/portal-build-service.js';
 import { NOT_FOUND_FILE_NAME, PortalSaveProblem, ZIP_FILE_NAME } from '../../types/portal-context.js';
+import { SiteAddress } from '../../types/portal/config/site-address.js';
 import { Result } from 'neverthrow';
 import { format as f } from '../format.js';
 import { logTail, noteWrapped, withSpinner } from '../prompt.js';
@@ -87,12 +88,27 @@ export class PortalGeneratePrompts {
     log.info(`Portal artifacts can be found at ${f.path(portal)}.`);
   }
 
-  public nextSteps(portal: DirectoryPath, zipped: boolean) {
-    const message = zipped
-      ? `Unpack ${f.var(ZIP_FILE_NAME)} in ${f.path(portal)} onto any static host.\n` +
-        `Configure ${f.var(NOT_FOUND_FILE_NAME)} as the error document so deep links resolve.`
-      : `Upload the contents of ${f.path(portal)} to any static host.\n` +
-        `Configure ${f.var(NOT_FOUND_FILE_NAME)} as the error document so deep links resolve.`;
+  public nextSteps(portal: DirectoryPath, zipped: boolean, site: SiteAddress | null) {
+    if (site === null || !site.hasPath()) {
+      const message = zipped
+        ? `Unpack ${f.var(ZIP_FILE_NAME)} in ${f.path(portal)} onto any static host.\n` +
+          `Configure ${f.var(NOT_FOUND_FILE_NAME)} as the error document so deep links resolve.`
+        : `Upload the contents of ${f.path(portal)} to any static host.\n` +
+          `Configure ${f.var(NOT_FOUND_FILE_NAME)} as the error document so deep links resolve.`;
+      noteWrapped(message, 'Next steps');
+      return;
+    }
+
+    // Read most by someone who previewed the output from a server's root and got a page with no styles.
+    const served = f.link(`${site}/`);
+    const message = [
+      zipped
+        ? `Unpack ${f.var(ZIP_FILE_NAME)} in ${f.path(portal)} so its contents are served at ${served}.`
+        : `Upload the contents of ${f.path(portal)} so they are served at ${served}.`,
+      `Serve ${f.var(NOT_FOUND_FILE_NAME)} for missing pages under ${f.var(site.path())}, so deep links resolve.`,
+      `Crawlers read ${f.var('robots.txt')} only at the root of a host, so none is generated. If you control the ` +
+        `root, add ${f.var(`Sitemap: ${site}/sitemap.xml`)} to its ${f.var('robots.txt')}.`
+    ].join('\n');
     noteWrapped(message, 'Next steps');
   }
 }

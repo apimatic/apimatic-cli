@@ -4,6 +4,7 @@ import { PortalGeneratePrompts } from '../../prompts/portal/generate.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { PortalContext } from '../../types/portal-context.js';
+import { SiteAddress } from '../../types/portal/config/site-address.js';
 import { ProjectContext } from '../../types/project-context.js';
 import { ActionResult } from '../action-result.js';
 import { PreparePortalProjectAction } from './prepare-project.js';
@@ -42,7 +43,8 @@ export class GenerateAction {
     const portalContext = new PortalContext(portalDirectory);
     return await new PreparePortalProjectAction(this.configDir, this.commandMetadata, this.authKey).execute(project, {
       confirm: () => this.confirmOverwrite(portalContext, portalDirectory, force),
-      onPrepared: (portalProject) => this.build(portalProject, portalContext, portalDirectory, zipPortal)
+      onPrepared: (portalProject, source) =>
+        this.build(portalProject, source.config.siteAddress(), portalContext, portalDirectory, zipPortal)
     });
   };
 
@@ -60,6 +62,7 @@ export class GenerateAction {
 
   private async build(
     portalProject: PortalProjectPaths,
+    site: SiteAddress | null,
     portalContext: PortalContext,
     portalDirectory: DirectoryPath,
     zipPortal: boolean
@@ -79,7 +82,7 @@ export class GenerateAction {
     }
 
     this.prompts.portalGenerated(portalDirectory);
-    this.prompts.nextSteps(portalDirectory, zipPortal);
+    this.prompts.nextSteps(portalDirectory, zipPortal, site);
 
     return ActionResult.success();
   }
