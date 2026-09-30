@@ -90,24 +90,25 @@ export class PortalGeneratePrompts {
 
   public nextSteps(portal: DirectoryPath, zipped: boolean, site: SiteAddress | null) {
     if (site === null || !site.hasPath()) {
-      const message = zipped
-        ? `Unpack ${f.var(ZIP_FILE_NAME)} in ${f.path(portal)} onto any static host.\n` +
-          `Configure ${f.var(NOT_FOUND_FILE_NAME)} as the error document so deep links resolve.`
-        : `Upload the contents of ${f.path(portal)} to any static host.\n` +
-          `Configure ${f.var(NOT_FOUND_FILE_NAME)} as the error document so deep links resolve.`;
-      noteWrapped(message, 'Next steps');
+      const upload = zipped
+        ? `Unpack ${f.var(ZIP_FILE_NAME)} in ${f.path(portal)} onto any static host.`
+        : `Upload the contents of ${f.path(portal)} to any static host.`;
+      noteWrapped(
+        `${upload}\nConfigure ${f.var(NOT_FOUND_FILE_NAME)} as the error document so deep links resolve.`,
+        'Next steps'
+      );
       return;
     }
 
-    // Read most by someone who previewed the output from a server's root and got a page with no styles.
-    const served = f.link(`${site}/`);
+    const served = f.link(site.addressOf('/'));
+    const upload = zipped
+      ? `Unpack ${f.var(ZIP_FILE_NAME)} in ${f.path(portal)} so its contents are served at ${served}.`
+      : `Upload the contents of ${f.path(portal)} so they are served at ${served}.`;
     const message = [
-      zipped
-        ? `Unpack ${f.var(ZIP_FILE_NAME)} in ${f.path(portal)} so its contents are served at ${served}.`
-        : `Upload the contents of ${f.path(portal)} so they are served at ${served}.`,
+      upload,
       `Serve ${f.var(NOT_FOUND_FILE_NAME)} for missing pages under ${f.var(site.path())}, so deep links resolve.`,
       `Crawlers read ${f.var('robots.txt')} only at the root of a host, so none is generated. If you control the ` +
-        `root, add ${f.var(`Sitemap: ${site}/sitemap.xml`)} to its ${f.var('robots.txt')}.`
+        `root, add ${f.var(`Sitemap: ${site.addressOf('/sitemap.xml')}`)} to its ${f.var('robots.txt')}.`
     ].join('\n');
     noteWrapped(message, 'Next steps');
   }

@@ -50,7 +50,12 @@ export class SiteAddress {
     return this.basePath !== '';
   }
 
-  /** With no trailing slash, so a portal-relative path appends to it. */
+  /** A portal-relative path's address on the host: `/sitemap.xml` is `https://example.com/docs/sitemap.xml`. */
+  public addressOf(portalPath: string): string {
+    return `${this}${portalPath}`;
+  }
+
+  /** The site address, with no trailing slash. */
   public toString(): string {
     return `${this.origin}${this.basePath}`;
   }

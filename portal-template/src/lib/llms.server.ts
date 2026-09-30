@@ -12,11 +12,13 @@ type PortalPage = ReturnType<typeof source.getPages>[number];
 type ReferencePage = Extract<PortalPage, { type: 'openapi' }>;
 
 // `llms()` links each page by its tree node's URL and has no base of its own; titles are found by `$ref`.
-const index = llms({ ...source, getPageTree: (locale?: string) => servedTree(source.getPageTree(locale)) });
-
-function servedTree(root: PageTree.Root): PageTree.Root {
-  return { ...root, children: root.children.map(servedNode) };
-}
+const index = llms({
+  ...source,
+  getPageTree: (locale?: string) => {
+    const root = source.getPageTree(locale);
+    return { ...root, children: root.children.map(servedNode) };
+  }
+});
 
 function servedNode(node: PageTree.Node): PageTree.Node {
   if (node.type === 'page') return { ...node, url: withBasePath(node.url) };

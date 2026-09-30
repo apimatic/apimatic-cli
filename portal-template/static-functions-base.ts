@@ -7,13 +7,7 @@ const PACKAGE = /[\\/]@tanstack[\\/]start-static-server-functions[\\/]/;
 /** Where it fetches that result from, opening backtick included so nothing else naming the folder matches. */
 export const CACHE_ADDRESS = '`/__tsr/staticServerFnCache/';
 
-/**
- * TanStack fetches a prerendered server function's result from the root of the host whatever
- * Vite's base is, so under a path every page reached by a link shows the not-found page
- * (TanStack/router#6152). This puts the browser's copy of that address under the base. The
- * server's copy is left alone: it writes the files by joining the address onto the output
- * directory, which is already where the host serves the base from. Delete it once #6152 ships.
- */
+/** Puts the browser's fetch of prerendered page data under the base, until TanStack/router#6152 does it itself. */
 export function staticFunctionsBase(): Plugin {
   let base = '/';
   let found = false;
@@ -21,6 +15,7 @@ export function staticFunctionsBase(): Plugin {
     name: 'apimatic:static-functions-base',
     apply: 'build',
     enforce: 'pre',
+    // The server writes the files under the output directory, which the host already serves at the base.
     applyToEnvironment: (environment) => environment.name === 'client',
     configResolved(config) {
       base = config.base;

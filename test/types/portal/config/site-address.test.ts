@@ -14,6 +14,9 @@ describe('SiteAddress', () => {
         expect(address(value).hasPath(), value).to.be.false;
       }
       expect(address('https://Docs.Example.com/').toString()).to.equal('https://docs.example.com');
+      expect(address('https://docs.example.com/').addressOf('/sitemap.xml')).to.equal(
+        'https://docs.example.com/sitemap.xml'
+      );
     });
 
     it('reads the path an address carries, keeping its case and dropping one trailing slash', () => {
@@ -32,6 +35,10 @@ describe('SiteAddress', () => {
         expect(address(value).path(), value).to.equal(path);
         expect(address(value).hasPath(), value).to.be.true;
       }
+      expect(address('https://acme.github.io/docs/').addressOf('/')).to.equal('https://acme.github.io/docs/');
+      expect(address('https://acme.github.io/docs').addressOf('/sitemap.xml')).to.equal(
+        'https://acme.github.io/docs/sitemap.xml'
+      );
     });
 
     it('refuses what is not a web address', () => {

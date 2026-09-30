@@ -26,7 +26,7 @@ export default function DefaultSearchDialog(props: SharedProps) {
       locale
     })
   });
-  // Served URLs, as the dialog navigates by href (search-navigation.test.ts); memoised, as a new array resets its highlight.
+  // Served URLs, since the dialog navigates by href (search-navigation.test.ts), memoised so its highlight stays put.
   const results = useMemo(
     () => (query.data === 'empty' ? null : query.data?.map((item) => ({ ...item, url: withBasePath(item.url) }))),
     [query.data]

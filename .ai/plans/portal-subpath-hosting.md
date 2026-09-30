@@ -229,6 +229,8 @@ Stopping it the way CTRL+C does left no project directory behind.
   - `path()` is where the portal is served, in the form Vite's `base` takes: `'/'` at the root,
     `'/docs/'` under a path. The contract test of section 6 holds `viteBase` to it.
   - `hasPath()` says whether it is under a path.
+  - `addressOf(portalPath)` is a portal-relative path's address on the host, so no caller
+    appends to `toString()` itself.
 - **No `BasePath` class.** It was planned for comparing a moved path under `portal serve`. With
   that notice cut (4.5), Next Steps is the only user, and `SiteAddress` covers it.
 - **What `parse` checks, on the raw text before `new URL` normalises it:**
@@ -255,12 +257,13 @@ Stopping it the way CTRL+C does left no project directory behind.
 
 - It holds `SiteAddress | null`. `validUrl` and `parseOrigin` go, replaced by
   `SiteAddress.parse`.
-- `origin()` becomes `address(): SiteAddress | null`, and `toJSON()` writes the address.
+- `origin()` becomes `siteAddress(): SiteAddress | null`, beside `siteName()` and
+  `siteDescription()`, and `toJSON()` writes the address.
 - The comment above the old check goes. `SiteAddress` owns the rule.
 
 ### 4.3 `PortalConfig` (`src/types/portal/portal-config.ts`)
 
-- `identity().siteUrl` is `site.address()?.toString() ?? null`.
+- `identity().siteUrl` is `site.siteAddress()?.toString() ?? null`.
 - New `siteAddress(): SiteAddress | null`, for Next Steps (4.6). `generate.ts` reaches it through
   the `source` that `onPrepared` already receives (`PortalSource.config`).
 - The comment on `PortalIdentity.siteUrl`, and on the template's `Portal.siteUrl`, becomes "The
@@ -297,8 +300,8 @@ Stopping it the way CTRL+C does left no project directory behind.
 ### 4.6 `portal generate` Next Steps (`src/prompts/portal/generate.ts:90`)
 
 `nextSteps` takes the site address (4.3). When `hasPath()`, the note reads as below, with the
-zipped line in place of the first one when zipped. The sitemap address is `toString()` plus
-`/sitemap.xml`, the way `seo.ts` builds it.
+zipped line in place of the first one when zipped. The sitemap address is
+`addressOf('/sitemap.xml')`, which is how `seo.ts` builds it too.
 
 > Upload the contents of `<dir>` so they are served at `https://acme.github.io/docs/`.
 >
@@ -853,3 +856,9 @@ and its unit guard scans the package's `dist` for the literal (5.6). The build p
 
 **Step 4** (2026-09-30): as specified in 4.5–4.7. The `portal serve` probe passed under `/api`,
 path edit included (section 3).
+
+**After reviewing all four steps** (2026-09-30), against #374's principles and the reviewer's bar:
+- `SiteAddress.addressOf()` builds the addresses Next Steps names (4.1, 4.6).
+- `SiteConfig`'s getter is `siteAddress()` (4.2).
+- The Next Steps note at the root says its 404 sentence once.
+- The plugin's comment is one line, and `llms.server.ts` has no single-use helper.

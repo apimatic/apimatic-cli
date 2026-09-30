@@ -97,7 +97,7 @@ export class PortalConfig {
 
   /** Where the portal is hosted, or null when `site.url` is left out. */
   public siteAddress(): SiteAddress | null {
-    return this.site.address();
+    return this.site.siteAddress();
   }
 
   /** Where the context plugin is hosted when it is not bundled into the portal, or null when it is. */
@@ -114,7 +114,7 @@ export class PortalConfig {
   }
 
   public identity(): PortalIdentity {
-    const address = this.site.address();
+    const address = this.site.siteAddress();
     const logo = this.brand.logoImages();
     const favicon = this.brand.faviconImage();
     return {

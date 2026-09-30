@@ -15,7 +15,7 @@ const KNOWN = ['name', 'url', 'description'];
 export class SiteConfig {
   private constructor(
     private readonly name: string,
-    private readonly url: SiteAddress | null,
+    private readonly address: SiteAddress | null,
     private readonly description: string | null
   ) {}
 
@@ -32,7 +32,7 @@ export class SiteConfig {
           optional(data.url, (url) => SiteAddress.parse(url, `${path}.url`)),
           SiteConfig.validDescription(data.description, `${path}.description`, suggested)
         ])
-      ).map(([name, url, description]) => new SiteConfig(name, url, description))
+      ).map(([name, address, description]) => new SiteConfig(name, address, description))
     );
   }
 
@@ -48,14 +48,14 @@ export class SiteConfig {
     return this.description;
   }
 
-  public address(): SiteAddress | null {
-    return this.url;
+  public siteAddress(): SiteAddress | null {
+    return this.address;
   }
 
   public toJSON(): { name: string; url?: string; description?: string } {
     return {
       name: this.name,
-      ...(this.url === null ? {} : { url: this.url.toString() }),
+      ...(this.address === null ? {} : { url: this.address.toString() }),
       ...(this.description === null ? {} : { description: this.description })
     };
   }
