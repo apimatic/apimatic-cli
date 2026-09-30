@@ -68,6 +68,8 @@ jobs:
     # Also after a failed release: the tag may already be on main.
     if: ${{ !cancelled() && github.ref_name == 'main' }}
     runs-on: ubuntu-latest
+    # A hung push would otherwise hold the next release behind the concurrency group for six hours.
+    timeout-minutes: 10
     # Holds the deploy key that dev's ruleset lets push; the environment admits only main.
     environment: back-merge
     permissions:

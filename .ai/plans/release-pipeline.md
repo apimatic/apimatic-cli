@@ -2,9 +2,9 @@
 
 Status: 7.2 implemented on this branch and code-reviewed, then extended with
 the automatic back-merge (D8) and narrowed to `main` and `beta` (D9); 7.1 and
-7.3 onward are admin and release-day steps, not yet taken. The plan was reviewed once before implementation
-(section 10). Grounded in
-`dev` at `74ad5d2e`, `beta` at `8581f9e8` and `main` at `c199698a`, and in the
+7.3 onward are admin and release-day steps, not yet taken. The plan was
+reviewed once before implementation (section 10). Grounded in `dev` at
+`74ad5d2e`, `beta` at `8581f9e8` and `main` at `c199698a`, and in the
 repository settings and rulesets as read on 2026-09-29. Every version number in
 section 5 comes from running semantic-release 25.0.3, with this plan's
 configuration, against a local copy of the repository (section 10).
@@ -350,7 +350,9 @@ Branch `saeedjamshaid/release-pipeline` → `dev`, titled
 
    - A `back-merge` job (D8), on `main` only. It needs the release job, and it
      runs even when that job failed, because the tag may already be on `main`.
-     It runs in the `back-merge` environment with a read-only token.
+     It runs in the `back-merge` environment with a read-only token, and
+     times out after ten minutes, so a hung push cannot hold the next release
+     behind the concurrency group.
      - **With `BACK_MERGE_DEPLOY_KEY` set:**
        1. It checks out `dev` over SSH with the key.
        2. It merges `origin/main` with `--no-ff` as
@@ -613,7 +615,8 @@ It has no `test.yml` and no `pull-requests.yml`. Its lockfile resolves
    force pushes and deletion; the same admin bypass as `release branches`.
 3. The first PR into `1.x` is `ci(release): release 1.x from the merge commit`:
    - 1.5.0's `release.yml` gets `1.x` in its triggers, plus the concurrency
-     group;
+     group, and its `permissions` move onto the job (SonarCloud's S8233 fails
+     the gate on a workflow-level write permission, as it did on this PR);
    - 1.5.0's `check_build.yml` gets `1.x` in its triggers, so this PR and every
      later one report the checks step 2 requires;
    - its `release.config.cjs` gets 7.2's plugins, parser options and `1.x` in
