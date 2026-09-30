@@ -137,6 +137,16 @@ jobs:
           fi
           echo "auth key is present"
 
+      # Points the CLI at the dev environment. The value is three base URLs
+      # separated by `;`: API, auth, and package publishing. Written to
+      # GITHUB_ENV so it applies to every later step — login and portal
+      # generation both need to hit the same environment.
+      - name: point the cli at the dev environment
+        shell: bash
+        run: |
+          echo "APIMATIC_BASE_URL=https://app.dev.apimatic.io/api;https://auth.dev.apimatic.io;https://api.package-publishing.dev.apimatic.io/api" >> "$GITHUB_ENV"
+          echo "APIMATIC_BASE_URL set for the remaining steps"
+
       - name: authenticate the cli
         shell: bash
         env:
