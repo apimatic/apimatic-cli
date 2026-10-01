@@ -29,7 +29,7 @@ export default [
     }
   },
   {
-    files: ['bin/preinstall.cjs'],
+    files: ['bin/**/*.cjs'],
     languageOptions: {
       globals: {
         process: 'readonly',
