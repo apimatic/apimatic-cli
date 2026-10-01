@@ -34,15 +34,15 @@ export function renderExampleLayout(slots: Readonly<LayoutSlots>): ReactNode {
 // Fumadocs passes a null selector for an operation with `x-exclusiveCodeSample`.
 function ExampleLayout({ selector, usageTabs, responseTabs }: Readonly<LayoutSlots>) {
   const { resolve } = useOpenAPI().doc;
-  const { operation, pathItem } = useOperation();
+  const { operation, parameters } = useOperation();
   const { items: bodyExamples, selected: defaultId, select: setExample } = useExampleRequests();
   // Only SDK samples follow a parameter's example ids; fumadocs' cURL and playground ignore them.
   const examples = useMemo(
     () =>
       CodeSample.listIn(operation).length === 0
         ? bodyExamples
-        : requestExamples(bodyExamples, Parameter.listIn(operation, pathItem, resolve)),
-    [bodyExamples, operation, pathItem, resolve]
+        : requestExamples(bodyExamples, Parameter.listIn(parameters, resolve)),
+    [bodyExamples, operation, parameters, resolve]
   );
   const [selectedId, setSelectedId] = useState(defaultId);
 
