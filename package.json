@@ -43,6 +43,7 @@
         "build": "rimraf lib tsconfig.tsbuildinfo oclif.manifest.json && tsc",
         "build:watch": "rimraf oclif.manifest.json && tsc --watch",
         "apimatic": "node ./bin/run.js",
+        "preinstall": "node ./bin/preinstall.cjs",
         "prepack": "oclif manifest",
         "pretest": "tsc -p test/tsconfig.json",
         "posttest": "eslint .",

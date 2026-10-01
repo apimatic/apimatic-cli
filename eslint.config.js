@@ -29,6 +29,15 @@ export default [
     }
   },
   {
+    files: ['bin/preinstall.cjs'],
+    languageOptions: {
+      globals: {
+        process: 'readonly',
+        console: 'readonly'
+      }
+    }
+  },
+  {
     // Test files use Mocha's global TDD/BDD functions and chai assertion
     // expressions (e.g. `expect(x).to.be.true`), which the base config would
     // otherwise flag as undefined globals / unused expressions.
