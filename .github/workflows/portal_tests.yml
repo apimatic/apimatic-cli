@@ -1,19 +1,5 @@
 name: Portal automation tests
 
-# Builds THIS commit of the CLI, packs it, installs the tarball globally, and
-# runs the portal test suite from apimatic/v4-test-automation against it. So the
-# suite exercises the CLI you just changed rather than whatever is on npm.
-#
-# The suite has three stages:
-#   artifacts   what `apimatic portal generate` produced vs what the build's
-#               src/apimatic.json declared (SDK archives, package identity,
-#               generated pages)
-#   visual      screenshots of the served portal against committed baselines
-#   functional  behaviour (wired up, cases still being added)
-#
-# Runs on pull requests as well as on merges into dev, so a change to generation
-# shows up on the PR that caused it rather than after it lands.
-
 on:
   push:
     branches: [dev]
@@ -91,8 +77,6 @@ jobs:
           apimatic --version
 
       # ---- the test suite -------------------------------------------------
-      # apimatic/v4-test-automation is private, so GITHUB_TOKEN — which is
-      # scoped to this repository — cannot read it.
       - name: checkout portal tests
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -142,8 +126,10 @@ jobs:
       # generation both need to hit the same environment.
       - name: point the cli at the dev environment
         shell: bash
+        env:
+          BASE_URL: ${{ vars.APIMATIC_BASE_URL }}
         run: |
-          echo "APIMATIC_BASE_URL=https://app.dev.apimatic.io/api;https://auth.dev.apimatic.io;https://api.package-publishing.dev.apimatic.io/api" >> "$GITHUB_ENV"
+          echo "APIMATIC_BASE_URL=$BASE_URL" >> "$GITHUB_ENV"
           echo "APIMATIC_BASE_URL set for the remaining steps"
 
       - name: authenticate the cli
