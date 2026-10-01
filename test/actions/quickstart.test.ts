@@ -18,6 +18,7 @@ import { Language } from '../../src/types/sdk/generate';
 import { PortalArtifactsService } from '../../src/infrastructure/services/portal-artifacts-service';
 import { FileDownloadService } from '../../src/infrastructure/services/file-download-service';
 import { UrlPath } from '../../src/types/file/urlPath';
+import { ProjectContext } from '../../src/types/project-context';
 import { completeArtifacts } from './portal/prepare-project-stubs';
 
 const COMMAND_METADATA: CommandMetadata = { commandName: 'portal quickstart', shell: 'test' };
@@ -150,6 +151,30 @@ describe('QuickstartAction', () => {
 
       // The one that was there, and no copy of it beside itself.
       expect(fs.readdirSync(path.join(sourceDirectory, 'spec'))).to.deep.equal(['Apimatic-Calculator.json']);
+    });
+
+    it('validates all of spec/, not only the document the portal is built from', async () => {
+      const zip = new FilePath(new DirectoryPath(root), new FileName('spec.zip'));
+      const specZip = sinon.stub(ProjectContext.prototype, 'specZip').resolves(ok(zip));
+
+      await execute(downloaded);
+
+      expect(specZip.calledOnce).to.be.true;
+      expect(specZip.firstCall.thisValue.isSourceDirectory(downloaded.join('src'))).to.be.true;
+      expect((ValidationService.prototype.validateViaFile as sinon.SinonStub).firstCall.args[0].file).to.equal(zip);
+    });
+
+    it('names the project in the failure, so the fix it suggests validates all of spec/', async () => {
+      const failed = { isSuccess: false, blocking: [], errors: ['bad'], warnings: [], information: [] };
+      (ValidationService.prototype.validateViaFile as sinon.SinonStub).resolves(
+        ok({ validation: failed, linting: PASSED } as never)
+      );
+
+      await execute(downloaded);
+
+      const named = prompts.specValidationFailed.firstCall.args[0];
+      expect(named).to.be.instanceOf(ProjectContext);
+      expect((named as ProjectContext).isSourceDirectory(downloaded.join('src'))).to.be.true;
     });
 
     // The sample is written where the wizard is told to write, and an adopted `spec/` already

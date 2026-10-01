@@ -1,13 +1,14 @@
-import * as path from "path";
-import { err, ok, Result } from "neverthrow";
-import { UrlPath } from "./file/urlPath.js";
-import { FilePath } from "./file/filePath.js";
-import { DirectoryPath } from "./file/directoryPath.js";
-import { FileName } from "./file/fileName.js";
-import { FileDownloadService } from "../infrastructure/services/file-download-service.js";
-import { FileService } from "../infrastructure/file-service.js";
-import { ResourceInput } from "./file/resource-input.js";
-import { ServiceError } from "../infrastructure/service-error.js";
+import * as path from 'path';
+import { err, ok, Result } from 'neverthrow';
+import { UrlPath } from './file/urlPath.js';
+import { FilePath } from './file/filePath.js';
+import { DirectoryPath } from './file/directoryPath.js';
+import { FileName } from './file/fileName.js';
+import { FileDownloadService } from '../infrastructure/services/file-download-service.js';
+import { FileService } from '../infrastructure/file-service.js';
+import { ResourceInput } from './file/resource-input.js';
+import { ServiceError } from '../infrastructure/service-error.js';
+import { ProjectContext, SpecZipProblem } from './project-context.js';
 
 export class ResourceContext {
   private readonly fileDownloadService = new FileDownloadService();
@@ -15,7 +16,12 @@ export class ResourceContext {
 
   constructor(private readonly tempDirectory: DirectoryPath) {}
 
-  public async resolveTo(resourcePath: ResourceInput): Promise<Result<FilePath, ServiceError>> {
+  public resolveTo(resourcePath: FilePath | UrlPath): Promise<Result<FilePath, ServiceError>>;
+  public resolveTo(resourcePath: ResourceInput): Promise<Result<FilePath, ServiceError | SpecZipProblem>>;
+  public async resolveTo(resourcePath: ResourceInput): Promise<Result<FilePath, ServiceError | SpecZipProblem>> {
+    if (resourcePath instanceof ProjectContext) {
+      return await resourcePath.specZip(this.tempDirectory);
+    }
     const fileName = new FileName(path.basename(resourcePath.toString()));
     const destinationFilePath = new FilePath(this.tempDirectory, fileName);
 

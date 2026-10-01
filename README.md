@@ -138,9 +138,11 @@ Validate API specification for syntactic and semantic correctness
 
 ```
 USAGE
-  $ apimatic api validate [--file <value>] [--url <value>] [-k <value>]
+  $ apimatic api validate [--file <value> | --url <value> | -i <value>] [-k <value>]
 
 FLAGS
+  -i, --input=<value>     [default: ./] path to the parent directory containing the 'src' directory, which includes API
+                          specifications and configuration files.
   -k, --auth-key=<value>  override current authentication state with an authentication key.
       --file=<value>      Path to the API specification file to validate
       --url=<value>       URL to the API specification file to validate (publicly accessible)
@@ -148,9 +150,14 @@ FLAGS
 DESCRIPTION
   Validate API specification for syntactic and semantic correctness
 
-  Validate your API specification to ensure it adheres to syntactic and semantic standards.
+  Validate the API specification in your 'src/spec' directory, or the one --file or --url points to, to ensure it
+  adheres to syntactic and semantic standards.
 
 EXAMPLES
+  apimatic api validate
+
+  apimatic api validate --input=./
+
   apimatic api validate --file=./specs/sample.json
 
   apimatic api validate --url="https://petstore.swagger.io/v2/swagger.json"

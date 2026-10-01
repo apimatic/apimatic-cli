@@ -6,13 +6,13 @@ import { DirectoryPath } from '../types/file/directoryPath.js';
 import { FilePath } from '../types/file/filePath.js';
 import { ServiceError } from '../infrastructure/service-error.js';
 import { Directory } from '../types/file/directory.js';
-import { createResourceInputFromInput, ResourceInput } from '../types/file/resource-input.js';
+import { createFileOrUrlFromInput, ResourceInput } from '../types/file/resource-input.js';
 import { FileDownloadResponse } from '../infrastructure/services/file-download-service.js';
 import { PortalAuthorizationFailure } from '../infrastructure/services/portal-authorization-service.js';
 import { APIMATIC_CONFIG_FILE_NAME } from '../types/apimatic-config/document.js';
 import { PluginConfigWriteFailure } from '../types/plugin-config-context.js';
 import { PortalScaffoldProblem } from '../types/portal/portal-source.js';
-import { GENERATED, GITIGNORE, GitignoreFailure } from '../types/project-context.js';
+import { GENERATED, GITIGNORE, GitignoreFailure, ProjectContext } from '../types/project-context.js';
 import { AVAILABLE_LANGUAGES, Language, languageLabel, UPCOMING_LANGUAGES } from '../types/sdk/generate.js';
 import { noteWrapped, withSpinner } from './prompt.js';
 import { reportAuthorizationFailure } from './portal/authorization.js';
@@ -38,7 +38,7 @@ Let's get started!`);
   }
 
   /** `defaultSpecUrl` is null once the sample has failed to download; it is not offered again. */
-  public async specPathPrompt(defaultSpecUrl: UrlPath | null): Promise<ResourceInput | undefined> {
+  public async specPathPrompt(defaultSpecUrl: UrlPath | null): Promise<FilePath | UrlPath | undefined> {
     const spec = await text({
       message: `Provide a local path or a public URL for your OpenAPI Definition file:`,
       placeholder: defaultSpecUrl
@@ -50,7 +50,7 @@ Let's get started!`);
         if (!value && defaultSpecUrl === null) {
           return 'Please enter a file path or URL.';
         }
-        if (value && !createResourceInputFromInput(value)) {
+        if (value && !createFileOrUrlFromInput(value)) {
           return 'Please enter a valid file path or URL.';
         }
       }
@@ -58,7 +58,7 @@ Let's get started!`);
     if (isCancel(spec)) {
       return undefined;
     }
-    return createResourceInputFromInput(spec);
+    return createFileOrUrlFromInput(spec);
   }
 
   public specFormatUnsupported(specPath: FilePath, format: string) {
@@ -112,17 +112,23 @@ Let's get started!`);
 
   public specValidationFailed(spec: ResourceInput) {
     log.error(`Oops, it looks like there are some errors in your API Definition`);
-    // A placeholder rather than the user's own path or URL, which no quoting survives every shell with.
-    const specFlag = spec instanceof UrlPath ? f.flag('url', '<url>') : f.flag('file', '<path>');
-    const validateCommand = `${f.cmdAlt('apimatic', 'api', 'validate')} ${specFlag}`;
     const message = [
-      `Ask an AI coding agent to run this command and fix what it reports:`,
-      validateCommand,
+      ...this.validateWithAgent(spec),
       '',
       `Or use APIMatic's interactive VS Code Extension:`,
       f.link(vscodeExtensionUrl)
     ].join('\n');
     noteWrapped(message, 'How to fix');
+  }
+
+  // A placeholder rather than the user's own path or URL, which no quoting survives every shell with.
+  private validateWithAgent(spec: ResourceInput): string[] {
+    const validate = f.cmdAlt('apimatic', 'api', 'validate');
+    if (spec instanceof ProjectContext) {
+      return [`Ask an AI coding agent to run ${validate} and fix what it reports.`];
+    }
+    const specFlag = spec instanceof UrlPath ? f.flag('url', '<url>') : f.flag('file', '<path>');
+    return [`Ask an AI coding agent to run this command and fix what it reports:`, `${validate} ${specFlag}`];
   }
 
   public createPortalStep() {

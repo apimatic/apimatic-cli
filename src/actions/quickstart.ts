@@ -91,7 +91,7 @@ export class QuickstartAction {
     tempDirectory: DirectoryPath
   ): Promise<ActionResult> {
     this.prompts.importSpecStepAdopted(project.sourceDirectory());
-    const validated = await this.validate({ file: specPath, source: specPath }, tempDirectory, true);
+    const validated = await this.validate({ file: specPath, source: project }, tempDirectory);
     if (validated.isErr()) {
       return validated.error;
     }
@@ -107,7 +107,7 @@ export class QuickstartAction {
     if (imported === undefined) {
       return ActionResult.cancelled();
     }
-    const validated = await this.validate(imported, tempDirectory, false);
+    const validated = await this.validate(imported, tempDirectory);
     if (validated.isErr()) {
       return validated.error;
     }
@@ -200,20 +200,22 @@ export class QuickstartAction {
   }
 
   /**
-   * `adopted` decides what a failure offers. The sample can replace a specification the user
-   * named, but not one their project carries: an adopted `spec/` already holds the document the
-   * portal would be built from, and nothing here moves the sample into it.
+   * An adopted project is validated as the whole of its `spec/`, as `apimatic api validate` reads
+   * it, and its failure offers no sample. The sample can replace a specification the user named,
+   * but not one their project carries: an adopted `spec/` already holds the document the portal
+   * would be built from, and nothing here moves the sample into it.
    */
-  private async validate(
-    spec: ImportedSpec,
-    tempDirectory: DirectoryPath,
-    adopted: boolean
-  ): Promise<Result<FilePath, ActionResult>> {
+  private async validate(spec: ImportedSpec, tempDirectory: DirectoryPath): Promise<Result<FilePath, ActionResult>> {
     this.prompts.validateSpecStep();
+    const adopted = spec.source instanceof ProjectContext;
     let validation = 'unchecked' as SpecCheck;
-    await new ValidateAction(this.configDir, this.commandMetadata).execute(spec.file, false, (check) => {
-      validation = check;
-    });
+    await new ValidateAction(this.configDir, this.commandMetadata).execute(
+      adopted ? spec.source : spec.file,
+      false,
+      (check) => {
+        validation = check;
+      }
+    );
     // The service's own error is already on screen; the spec may be valid, so there is nothing to fix.
     if (validation === 'unchecked') {
       return err(ActionResult.failed());

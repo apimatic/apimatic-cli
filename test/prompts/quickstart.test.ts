@@ -8,6 +8,7 @@ import { DirectoryPath } from '../../src/types/file/directoryPath.js';
 import { FileName } from '../../src/types/file/fileName.js';
 import { FilePath } from '../../src/types/file/filePath.js';
 import { UrlPath } from '../../src/types/file/urlPath.js';
+import { ProjectContext } from '../../src/types/project-context.js';
 
 describe('QuickstartPrompts', () => {
   const prompts = new QuickstartPrompts();
@@ -66,6 +67,14 @@ describe('QuickstartPrompts', () => {
       write.restore();
 
       expect(howToFix()).to.contain('apimatic api validate --url=<url>');
+    });
+
+    it("names validate inline and with no flags for a project's spec/", () => {
+      prompts.specValidationFailed(ProjectContext.in(new DirectoryPath('project')));
+      write.restore();
+
+      expect(howToFix()).to.contain('Ask an AI coding agent to run apimatic api validate and fix what it reports.');
+      expect(howToFix()).not.to.contain('--');
     });
   });
 });

@@ -8,7 +8,7 @@ import { withDirPath } from '../../infrastructure/tmp-extensions.js';
 import { ResourceContext } from '../../types/resource-context.js';
 import { ValidationSummary } from '@apimatic/sdk';
 
-/** `unchecked`: the spec could not be fetched or the validation service did not answer, so nothing is known of it. */
+/** `unchecked`: the spec never reached the validation service, or the service did not answer, so nothing is known of it. */
 export type SpecCheck = 'valid' | 'invalid' | 'unchecked';
 
 export class ValidateAction {
@@ -25,29 +25,25 @@ export class ValidateAction {
 
   /** `onChecked` hears what the validation found, which the `ActionResult` alone cannot tell apart. */
   public readonly execute = async (
-    resourcePath: ResourceInput,
+    spec: ResourceInput,
     displayValidationSummary = true,
     onChecked?: (check: SpecCheck) => void
   ): Promise<ActionResult> => {
-    const check = await this.check(resourcePath, displayValidationSummary);
+    const check = await this.check(spec, displayValidationSummary);
     onChecked?.(check);
     return check === 'valid' ? ActionResult.success() : ActionResult.failed();
   };
 
-  private readonly check = async (
-    resourcePath: ResourceInput,
-    displayValidationSummary: boolean
-  ): Promise<SpecCheck> => {
+  private readonly check = async (spec: ResourceInput, displayValidationSummary: boolean): Promise<SpecCheck> => {
     return await withDirPath(async (tempDirectory) => {
-      const resourceContext = new ResourceContext(tempDirectory);
-      const specFileDirResult = await resourceContext.resolveTo(resourcePath);
-      if (specFileDirResult.isErr()) {
-        this.prompts.networkError(specFileDirResult.error);
+      const specFile = await new ResourceContext(tempDirectory).resolveTo(spec);
+      if (specFile.isErr()) {
+        this.prompts.specUnavailable(specFile.error);
         return 'unchecked';
       }
       const validationSummaryResult = await this.prompts.validateApi(
         this.validationService.validateViaFile({
-          file: specFileDirResult.value,
+          file: specFile.value,
           commandMetadata: this.commandMetadata,
           authKey: this.authKey
         })
