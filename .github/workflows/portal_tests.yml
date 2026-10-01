@@ -59,7 +59,8 @@ jobs:
         working-directory: cli
         run: |
           pnpm pack
-          tarball=$(ls -1 *.tgz | head -n 1)
+          tarball=$(ls -1 ./*.tgz | head -n 1)
+          tarball="${tarball#./}"
           if [ -z "$tarball" ]; then
             echo "::error::pnpm pack produced no tarball"
             exit 1
@@ -103,7 +104,7 @@ jobs:
         run: pnpm exec playwright install chromium
 
       - name: install http-server
-        run: npm install -g http-server
+        run: npm install -g http-server@14.1.1
 
       # Portal generation is subscription-gated, so a fresh runner has no
       # credentials. Checked before login so a missing secret says so plainly
@@ -127,7 +128,7 @@ jobs:
       - name: point the cli at the dev environment
         shell: bash
         env:
-          BASE_URL: ${{ vars.APIMATIC_BASE_URL }}
+          BASE_URL: ${{ secrets.DEV_APIMATIC_BASE_URL }}
         run: |
           echo "APIMATIC_BASE_URL=$BASE_URL" >> "$GITHUB_ENV"
           echo "APIMATIC_BASE_URL set for the remaining steps"
