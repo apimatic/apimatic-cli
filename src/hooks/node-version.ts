@@ -1,7 +1,7 @@
 import { Hook } from '@oclif/core';
 import semver from 'semver';
 
-// `bin/preinstall.cjs` only stops npm installs, and Node can be switched after installing, so
+// `bin/preinstall.cjs` only stops installs that run scripts, and Node can be switched after installing, so
 // without this an unsupported Node surfaces later as an unrelated-looking crash.
 const hook: Hook.Init = async function () {
   const supported = this.config.pjson.engines?.node;
