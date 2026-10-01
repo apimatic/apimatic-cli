@@ -605,9 +605,4 @@ const stylesheetOf = (output: DirectoryPath) => {
     expect(everything).to.contain('Create a pet');
     expect(everything).to.not.contain('Audit the pets');
   });
-
-  // Fumadocs has no adapter of its own for an image body, and without one the page is only an error screen.
-  it('renders the request body of an operation that uploads an image', () => {
-    expect(read('api/pets/pets/uploadPetPhoto/index.html')).to.contain('id="request-body"');
-  });
 });

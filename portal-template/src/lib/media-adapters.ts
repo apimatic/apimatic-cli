@@ -1,6 +1,6 @@
 import type { MediaAdapter } from 'fumadocs-openapi';
 
-// Fumadocs throws on a request body type it has no adapter for, and matches a wildcard type only as written.
+// Fumadocs will not send a request body type it has no adapter for, and matches a wildcard type only as written.
 const UNADAPTED_MEDIA_TYPES = [
   '*/*',
   'application/*',
@@ -9,7 +9,7 @@ const UNADAPTED_MEDIA_TYPES = [
   'image/*',
   'audio/*',
   'video/*',
-  // Fumadocs' own fallback misses "text/plain; charset=utf-8" and quotes the text as JSON.
+  // Fumadocs' own fallback sends text/plain through its JSON encoder, which quotes the text.
   'text/plain',
   'text/json',
   'text/html',
@@ -27,7 +27,7 @@ const UNADAPTED_MEDIA_TYPES = [
 const asEntered: MediaAdapter = {
   // An object the playground built from the schema would otherwise be sent as "[object Object]".
   encode: ({ body }) => (typeof body === 'string' || body instanceof Blob ? body : JSON.stringify(body)),
-  // The portal registers no Fumadocs code generator, so nothing asks for a body example.
+  // cURL, the one generator the portal registers, never asks for a body example.
   generateExample: () => undefined
 };
 
