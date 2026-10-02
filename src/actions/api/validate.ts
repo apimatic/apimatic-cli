@@ -9,7 +9,7 @@ import { ResourceContext } from '../../types/resource-context.js';
 import { ValidationSummary } from '@apimatic/sdk';
 
 /** `unchecked`: the spec never reached the validation service, or the service did not answer, so nothing is known of it. */
-export type SpecCheck = 'valid' | 'invalid' | 'unchecked';
+export type ValidationFailure = 'invalid' | 'unchecked';
 
 export class ValidateAction {
   private readonly prompts: ApiValidatePrompts = new ApiValidatePrompts();
@@ -23,47 +23,47 @@ export class ValidateAction {
     this.commandMetadata = commandMetadata;
   }
 
-  /** `onChecked` hears what the validation found, which the `ActionResult` alone cannot tell apart. */
   public readonly execute = async (
-    spec: ResourceInput,
-    displayValidationSummary = true,
-    onChecked?: (check: SpecCheck) => void
-  ): Promise<ActionResult> => {
-    const check = await this.check(spec, displayValidationSummary);
-    onChecked?.(check);
-    return check === 'valid' ? ActionResult.success() : ActionResult.failed();
-  };
-
-  private readonly check = async (spec: ResourceInput, displayValidationSummary: boolean): Promise<SpecCheck> => {
-    return await withDirPath(async (tempDirectory) => {
-      const specFile = await new ResourceContext(tempDirectory).resolveTo(spec);
-      if (specFile.isErr()) {
-        this.prompts.specUnavailable(specFile.error);
-        return 'unchecked';
-      }
-      const validationSummaryResult = await this.prompts.validateApi(
-        this.validationService.validateViaFile({
-          file: specFile.value,
-          commandMetadata: this.commandMetadata,
-          authKey: this.authKey
-        })
+    spec: ResourceInput | ResourceContext,
+    displayValidationSummary = true
+  ): Promise<ActionResult<void, ValidationFailure>> => {
+    if (!(spec instanceof ResourceContext)) {
+      return await withDirPath((tempDirectory) =>
+        this.execute(new ResourceContext(spec, tempDirectory), displayValidationSummary)
       );
+    }
+    const specFile = await spec.resolveTo();
+    if (specFile.isErr()) {
+      this.prompts.specUnavailable(specFile.error);
+      return ActionResult.failed(undefined, 'unchecked');
+    }
+    const validationSummaryResult = await this.prompts.validateApi(
+      this.validationService.validateViaFile({
+        file: specFile.value,
+        commandMetadata: this.commandMetadata,
+        authKey: this.authKey
+      })
+    );
 
-      if (validationSummaryResult.isErr()) {
-        this.prompts.logValidationError(validationSummaryResult.error.message);
-        return validationSummaryResult.error.kind === 'rejected' ? 'invalid' : 'unchecked';
+    if (validationSummaryResult.isErr()) {
+      this.prompts.logValidationError(validationSummaryResult.error.message);
+      return ActionResult.failed(
+        undefined,
+        validationSummaryResult.error.kind === 'rejected' ? 'invalid' : 'unchecked'
+      );
+    }
+    const { validation, linting } = validationSummaryResult.value;
+    if (displayValidationSummary) {
+      if (this.hasValidationIssues(validation)) {
+        this.prompts.displayValidationSummary(validation);
       }
-      const { validation, linting } = validationSummaryResult.value;
-      if (displayValidationSummary) {
-        if (this.hasValidationIssues(validation)) {
-          this.prompts.displayValidationSummary(validation);
-        }
-        if (this.hasValidationIssues(linting)) {
-          this.prompts.displayValidationSummary(linting);
-        }
+      if (this.hasValidationIssues(linting)) {
+        this.prompts.displayValidationSummary(linting);
       }
-      return validation.isSuccess && linting.isSuccess ? 'valid' : 'invalid';
-    });
+    }
+    return validation.isSuccess && linting.isSuccess
+      ? ActionResult.success()
+      : ActionResult.failed(undefined, 'invalid');
   };
 
   private hasValidationIssues(summary: ValidationSummary): boolean {

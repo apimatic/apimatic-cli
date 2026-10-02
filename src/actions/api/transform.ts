@@ -32,10 +32,9 @@ export class TransformAction {
     force: boolean
   ): Promise<ActionResult> => {
     return await withDirPath(async (tempDirectory) => {
-      const resourceContext = new ResourceContext(tempDirectory);
-      const specFileDirResult = await resourceContext.resolveTo(resourcePath);
+      const specFileDirResult = await new ResourceContext(resourcePath, tempDirectory).resolveTo();
       if (specFileDirResult.isErr()) {
-        this.prompts.networkError(specFileDirResult.error);
+        this.validatePrompts.specUnavailable(specFileDirResult.error);
         return ActionResult.failed();
       }
       const transformContext = new TransformContext(specFileDirResult.value, format, destination);

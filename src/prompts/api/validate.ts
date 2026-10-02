@@ -4,9 +4,8 @@ import { listedInProse } from '../../utils/string-utils.js';
 import { ValidationMessages } from '../../types/utils.js';
 import { Result } from 'neverthrow';
 import { ValidateApiResult, ValidationEntry, ValidationSummary } from '@apimatic/sdk';
-import { ServiceError } from '../../infrastructure/service-error.js';
 import { FilePath } from '../../types/file/filePath.js';
-import { SpecZipProblem } from '../../types/project-context.js';
+import { ResolveProblem } from '../../types/resource-context.js';
 import { format as f } from '../format.js';
 import { withSpinner } from '../prompt.js';
 
@@ -84,12 +83,16 @@ export class ApiValidatePrompts {
     log.error(error);
   }
 
-  public specUnavailable(problem: ServiceError | SpecZipProblem): void {
-    if (problem instanceof ServiceError) {
-      log.error(problem.errorMessage);
-      return;
-    }
+  public specUnavailable(problem: ResolveProblem): void {
     switch (problem.kind) {
+      case 'downloadFailed': {
+        log.error(problem.error.errorMessage);
+        return;
+      }
+      case 'fileUnreadable': {
+        log.error(`${f.path(problem.file)} does not exist or could not be read.`);
+        return;
+      }
       case 'noSpec': {
         const message =
           `No API specification found in ${f.path(problem.specDirectory)}. Add yours there, point ` +

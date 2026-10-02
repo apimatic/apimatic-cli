@@ -376,6 +376,23 @@ describe('PortalSourceContext', () => {
     });
   });
 
+  describe('resolveSpecs', () => {
+    const resolveSpecs = () => new PortalSourceContext(new DirectoryPath(root)).resolveSpecs();
+
+    it('answers with the specs a build would read, without an apimatic.json', async () => {
+      write('spec/api.json', OPENAPI);
+      write('spec/old.json', JSON.stringify({ swagger: '2.0', info: {}, paths: {} }));
+
+      expect((await resolveSpecs())._unsafeUnwrap().map((spec) => spec.slug)).to.deep.equal(['api']);
+    });
+
+    it('refuses a spec directory with no OpenAPI 3.x document, as resolve does', async () => {
+      write('spec/petstore.json', JSON.stringify({ swagger: '2.0', info: {}, paths: {} }));
+
+      expect((await resolveSpecs())._unsafeUnwrapErr().kind).to.equal('noOpenApiSpec');
+    });
+  });
+
   describe('spec discovery', () => {
     beforeEach(() => writeConfig({ site: { name: 'Calc' } }));
 
@@ -1856,17 +1873,17 @@ describe('PortalSourceContext', () => {
       });
     });
 
-    // What a build downloaded from the platform arrives as: `spec/` filled, and nothing else.
+    // What a build downloaded from the platform arrives as: `spec/` filled, beside its own `apimatic.json`.
     describe('adopt', () => {
-      const writeSourceSpec = (name: string, info: Record<string, unknown>): FilePath => {
+      const writeSourceSpec = (name: string, info: Record<string, unknown>) =>
         write(path.join('project', 'src', 'spec', name), JSON.stringify({ openapi: '3.0.0', info, paths: {} }));
-        return new FilePath(source.join('spec'), new FileName(name));
-      };
+      const adopt = async () => (await new PortalSourceContext(source).adopt(APIMATIC_SCHEMA_URL))._unsafeUnwrap();
+      const siteName = () => JSON.parse(read('apimatic.json')).portal.site.name;
 
       it('writes the tree around a specification already in the source directory', async () => {
-        const specPath = writeSourceSpec('petstore.json', { title: 'Petstore', version: '1' });
+        writeSourceSpec('petstore.json', { title: 'Petstore', version: '1' });
 
-        (await new PortalSourceContext(source).adopt(specPath, APIMATIC_SCHEMA_URL))._unsafeUnwrap();
+        await adopt();
         addLanguages();
 
         const resolved = (await new PortalSourceContext(source).resolve())._unsafeUnwrap();
@@ -1875,24 +1892,32 @@ describe('PortalSourceContext', () => {
         expect(fs.readdirSync(path.join(source.toString(), 'spec'))).to.deep.equal(['petstore.json']);
       });
 
-      it('finds the document the portal speaks for, sorted as every other list sorts it', async () => {
+      it('keeps what the apimatic.json the project carries already says', async () => {
+        writeSourceSpec('petstore.json', { title: 'Petstore', version: '1' });
+        write(path.join('project', 'src', 'apimatic.json'), JSON.stringify({ languages: LANGUAGES }));
+
+        await adopt();
+
+        const resolved = (await new PortalSourceContext(source).resolve())._unsafeUnwrap();
+        expect(resolved.config.siteTitle()).to.equal('Petstore');
+      });
+
+      it('names the portal after the first document, sorted as every other list sorts it', async () => {
         writeSourceSpec('zebra.yaml', { title: 'Zebra', version: '1' });
         writeSourceSpec('alpha.json', { title: 'Alpha', version: '1' });
         write(path.join('project', 'src', 'spec', 'README.md'), '# not a specification');
 
-        const found = await new PortalSourceContext(source).primarySpec();
+        await adopt();
 
-        expect(found?.name().toString()).to.equal('alpha.json');
+        expect(siteName()).to.equal('Alpha');
       });
 
-      it('finds nothing in a project with no source directory', async () => {
-        expect(await new PortalSourceContext(source).primarySpec()).to.be.null;
-      });
-
-      it('finds nothing when the specification directory holds no document', async () => {
+      it('falls back to a placeholder name when the specification directory holds no document', async () => {
         write(path.join('project', 'src', 'spec', 'notes.txt'), 'nothing here');
 
-        expect(await new PortalSourceContext(source).primarySpec()).to.be.null;
+        await adopt();
+
+        expect(siteName()).to.equal('My API');
       });
     });
   });

@@ -115,6 +115,11 @@ export class PortalSourceContext {
     });
   }
 
+  /** The `spec/` half of `resolve`, for quickstart to refuse a project the build would refuse before writing into it. */
+  public async resolveSpecs(): Promise<Result<PortalSpec[], PortalSourceProblem>> {
+    return (await this.specs()).map(({ specs }) => specs);
+  }
+
   /**
    * The `content/` half of `resolve`, for `portal serve` to run on each save, against the `specs`
    * it found and the generated pages the preview shows.
@@ -309,26 +314,25 @@ export class PortalSourceContext {
   public async scaffold(specPath: FilePath, schemaUrl: string): Promise<Result<FilePath, PortalScaffoldProblem>> {
     try {
       await new SpecContext(this.specDirectory).install(specPath);
+      return await this.writeSourceTree(await this.suggestedSite(specPath), schemaUrl);
     } catch (error) {
       return err({ kind: 'sourceUnwritable', reason: errorMessage(error) });
     }
-    return await this.adopt(specPath, schemaUrl);
   }
 
-  /** The same tree around a specification the project already carries, which is left where it is. */
-  public async adopt(specPath: FilePath, schemaUrl: string): Promise<Result<FilePath, PortalScaffoldProblem>> {
+  /** The same tree around the specification the project already carries, which is left where it is. */
+  public async adopt(schemaUrl: string): Promise<Result<FilePath, PortalScaffoldProblem>> {
     try {
-      return await this.writeSourceTree(specPath, schemaUrl);
+      const primarySpec = await this.primarySpec();
+      const site = primarySpec === null ? PLACEHOLDER_SITE : await this.suggestedSite(primarySpec);
+      return await this.writeSourceTree(site, schemaUrl);
     } catch (error) {
       return err({ kind: 'sourceUnwritable', reason: errorMessage(error) });
     }
   }
 
-  /**
-   * The document the portal speaks for, and the one quickstart validates when it adopts a
-   * project someone downloaded rather than asking for a specification the project has.
-   */
-  public async primarySpec(): Promise<FilePath | null> {
+  /** The document an adopted project's portal is named after. */
+  private async primarySpec(): Promise<FilePath | null> {
     const fileName = (await this.specDirectoryListing()).fileNames.find((name) =>
       SPEC_EXTENSIONS.some((extension) => name.hasExtension(extension))
     );
@@ -336,14 +340,13 @@ export class PortalSourceContext {
   }
 
   private async writeSourceTree(
-    specPath: FilePath,
+    site: SuggestedSite,
     schemaUrl: string
   ): Promise<Result<FilePath, PortalScaffoldProblem>> {
-    const site = await this.suggestedSite(specPath);
     const config = PortalConfig.scaffolded(site);
-    // A downloaded build carries `spec/` and no config, so the merge creates the file on both
-    // paths. Every default is spelled out, so the block shows what can be set, and the schema
-    // lets an editor complete and check the rest.
+    // An adopted project's file is merged into, and a new project's is created. Every default
+    // is spelled out, so the block shows what can be set, and the schema lets an editor
+    // complete and check the rest.
     const written = await this.configContext.merge(['portal'], (document) =>
       document.referencingSchema(schemaUrl).with('portal', config.toJSON())
     );

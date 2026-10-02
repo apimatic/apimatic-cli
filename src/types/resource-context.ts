@@ -1,40 +1,63 @@
-import * as path from 'path';
 import { err, ok, Result } from 'neverthrow';
 import { UrlPath } from './file/urlPath.js';
 import { FilePath } from './file/filePath.js';
 import { DirectoryPath } from './file/directoryPath.js';
-import { FileName } from './file/fileName.js';
 import { FileDownloadService } from '../infrastructure/services/file-download-service.js';
 import { FileService } from '../infrastructure/file-service.js';
 import { ResourceInput } from './file/resource-input.js';
 import { ServiceError } from '../infrastructure/service-error.js';
 import { ProjectContext, SpecZipProblem } from './project-context.js';
 
-export class ResourceContext {
+export type ResourceKind = 'file' | 'url' | 'project';
+
+export type DownloadProblem = { kind: 'downloadFailed'; url: UrlPath; error: ServiceError };
+
+export type FileProblem = { kind: 'fileUnreadable'; file: FilePath };
+
+export type ResolveProblem = SpecZipProblem | DownloadProblem | FileProblem;
+
+export class ResourceContext<I extends ResourceInput = ResourceInput> {
   private readonly fileDownloadService = new FileDownloadService();
   private readonly fileService = new FileService();
+  private resolved: Promise<Result<FilePath, ResolveProblem>> | undefined;
 
-  constructor(private readonly tempDirectory: DirectoryPath) {}
+  constructor(private readonly input: I, private readonly tempDirectory: DirectoryPath) {}
 
-  public resolveTo(resourcePath: FilePath | UrlPath): Promise<Result<FilePath, ServiceError>>;
-  public resolveTo(resourcePath: ResourceInput): Promise<Result<FilePath, ServiceError | SpecZipProblem>>;
-  public async resolveTo(resourcePath: ResourceInput): Promise<Result<FilePath, ServiceError | SpecZipProblem>> {
-    if (resourcePath instanceof ProjectContext) {
-      return await resourcePath.specZip(this.tempDirectory);
+  public kind(): ResourceKind {
+    if (this.input instanceof ProjectContext) {
+      return 'project';
     }
-    const fileName = new FileName(path.basename(resourcePath.toString()));
-    const destinationFilePath = new FilePath(this.tempDirectory, fileName);
+    return this.input instanceof UrlPath ? 'url' : 'file';
+  }
 
-    if (resourcePath instanceof UrlPath) {
-      const downloadFileResult = await this.fileDownloadService.downloadFile(resourcePath);
-      if (downloadFileResult.isErr()) {
-        return err(downloadFileResult.error);
+  public resolveTo(this: ResourceContext<FilePath | UrlPath>): Promise<Result<FilePath, DownloadProblem | FileProblem>>;
+  public resolveTo(): Promise<Result<FilePath, ResolveProblem>>;
+  public resolveTo(): Promise<Result<FilePath, ResolveProblem>> {
+    this.resolved ??= this.resolve();
+    return this.resolved;
+  }
+
+  private async resolve(): Promise<Result<FilePath, ResolveProblem>> {
+    const input: ResourceInput = this.input;
+    if (input instanceof ProjectContext) {
+      return await input.specZip(this.tempDirectory);
+    }
+    await this.fileService.createDirectoryIfNotExists(this.tempDirectory);
+    if (input instanceof UrlPath) {
+      const downloaded = await this.fileDownloadService.downloadFile(input);
+      if (downloaded.isErr()) {
+        return err({ kind: 'downloadFailed', url: input, error: downloaded.error });
       }
-      await this.fileService.writeFile(destinationFilePath, downloadFileResult.value.stream);
+      const file = new FilePath(this.tempDirectory, downloaded.value.filename);
+      await this.fileService.writeFile(file, downloaded.value.stream);
+      return ok(file);
     }
-    if (resourcePath instanceof FilePath) {
-      await this.fileService.copy(resourcePath, destinationFilePath);
+    const copy = input.replaceDirectory(this.tempDirectory);
+    try {
+      await this.fileService.copy(input, copy);
+    } catch {
+      return err({ kind: 'fileUnreadable', file: input });
     }
-    return ok(destinationFilePath);
+    return ok(copy);
   }
 }
