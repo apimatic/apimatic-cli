@@ -20,6 +20,8 @@ import { PortalTab } from '../../src/types/portal/portal-tabs';
 import { DirectoryPath } from '../../src/types/file/directoryPath';
 import { FileName } from '../../src/types/file/fileName';
 import { FilePath } from '../../src/types/file/filePath';
+import { PLUGIN_SECTION, SDK_SECTION } from '../../src/types/portal/generated-pages';
+import { TabEntry } from '../../src/types/portal/portal-navigation';
 import { ZipService } from '../../src/infrastructure/zip-service';
 
 const OPENAPI = JSON.stringify({ openapi: '3.0.0', info: { title: 'Calc', version: '1' }, paths: {} });
@@ -967,7 +969,7 @@ describe('PortalSourceContext', () => {
 
     it('gives the notices resolve gives about the content', async () => {
       write('content/guides/intro.md', page('Intro'));
-      write('content/nav.json', JSON.stringify({ pages: ['index', 'guides'] }));
+      write('content/nav.json', JSON.stringify({ tabs: ['guides'], pages: ['index'] }));
       write('content/api/api/notes.md', page('Notes'));
       write('content/guides/Nav.json', JSON.stringify({ pages: ['intro'] }));
       const source = (await resolve())._unsafeUnwrap();
@@ -980,13 +982,12 @@ describe('PortalSourceContext', () => {
       expect(accepted._unsafeUnwrap().notices).to.deep.equal(source.contentNotices);
       expect(hidden(source)).to.deep.equal(['content/api/api/notes.md']);
       expect(ignored(source)).to.deep.equal(['content/guides/Nav.json']);
-      expect(source.contentNotices.folderTabs.map((folder) => folder.leafName())).to.deep.equal(['guides']);
     });
 
     // What `portal serve` writes into the preview's copy, since a save made after it read them went unchecked.
     it('gives each page and nav.json it accepted, as it read them', async () => {
       write('content/guides/intro.md', page('Intro'));
-      write('content/nav.json', JSON.stringify({ pages: ['index', 'guides'] }));
+      write('content/nav.json', JSON.stringify({ tabs: ['guides'], pages: ['index'] }));
       write('content/logo.png', 'x');
       const { specs, generatedPages } = (await resolve())._unsafeUnwrap();
 
@@ -999,7 +1000,7 @@ describe('PortalSourceContext', () => {
       ).to.deep.equal([
         ['content/guides/intro.md', page('Intro')],
         ['content/index.md', page('Home')],
-        ['content/nav.json', JSON.stringify({ pages: ['index', 'guides'] })]
+        ['content/nav.json', JSON.stringify({ tabs: ['guides'], pages: ['index'] })]
       ]);
     });
 
@@ -1007,7 +1008,7 @@ describe('PortalSourceContext', () => {
     it('names the tabs against the generated pages it is given', async () => {
       write('content/extensions/first.md', page('First'));
       write('content/extensions/nav.json', JSON.stringify({ title: 'Context Plugin' }));
-      write('content/nav.json', JSON.stringify({ pages: ['index', 'extensions'] }));
+      write('content/nav.json', JSON.stringify({ tabs: ['extensions', 'apimatic:plugin'], pages: ['index'] }));
       const { specs, generatedPages: withoutPlugin } = (await resolve())._unsafeUnwrap();
       write('apimatic.json', JSON.stringify({ portal: { site: { name: 'Calc' } }, languages: LANGUAGES, plugin: {} }));
       const { generatedPages: withPlugin } = (await resolve())._unsafeUnwrap();
@@ -1233,10 +1234,20 @@ describe('PortalSourceContext', () => {
       return problem.errors;
     };
 
-    it('accepts a file naming the pages beside it, and both tokens at the root', async () => {
+    it('accepts a file naming the pages beside it, and both tokens at the root as tabs', async () => {
       write(
         'content/nav.json',
-        JSON.stringify({ pages: ['index', 'apimatic:sdks', 'authentication', 'apimatic:api'] })
+        JSON.stringify({ tabs: ['apimatic:sdks', 'apimatic:api'], pages: ['index', 'authentication'] })
+      );
+
+      expect((await resolve()).isOk()).to.be.true;
+    });
+
+    // A token in `pages` places its section in Home's sidebar.
+    it('accepts the tokens in pages beside an empty tabs, which places the sections in Home', async () => {
+      write(
+        'content/nav.json',
+        JSON.stringify({ tabs: [], pages: ['index', 'apimatic:sdks', 'authentication', 'apimatic:api'] })
       );
 
       expect((await resolve()).isOk()).to.be.true;
@@ -1304,21 +1315,37 @@ describe('PortalSourceContext', () => {
       ]);
     });
 
-    it('makes a tab of each folder the root nav.json lists, in its order, and of no other', async () => {
+    it('accepts tabs naming the folders that are tabs, with pages ordering the rest inside Home', async () => {
       write('content/tutorials/first-call.md', page('First call'));
       write('content/guides/intro.md', page('Intro'));
       write('content/concepts/pets.md', page('Pets'));
-      write('content/nav.json', JSON.stringify({ pages: ['index', 'tutorials', 'guides', '...'] }));
+      write('content/nav.json', JSON.stringify({ tabs: ['tutorials', 'guides'], pages: ['index', 'concepts', '...'] }));
 
-      const folders = (await resolve())._unsafeUnwrap().contentNotices.folderTabs.map((folder) => folder.leafName());
+      expect((await resolve()).isOk()).to.be.true;
+    });
 
-      expect(folders).to.deep.equal(['tutorials', 'guides']);
+    // With no `tabs` there is no tab, so the file has one reading: every entry orders Home's sidebar.
+    it('accepts a root file with no tabs that lists a folder or a token in pages', async () => {
+      write('content/tutorials/first-call.md', page('First call'));
+      write('content/nav.json', JSON.stringify({ pages: ['index', 'tutorials', 'apimatic:api'] }));
+
+      expect((await resolve()).isOk()).to.be.true;
+    });
+
+    it('refuses tabs below the content root', async () => {
+      write('content/guides/intro.md', page('Intro'));
+      write('content/guides/nav.json', JSON.stringify({ tabs: ['intro'] }));
+
+      const errors = navigationErrors((await resolve())._unsafeUnwrapErr());
+
+      expect(errors).to.have.lengthOf(1);
+      expect(errors[0]).to.contain("content/guides/nav.json: 'tabs' is only read in the nav.json at the top");
     });
 
     it('refuses a name shared by a page and a folder, since only the folder could be positioned', async () => {
       write('content/guides.md', page('Guides'));
       write('content/guides/intro.md', page('Intro'));
-      write('content/nav.json', JSON.stringify({ pages: ['guides', 'index'] }));
+      write('content/nav.json', JSON.stringify({ tabs: [], pages: ['guides', 'index'] }));
 
       const errors = navigationErrors((await resolve())._unsafeUnwrapErr());
 
@@ -1330,7 +1357,7 @@ describe('PortalSourceContext', () => {
     // template would honour as the reference into an error rather than a silent reordering.
     it('refuses api at the root when a page carries the name the reference is mounted at', async () => {
       write('content/api.md', page('My API notes'));
-      write('content/nav.json', JSON.stringify({ pages: ['index', 'api'] }));
+      write('content/nav.json', JSON.stringify({ tabs: [], pages: ['index', 'api'] }));
 
       const errors = navigationErrors((await resolve())._unsafeUnwrapErr());
 
@@ -1341,14 +1368,14 @@ describe('PortalSourceContext', () => {
     // The mount point is a child of the content root in every portal, so the entry positions
     // the reference whether or not the user keeps a directory of their own there.
     it('accepts api at the root with nothing of that name on disk at all', async () => {
-      write('content/nav.json', JSON.stringify({ pages: ['index', 'api'] }));
+      write('content/nav.json', JSON.stringify({ tabs: [], pages: ['index', 'api'] }));
 
       expect((await resolve()).isOk()).to.be.true;
     });
 
     it('accepts api at the root when a directory of that name holds the user’s own pages', async () => {
       write('content/api/overview.md', page('Overview'));
-      write('content/nav.json', JSON.stringify({ pages: ['index', 'api'] }));
+      write('content/nav.json', JSON.stringify({ tabs: [], pages: ['index', 'api'] }));
 
       expect((await resolve()).isOk()).to.be.true;
     });
@@ -1356,7 +1383,7 @@ describe('PortalSourceContext', () => {
     // One node, so the two spellings name it twice wherever the directory came from.
     it('refuses api together with the token, with or without a directory of that name', async () => {
       write('content/api/overview.md', page('Overview'));
-      write('content/nav.json', JSON.stringify({ pages: ['index', 'api', 'apimatic:api'] }));
+      write('content/nav.json', JSON.stringify({ tabs: [], pages: ['index', 'api', 'apimatic:api'] }));
 
       const errors = navigationErrors((await resolve())._unsafeUnwrapErr());
 
@@ -1384,7 +1411,7 @@ describe('PortalSourceContext', () => {
 
     it('validates a nested file against its own directory', async () => {
       write('content/guides/intro.md', page('Intro'));
-      write('content/nav.json', JSON.stringify({ pages: ['index', 'guides'] }));
+      write('content/nav.json', JSON.stringify({ tabs: ['guides'], pages: ['index'] }));
       write('content/guides/nav.json', JSON.stringify({ pages: ['intro'] }));
 
       expect((await resolve()).isOk()).to.be.true;
@@ -1394,7 +1421,7 @@ describe('PortalSourceContext', () => {
     it('refuses index in a nested file while keeping it at the content root', async () => {
       write('content/guides/index.md', page('Guides'));
       write('content/guides/intro.md', page('Intro'));
-      write('content/nav.json', JSON.stringify({ pages: ['index', 'guides'] }));
+      write('content/nav.json', JSON.stringify({ tabs: ['guides'], pages: ['index'] }));
       write('content/guides/nav.json', JSON.stringify({ pages: ['index', 'intro'] }));
 
       const errors = navigationErrors((await resolve())._unsafeUnwrapErr());
@@ -1455,7 +1482,7 @@ describe('PortalSourceContext', () => {
     // The template drops the empty folder Fumadocs would otherwise build for it.
     it('refuses a directory that holds only a nav.json', async () => {
       write('content/guides/nav.json', JSON.stringify({ pages: [] }));
-      write('content/nav.json', JSON.stringify({ pages: ['index', 'guides'] }));
+      write('content/nav.json', JSON.stringify({ tabs: ['guides'], pages: ['index'] }));
 
       const errors = navigationErrors((await resolve())._unsafeUnwrapErr());
 
@@ -1468,7 +1495,7 @@ describe('PortalSourceContext', () => {
     it('refuses to make a tab of a (group) folder that serves the home page, however deep', async () => {
       fs.rmSync(path.join(root, 'content/index.md'));
       write('content/(start)/(welcome)/index.md', page('Welcome'));
-      write('content/nav.json', JSON.stringify({ pages: ['(start)', 'authentication'] }));
+      write('content/nav.json', JSON.stringify({ tabs: ['(start)'], pages: ['authentication'] }));
 
       const errors = navigationErrors((await resolve())._unsafeUnwrapErr());
 
@@ -1480,16 +1507,22 @@ describe('PortalSourceContext', () => {
 
     it('makes a tab of a (group) folder that does not serve the home page', async () => {
       write('content/(start)/intro/index.md', page('Intro'));
-      write('content/nav.json', JSON.stringify({ pages: ['index', '(start)'] }));
+      write('content/nav.json', JSON.stringify({ tabs: ['(start)'], pages: ['index'] }));
 
-      const { folderTabs } = (await resolve())._unsafeUnwrap().contentNotices;
+      expect((await resolve()).isOk()).to.be.true;
+    });
 
-      expect(folderTabs.map((folder) => folder.leafName())).to.deep.equal(['(start)']);
+    it('orders a (group) folder that serves the home page inside Home when pages names it', async () => {
+      fs.rmSync(path.join(root, 'content/index.md'));
+      write('content/(start)/index.md', page('Welcome'));
+      write('content/nav.json', JSON.stringify({ tabs: [], pages: ['authentication', '(start)'] }));
+
+      expect((await resolve()).isOk()).to.be.true;
     });
 
     it('accepts a directory whose pages are nested below it', async () => {
       write('content/guides/deep/intro.md', page('Intro'));
-      write('content/nav.json', JSON.stringify({ pages: ['index', 'guides'] }));
+      write('content/nav.json', JSON.stringify({ tabs: ['guides'], pages: ['index'] }));
 
       expect((await resolve()).isOk()).to.be.true;
     });
@@ -1542,6 +1575,62 @@ describe('PortalSourceContext', () => {
     });
   });
 
+  describe('the tab bar notices', () => {
+    beforeEach(() => {
+      writeConfig({ site: { name: 'Calc' } });
+      write('spec/api.json', OPENAPI);
+      write('content/index.md', page('Welcome'));
+    });
+
+    const rootNavigation = () => new FilePath(new DirectoryPath(root).join('content'), new FileName('nav.json'));
+    const notices = async () => (await resolve())._unsafeUnwrap().contentNotices;
+
+    const sdks: TabEntry = { kind: 'generated', section: SDK_SECTION };
+    const plugin: TabEntry = { kind: 'generated', section: PLUGIN_SECTION };
+    const apiReference: TabEntry = { kind: 'apiReference' };
+
+    it('says once that a root file with no tabs makes no tab, naming the nodes nothing places', async () => {
+      write('content/nav.json', JSON.stringify({ pages: ['index', '...'] }));
+
+      expect((await notices()).noTabsListed).to.deep.equal({ file: rootNavigation(), unplaced: [sdks, apiReference] });
+
+      write('apimatic.json', JSON.stringify({ portal: { site: { name: 'Calc' } }, languages: LANGUAGES, plugin: {} }));
+
+      expect((await notices()).noTabsListed?.unplaced).to.deep.equal([sdks, plugin, apiReference]);
+    });
+
+    // A node `pages` names is in Home because that is what `pages` means, so the line offered leaves it out.
+    it('leaves out what pages places, however the reference is spelled, and says nothing once it places all', async () => {
+      write('content/nav.json', JSON.stringify({ pages: ['index', 'apimatic:sdks', '...'] }));
+
+      expect((await notices()).noTabsListed?.unplaced).to.deep.equal([apiReference]);
+
+      write('content/nav.json', JSON.stringify({ pages: ['index', 'api', 'apimatic:sdks'] }));
+
+      expect((await notices()).noTabsListed).to.be.undefined;
+    });
+
+    it('says the same of a project with no root file', async () => {
+      expect((await notices()).noTabsListed).to.deep.equal({ file: undefined, unplaced: [sdks, apiReference] });
+    });
+
+    it('takes an empty tabs as said on purpose', async () => {
+      write('content/nav.json', JSON.stringify({ tabs: [], pages: ['index', '...'] }));
+
+      expect((await notices()).noTabsListed).to.be.undefined;
+    });
+
+    it('says a Home title shows nowhere while Home is the only tab', async () => {
+      write('content/nav.json', JSON.stringify({ title: 'Docs', tabs: [], pages: ['index'] }));
+
+      expect((await notices()).unseenHomeTitle).to.deep.equal(rootNavigation());
+
+      write('content/nav.json', JSON.stringify({ title: 'Docs', tabs: ['apimatic:api'], pages: ['index'] }));
+
+      expect((await notices()).unseenHomeTitle).to.be.undefined;
+    });
+  });
+
   describe('tab names', () => {
     beforeEach(() => {
       writeConfig({ site: { name: 'Calc' } });
@@ -1570,11 +1659,15 @@ describe('PortalSourceContext', () => {
       }
     };
 
-    /** The root `nav.json`, listing these folders and so making each a tab, and naming Home if given a title. */
+    /** The root `nav.json`, making a tab of each of these folders and of every section, and naming Home if given a title. */
     const listFolders = (folders: string[], title?: string) =>
       write(
         'content/nav.json',
-        JSON.stringify({ ...(title === undefined ? {} : { title }), pages: ['index', ...folders] })
+        JSON.stringify({
+          ...(title === undefined ? {} : { title }),
+          tabs: [...folders, 'apimatic:sdks', 'apimatic:plugin', 'apimatic:api'],
+          pages: ['index']
+        })
       );
 
     it('finds none when every tab has a name of its own', async () => {
@@ -1756,10 +1849,13 @@ describe('PortalSourceContext', () => {
       expect(fs.existsSync(configFile.toString())).to.be.true;
     });
 
-    it('orders the sidebar with the welcome page first', async () => {
+    it('keeps a tab for each generated section, and orders the sidebar with the welcome page first', async () => {
       await scaffold(writeSpec({ title: 'Petstore', version: '1' }));
 
-      expect(JSON.parse(read('content/nav.json'))).to.deep.equal({ pages: ['index', '...'] });
+      expect(JSON.parse(read('content/nav.json'))).to.deep.equal({
+        tabs: ['apimatic:sdks', 'apimatic:plugin', 'apimatic:api'],
+        pages: ['index', '...']
+      });
     });
 
     // A freshly scaffolded project must not carry a file the build never reads, such as a

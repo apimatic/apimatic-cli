@@ -99,6 +99,48 @@ async function removeBuilt(built: BuiltPortal | undefined): Promise<void> {
 }
 
 /**
+ * One fixture built before a describe block's cases and removed after them, read through the
+ * accessors, which resolve the build lazily since the hooks run after the block is declared.
+ */
+function portalBuilt(name: string, delivered: Delivered = {}) {
+  let built: BuiltPortal | undefined;
+  const have = (): BuiltPortal => {
+    if (built === undefined) throw new Error(`${name} is not built`);
+    return built;
+  };
+
+  before(async () => {
+    built = await buildFixture(name, delivered);
+  });
+
+  after(async () => {
+    await removeBuilt(built);
+  });
+
+  return {
+    output: () => have().output,
+    project: () => have().project,
+    read: (relative: string) => fs.readFileSync(path.join(have().output.toString(), relative), 'utf8'),
+    exists: (relative: string) => fs.existsSync(path.join(have().output.toString(), relative))
+  };
+}
+
+/** Where each tab's link sits in a prerendered page's header, or -1 for a tab that is not there. */
+const tabPositions = (page: string, tabs: [href: string, name: string][]): number[] =>
+  tabs.map(([href, name]) => page.search(new RegExp(`href="${href}"[^>]*><span[^>]*>${name}</span></a>`)));
+
+/** The layout puts the tab bar in the header, and the prerendered page carries it before any script runs. */
+function expectTabsInOrder(page: string, tabs: [href: string, name: string][]): void {
+  const positions = tabPositions(page, tabs);
+
+  expect(
+    positions.every((at) => at !== -1),
+    'a tab is missing'
+  ).to.be.true;
+  expect(positions).to.deep.equal([...positions].sort((left, right) => left - right));
+}
+
+/**
  * Vite strips types without checking them, and nothing else in the repository imports the
  * routes and components, so this is the one place the template is held to its types. It runs
  * after a build because the build generates the route tree the router imports.
@@ -146,28 +188,14 @@ const stylesheetOf = (output: DirectoryPath) => {
   this.timeout(10 * 60 * 1000);
 
   const fixture = new DirectoryPath(process.cwd()).join('test/resources/portal-inputs/default/src');
-
-  let built: BuiltPortal | undefined;
-  let project: DirectoryPath;
-  let output: DirectoryPath;
-
-  before(async () => {
-    built = await buildFixture('default', { codeSampleCatalogs: CODE_SAMPLES });
-    ({ project, output } = built);
-  });
-
-  after(async () => {
-    await removeBuilt(built);
-  });
-
-  const read = (relative: string) => fs.readFileSync(path.join(output.toString(), relative), 'utf8');
-  const exists = (relative: string) => fs.existsSync(path.join(output.toString(), relative));
+  const portal = portalBuilt('default', { codeSampleCatalogs: CODE_SAMPLES });
+  const { read, exists } = portal;
 
   /** The prerendered server-function cache entries carrying the sidebar tree. */
   const treeCacheFiles = () => {
     const cache = '__tsr/staticServerFnCache';
     return fs
-      .readdirSync(path.join(output.toString(), cache))
+      .readdirSync(path.join(portal.output().toString(), cache))
       .map((name) => `${cache}/${name}`)
       .filter((relative) => read(relative).includes('"pageTree"'));
   };
@@ -215,7 +243,9 @@ const stylesheetOf = (output: DirectoryPath) => {
   });
 
   it('keeps the server-side specification loader out of the browser bundle', () => {
-    const scripts = fs.readdirSync(path.join(output.toString(), 'assets')).filter((name) => name.endsWith('.js'));
+    const scripts = fs
+      .readdirSync(path.join(portal.output().toString(), 'assets'))
+      .filter((name) => name.endsWith('.js'));
     const offenders = scripts.filter((name) => read('assets/' + name).includes('Failed to resolve input'));
     expect(offenders).to.deep.equal([]);
   });
@@ -236,7 +266,7 @@ const stylesheetOf = (output: DirectoryPath) => {
       });
 
     return (
-      walk(output.toString())
+      walk(portal.output().toString())
         // Images and fonts cannot carry a path the build put there, and reading them as text
         // only invites a false match.
         .filter((file) => !/\.(png|jpe?g|gif|svg|ico|woff2?)$/i.test(file))
@@ -244,7 +274,7 @@ const stylesheetOf = (output: DirectoryPath) => {
           const content = fs.readFileSync(file, 'utf8');
           return secrets.some((secret) => content.includes(secret));
         })
-        .map((file) => path.relative(output.toString(), file))
+        .map((file) => path.relative(portal.output().toString(), file))
     );
   };
 
@@ -252,7 +282,7 @@ const stylesheetOf = (output: DirectoryPath) => {
   // published: `portal.server.ts` holds the absolute path of every specification, and the
   // prepared project's own location has no business in the output either.
   it('publishes neither the specification paths nor the project directory', () => {
-    expect(filesNaming(project.toString(), fixture.join('spec').toString())).to.deep.equal([]);
+    expect(filesNaming(portal.project().toString(), fixture.join('spec').toString())).to.deep.equal([]);
   });
 
   // `defineDocs({ dir })` compiles its directory into the client bundle as the collection's
@@ -304,7 +334,7 @@ const stylesheetOf = (output: DirectoryPath) => {
   it('ships only the syntax grammars a portal can contain', () => {
     // Shiki's full catalogue is some 400 chunks and ten megabytes of unused grammars.
     // `src/lib/shiki-bundle.ts` replaces it; this notices if that stops taking effect.
-    const assets = fs.readdirSync(path.join(output.toString(), 'assets'));
+    const assets = fs.readdirSync(path.join(portal.output().toString(), 'assets'));
     const unusable = assets.filter((name) => /^(cobol|wolfram|emacs-lisp|abap|ballerina|apl)-/.test(name));
 
     expect(unusable, 'grammars for languages a portal cannot contain').to.deep.equal([]);
@@ -320,33 +350,22 @@ const stylesheetOf = (output: DirectoryPath) => {
 
   it('keeps an operation page small', () => {
     const page = 'api/apimatic-calculator/simple-calculator/Calculate/index.html';
-    expect(fs.statSync(path.join(output.toString(), page)).size).to.be.below(100 * 1024);
+    expect(fs.statSync(path.join(portal.output().toString(), page)).size).to.be.below(100 * 1024);
   });
 
   it('type-checks against the packages it is built with', async () => {
-    const result = await typeCheck(project);
+    const result = await typeCheck(portal.project());
 
     expect(result.exitCode, result.all).to.equal(0);
   });
 
-  // The layout puts the tab bar in the header, and the prerendered page carries it,
-  // so the tabs are there before any script runs.
   it('renders the top level as tabs in the header, in the order nav.json gives, Home named by it', () => {
-    const page = read('index.html');
-    const tab = (href: string, name: string) =>
-      page.search(new RegExp(`href="${href}"[^>]*><span[^>]*>${name}</span></a>`));
-    const positions = [
-      tab('/', 'Overview'),
-      tab('/guides/intro', 'Developer Guides'),
-      tab('/api/apimatic-calculator/simple-calculator/Calculate', 'API Reference'),
-      tab('/sdks', 'SDKs')
-    ];
-
-    expect(
-      positions.every((at) => at !== -1),
-      'a tab is missing'
-    ).to.be.true;
-    expect(positions).to.deep.equal([...positions].sort((left, right) => left - right));
+    expectTabsInOrder(read('index.html'), [
+      ['/', 'Overview'],
+      ['/guides/intro', 'Developer Guides'],
+      ['/api/apimatic-calculator/simple-calculator/Calculate', 'API Reference'],
+      ['/sdks', 'SDKs']
+    ]);
   });
 
   // The fixture's `languages` block names TypeScript; the pages come from the shipped templates.
@@ -437,7 +456,7 @@ const stylesheetOf = (output: DirectoryPath) => {
   // The browser imports `portal.identity.json` whole, which is safe only because nothing in
   // it, and nothing else the CLI writes, addresses the build machine.
   it('ships what the browser is told, and nothing from the build-only config', () => {
-    const scripts = scriptsOf(output);
+    const scripts = scriptsOf(portal.output());
 
     expect(scripts.some((script) => script.text.includes('pageActions'))).to.be.true;
     expect(
@@ -446,7 +465,7 @@ const stylesheetOf = (output: DirectoryPath) => {
   });
 
   it('bundles Geist and loads the neutral theme', () => {
-    const css = stylesheetOf(output);
+    const css = stylesheetOf(portal.output());
 
     expect(read('index.html')).not.to.contain('fonts.googleapis.com');
     // Fumadocs' type tables and playground output use the `font-mono` class, which reads `--font-mono`.
@@ -471,31 +490,19 @@ const stylesheetOf = (output: DirectoryPath) => {
  * fixture leaves at their defaults: a logo per mode, a favicon, a primary colour, a forced
  * colour mode and header links. Its specification has a deprecated operation, an internal one
  * and one whose body is an image, and it has no content directory, so it also covers the
- * fallback home page and the default order of the tabs. Its `plugin` block covers the context
- * plugin page, and its TypeScript release the card of a published SDK.
+ * fallback home page and a portal with no `nav.json`, which has Home alone. Its `plugin` block
+ * covers the context plugin page, and its TypeScript release the card of a published SDK.
  */
 (enabled ? describe : describe.skip)('portal build, branded (end to end)', function () {
   this.timeout(10 * 60 * 1000);
 
-  let built: BuiltPortal | undefined;
-  let output: DirectoryPath;
-
-  before(async () => {
-    built = await buildFixture('branded', { plugin: true });
-    ({ output } = built);
-  });
-
-  after(async () => {
-    await removeBuilt(built);
-  });
-
-  const read = (relative: string) => fs.readFileSync(path.join(output.toString(), relative), 'utf8');
-  const exists = (relative: string) => fs.existsSync(path.join(output.toString(), relative));
+  const portal = portalBuilt('branded', { plugin: true });
+  const { read, exists } = portal;
 
   // The minifier may merge the two modes' rules when they match, as they do for a primary
   // written once, so the selectors and their place are checked rather than one spelling.
   it("lays the primary over the theme in both modes, after the theme's own rules", () => {
-    const css = stylesheetOf(output);
+    const css = stylesheetOf(portal.output());
     // The theme's own dark background, which nothing the CLI writes sets.
     const themeDark = css.search(/\.dark\{--color-fd-background:/);
     const overrides = [...css.matchAll(/([^{}]+)\{--color-fd-primary:#1d4ed8;--color-fd-primary-foreground:#fafafa/g)];
@@ -514,7 +521,7 @@ const stylesheetOf = (output: DirectoryPath) => {
     expect(page).to.match(/<link rel="icon" href="\/favicon\.svg" type="image\/svg\+xml"/);
     expect(exists('logo-dark.svg')).to.be.true;
     // Classes only the template uses, so they exist only if Tailwind scanned it.
-    expect(stylesheetOf(output)).to.match(/\.dark\\:block/);
+    expect(stylesheetOf(portal.output())).to.match(/\.dark\\:block/);
   });
 
   // The DOM itself, after hydration, is checked by hand in a browser; the page as served
@@ -529,8 +536,8 @@ const stylesheetOf = (output: DirectoryPath) => {
   it('builds a home page without an index page, with the header link and a tab of its own', () => {
     const page = read('index.html');
     const tree = fs
-      .readdirSync(path.join(output.toString(), '__tsr/staticServerFnCache'))
-      .map((name) => fs.readFileSync(path.join(output.toString(), '__tsr/staticServerFnCache', name), 'utf8'))
+      .readdirSync(path.join(portal.output().toString(), '__tsr/staticServerFnCache'))
+      .map((name) => fs.readFileSync(path.join(portal.output().toString(), '__tsr/staticServerFnCache', name), 'utf8'))
       .find((text) => text.includes('"pageTree"'));
 
     expect(page).to.contain('href="https://status.example.com"');
@@ -572,24 +579,19 @@ const stylesheetOf = (output: DirectoryPath) => {
     expect(read('__downloads/plugin.zip')).to.equal('PK plugin');
   });
 
-  // No nav.json, so the defaults: the generated tabs before the reference, in the CLI's order,
-  // where Fumadocs' own, by path, would put the context plugin's folder first.
-  it('puts the generated tabs before the API reference, SDKs first, when nothing orders them', () => {
-    const page = read('index.html');
-    const tab = (href: string, name: string) =>
-      page.search(new RegExp(`href="${href}"[^>]*><span[^>]*>${name}</span></a>`));
-    const positions = [
-      tab('/', 'Home'),
-      tab('/sdks', 'SDKs'),
-      tab('/context-plugin', 'Context Plugin'),
-      tab('/api/[^"]+', 'API Reference')
-    ];
-
+  // No nav.json, so no `tabs`, so no tab: every section is a folder in Home, and the header
+  // renders no tab bar over a single choice. Home is not looked for: the fallback home page's
+  // own sidebar link is `/` and reads Home too, so it would match whether or not a tab bar is there.
+  it('renders no tab bar when no nav.json names a tab, every section being in Home', () => {
     expect(
-      positions.every((at) => at !== -1),
-      'a tab is missing'
-    ).to.be.true;
-    expect(positions).to.deep.equal([...positions].sort((left, right) => left - right));
+      tabPositions(read('index.html'), [
+        ['/sdks', 'SDKs'],
+        ['/context-plugin', 'Context Plugin'],
+        ['/api/[^"]+', 'API Reference']
+      ])
+    ).to.deep.equal([-1, -1, -1]);
+    expect(exists('sdks/index.html')).to.be.true;
+    expect(exists('context-plugin/index.html')).to.be.true;
   });
 
   it('documents the deprecated operation and leaves the internal one out, pages and sidebar alike', () => {
@@ -598,11 +600,120 @@ const stylesheetOf = (output: DirectoryPath) => {
     expect(exists('api/pets/pets/auditPets/index.html')).to.be.false;
 
     const everything = fs
-      .readdirSync(path.join(output.toString(), '__tsr/staticServerFnCache'))
-      .map((name) => fs.readFileSync(path.join(output.toString(), '__tsr/staticServerFnCache', name), 'utf8'))
+      .readdirSync(path.join(portal.output().toString(), '__tsr/staticServerFnCache'))
+      .map((name) => fs.readFileSync(path.join(portal.output().toString(), '__tsr/staticServerFnCache', name), 'utf8'))
       .join('\n');
     expect(everything).to.contain('List pets');
     expect(everything).to.contain('Create a pet');
     expect(everything).to.not.contain('Audit the pets');
+  });
+});
+
+/**
+ * A third portal, whose root `nav.json` places the API reference and both generated sections
+ * in Home with `pages`, and names no tab. Home is then the only tab, so the header shows no tab
+ * bar, and each section is a folder in Home's sidebar served where it always is. Built from the
+ * default fixture's specification with a `plugin` block, so every section the CLI generates is
+ * placed.
+ */
+(enabled ? describe : describe.skip)('portal build, every section in Home (end to end)', function () {
+  this.timeout(10 * 60 * 1000);
+
+  const portal = portalBuilt('sections-in-home', { plugin: true });
+  const { read, exists } = portal;
+
+  interface TreeNode {
+    $id?: string;
+    name?: unknown;
+    children?: TreeNode[];
+  }
+
+  /** The top-level nodes of the prerendered sidebar tree: the array holding the Home tab. */
+  const rootNodes = (): TreeNode[] => {
+    const cache = path.join(portal.output().toString(), '__tsr/staticServerFnCache');
+    const carrying = fs
+      .readdirSync(cache)
+      .map((name) => fs.readFileSync(path.join(cache, name), 'utf8'))
+      .find((text) => text.includes('"pageTree"'));
+    expect(carrying, 'no page tree').to.not.be.undefined;
+
+    // The entry is seroval's encoding, as the start plugin writes it: an object is `{t:10,p:{k,v}}`
+    // with keys and values in step, an array `{t:9,a}`, a string `{t:1,s}`; anything else here
+    // is a constant the walk does not need.
+    const decode = (value: unknown): unknown => {
+      if (typeof value !== 'object' || value === null) return value;
+      const node = value as { t?: number; s?: unknown; a?: unknown[]; p?: { k: string[]; v: unknown[] } };
+      if (node.t === 1) return node.s;
+      if (node.t === 9) return (node.a ?? []).map(decode);
+      if (node.t === 10 && node.p !== undefined) {
+        return Object.fromEntries(node.p.k.map((key, index) => [key, decode(node.p?.v[index])]));
+      }
+      // A constant or a back-reference, which the walk does not need; or the plain wrapper around the root.
+      if (typeof node.t === 'number') return undefined;
+      return Object.fromEntries(Object.entries(node).map(([key, item]) => [key, decode(item)]));
+    };
+
+    const holdingHome = (value: unknown): TreeNode[] | undefined => {
+      if (Array.isArray(value)) {
+        if (value.some((item) => (item as TreeNode)?.$id === '/tab/home')) return value as TreeNode[];
+        for (const item of value) {
+          const found = holdingHome(item);
+          if (found !== undefined) return found;
+        }
+      } else if (typeof value === 'object' && value !== null) {
+        for (const item of Object.values(value)) {
+          const found = holdingHome(item);
+          if (found !== undefined) return found;
+        }
+      }
+      return undefined;
+    };
+    const found = holdingHome(decode(JSON.parse(carrying ?? '')));
+    expect(found, 'no Home tab in the tree').to.not.be.undefined;
+    return found ?? [];
+  };
+
+  const names = (nodes: TreeNode[]) => nodes.map((node) => (typeof node.name === 'string' ? node.name : '?'));
+
+  // The sections keep the CLI's order among the user's pages, and the reference keeps its title.
+  it('lists the API reference and each generated section in Home’s sidebar, where pages names them', () => {
+    const roots = rootNodes();
+    const home = roots[0];
+
+    expect(roots.map((node) => node.$id)).to.deep.equal(['/tab/home']);
+    expect(names(home.children ?? [])).to.deep.equal([
+      'Welcome',
+      'API Reference',
+      'Developer Guides',
+      'SDKs',
+      'Authentication',
+      'Context Plugin'
+    ]);
+    // The single specification is lifted away inside Home as it is in a tab of its own.
+    const reference = home.children?.find((node) => node.name === 'API Reference');
+    expect(names(reference?.children ?? [])).to.deep.equal(['Simple Calculator']);
+  });
+
+  it('serves each section where it always is, whatever the sidebar says', () => {
+    expect(exists('api/apimatic-calculator/simple-calculator/Calculate/index.html')).to.be.true;
+    expect(exists('sdks/index.html')).to.be.true;
+    expect(exists('sdks/typescript/index.html')).to.be.true;
+    expect(exists('context-plugin/index.html')).to.be.true;
+  });
+
+  // A switcher with one choice switches nothing, so the header carries none; the other builds
+  // prove the same markup is there whenever there is more than one tab.
+  it('renders no tab bar over Home alone', () => {
+    const page = read('index.html');
+
+    expect(page).to.contain('Every section sits in Home.');
+    expect(
+      tabPositions(page, [
+        ['/', 'Home'],
+        ['/sdks', 'SDKs'],
+        ['/context-plugin', 'Context Plugin'],
+        ['/api/[^"]+', 'API Reference']
+      ])
+    ).to.deep.equal([-1, -1, -1, -1]);
   });
 });

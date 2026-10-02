@@ -6,7 +6,7 @@ import { GROUP_FOLDER } from './portal-navigation.js';
 /** What a tab is made of. */
 export type TabOwner =
   | { kind: 'home' }
-  // A folder directly under `content/` that `content/nav.json` lists.
+  // A folder directly under `content/` that `content/nav.json`'s `tabs` lists.
   | { kind: 'folder'; directory: DirectoryPath }
   | { kind: 'apiReference' }
   | { kind: 'generated'; section: GeneratedSection };
