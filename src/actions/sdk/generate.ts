@@ -1,4 +1,5 @@
 import { SdkGenerationService } from '../../infrastructure/services/sdk-generation-service.js';
+import { ServiceError } from '../../infrastructure/service-error.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { ActionResult } from '../action-result.js';
 import { withDirPath } from '../../infrastructure/tmp-extensions.js';
@@ -71,11 +72,15 @@ export class GenerateAction {
 
     return await withDirPath(async (tempDirectory) => {
       const tempContext = new TempContext(tempDirectory);
-      const buildZipPath = await buildFrom.buildZip(tempDirectory, packageSettingsDirectory);
+      const buildZip = await buildFrom.buildZip(tempDirectory, packageSettingsDirectory);
+      if (buildZip.isErr()) {
+        this.prompts.buildNotPackaged(sourceDirectory, buildZip.error);
+        return ActionResult.failed();
+      }
 
       const response = await this.prompts.generateSdk(
         this.sdkGenerationService.generateSdk(
-          buildZipPath,
+          buildZip.value,
           language,
           stability,
           this.configDir,
@@ -91,8 +96,18 @@ export class GenerateAction {
 
       const responseSdkZipPath = await tempContext.save(response.value);
       const tempSdk = await sdkContext.loadSdkInTempDirectory(tempDirectory, responseSdkZipPath);
-      this.prompts.sdkGenerated(await sdkContext.save(tempSdk, zipSdk));
+      if (tempSdk.isErr()) {
+        this.prompts.sdkGenerationServiceError(ServiceError.InvalidResponse);
+        return ActionResult.failed();
+      }
 
+      const saved = await sdkContext.save(tempSdk.value, zipSdk);
+      if (saved.isErr()) {
+        this.prompts.sdkNotSaved(sdkDirectory, saved.error);
+        return ActionResult.failed();
+      }
+
+      this.prompts.sdkGenerated(saved.value);
       return ActionResult.success();
     });
   };

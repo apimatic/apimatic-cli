@@ -1,3 +1,4 @@
+import { ok, Result } from 'neverthrow';
 import { FileService } from '../infrastructure/file-service.js';
 import { DirectoryPath } from './file/directoryPath.js';
 import { FilePath } from './file/filePath.js';
@@ -18,13 +19,13 @@ export class SpecContext {
   }
 
   /** Adds a specification to this directory, unpacking it when it is a split-spec archive. */
-  public async install(specPath: FilePath) {
+  public async install(specPath: FilePath): Promise<Result<void, string>> {
     await this.fileService.createDirectoryIfNotExists(this.specDirectory);
     if (await this.fileService.isZipFile(specPath)) {
-      await this.zipService.unArchive(specPath, this.specDirectory);
-    } else {
-      await this.fileService.copy(specPath, specPath.replaceDirectory(this.specDirectory));
+      return await this.zipService.unArchive(specPath, this.specDirectory);
     }
+    await this.fileService.copy(specPath, specPath.replaceDirectory(this.specDirectory));
+    return ok(undefined);
   }
 
   public async save(stream: NodeJS.ReadableStream, fileName: FileName): Promise<FilePath> {

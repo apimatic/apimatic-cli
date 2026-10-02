@@ -77,11 +77,15 @@ export class SdkPublishAction {
       }
 
       const tempContext = new TempContext(tempDirectory);
-      const sdkFilePath = await tempContext.zip(sdkLanguageDirectory);
+      const sdkFile = await tempContext.zip(sdkLanguageDirectory);
+      if (sdkFile.isErr()) {
+        this.prompts.sdkNotPackaged(sdkLanguageDirectory, sdkFile.error);
+        return ActionResult.failed();
+      }
 
       const publishSdkResponse = await this.prompts.publishSdk(
         this.publishingApiService.publishSdkPackage(
-          sdkFilePath,
+          sdkFile.value,
           profileId,
           language,
           semVersion,

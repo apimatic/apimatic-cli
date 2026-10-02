@@ -97,6 +97,18 @@ describe('PortalContext', () => {
       expect(fs.existsSync(staging().toString())).to.be.false;
     });
 
+    it('keeps the previous portal as it was when the site cannot be zipped', async () => {
+      write(portal, 'old.html', 'previous');
+
+      const saved = await new PortalContext(portal).save(new DirectoryPath(root).join('missing'), true);
+
+      const problem = saved._unsafeUnwrapErr();
+      expect(problem.kind).to.equal('stagingFailed');
+      expect(problem.reason).to.contain('ENOENT');
+      expect(fs.readFileSync(path.join(portal.toString(), 'old.html'), 'utf8')).to.equal('previous');
+      expect(fs.existsSync(staging().toString())).to.be.false;
+    });
+
     it('keeps the staged site, and says where, when the swap fails part-way', async () => {
       write(portal, 'old.html');
       sinon.stub(FileService.prototype, 'moveDirectoryContents').rejects(new Error('EBUSY: resource busy or locked'));

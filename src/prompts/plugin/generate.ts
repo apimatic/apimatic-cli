@@ -61,6 +61,10 @@ export class PluginGeneratePrompts {
     log.error(error);
   }
 
+  public buildNotPackaged(sourceDirectory: DirectoryPath, reason: string) {
+    log.error(`The build in ${f.path(sourceDirectory)} could not be packaged for upload: ${reason}`);
+  }
+
   public configNotPrepared(failure: PluginConfigWriteFailure, sourceDirectory: DirectoryPath) {
     const message =
       failure === 'unreadable'

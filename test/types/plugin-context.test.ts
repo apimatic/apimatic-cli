@@ -104,7 +104,7 @@ describe('PluginContext', () => {
       fs.writeFileSync(path.join(source.toString(), 'skills', 'SKILL.md'), '# skill');
 
       archive = new FilePath(new DirectoryPath(root), new FileName('plugin.zip'));
-      await new ZipService().archive(source, archive);
+      (await new ZipService().archive(source, archive))._unsafeUnwrap();
 
       destination = new DirectoryPath(path.join(root, 'destination'));
     });
@@ -115,6 +115,12 @@ describe('PluginContext', () => {
       expect(fs.readFileSync(path.join(destination.toString(), 'README.md'), 'utf-8')).to.equal('# plugin');
       expect(fs.readFileSync(path.join(destination.toString(), 'skills', 'SKILL.md'), 'utf-8')).to.equal('# skill');
       expect(fs.existsSync(path.join(destination.toString(), 'plugin.zip'))).to.be.false;
+    });
+
+    it('reports an archive it cannot expand', async () => {
+      fs.writeFileSync(archive.toString(), 'not a zip');
+
+      expect((await new PluginContext(destination).save(archive))._unsafeUnwrapErr()).to.not.be.empty;
     });
 
     it('creates the destination directory when it does not exist yet', async () => {

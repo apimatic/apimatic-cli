@@ -1,3 +1,4 @@
+import { ok, Result } from 'neverthrow';
 import { FileService } from '../infrastructure/file-service.js';
 import { DirectoryPath } from './file/directoryPath.js';
 import { FilePath } from './file/filePath.js';
@@ -22,20 +23,23 @@ export class SdkContext {
     return !(await this.fileService.directoryEmpty(this.sdkDirectory));
   }
 
-  public async save(tempSdkDirectory: DirectoryPath, zipSdk: boolean): Promise<DirectoryPath> {
+  public async save(tempSdkDirectory: DirectoryPath, zipSdk: boolean): Promise<Result<DirectoryPath, string>> {
     await this.fileService.cleanDirectory(this.sdkDirectory);
     if (!zipSdk) {
       await this.fileService.copyDirectoryContents(tempSdkDirectory, this.sdkDirectory);
-    } else {
-      await this.zipService.archive(tempSdkDirectory, this.zipPath);
+      return ok(this.sdkDirectory);
     }
-    return this.sdkDirectory;
+    const archived = await this.zipService.archive(tempSdkDirectory, this.zipPath);
+    return archived.map(() => this.sdkDirectory);
   }
 
-  public async loadSdkInTempDirectory(tempDirectory: DirectoryPath, tempSdk: FilePath): Promise<DirectoryPath> {
+  public async loadSdkInTempDirectory(
+    tempDirectory: DirectoryPath,
+    tempSdk: FilePath
+  ): Promise<Result<DirectoryPath, string>> {
     const tempSdkDirectory = tempDirectory.join('sdk-original');
     await this.fileService.createDirectoryIfNotExists(tempSdkDirectory);
-    await this.zipService.unArchive(tempSdk, tempSdkDirectory);
-    return tempSdkDirectory;
+    const unpacked = await this.zipService.unArchive(tempSdk, tempSdkDirectory);
+    return unpacked.map(() => tempSdkDirectory);
   }
 }

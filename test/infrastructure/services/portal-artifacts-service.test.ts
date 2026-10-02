@@ -52,7 +52,7 @@ describe('PortalArtifactsService', () => {
     fs.mkdirSync(staging, { recursive: true });
 
     const zipPath = new FilePath(new DirectoryPath(workDir), new FileName(`${path.basename(staging)}.zip`));
-    await new ZipService().archive(new DirectoryPath(staging), zipPath);
+    (await new ZipService().archive(new DirectoryPath(staging), zipPath))._unsafeUnwrap();
     return fs.readFileSync(zipPath.toString());
   };
 
@@ -266,6 +266,12 @@ describe('PortalArtifactsService', () => {
 
       expect(error.code).to.equal(ServiceErrorCode.Timeout);
       expect(error.errorMessage).to.contain('Portal artifacts generation timed out');
+    });
+
+    it('refuses a download that is not an archive', async () => {
+      artifactsZip = Buffer.from('not a zip');
+
+      expect((await generate())._unsafeUnwrapErr()).to.equal(ServiceError.InvalidResponse);
     });
 
     it('refuses a catalog for a language it cannot read, rather than leaving it out', async () => {

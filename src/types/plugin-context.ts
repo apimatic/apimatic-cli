@@ -1,3 +1,4 @@
+import { Result } from 'neverthrow';
 import { FileService } from '../infrastructure/file-service.js';
 import { ZipService } from '../infrastructure/zip-service.js';
 import { DirectoryPath } from './file/directoryPath.js';
@@ -28,9 +29,9 @@ export class PluginContext {
     return await this.fileService.directoryExists(this.pluginDirectory.join(GIT_DIRECTORY_NAME));
   }
 
-  public async save(tempPluginFilePath: FilePath): Promise<void> {
+  public async save(tempPluginFilePath: FilePath): Promise<Result<void, string>> {
     // This directory is the user's repository once published: emptying it outright would discard their history.
     await this.fileService.cleanDirectoryExcluding(this.pluginDirectory, [new FileName(GIT_DIRECTORY_NAME)]);
-    await this.zipService.unArchive(tempPluginFilePath, this.pluginDirectory);
+    return await this.zipService.unArchive(tempPluginFilePath, this.pluginDirectory);
   }
 }

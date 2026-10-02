@@ -22,6 +22,7 @@ import { FileService } from '../../../src/infrastructure/file-service.js';
 import { CommandMetadata } from '../../../src/types/common/command-metadata.js';
 import { PublishingApiService } from '../../../src/infrastructure/services/publishing-api-service.js';
 import { ProjectContext } from '../../../src/types/project-context.js';
+import { TempContext } from '../../../src/types/temp-context.js';
 import { AVAILABLE_LANGUAGES, Language } from '../../../src/types/sdk/generate.js';
 
 const COMMAND_METADATA: CommandMetadata = { commandName: 'plugin generate', shell: 'test' };
@@ -80,7 +81,7 @@ describe('PluginGenerateAction', () => {
     await fsExtra.outputFile(path.join(archiveSource, 'README.md'), '# plugin');
     await fsExtra.outputFile(path.join(archiveSource, 'skills', 'SKILL.md'), '# skill');
     const archivePath = new FilePath(new DirectoryPath(tmpDirResult.path), new FileName('plugin.zip'));
-    await new ZipService().archive(new DirectoryPath(archiveSource), archivePath);
+    (await new ZipService().archive(new DirectoryPath(archiveSource), archivePath))._unsafeUnwrap();
     pluginArchive = await fsExtra.readFile(archivePath.toString());
 
     await fsExtra.ensureDir(sourceDirectory);
@@ -644,6 +645,25 @@ describe('PluginGenerateAction', () => {
   });
 
   describe('generation failures', () => {
+    it('reports a build it could not package, without generating', async () => {
+      const generatePlugin = sinon.stub(PluginService.prototype, 'generatePlugin');
+      sinon.stub(TempContext.prototype, 'zip').resolves(err('EACCES: permission denied'));
+      const buildNotPackaged = sinon.stub(PluginGeneratePrompts.prototype, 'buildNotPackaged');
+
+      expect((await execute()).isFailed()).to.be.true;
+      expect(generatePlugin.called).to.be.false;
+      expect(buildNotPackaged.firstCall.args[1]).to.equal('EACCES: permission denied');
+    });
+
+    it('reports an artifact it cannot expand as an invalid response', async () => {
+      pluginArchive = Buffer.from('not a zip');
+      generated();
+      const pluginGenerationError = sinon.stub(PluginGeneratePrompts.prototype, 'pluginGenerationError');
+
+      expect((await execute()).isFailed()).to.be.true;
+      expect(pluginGenerationError.firstCall.args[0]).to.equal(ServiceError.InvalidResponse.errorMessage);
+    });
+
     it('falls back to the plain service message for any other failure', async () => {
       sinon.stub(PluginService.prototype, 'generatePlugin').resolves(err(ServiceError.ServerError));
       const pluginGenerationError = sinon.stub(PluginGeneratePrompts.prototype, 'pluginGenerationError');

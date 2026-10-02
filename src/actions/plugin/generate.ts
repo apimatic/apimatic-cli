@@ -14,6 +14,8 @@ import { TempContext } from '../../types/temp-context.js';
 import { ActionResult } from '../action-result.js';
 import { PluginRecordMetadataAction } from './record-metadata.js';
 
+type UploadPackagingFailure = { reason: string };
+
 export class PluginGenerateAction {
   private readonly prompts: PluginGeneratePrompts = new PluginGeneratePrompts();
   private readonly pluginService: PluginService = new PluginService();
@@ -101,7 +103,9 @@ export class PluginGenerateAction {
       const written = await configContext.recordLanguages(selection);
       return await written
         .asyncAndThen(() => new ResultAsync(configContext.stageUpload(tempDirectory, selection)))
-        .map((staged) => tempContext.zip(staged))
+        .andThen((staged) =>
+          new ResultAsync(tempContext.zip(staged)).mapErr((reason): UploadPackagingFailure => ({ reason }))
+        )
         .andThen(
           (upload) =>
             new ResultAsync(
@@ -110,7 +114,11 @@ export class PluginGenerateAction {
               )
             )
         )
-        .map(async (stream) => pluginContext.save(await tempContext.save(stream)));
+        .andThen((stream) =>
+          new ResultAsync(tempContext.save(stream).then((archive) => pluginContext.save(archive)))
+            // TODO: also write the actual error to a log file and tell the user.
+            .mapErr(() => ServiceError.InvalidResponse)
+        );
     });
     if (generated.isErr()) {
       this.reportGenerationProblem(generated.error, sourceDirectory);
@@ -125,12 +133,17 @@ export class PluginGenerateAction {
     return ActionResult.success();
   };
 
-  /** A record, a staging and a generation fault land here alike; only the wording differs. */
+  /** A record, a staging, a packaging and a generation fault land here alike; only the wording differs. */
   private readonly reportGenerationProblem = (
-    problem: ServiceError | PluginConfigWriteFailure,
+    problem: ServiceError | PluginConfigWriteFailure | UploadPackagingFailure,
     sourceDirectory: DirectoryPath
-  ) =>
-    typeof problem === 'string'
-      ? this.prompts.configNotPrepared(problem, sourceDirectory)
-      : this.prompts.pluginGenerationError(problem.errorMessage);
+  ) => {
+    if (problem instanceof ServiceError) {
+      this.prompts.pluginGenerationError(problem.errorMessage);
+    } else if (typeof problem === 'string') {
+      this.prompts.configNotPrepared(problem, sourceDirectory);
+    } else {
+      this.prompts.buildNotPackaged(sourceDirectory, problem.reason);
+    }
+  };
 }

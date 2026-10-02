@@ -65,6 +65,14 @@ export class SdkGeneratePrompts {
     log.error(serviceError.errorMessage);
   }
 
+  public buildNotPackaged(sourceDirectory: DirectoryPath, reason: string) {
+    log.error(`The build in ${f.path(sourceDirectory)} could not be packaged for upload: ${reason}`);
+  }
+
+  public sdkNotSaved(sdkDirectory: DirectoryPath, reason: string) {
+    log.error(`The SDK could not be saved to ${f.path(sdkDirectory)}: ${reason}`);
+  }
+
   public noVersionToBuild(problem: VersionProblem, sourceDirectory: DirectoryPath) {
     const messages: Record<VersionProblem, string> = {
       noVersions: `The ${f.var('versioned_docs')} directory is either empty or invalid: ${f.path(sourceDirectory)}`,
