@@ -1,10 +1,10 @@
 import type { ReactNode } from 'react';
 import { CodeBlockTab, CodeBlockTabs, CodeBlockTabsList, CodeBlockTabsTrigger } from 'fumadocs-ui/components/codeblock';
+import { useComponents } from 'fumadocs-openapi';
 import { useCodeUsage } from 'fumadocs-openapi/operation';
 import { createCodeUsageGeneratorRegistry } from 'fumadocs-openapi/requests/generators';
 import { curl } from 'fumadocs-openapi/requests/generators/curl';
 import { CodeSample } from '@/lib/code-samples';
-import { CodeBlock } from './code-block';
 import { useExampleSelection } from './example-layout';
 
 interface UsageTab {
@@ -54,6 +54,7 @@ function UsageTabs() {
 }
 
 function SampleCode({ sample }: Readonly<{ sample: CodeSample }>) {
+  const { CodeBlock } = useComponents();
   const { examples, selected } = useExampleSelection();
   const source = sample.sourceFor(selected.id, examples.length);
 
@@ -65,6 +66,7 @@ function SampleCode({ sample }: Readonly<{ sample: CodeSample }>) {
 
 // Follows the playground's edits to the selected example, on the selected server.
 function CurlCode() {
+  const { CodeBlock } = useComponents();
   const code = useCodeUsage(CURL_USAGE_ID);
-  return <CodeBlock lang={curl.lang} code={code} />;
+  return code === undefined ? null : <CodeBlock lang={curl.lang} code={code} />;
 }
