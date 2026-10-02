@@ -32,7 +32,7 @@ export class TransformAction {
     force: boolean
   ): Promise<ActionResult> => {
     return await withDirPath(async (tempDirectory) => {
-      const specFileDirResult = await new ResourceContext(resourcePath, tempDirectory).resolveTo();
+      const specFileDirResult = await ResourceContext.resolveTo(resourcePath, tempDirectory).resolveTo();
       if (specFileDirResult.isErr()) {
         this.validatePrompts.specUnavailable(specFileDirResult.error);
         return ActionResult.failed();

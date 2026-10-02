@@ -123,7 +123,7 @@ export class QuickstartAction {
         this.prompts.noSpecSpecified();
         return ActionResult.cancelled();
       }
-      spec = new ResourceContext(input, tempDirectory);
+      spec = ResourceContext.resolveTo(input, tempDirectory);
       const resolved =
         spec.kind() === 'url' ? await this.prompts.downloadSpecFile(spec.resolveTo()) : await spec.resolveTo();
       if (resolved.isOk()) {
@@ -149,7 +149,7 @@ export class QuickstartAction {
         return ActionResult.cancelled();
       }
       const sample = await this.prompts.downloadSpecFile(
-        new ResourceContext(this.defaultSpecUrl, tempDirectory.join('sample')).resolveTo()
+        ResourceContext.resolveTo(this.defaultSpecUrl, tempDirectory.join('sample')).resolveTo()
       );
       if (sample.isErr()) {
         this.prompts.specUnavailable(sample.error);

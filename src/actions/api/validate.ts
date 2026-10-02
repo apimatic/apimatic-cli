@@ -29,7 +29,7 @@ export class ValidateAction {
   ): Promise<ActionResult<void, ValidationFailure>> => {
     if (!(spec instanceof ResourceContext)) {
       return await withDirPath((tempDirectory) =>
-        this.execute(new ResourceContext(spec, tempDirectory), displayValidationSummary)
+        this.execute(ResourceContext.resolveTo(spec, tempDirectory), displayValidationSummary)
       );
     }
     const specFile = await spec.resolveTo();

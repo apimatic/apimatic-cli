@@ -33,16 +33,18 @@ describe('ResourceContext', () => {
   it('tells a file, a URL and a project apart', () => {
     const file = new FilePath(new DirectoryPath(root), new FileName('openapi.json'));
 
-    expect(new ResourceContext(file, tempDirectory).kind()).to.equal('file');
-    expect(new ResourceContext(new UrlPath(`${HOST}/openapi.json`), tempDirectory).kind()).to.equal('url');
-    expect(new ResourceContext(ProjectContext.in(new DirectoryPath(root)), tempDirectory).kind()).to.equal('project');
+    expect(ResourceContext.resolveTo(file, tempDirectory).kind()).to.equal('file');
+    expect(ResourceContext.resolveTo(new UrlPath(`${HOST}/openapi.json`), tempDirectory).kind()).to.equal('url');
+    expect(ResourceContext.resolveTo(ProjectContext.in(new DirectoryPath(root)), tempDirectory).kind()).to.equal(
+      'project'
+    );
   });
 
   it('copies a local file under its own name', async () => {
     fs.writeFileSync(path.join(root, 'openapi.yaml'), 'openapi: 3.0.3');
     const file = new FilePath(new DirectoryPath(root), new FileName('openapi.yaml'));
 
-    const copy = (await new ResourceContext(file, tempDirectory).resolveTo())._unsafeUnwrap();
+    const copy = (await ResourceContext.resolveTo(file, tempDirectory).resolveTo())._unsafeUnwrap();
 
     expect(copy.isEqual(file)).to.be.false;
     expect(copy.name().toString()).to.equal('openapi.yaml');
@@ -52,14 +54,14 @@ describe('ResourceContext', () => {
   it('reports a local file it cannot read as the file the user gave', async () => {
     const missing = new FilePath(new DirectoryPath(root), new FileName('missing.json'));
 
-    const resolved = await new ResourceContext(missing, tempDirectory).resolveTo();
+    const resolved = await ResourceContext.resolveTo(missing, tempDirectory).resolveTo();
 
     expect(resolved._unsafeUnwrapErr()).to.deep.equal({ kind: 'fileUnreadable', file: missing });
   });
 
   it('downloads a URL once, however often it is resolved', async () => {
     const scope = nock(HOST).get('/openapi.json').once().reply(200, 'openapi: 3.0.3');
-    const spec = new ResourceContext(new UrlPath(`${HOST}/openapi.json`), tempDirectory);
+    const spec = ResourceContext.resolveTo(new UrlPath(`${HOST}/openapi.json`), tempDirectory);
 
     const first = (await spec.resolveTo())._unsafeUnwrap();
     const second = (await spec.resolveTo())._unsafeUnwrap();
@@ -76,7 +78,7 @@ describe('ResourceContext', () => {
       .reply(200, 'openapi: 3.0.3', { 'Content-Disposition': 'attachment; filename="petstore.yaml"' });
 
     const file = (
-      await new ResourceContext(new UrlPath(`${HOST}/download?id=1`), tempDirectory).resolveTo()
+      await ResourceContext.resolveTo(new UrlPath(`${HOST}/download?id=1`), tempDirectory).resolveTo()
     )._unsafeUnwrap();
 
     expect(file.name().toString()).to.equal('petstore.yaml');
@@ -86,7 +88,7 @@ describe('ResourceContext', () => {
     nock(HOST).get('/v1/openapi.json').query({ token: 'abc' }).reply(200, '{}');
 
     const url = new UrlPath(`${HOST}/v1/openapi.json?token=abc`);
-    const file = (await new ResourceContext(url, tempDirectory).resolveTo())._unsafeUnwrap();
+    const file = (await ResourceContext.resolveTo(url, tempDirectory).resolveTo())._unsafeUnwrap();
 
     expect(file.name().toString()).to.equal('openapi.json');
   });
@@ -95,7 +97,7 @@ describe('ResourceContext', () => {
     nock(HOST).get('/openapi.json').reply(404);
     const url = new UrlPath(`${HOST}/openapi.json`);
 
-    const problem = (await new ResourceContext(url, tempDirectory).resolveTo())._unsafeUnwrapErr();
+    const problem = (await ResourceContext.resolveTo(url, tempDirectory).resolveTo())._unsafeUnwrapErr();
 
     expect(problem.kind).to.equal('downloadFailed');
     expect(problem.kind === 'downloadFailed' && problem.url).to.equal(url);

@@ -127,7 +127,10 @@ describe('ValidateAction', () => {
     const download = sinon
       .stub(FileDownloadService.prototype, 'downloadFile')
       .resolves(ok({ stream: Readable.from(['openapi: 3.0.3']), filename: new FileName('openapi.yaml') }));
-    const spec = new ResourceContext(new UrlPath('https://example.org/openapi.yaml'), workingDirectory.join('temp'));
+    const spec = ResourceContext.resolveTo(
+      new UrlPath('https://example.org/openapi.yaml'),
+      workingDirectory.join('temp')
+    );
     const resolved = (await spec.resolveTo())._unsafeUnwrap();
 
     expect((await validate(spec)).isSuccess()).to.be.true;

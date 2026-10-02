@@ -171,8 +171,7 @@ export class {PascalName}Action {
     // 3. Business logic wrapped in withDirPath for temp directory
     return await withDirPath(async (tempDirectory) => {
       // 4. Resolve resources / prepare context
-      //    const resourceContext = new ResourceContext(tempDirectory);
-      //    const specFileDirResult = await resourceContext.resolveTo(resourcePath);
+      //    const specFileDirResult = await ResourceContext.resolveTo(resourcePath, tempDirectory).resolveTo();
       //    if (specFileDirResult.isErr()) {
       //      this.prompts.networkError(specFileDirResult.error);
       //      return ActionResult.failed();

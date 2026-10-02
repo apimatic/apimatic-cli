@@ -21,7 +21,11 @@ export class ResourceContext<I extends ResourceInput = ResourceInput> {
   private readonly fileService = new FileService();
   private resolved: Promise<Result<FilePath, ResolveProblem>> | undefined;
 
-  constructor(private readonly input: I, private readonly tempDirectory: DirectoryPath) {}
+  private constructor(private readonly input: I, private readonly tempDirectory: DirectoryPath) {}
+
+  public static resolveTo<I extends ResourceInput>(input: I, tempDirectory: DirectoryPath): ResourceContext<I> {
+    return new ResourceContext(input, tempDirectory);
+  }
 
   public kind(): ResourceKind {
     if (this.input instanceof ProjectContext) {
