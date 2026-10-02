@@ -35,7 +35,9 @@ describe('SdkContext', () => {
     it('reports an SDK it could not zip, and leaves no archive behind', async () => {
       const saved = await context.save(new DirectoryPath(inRoot('missing')), true);
 
-      expect(saved._unsafeUnwrapErr()).to.contain('ENOENT');
+      const problem = saved._unsafeUnwrapErr();
+      expect(problem.kind).to.equal('zipFailed');
+      expect(problem.reason).to.contain('ENOENT');
       expect(fs.existsSync(inRoot('sdk', 'python', 'python.zip'))).to.be.false;
     });
   });
@@ -47,7 +49,9 @@ describe('SdkContext', () => {
 
       const loaded = await context.loadSdkInTempDirectory(new DirectoryPath(inRoot('temp')), download);
 
-      expect(loaded._unsafeUnwrapErr()).to.not.be.empty;
+      const problem = loaded._unsafeUnwrapErr();
+      expect(problem.kind).to.equal('unzipFailed');
+      expect(problem.reason).to.not.be.empty;
     });
   });
 });

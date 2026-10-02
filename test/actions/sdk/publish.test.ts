@@ -15,6 +15,7 @@ import { CommandMetadata } from '../../../src/types/common/command-metadata.js';
 import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
 import { FileName } from '../../../src/types/file/fileName.js';
 import { FilePath } from '../../../src/types/file/filePath.js';
+import { FileProblem } from '../../../src/types/file/file-problem.js';
 import { ProjectContext } from '../../../src/types/project-context.js';
 import { PublishType } from '../../../src/types/publish-api/publishing-profile-item.js';
 import { ProfileId } from '../../../src/types/publish/profile-id.js';
@@ -72,14 +73,15 @@ describe('SdkPublishAction', () => {
   });
 
   it('reports an SDK it could not zip, without publishing', async () => {
+    const problem: FileProblem = { kind: 'zipFailed', reason: 'EACCES: permission denied' };
     const zip = sinon.stub(TempContext.prototype, 'zip').callThrough();
-    zip.onSecondCall().resolves(err('EACCES: permission denied'));
+    zip.onSecondCall().resolves(err(problem));
     const publishSdkPackage = sinon.stub(PublishingApiService.prototype, 'publishSdkPackage');
     const sdkNotZipped = sinon.stub(SdkPublishPrompts.prototype, 'sdkNotZipped');
 
     expect((await execute()).isFailed()).to.be.true;
     expect(publishSdkPackage.called).to.be.false;
-    expect(sdkNotZipped.firstCall.args[1]).to.equal('EACCES: permission denied');
+    expect(sdkNotZipped.firstCall.args[1]).to.equal(problem);
     expect(onPublishSdkError.called).to.be.false;
   });
 });

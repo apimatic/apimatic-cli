@@ -310,7 +310,7 @@ export class PortalSourceContext {
     try {
       const installed = await new SpecContext(this.specDirectory).install(specPath);
       if (installed.isErr()) {
-        return err({ kind: 'sourceUnwritable', reason: installed.error });
+        return err({ kind: 'sourceUnwritable', reason: installed.error.reason });
       }
     } catch (error) {
       return err({ kind: 'sourceUnwritable', reason: errorMessage(error) });

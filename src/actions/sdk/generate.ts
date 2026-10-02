@@ -1,5 +1,4 @@
 import { SdkGenerationService } from '../../infrastructure/services/sdk-generation-service.js';
-import { ServiceError } from '../../infrastructure/service-error.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { ActionResult } from '../action-result.js';
 import { withDirPath } from '../../infrastructure/tmp-extensions.js';
@@ -97,7 +96,7 @@ export class GenerateAction {
       const responseSdkZipPath = await tempContext.save(response.value);
       const tempSdk = await sdkContext.loadSdkInTempDirectory(tempDirectory, responseSdkZipPath);
       if (tempSdk.isErr()) {
-        this.prompts.sdkGenerationServiceError(ServiceError.InvalidResponse);
+        this.prompts.sdkNotUnzipped(tempSdk.error);
         return ActionResult.failed();
       }
 

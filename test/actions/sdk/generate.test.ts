@@ -7,7 +7,6 @@ import { expect } from 'chai';
 import { err, ok } from 'neverthrow';
 import sinon from 'sinon';
 import { GenerateAction } from '../../../src/actions/sdk/generate.js';
-import { ServiceError } from '../../../src/infrastructure/service-error.js';
 import { SdkGenerationService } from '../../../src/infrastructure/services/sdk-generation-service.js';
 import { ZipService } from '../../../src/infrastructure/zip-service.js';
 import { SdkGeneratePrompts } from '../../../src/prompts/sdk/generate.js';
@@ -15,6 +14,7 @@ import { CommandMetadata } from '../../../src/types/common/command-metadata.js';
 import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
 import { FileName } from '../../../src/types/file/fileName.js';
 import { FilePath } from '../../../src/types/file/filePath.js';
+import { FileProblem } from '../../../src/types/file/file-problem.js';
 import { ProjectContext } from '../../../src/types/project-context.js';
 import { SdkContext } from '../../../src/types/sdk-context.js';
 import { Language, Stability } from '../../../src/types/sdk/generate.js';
@@ -69,29 +69,33 @@ describe('GenerateAction (sdk)', () => {
   });
 
   it('reports a source directory it could not zip, without generating', async () => {
-    sinon.stub(TempContext.prototype, 'zip').resolves(err('EACCES: permission denied'));
+    const problem: FileProblem = { kind: 'zipFailed', reason: 'EACCES: permission denied' };
+    sinon.stub(TempContext.prototype, 'zip').resolves(err(problem));
     const srcDirNotZipped = sinon.stub(SdkGeneratePrompts.prototype, 'srcDirNotZipped');
 
     expect((await execute()).isFailed()).to.be.true;
     expect(generateSdk.called).to.be.false;
-    expect(srcDirNotZipped.firstCall.args[1]).to.equal('EACCES: permission denied');
+    expect(srcDirNotZipped.firstCall.args[1]).to.equal(problem);
   });
 
-  it('reports a generated SDK it cannot expand as an invalid response', async () => {
+  it('reports a generated SDK it cannot expand, with the reason it could not', async () => {
     sdkArchive = Buffer.from('not a zip');
-    const serviceError = sinon.stub(SdkGeneratePrompts.prototype, 'sdkGenerationServiceError');
+    const sdkNotUnzipped = sinon.stub(SdkGeneratePrompts.prototype, 'sdkNotUnzipped');
 
     expect((await execute()).isFailed()).to.be.true;
-    expect(serviceError.firstCall.args[0]).to.equal(ServiceError.InvalidResponse);
+    const problem = sdkNotUnzipped.firstCall.args[0];
+    expect(problem.kind).to.equal('unzipFailed');
+    expect(problem.reason).to.not.be.empty;
   });
 
   it('reports an SDK it could not save, naming the destination', async () => {
-    sinon.stub(SdkContext.prototype, 'save').resolves(err('ENOSPC: no space left on device, write'));
+    const problem: FileProblem = { kind: 'zipFailed', reason: 'ENOSPC: no space left on device, write' };
+    sinon.stub(SdkContext.prototype, 'save').resolves(err(problem));
     const sdkNotSaved = sinon.stub(SdkGeneratePrompts.prototype, 'sdkNotSaved');
     const sdkGenerated = sinon.stub(SdkGeneratePrompts.prototype, 'sdkGenerated');
 
     expect((await execute(true)).isFailed()).to.be.true;
-    expect(sdkNotSaved.firstCall.args).to.deep.equal([sdkDirectory, 'ENOSPC: no space left on device, write']);
+    expect(sdkNotSaved.firstCall.args).to.deep.equal([sdkDirectory, problem]);
     expect(sdkGenerated.called).to.be.false;
   });
 });

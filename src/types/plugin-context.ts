@@ -4,6 +4,7 @@ import { ZipService } from '../infrastructure/zip-service.js';
 import { DirectoryPath } from './file/directoryPath.js';
 import { FileName } from './file/fileName.js';
 import { FilePath } from './file/filePath.js';
+import { FileProblem } from './file/file-problem.js';
 import { PluginContents } from './plugin/plugin-contents.js';
 
 const GIT_DIRECTORY_NAME = '.git';
@@ -29,9 +30,10 @@ export class PluginContext {
     return await this.fileService.directoryExists(this.pluginDirectory.join(GIT_DIRECTORY_NAME));
   }
 
-  public async save(tempPluginFilePath: FilePath): Promise<Result<void, string>> {
+  public async save(tempPluginFilePath: FilePath): Promise<Result<void, FileProblem>> {
     // This directory is the user's repository once published: emptying it outright would discard their history.
     await this.fileService.cleanDirectoryExcluding(this.pluginDirectory, [new FileName(GIT_DIRECTORY_NAME)]);
-    return await this.zipService.unArchive(tempPluginFilePath, this.pluginDirectory);
+    const unpacked = await this.zipService.unArchive(tempPluginFilePath, this.pluginDirectory);
+    return unpacked.mapErr((reason): FileProblem => ({ kind: 'unzipFailed', reason }));
   }
 }

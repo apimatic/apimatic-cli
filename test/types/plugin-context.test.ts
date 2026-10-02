@@ -120,7 +120,9 @@ describe('PluginContext', () => {
     it('reports an archive it cannot expand', async () => {
       fs.writeFileSync(archive.toString(), 'not a zip');
 
-      expect((await new PluginContext(destination).save(archive))._unsafeUnwrapErr()).to.not.be.empty;
+      const problem = (await new PluginContext(destination).save(archive))._unsafeUnwrapErr();
+      expect(problem.kind).to.equal('unzipFailed');
+      expect(problem.reason).to.not.be.empty;
     });
 
     it('creates the destination directory when it does not exist yet', async () => {

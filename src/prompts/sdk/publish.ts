@@ -11,6 +11,7 @@ import { noteWrapped, withSpinner } from '../prompt.js';
 import { format as f } from '../format.js';
 import { PublishingProfile } from '../../types/publish/publishing-profile.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
+import { FileProblem } from '../../types/file/file-problem.js';
 
 export type PublishingOutcome = 'succeeded' | 'failed' | 'cancelled';
 
@@ -23,8 +24,8 @@ export class SdkPublishPrompts {
     log.error(serviceError.errorMessage);
   }
 
-  public sdkNotZipped(sdkDirectory: DirectoryPath, reason: string) {
-    log.error(`The SDK in ${f.path(sdkDirectory)} could not be zipped for upload: ${reason}`);
+  public sdkNotZipped(sdkDirectory: DirectoryPath, problem: FileProblem) {
+    log.error(`The SDK in ${f.path(sdkDirectory)} could not be zipped for upload: ${problem.reason}`);
   }
 
   public dryRunNotice(publishingSummary: string): void {

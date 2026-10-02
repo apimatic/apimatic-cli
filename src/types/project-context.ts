@@ -5,6 +5,7 @@ import { BuildConfig } from './build/build.js';
 import { DirectoryPath } from './file/directoryPath.js';
 import { FileName } from './file/fileName.js';
 import { FilePath } from './file/filePath.js';
+import { FileProblem } from './file/file-problem.js';
 import { PluginConfigContext } from './plugin-config-context.js';
 import { PortalSourceContext } from './portal-source-context.js';
 import { OUTPUT_DIRECTORY_NAMES, SOURCE_DIRECTORY_NAME, SPEC_DIRECTORY_NAME } from './project-layout.js';
@@ -88,7 +89,7 @@ export class ProjectContext {
   public async srcDirZip(
     tempDirectory: DirectoryPath,
     packageSettingsDirectory?: DirectoryPath
-  ): Promise<Result<FilePath, string>> {
+  ): Promise<Result<FilePath, FileProblem>> {
     const staged = tempDirectory.join(SOURCE_DIRECTORY_NAME);
     await this.fileService.copyDirectoryContents(this.source, staged);
     if (packageSettingsDirectory) {

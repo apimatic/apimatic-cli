@@ -7,10 +7,28 @@ import { FilePath } from '../../types/file/filePath.js';
 import { format as f } from '../format.js';
 import { withSpinner } from '../prompt.js';
 import { APIMATIC_CONFIG_FILE_NAME } from '../../types/apimatic-config/document.js';
-import { PluginConfig, PluginConfigWriteFailure } from '../../types/plugin-config-context.js';
+import { PluginConfig } from '../../types/plugin-config-context.js';
+import { PluginGenerationProblem } from '../../types/plugin/generation-problem.js';
 import { LANGUAGES_EXAMPLE } from '../../types/apimatic-config/languages-block.js';
 import { AVAILABLE_LANGUAGES, Language, languageLabel } from '../../types/sdk/generate.js';
 import { listedInProse } from '../../utils/string-utils.js';
+
+function describeGenerationProblem(problem: PluginGenerationProblem, sourceDirectory: DirectoryPath): string {
+  const configFile = `${f.var(APIMATIC_CONFIG_FILE_NAME)} in ${f.path(sourceDirectory)}`;
+  switch (problem.kind) {
+    case 'configNotPrepared':
+      return problem.failure === 'unreadable'
+        ? `${configFile} could not be read. Check that it can be read and try again.`
+        : `${configFile} starts with a byte-order mark, which the plugin cannot be generated from, and it could ` +
+            `not be rewritten without one. Save the file as UTF-8 without a BOM and try again.`;
+    case 'generationFailed':
+      return problem.error.errorMessage;
+    case 'zipFailed':
+      return `${f.path(sourceDirectory)} could not be zipped for upload: ${problem.reason}`;
+    case 'unzipFailed':
+      return `${ServiceError.InvalidResponse.errorMessage}\n${problem.reason}`;
+  }
+}
 
 export class PluginGeneratePrompts {
   // The spinner covers the service call only; until the save has run there is no path to name.
@@ -57,23 +75,8 @@ export class PluginGeneratePrompts {
     log.error('Please enter a different destination folder or remove the existing files and try again.');
   }
 
-  public pluginGenerationError(error: string) {
-    log.error(error);
-  }
-
-  public srcDirNotZipped(sourceDirectory: DirectoryPath, reason: string) {
-    log.error(`${f.path(sourceDirectory)} could not be zipped for upload: ${reason}`);
-  }
-
-  public configNotPrepared(failure: PluginConfigWriteFailure, sourceDirectory: DirectoryPath) {
-    const message =
-      failure === 'unreadable'
-        ? `${f.var(APIMATIC_CONFIG_FILE_NAME)} in ${f.path(sourceDirectory)} could not be read. ` +
-          `Check that it can be read and try again.`
-        : `${f.var(APIMATIC_CONFIG_FILE_NAME)} in ${f.path(sourceDirectory)} starts with a byte-order mark, ` +
-          `which the plugin cannot be generated from, and it could not be rewritten without one. ` +
-          `Save the file as UTF-8 without a BOM and try again.`;
-    log.error(message);
+  public pluginNotGenerated(problem: PluginGenerationProblem, sourceDirectory: DirectoryPath) {
+    log.error(describeGenerationProblem(problem, sourceDirectory));
   }
 
   public pluginConfigUnreadable(reason: string, path: FilePath) {

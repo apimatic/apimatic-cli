@@ -1,5 +1,6 @@
 import { isCancel, confirm, log, select } from '@clack/prompts';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
+import { FileProblem } from '../../types/file/file-problem.js';
 import { format as f } from '../format.js';
 import { Result } from 'neverthrow';
 import { withSpinner } from '../prompt.js';
@@ -65,12 +66,16 @@ export class SdkGeneratePrompts {
     log.error(serviceError.errorMessage);
   }
 
-  public srcDirNotZipped(sourceDirectory: DirectoryPath, reason: string) {
-    log.error(`${f.path(sourceDirectory)} could not be zipped for upload: ${reason}`);
+  public srcDirNotZipped(sourceDirectory: DirectoryPath, problem: FileProblem) {
+    log.error(`${f.path(sourceDirectory)} could not be zipped for upload: ${problem.reason}`);
   }
 
-  public sdkNotSaved(sdkDirectory: DirectoryPath, reason: string) {
-    log.error(`The SDK could not be saved to ${f.path(sdkDirectory)}: ${reason}`);
+  public sdkNotUnzipped(problem: FileProblem) {
+    log.error(`${ServiceError.InvalidResponse.errorMessage}\n${problem.reason}`);
+  }
+
+  public sdkNotSaved(sdkDirectory: DirectoryPath, problem: FileProblem) {
+    log.error(`The SDK could not be saved to ${f.path(sdkDirectory)}: ${problem.reason}`);
   }
 
   public noVersionToBuild(problem: VersionProblem, sourceDirectory: DirectoryPath) {

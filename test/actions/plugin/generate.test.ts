@@ -5,6 +5,7 @@ import AdmZip from 'adm-zip';
 import fsExtra from 'fs-extra';
 import sinon from 'sinon';
 import { expect } from 'chai';
+import { log } from '@clack/prompts';
 import { err, ok } from 'neverthrow';
 import { dir as tmpDir, DirectoryResult } from 'tmp-promise';
 import { PluginGenerateAction } from '../../../src/actions/plugin/generate.js';
@@ -17,6 +18,7 @@ import { ServiceError } from '../../../src/infrastructure/service-error.js';
 import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
 import { FileName } from '../../../src/types/file/fileName.js';
 import { FilePath } from '../../../src/types/file/filePath.js';
+import { FileProblem } from '../../../src/types/file/file-problem.js';
 import { ZipService } from '../../../src/infrastructure/zip-service.js';
 import { FileService } from '../../../src/infrastructure/file-service.js';
 import { CommandMetadata } from '../../../src/types/common/command-metadata.js';
@@ -215,9 +217,11 @@ describe('PluginGenerateAction', () => {
       const generatePlugin = generated();
       await fsExtra.writeFile(configPath(), BOM + JSON.stringify({ plugin: PLUGIN, languages: LANGUAGES }));
       sinon.stub(FileService.prototype, 'replaceContents').rejects(new Error('EACCES: permission denied'));
+      const pluginNotGenerated = sinon.stub(PluginGeneratePrompts.prototype, 'pluginNotGenerated');
 
       expect((await execute()).isFailed()).to.be.true;
       expect(generatePlugin.called).to.be.false;
+      expect(pluginNotGenerated.firstCall.args[0]).to.deep.equal({ kind: 'configNotPrepared', failure: 'unwritable' });
     });
   });
 
@@ -647,29 +651,35 @@ describe('PluginGenerateAction', () => {
   describe('generation failures', () => {
     it('reports a source directory it could not zip, without generating', async () => {
       const generatePlugin = sinon.stub(PluginService.prototype, 'generatePlugin');
-      sinon.stub(TempContext.prototype, 'zip').resolves(err('EACCES: permission denied'));
-      const srcDirNotZipped = sinon.stub(PluginGeneratePrompts.prototype, 'srcDirNotZipped');
+      const problem: FileProblem = { kind: 'zipFailed', reason: 'EACCES: permission denied' };
+      sinon.stub(TempContext.prototype, 'zip').resolves(err(problem));
+      const pluginNotGenerated = sinon.stub(PluginGeneratePrompts.prototype, 'pluginNotGenerated');
 
       expect((await execute()).isFailed()).to.be.true;
       expect(generatePlugin.called).to.be.false;
-      expect(srcDirNotZipped.firstCall.args[1]).to.equal('EACCES: permission denied');
+      expect(pluginNotGenerated.firstCall.args[0]).to.equal(problem);
     });
 
-    it('reports an artifact it cannot expand as an invalid response', async () => {
+    it('reports an artifact it cannot expand, with the reason it could not', async () => {
       pluginArchive = Buffer.from('not a zip');
       generated();
-      const pluginGenerationError = sinon.stub(PluginGeneratePrompts.prototype, 'pluginGenerationError');
+      const pluginNotGenerated = sinon.stub(PluginGeneratePrompts.prototype, 'pluginNotGenerated');
 
       expect((await execute()).isFailed()).to.be.true;
-      expect(pluginGenerationError.firstCall.args[0]).to.equal(ServiceError.InvalidResponse.errorMessage);
+      const problem = pluginNotGenerated.firstCall.args[0];
+      expect(problem.kind).to.equal('unzipFailed');
+      expect(problem).to.have.property('reason').that.is.not.empty;
     });
 
     it('falls back to the plain service message for any other failure', async () => {
       sinon.stub(PluginService.prototype, 'generatePlugin').resolves(err(ServiceError.ServerError));
-      const pluginGenerationError = sinon.stub(PluginGeneratePrompts.prototype, 'pluginGenerationError');
+      const pluginNotGenerated = sinon.stub(PluginGeneratePrompts.prototype, 'pluginNotGenerated');
 
       expect((await execute()).isFailed()).to.be.true;
-      expect(pluginGenerationError.called).to.be.true;
+      expect(pluginNotGenerated.firstCall.args[0]).to.deep.equal({
+        kind: 'generationFailed',
+        error: ServiceError.ServerError
+      });
     });
 
     it('reports every message the response carries, whatever key it arrived under', async () => {
@@ -680,10 +690,10 @@ describe('PluginGenerateAction', () => {
         someKeyTheCliDoesNotKnow: ['b']
       });
       sinon.stub(PluginService.prototype, 'generatePlugin').resolves(err(error));
-      const pluginGenerationError = sinon.stub(PluginGeneratePrompts.prototype, 'pluginGenerationError');
+      const printed = sinon.stub(log, 'error');
 
       expect((await execute()).isFailed()).to.be.true;
-      expect(pluginGenerationError.firstCall.args[0]).to.equal('One or more validation errors occurred.\n- a\n- b');
+      expect(printed.lastCall.args[0]).to.equal('One or more validation errors occurred.\n- a\n- b');
     });
   });
 });
