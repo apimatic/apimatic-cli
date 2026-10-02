@@ -282,7 +282,7 @@ export class PortalNavigation {
       case 'token':
         return PortalNavigation.tokenError(target.token, context);
       case 'apiReference':
-        return PortalNavigation.apiSharedNameError(context);
+        return PortalNavigation.apiSharedNameError(entry, context);
       case 'generated':
         return undefined;
       case 'folder':
@@ -312,7 +312,7 @@ export class PortalNavigation {
       case 'token':
         return PortalNavigation.tokenError(target.token, context);
       case 'apiReference':
-        return PortalNavigation.apiSharedNameError(context);
+        return PortalNavigation.apiSharedNameError(entry, context);
       case 'folder':
         // A page and a folder of one name are both children, and an entry positions the folder.
         // The page could then never be positioned, which is the quietly wrong sidebar this file
@@ -393,9 +393,9 @@ export class PortalNavigation {
     return context.childNames.filter((name) => name === entry).length > 1;
   }
 
-  /** A page named `api` beside the mount point could never be positioned, whichever spelling the entry uses. */
-  private static apiSharedNameError(context: NavigationContext): string | undefined {
-    return PortalNavigation.isSharedName(API_REFERENCE_NAME, context)
+  /** Only `api` spelled out might have meant a page of that name beside the mount point; the token never does. */
+  private static apiSharedNameError(entry: string, context: NavigationContext): string | undefined {
+    return entry === API_REFERENCE_NAME && PortalNavigation.isSharedName(API_REFERENCE_NAME, context)
       ? `${context.label}: '${API_REFERENCE_NAME}' is where the API reference is mounted, so the entry positions ` +
           `the reference rather than the page of that name. Rename the page to position it.`
       : undefined;

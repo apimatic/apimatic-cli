@@ -427,16 +427,18 @@ describe('PortalNavigation', () => {
       ]);
     });
 
-    // `content/api.md` is a second child at the root, so the entry could position only the reference.
-    it('refuses api when a page of that name is a second child, as pages does, however it is spelled', () => {
+    // `content/api.md` is a second child at the root, so `api` could position only the reference. The
+    // token never meant the page, and the scaffold writes it, so a page of that name does not fail the build.
+    it('refuses api when a page of that name is a second child, as pages does, and not the token', () => {
       const withApiPage = { childNames: ['index', 'api', 'api'], folderNames: [] };
       const sentence =
         "content/nav.json: 'api' is where the API reference is mounted, so the entry positions the " +
         'reference rather than the page of that name. Rename the page to position it.';
 
       expect(fileErrors({ tabs: ['api'], pages: ['index'] }, withApiPage)).to.deep.equal([sentence]);
-      expect(fileErrors({ tabs: ['apimatic:api'], pages: ['index'] }, withApiPage)).to.deep.equal([sentence]);
-      expect(fileErrors({ tabs: [], pages: ['index', 'apimatic:api'] }, withApiPage)).to.deep.equal([sentence]);
+      expect(fileErrors({ tabs: [], pages: ['index', 'api'] }, withApiPage)).to.deep.equal([sentence]);
+      expect(validateFile({ tabs: ['apimatic:api'], pages: ['index'] }, withApiPage).isOk()).to.be.true;
+      expect(validateFile({ tabs: [], pages: ['index', 'apimatic:api'] }, withApiPage).isOk()).to.be.true;
       expect(validateFile({ tabs: ['api'], pages: ['index'] }, { childNames: ['index', 'api'] }).isOk()).to.be.true;
     });
 
