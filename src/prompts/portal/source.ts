@@ -2,8 +2,8 @@ import { log } from '@clack/prompts';
 import { APIMATIC_CONFIG_FILE_NAME } from '../../types/apimatic-config/document.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { listedInProse } from '../../utils/string-utils.js';
-import { ContentNotices } from '../../types/portal/content-notices.js';
-import { NAVIGATION_FILE_NAME } from '../../types/portal/portal-navigation.js';
+import { ContentNotices, NoTabsListed } from '../../types/portal/content-notices.js';
+import { API_REFERENCE_TOKEN, NAVIGATION_FILE_NAME, TabEntry } from '../../types/portal/portal-navigation.js';
 import {
   ContentProblem,
   MissingFile,
@@ -284,16 +284,55 @@ export function reportIgnoredNavigationFiles(files: FilePath[], sourceDirectory:
 export function reportContentNotices(notices: ContentNotices, sourceDirectory: DirectoryPath): void {
   reportHiddenPages(notices.hiddenPages, sourceDirectory);
   reportIgnoredNavigationFiles(notices.ignoredNavigationFiles, sourceDirectory);
-  reportFolderTabs(notices.folderTabs);
   reportSharedTabNames(notices.sharedTabNames, sourceDirectory);
+  reportNoTabsListed(notices.noTabsListed, sourceDirectory);
+  reportUnseenHomeTitle(notices.unseenHomeTitle, sourceDirectory);
 }
 
-export function reportFolderTabs(folders: DirectoryPath[]): void {
-  if (folders.length === 0) {
+/** Nothing names these root nodes and no `tabs` says they are no tab, so the choice is put once per build. */
+export function reportNoTabsListed(notice: NoTabsListed | undefined, sourceDirectory: DirectoryPath): void {
+  if (notice === undefined) {
     return;
   }
-  const names = listedInProse(folders.map((folder) => f.var(folder.leafName())));
-  log.info(`${f.var(ROOT_NAVIGATION_FILE)} makes a tab of each folder it lists: ${names}.`);
+  const name = (entry: TabEntry): string => {
+    switch (entry.kind) {
+      case 'apiReference':
+        return 'the API reference';
+      case 'generated':
+        return entry.section.title;
+      case 'folder':
+        return `'${entry.name}'`;
+    }
+  };
+  const token = (entry: TabEntry): string => {
+    switch (entry.kind) {
+      case 'apiReference':
+        return API_REFERENCE_TOKEN;
+      case 'generated':
+        return entry.section.token;
+      case 'folder':
+        return entry.name;
+    }
+  };
+  const names = listedInProse(notice.unplaced.map(name));
+  const listing = f.var(`"tabs": ${JSON.stringify(notice.unplaced.map(token))}`);
+  const file = notice.file === undefined ? undefined : relative(notice.file, sourceDirectory);
+  const cause = file === undefined ? `There is no ${f.var(ROOT_NAVIGATION_FILE)}` : `${file} has no ${f.var('tabs')}`;
+  const add = file === undefined ? 'Add the file with' : 'Add';
+  log.warn(
+    `${cause}, so nothing is a tab: the header shows no tab bar, and ${names} are folders in Home's sidebar. ` +
+      `${add} ${listing} to show them as tabs, or ${f.var('"tabs": []')} to keep this sidebar.`
+  );
+}
+
+export function reportUnseenHomeTitle(file: FilePath | undefined, sourceDirectory: DirectoryPath): void {
+  if (file === undefined) {
+    return;
+  }
+  log.warn(
+    `${relative(file, sourceDirectory)} names the Home tab with ${f.var('title')}, but Home is the only tab ` +
+      `and one tab draws no tab bar, so the name shows nowhere. Name a tab in ${f.var('tabs')}, or remove the setting.`
+  );
 }
 
 export function reportSharedTabNames(shared: SharedTabName[], sourceDirectory: DirectoryPath): void {
@@ -321,8 +360,8 @@ export function reportSharedTabNames(shared: SharedTabName[], sourceDirectory: D
   log.message(shared.map(({ tabs }) => `  • ${spellings(tabs)}: ${listedInProse(tabs.map(describe))}`).join('\n'));
   log.message(
     `Rename all but one tab of each name with a ${f.var('title')} in its folder's ` +
-      `${f.var(NAVIGATION_FILE_NAME)}, or in ${f.var(ROOT_NAVIGATION_FILE)} for the Home tab; the tabs of the ` +
-      `SDK pages and the context plugin keep their names.`
+      `${f.var(NAVIGATION_FILE_NAME)}, or in ${f.var(ROOT_NAVIGATION_FILE)} for the Home tab; the SDKs and ` +
+      `Context Plugin sections keep their names.`
   );
 }
 

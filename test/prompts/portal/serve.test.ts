@@ -33,7 +33,7 @@ describe('PortalServePrompts', () => {
     it('says a language or the plugin block removed from apimatic.json follows without a restart', () => {
       expect(printed()).to.contain(
         "So does removing a language from 'languages' (updates the SDK pages) or the 'plugin' block " +
-          '(removes the Context Plugin tab).'
+          '(removes the Context Plugin pages).'
       );
     });
 

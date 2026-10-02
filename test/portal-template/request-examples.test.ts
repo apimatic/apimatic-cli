@@ -1,24 +1,30 @@
 import { expect } from 'chai';
+import type { ParameterObject } from 'fumadocs-openapi';
+import type { OperationParameters } from 'fumadocs-openapi/operation';
 import { Parameter, requestExamples, type RequestExample } from '../../portal-template/src/lib/request-examples';
+
+type Location = OperationParameters['in'];
 
 const example = (id: string): RequestExample => ({ id, name: id });
 
-const parameter = (location: string, name: string, ...ids: string[]) => ({
+// Fumadocs groups an operation's parameters by location.
+const group = (location: Location, item: Omit<ParameterObject, 'in'>): OperationParameters => ({
   in: location,
-  name,
-  examples: Object.fromEntries(ids.map((id) => [id, { value: `${name}-${id}` }]))
+  items: [{ ...item, in: location }]
 });
 
+const parameter = (location: Location, name: string, ...ids: string[]) =>
+  group(location, { name, examples: Object.fromEntries(ids.map((id) => [id, { value: `${name}-${id}` }])) });
+
 const components: Record<string, unknown> = {
-  '#/components/parameters/View': parameter('query', 'view', 'summary', 'full'),
   '#/components/examples/Summary': { summary: 'Summary', value: 'summary' }
 };
 
 const resolve = (node: unknown): unknown =>
   typeof node === 'object' && node !== null && '$ref' in node ? components[String(node.$ref)] : node;
 
-const idsOf = (bodyExamples: RequestExample[], ...parameters: object[]) =>
-  requestExamples(bodyExamples, Parameter.listIn({ parameters }, {}, resolve)).map((item) => item.id);
+const idsOf = (bodyExamples: RequestExample[], ...groups: OperationParameters[]) =>
+  requestExamples(bodyExamples, Parameter.listIn(groups, resolve)).map((item) => item.id);
 
 describe('requestExamples', () => {
   it('keeps the request body examples, whatever ids the parameters name', () => {
@@ -69,16 +75,12 @@ describe('requestExamples', () => {
     const [first] = requestExamples(
       [example('_default')],
       Parameter.listIn(
-        {
-          parameters: [
-            {
-              in: 'query',
-              name: 'view',
-              examples: { full: { summary: 'Everything', description: 'All fields', value: 1 } }
-            }
-          ]
-        },
-        {},
+        [
+          group('query', {
+            name: 'view',
+            examples: { full: { summary: 'Everything', description: 'All fields', value: 1 } }
+          })
+        ],
         resolve
       )
     );
@@ -90,27 +92,11 @@ describe('requestExamples', () => {
     expect(idsOf([example('_default')], parameter('query', 'view', 'Example'))).to.deep.equal(['_default']);
   });
 
-  it('reads parameters declared on the path item', () => {
-    const examples = requestExamples(
-      [example('_default')],
-      Parameter.listIn({}, { parameters: [parameter('path', 'itemId', 'a', 'b')] }, resolve)
-    );
-
-    expect(examples.map((item) => item.id)).to.deep.equal(['a', 'b']);
-  });
-
-  it('follows a parameter that is a reference', () => {
-    expect(idsOf([example('_default')], { $ref: '#/components/parameters/View' })).to.deep.equal(['summary', 'full']);
-  });
-
   it('follows a parameter example that is a reference', () => {
     const [first] = requestExamples(
       [example('_default')],
       Parameter.listIn(
-        {
-          parameters: [{ in: 'query', name: 'view', examples: { summary: { $ref: '#/components/examples/Summary' } } }]
-        },
-        {},
+        [group('query', { name: 'view', examples: { summary: { $ref: '#/components/examples/Summary' } } })],
         resolve
       )
     );
@@ -118,20 +104,12 @@ describe('requestExamples', () => {
     expect([first.id, first.name]).to.deep.equal(['summary', 'Summary']);
   });
 
-  it('skips malformed parameters and examples without a value', () => {
-    const parameters = Parameter.listIn(
-      {
-        parameters: [
-          null,
-          { in: 'body', name: 'x', examples: { a: { value: 1 } } },
-          { in: 'query', examples: { a: { value: 1 } } },
-          { in: 'query', name: 'view', examples: { external: { externalValue: 'https://example.com/a' } } }
-        ]
-      },
-      undefined,
-      resolve
-    );
-
-    expect(requestExamples([example('_default')], parameters).map((item) => item.id)).to.deep.equal(['_default']);
+  it('skips a parameter example without a value', () => {
+    expect(
+      idsOf(
+        [example('_default')],
+        group('query', { name: 'view', examples: { external: { externalValue: 'https://example.com/a' } } })
+      )
+    ).to.deep.equal(['_default']);
   });
 });

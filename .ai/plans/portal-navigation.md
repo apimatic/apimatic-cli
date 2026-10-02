@@ -21,7 +21,10 @@ things here, each also noted where it applies:
   their first nodes appear (portal-config section 5). A `nav.json` directly
   under `content/` may set `"root": true` to make its folder a tab. *(Amended
   2026-09-25: `root` is gone; a folder the root `nav.json` lists is a tab,
-  portal-config section 5.)*
+  portal-config section 5.)* *(Amended 2026-09-29, proposed: the root file's
+  `tabs` lists the tabs, and its `pages` orders Home's sidebar as every other
+  file's orders its folder; a token in `pages` places its section in Home.
+  Tokens stay valid only in the root file. Portal-config sections 5 and 16.)*
 - The `languages` requirement of section 4 lands with that PR, before the SDK
   page, which answers open question 2 of section 11.
 - The fallback home page of section 6 now exists and gets a node in the tree.
@@ -161,7 +164,12 @@ the page exists. The file gains a third setting, `root`, a boolean accepted only
 in the `nav.json` of a folder directly under `content/` other than
 `content/api/`; `true` makes that folder a tab of its own. The root file's
 order now also orders the tabs. *(Amended 2026-09-25: `root` is gone; each
-folder the root file lists is a tab, and its `title` names Home.)*
+folder the root file lists is a tab, and its `title` names Home.)* *(Amended
+2026-09-29, proposed: the root file gains `tabs`, a third setting beside
+`pages` and `title` now that `root` is gone, which lists and orders the tabs;
+its `pages` orders Home's sidebar only. Portal-config section 5.)* *(2026-09-30:
+built; `tabs` is the whole tab bar after Home, and a section it does not name
+is a folder in Home.)*
 
 *Amended 2026-09-24* (`.ai/plans/generated-pages.md`, sections 2 and 5): the
 generated pages are two folders, each a tab of its own, and each token claims
