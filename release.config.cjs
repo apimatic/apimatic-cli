@@ -1,45 +1,31 @@
+// A squash commit's body is its PR description; only the header may decide a version or a notes line.
+const headerOnly = { noteKeywords: null, issuePrefixes: null, fieldPattern: null };
+
 module.exports = {
-  // Three-tier release flow: alpha → beta → main.
-  // - `main`  publishes stable releases to the npm `latest` dist-tag.
-  // - `beta`  publishes prereleases to the `beta` dist-tag.
-  // - `alpha` publishes prereleases to the `alpha` dist-tag.
-  // The existing `v1.1.0-beta.*` git notes carry channels ["beta", null], so
-  // `main` (default/`latest` channel) sees beta.19 as its last release and
-  // graduates it to 1.1.0, while `beta` keeps its own counter — no notes
-  // migration is needed. (Previously `beta` used `channel: false` to point
-  // `latest` at the beta because no stable channel existed; `main` now owns it.)
   branches: [
-    // Keeps a release path for 1.x fixes once 2.0.0 prereleases exist on the other
-    // branches; without it a patch to the shipped major has nowhere to go.
+    // Cut from v1.5.0 only when a 1.x fix is needed (.ai/plans/release-pipeline.md, 7.6).
     "1.x",
     "main",
     {
       name: "beta",
       prerelease: true
-    },
-    {
-      name: "alpha",
-      prerelease: true
     }
   ],
   plugins: [
-    "@semantic-release/commit-analyzer",
-    "@semantic-release/release-notes-generator",
     [
-      "@semantic-release/changelog",
+      "@semantic-release/commit-analyzer",
       {
-        changelogFile: "CHANGELOG.md"
+        preset: "conventionalcommits",
+        parserOpts: headerOnly,
+        // A revert squash lacks git's "This reverts commit" line; a matched custom rule skips the defaults, hence breaking first.
+        releaseRules: [
+          { breaking: true, release: "major" },
+          { type: "revert", release: "patch" }
+        ]
       }
     ],
+    ["@semantic-release/release-notes-generator", { preset: "conventionalcommits", parserOpts: headerOnly }],
     "@semantic-release/npm",
-    "@semantic-release/github",
-    [
-      "@semantic-release/git",
-      {
-        assets: ["CHANGELOG.md", "package.json"],
-        message:
-          "chore(release): set `package.json` to ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}"
-      }
-    ]
+    "@semantic-release/github"
   ]
 };

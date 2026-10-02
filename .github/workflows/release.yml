@@ -2,13 +2,12 @@ name: Release
 
 on:
   push:
-    branches: [ alpha, beta, main, "1.x" ]
+    branches: [ beta, main, "1.x" ]
 
-permissions:
-  id-token: write  # Required for OIDC
-  contents: write       # needed by @semantic-release/github to needed to push tags/version commits
-  issues: write         # needed by @semantic-release/github
-  pull-requests: write  # needed if semantic-release comments on PRs
+# A second merge into the same branch waits for this run instead of racing it for the version.
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: false
 
 jobs:
   release:
@@ -19,9 +18,14 @@ jobs:
         # npm >= 11.5.1, and Node 24.5.0 is the first release whose bundled npm clears that.
         node: [ '24' ]
     name: Release with Node version ${{ matrix.node }}
+    permissions:
+      id-token: write       # Required for OIDC
+      contents: write       # pushes the release tag and its note, and creates the GitHub release
+      issues: write         # needed by @semantic-release/github
+      pull-requests: write  # needed if semantic-release comments on PRs
     steps:
       - name: Checkout CLI
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           repository: apimatic/apimatic-cli
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -37,7 +41,7 @@ jobs:
           standalone: true
 
       - name: setup node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: ${{ matrix.node }}
           cache: 'pnpm'
@@ -56,3 +60,73 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: pnpm exec semantic-release
+
+  # The release tag sits on main's merge commit, and a beta cut from a dev that cannot reach it gets the wrong version.
+  back-merge:
+    name: Merge main back into dev
+    needs: release
+    # Also after a failed release: the tag may already be on main.
+    if: ${{ !cancelled() && github.ref_name == 'main' }}
+    runs-on: ubuntu-latest
+    # A hung push would otherwise hold the next release behind the concurrency group for six hours.
+    timeout-minutes: 10
+    # Holds the deploy key that dev's ruleset lets push; the environment admits only main.
+    environment: back-merge
+    permissions:
+      contents: read
+    steps:
+      - name: look for the back-merge key
+        id: key
+        env:
+          KEY: ${{ secrets.BACK_MERGE_DEPLOY_KEY }}
+        run: echo "present=$([ -n "$KEY" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
+      - name: checkout dev
+        if: steps.key.outputs.present == 'true'
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: dev
+          fetch-depth: 0
+          ssh-key: ${{ secrets.BACK_MERGE_DEPLOY_KEY }}
+
+      - name: merge main into dev
+        if: steps.key.outputs.present == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          for _ in 1 2 3; do
+            git fetch --quiet origin dev main
+            git reset --quiet --hard origin/dev
+            if ! git merge --no-ff --no-edit -m "chore: merge main into dev" origin/main; then
+              git merge --abort
+              {
+                echo "### main conflicts with dev, so it was not merged back"
+                echo "Cut \`<name>/merge-main\` from dev, merge origin/main into it, resolve the conflicts, and open a PR into dev. Until it is merged, dev → beta is refused."
+                echo "Its merge button offers only **Squash and merge**, which would leave the release tag out of dev: an admin adds **merge commit** to dev's ruleset, merges the PR with **Create a merge commit**, and sets the ruleset back to squash only."
+              } >> "$GITHUB_STEP_SUMMARY"
+              exit 1
+            fi
+            if rejection=$(git push --quiet origin HEAD:dev 2>&1); then exit 0; fi
+            echo "$rejection"
+            # Only a push that lost a race with another merge into dev is worth another try.
+            case "$rejection" in
+              *"(fetch first)"*|*"(non-fast-forward)"*) ;;
+              *)
+                {
+                  echo "### dev refused the back-merge push"
+                  echo "Every ruleset that requires a pull request on dev must list deploy keys as a bypass actor (\`.ai/plans/release-pipeline.md\`, 7.3); then re-run this job."
+                } >> "$GITHUB_STEP_SUMMARY"
+                exit 1 ;;
+            esac
+          done
+          echo "### main was merged into dev, but dev kept moving and the push failed three times; re-run this job." >> "$GITHUB_STEP_SUMMARY"
+          exit 1
+
+      - name: link the back-merge
+        if: steps.key.outputs.present != 'true'
+        run: |
+          {
+            echo "### Next: merge main back into dev"
+            echo "Open $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/compare/dev...main?expand=1&title=chore%3A%20merge%20main%20into%20dev and merge it with **Create a merge commit**; a squash leaves the release tag out of dev."
+            echo "dev's ruleset allows only squash, so an admin adds **merge commit** to it for this one PR and sets it back to squash only afterwards."
+          } >> "$GITHUB_STEP_SUMMARY"
