@@ -22,7 +22,7 @@ export class SpecContext {
   public async install(specPath: FilePath): Promise<Result<void, string>> {
     await this.fileService.createDirectoryIfNotExists(this.specDirectory);
     if (await this.fileService.isZipFile(specPath)) {
-      return this.zipService.unArchive(specPath, this.specDirectory);
+      return await this.zipService.unArchive(specPath, this.specDirectory);
     }
     await this.fileService.copy(specPath, specPath.replaceDirectory(this.specDirectory));
     return ok(undefined);

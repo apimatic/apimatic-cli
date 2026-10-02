@@ -64,16 +64,16 @@ describe('ZipService', () => {
       (await new ZipService().archive(source, archive))._unsafeUnwrap();
       const destination = new DirectoryPath(path.join(root, 'destination'));
 
-      expect(new ZipService().unArchive(archive, destination).isOk()).to.be.true;
+      expect((await new ZipService().unArchive(archive, destination)).isOk()).to.be.true;
 
       expect(fs.readFileSync(path.join(destination.toString(), 'openapi.json'), 'utf-8')).to.equal('{}');
       expect(fs.readFileSync(path.join(destination.toString(), 'paths', 'pets.json'), 'utf-8')).to.equal('[]');
     });
 
-    it('reports a file that is not an archive', () => {
+    it('reports a file that is not an archive', async () => {
       fs.writeFileSync(archive.toString(), 'not a zip');
 
-      const unpacked = new ZipService().unArchive(archive, new DirectoryPath(path.join(root, 'destination')));
+      const unpacked = await new ZipService().unArchive(archive, new DirectoryPath(path.join(root, 'destination')));
 
       expect(unpacked._unsafeUnwrapErr()).to.not.be.empty;
     });

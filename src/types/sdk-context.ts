@@ -39,7 +39,7 @@ export class SdkContext {
   ): Promise<Result<DirectoryPath, string>> {
     const tempSdkDirectory = tempDirectory.join('sdk-original');
     await this.fileService.createDirectoryIfNotExists(tempSdkDirectory);
-    const unpacked = this.zipService.unArchive(tempSdk, tempSdkDirectory);
+    const unpacked = await this.zipService.unArchive(tempSdk, tempSdkDirectory);
     return unpacked.map(() => tempSdkDirectory);
   }
 }

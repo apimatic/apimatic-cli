@@ -32,6 +32,6 @@ export class PluginContext {
   public async save(tempPluginFilePath: FilePath): Promise<Result<void, string>> {
     // This directory is the user's repository once published: emptying it outright would discard their history.
     await this.fileService.cleanDirectoryExcluding(this.pluginDirectory, [new FileName(GIT_DIRECTORY_NAME)]);
-    return this.zipService.unArchive(tempPluginFilePath, this.pluginDirectory);
+    return await this.zipService.unArchive(tempPluginFilePath, this.pluginDirectory);
   }
 }
