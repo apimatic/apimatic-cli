@@ -1,5 +1,5 @@
-const { execFileSync } = require('child_process');
-const path = require('path');
+const { execFileSync } = require('node:child_process');
+const path = require('node:path');
 
 function nodeVersionOf(executable) {
   return execFileSync(executable, ['-p', 'process.versions.node'], { encoding: 'utf8', timeout: 10000 }).trim();
@@ -43,7 +43,7 @@ function verdict(range, version) {
 if (require.main === module) {
   const { engines } = require('../package.json');
   const running = { execPath: process.execPath, version: process.versions.node };
-  const result = verdict(engines && engines.node, installingVersion(process.env, running, nodeVersionOf));
+  const result = verdict(engines?.node, installingVersion(process.env, running, nodeVersionOf));
   if (result.refused) {
     console.error(result.message);
     process.exitCode = 1;
