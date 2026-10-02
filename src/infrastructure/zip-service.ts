@@ -3,8 +3,11 @@ import yazl from 'yazl';
 import AdmZip from 'adm-zip';
 import { err, ok, Result } from 'neverthrow';
 import { DirectoryPath } from '../types/file/directoryPath.js';
+import { FileName } from '../types/file/fileName.js';
 import { FilePath } from '../types/file/filePath.js';
 import { errorMessage } from '../utils/error-utils.js';
+
+type ZipEntry = { file: FilePath; metadataPath: string };
 
 export class ZipService {
   public async archive(sourceDir: DirectoryPath, outputZipPath: FilePath): Promise<Result<void, string>> {
@@ -27,23 +30,8 @@ export class ZipService {
   }
 
   private async write(sourceDir: DirectoryPath, outputZipPath: FilePath): Promise<void> {
+    const entries = this.entriesUnder(sourceDir, '');
     const zipfile = new yazl.ZipFile();
-
-    const addDirectory = (dir: DirectoryPath, relativePrefix: string) => {
-      for (const entry of fs.readdirSync(dir.toString(), { withFileTypes: true })) {
-        const fullPath = dir.join(entry.name);
-        // Always use forward slashes as metadataPath — zip format requires it
-        const metadataPath = relativePrefix ? `${relativePrefix}/${entry.name}` : entry.name;
-        if (entry.isDirectory()) {
-          addDirectory(fullPath, metadataPath);
-        } else {
-          zipfile.addFile(fullPath.toString(), metadataPath);
-        }
-      }
-    };
-
-    addDirectory(sourceDir, '');
-    zipfile.end();
 
     return new Promise((resolve, reject) => {
       const output = fs.createWriteStream(outputZipPath.toString());
@@ -51,6 +39,20 @@ export class ZipService {
       output.on('error', reject);
       output.on('close', resolve);
       zipfile.outputStream.pipe(output);
+      for (const { file, metadataPath } of entries) {
+        zipfile.addFile(file.toString(), metadataPath);
+      }
+      zipfile.end();
+    });
+  }
+
+  private entriesUnder(dir: DirectoryPath, relativePrefix: string): ZipEntry[] {
+    return fs.readdirSync(dir.toString(), { withFileTypes: true }).flatMap((entry) => {
+      // Always use forward slashes as metadataPath — zip format requires it
+      const metadataPath = relativePrefix ? `${relativePrefix}/${entry.name}` : entry.name;
+      return entry.isDirectory()
+        ? this.entriesUnder(dir.join(entry.name), metadataPath)
+        : [{ file: new FilePath(dir, new FileName(entry.name)), metadataPath }];
     });
   }
 
