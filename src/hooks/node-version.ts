@@ -1,8 +1,8 @@
 import { Hook } from '@oclif/core';
 import semver from 'semver';
 
-// npm and pnpm only warn when the installed Node falls outside `engines.node`, so without
-// this the install succeeds and the failure surfaces later as an unrelated-looking crash.
+// `bin/preinstall.cjs` only stops installs that run scripts, and Node can be switched after installing, so
+// without this an unsupported Node surfaces later as an unrelated-looking crash.
 const hook: Hook.Init = async function () {
   const supported = this.config.pjson.engines?.node;
   if (supported !== undefined && !semver.satisfies(process.versions.node, supported)) {
