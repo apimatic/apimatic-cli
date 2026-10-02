@@ -1,13 +1,14 @@
 # Plan: a release is a merge
 
 Status: 7.2 implemented on this branch and code-reviewed, then extended with
-the automatic back-merge (D8) and narrowed to `main` and `beta` (D9); 7.1 and
-7.3 onward are admin and release-day steps, not yet taken. The plan was
-reviewed once before implementation (section 10). Grounded in `dev` at
-`74ad5d2e`, `beta` at `8581f9e8` and `main` at `c199698a`, and in the
-repository settings and rulesets as read on 2026-09-29. Every version number in
-section 5 comes from running semantic-release 25.0.3, with this plan's
-configuration, against a local copy of the repository (section 10).
+the automatic back-merge (D8), narrowed to `main` and `beta` (D9), and `dev`
+restricted to squash (D10); 7.1 and 7.3 onward are admin and release-day
+steps, not yet taken. The plan was reviewed once before implementation
+(section 10). Grounded in `dev` at `74ad5d2e`, `beta` at `8581f9e8` and `main`
+at `c199698a`, and in the repository settings and rulesets as read on
+2026-09-29. Every version number in section 5 comes from running
+semantic-release 25.0.3, with this plan's configuration, against a local copy
+of the repository (section 10).
 
 ## 1. Goal and scope
 
@@ -16,14 +17,15 @@ Merging a pull request is the whole release:
 - into `main`, it publishes a stable version to the npm `latest` dist-tag;
 - into `beta`, a prerelease to `beta`.
 
-No ruleset is switched off, no branch is deleted and recreated, no file is
-edited by hand, and the generated notes can be published as they are. The
-main → dev back-merge that follows a stable release or a hotfix is made by the
-release run itself (7.2, item 3). Two things still need a person, both made
-plain where they occur:
+No ruleset is switched off around a release, no branch is deleted and
+recreated, no file is edited by hand, and the generated notes can be published
+as they are. The main → dev back-merge that follows a stable release or a
+hotfix is made by the release run itself (7.2, item 3). Two things still need a
+person, both made plain where they occur:
 
 - a back-merge that conflicts with `dev`. The next promotion is refused until
-  someone resolves it, so it cannot be missed (7.2, item 4);
+  someone resolves it, so it cannot be missed (7.2, item 4), and an admin
+  widens dev's ruleset for that one merge commit (D10);
 - 2.0.0's notes, which are curated once (7.4, step 5).
 
 Out of scope: what goes into a release, and the follow-ups in section 9.
@@ -167,12 +169,13 @@ the beta line. The CLI never fetches the URL; only editors use it.
 | D7 | `1.x` is created only if a 1.x patch is ever needed, from `v1.5.0`. | Creating it now: nothing ships on it yet, and it needs the bootstrap PR in 7.6 either way. |
 | D8 | After every push to `main`, the release run merges `main` into `dev` with a merge commit and pushes it. It pushes with a deploy key, the only bypass actor on dev's ruleset, kept in a `back-merge` environment that admits only `main`. `dev → beta` is refused while `dev` lacks `main`. | A manual back-merge: the one step anyone could forget, and a forgotten one ships a mis-numbered beta. A GitHub App: more to create and maintain for the same bypass. `@saithodev/semantic-release-backmerge`: it rebases by default, which loses the tag, and it puts the push credential inside the publishing job. A fast-forward promotion that would make the back-merge unnecessary: GitHub cannot fast-forward a PR merge. |
 | D9 | No `alpha` branch: `main` and `beta` are the release branches, and `release.config.cjs`, `release.yml` and `test.yml` stop naming `alpha`. | Keeping it: nothing has shipped on it since 1.1.0-alpha.22, and a second prerelease line costs a promotion PR, a ruleset entry and a gate case each time. Keeping it dormant in the config: an `alpha` branch created by accident would publish on its first push. |
+| D10 | `dev`'s ruleset allows only squash. The release run's back-merge pushes past it with the deploy key. The only PRs into `dev` that must be merge commits, the conflict path's `<name>/merge-main` and the linked main → dev PR before the key exists, need an admin to add merge commit to the ruleset's allowed methods for that merge and remove it afterwards. | Allowing both methods on `dev`: whoever merges picks from a dropdown, and a feature PR merged with a merge commit lands its branch's commits on `dev` unlinted, since `Commit messages` reads only the title. Each one that parses as a conventional commit gets a line in the notes and can move the version, and no check catches it. A dispatched job that fast-forwards `dev` to the resolved branch with the key, so that no ruleset is touched: another guarded use of the key, and it skips the PR's approval unless the job checks it. |
 
 ## 4. The model
 
 | Branch | Takes PRs from | Merge method | Publishes |
 |---|---|---|---|
-| `dev` | feature and fix branches; the release run's back-merge from `main`, or a `<name>/merge-main` branch when it conflicts | squash for branches; **merge commit** for a back-merge | nothing |
+| `dev` | feature and fix branches; the release run's back-merge from `main`, or a `<name>/merge-main` branch when it conflicts | squash, the only method the ruleset allows; a back-merge is a **merge commit**, pushed past the ruleset by the release run or let through by an admin (D10) | nothing |
 | `beta` | `dev` | merge commit | `x.y.z-beta.N` → `beta` |
 | `main` | `beta`; hotfix branches cut from `main` | merge commit | `x.y.z` → `latest` |
 | `1.x` | fix branches cut from `1.x` | merge commit | `1.x.y` → `release-1.x` |
@@ -183,9 +186,12 @@ the beta line. The CLI never fetches the URL; only editors use it.
    conventional commit (no release) or duplicates changes that will arrive
    again (2.5). A rebase gives the commits new hashes, so the release branch
    stops containing dev's commits and the next promotion conflicts.
-2. **Only `dev` squashes**, so one PR is one commit and one line in the notes.
-   The PR title is the line users read, and `Commit messages` refuses a title
-   that is not a conventional header before the PR can merge.
+2. **Only `dev` squashes, and `dev` only squashes**, so one PR is one commit
+   and one line in the notes. The PR title is the line users read, and
+   `Commit messages` refuses a title that is not a conventional header before
+   the PR can merge. Its ruleset allows no other method (D10): a feature PR
+   merged with a merge commit would land commits nobody linted, and the next
+   promotion would read every one of them.
 3. **After every push to `main`, stable release or hotfix, `main` is merged
    into `dev` with a merge commit, and the release run does it (D8).** The
    `v2.0.0` tag sits on main's merge commit. Until `dev` can reach it, the
@@ -364,10 +370,11 @@ Branch `saeedjamshaid/release-pipeline` → `dev`, titled
        4. When `dev` already contains `main`, the merge is a no-op and the job
           succeeds.
        5. On a conflict, the job aborts the merge, leaves `dev` alone, fails,
-          and says in the run summary how to finish it by hand.
+          and says in the run summary how to finish it by hand, the ruleset
+          step of D10 included.
      - **Without the key** (before 7.3's setup): it writes the compare link
-       into the run summary, with the PR title filled in, for a person to open.
-       So this PR can merge before the key exists.
+       into the run summary, with the PR title filled in and the same ruleset
+       step, for a person to open. So this PR can merge before the key exists.
    - The `permissions` block moves from the workflow to the `release` job, so
      each job states its own token, and the `contents: write` comment stops
      mentioning "version commits". SonarCloud fails the gate on a
@@ -435,7 +442,8 @@ Branch `saeedjamshaid/release-pipeline` → `dev`, titled
      - the release run makes the back-merge itself, and a promotion is refused
        without it;
      - the conflict path's `<name>/merge-main` branch, cut from `dev`, is
-       merged with a merge commit, because a squash there loses the tag.
+       merged with a merge commit, because a squash there loses the tag, and
+       an admin widens dev's ruleset for it (D10).
    - **Commit Conventions:**
      - the PR title becomes the squash commit's header;
      - a revert PR is titled `revert(scope): …` and releases a patch; the
@@ -497,7 +505,7 @@ Verification:
 
 | Ruleset | Targets | Rules | Bypass |
 |---|---|---|---|
-| `dev` (rename `dev branch merge method`) | `refs/heads/dev` | require a pull request; allowed merge methods: **squash and merge commit**; 1 approval (what `no-direct-commits` enforced); required checks `Commit messages` and `Promotion source`; up to date off; block force pushes and deletion | **deploy keys**, mode **always**: the back-merge key below is the only one |
+| `dev` (rename `dev branch merge method`) | `refs/heads/dev` | require a pull request; allowed merge method: **squash** only (D10); 1 approval (what `no-direct-commits` enforced); required checks `Commit messages` and `Promotion source`; up to date off; block force pushes and deletion | **deploy keys**, mode **always**: the back-merge key below is the only one |
 | `release branches` (replaces `main branch merge method`) | `refs/heads/main`, `refs/heads/beta` | require a pull request; allowed merge method: **merge commit** only; 1 approval; required checks `ubuntu-latest / Node 24`, `ubuntu-latest / Node 26`, `windows-latest / Node 24`, `windows-latest / Node 26`, `macos-latest / Node 24`, `macos-latest / Node 26`, `Commit messages`, `Promotion source`; **require branches to be up to date: off**; block force pushes and deletion | repository admin, mode **pull requests only** |
 | `release tags` (new, targets tags) | `refs/tags/v*` | restrict updates; restrict deletions. Creations stay allowed, because semantic-release creates the tags. | repository admin, mode **always** (a tag cannot be deleted through a PR) |
 | `no-direct-commits` | | deleted last, once the three above are active, so no branch is ever unprotected | |
@@ -505,6 +513,14 @@ Verification:
 - **"Up to date" must stay off.** A release branch always has promotion merge
   commits that `dev` never gets. So every promotion PR would count as out of
   date forever, and "Update branch" would commit to the release branch.
+- **Squash only on `dev` (D10).** The back-merge key bypasses the whole
+  ruleset, so the restriction never touches the release run. A
+  `<name>/merge-main` PR, or the linked main → dev PR before the key exists,
+  are the only PRs into `dev` that must be merge commits. Their merge button
+  offers only **Squash and merge** until an admin adds **merge commit** to the
+  ruleset's allowed merge methods; the admin merges the PR with **Create a
+  merge commit** and removes the method again. While it is widened, `dev`
+  still requires a pull request, one approval and both checks.
 - **A PR into `dev` opened before 7.2 merged reports the two checks only after
   its next event.** Editing its title once is enough; the workflow runs on
   `edited`.
@@ -576,8 +592,8 @@ tags stay behind rulesets that list no deploy keys.
      describe both;
    - fixes to 2.0-only work are left out of these notes.
 6. Check the release run's `back-merge` job: `dev` now contains `main`. Without
-   the key yet, open the back-merge from the link in its summary and merge it
-   with **Create a merge commit**.
+   the key yet, open the back-merge from the link in its summary, have an admin
+   widen dev's ruleset (7.3), and merge it with **Create a merge commit**.
 7. PR into `dev`: `chore: retire CHANGELOG.md and the committed version`.
    `dev` now has main's copies, so there is no conflict.
    - `CHANGELOG.md` opens with a line pointing at GitHub Releases. It keeps the
@@ -650,15 +666,18 @@ It has no `test.yml` and no `pull-requests.yml`. Its lockfile resolves
   conflict): GitHub's "Resolve conflicts" button would commit to `main`, which
   the ruleset blocks. Until this is done, `dev → beta` is refused. Instead:
   1. Cut a `<name>/merge-main` branch from `dev`.
-  2. Merge `origin/main` into it and resolve the conflicts.
-  3. Merge that PR into `dev` with a merge commit.
+  2. Merge `origin/main` into it, resolve the conflicts, and open the PR into
+     `dev`.
+  3. An admin adds **merge commit** to dev's ruleset, merges the PR with
+     **Create a merge commit**, and sets the ruleset back to squash only.
+     Until then the merge button offers only **Squash and merge**.
 
 When something goes wrong:
 
 - **A hand-made back-merge was squashed.** `dev` still lacks main's commit, so
-  the next `dev → beta` is refused. Make the back-merge again
-  with a merge commit; the content is already there, so only the ancestry
-  changes.
+  the next `dev → beta` is refused. Make the back-merge again, with the
+  ruleset widened and a merge commit; the content is already there, so only
+  the ancestry changes.
 - **The back-merge push was refused.** A ruleset that requires a pull request
   on `dev` does not list deploy keys as a bypass actor (7.3). Fix the ruleset
   and re-run the job.
@@ -785,3 +804,8 @@ When something goes wrong:
   steps against this configuration: every `beta` and `main` row of section 5
   came out the same, and no branch moved. The promotion harness lost its three
   alpha cases.
+- **`dev` restricted to squash (D10, 2026-10-02).** Asked for because a feature
+  PR merged with a merge commit was the one wrong merge method nothing caught.
+  The conflict path and the no-key path gain the admin step, in the job's two
+  summaries, 7.3, 7.4, section 8 and the instructions. The job's script is
+  unchanged.

@@ -101,7 +101,8 @@ jobs:
               git merge --abort
               {
                 echo "### main conflicts with dev, so it was not merged back"
-                echo "Cut \`<name>/merge-main\` from dev, merge origin/main into it, resolve the conflicts, and merge that PR into dev with **Create a merge commit**. Until then, dev → beta is refused."
+                echo "Cut \`<name>/merge-main\` from dev, merge origin/main into it, resolve the conflicts, and open a PR into dev. Until it is merged, dev → beta is refused."
+                echo "Its merge button offers only **Squash and merge**, which would leave the release tag out of dev: an admin adds **merge commit** to dev's ruleset, merges the PR with **Create a merge commit**, and sets the ruleset back to squash only."
               } >> "$GITHUB_STEP_SUMMARY"
               exit 1
             fi
@@ -127,4 +128,5 @@ jobs:
           {
             echo "### Next: merge main back into dev"
             echo "Open $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/compare/dev...main?expand=1&title=chore%3A%20merge%20main%20into%20dev and merge it with **Create a merge commit**; a squash leaves the release tag out of dev."
+            echo "dev's ruleset allows only squash, so an admin adds **merge commit** to it for this one PR and sets it back to squash only afterwards."
           } >> "$GITHUB_STEP_SUMMARY"
