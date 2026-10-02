@@ -89,7 +89,7 @@ export class ProjectContext {
     tempDirectory: DirectoryPath,
     packageSettingsDirectory?: DirectoryPath
   ): Promise<Result<FilePath, string>> {
-    const staged = tempDirectory.join('src');
+    const staged = tempDirectory.join(SOURCE_DIRECTORY_NAME);
     await this.fileService.copyDirectoryContents(this.source, staged);
     if (packageSettingsDirectory) {
       await this.fileService.copyDirectoryContents(packageSettingsDirectory, staged.join('package-settings'));
