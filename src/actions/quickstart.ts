@@ -115,19 +115,17 @@ export class QuickstartAction {
     // Dropped once the CLI's own sample has failed: re-offering the address the user just
     // watched fail, pre-filled, is the one suggestion that cannot work.
     let sampleUrl: UrlPath | null = this.defaultSpecUrl;
-    let spec: ResourceContext<FilePath | UrlPath>;
-    let specFile: FilePath;
+    let spec: ResourceContext;
     for (;;) {
       const input = await this.prompts.specPathPrompt(sampleUrl);
       if (!input) {
         this.prompts.noSpecSpecified();
         return ActionResult.cancelled();
       }
-      spec = ResourceContext.resolveTo(input, tempDirectory);
-      const resolved =
-        spec.kind() === 'url' ? await this.prompts.downloadSpecFile(spec.resolveTo()) : await spec.resolveTo();
+      const resolving = ResourceContext.resolveTo(input, tempDirectory);
+      const resolved = input instanceof UrlPath ? await this.prompts.downloadSpecFile(resolving) : await resolving;
       if (resolved.isOk()) {
-        specFile = resolved.value;
+        spec = resolved.value;
         break;
       }
       this.prompts.specUnavailable(resolved.error);
@@ -149,14 +147,15 @@ export class QuickstartAction {
         return ActionResult.cancelled();
       }
       const sample = await this.prompts.downloadSpecFile(
-        ResourceContext.resolveTo(this.defaultSpecUrl, tempDirectory.join('sample')).resolveTo()
+        ResourceContext.resolveTo(this.defaultSpecUrl, tempDirectory.join('sample'))
       );
       if (sample.isErr()) {
         this.prompts.specUnavailable(sample.error);
         return ActionResult.failed();
       }
-      specFile = sample.value;
+      spec = sample.value;
     }
+    const specFile = spec.file();
 
     // The validation above accepts Swagger 2.0, which a portal cannot be built from. Asked
     // here rather than left to `portal serve`, which refuses only once the project is

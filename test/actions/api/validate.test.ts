@@ -127,15 +127,13 @@ describe('ValidateAction', () => {
     const download = sinon
       .stub(FileDownloadService.prototype, 'downloadFile')
       .resolves(ok({ stream: Readable.from(['openapi: 3.0.3']), filename: new FileName('openapi.yaml') }));
-    const spec = ResourceContext.resolveTo(
-      new UrlPath('https://example.org/openapi.yaml'),
-      workingDirectory.join('temp')
-    );
-    const resolved = (await spec.resolveTo())._unsafeUnwrap();
+    const spec = (
+      await ResourceContext.resolveTo(new UrlPath('https://example.org/openapi.yaml'), workingDirectory.join('temp'))
+    )._unsafeUnwrap();
 
     expect((await validate(spec)).isSuccess()).to.be.true;
     expect(download.calledOnce).to.be.true;
-    expect((validateViaFile.firstCall.args[0] as ValidateViaFileParams).file).to.equal(resolved);
-    expect(fs.existsSync(resolved.toString()), 'the file outlives the validation').to.be.true;
+    expect((validateViaFile.firstCall.args[0] as ValidateViaFileParams).file).to.equal(spec.file());
+    expect(fs.existsSync(spec.file().toString()), 'the file outlives the validation').to.be.true;
   });
 });

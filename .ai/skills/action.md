@@ -171,16 +171,16 @@ export class {PascalName}Action {
     // 3. Business logic wrapped in withDirPath for temp directory
     return await withDirPath(async (tempDirectory) => {
       // 4. Resolve resources / prepare context
-      //    const specFileDirResult = await ResourceContext.resolveTo(resourcePath, tempDirectory).resolveTo();
-      //    if (specFileDirResult.isErr()) {
-      //      this.prompts.networkError(specFileDirResult.error);
+      //    const spec = await ResourceContext.resolveTo(resourcePath, tempDirectory);
+      //    if (spec.isErr()) {
+      //      this.prompts.networkError(spec.error);
       //      return ActionResult.failed();
       //    }
 
       // 5. Service call via prompts spinner
       //    const response = await this.prompts.spinnerMethod(
       //      this.someService.doSomething({
-      //        file: specFileDirResult.value,
+      //        file: spec.value.file(),
       //        commandMetadata: this.commandMetadata,
       //        authKey: this.authKey
       //      })

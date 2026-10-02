@@ -28,18 +28,18 @@ export class ValidateAction {
     displayValidationSummary = true
   ): Promise<ActionResult<void, ValidationFailure>> => {
     if (!(spec instanceof ResourceContext)) {
-      return await withDirPath((tempDirectory) =>
-        this.execute(ResourceContext.resolveTo(spec, tempDirectory), displayValidationSummary)
-      );
-    }
-    const specFile = await spec.resolveTo();
-    if (specFile.isErr()) {
-      this.prompts.specUnavailable(specFile.error);
-      return ActionResult.failed(undefined, 'unchecked');
+      return await withDirPath(async (tempDirectory) => {
+        const resolved = await ResourceContext.resolveTo(spec, tempDirectory);
+        if (resolved.isErr()) {
+          this.prompts.specUnavailable(resolved.error);
+          return ActionResult.failed(undefined, 'unchecked');
+        }
+        return await this.execute(resolved.value, displayValidationSummary);
+      });
     }
     const validationSummaryResult = await this.prompts.validateApi(
       this.validationService.validateViaFile({
-        file: specFile.value,
+        file: spec.file(),
         commandMetadata: this.commandMetadata,
         authKey: this.authKey
       })

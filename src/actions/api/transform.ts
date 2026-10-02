@@ -32,12 +32,12 @@ export class TransformAction {
     force: boolean
   ): Promise<ActionResult> => {
     return await withDirPath(async (tempDirectory) => {
-      const specFileDirResult = await ResourceContext.resolveTo(resourcePath, tempDirectory).resolveTo();
-      if (specFileDirResult.isErr()) {
-        this.validatePrompts.specUnavailable(specFileDirResult.error);
+      const spec = await ResourceContext.resolveTo(resourcePath, tempDirectory);
+      if (spec.isErr()) {
+        this.validatePrompts.specUnavailable(spec.error);
         return ActionResult.failed();
       }
-      const transformContext = new TransformContext(specFileDirResult.value, format, destination);
+      const transformContext = new TransformContext(spec.value.file(), format, destination);
       if (!force && (await transformContext.exists()) && !(await this.prompts.overwriteApi(destination))) {
         this.prompts.transformedApiAlreadyExists();
         return ActionResult.cancelled();
@@ -45,7 +45,7 @@ export class TransformAction {
 
       const result = await this.prompts.transformApi(
         this.transformationService.transformViaFile({
-          file: specFileDirResult.value,
+          file: spec.value.file(),
           format: format,
           configDir: this.configDir,
           commandMetadata: this.commandMetadata,
