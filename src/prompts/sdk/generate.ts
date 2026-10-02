@@ -7,6 +7,7 @@ import { withSpinner } from '../prompt.js';
 import { ServiceError } from '../../infrastructure/service-error.js';
 import { AVAILABLE_LANGUAGES, Language, languageLabel, UPCOMING_LANGUAGES } from '../../types/sdk/generate.js';
 import { VersionProblem } from '../../types/project-context.js';
+import { SdkSaveProblem } from '../../types/sdk-context.js';
 
 const names = (languages: readonly Language[]) => languages.map(languageLabel).join(', ');
 
@@ -74,8 +75,8 @@ export class SdkGeneratePrompts {
     log.error(`${ServiceError.InvalidResponse.errorMessage}\n${problem.reason}`);
   }
 
-  public sdkNotSaved(sdkDirectory: DirectoryPath, problem: FileProblem) {
-    log.error(`The SDK could not be saved to ${f.path(sdkDirectory)}: ${problem.reason}`);
+  public sdkNotSaved(problem: SdkSaveProblem) {
+    log.error(`The SDK could not be saved to ${f.path(problem.sdkDirectory)}: ${problem.reason}`);
   }
 
   public noVersionToBuild(problem: VersionProblem, sourceDirectory: DirectoryPath) {

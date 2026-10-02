@@ -7,6 +7,8 @@ import { FileProblem } from './file/file-problem.js';
 import { Language } from './sdk/generate.js';
 import { ZipService } from '../infrastructure/zip-service.js';
 
+export type SdkSaveProblem = FileProblem & { sdkDirectory: DirectoryPath };
+
 export class SdkContext {
   private readonly fileService = new FileService();
   private readonly zipService = new ZipService();
@@ -24,14 +26,16 @@ export class SdkContext {
     return !(await this.fileService.directoryEmpty(this.sdkDirectory));
   }
 
-  public async save(tempSdkDirectory: DirectoryPath, zipSdk: boolean): Promise<Result<DirectoryPath, FileProblem>> {
+  public async save(tempSdkDirectory: DirectoryPath, zipSdk: boolean): Promise<Result<DirectoryPath, SdkSaveProblem>> {
     await this.fileService.cleanDirectory(this.sdkDirectory);
     if (!zipSdk) {
       await this.fileService.copyDirectoryContents(tempSdkDirectory, this.sdkDirectory);
       return ok(this.sdkDirectory);
     }
     const archived = await this.zipService.archive(tempSdkDirectory, this.zipPath);
-    return archived.map(() => this.sdkDirectory).mapErr((reason): FileProblem => ({ kind: 'zipFailed', reason }));
+    return archived
+      .map(() => this.sdkDirectory)
+      .mapErr((reason): SdkSaveProblem => ({ kind: 'zipFailed', reason, sdkDirectory: this.sdkDirectory }));
   }
 
   public async loadSdkInTempDirectory(

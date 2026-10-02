@@ -32,12 +32,13 @@ describe('SdkContext', () => {
       expect(fs.existsSync(inRoot('sdk', 'python', 'python.zip'))).to.be.true;
     });
 
-    it('reports an SDK it could not zip, and leaves no archive behind', async () => {
+    it('reports an SDK it could not zip, naming its language directory, and leaves no archive behind', async () => {
       const saved = await context.save(new DirectoryPath(inRoot('missing')), true);
 
       const problem = saved._unsafeUnwrapErr();
       expect(problem.kind).to.equal('zipFailed');
       expect(problem.reason).to.contain('ENOENT');
+      expect(problem.sdkDirectory.toString()).to.equal(inRoot('sdk', 'python'));
       expect(fs.existsSync(inRoot('sdk', 'python', 'python.zip'))).to.be.false;
     });
   });

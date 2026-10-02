@@ -102,7 +102,7 @@ export class GenerateAction {
 
       const saved = await sdkContext.save(tempSdk.value, zipSdk);
       if (saved.isErr()) {
-        this.prompts.sdkNotSaved(sdkDirectory, saved.error);
+        this.prompts.sdkNotSaved(saved.error);
         return ActionResult.failed();
       }
 

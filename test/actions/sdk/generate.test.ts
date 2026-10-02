@@ -16,7 +16,6 @@ import { FileName } from '../../../src/types/file/fileName.js';
 import { FilePath } from '../../../src/types/file/filePath.js';
 import { FileProblem } from '../../../src/types/file/file-problem.js';
 import { ProjectContext } from '../../../src/types/project-context.js';
-import { SdkContext } from '../../../src/types/sdk-context.js';
 import { Language, Stability } from '../../../src/types/sdk/generate.js';
 import { TempContext } from '../../../src/types/temp-context.js';
 
@@ -88,14 +87,18 @@ describe('GenerateAction (sdk)', () => {
     expect(problem.reason).to.not.be.empty;
   });
 
-  it('reports an SDK it could not save, naming the destination', async () => {
-    const problem: FileProblem = { kind: 'zipFailed', reason: 'ENOSPC: no space left on device, write' };
-    sinon.stub(SdkContext.prototype, 'save').resolves(err(problem));
+  it('reports an SDK it could not save, naming its language directory', async () => {
+    const archive = sinon.stub(ZipService.prototype, 'archive').callThrough();
+    archive.onSecondCall().resolves(err('ENOSPC: no space left on device, write'));
     const sdkNotSaved = sinon.stub(SdkGeneratePrompts.prototype, 'sdkNotSaved');
     const sdkGenerated = sinon.stub(SdkGeneratePrompts.prototype, 'sdkGenerated');
 
     expect((await execute(true)).isFailed()).to.be.true;
-    expect(sdkNotSaved.firstCall.args).to.deep.equal([sdkDirectory, problem]);
+    expect(sdkNotSaved.firstCall.args[0]).to.deep.equal({
+      kind: 'zipFailed',
+      reason: 'ENOSPC: no space left on device, write',
+      sdkDirectory: sdkDirectory.join('python')
+    });
     expect(sdkGenerated.called).to.be.false;
   });
 });
