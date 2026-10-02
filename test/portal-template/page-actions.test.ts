@@ -2,13 +2,8 @@ import { expect } from 'chai';
 import { createServer, type Plugin, type ViteDevServer } from 'vite';
 
 const ENTRY = 'virtual:page-actions-fixture';
-const POPOVER_STUB = '\0page-actions-popover-stub';
+const ALWAYS_OPEN_POPOVER = '\0page-actions-always-open-popover';
 
-/**
- * Renders the page actions the content route renders, for a page whose Markdown companion is
- * at `markdownUrl`. The popover is stubbed to render its content inline, as an open popover
- * would, so the links can be read off the server-rendered markup.
- */
 const fixture = `
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -26,7 +21,7 @@ export function render(markdownUrl) {
 }
 `;
 
-const popoverStub = `
+const alwaysOpenPopover = `
 import { createElement, Fragment } from 'react';
 const passThrough = ({ children }) => createElement(Fragment, null, children);
 export const Popover = passThrough;
@@ -41,18 +36,17 @@ function pageActionsFixture(): Plugin {
     enforce: 'pre',
     resolveId(id, importer) {
       if (id === ENTRY) return `\0${ENTRY}`;
-      if (id.endsWith('/components/ui/popover.js') && importer?.includes('fumadocs-ui')) return POPOVER_STUB;
+      if (id.endsWith('/components/ui/popover.js') && importer?.includes('fumadocs-ui')) return ALWAYS_OPEN_POPOVER;
       return null;
     },
     load(id) {
       if (id === `\0${ENTRY}`) return fixture;
-      if (id === POPOVER_STUB) return popoverStub;
+      if (id === ALWAYS_OPEN_POPOVER) return alwaysOpenPopover;
       return null;
     }
   };
 }
 
-/** The `href` of the popover's "View as Markdown" link when the site is built with `base`. */
 async function viewAsMarkdownHref(base: string, markdownUrl: string): Promise<string> {
   const server: ViteDevServer = await createServer({
     configFile: false,
@@ -60,16 +54,16 @@ async function viewAsMarkdownHref(base: string, markdownUrl: string): Promise<st
     base,
     logLevel: 'silent',
     appType: 'custom',
-    server: { middlewareMode: true, hmr: false, ws: false },
-    // Externalized, fumadocs-ui would be loaded by Node as is, and `import.meta.env.BASE_URL`
-    // -- what the page actions prefix their links with -- would never be defined.
+    server: { middlewareMode: true, hmr: false, ws: false, watch: null },
+    optimizeDeps: { noDiscovery: true, include: [] },
+    // Bundled, so Vite defines import.meta.env.BASE_URL for fumadocs-ui.
     ssr: { noExternal: ['fumadocs-ui'] },
     plugins: [pageActionsFixture()]
   });
   try {
     const { render } = (await server.ssrLoadModule(ENTRY)) as { render: (url: string) => string };
     const markup = render(markdownUrl);
-    const link = /<a href="([^"]*)"[^>]*>(?:(?!<\/a>).)*View as Markdown/s.exec(markup);
+    const link = /<a [^>]*href="([^"]*)"[^>]*>(?:(?!<\/a>).)*View as Markdown/s.exec(markup);
     expect(link, 'the popover renders a "View as Markdown" link').to.not.be.null;
     return link![1];
   } finally {
@@ -77,8 +71,6 @@ async function viewAsMarkdownHref(base: string, markdownUrl: string): Promise<st
   }
 }
 
-// fuma-nama/fumadocs#3620: from 16.15.13 the link was handed out as given, so a portal hosted
-// under a path sent the reader to the host's root, where the Markdown companion is not.
 describe('the "View as Markdown" page action', function () {
   this.timeout(60 * 1000);
 

@@ -66,9 +66,7 @@ describe('a page whose operationId needs encoding', () => {
     expect(source.getPage(decodeMarkdownUrl(slugsFromSplat(decodedSplatOf(url))))?.url).to.equal(url);
   });
 
-  // Since fumadocs-core 16.15.17 the loader decodes both sides of the lookup, so the splat
-  // finds the page without slugsFromSplat too.
-  it('is found from the splat as it arrives too', () => {
+  it('is found from the splat as it arrives, without slugsFromSplat', () => {
     expect(source.getPage(decodedSplatOf(url).split('/'))?.url).to.equal(url);
   });
 });
