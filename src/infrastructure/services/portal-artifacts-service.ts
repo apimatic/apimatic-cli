@@ -201,7 +201,7 @@ export class PortalArtifactsService {
     } catch {
       return err(ServiceError.InvalidResponse);
     }
-    const unpacked = await this.zipService.unArchive(archive, contents);
+    const unpacked = this.zipService.unArchive(archive, contents);
     if (unpacked.isErr()) {
       return err(ServiceError.InvalidResponse);
     }

@@ -4,7 +4,7 @@ import { ZipService } from '../infrastructure/zip-service.js';
 import { DirectoryPath } from './file/directoryPath.js';
 import { FilePath } from './file/filePath.js';
 import { FileName } from './file/fileName.js';
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
 
 export class TempContext {
   private readonly fileService = new FileService();

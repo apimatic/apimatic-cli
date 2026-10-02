@@ -17,7 +17,7 @@ export class ZipService {
     }
   }
 
-  public async unArchive(sourceFile: FilePath, destinationDirectory: DirectoryPath): Promise<Result<void, string>> {
+  public unArchive(sourceFile: FilePath, destinationDirectory: DirectoryPath): Result<void, string> {
     try {
       this.extract(sourceFile, destinationDirectory);
       return ok(undefined);
