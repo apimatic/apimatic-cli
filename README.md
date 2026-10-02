@@ -57,9 +57,9 @@ Documentation portals are now built on your machine from a `src/` directory, and
   as any other `nav.json` orders its folder, a token standing for its section, and the file's
   `title` names it; what `pages` does not name follows in alphabetical order, pages before
   folders. A file with no `tabs`, or no file at all, makes no tab, so Home stands alone and
-  there is no tab bar; the build says so once, with the line that makes the sections tabs
-  again, since a portal from before the setting existed had them. A new portal starts with
-  the three sections as tabs.
+  there is no tab bar; the build says so once, with the line that brings back the tabs a
+  portal from before the setting had: the sections, and the folders its `pages` named. A new
+  portal starts with the three sections as tabs.
   ```json
   {
     "title": "Overview",

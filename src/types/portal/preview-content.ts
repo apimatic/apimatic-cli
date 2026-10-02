@@ -62,7 +62,9 @@ function isSameNoTabs(left: NoTabsListed, right: NoTabsListed): boolean {
   return (
     isSameFile(left.file, right.file) &&
     left.sections.length === right.sections.length &&
-    left.sections.every((section, index) => section === right.sections[index])
+    left.sections.every((section, index) => section === right.sections[index]) &&
+    left.folders.length === right.folders.length &&
+    left.folders.every((folder, index) => folder === right.folders[index])
   );
 }
 

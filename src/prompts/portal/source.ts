@@ -289,14 +289,19 @@ export function reportContentNotices(notices: ContentNotices, sourceDirectory: D
   reportUnseenHomeTitle(notices.unseenHomeTitle, sourceDirectory);
 }
 
-/** A 2.0.0-beta.1 portal had the sections as tabs with no `tabs` at all, so losing them is said once per build. */
+/** Before `tabs` existed the sections and the folders `pages` named were tabs, so losing them is said once per build. */
 export function reportNoTabsListed(notice: NoTabsListed | undefined, sourceDirectory: DirectoryPath): void {
   if (notice === undefined) {
     return;
   }
-  const names = listedInProse([...notice.sections.map(({ title }) => title), 'the API reference']);
+  const names = listedInProse([
+    ...notice.sections.map(({ title }) => title),
+    'the API reference',
+    ...notice.folders.map((folder) => `'${folder}'`)
+  ]);
+  // In beta.1's order: the folders `pages` named, then the sections and the reference it did not.
   const listing = f.var(
-    `"tabs": ${JSON.stringify([...notice.sections.map(({ token }) => token), API_REFERENCE_TOKEN])}`
+    `"tabs": ${JSON.stringify([...notice.folders, ...notice.sections.map(({ token }) => token), API_REFERENCE_TOKEN])}`
   );
   const file = notice.file === undefined ? undefined : relative(notice.file, sourceDirectory);
   const cause = file === undefined ? `There is no ${f.var(ROOT_NAVIGATION_FILE)}` : `${file} has no ${f.var('tabs')}`;

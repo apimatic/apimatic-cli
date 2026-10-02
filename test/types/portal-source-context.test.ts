@@ -1588,15 +1588,29 @@ describe('PortalSourceContext', () => {
     it('says once that a root file with no tabs makes no tab, naming the sections then in Home', async () => {
       write('content/nav.json', JSON.stringify({ pages: ['index', '...'] }));
 
-      expect((await notices()).noTabsListed).to.deep.equal({ file: rootNavigation(), sections: [SDK_SECTION] });
+      expect((await notices()).noTabsListed).to.deep.equal({
+        file: rootNavigation(),
+        sections: [SDK_SECTION],
+        folders: []
+      });
 
       write('apimatic.json', JSON.stringify({ portal: { site: { name: 'Calc' } }, languages: LANGUAGES, plugin: {} }));
 
       expect((await notices()).noTabsListed?.sections).to.deep.equal([SDK_SECTION, PLUGIN_SECTION]);
     });
 
+    // In beta.1 a folder the root `pages` named was a tab as well, so the line offered must bring it back too.
+    it('names the folders pages lists, in its order, and not its pages or the reference', async () => {
+      write('content/tutorials/first.md', page('First'));
+      write('content/guides/first.md', page('First'));
+      write('content/faq.md', page('FAQ'));
+      write('content/nav.json', JSON.stringify({ pages: ['index', 'guides', 'faq', 'api', 'tutorials', '...'] }));
+
+      expect((await notices()).noTabsListed?.folders).to.deep.equal(['guides', 'tutorials']);
+    });
+
     it('says the same of a project with no root file, which had them too', async () => {
-      expect((await notices()).noTabsListed).to.deep.equal({ file: undefined, sections: [SDK_SECTION] });
+      expect((await notices()).noTabsListed).to.deep.equal({ file: undefined, sections: [SDK_SECTION], folders: [] });
     });
 
     it('takes an empty tabs as said on purpose', async () => {

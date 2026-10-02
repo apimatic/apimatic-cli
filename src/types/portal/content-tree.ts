@@ -170,7 +170,11 @@ export class ContentTree {
       // on upgrade; said once rather than silently. `"tabs": []` says the same on purpose.
       noTabsListed:
         rootNavigation?.settings.tabs === undefined
-          ? { file: rootNavigation?.file, sections: generatedPages.sections() }
+          ? {
+              file: rootNavigation?.file,
+              sections: generatedPages.sections(),
+              folders: ContentTree.foldersNamed(navigation.root)
+            }
           : undefined,
       // Home's name shows only in a tab bar, and one tab draws none.
       unseenHomeTitle:
@@ -209,6 +213,18 @@ export class ContentTree {
   private navigation(navigationFiles: ContentFile[], specs: PortalSpec[]): NavigationScan {
     const walk = new NavigationWalk(navigationFiles, specs, this.sourceDirectory);
     return { root: walk.visit(this.tree, true, false), ignoredFiles: walk.ignoredFiles };
+  }
+
+  /** The folders the root `pages` names, tabs before `tabs` existed; one serving the home page can be no tab. */
+  private static foldersNamed(root: DirectoryScan): string[] {
+    return (root.navigation?.settings.pages ?? []).filter((entry) => {
+      const subfolder = root.subfolders.get(entry);
+      return (
+        subfolder !== undefined &&
+        entry !== API_REFERENCE_NAME &&
+        !(GROUP_FOLDER.test(entry) && subfolder.scan.servesOwnAddress)
+      );
+    });
   }
 
   /**

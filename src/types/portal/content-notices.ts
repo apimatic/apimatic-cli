@@ -2,10 +2,12 @@ import { FilePath } from '../file/filePath.js';
 import { GeneratedSection } from './generated-pages.js';
 import { SharedTabName } from './portal-tabs.js';
 
-/** The root `nav.json` has no `tabs`, or there is no such file, with the sections that are then in Home. */
+/** The root `nav.json` has no `tabs`, or there is no such file, with what was a tab before the setting and is now in Home. */
 export interface NoTabsListed {
   file: FilePath | undefined;
   sections: GeneratedSection[];
+  /** The folders the root `pages` names, in its order. */
+  folders: string[];
 }
 
 /** What a build accepts in `content/`, but the user should hear of. */

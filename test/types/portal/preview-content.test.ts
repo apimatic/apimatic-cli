@@ -3,7 +3,7 @@ import { DirectoryPath } from '../../../src/types/file/directoryPath';
 import { FileName } from '../../../src/types/file/fileName';
 import { FilePath } from '../../../src/types/file/filePath';
 import { ContentNotices } from '../../../src/types/portal/content-notices';
-import { PLUGIN_SECTION, SDK_SECTION } from '../../../src/types/portal/generated-pages';
+import { GeneratedSection, PLUGIN_SECTION, SDK_SECTION } from '../../../src/types/portal/generated-pages';
 import { PortalTab, SharedTabName } from '../../../src/types/portal/portal-tabs';
 import { PreviewContent } from '../../../src/types/portal/preview-content';
 
@@ -89,13 +89,17 @@ describe('PreviewContent', () => {
   // A project that lost its tabs hears it once; adding the plugin block changes what it is told.
   it('gives the missing tabs once, and again when the sections in Home change', () => {
     const rootNavigation = new FilePath(content, new FileName('nav.json'));
-    const before = notices({ noTabsListed: { file: rootNavigation, sections: [SDK_SECTION] } });
-    const same = notices({ noTabsListed: { file: rootNavigation, sections: [SDK_SECTION] } });
-    const withPlugin = notices({ noTabsListed: { file: rootNavigation, sections: [SDK_SECTION, PLUGIN_SECTION] } });
+    const lost = (sections: GeneratedSection[], folders: string[] = []) =>
+      notices({ noTabsListed: { file: rootNavigation, sections, folders } });
+    const before = lost([SDK_SECTION]);
+    const same = lost([SDK_SECTION]);
+    const withPlugin = lost([SDK_SECTION, PLUGIN_SECTION]);
+    const withFolder = lost([SDK_SECTION], ['tutorials']);
 
     expect(noticesAfter(before, NONE).noTabsListed).to.deep.equal(before.noTabsListed);
     expect(noticesAfter(same, before).noTabsListed).to.be.undefined;
     expect(noticesAfter(withPlugin, before).noTabsListed).to.deep.equal(withPlugin.noTabsListed);
+    expect(noticesAfter(withFolder, before).noTabsListed).to.deep.equal(withFolder.noTabsListed);
     expect(noticesAfter(NONE, before).noTabsListed).to.be.undefined;
   });
 
