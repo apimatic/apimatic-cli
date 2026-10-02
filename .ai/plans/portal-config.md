@@ -438,7 +438,9 @@ is the one layout since section 15.
   the near-miss hint all read that one answer. `api` and `apimatic:api` being
   one node is ruled on there alone on the CLI side; the template keeps its own
   copy, as it keeps everything. A page named `api` beside the mount point is
-  refused under either spelling, since it could be positioned under neither.
+  refused when the entry is `api`, the one spelling that might have meant the
+  page; the token never did, and the scaffold writes it, so under the token the
+  page is accepted and stays unpositioned, as on 2.0.0-beta.1.
 - Every problem in `content/` is reported in one run, the front matter and the
   `nav.json` files together; the `nav.json` entries are judged only once no two
   pages would be served at one address, since an entry naming one of them would
@@ -499,12 +501,21 @@ where it is.
   `title` with no tab bar to show in is told it shows nowhere. An unnamed
   section's alphabetical place among the folders is kept on purpose: the
   bands that put it last existed so that a release adding a section left a
-  sidebar alone, but the scaffold and the sample name the sections as tabs,
-  so few portals see the default, and a section that is one more folder in
-  Home is the rule `tabs` promises. The CLI resolves each entry once for
-  every rule; the template claims the tabs the way `reorder` claims an entry,
-  rather than matching folders to entries and entries to folders in turn; and
-  `portalTabs` draws no tab bar for one tab, whichever it is.
+  sidebar alone, but a section that is one more folder in Home is the rule
+  `tabs` promises, and naming its token in either list places it exactly.
+  The cost is accepted with open eyes: the scaffold writes `nav.json` once,
+  so a release that adds a section lands it alphabetically in Home in every
+  existing portal, and that release must tell them to name its token. The
+  CLI resolves each entry once for every rule; the template claims the tabs
+  the way `reorder` claims an entry, rather than matching folders to entries
+  and entries to folders in turn; and `portalTabs` draws no tab bar for one
+  tab, whichever it is.
+- 2026-10-02, fourth review: resolving both spellings to the reference had
+  made `apimatic:api` refuse a page named `api` too, which failed the build
+  of every scaffolded portal that added `content/api.md`; the refusal is back
+  to `api` spelled out, the one spelling that might have meant the page. The
+  no-tabs notice names the folders the root `pages` named as well, since
+  beta.1 made tabs of those too, and its suggested line leads with them.
 
 ## 6. Template changes
 
