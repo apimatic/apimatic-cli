@@ -71,15 +71,15 @@ describe('SdkPublishAction', () => {
     fs.rmSync(root, { recursive: true, force: true });
   });
 
-  it('reports an SDK it could not package, without publishing', async () => {
+  it('reports an SDK it could not zip, without publishing', async () => {
     const zip = sinon.stub(TempContext.prototype, 'zip').callThrough();
     zip.onSecondCall().resolves(err('EACCES: permission denied'));
     const publishSdkPackage = sinon.stub(PublishingApiService.prototype, 'publishSdkPackage');
-    const sdkNotPackaged = sinon.stub(SdkPublishPrompts.prototype, 'sdkNotPackaged');
+    const sdkNotZipped = sinon.stub(SdkPublishPrompts.prototype, 'sdkNotZipped');
 
     expect((await execute()).isFailed()).to.be.true;
     expect(publishSdkPackage.called).to.be.false;
-    expect(sdkNotPackaged.firstCall.args[1]).to.equal('EACCES: permission denied');
+    expect(sdkNotZipped.firstCall.args[1]).to.equal('EACCES: permission denied');
     expect(onPublishSdkError.called).to.be.false;
   });
 });

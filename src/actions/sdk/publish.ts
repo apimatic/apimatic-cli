@@ -79,7 +79,7 @@ export class SdkPublishAction {
       const tempContext = new TempContext(tempDirectory);
       const sdkFile = await tempContext.zip(sdkLanguageDirectory);
       if (sdkFile.isErr()) {
-        this.prompts.sdkNotPackaged(sdkLanguageDirectory, sdkFile.error);
+        this.prompts.sdkNotZipped(sdkLanguageDirectory, sdkFile.error);
         return ActionResult.failed();
       }
 

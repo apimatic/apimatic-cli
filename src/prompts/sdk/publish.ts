@@ -23,8 +23,8 @@ export class SdkPublishPrompts {
     log.error(serviceError.errorMessage);
   }
 
-  public sdkNotPackaged(sdkDirectory: DirectoryPath, reason: string) {
-    log.error(`The SDK in ${f.path(sdkDirectory)} could not be packaged for upload: ${reason}`);
+  public sdkNotZipped(sdkDirectory: DirectoryPath, reason: string) {
+    log.error(`The SDK in ${f.path(sdkDirectory)} could not be zipped for upload: ${reason}`);
   }
 
   public dryRunNotice(publishingSummary: string): void {
