@@ -1,11 +1,13 @@
 import { isCancel, confirm, log, select } from '@clack/prompts';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
+import { FileProblem } from '../../types/file/file-problem.js';
 import { format as f } from '../format.js';
 import { Result } from 'neverthrow';
 import { withSpinner } from '../prompt.js';
 import { ServiceError } from '../../infrastructure/service-error.js';
 import { AVAILABLE_LANGUAGES, Language, languageLabel, UPCOMING_LANGUAGES } from '../../types/sdk/generate.js';
 import { VersionProblem } from '../../types/project-context.js';
+import { SdkSaveProblem } from '../../types/sdk-context.js';
 
 const names = (languages: readonly Language[]) => languages.map(languageLabel).join(', ');
 
@@ -63,6 +65,18 @@ export class SdkGeneratePrompts {
 
   public sdkGenerationServiceError(serviceError: ServiceError) {
     log.error(serviceError.errorMessage);
+  }
+
+  public srcDirNotZipped(sourceDirectory: DirectoryPath, problem: FileProblem) {
+    log.error(`${f.path(sourceDirectory)} could not be zipped for upload: ${problem.reason}`);
+  }
+
+  public sdkNotUnzipped(problem: FileProblem) {
+    log.error(`${ServiceError.InvalidResponse.errorMessage}\n${problem.reason}`);
+  }
+
+  public sdkNotSaved(problem: SdkSaveProblem) {
+    log.error(`The SDK could not be saved to ${f.path(problem.sdkDirectory)}: ${problem.reason}`);
   }
 
   public noVersionToBuild(problem: VersionProblem, sourceDirectory: DirectoryPath) {

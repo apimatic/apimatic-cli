@@ -308,7 +308,10 @@ export class PortalSourceContext {
    */
   public async scaffold(specPath: FilePath, schemaUrl: string): Promise<Result<FilePath, PortalScaffoldProblem>> {
     try {
-      await new SpecContext(this.specDirectory).install(specPath);
+      const installed = await new SpecContext(this.specDirectory).install(specPath);
+      if (installed.isErr()) {
+        return err({ kind: 'sourceUnwritable', reason: installed.error.reason });
+      }
     } catch (error) {
       return err({ kind: 'sourceUnwritable', reason: errorMessage(error) });
     }

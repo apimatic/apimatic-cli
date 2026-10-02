@@ -1,42 +1,62 @@
 import fs from 'fs';
 import yazl from 'yazl';
 import AdmZip from 'adm-zip';
+import { err, ok, Result } from 'neverthrow';
 import { DirectoryPath } from '../types/file/directoryPath.js';
+import { FileName } from '../types/file/fileName.js';
 import { FilePath } from '../types/file/filePath.js';
+import { errorMessage } from '../utils/error-utils.js';
+
+type ZipEntry = { file: FilePath; metadataPath: string };
 
 export class ZipService {
-  public async archive(sourceDir: DirectoryPath, outputZipPath: FilePath): Promise<void> {
+  public async archive(sourceDir: DirectoryPath, outputZipPath: FilePath): Promise<Result<void, string>> {
+    try {
+      await this.write(sourceDir, outputZipPath);
+      return ok(undefined);
+    } catch (error) {
+      await fs.promises.rm(outputZipPath.toString(), { force: true }).catch(() => undefined);
+      return err(errorMessage(error));
+    }
+  }
+
+  public async unArchive(sourceFile: FilePath, destinationDirectory: DirectoryPath): Promise<Result<void, string>> {
+    try {
+      this.extract(sourceFile, destinationDirectory);
+      return ok(undefined);
+    } catch (error) {
+      return err(errorMessage(error));
+    }
+  }
+
+  private async write(sourceDir: DirectoryPath, outputZipPath: FilePath): Promise<void> {
+    const entries = this.entriesUnder(sourceDir, '');
+    const zipfile = new yazl.ZipFile();
+
     return new Promise((resolve, reject) => {
-      const zipfile = new yazl.ZipFile();
-
-      const addDirectory = (dir: DirectoryPath, relativePrefix: string) => {
-        for (const entry of fs.readdirSync(dir.toString(), { withFileTypes: true })) {
-          const fullPath = dir.join(entry.name);
-          // Always use forward slashes as metadataPath — zip format requires it
-          const metadataPath = relativePrefix ? `${relativePrefix}/${entry.name}` : entry.name;
-          if (entry.isDirectory()) {
-            addDirectory(fullPath, metadataPath);
-          } else {
-            zipfile.addFile(fullPath.toString(), metadataPath);
-          }
-        }
-      };
-
-      try {
-        addDirectory(sourceDir, '');
-      } catch (err) {
-        return reject(err);
-      }
-
-      zipfile.end();
       const output = fs.createWriteStream(outputZipPath.toString());
-      zipfile.outputStream.pipe(output);
-      output.on('close', resolve);
+      zipfile.on('error', (error: Error) => output.destroy(error));
       output.on('error', reject);
+      output.on('close', resolve);
+      zipfile.outputStream.pipe(output);
+      for (const { file, metadataPath } of entries) {
+        zipfile.addFile(file.toString(), metadataPath);
+      }
+      zipfile.end();
     });
   }
 
-  public async unArchive(sourceFile: FilePath, destinationDirectory: DirectoryPath): Promise<void> {
+  private entriesUnder(dir: DirectoryPath, relativePrefix: string): ZipEntry[] {
+    return fs.readdirSync(dir.toString(), { withFileTypes: true }).flatMap((entry) => {
+      // Always use forward slashes as metadataPath — zip format requires it
+      const metadataPath = relativePrefix ? `${relativePrefix}/${entry.name}` : entry.name;
+      return entry.isDirectory()
+        ? this.entriesUnder(dir.join(entry.name), metadataPath)
+        : [{ file: new FilePath(dir, new FileName(entry.name)), metadataPath }];
+    });
+  }
+
+  private extract(sourceFile: FilePath, destinationDirectory: DirectoryPath) {
     const MAX_FILES = 100_000;
     const MAX_SIZE = 1_000_000_000; // 1 GB
 

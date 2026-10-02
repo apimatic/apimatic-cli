@@ -2,9 +2,11 @@ import { stripVTControlCharacters } from 'node:util';
 import { expect } from 'chai';
 import sinon from 'sinon';
 import { log } from '@clack/prompts';
+import { ServiceError } from '../../../src/infrastructure/service-error.js';
 import { PluginGeneratePrompts } from '../../../src/prompts/plugin/generate.js';
 import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
 import { PluginConfig } from '../../../src/types/plugin-config-context.js';
+import { PluginGenerationProblem } from '../../../src/types/plugin/generation-problem.js';
 
 describe('PluginGeneratePrompts', () => {
   const identity = { pluginId: 'acme-payments', pluginName: 'Acme Payments' };
@@ -40,6 +42,32 @@ describe('PluginGeneratePrompts', () => {
 
       expect(message).to.contain('names no language the plugin can carry, and there is no terminal to ask which.');
       expect(message).to.contain('"languages": { "typescript": {} }');
+    });
+  });
+
+  describe('pluginNotGenerated', () => {
+    const printed = (problem: PluginGenerationProblem) => {
+      const error = sinon.stub(log, 'error');
+      new PluginGeneratePrompts().pluginNotGenerated(problem, sourceDirectory);
+      return stripVTControlCharacters(String(error.firstCall.args[0]));
+    };
+
+    it('says what a bad response says, then why the plugin could not be unzipped', () => {
+      expect(printed({ kind: 'unzipFailed', reason: 'EPERM: operation not permitted' })).to.equal(
+        `${stripVTControlCharacters(ServiceError.InvalidResponse.errorMessage)}\nEPERM: operation not permitted`
+      );
+    });
+
+    it('names the source directory it could not zip, and why', () => {
+      expect(printed({ kind: 'zipFailed', reason: 'EACCES: permission denied' })).to.equal(
+        `'${sourceDirectory}' could not be zipped for upload: EACCES: permission denied`
+      );
+    });
+
+    it('passes the service message through as it was assembled', () => {
+      const error = ServiceError.badRequest('One or more validation errors occurred.\n- a', { pluginConfig: ['a'] });
+
+      expect(printed({ kind: 'generationFailed', error })).to.equal('One or more validation errors occurred.\n- a');
     });
   });
 });
