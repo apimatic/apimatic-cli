@@ -16,17 +16,21 @@ export type FileProblem = { kind: 'fileUnreadable'; file: FilePath };
 
 export type ResolveProblem = SpecZipProblem | DownloadProblem | FileProblem;
 
-type Resolution<P extends ResolveProblem> = Promise<Result<ResourceContext, P>>;
-
 export class ResourceContext {
   private constructor(private readonly input: ResourceInput, private readonly resolvedFile: FilePath) {}
 
   public static resolveTo(
     input: FilePath | UrlPath,
     tempDirectory: DirectoryPath
-  ): Resolution<DownloadProblem | FileProblem>;
-  public static resolveTo(input: ResourceInput, tempDirectory: DirectoryPath): Resolution<ResolveProblem>;
-  public static async resolveTo(input: ResourceInput, tempDirectory: DirectoryPath): Resolution<ResolveProblem> {
+  ): Promise<Result<ResourceContext, DownloadProblem | FileProblem>>;
+  public static resolveTo(
+    input: ResourceInput,
+    tempDirectory: DirectoryPath
+  ): Promise<Result<ResourceContext, ResolveProblem>>;
+  public static async resolveTo(
+    input: ResourceInput,
+    tempDirectory: DirectoryPath
+  ): Promise<Result<ResourceContext, ResolveProblem>> {
     if (input instanceof ProjectContext) {
       return (await input.specZip(tempDirectory)).map((zip) => new ResourceContext(input, zip));
     }
