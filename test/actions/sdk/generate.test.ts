@@ -68,13 +68,13 @@ describe('GenerateAction (sdk)', () => {
     expect(fs.readFileSync(path.join(sdkDirectory.toString(), 'python', 'README.md'), 'utf-8')).to.equal('# sdk');
   });
 
-  it('reports a build it could not package, without generating', async () => {
+  it('reports a source directory it could not zip, without generating', async () => {
     sinon.stub(TempContext.prototype, 'zip').resolves(err('EACCES: permission denied'));
-    const buildNotPackaged = sinon.stub(SdkGeneratePrompts.prototype, 'buildNotPackaged');
+    const srcDirNotZipped = sinon.stub(SdkGeneratePrompts.prototype, 'srcDirNotZipped');
 
     expect((await execute()).isFailed()).to.be.true;
     expect(generateSdk.called).to.be.false;
-    expect(buildNotPackaged.firstCall.args[1]).to.equal('EACCES: permission denied');
+    expect(srcDirNotZipped.firstCall.args[1]).to.equal('EACCES: permission denied');
   });
 
   it('reports a generated SDK it cannot expand as an invalid response', async () => {

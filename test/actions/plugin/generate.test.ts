@@ -61,9 +61,9 @@ describe('PluginGenerateAction', () => {
   // The upload is read while the stub runs: the temporary directory it sits in is gone once the
   // action returns.
   const generated = () =>
-    sinon.stub(PluginService.prototype, 'generatePlugin').callsFake(async (buildZipPath: FilePath) => {
+    sinon.stub(PluginService.prototype, 'generatePlugin').callsFake(async (srcDirZipPath: FilePath) => {
       uploaded = Object.fromEntries(
-        new AdmZip(buildZipPath.toString())
+        new AdmZip(srcDirZipPath.toString())
           .getEntries()
           .filter((entry) => !entry.isDirectory)
           .map((entry) => [entry.entryName, entry.getData().toString('utf-8')])
@@ -645,14 +645,14 @@ describe('PluginGenerateAction', () => {
   });
 
   describe('generation failures', () => {
-    it('reports a build it could not package, without generating', async () => {
+    it('reports a source directory it could not zip, without generating', async () => {
       const generatePlugin = sinon.stub(PluginService.prototype, 'generatePlugin');
       sinon.stub(TempContext.prototype, 'zip').resolves(err('EACCES: permission denied'));
-      const buildNotPackaged = sinon.stub(PluginGeneratePrompts.prototype, 'buildNotPackaged');
+      const srcDirNotZipped = sinon.stub(PluginGeneratePrompts.prototype, 'srcDirNotZipped');
 
       expect((await execute()).isFailed()).to.be.true;
       expect(generatePlugin.called).to.be.false;
-      expect(buildNotPackaged.firstCall.args[1]).to.equal('EACCES: permission denied');
+      expect(srcDirNotZipped.firstCall.args[1]).to.equal('EACCES: permission denied');
     });
 
     it('reports an artifact it cannot expand as an invalid response', async () => {

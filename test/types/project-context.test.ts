@@ -92,11 +92,11 @@ describe('ProjectContext', () => {
       const settings = new DirectoryPath(inProject('settings'));
       write('settings/package.json', '{}');
 
-      const zip = (await project().buildZip(temp, settings))._unsafeUnwrap();
+      const zip = (await project().srcDirZip(temp, settings))._unsafeUnwrap();
 
       expect(fs.existsSync(zip.toString())).to.be.true;
-      expect(fs.existsSync(inProject('temp', 'build', 'spec', 'openapi.json'))).to.be.true;
-      expect(fs.existsSync(inProject('temp', 'build', 'package-settings', 'package.json'))).to.be.true;
+      expect(fs.existsSync(inProject('temp', 'src', 'spec', 'openapi.json'))).to.be.true;
+      expect(fs.existsSync(inProject('temp', 'src', 'package-settings', 'package.json'))).to.be.true;
     });
   });
 

@@ -180,7 +180,7 @@ export class PluginConfigContext {
     into: DirectoryPath,
     languages: readonly Language[]
   ): Promise<Result<DirectoryPath, PluginConfigWriteFailure>> {
-    const staged = into.join('build');
+    const staged = into.join('src');
     await this.fileService.copyDirectoryContents(this.sourceDirectory, staged);
 
     const config = new ApimaticConfigContext(staged);

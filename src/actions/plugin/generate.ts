@@ -143,7 +143,7 @@ export class PluginGenerateAction {
     } else if (typeof problem === 'string') {
       this.prompts.configNotPrepared(problem, sourceDirectory);
     } else {
-      this.prompts.buildNotPackaged(sourceDirectory, problem.reason);
+      this.prompts.srcDirNotZipped(sourceDirectory, problem.reason);
     }
   };
 }

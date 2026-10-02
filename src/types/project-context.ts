@@ -85,11 +85,11 @@ export class ProjectContext {
     return await new SpecContext(this.source.join(SPEC_DIRECTORY_NAME)).validate();
   }
 
-  public async buildZip(
+  public async srcDirZip(
     tempDirectory: DirectoryPath,
     packageSettingsDirectory?: DirectoryPath
   ): Promise<Result<FilePath, string>> {
-    const staged = tempDirectory.join('build');
+    const staged = tempDirectory.join('src');
     await this.fileService.copyDirectoryContents(this.source, staged);
     if (packageSettingsDirectory) {
       await this.fileService.copyDirectoryContents(packageSettingsDirectory, staged.join('package-settings'));

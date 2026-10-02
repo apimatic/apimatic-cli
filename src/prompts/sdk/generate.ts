@@ -65,8 +65,8 @@ export class SdkGeneratePrompts {
     log.error(serviceError.errorMessage);
   }
 
-  public buildNotPackaged(sourceDirectory: DirectoryPath, reason: string) {
-    log.error(`The build in ${f.path(sourceDirectory)} could not be packaged for upload: ${reason}`);
+  public srcDirNotZipped(sourceDirectory: DirectoryPath, reason: string) {
+    log.error(`${f.path(sourceDirectory)} could not be zipped for upload: ${reason}`);
   }
 
   public sdkNotSaved(sdkDirectory: DirectoryPath, reason: string) {
