@@ -3,7 +3,7 @@ import { APIMATIC_CONFIG_FILE_NAME } from '../../types/apimatic-config/document.
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { listedInProse } from '../../utils/string-utils.js';
 import { ContentNotices, NoTabsListed } from '../../types/portal/content-notices.js';
-import { API_REFERENCE_TOKEN, NAVIGATION_FILE_NAME } from '../../types/portal/portal-navigation.js';
+import { API_REFERENCE_TOKEN, NAVIGATION_FILE_NAME, TabEntry } from '../../types/portal/portal-navigation.js';
 import {
   ContentProblem,
   MissingFile,
@@ -289,20 +289,33 @@ export function reportContentNotices(notices: ContentNotices, sourceDirectory: D
   reportUnseenHomeTitle(notices.unseenHomeTitle, sourceDirectory);
 }
 
-/** Before `tabs` existed the sections and the folders `pages` named were tabs, so losing them is said once per build. */
+/** Nothing names these root nodes and no `tabs` says they are no tab, so the choice is put once per build. */
 export function reportNoTabsListed(notice: NoTabsListed | undefined, sourceDirectory: DirectoryPath): void {
   if (notice === undefined) {
     return;
   }
-  const names = listedInProse([
-    ...notice.sections.map(({ title }) => title),
-    'the API reference',
-    ...notice.folders.map((folder) => `'${folder}'`)
-  ]);
-  // In beta.1's order: the folders `pages` named, then the sections and the reference it did not.
-  const listing = f.var(
-    `"tabs": ${JSON.stringify([...notice.folders, ...notice.sections.map(({ token }) => token), API_REFERENCE_TOKEN])}`
-  );
+  const name = (entry: TabEntry): string => {
+    switch (entry.kind) {
+      case 'apiReference':
+        return 'the API reference';
+      case 'generated':
+        return entry.section.title;
+      case 'folder':
+        return `'${entry.name}'`;
+    }
+  };
+  const token = (entry: TabEntry): string => {
+    switch (entry.kind) {
+      case 'apiReference':
+        return API_REFERENCE_TOKEN;
+      case 'generated':
+        return entry.section.token;
+      case 'folder':
+        return entry.name;
+    }
+  };
+  const names = listedInProse(notice.unplaced.map(name));
+  const listing = f.var(`"tabs": ${JSON.stringify(notice.unplaced.map(token))}`);
   const file = notice.file === undefined ? undefined : relative(notice.file, sourceDirectory);
   const cause = file === undefined ? `There is no ${f.var(ROOT_NAVIGATION_FILE)}` : `${file} has no ${f.var('tabs')}`;
   const add = file === undefined ? 'Add the file with' : 'Add';

@@ -4,6 +4,7 @@ import { FileName } from '../../../src/types/file/fileName';
 import { FilePath } from '../../../src/types/file/filePath';
 import { ContentNotices } from '../../../src/types/portal/content-notices';
 import { GeneratedSection, PLUGIN_SECTION, SDK_SECTION } from '../../../src/types/portal/generated-pages';
+import { TabEntry } from '../../../src/types/portal/portal-navigation';
 import { PortalTab, SharedTabName } from '../../../src/types/portal/portal-tabs';
 import { PreviewContent } from '../../../src/types/portal/preview-content';
 
@@ -86,20 +87,23 @@ describe('PreviewContent', () => {
     expect(noticesAfter(after, before)).to.deep.equal(NONE);
   });
 
-  // A project that lost its tabs hears it once; adding the plugin block changes what it is told.
-  it('gives the missing tabs once, and again when the sections in Home change', () => {
+  // The notice is given once; adding the plugin block changes what nothing places, and so what it says.
+  it('gives the missing tabs once, and again when the nodes nothing places change', () => {
     const rootNavigation = new FilePath(content, new FileName('nav.json'));
-    const lost = (sections: GeneratedSection[], folders: string[] = []) =>
-      notices({ noTabsListed: { file: rootNavigation, sections, folders } });
-    const before = lost([SDK_SECTION]);
-    const same = lost([SDK_SECTION]);
-    const withPlugin = lost([SDK_SECTION, PLUGIN_SECTION]);
-    const withFolder = lost([SDK_SECTION], ['tutorials']);
+    const unplaced = (sections: GeneratedSection[]) =>
+      notices({
+        noTabsListed: {
+          file: rootNavigation,
+          unplaced: [...sections.map((section): TabEntry => ({ kind: 'generated', section })), { kind: 'apiReference' }]
+        }
+      });
+    const before = unplaced([SDK_SECTION]);
+    const same = unplaced([SDK_SECTION]);
+    const withPlugin = unplaced([SDK_SECTION, PLUGIN_SECTION]);
 
     expect(noticesAfter(before, NONE).noTabsListed).to.deep.equal(before.noTabsListed);
     expect(noticesAfter(same, before).noTabsListed).to.be.undefined;
     expect(noticesAfter(withPlugin, before).noTabsListed).to.deep.equal(withPlugin.noTabsListed);
-    expect(noticesAfter(withFolder, before).noTabsListed).to.deep.equal(withFolder.noTabsListed);
     expect(noticesAfter(NONE, before).noTabsListed).to.be.undefined;
   });
 

@@ -1,13 +1,12 @@
 import { FilePath } from '../file/filePath.js';
-import { GeneratedSection } from './generated-pages.js';
+import { TabEntry } from './portal-navigation.js';
 import { SharedTabName } from './portal-tabs.js';
 
-/** The root `nav.json` has no `tabs`, or there is no such file, with what was a tab before the setting and is now in Home. */
+/** The root `nav.json` has no `tabs`, or there is no such file, while nothing positions these root nodes. */
 export interface NoTabsListed {
   file: FilePath | undefined;
-  sections: GeneratedSection[];
-  /** The folders the root `pages` names, in its order. */
-  folders: string[];
+  /** The sections and the API reference that neither list names, in the order the scaffold lists them. */
+  unplaced: TabEntry[];
 }
 
 /** What a build accepts in `content/`, but the user should hear of. */
@@ -24,10 +23,7 @@ export interface ContentNotices {
   ignoredNavigationFiles: FilePath[];
   /** Names more than one tab would show, which the build accepts and a reader cannot tell apart. */
   sharedTabNames: SharedTabName[];
-  /**
-   * Nothing is a tab because no `tabs` says so. A portal from before the setting existed had
-   * the sections as tabs, and would otherwise lose them on upgrade without a word.
-   */
+  /** Nothing is a tab because no `tabs` says so, while a section or the reference sits in Home unnamed. */
   noTabsListed: NoTabsListed | undefined;
   /** The root `nav.json` that titles Home while Home is the only tab, so no tab bar shows the name. */
   unseenHomeTitle: FilePath | undefined;

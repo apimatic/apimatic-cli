@@ -331,8 +331,19 @@ describe('PortalNavigation', () => {
       expect(validateFile({ tabs: ['api'] })._unsafeUnwrap().tabs).to.deep.equal([{ kind: 'apiReference' }]);
       expect(PortalNavigation.validate('{}', contextFor())._unsafeUnwrap()).to.deep.include({
         pages: [],
+        placedInHome: [],
         tabs: undefined
       });
+    });
+
+    // What `pages` places in Home is told apart from what nothing names, so a folder is not among them.
+    it('answers with the reference and the sections pages places, however the reference is spelled', () => {
+      const settings = validateFile({ tabs: [], pages: ['index', 'guides', 'api', 'apimatic:sdks', '...'] });
+
+      expect(settings._unsafeUnwrap().placedInHome).to.deep.equal([
+        { kind: 'apiReference' },
+        { kind: 'generated', section: SDK_SECTION }
+      ]);
     });
 
     it('accepts a folder, api or its token, and each section’s token as a tab', () => {

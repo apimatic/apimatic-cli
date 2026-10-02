@@ -11,10 +11,12 @@ import {
   API_REFERENCE_NAME,
   GROUP_FOLDER,
   INDEX_NAME,
+  isSameTabEntry,
   NAVIGATION_FILE_NAME,
   NavigationContext,
   NavigationSettings,
-  PortalNavigation
+  PortalNavigation,
+  TabEntry
 } from './portal-navigation.js';
 import { ContentProblem, MissingImage, PortalSpec, ReservedAddressPage, SharedAddress } from './portal-source.js';
 import { PortalTab, sharedTabNames, TabOwner, untitledTabName } from './portal-tabs.js';
@@ -162,19 +164,15 @@ export class ContentTree {
 
     const tabs = ContentTree.tabs(navigation.root, titled, generatedPages);
     const rootNavigation = navigation.root.navigation;
+    const unplaced = ContentTree.unplaced(rootNavigation?.settings, generatedPages);
     return ok({
       hiddenPages: ContentTree.hiddenPages(pages, specs),
       ignoredNavigationFiles: navigation.ignoredFiles,
       sharedTabNames: sharedTabNames(tabs),
-      // Before `tabs` existed every section was a tab, so a project from then loses its tabs
-      // on upgrade; said once rather than silently. `"tabs": []` says the same on purpose.
+      // Said once rather than silently; `"tabs": []` says the same on purpose.
       noTabsListed:
-        rootNavigation?.settings.tabs === undefined
-          ? {
-              file: rootNavigation?.file,
-              sections: generatedPages.sections(),
-              folders: ContentTree.foldersNamed(navigation.root)
-            }
+        rootNavigation?.settings.tabs === undefined && unplaced.length > 0
+          ? { file: rootNavigation?.file, unplaced }
           : undefined,
       // Home's name shows only in a tab bar, and one tab draws none.
       unseenHomeTitle:
@@ -215,16 +213,13 @@ export class ContentTree {
     return { root: walk.visit(this.tree, true, false), ignoredFiles: walk.ignoredFiles };
   }
 
-  /** The folders the root `pages` names, tabs before `tabs` existed; one serving the home page can be no tab. */
-  private static foldersNamed(root: DirectoryScan): string[] {
-    return (root.navigation?.settings.pages ?? []).filter((entry) => {
-      const subfolder = root.subfolders.get(entry);
-      return (
-        subfolder !== undefined &&
-        entry !== API_REFERENCE_NAME &&
-        !(GROUP_FOLDER.test(entry) && subfolder.scan.servesOwnAddress)
-      );
-    });
+  /** The sections and the API reference the root `pages` does not place, which sit in Home with nothing naming them. */
+  private static unplaced(settings: NavigationSettings | undefined, generatedPages: GeneratedPages): TabEntry[] {
+    const nodes: TabEntry[] = [
+      ...generatedPages.sections().map((section): TabEntry => ({ kind: 'generated', section })),
+      { kind: 'apiReference' }
+    ];
+    return nodes.filter((node) => !(settings?.placedInHome ?? []).some((placed) => isSameTabEntry(placed, node)));
   }
 
   /**

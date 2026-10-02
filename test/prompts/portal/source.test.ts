@@ -476,24 +476,33 @@ describe('reportNoTabsListed', () => {
     expect(lines).to.deep.equal([]);
   });
 
-  // The word a 2.0.0-beta.1 project gets for the tabs it had, with the line that brings them all back:
-  // a folder its `pages` named was a tab then too, ahead of the sections it did not name.
-  it('names the file, the sections and folders now in Home, and both ways to say so on purpose', () => {
+  // The line offered names what nothing places, so following it collides with nothing in `pages`.
+  it('names the file and the nodes nothing places, with both ways to say so on purpose', () => {
     reportNoTabsListed(
-      { file: rootNavigation, sections: [SDK_SECTION, PLUGIN_SECTION], folders: ['tutorials', 'guides'] },
+      {
+        file: rootNavigation,
+        unplaced: [
+          { kind: 'generated', section: SDK_SECTION },
+          { kind: 'generated', section: PLUGIN_SECTION },
+          { kind: 'apiReference' }
+        ]
+      },
       source
     );
 
     expect(lines).to.deep.equal([
       "'content/nav.json' has no 'tabs', so nothing is a tab: the header shows no tab bar, and SDKs, Context " +
-        "Plugin, the API reference, 'tutorials' and 'guides' are folders in Home's sidebar. Add " +
-        '\'"tabs": ["tutorials","guides","apimatic:sdks","apimatic:plugin","apimatic:api"]\' to show them as tabs, ' +
-        'or \'"tabs": []\' to keep this sidebar.'
+        "Plugin and the API reference are folders in Home's sidebar. Add " +
+        '\'"tabs": ["apimatic:sdks","apimatic:plugin","apimatic:api"]\' to show them as tabs, or \'"tabs": []\' ' +
+        'to keep this sidebar.'
     ]);
   });
 
-  it('says there is no root file when there is none, and names only the sections there are', () => {
-    reportNoTabsListed({ file: undefined, sections: [SDK_SECTION], folders: [] }, source);
+  it('says there is no root file when there is none, and names only the nodes there are', () => {
+    reportNoTabsListed(
+      { file: undefined, unplaced: [{ kind: 'generated', section: SDK_SECTION }, { kind: 'apiReference' }] },
+      source
+    );
 
     expect(lines).to.deep.equal([
       "There is no 'content/nav.json', so nothing is a tab: the header shows no tab bar, and SDKs and the API " +

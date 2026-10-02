@@ -1,5 +1,6 @@
 import { FilePath } from '../file/filePath.js';
 import { ContentNotices, NoTabsListed } from './content-notices.js';
+import { isSameTabEntry } from './portal-navigation.js';
 import { SharedTabName, TabOwner } from './portal-tabs.js';
 
 /** A notice is given once, on the save that brings it about, rather than on every save after it. */
@@ -61,10 +62,8 @@ function isSameFile(left: FilePath | undefined, right: FilePath | undefined): bo
 function isSameNoTabs(left: NoTabsListed, right: NoTabsListed): boolean {
   return (
     isSameFile(left.file, right.file) &&
-    left.sections.length === right.sections.length &&
-    left.sections.every((section, index) => section === right.sections[index]) &&
-    left.folders.length === right.folders.length &&
-    left.folders.every((folder, index) => folder === right.folders[index])
+    left.unplaced.length === right.unplaced.length &&
+    left.unplaced.every((entry, index) => isSameTabEntry(entry, right.unplaced[index]))
   );
 }
 

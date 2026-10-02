@@ -514,8 +514,13 @@ where it is.
   made `apimatic:api` refuse a page named `api` too, which failed the build
   of every scaffolded portal that added `content/api.md`; the refusal is back
   to `api` spelled out, the one spelling that might have meant the page. The
-  no-tabs notice names the folders the root `pages` named as well, since
-  beta.1 made tabs of those too, and its suggested line leads with them.
+  no-tabs notice first gained the folders the root `pages` named, as beta.1
+  made tabs of those, and lost them again the same day: the line it offered
+  was refused when followed, a node being in one list or the other, and the
+  CLI's messages describe how `nav.json` works now, not what beta.1 did --
+  that is for the release notes. The notice names only the sections and the
+  reference that nothing places, and says nothing once `pages` places them
+  all; the text that leaned on the history is in present terms.
 
 ## 6. Template changes
 

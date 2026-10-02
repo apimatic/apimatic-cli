@@ -93,12 +93,26 @@ export interface NavigationSettings {
   title: string | undefined;
   /** Its entries, trimmed, which order the folder's pages; at the content root, Home's sidebar. */
   pages: string[];
+  /** The API reference and the sections `pages` places in Home, so one that nothing names can be told apart. */
+  placedInHome: TabEntry[];
   /**
    * At the content root, the tabs after Home in order, and the only ones. Undefined when the
-   * file has no `tabs`, which makes no tab either, but is worth a word to a project that had
-   * tabs before the setting existed; and below the root, where the setting is refused.
+   * file has no `tabs`, which makes no tab either but is said once, where `[]` is taken as
+   * meant; and below the root, where the setting is refused.
    */
   tabs: TabEntry[] | undefined;
+}
+
+/** Whether two entries name the same tab. */
+export function isSameTabEntry(left: TabEntry, right: TabEntry): boolean {
+  switch (left.kind) {
+    case 'apiReference':
+      return right.kind === 'apiReference';
+    case 'generated':
+      return right.kind === 'generated' && left.section === right.section;
+    case 'folder':
+      return right.kind === 'folder' && left.name === right.name;
+  }
 }
 
 /**
@@ -145,10 +159,12 @@ export class PortalNavigation {
     if (errors.length > 0) {
       return err(errors);
     }
+    const pageEntries = pages.unwrapOr(undefined) ?? [];
     const tabEntries = tabs.unwrapOr(undefined);
     return ok({
       title,
-      pages: pages.unwrapOr(undefined) ?? [],
+      pages: pageEntries,
+      placedInHome: PortalNavigation.tabEntries(pageEntries, context).filter((entry) => entry.kind !== 'folder'),
       tabs: tabEntries === undefined ? undefined : PortalNavigation.tabEntries(tabEntries, context)
     });
   }
@@ -168,7 +184,7 @@ export class PortalNavigation {
     return ok((value as string[]).map((entry) => entry.trim()));
   }
 
-  /** The tabs a valid file's `tabs` names, as the tab bar shows them. */
+  /** The tabs a valid file's list names, in its order. */
   private static tabEntries(entries: string[], context: NavigationContext): TabEntry[] {
     return entries.flatMap((entry) => {
       const target = PortalNavigation.target(entry, context);
