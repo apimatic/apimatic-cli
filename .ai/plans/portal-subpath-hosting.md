@@ -5,7 +5,8 @@ Status: designed 2026-09-29 on `saeedjamshaid/portal-subpath-hosting` (worktree
 apimatic-io#2275, whose design this follows except where section 14 says otherwise. Reviewed
 four times on 2026-09-29; section 15 records what each round changed.
 
-Not implemented.
+Implemented in steps 1–4 on 2026-09-29 and 30, and opened as apimatic/apimatic-cli#411, which
+supersedes #407. Step 5 (section 7) is the follow-up outside this repository.
 
 ## 1. Goal and scope
 
@@ -621,8 +622,11 @@ after each one. In all, roughly 400 lines of source and 500 of tests.
      - It names `robots.txt` (and `sitemap.xml`) even where none is generated: without
        `site.url`, and now under a path. `GENERATED_ROOT_FILES` lists them unconditionally.
      - Pre-existing, so not fixed here.
-   - the TanStack comment of section 10, once the user has read it. The Fumadocs issue was filed
-     by the user as fuma-nama/fumadocs#3620 and fixed in fumadocs-ui 16.15.17 (section 10).
+   - a ticket for the `<img src="__img0">` placeholders in the Markdown copies (section 9),
+     found while checking the links there;
+   - the optional TanStack reaction or comment of section 10, if the user wants one. The
+     Fumadocs issue was filed by the user as fuma-nama/fumadocs#3620 and fixed in fumadocs-ui
+     16.15.17 (section 10).
 
 ## 8. Risks
 
@@ -681,7 +685,12 @@ after each one. In all, roughly 400 lines of source and 500 of tests.
       `includeProcessedMarkdown` options. Handlers for `link`, `image` and `definition` would
       prefix root-relative URLs in the copy alone.
     - Open: how the handlers learn the base, given that `source.ts` goes through
-      `fumadocs-mdx/macro`, and which image nodes remain after `remarkImage`.
+      `fumadocs-mdx/macro`.
+
+**Images in the Markdown copies are broken on every portal** (measured 2026-09-30, root and
+path alike). `remarkImage` swaps the image for an import, and the copy and `llms-full.txt` carry
+`<img alt="…" src="__img0" />`, which leads nowhere. This predates the path: `useImport` is the
+default. It gets a ticket of its own.
 
 **API reference pages' Markdown copies keep the spec's own text:** its description and the YAML.
 A root-relative link inside a spec description is prefixed in the page's HTML, which renders it
@@ -691,17 +700,18 @@ with the MDX components, but not in its copy.
 
 | Item | State (2026-09-29) | What it means for us |
 |---|---|---|
-| TanStack/router#6152, PR #5970 | Both open. A maintainer (2026-07-17): the cache URL "should follow Start's public asset base"; the PR builds the URL with `path.join` and needs an e2e served from a sub-path. | When it ships, delete 5.6. |
+| TanStack/router#6152, PR #5970 | Both open (checked 2026-09-30). A maintainer (2026-07-17): the cache URL "should follow Start's public asset base"; the PR builds the URL with `path.join` and needs an e2e served from a sub-path. SimYunSup (2026-08-12, on the PR): a repro, `path.join` throwing in the browser, a string join returning 200, `import.meta.env.BASE_URL` working, and an offer of the e2e fixture. | When it ships, delete 5.6. |
 | fuma-nama/fumadocs#3620, from PR #3572 (ui 16.15.13) | Fixed 2026-09-29 in fumadocs-ui 16.15.17 (commit `6791d6f`): the popover prefixes `markdownUrl` with `withBasePath` again, in both `radix-ui` and `base-ui` | Nothing to undo. The full address we pass goes through that `withBasePath` unchanged, so it is right on 16.15.15 and on 16.15.17 (5.2). An upgrade needs no change here |
 | TanStack/router#4888, docs PR #7882 | Docs only | None |
 
 **The fixes:**
 - **Fumadocs:** filed by the user as fuma-nama/fumadocs#3620, from the draft at
   `C:\repos\fumadocs-issue-view-as-markdown-base-path.md`, and fixed as it proposed.
-- **TanStack** (drafted, not posted): first a comment on #6152, with our repro and a fix that prefixes only the client
-  fetch in `fetchItem`: `fetch(import.meta.env.BASE_URL.replace(/\/$/, '') + url)`.
-  - `getStaticCacheUrl` is left alone, since the writer joins it onto the client output directory.
-  - It uses the Vite base rather than the router basepath, as the maintainer asked.
+- **TanStack:** the planned comment on #6152 would have given a repro and a fix that prefixes only
+  the client fetch in `fetchItem`, `fetch(import.meta.env.BASE_URL.replace(/\/$/, '') + url)`,
+  leaving `getStaticCacheUrl` alone. SimYunSup's comments on PR #5970 (2026-08-12) already say all
+  of that. So what is left is optional: a reaction on #6152, or a short comment confirming the
+  current release and the Vite base the maintainer asked for.
   - A PR, with the e2e case served from a sub-path that the maintainer asked for, follows only if
     a maintainer answers. That e2e case lives in their monorepo and costs more than the fix, and
     5.6 already covers us until then.
@@ -862,3 +872,8 @@ path edit included (section 3).
 - `SiteConfig`'s getter is `siteAddress()` (4.2).
 - The Next Steps note at the root says its 404 sentence once.
 - The plugin's comment is one line, and `llms.server.ts` has no single-use helper.
+
+**The PR** (2026-09-30): opened as apimatic/apimatic-cli#411, superseding #407. It passed CI on
+Linux, macOS and Windows under Node 24 and 26, the sub-path e2e build included. The planned
+TanStack comment became optional: SimYunSup's comments on PR #5970 already say what it would have
+said (section 10).
