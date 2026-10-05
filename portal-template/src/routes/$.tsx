@@ -136,7 +136,9 @@ function Content({
       <DocsTitle>{page.title}</DocsTitle>
       <DocsDescription>{page.description}</DocsDescription>
       <div className="flex flex-row gap-2 items-center border-b -mt-4 pb-6">
-        <MarkdownCopyButton markdownUrl={markdownUrl} />
+        {/* Keyed, or moving to another page keeps the last page's "Copy failed", or shows
+            "Copied Markdown" there when that page's copy finishes after the move. */}
+        <MarkdownCopyButton key={markdownUrl} markdownUrl={markdownUrl} />
         {/* Sends the reader to an external AI vendor, so a portal published under someone
             else's brand can turn it off. */}
         {portal.pageActions ? <ViewOptionsPopover markdownUrl={markdownUrl} pageUrl={pageUrl} /> : null}
