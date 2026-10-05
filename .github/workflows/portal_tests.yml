@@ -1,0 +1,194 @@
+name: Portal automation tests
+
+on:
+  push:
+    branches: [dev]
+
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  portal-tests:
+    name: Portal tests against this build
+    # windows-latest is required, not a preference: the suite's visual baselines
+    # were captured on win32/Chromium, and font rasterisation differs enough
+    # across operating systems that a ubuntu runner would fail every snapshot.
+    runs-on: windows-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: checkout cli
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+          path: cli
+
+      # Corepack is not distributed with Node 25 and newer, so pnpm is installed
+      # standalone — same as the other workflows in this repo.
+      - name: setup pnpm
+        uses: pnpm/action-setup@a15d269cd4658e1107c09f1fabf4cbd7bd1f308a # v4.4.0
+        with:
+          version: 11.0.8
+          standalone: true
+
+      - name: setup node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+          cache-dependency-path: cli/pnpm-lock.yaml
+
+      - name: install dependencies
+        working-directory: cli
+        run: pnpm install --frozen-lockfile
+
+      - name: build
+        working-directory: cli
+        run: pnpm build
+
+      # `pnpm pack` runs the `prepack` script, which regenerates
+      # oclif.manifest.json — without it the installed CLI can't resolve its own
+      # commands. The filename carries the version, so it's globbed rather than
+      # hardcoded.
+      - name: pack
+        id: pack
+        shell: bash
+        working-directory: cli
+        run: |
+          pnpm pack
+          tarball=$(ls -1 ./*.tgz | head -n 1)
+          tarball="${tarball#./}"
+          if [ -z "$tarball" ]; then
+            echo "::error::pnpm pack produced no tarball"
+            exit 1
+          fi
+          echo "tarball=$(pwd)/${tarball}" >> "$GITHUB_OUTPUT"
+          echo "packed ${tarball}"
+
+      # Installed globally from the tarball, exactly as a user would install it,
+      # so `apimatic` on PATH is this commit's build.
+      - name: install the packed cli
+        shell: bash
+        run: |
+          npm install -g "${{ steps.pack.outputs.tarball }}"
+          echo "apimatic on PATH: $(which apimatic)"
+          apimatic --version
+
+      # ---- the test suite -------------------------------------------------
+      - name: checkout portal tests
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          repository: apimatic/v4-test-automation
+          path: tests
+
+      - name: install test dependencies
+        working-directory: tests
+        run: pnpm install --frozen-lockfile
+
+      - name: cache playwright browsers
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ${{ github.workspace }}\.playwright-browsers
+          key: playwright-${{ runner.os }}-${{ hashFiles('tests/pnpm-lock.yaml') }}
+          restore-keys: playwright-${{ runner.os }}-
+
+      # No --with-deps: it installs OS-level libraries, a Linux concern that
+      # only costs minutes on a Windows runner.
+      - name: install chromium
+        working-directory: tests
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}\.playwright-browsers
+        run: pnpm exec playwright install chromium
+
+      - name: install http-server
+        run: npm install -g http-server@14.1.1
+
+      # Portal generation is subscription-gated, so a fresh runner has no
+      # credentials. Checked before login so a missing secret says so plainly
+      # rather than surfacing as an opaque CLI error a few steps later.
+      - name: check the auth key is configured
+        shell: bash
+        env:
+          AUTH_KEY: ${{ secrets.APIMATIC_AUTH_KEY }}
+        run: |
+          if [ -z "$AUTH_KEY" ]; then
+            echo "::error::APIMATIC_AUTH_KEY is not set, so the CLI cannot generate a portal."
+            echo "::error::Add it under Settings -> Secrets and variables -> Actions."
+            exit 1
+          fi
+          echo "auth key is present"
+
+      # Points the CLI at the dev environment. The value is three base URLs
+      # separated by `;`: API, auth, and package publishing. Written to
+      # GITHUB_ENV so it applies to every later step — login and portal
+      # generation both need to hit the same environment.
+      - name: point the cli at the dev environment
+        shell: bash
+        env:
+          BASE_URL: ${{ secrets.DEV_APIMATIC_BASE_URL }}
+        run: |
+          echo "APIMATIC_BASE_URL=$BASE_URL" >> "$GITHUB_ENV"
+          echo "APIMATIC_BASE_URL set for the remaining steps"
+
+      - name: authenticate the cli
+        shell: bash
+        env:
+          AUTH_KEY: ${{ secrets.APIMATIC_AUTH_KEY }}
+        run: |
+          apimatic auth login --auth-key "$AUTH_KEY"
+          # The account's allowed languages land in this log. A subscription
+          # that doesn't cover a declared language is a plausible cause of a
+          # missing SDK artifact further down.
+          apimatic auth status
+
+      - name: generate the portal
+        id: generate
+        working-directory: tests
+        run: pnpm portal:generate
+
+      
+      - name: artifacts — produced vs declared
+        working-directory: tests
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}\.playwright-browsers
+        run: pnpm test:artifacts
+
+# PORTAL_PREBUILT tells the suite's web server to serve what was just
+      # generated instead of regenerating it for every project.
+      - name: visual
+        if: ${{ !cancelled() && steps.generate.outcome == 'success' }}
+        working-directory: tests
+        env:
+          PORTAL_PREBUILT: '1'
+          PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}\.playwright-browsers
+        run: pnpm test:visual
+
+      - name: functional
+        if: ${{ !cancelled() && steps.generate.outcome == 'success' }}
+        working-directory: tests
+        env:
+          PORTAL_PREBUILT: '1'
+          PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}\.playwright-browsers
+        run: pnpm test:functional
+
+      - name: upload playwright report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: playwright-report
+          path: tests/playwright-report/
+          retention-days: 30
+
+      # The expected/actual/diff PNGs — what tells you whether a visual diff is
+      # a regression in this PR or an intended change that needs new baselines.
+      - name: upload failure output
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: test-results
+          path: tests/test-results/
+          retention-days: 30
+          if-no-files-found: ignore

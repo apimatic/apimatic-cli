@@ -26,11 +26,7 @@ const REST_TOKEN = '...';
 /** The API reference, positioned as one node. */
 const API_REFERENCE_TOKEN = 'apimatic:api';
 
-/**
- * The folders the CLI generates, each a tab of its own, by the token that positions it and in
- * the order they take when the root `nav.json` names none of them. The CLI's
- * `GENERATED_SECTIONS` lists the same, and a test holds the two together.
- */
+/** The folders the CLI generates, by the token that positions each; the CLI's `GENERATED_SECTIONS` lists the same. */
 export const GENERATED_SECTIONS = [
   { token: 'apimatic:sdks', folder: 'sdks' },
   { token: 'apimatic:plugin', folder: 'context-plugin' }
@@ -43,14 +39,14 @@ const API_REFERENCE_TITLE = 'API Reference';
 /** Where the home page is served, which is how its node is told apart from every other page. */
 const HOME_URL = docsRoute;
 
-/** Fixed, as tab matching goes by id after serialisation; Fumadocs' ids never start with a slash. */
-const HOME_TAB_ID = '/tab/home';
-
 /** The Home tab's name when the root `nav.json` gives none, and the fallback home page's. */
 const HOME_NAME = 'Home';
 
 /** The node the fallback home page gets when there is no index page; see `withFallbackHomePage`. */
 const SYNTHETIC_HOME_ID = '/page/home';
+
+/** The Home tab's id. Fixed, as tab matching goes by id after serialisation; Fumadocs' ids never start with a slash. */
+const HOME_TAB_ID = '/tab/home';
 
 /**
  * The key the generated pages are passed to `loader()` under, which the storage stamps onto
@@ -82,16 +78,10 @@ export function navigationTransformer<S extends ContentStorage>(): PageTreeTrans
       // folder whose only page is its index is not empty: the folder itself links to it.
       node.children = node.children.filter((child) => !isEmptyFolder(child));
 
-      // The root is ordered even with no file of its own: naming nothing still puts the
-      // generated sections and the API reference at their defaults, and Fumadocs' own order
-      // would not. It sorts folders by path, so `api` lands above a user folder called anything
-      // later in the alphabet, and a generated folder lands in the middle of the user's pages.
-      // Below the root those defaults do not apply, so a folder with no file keeps Fumadocs'
-      // order untouched, which is every tag folder of every specification.
+      // A directory with no order keeps Fumadocs' own, the root included.
       const settings = readSettings(this, folderPath);
-      const order = settings?.pages;
-      if (folderPath === '' || order !== undefined) {
-        node.children = reorder(this, node, folderPath, order ?? []);
+      if (settings?.pages !== undefined) {
+        node.children = reorder(this, node, folderPath, settings.pages);
       }
       if (folderPath === apiBaseDir) {
         applyApiStructure(this, node);
@@ -105,7 +95,7 @@ export function navigationTransformer<S extends ContentStorage>(): PageTreeTrans
   };
 }
 
-/** A tab per folder the root `nav.json` lists, the API reference and each generated folder; the rest is Home. */
+/** A tab per entry of the root `nav.json`'s `tabs`, in its order; everything else is Home. */
 export function tabsTransformer<S extends ContentStorage>(): PageTreeTransformer<S> {
   return {
     root(root) {
@@ -119,6 +109,8 @@ export function tabsTransformer<S extends ContentStorage>(): PageTreeTransformer
 interface NavigationSettings {
   pages: string[] | undefined;
   title: string | undefined;
+  /** Read at the root only; the CLI refuses it anywhere else. */
+  tabs: string[] | undefined;
 }
 
 function readSettings(context: NavigationContext, folderPath: string): NavigationSettings | undefined {
@@ -130,41 +122,36 @@ function readSettings(context: NavigationContext, folderPath: string): Navigatio
     return undefined;
   }
 
-  const { pages, title } = file.data as { pages?: unknown; title?: unknown };
+  const { pages, tabs, title } = file.data as { pages?: unknown; tabs?: unknown; title?: unknown };
   // A half-typed title reloads to here as an empty string, which would blank the folder in
   // the sidebar with nothing to click. The CLI refuses one; the preview keeps the default
   // name until the file is worth reading again.
   const named = typeof title === 'string' ? title.trim() : '';
   return {
-    pages: Array.isArray(pages) ? pages.filter((entry): entry is string => typeof entry === 'string') : undefined,
+    pages: stringsOf(pages),
+    tabs: stringsOf(tabs),
     title: named.length > 0 ? named : undefined
   };
 }
 
-function isTabFolder(rootSettings: NavigationSettings | undefined, folder: Folder): boolean {
-  const folderPath = folder.$ref?.folder;
-  return (
-    folderPath !== undefined &&
-    folderPath !== apiBaseDir &&
-    lists(rootSettings, folderPath) &&
-    // The home page is the Home tab's, whichever `(group)` folder serves it.
-    !containsUrl([folder], HOME_URL)
-  );
+function stringsOf(entries: unknown): string[] | undefined {
+  return Array.isArray(entries) ? entries.filter((entry): entry is string => typeof entry === 'string') : undefined;
 }
 
+/** The nodes the root `tabs` names become the tabs, in its order; everything else is Home. */
 function groupIntoTabs(context: NavigationContext, children: Node[]): Node[] {
   const settings = readSettings(context, '');
+  const remaining = new Set(children);
   const tabs: Folder[] = [];
-  const loose: Node[] = [];
 
-  for (const child of children) {
-    if (
-      child.type === 'folder' &&
-      (isApiReference(child) || isTabFolder(settings, child) || isInjected(context, child))
-    ) {
-      tabs.push(asTab(child));
-    } else {
-      loose.push(child);
+  // Resolved as `reorder` resolves an entry, before the tabs lose their `$ref`. A page is no
+  // tab, and the home page is the Home tab's whichever `(group)` folder serves it; the CLI
+  // refuses both entries, and an entry naming nothing is left to it as well.
+  for (const raw of settings?.tabs ?? []) {
+    const node = nodeNamed(context, [...remaining], '', raw.trim());
+    if (node?.type === 'folder' && !containsUrl([node], HOME_URL)) {
+      remaining.delete(node);
+      tabs.push(asTab(node));
     }
   }
 
@@ -181,7 +168,7 @@ function groupIntoTabs(context: NavigationContext, children: Node[]): Node[] {
     $id: HOME_TAB_ID,
     name: settings?.title ?? HOME_NAME,
     root: true,
-    children: withFallbackHomePage(loose)
+    children: withFallbackHomePage([...remaining])
   };
   // Home opens the site, so it leads wherever the file lists its pages; `index` orders them only.
   return [home, ...tabs];
@@ -207,10 +194,6 @@ function asTab(folder: Folder): Folder {
     folder.index = undefined;
   }
   return folder;
-}
-
-function lists(settings: NavigationSettings | undefined, name: string): boolean {
-  return settings?.pages?.some((entry) => entry.trim() === name) ?? false;
 }
 
 /**
@@ -268,66 +251,51 @@ function firstPageIn(folder: Folder): Node | undefined {
   return undefined;
 }
 
+/**
+ * `node`'s children with the ones `order` names first, in its order, and the rest where its
+ * rest token stands, or after everything named when it has none. The rest keep Fumadocs' own
+ * order: pages before folders, each by path.
+ */
 function reorder(context: NavigationContext, node: Folder, folderPath: string, order: string[]): Node[] {
   const remaining = new Set(node.children);
-  // Asked once per child: the token, both bands and the anchor all want to know, and each
-  // answer is a storage read.
-  const injectedChildren = new Set(node.children.filter((child) => isInjected(context, child)));
-  const isInjectedChild = (child: Node): boolean => injectedChildren.has(child);
   const named: Node[] = [];
   let restIndex: number | undefined;
 
-  const claim = (child: Node | undefined): void => {
+  for (const raw of order) {
+    const entry = raw.trim();
+    if (entry === REST_TOKEN) {
+      restIndex = named.length;
+      continue;
+    }
+    const child = nodeNamed(context, [...remaining], folderPath, entry);
     if (child !== undefined) {
       remaining.delete(child);
       named.push(child);
     }
-  };
-
-  // Every token names a node that lives at the content root, and the CLI refuses each one
-  // anywhere else. Honouring them in a nested directory would let the two halves of the
-  // format disagree about a file only one of them had rejected.
-  const isContentRoot = folderPath === '';
-
-  for (const raw of order) {
-    const entry = raw.trim();
-    const section = GENERATED_SECTIONS.find((candidate) => candidate.token === entry);
-    if (entry === REST_TOKEN) {
-      restIndex = named.length;
-    } else if (entry === API_REFERENCE_TOKEN) {
-      if (isContentRoot) {
-        claim([...remaining].find((child) => isApiReference(child)));
-      }
-    } else if (section !== undefined) {
-      if (isContentRoot) {
-        claim([...remaining].find((child) => isInjectedChild(child) && isSectionFolder(child, section)));
-      }
-    } else {
-      claim(matching(context, [...remaining], folderPath, entry));
-    }
   }
 
-  // What is left keeps its default order, in three bands. The generated sections and the API
-  // reference have defaults of their own rather than travelling with the content, so that
-  // a later release adding a section never splits the band or reorders a sidebar nobody
-  // touched. The sections keep the CLI's order: Fumadocs' own is by path, which would put
-  // `context-plugin` above `sdks`.
-  const rest = [...remaining];
-  const api = rest.filter((child) => isApiReference(child));
-  const injected = rest.filter(isInjectedChild).sort((left, right) => sectionRank(left) - sectionRank(right));
-  const content = rest.filter((child) => !isApiReference(child) && !isInjectedChild(child));
+  const at = restIndex ?? named.length;
+  return [...named.slice(0, at), ...remaining, ...named.slice(at)];
+}
 
-  // With no rest token, unnamed content joins the user's own pages: after the last one the
-  // file named. Appending at the end instead would drop it below the whole API reference,
-  // and inserting before the reference would lift it above one the file deliberately put
-  // first.
-  const at = restIndex ?? afterNamedContent(named, isInjectedChild);
-  const ordered = [...named.slice(0, at), ...content, ...named.slice(at)];
-
-  // Before the API reference, but never above the user's own pages: when the file puts the
-  // reference first, the band follows the content instead.
-  const anchor = Math.max(anchorIn(ordered), at + content.length);
-  return [...ordered.slice(0, anchor), ...injected, ...ordered.slice(anchor), ...api];
+/**
+ * The child an entry names, or undefined. A token names a node that lives at the content root,
+ * and the CLI refuses each one anywhere else; honouring it in a nested directory would let the
+ * two halves of the format disagree about a file only one of them had rejected.
+ */
+function nodeNamed(context: NavigationContext, children: Node[], folderPath: string, entry: string): Node | undefined {
+  const isContentRoot = folderPath === '';
+  const section = GENERATED_SECTIONS.find((candidate) => candidate.token === entry);
+  if (entry === API_REFERENCE_TOKEN) {
+    return isContentRoot ? children.find((child) => isApiReference(child)) : undefined;
+  }
+  if (section !== undefined) {
+    // The cheap path check first: `isInjected` reads storage.
+    return isContentRoot
+      ? children.find((child) => isSectionFolder(child, section) && isInjected(context, child))
+      : undefined;
+  }
+  return matching(context, children, folderPath, entry);
 }
 
 /**
@@ -344,22 +312,6 @@ function matching(context: NavigationContext, children: Node[], folderPath: stri
   }
   const pagePath = context.builder.resolveFlattenPath(target, 'page');
   return children.find((child) => child.type === 'page' && child.$ref === pagePath);
-}
-
-function afterNamedContent(named: Node[], isInjectedChild: (child: Node) => boolean): number {
-  for (let index = named.length - 1; index >= 0; index -= 1) {
-    if (!isApiReference(named[index]) && !isInjectedChild(named[index])) {
-      return index + 1;
-    }
-  }
-  // Nothing named is the user's own, so everything named is what the CLI adds, and the
-  // user's pages keep their default place above all of it.
-  return 0;
-}
-
-function anchorIn(children: Node[]): number {
-  const index = children.findIndex((child) => isApiReference(child));
-  return index === -1 ? children.length : index;
 }
 
 function isApiReference(child: Node): child is Folder {
@@ -381,15 +333,6 @@ function isInjected(context: NavigationContext, child: Node): boolean {
     return page !== undefined && isFromSource(context, page, GENERATED_SOURCE);
   }
   return isFromSource(context, child, GENERATED_SOURCE);
-}
-
-/**
- * Where a generated folder comes in `GENERATED_SECTIONS`. Anything else sorts after them, which
- * only a loose generated page could be, and the CLI writes none.
- */
-function sectionRank(child: Node): number {
-  const rank = GENERATED_SECTIONS.findIndex((section) => isSectionFolder(child, section));
-  return rank === -1 ? GENERATED_SECTIONS.length : rank;
 }
 
 function isSectionFolder(child: Node, section: (typeof GENERATED_SECTIONS)[number]): boolean {

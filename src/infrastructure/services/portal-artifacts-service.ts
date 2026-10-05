@@ -70,9 +70,8 @@ export class PortalArtifactsService {
     }
 
     const build = new FilePath(into, new FileName('build.zip'));
-    try {
-      await this.zipService.archive(source, build);
-    } catch {
+    const archived = await this.zipService.archive(source, build);
+    if (archived.isErr()) {
       return err(ServiceError.InvalidResponse);
     }
 
@@ -199,8 +198,11 @@ export class PortalArtifactsService {
     try {
       await this.fileService.writeFile(archive, zip);
       await this.fileService.createDirectoryIfNotExists(contents);
-      await this.zipService.unArchive(archive, contents);
     } catch {
+      return err(ServiceError.InvalidResponse);
+    }
+    const unpacked = await this.zipService.unArchive(archive, contents);
+    if (unpacked.isErr()) {
       return err(ServiceError.InvalidResponse);
     }
 

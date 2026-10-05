@@ -1,13 +1,13 @@
 import { ResultAsync } from 'neverthrow';
-import { ServiceError } from '../../infrastructure/service-error.js';
 import { withDirPath } from '../../infrastructure/tmp-extensions.js';
 import { PluginService } from '../../infrastructure/services/plugin-service.js';
 import { PublishingApiService } from '../../infrastructure/services/publishing-api-service.js';
 import { PluginGeneratePrompts } from '../../prompts/plugin/generate.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
-import { PluginConfig, PluginConfigWriteFailure } from '../../types/plugin-config-context.js';
+import { PluginConfig } from '../../types/plugin-config-context.js';
 import { PluginContext } from '../../types/plugin-context.js';
+import { PluginGenerationProblem } from '../../types/plugin/generation-problem.js';
 import { ProjectContext } from '../../types/project-context.js';
 import { PublishingProfiles } from '../../types/publish/publishing-profiles.js';
 import { TempContext } from '../../types/temp-context.js';
@@ -101,19 +101,19 @@ export class PluginGenerateAction {
       const written = await configContext.recordLanguages(selection);
       return await written
         .asyncAndThen(() => new ResultAsync(configContext.stageUpload(tempDirectory, selection)))
-        .map((staged) => tempContext.zip(staged))
-        .andThen(
-          (upload) =>
-            new ResultAsync(
-              this.prompts.generatePlugin(
-                this.pluginService.generatePlugin(upload, this.configDir, this.commandMetadata, this.authKey)
-              )
+        .mapErr((failure): PluginGenerationProblem => ({ kind: 'configNotPrepared', failure }))
+        .andThen((staged) => new ResultAsync(tempContext.zip(staged)))
+        .andThen((upload) =>
+          new ResultAsync(
+            this.prompts.generatePlugin(
+              this.pluginService.generatePlugin(upload, this.configDir, this.commandMetadata, this.authKey)
             )
+          ).mapErr((error): PluginGenerationProblem => ({ kind: 'generationFailed', error }))
         )
-        .map(async (stream) => pluginContext.save(await tempContext.save(stream)));
+        .andThen((stream) => new ResultAsync(tempContext.save(stream).then((archive) => pluginContext.save(archive))));
     });
     if (generated.isErr()) {
-      this.reportGenerationProblem(generated.error, sourceDirectory);
+      this.prompts.pluginNotGenerated(generated.error, sourceDirectory);
       return ActionResult.failed();
     }
 
@@ -124,13 +124,4 @@ export class PluginGenerateAction {
 
     return ActionResult.success();
   };
-
-  /** A record, a staging and a generation fault land here alike; only the wording differs. */
-  private readonly reportGenerationProblem = (
-    problem: ServiceError | PluginConfigWriteFailure,
-    sourceDirectory: DirectoryPath
-  ) =>
-    typeof problem === 'string'
-      ? this.prompts.configNotPrepared(problem, sourceDirectory)
-      : this.prompts.pluginGenerationError(problem.errorMessage);
 }

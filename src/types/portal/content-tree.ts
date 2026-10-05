@@ -11,10 +11,12 @@ import {
   API_REFERENCE_NAME,
   GROUP_FOLDER,
   INDEX_NAME,
+  isSameTabEntry,
   NAVIGATION_FILE_NAME,
   NavigationContext,
   NavigationSettings,
-  PortalNavigation
+  PortalNavigation,
+  TabEntry
 } from './portal-navigation.js';
 import { ContentProblem, MissingImage, PortalSpec, ReservedAddressPage, SharedAddress } from './portal-source.js';
 import { PortalTab, sharedTabNames, TabOwner, untitledTabName } from './portal-tabs.js';
@@ -161,11 +163,20 @@ export class ContentTree {
     }
 
     const tabs = ContentTree.tabs(navigation.root, titled, generatedPages);
+    const rootNavigation = navigation.root.navigation;
+    const unplaced = ContentTree.unplaced(rootNavigation?.settings, generatedPages);
     return ok({
       hiddenPages: ContentTree.hiddenPages(pages, specs),
       ignoredNavigationFiles: navigation.ignoredFiles,
-      folderTabs: tabs.flatMap(({ owner }) => (owner.kind === 'folder' ? [owner.directory] : [])),
-      sharedTabNames: sharedTabNames(tabs)
+      sharedTabNames: sharedTabNames(tabs),
+      // Said once rather than silently; `"tabs": []` says the same on purpose.
+      noTabsListed:
+        rootNavigation?.settings.tabs === undefined && unplaced.length > 0
+          ? { file: rootNavigation?.file, unplaced }
+          : undefined,
+      // Home's name shows only in a tab bar, and one tab draws none.
+      unseenHomeTitle:
+        rootNavigation?.settings.title !== undefined && tabs.length === 1 ? rootNavigation.file : undefined
     });
   }
 
@@ -202,9 +213,18 @@ export class ContentTree {
     return { root: walk.visit(this.tree, true, false), ignoredFiles: walk.ignoredFiles };
   }
 
+  /** The sections and the API reference the root `pages` does not place, which sit in Home with nothing naming them. */
+  private static unplaced(settings: NavigationSettings | undefined, generatedPages: GeneratedPages): TabEntry[] {
+    const nodes: TabEntry[] = [
+      ...generatedPages.sections().map((section): TabEntry => ({ kind: 'generated', section })),
+      { kind: 'apiReference' }
+    ];
+    return nodes.filter((node) => !(settings?.placedInHome ?? []).some((placed) => isSameTabEntry(placed, node)));
+  }
+
   /**
-   * Every tab, named as the template names it, in the order a report lists them: Home, the
-   * folders the root `nav.json` lists, the generated sections, then the API reference.
+   * Every tab, named as the template names it, in the order the tab bar shows them: Home, then
+   * what the root `nav.json`'s `tabs` names. Nothing else is a tab, so nothing else is compared.
    */
   private static tabs(root: DirectoryScan, pages: TitledPage[], generatedPages: GeneratedPages): PortalTab[] {
     const named = (owner: TabOwner, scan: DirectoryScan | undefined): PortalTab =>
@@ -212,13 +232,24 @@ export class ContentTree {
 
     // The home page is the content root's index page, which names no tab.
     const home = ContentTree.namedTab({ kind: 'home' }, root.navigation, undefined, pages);
-    const folders = (root.navigation?.settings.pages ?? []).flatMap((entry) => {
-      const subfolder = entry === API_REFERENCE_NAME ? undefined : root.subfolders.get(entry);
-      return subfolder === undefined ? [] : [named({ kind: 'folder', directory: subfolder.directory }, subfolder.scan)];
+    const listed = (root.navigation?.settings.tabs ?? []).flatMap((tab): PortalTab[] => {
+      switch (tab.kind) {
+        case 'apiReference':
+          return [named({ kind: 'apiReference' }, root.subfolders.get(API_REFERENCE_NAME)?.scan)];
+        case 'generated':
+          // A token for a section that is not generated names no tab, as it resolves to no node.
+          return generatedPages.sections().includes(tab.section)
+            ? [named({ kind: 'generated', section: tab.section }, undefined)]
+            : [];
+        case 'folder': {
+          const subfolder = root.subfolders.get(tab.name);
+          return subfolder === undefined
+            ? []
+            : [named({ kind: 'folder', directory: subfolder.directory }, subfolder.scan)];
+        }
+      }
     });
-    const generated = generatedPages.sections().map((section) => named({ kind: 'generated', section }, undefined));
-    const reference = named({ kind: 'apiReference' }, root.subfolders.get(API_REFERENCE_NAME)?.scan);
-    return [home, ...folders, ...generated, reference];
+    return [home, ...listed];
   }
 
   /** A tab by the name the template gives it: its `nav.json` title, else its index page's. */
@@ -383,11 +414,13 @@ class NavigationWalk {
     // A directory with no page anywhere beneath it becomes no node in the page tree, so naming it
     // would resolve to nothing. Fumadocs would build one for a directory that holds only a
     // `nav.json`, but the template drops it again to keep to this rule.
+    const isFolder = ({ scan, isApiChild }: WalkedFolder): boolean => scan.holdsPage && !isApiChild;
+    const folderNames = folders.filter(isFolder).map(({ name }) => name);
     const childNames = entries.flatMap((entry) => {
       if ('page' in entry) {
         return [entry.page];
       }
-      return entry.scan.holdsPage && !entry.isApiChild ? [entry.name] : [];
+      return isFolder(entry) ? [entry.name] : [];
     });
     const { errors, navigation } = this.checkedNavigation(listing.navigationFile, {
       isContentRoot,
@@ -396,6 +429,8 @@ class NavigationWalk {
       // keeps in it, because the specification sections are mounted there.
       becomesFolder: holdsPage || isApiDirectory,
       childNames: this.withMountedChildren(childNames, pages, isContentRoot, isApiDirectory),
+      // The reference is not among them: `api` is ruled on by name, at the root and in `tabs` alike.
+      folderNames,
       emptyFolders: folders.filter(({ scan, isApiChild }) => !scan.holdsPage && !isApiChild).map(({ name }) => name),
       // At the content root, the address such a folder serves is the home page's.
       homePageFolders: isContentRoot ? servingThisAddress : []

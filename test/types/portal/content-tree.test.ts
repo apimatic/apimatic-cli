@@ -66,7 +66,7 @@ describe('ContentTree', () => {
 
   it('judges the files it is handed', () => {
     const navigationFiles = handed(
-      [inContent('nav.json'), JSON.stringify({ pages: ['index', 'guides', 'missing'] })],
+      [inContent('nav.json'), JSON.stringify({ tabs: ['guides'], pages: ['index', 'missing'] })],
       [inContent('guides', 'nav.json'), JSON.stringify({ title: 'Guides' })]
     );
 
@@ -82,7 +82,10 @@ describe('ContentTree', () => {
 
   // Looked up by the caller, which has the disk; refused here, with the page problems ahead of the navigation's.
   it('refuses the images it is told the build would not find', () => {
-    const navigationFiles = handed([inContent('nav.json'), JSON.stringify({ pages: ['index', 'guides', 'missing'] })]);
+    const navigationFiles = handed([
+      inContent('nav.json'),
+      JSON.stringify({ tabs: ['guides'], pages: ['index', 'missing'] })
+    ]);
     const image = {
       page: inContent('index.md'),
       line: 3,
@@ -98,16 +101,74 @@ describe('ContentTree', () => {
 
   it('names the tabs from what it is handed', () => {
     const navigationFiles = handed(
-      [inContent('nav.json'), JSON.stringify({ title: 'Guides', pages: ['index', 'guides'] })],
+      [inContent('nav.json'), JSON.stringify({ title: 'Guides', tabs: ['guides'], pages: ['index'] })],
       [inContent('guides', 'nav.json'), JSON.stringify({ title: 'Guides' })]
     );
 
     const notices = tree.check({ pages, navigationFiles, missingImages: [] }, [], GENERATED)._unsafeUnwrap();
 
-    expect(notices.folderTabs.map((directory) => directory.leafName())).to.deep.equal(['guides']);
     expect(notices.sharedTabNames.map(({ name, tabs }) => [name, tabs.map(({ owner }) => owner.kind)])).to.deep.equal([
       ['Guides', ['home', 'folder']]
     ]);
     expect(relative(notices.ignoredNavigationFiles)).to.deep.equal(['content/Nav.json']);
+  });
+
+  // The shared-name warning describes the tabs, so it lists them as the tab bar shows them.
+  it('names the tabs in the order the tab bar shows them, tokens interleaved with folders', () => {
+    const navigationFiles = handed(
+      [
+        inContent('nav.json'),
+        JSON.stringify({ title: 'Home', tabs: ['apimatic:sdks', 'guides', 'apimatic:api'], pages: ['index'] })
+      ],
+      [inContent('guides', 'nav.json'), JSON.stringify({ title: 'Guides' })]
+    );
+
+    const notices = tree.check({ pages, navigationFiles, missingImages: [] }, [], GENERATED)._unsafeUnwrap();
+
+    expect(notices.sharedTabNames).to.deep.equal([]);
+  });
+
+  it('lists a tab named like Home after it, however early its token comes', () => {
+    const navigationFiles = handed(
+      [inContent('nav.json'), JSON.stringify({ title: 'SDKs', tabs: ['apimatic:sdks', 'guides'], pages: ['index'] })],
+      [inContent('guides', 'nav.json'), JSON.stringify({ title: 'Guides' })]
+    );
+
+    const notices = tree.check({ pages, navigationFiles, missingImages: [] }, [], GENERATED)._unsafeUnwrap();
+
+    expect(notices.sharedTabNames.map(({ name, tabs }) => [name, tabs.map(({ owner }) => owner.kind)])).to.deep.equal([
+      ['SDKs', ['home', 'generated']]
+    ]);
+  });
+
+  // A section `tabs` does not name is a folder in Home's sidebar, so its name clashes with no tab's.
+  it('leaves a section tabs does not name out of the tabs, and out of the shared names', () => {
+    const sharedWith = (root: Record<string, unknown>) =>
+      tree
+        .check(
+          {
+            pages,
+            navigationFiles: handed(
+              [inContent('nav.json'), JSON.stringify(root)],
+              [inContent('guides', 'nav.json'), JSON.stringify({ title: 'Guides' })]
+            ),
+            missingImages: []
+          },
+          [],
+          GENERATED
+        )
+        ._unsafeUnwrap()
+        .sharedTabNames.map(({ name, tabs }) => [name, tabs.map(({ owner }) => owner.kind)]);
+
+    expect(sharedWith({ title: 'SDKs', tabs: ['apimatic:sdks'], pages: ['index'] })).to.deep.equal([
+      ['SDKs', ['home', 'generated']]
+    ]);
+    expect(sharedWith({ title: 'SDKs', tabs: [], pages: ['index', 'apimatic:sdks'] })).to.deep.equal([]);
+    expect(sharedWith({ title: 'API Reference', tabs: [], pages: ['index', 'api'] })).to.deep.equal([]);
+    expect(sharedWith({ title: 'API Reference', tabs: [], pages: ['index', 'apimatic:api'] })).to.deep.equal([]);
+    expect(sharedWith({ title: 'API Reference', tabs: [], pages: ['index'] })).to.deep.equal([]);
+    expect(sharedWith({ title: 'API Reference', tabs: ['api'], pages: ['index'] })).to.deep.equal([
+      ['API Reference', ['home', 'apiReference']]
+    ]);
   });
 });

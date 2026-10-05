@@ -1,0 +1,4 @@
+{
+  "tabs": [],
+  "pages": ["index", "apimatic:api", "guides", "apimatic:sdks", "authentication", "apimatic:plugin"]
+}
