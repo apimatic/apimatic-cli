@@ -49,10 +49,9 @@ export function MarkdownCopyButton({ markdownUrl }: Readonly<{ markdownUrl: stri
         <StateIcon state={state} />
         {labels[state]}
       </button>
-      {/* Screen readers don't reliably announce a change to the focused button's own text. */}
-      <span role="status" className="sr-only">
-        {state === 'copied' || state === 'failed' ? labels[state] : ''}
-      </span>
+      {/* Screen readers don't reliably announce a change to the focused button's own text,
+          so the result goes to a live region: <output> is one, with the status role. */}
+      <output className="sr-only">{state === 'copied' || state === 'failed' ? labels[state] : ''}</output>
     </>
   );
 }
