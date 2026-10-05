@@ -5,6 +5,7 @@ import AdmZip from 'adm-zip';
 import fsExtra from 'fs-extra';
 import sinon from 'sinon';
 import { expect } from 'chai';
+import { log } from '@clack/prompts';
 import { err, ok } from 'neverthrow';
 import { dir as tmpDir, DirectoryResult } from 'tmp-promise';
 import { PluginGenerateAction } from '../../../src/actions/plugin/generate.js';
@@ -17,11 +18,13 @@ import { ServiceError } from '../../../src/infrastructure/service-error.js';
 import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
 import { FileName } from '../../../src/types/file/fileName.js';
 import { FilePath } from '../../../src/types/file/filePath.js';
+import { FileProblem } from '../../../src/types/file/file-problem.js';
 import { ZipService } from '../../../src/infrastructure/zip-service.js';
 import { FileService } from '../../../src/infrastructure/file-service.js';
 import { CommandMetadata } from '../../../src/types/common/command-metadata.js';
 import { PublishingApiService } from '../../../src/infrastructure/services/publishing-api-service.js';
 import { ProjectContext } from '../../../src/types/project-context.js';
+import { TempContext } from '../../../src/types/temp-context.js';
 import { AVAILABLE_LANGUAGES, Language } from '../../../src/types/sdk/generate.js';
 
 const COMMAND_METADATA: CommandMetadata = { commandName: 'plugin generate', shell: 'test' };
@@ -60,9 +63,9 @@ describe('PluginGenerateAction', () => {
   // The upload is read while the stub runs: the temporary directory it sits in is gone once the
   // action returns.
   const generated = () =>
-    sinon.stub(PluginService.prototype, 'generatePlugin').callsFake(async (buildZipPath: FilePath) => {
+    sinon.stub(PluginService.prototype, 'generatePlugin').callsFake(async (srcDirZipPath: FilePath) => {
       uploaded = Object.fromEntries(
-        new AdmZip(buildZipPath.toString())
+        new AdmZip(srcDirZipPath.toString())
           .getEntries()
           .filter((entry) => !entry.isDirectory)
           .map((entry) => [entry.entryName, entry.getData().toString('utf-8')])
@@ -80,7 +83,7 @@ describe('PluginGenerateAction', () => {
     await fsExtra.outputFile(path.join(archiveSource, 'README.md'), '# plugin');
     await fsExtra.outputFile(path.join(archiveSource, 'skills', 'SKILL.md'), '# skill');
     const archivePath = new FilePath(new DirectoryPath(tmpDirResult.path), new FileName('plugin.zip'));
-    await new ZipService().archive(new DirectoryPath(archiveSource), archivePath);
+    (await new ZipService().archive(new DirectoryPath(archiveSource), archivePath))._unsafeUnwrap();
     pluginArchive = await fsExtra.readFile(archivePath.toString());
 
     await fsExtra.ensureDir(sourceDirectory);
@@ -214,9 +217,11 @@ describe('PluginGenerateAction', () => {
       const generatePlugin = generated();
       await fsExtra.writeFile(configPath(), BOM + JSON.stringify({ plugin: PLUGIN, languages: LANGUAGES }));
       sinon.stub(FileService.prototype, 'replaceContents').rejects(new Error('EACCES: permission denied'));
+      const pluginNotGenerated = sinon.stub(PluginGeneratePrompts.prototype, 'pluginNotGenerated');
 
       expect((await execute()).isFailed()).to.be.true;
       expect(generatePlugin.called).to.be.false;
+      expect(pluginNotGenerated.firstCall.args[0]).to.deep.equal({ kind: 'configNotPrepared', failure: 'unwritable' });
     });
   });
 
@@ -644,12 +649,37 @@ describe('PluginGenerateAction', () => {
   });
 
   describe('generation failures', () => {
-    it('falls back to the plain service message for any other failure', async () => {
-      sinon.stub(PluginService.prototype, 'generatePlugin').resolves(err(ServiceError.ServerError));
-      const pluginGenerationError = sinon.stub(PluginGeneratePrompts.prototype, 'pluginGenerationError');
+    it('reports a source directory it could not zip, without generating', async () => {
+      const generatePlugin = sinon.stub(PluginService.prototype, 'generatePlugin');
+      const problem: FileProblem = { kind: 'zipFailed', reason: 'EACCES: permission denied' };
+      sinon.stub(TempContext.prototype, 'zip').resolves(err(problem));
+      const pluginNotGenerated = sinon.stub(PluginGeneratePrompts.prototype, 'pluginNotGenerated');
 
       expect((await execute()).isFailed()).to.be.true;
-      expect(pluginGenerationError.called).to.be.true;
+      expect(generatePlugin.called).to.be.false;
+      expect(pluginNotGenerated.firstCall.args[0]).to.equal(problem);
+    });
+
+    it('reports an artifact it cannot expand, with the reason it could not', async () => {
+      pluginArchive = Buffer.from('not a zip');
+      generated();
+      const pluginNotGenerated = sinon.stub(PluginGeneratePrompts.prototype, 'pluginNotGenerated');
+
+      expect((await execute()).isFailed()).to.be.true;
+      const problem = pluginNotGenerated.firstCall.args[0];
+      expect(problem.kind).to.equal('unzipFailed');
+      expect(problem).to.have.property('reason').that.is.not.empty;
+    });
+
+    it('falls back to the plain service message for any other failure', async () => {
+      sinon.stub(PluginService.prototype, 'generatePlugin').resolves(err(ServiceError.ServerError));
+      const pluginNotGenerated = sinon.stub(PluginGeneratePrompts.prototype, 'pluginNotGenerated');
+
+      expect((await execute()).isFailed()).to.be.true;
+      expect(pluginNotGenerated.firstCall.args[0]).to.deep.equal({
+        kind: 'generationFailed',
+        error: ServiceError.ServerError
+      });
     });
 
     it('reports every message the response carries, whatever key it arrived under', async () => {
@@ -660,10 +690,10 @@ describe('PluginGenerateAction', () => {
         someKeyTheCliDoesNotKnow: ['b']
       });
       sinon.stub(PluginService.prototype, 'generatePlugin').resolves(err(error));
-      const pluginGenerationError = sinon.stub(PluginGeneratePrompts.prototype, 'pluginGenerationError');
+      const printed = sinon.stub(log, 'error');
 
       expect((await execute()).isFailed()).to.be.true;
-      expect(pluginGenerationError.firstCall.args[0]).to.equal('One or more validation errors occurred.\n- a\n- b');
+      expect(printed.lastCall.args[0]).to.equal('One or more validation errors occurred.\n- a\n- b');
     });
   });
 });

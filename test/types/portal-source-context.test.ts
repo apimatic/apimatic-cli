@@ -1,6 +1,7 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import { Buffer } from 'node:buffer';
 import Ajv from 'ajv';
 import { expect } from 'chai';
 import { Result } from 'neverthrow';
@@ -1910,11 +1911,22 @@ describe('PortalSourceContext', () => {
       }
     });
 
+    it('reports a split specification it cannot unpack rather than throwing', async () => {
+      const archive = new FilePath(new DirectoryPath(root), new FileName('spec.zip'));
+      fs.writeFileSync(archive.toString(), Buffer.from([0x50, 0x4b, 0x03, 0x04, 0x00]));
+
+      const scaffolded = await new PortalSourceContext(source).scaffold(archive, APIMATIC_SCHEMA_URL);
+
+      const problem = scaffolded._unsafeUnwrapErr();
+      expect(problem.kind).to.equal('sourceUnwritable');
+      expect(problem).to.have.property('reason').that.is.not.empty;
+    });
+
     it('unpacks a split specification into the spec directory', async () => {
       write('split/openapi.json', JSON.stringify({ openapi: '3.0.0', info: { title: 'Split', version: '1' } }));
       write('split/paths/pets.json', '{}');
       const archive = new FilePath(new DirectoryPath(root), new FileName('spec.zip'));
-      await new ZipService().archive(new DirectoryPath(root).join('split'), archive);
+      (await new ZipService().archive(new DirectoryPath(root).join('split'), archive))._unsafeUnwrap();
 
       await scaffold(archive);
 
