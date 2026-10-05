@@ -113,28 +113,13 @@ Always start work from `dev`, the default branch. This applies to branches and w
 
 ## Releases
 
-A merge into a release branch is the release: `main` publishes to the npm `latest` dist-tag, `beta` to `beta`, and `1.x` to `release-1.x`. semantic-release picks the version from the commits and publishes the notes as a GitHub release; it commits nothing back. The full model is `.ai/plans/release-pipeline.md`.
-
-| Branch | Takes pull requests from | Merge with |
-|---|---|---|
-| `dev` | feature and fix branches; `main` when the release run could not push the back-merge, or a `<name>/merge-main` branch when that back-merge conflicts | squash, the only method its ruleset allows; a **merge commit** for a back-merge, which an admin lets through |
-| `beta` | `dev` only | merge commit |
-| `main` | `beta`; hotfix branches cut from `main` | merge commit |
-| `1.x` | fix branches cut from `1.x` | merge commit |
-
-- Never squash or rebase into a release branch: semantic-release reads every commit there, and a copy of a commit shows up in the notes twice.
-- After every push to `main`, the release run merges `main` back into `dev` with a merge commit. The release tag sits on main's merge commit, and a beta cut from a `dev` that cannot reach it gets the wrong version, so `dev → beta` is refused until `dev` contains `main`. When the run cannot push the back-merge, its summary says what to do: without the back-merge key, open the `main → dev` PR it links; on a conflict, cut `<name>/merge-main` from `dev`, merge `origin/main` into it, resolve, and open that PR. Either one is merged into `dev` with a merge commit, never a squash: `dev`'s ruleset allows only squash, so an admin adds merge commit to it for that one PR and sets it back afterwards.
-- `beta` must contain `main` before `beta → main`: after a hotfix, promote `dev → beta` (once the back-merge is in `dev`) first.
-- Never merge `1.x` into `main` or `dev`; a fix both lines need is made on each.
-- Never name an npm dist-tag in code: a promotion ships the same commits to every channel.
+A merge into `main`, `beta` or `1.x` is the release: semantic-release picks the version from commit headers, publishes to npm and GitHub Releases, and commits nothing back. Never bump `version` or write a changelog by hand, and never name an npm dist-tag in code. For a promotion, hotfix or back-merge, follow section 8 of `.ai/plans/release-pipeline.md`; a 1.x fix follows its 7.6.
 
 ## Commit Conventions
 
 Uses [Conventional Commits](https://www.conventionalcommits.org/) enforced by commitlint + husky. Pre-commit runs lint-staged (ESLint + Prettier).
 
-Pull requests into `dev` are squash-merged, and the squash commit is the PR title plus the PR description. The title alone decides the release and its line in the notes, so write it for users as a Conventional Commit header, and title a revert `revert(scope): <what it reverts>` (it releases a patch); the title check refuses GitHub's `Revert "…"`. The description stays in `git log` and never reaches the notes, and the issues its `Fixes #N` closes are closed but not listed.
-
-A release reads only commit headers, so mark a breaking change with `!` in the header (`feat(sdk)!: retire v3 generation`), in a PR title and in any commit alike. commitlint refuses a `BREAKING CHANGE:` footer without the `!`.
+A PR into `dev` is squash-merged, and its title alone becomes the commit header that decides the release and its line in the notes. Write it for users as a Conventional Commit header, title a revert `revert(scope): …`, and mark a breaking change with `!` (`feat(sdk)!: …`) in a title or any commit; a `BREAKING CHANGE:` footer alone is ignored by the release, and the checks refuse one under a header without `!`.
 
 **Do not commit or push automatically.** Always wait for explicit instruction from the user before running `git commit` or `git push`.
 

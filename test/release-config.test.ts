@@ -67,12 +67,10 @@ describe('release.config.cjs', () => {
     expect(await releaseOf('revert(portal)!: bring back the v3 generator (#420)')).to.equal('major');
   });
 
-  it('releases nothing for a promotion merge commit or a documentation change', async () => {
-    expect(
-      await releaseOf(
-        'Merge pull request #404 from apimatic/dev\n\nRelease',
-        'docs: add the CONTEXT.md glossary (#365)'
-      )
-    ).to.be.null;
+  it('releases from the commits a promotion brings, never from its merge commit', async () => {
+    const merge = 'Merge pull request #404 from apimatic/dev\n\nRelease';
+
+    expect(await releaseOf(merge, 'fix(portal): keep the header on one line (#398)')).to.equal('patch');
+    expect(await releaseOf(merge, 'docs: add the CONTEXT.md glossary (#365)')).to.be.null;
   });
 });

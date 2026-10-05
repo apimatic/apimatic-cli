@@ -17,7 +17,7 @@ module.exports = {
       {
         preset: "conventionalcommits",
         parserOpts: headerOnly,
-        // A revert squash lacks git's "This reverts commit" line; a matched custom rule skips the defaults, hence breaking first.
+        // A revert squash lacks git's "This reverts commit" line; a matched custom rule skips the defaults, so breaking is repeated here.
         releaseRules: [
           { breaking: true, release: "major" },
           { type: "revert", release: "patch" }

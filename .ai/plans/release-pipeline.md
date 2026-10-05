@@ -1,14 +1,14 @@
 # Plan: a release is a merge
 
 Status: 7.2 implemented on this branch and code-reviewed, then extended with
-the automatic back-merge (D8), narrowed to `main` and `beta` (D9), and `dev`
-restricted to squash (D10); 7.1 and 7.3 onward are admin and release-day
-steps, not yet taken. The plan was reviewed once before implementation
-(section 10). Grounded in `dev` at `74ad5d2e`, `beta` at `8581f9e8` and `main`
-at `c199698a`, and in the repository settings and rulesets as read on
-2026-09-29. Every version number in section 5 comes from running
-semantic-release 25.0.3, with this plan's configuration, against a local copy
-of the repository (section 10).
+the automatic back-merge (D8), narrowed to `main` and `beta` (D9), `dev`
+restricted to squash (D10), and reviewed again on 2026-10-05 (section 10);
+7.1 and 7.3 onward are admin and release-day steps, not yet taken. The plan
+was reviewed once before implementation (section 10). Grounded in `dev` at
+`74ad5d2e`, `beta` at `8581f9e8` and `main` at `c199698a`, and in the
+repository settings and rulesets as read on 2026-09-29. Every version number
+in section 5 comes from running semantic-release 25.0.3, with this plan's
+configuration, against a local copy of the repository (section 10).
 
 ## 1. Goal and scope
 
@@ -162,7 +162,7 @@ the beta line. The CLI never fetches the URL; only editors use it.
 |---|---|---|
 | D1 | Release notes live in GitHub Releases only. `@semantic-release/git` and `@semantic-release/changelog` go, so a release pushes no commit. semantic-release itself pushes only tags (`git push --tags`) and `refs/notes/semantic-release-*` (its `lib/git.js`), and branch rulesets do not cover either. | Keeping `CHANGELOG.md` on `main` only needs a GitHub App on the bypass list, a secret, a token step, and the commit merged back every time. Keeping it on every branch is today's drift (2.2), with the toggle swapped for the App. `CHANGELOG.md` is not in `package.json` `files`, so npm users never saw it. |
 | D2 | `beta` takes PRs only from `dev`; `main` takes only `beta` and hotfix branches. A required check enforces it (7.2, item 4). | A longer chain, with an alpha stage before beta, adds a PR to every beta for no extra safety. Allowing dev → main means a stable can ship code no beta tester ran, as 1.2 to 1.5 did. |
-| D3 | A squash commit into `dev` is the PR title plus the PR description. Only the title decides the version and the notes line: a breaking change takes `!` in the title, and the parser ignores notes and issue references in the body (7.2, item 1). | Title only drops the why from `git log` and `git blame`; it survives only on the PR. Commit messages (today) cause 2.3. Asking authors to avoid footer-like wording fails silently, because of the pattern described in 2.3. |
+| D3 | A squash commit into `dev` is the PR title plus the PR description. Only the title decides the version and the notes line: a breaking change takes `!` in the title, and the parser ignores notes and issue references in the body (7.2, item 1). `Commit messages` refuses a description whose footer says breaking while the title does not (7.2, item 4). | Title only drops the why from `git log` and `git blame`; it survives only on the PR. Commit messages (today) cause 2.3. Asking authors to avoid footer-like wording fails silently, because of the pattern described in 2.3. |
 | D4 | Both semantic-release plugins use the `conventionalcommits` preset. | `angular` (2.4). |
 | D5 | A PR into a release branch needs 1 approval, from anyone with write access, and a green Tests matrix. | Without a gate, a red build can publish. |
 | D6 | Workflows can no longer open or approve PRs. | Requiring a code owner's approval instead: only two owners in `.github/CODEOWNERS` resolve, and one of them approved none of the last 60 merged PRs, so most promotions would need the admin bypass. Keeping the setting with a plain approval: a PR could approve itself (2.9). |
@@ -324,7 +324,9 @@ Branch `saeedjamshaid/release-pipeline` → `dev`, titled
      generator, and `-revert-` makes a `docs:` commit release a patch.
    - `releaseRules`: a revert squash has no "This reverts commit" line, so a
      `revert(scope):` header releases a patch by its type. A matched custom
-     rule skips the defaults, so the breaking rule comes first.
+     rule skips the defaults, so the breaking rule is repeated in the list.
+     Every matching rule applies and the highest wins, so their order is
+     irrelevant.
    - The notes still link the `(#N)` in a subject, because the writer finds that
      itself.
    - One body line still reaches the notes: the writer shows a hidden-type
@@ -354,8 +356,24 @@ Branch `saeedjamshaid/release-pipeline` → `dev`, titled
        cancel-in-progress: false
      ```
 
-   - A `back-merge` job (D8), on `main` only. It needs the release job, and it
-     runs even when that job failed, because the tag may already be on `main`.
+   - A guard on `beta`, right after the checkout: `git merge-base
+     --is-ancestor origin/main HEAD`, or the run fails before it installs
+     anything, with the remedy in its summary. `Promotion source` ran on the
+     PR's head, and a tag `main` gained after that does not re-run it ("up to
+     date" is off), so a green dev → beta PR can go stale: merging it would
+     publish `2.0.0-beta.4` in place of `2.1.0-beta.1`. The release run is the
+     one place the check cannot be stale. Only exit 1 means "not an
+     ancestor"; a git error (a missing ref is 128) fails the step without
+     that diagnosis. When the guard fails, the merge into `beta` has already
+     happened; the back-merge and one more dev → beta promotion release what
+     `beta` holds.
+   - `timeout-minutes: 30` on the release job. Runs take three to six minutes,
+     and a hung npm or GitHub call would otherwise hold every later merge into
+     the branch behind the concurrency group for GitHub's six-hour default.
+   - A `back-merge` job (D8), on `main` only. It needs the release job and
+     runs whatever that job's result (`always()`): a failed, timed-out or
+     cancelled run may already have pushed the tag, and a job that hits its
+     timeout counts as cancelled.
      It runs in the `back-merge` environment with a read-only token, and
      times out after ten minutes, so a hung push cannot hold the next release
      behind the concurrency group.
@@ -375,6 +393,8 @@ Branch `saeedjamshaid/release-pipeline` → `dev`, titled
      - **Without the key** (before 7.3's setup): it writes the compare link
        into the run summary, with the PR title filled in and the same ruleset
        step, for a person to open. So this PR can merge before the key exists.
+       The ruleset sentence is held once, in the job's `env`, so both
+       summaries say the same.
    - The `permissions` block moves from the workflow to the `release` job, so
      each job states its own token, and the `contents: write` comment stops
      mentioning "version commits". SonarCloud fails the gate on a
@@ -389,18 +409,27 @@ Branch `saeedjamshaid/release-pipeline` → `dev`, titled
    are the required checks of 7.3, which a comment in the file says.
    - **`Commit messages`**, one job with one install, for the two subjects a
      commit message has here:
-     - **PRs into `dev`:** the PR title, which becomes the squash commit's
-       header. It is linted with `.github/commitlint-pr-title.cjs`, which
-       extends the repo's config with `defaultIgnores: false`. Otherwise
-       commitlint waves through titles such as GitHub's `Revert "…"`,
-       `Merge …`, `fixup! …` and a bare `2.0.1`, all of which release
-       nothing. The title is passed in through an environment variable, never
-       interpolated into the script. It is a required check on `dev` too
-       (7.3): the title is the one thing that decides a release, and the job
-       runs on every PR into `dev` anyway.
+     - **PRs into `dev`:** the PR title and the PR description, linted
+       together as the squash commit they become (7.1), with
+       `.github/commitlint-pull-request.cjs`. It extends the repo's config
+       with `defaultIgnores: false`, because commitlint otherwise waves
+       through titles such as GitHub's `Revert "…"`, `Merge …`, `fixup! …`
+       and a bare `2.0.1`, all of which release nothing, and it turns off the
+       body and footer line-length rules, because a description is not
+       wrapped. So the `breaking-change-in-header` rule (item 8) is the one
+       place that says what a breaking note is, and a `BREAKING CHANGE:`
+       footer in a description, in any form the parser reads (`* `, `**`, a
+       table cell, any case), is refused unless the title carries `!`. The
+       header-only parser would otherwise ship a real breaking change as a
+       minor with no error anywhere, and the description was the one body
+       commitlint never saw. Both are passed in through environment
+       variables, never interpolated into the script. It is a required check
+       on `dev` too (7.3): the title is the one thing that decides a release,
+       and the job runs on every PR into `dev` anyway.
      - **Hotfix PRs into `main`** (head not `beta`): commitlint
-       `--from <base sha> --to <head sha>` after a checkout with
-       `fetch-depth: 0`, because a hotfix lands with its own commits.
+       `--from <base sha> --to <head sha>` after a checkout with full
+       history, because a hotfix lands with its own commits; the title path
+       checks out one commit.
        Promotions skip it: their commits are dev's squash commits, already
        linted by title, and a failure there could not be fixed without
        rewriting `dev`.
@@ -409,7 +438,8 @@ Branch `saeedjamshaid/release-pipeline` → `dev`, titled
      - into a release branch: the head must be a branch of this repository;
      - into `beta`: the head must be `dev`, and `dev` must contain
        `main`. A back-merge that didn't happen (a conflict, or no key yet)
-       blocks the next prerelease instead of mis-numbering it;
+       blocks the next prerelease instead of mis-numbering it. The result is
+       for the PR's head, so the release run checks again (item 3);
      - into `main`: the head must not be `dev` or `1.x`;
      - into `main` from `beta`: `beta` must contain `main`
        (`git merge-base --is-ancestor`). That enforces rule 4, and rule 3's
@@ -418,7 +448,10 @@ Branch `saeedjamshaid/release-pipeline` → `dev`, titled
        commits may be on `dev`. A branch cut from `dev` under any name is
        refused, while a branch cut from `main` passes.
 
-     It checks out history only for PRs into a release branch.
+     It checks out history only for PRs into a release branch. Only exit 1 of
+     `git merge-base --is-ancestor` means "not an ancestor"; any other git
+     failure ends the check with git's own message, as the release run's
+     guard does.
    - A job skipped by `if:` reports success, so both checks can be required on
      every release branch (7.3). A check whose workflow never runs stays pending
      and blocks the merge. Skipping on body-only edits would be wrong for the
@@ -431,27 +464,29 @@ Branch `saeedjamshaid/release-pipeline` → `dev`, titled
    - Of the 47 squash titles on `dev` since 1.5.0, 45 pass. The other two exceed
      `header-max-length` (100) only because of GitHub's ` (#N)` suffix, which
      the title check never sees.
-5. `.ai/instructions.md`:
-   - **Branching:**
-     - say that the default branch is `dev`;
-     - add the table and rules from section 4, and the hotfix exception to
-       "never target main";
-     - in the Worktrees paragraph, start new worktrees from `origin/dev`
-       explicitly.
-   - **Branching, the back-merge:**
-     - the release run makes the back-merge itself, and a promotion is refused
-       without it;
-     - the conflict path's `<name>/merge-main` branch, cut from `dev`, is
-       merged with a merge commit, because a squash there loses the tag, and
-       an admin widens dev's ruleset for it (D10).
-   - **Commit Conventions:**
-     - the PR title becomes the squash commit's header;
-     - a revert PR is titled `revert(scope): …` and releases a patch; the
-       title check refuses GitHub's `Revert "…"`;
-     - a breaking change takes `!` in the header of any commit, and a
-       `BREAKING CHANGE:` footer alone is ignored.
-   - `.ai/plans/apimatic-config.md:82` still prescribes a footer in PR
-     descriptions; mark that line superseded by D3.
+   - Of the last 60 PRs merged into `dev`, 59 pass the title-and-description
+     lint. The one refused is #343, whose description carries
+     `BREAKING CHANGE: building a portal requires Node >= 22.12 …` under a
+     `feat(portal):` title: the breaking change the header-only release would
+     have shipped as a minor.
+5. `.ai/instructions.md`, which every session reads in full, so it keeps only
+   what an agent needs on every task. The branch table, the back-merge
+   recovery and the ruleset steps are release-manager procedure, and live in
+   sections 4 and 8 here and in the release run's summary.
+   - **Branching:** say that the default branch is `dev`, add the hotfix
+     exception to "never target main", and in the Worktrees paragraph start
+     new worktrees from `origin/dev` explicitly.
+   - **Releases:** three sentences. A merge into `main`, `beta` or `1.x` is
+     the release, and nothing is committed back; `version`, a changelog and
+     npm dist-tags are never written by hand or named in code; a promotion,
+     hotfix or back-merge follows section 8.
+   - **Commit Conventions:** one paragraph. The PR title becomes the squash
+     header that decides the release and its notes line; a revert is titled
+     `revert(scope): …`; a breaking change takes `!` in a title or any
+     commit, and a `BREAKING CHANGE:` footer alone is ignored by the release
+     and refused by the checks.
+   - `.ai/plans/apimatic-config.md:82` prescribed a footer in the PR
+     description; the sentence now says `!` in the title (D3).
 6. Delete `.github/workflows/check_build.yml` (2.9). No ruleset requires its
    checks.
 7. Leave `CHANGELOG.md` alone. Editing it on `dev` now would conflict with
@@ -462,12 +497,16 @@ Branch `saeedjamshaid/release-pipeline` → `dev`, titled
    `BREAKING-CHANGE` note while its header has no `!`. The release ignores
    every body, not only a squash's, so a hotfix commit's footer-only breaking
    change would otherwise ship to `latest` as a patch. The husky hook and the
-   hotfix range lint both apply it. The parser's own match is case-insensitive
-   and allows `*` or `|` before the keyword, so the rule looks at the note's
-   title: a body line such as `* Breaking change: none` does not count.
-   `test/commitlint-config.test.ts` runs the CLI, as the hook and the title
-   check do, over the footer, the `!` header, that body line, and GitHub's own
-   `Revert "…"` and `Merge …` titles.
+   hotfix range lint both apply it. The parser finds the keyword in any case,
+   allows `*` or `|` before it, and keeps the commit's own spelling as the
+   note's title, so the rule matches the title in any case too: a lowercase
+   `breaking change:` footer is refused, and so is a body line such as
+   `* Breaking change: none`, which the parser also reads as a note.
+   `test/commitlint-config.test.ts` runs the CLI, as the hook and the PR
+   check do, over the footer, the `!` header, the lowercase footer, that
+   `* Breaking change: none` line, a description's bold footer under a title
+   with and without `!`, a description with long and field-like lines, and
+   GitHub's own `Revert "…"` and `Merge …` titles.
 9. `test/release-config.test.ts`, with the two plugins typed in
    `test/semantic-release-plugins.d.ts`, runs the analyzer and notes generator
    with `release.config.cjs`'s own options:
@@ -475,7 +514,9 @@ Branch `saeedjamshaid/release-pipeline` → `dev`, titled
      releases a patch, and its notes show neither BREAKING nor `closes`;
    - a `feat!:` releases a major, with a BREAKING section;
    - `revert(scope):` releases a patch, and `revert(scope)!:` a major;
-   - a promotion merge commit and a `docs:` commit release nothing.
+   - a promotion releases from the squash commits it brings (a `fix:` makes a
+     patch), never from its merge commit, and a `docs:` commit releases
+     nothing.
 
    With the parser options emptied, the first two fail; the first crashes on
    `-notes-`. A preset or parser bump that changes what these options mean
@@ -491,6 +532,10 @@ Verification:
 - Run the workflow's own scripts, read from the YAML, against every promotion
   and title case, the ancestry cases on the real `origin/main`, `origin/dev`
   and `origin/beta` included.
+- Run the PR lint step and the `beta` guard the same way: a description with
+  a breaking footer under a title with and without `!`, and the guard against
+  a checkout that contains `main`, one that does not, and one with no
+  `origin/main` at all.
 - Run the back-merge job's script, read from the YAML, against a throwaway
   bare repository in four cases: a release commit `dev` lacks (a merge
   commit lands on `dev`), `dev` already containing `main` (no new commit),
@@ -594,16 +639,18 @@ tags stay behind rulesets that list no deploy keys.
 6. Check the release run's `back-merge` job: `dev` now contains `main`. Without
    the key yet, open the back-merge from the link in its summary, have an admin
    widen dev's ruleset (7.3), and merge it with **Create a merge commit**.
-7. PR into `dev`: `chore: retire CHANGELOG.md and the committed version`.
-   `dev` now has main's copies, so there is no conflict.
+7. PR into `dev`: `chore: retire CHANGELOG.md and the committed version`,
+   tracked as #420. `dev` now has main's copies, so there is no conflict.
    - `CHANGELOG.md` opens with a line pointing at GitHub Releases. It keeps the
      history up to 1.5.0 and drops the 2.0.0-beta sections, which live in the
      releases.
-   - `package.json`'s `version` becomes `0.0.0-development`. Otherwise it stays
-     at `2.0.0-beta.2` forever, because nothing commits a version any more. The
-     published package still gets the real version: `@semantic-release/npm`
-     writes it before `npm publish`. A build run from source reports the new
-     value in its User-Agent (`src/infrastructure/env-info.ts:30-33`).
+   - `package.json`'s `version` becomes `0.0.0-semantically-released`, the
+     placeholder semantic-release's FAQ offers that says who sets the version.
+     Otherwise it stays at `2.0.0-beta.2` forever, because nothing commits a
+     version any more. The published package still gets the real version:
+     `@semantic-release/npm` writes it before `npm publish`. A build run from
+     source reports the placeholder in its User-Agent
+     (`src/infrastructure/env-info.ts:30-33`).
 
 ### 7.5 After 2.0.0
 
@@ -681,6 +728,11 @@ When something goes wrong:
 - **The back-merge push was refused.** A ruleset that requires a pull request
   on `dev` does not list deploy keys as a bypass actor (7.3). Fix the ruleset
   and re-run the job.
+- **A beta run failed with "beta does not contain main".** The dev → beta PR
+  was checked before `main` gained its latest tag, and merged after. Nothing
+  was published. Get `main` into `dev` (the back-merge, or section 8's
+  conflict steps) and promote dev → beta again; that run releases everything
+  `beta` has gathered.
 - **A release run failed.** Check first whether the run pushed its tag.
   semantic-release tags, pushes the tag, pushes the tag's note, and only then
   publishes.
@@ -807,5 +859,30 @@ When something goes wrong:
 - **`dev` restricted to squash (D10, 2026-10-02).** Asked for because a feature
   PR merged with a merge commit was the one wrong merge method nothing caught.
   The conflict path and the no-key path gain the admin step, in the job's two
-  summaries, 7.3, 7.4, section 8 and the instructions. The job's script is
-  unchanged.
+  summaries, 7.3, 7.4 and section 8. The job's script is unchanged.
+- **Review by mrafnadeem-apimatic (2026-10-05).** Eleven threads, all taken: a
+  guard on `beta` in the release run, because `Promotion source`'s result is
+  for the PR's head and goes stale once `main` gains a tag; the description
+  check for a breaking footer; the commitlint rule matching the note title in
+  any case, as the parser does, with its two halves named; `timeout-minutes`
+  on the release job; the release-rule comment, which claimed an order the
+  analyzer ignores (every matching rule applies, the highest wins); the
+  promotion test showing both sides; `apimatic-config.md`'s sentence rewritten
+  for D3; the instructions cut to what every session needs; `fetch-depth` 1
+  on the title path; and the version placeholder tracked as #420, as
+  `0.0.0-semantically-released`. A second pass over those changes then found:
+  the suggested `grep` for the footer missed the `* ` and `**` forms the
+  parser reads, and copied the header regex, so the title and description are
+  linted together through commitlint instead (item 4); a job that hits
+  `timeout-minutes` counts as cancelled, which `!cancelled()` would have
+  turned into a skipped back-merge, so the gate is `always()`; the guard took
+  any git error for "not an ancestor" and wrote no summary; and the new test
+  did not name the rule it expects. The PR lint step and the guard ran through
+  a harness that executes a step's script from the YAML, and the lint ran over
+  the last 60 PRs merged into `dev`: 59 pass, and #343 is refused for the
+  footer it really carries. A third pass found the same ancestry check in
+  `Promotion source` taking a git error for "not an ancestor", the ruleset
+  sentence written twice in the back-merge job's summaries, and two stale
+  comments; all fixed. It also proposed reading `BREAKING CHANGES:` and
+  `BREAKING:` as breaking, which no parser does, and linting in-process
+  instead of through the CLI; both declined.

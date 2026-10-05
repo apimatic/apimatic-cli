@@ -25,7 +25,8 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
-          fetch-depth: 0
+          # Only the hotfix lint into main reads history; the title path needs one commit.
+          fetch-depth: ${{ github.base_ref == 'dev' && 1 || 0 }}
 
       - name: setup pnpm
         uses: pnpm/action-setup@a15d269cd4658e1107c09f1fabf4cbd7bd1f308a # v4.4.0
@@ -43,11 +44,13 @@ jobs:
       - name: install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: lint the title
+      # The squash commit is the title plus the description, so both are linted as that commit: a breaking footer in the description needs ! in the title.
+      - name: lint the title and description
         if: github.base_ref == 'dev'
         env:
           TITLE: ${{ github.event.pull_request.title }}
-        run: printf '%s\n' "$TITLE" | pnpm exec commitlint --config .github/commitlint-pr-title.cjs --verbose
+          BODY: ${{ github.event.pull_request.body }}
+        run: printf '%s\n\n%s\n' "$TITLE" "$BODY" | pnpm exec commitlint --config .github/commitlint-pull-request.cjs --verbose
 
       - name: lint the commits
         if: github.base_ref == 'main'
@@ -76,6 +79,8 @@ jobs:
           REPO: ${{ github.repository }}
         run: |
           refuse() { echo "::error::$1"; exit 1; }
+          # Only exit 1 means "not an ancestor"; any other git failure ends the check with git's own message.
+          contains() { git merge-base --is-ancestor "$1" "$2" || { status=$?; [ "$status" -eq 1 ] && return 1; exit "$status"; }; }
           if [ "$TARGET" = dev ]; then
             [ "$SOURCE" != 1.x ] || refuse "1.x is never merged into dev; make the fix again on a branch cut from dev."
             exit 0
@@ -84,13 +89,13 @@ jobs:
           case "$TARGET" in
             beta)
               [ "$SOURCE" = dev ] || refuse "$TARGET takes pull requests only from dev, not from $SOURCE."
-              git merge-base --is-ancestor origin/main "$SOURCE_SHA" ||
+              contains origin/main "$SOURCE_SHA" ||
                 refuse "dev does not contain main yet, so this release would miss main's tag: merge main into dev first (the last release run on main says how)." ;;
             main)
               case "$SOURCE" in
                 dev|1.x) refuse "main takes beta or a hotfix branch cut from main, not $SOURCE." ;;
                 beta)
-                  git merge-base --is-ancestor origin/main "$SOURCE_SHA" ||
+                  contains origin/main "$SOURCE_SHA" ||
                     refuse "beta does not contain main yet: merge main into dev, promote dev to beta, then promote beta." ;;
                 *)
                   unreleased=$(git rev-list --count "$SOURCE_SHA" ^origin/main)
