@@ -14,6 +14,8 @@ export interface BuildPaths {
   staticDir: string | null;
   /** Absolute, inside this project: the SDKs and the context plugin, laid out as the site serves them under `/__downloads/`. */
   downloadsDir: string | null;
+  /** Absolute: the installations the dependencies are linked from, which the dev server must be allowed to serve. */
+  dependencyDirs: string[];
 }
 
 export async function readBuildPaths(): Promise<BuildPaths> {

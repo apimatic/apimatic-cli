@@ -14,8 +14,7 @@ import {
   removePortalProjectDirectoryBase
 } from '../../src/infrastructure/tmp-extensions';
 
-// A real Vite dev server takes a minute to compile the portal and needs every runtime
-// dependency installed, so it stays out of the default run, as the build test does.
+// A real dev server needs every runtime dependency installed, so it runs only where the build test does.
 const enabled = process.env.APIMATIC_E2E === '1';
 
 (enabled ? describe : describe.skip)('portal serve (end to end)', function () {
@@ -59,12 +58,7 @@ const enabled = process.env.APIMATIC_E2E === '1';
     await removePortalProjectDirectoryBase(base);
   });
 
-  /**
-   * Safari keeps the entry module cached across previews on the fixed port and executes it
-   * without asking the fresh server, so its first request is the file the entry imports from
-   * the CLI's installation. Served only through its importer's transform, that first request
-   * is refused as outside the allow list, and the page stays blank (apimatic-io#2287).
-   */
+  // Safari asked for this before its importer, and was refused as outside the allow list (apimatic-io#2287).
   it('serves the TanStack dev entry to a browser that asks for it before anything else', async () => {
     const installed = fs.realpathSync(path.join(root, 'build', 'node_modules', '@tanstack', 'react-start'));
     const entry = path.join(installed, 'dist', 'plugin', 'default-entry', 'client.tsx').split(path.sep).join('/');

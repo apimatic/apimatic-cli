@@ -1,10 +1,9 @@
 import { fileURLToPath } from 'node:url';
 import react from '@vitejs/plugin-react';
 import { tanstackStart } from '@tanstack/react-start/plugin/vite';
-import { defineConfig } from 'vite';
+import { defineConfig, searchForWorkspaceRoot } from 'vite';
 import tailwindcss from '@tailwindcss/vite';
 import { fumadocsMdx } from 'fumadocs-mdx/vite';
-import { dependencyDirectories } from './dependency-directories.ts';
 import { downloads } from './downloads.ts';
 import { generatedPagesReload } from './generated-pages-reload.ts';
 import { readBuildPaths, readPortalIdentity } from './portal-config.ts';
@@ -15,7 +14,6 @@ export default defineConfig(async () => {
   const [paths, identity] = await Promise.all([readBuildPaths(), readPortalIdentity()]);
   const pages = await prerenderPages(paths, identity.siteUrl);
   const publicDir: string | false = paths.staticDir ?? false;
-  const projectDirectory = fileURLToPath(new URL('.', import.meta.url));
 
   return {
     publicDir,
@@ -57,9 +55,10 @@ export default defineConfig(async () => {
     // listens on `::1` alone, a connect that stalls under load falls back to 127.0.0.1 and is
     // refused, failing the build; binding IPv4 leaves the fetch a single address to reach.
     preview: { host: '127.0.0.1' },
-    // Spelled out because the default, the project alone, misses the CLI installation the
-    // dependencies are linked from. See `dependencyDirectories`.
-    server: { fs: { allow: [projectDirectory, ...dependencyDirectories(projectDirectory)] } },
+    // The dependencies are linked in from the CLI's installation, outside the workspace Vite trusts by default.
+    server: {
+      fs: { allow: [searchForWorkspaceRoot(fileURLToPath(new URL('.', import.meta.url))), ...paths.dependencyDirs] }
+    },
     resolve: {
       tsconfigPaths: true,
       alias: [
