@@ -12,7 +12,7 @@ describe('copying a page as Markdown', () => {
   beforeEach(() => {
     clipboard = 'before';
     sinon.define(globalThis, 'ClipboardItem', FakeClipboardItem);
-    sinon.define(navigator, 'clipboard', {
+    sinon.define(globalThis.navigator, 'clipboard', {
       write: async ([item]: FakeClipboardItem[]) => {
         clipboard = await item.items['text/plain'];
       }
@@ -22,7 +22,7 @@ describe('copying a page as Markdown', () => {
   afterEach(() => sinon.restore());
 
   it('puts the Markdown fetched under the base path on the clipboard', async () => {
-    const fetch = sinon.stub(globalThis, 'fetch').resolves(new Response('# Intro'));
+    const fetch = sinon.stub(globalThis, 'fetch').resolves(new globalThis.Response('# Intro'));
 
     await copyMarkdown('/guides/intro.md', '/docs/');
 
@@ -31,7 +31,7 @@ describe('copying a page as Markdown', () => {
   });
 
   it('fetches from the root when the site is hosted there', async () => {
-    const fetch = sinon.stub(globalThis, 'fetch').resolves(new Response('# Intro'));
+    const fetch = sinon.stub(globalThis, 'fetch').resolves(new globalThis.Response('# Intro'));
 
     await copyMarkdown('/guides/intro.md', '/');
 
@@ -39,7 +39,7 @@ describe('copying a page as Markdown', () => {
   });
 
   it('rejects on an error response and leaves the clipboard as it was', async () => {
-    sinon.stub(globalThis, 'fetch').resolves(new Response('<html>Not Found</html>', { status: 404 }));
+    sinon.stub(globalThis, 'fetch').resolves(new globalThis.Response('<html>Not Found</html>', { status: 404 }));
 
     const error = await copyMarkdown('/guides/intro.md', '/').catch((reason: unknown) => reason);
 
