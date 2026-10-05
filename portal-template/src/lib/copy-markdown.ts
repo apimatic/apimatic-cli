@@ -1,6 +1,10 @@
 const cache = new Map<string, string>();
 
-/** Puts a page's Markdown on the clipboard; rejects when it cannot be fetched or written. */
+/**
+ * Puts a page's Markdown on the clipboard; rejects when it cannot be fetched or written.
+ * `markdownUrl` is root-relative, starting with `/`, as `getPageMarkdownUrl` builds it:
+ * it is appended to `base` as is.
+ */
 export async function copyMarkdown(markdownUrl: string, base: string): Promise<void> {
   const url = `${base.replace(/\/$/, '')}${markdownUrl}`;
   const cached = cache.get(url);
