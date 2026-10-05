@@ -72,4 +72,44 @@ describe('copying a page as Markdown', () => {
     expect(error).to.be.an('error').with.property('message', 'Failed to fetch /guides/missing.md: 404');
     expect(clipboard).to.equal('before');
   });
+
+  it('rejects when the clipboard refuses the write', async () => {
+    sinon.stub(globalThis, 'fetch').resolves(new globalThis.Response('# Denied'));
+    const denied = new globalThis.DOMException('Write permission denied.', 'NotAllowedError');
+    sinon.stub(globalThis.navigator.clipboard, 'write').rejects(denied);
+
+    const error = await copyMarkdown('/guides/denied.md', '/').catch((reason: unknown) => reason);
+
+    expect(error).to.equal(denied);
+    expect(clipboard).to.equal('before');
+  });
+
+  it('rejects when the clipboard refuses Markdown fetched on an earlier click', async () => {
+    sinon.stub(globalThis, 'fetch').resolves(new globalThis.Response('# Cached'));
+    await copyMarkdown('/guides/cached-denied.md', '/');
+    clipboard = 'before';
+    const denied = new globalThis.DOMException('Write permission denied.', 'NotAllowedError');
+    sinon.stub(globalThis.navigator.clipboard, 'writeText').rejects(denied);
+
+    const error = await copyMarkdown('/guides/cached-denied.md', '/').catch((reason: unknown) => reason);
+
+    expect(error).to.equal(denied);
+    expect(clipboard).to.equal('before');
+  });
+
+  it('keeps the Markdown it fetched when the clipboard refuses it, so the next click does not fetch it again', async () => {
+    const fetch = sinon.stub(globalThis, 'fetch').resolves(new globalThis.Response('# Kept'));
+    const write = sinon.stub(globalThis.navigator.clipboard, 'write');
+    // Takes the fetched Markdown before refusing, as a page that loses focus mid-copy does.
+    write.callsFake(async ([item]) => {
+      await (item as unknown as FakeClipboardItem).items['text/plain'];
+      throw new globalThis.DOMException('Document is not focused.', 'NotAllowedError');
+    });
+    await copyMarkdown('/guides/kept.md', '/').catch(() => undefined);
+
+    await copyMarkdown('/guides/kept.md', '/');
+
+    expect(fetch.calledOnce).to.equal(true);
+    expect(clipboard).to.equal('# Kept');
+  });
 });
