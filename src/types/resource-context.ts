@@ -12,9 +12,9 @@ export type ResourceKind = 'file' | 'url' | 'project';
 
 export type DownloadProblem = { kind: 'downloadFailed'; url: UrlPath; error: ServiceError };
 
-export type FileProblem = { kind: 'fileUnreadable'; file: FilePath };
+export type FileReadProblem = { kind: 'fileUnreadable'; file: FilePath };
 
-export type ResolveProblem = SpecZipProblem | DownloadProblem | FileProblem;
+export type ResolveProblem = SpecZipProblem | DownloadProblem | FileReadProblem;
 
 export class ResourceContext {
   private constructor(private readonly input: ResourceInput, private readonly resolvedFile: FilePath) {}
@@ -22,7 +22,7 @@ export class ResourceContext {
   public static resolveTo(
     input: FilePath | UrlPath,
     tempDirectory: DirectoryPath
-  ): Promise<Result<ResourceContext, DownloadProblem | FileProblem>>;
+  ): Promise<Result<ResourceContext, DownloadProblem | FileReadProblem>>;
   public static resolveTo(
     input: ResourceInput,
     tempDirectory: DirectoryPath

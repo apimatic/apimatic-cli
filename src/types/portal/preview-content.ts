@@ -1,4 +1,6 @@
-import { ContentNotices } from './content-notices.js';
+import { FilePath } from '../file/filePath.js';
+import { ContentNotices, NoTabsListed } from './content-notices.js';
+import { isSameTabEntry } from './portal-navigation.js';
 import { SharedTabName, TabOwner } from './portal-tabs.js';
 
 /** A notice is given once, on the save that brings it about, rather than on every save after it. */
@@ -34,14 +36,35 @@ export class PreviewContent {
         previous.ignoredNavigationFiles,
         (left, right) => left.isEqual(right)
       ),
-      folderTabs: whenAnyNew(current.folderTabs, previous.folderTabs, (left, right) => left.isEqual(right)),
-      sharedTabNames: whenAnyNew(current.sharedTabNames, previous.sharedTabNames, isSameSharedName)
+      sharedTabNames: whenAnyNew(current.sharedTabNames, previous.sharedTabNames, isSameSharedName),
+      noTabsListed: whenNew(current.noTabsListed, previous.noTabsListed, isSameNoTabs),
+      unseenHomeTitle: whenNew(current.unseenHomeTitle, previous.unseenHomeTitle, isSameFile)
     };
   }
 }
 
 function whenAnyNew<T>(current: T[], previous: T[], isSame: (left: T, right: T) => boolean): T[] {
   return current.some((item) => !previous.some((earlier) => isSame(item, earlier))) ? current : [];
+}
+
+function whenNew<T>(
+  current: T | undefined,
+  previous: T | undefined,
+  isSame: (left: T, right: T) => boolean
+): T | undefined {
+  return current !== undefined && (previous === undefined || !isSame(current, previous)) ? current : undefined;
+}
+
+function isSameFile(left: FilePath | undefined, right: FilePath | undefined): boolean {
+  return left === undefined || right === undefined ? left === right : left.isEqual(right);
+}
+
+function isSameNoTabs(left: NoTabsListed, right: NoTabsListed): boolean {
+  return (
+    isSameFile(left.file, right.file) &&
+    left.unplaced.length === right.unplaced.length &&
+    left.unplaced.every((entry, index) => isSameTabEntry(entry, right.unplaced[index]))
+  );
 }
 
 /** The same name on the same tabs, whichever file gives it to each. */

@@ -18,7 +18,7 @@ import { OpenApiDocument } from './portal/openapi-document.js';
 import { parsePage } from './portal/page.js';
 import { PortalConfig } from './portal/portal-config.js';
 import { PortalLanguages } from './portal/portal-languages.js';
-import { NAVIGATION_FILE_NAME } from './portal/portal-navigation.js';
+import { NAVIGATION_FILE_NAME, TOKENS } from './portal/portal-navigation.js';
 import {
   ContentProblem,
   MissingFile,
@@ -313,7 +313,10 @@ export class PortalSourceContext {
    */
   public async scaffold(specPath: FilePath, schemaUrl: string): Promise<Result<FilePath, PortalScaffoldProblem>> {
     try {
-      await new SpecContext(this.specDirectory).install(specPath);
+      const installed = await new SpecContext(this.specDirectory).install(specPath);
+      if (installed.isErr()) {
+        return err({ kind: 'sourceUnwritable', reason: installed.error.reason });
+      }
       return await this.writeSourceTree(await this.suggestedSite(specPath), schemaUrl);
     } catch (error) {
       return err({ kind: 'sourceUnwritable', reason: errorMessage(error) });
@@ -372,10 +375,10 @@ export class PortalSourceContext {
         ''
       ].join('\n')
     );
-    // Orders the sidebar: named pages first, then everything else alphabetically.
+    // Each section a tab, as the sample portal has; Home's sidebar leads with the welcome page.
     await this.fileService.writeContents(
       new FilePath(this.contentDirectory, new FileName(NAVIGATION_FILE_NAME)),
-      JSON.stringify({ pages: ['index', '...'] }, null, 2) + '\n'
+      JSON.stringify({ tabs: TOKENS, pages: ['index', '...'] }, null, 2) + '\n'
     );
     return ok(new FilePath(this.sourceDirectory, new FileName(APIMATIC_CONFIG_FILE_NAME)));
   }

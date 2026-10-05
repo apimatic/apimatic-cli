@@ -93,11 +93,11 @@ describe('ProjectContext', () => {
       const settings = new DirectoryPath(inProject('settings'));
       write('settings/package.json', '{}');
 
-      const zip = await project().buildZip(temp, settings);
+      const zip = (await project().srcDirZip(temp, settings))._unsafeUnwrap();
 
       expect(fs.existsSync(zip.toString())).to.be.true;
-      expect(fs.existsSync(inProject('temp', 'build', 'spec', 'openapi.json'))).to.be.true;
-      expect(fs.existsSync(inProject('temp', 'build', 'package-settings', 'package.json'))).to.be.true;
+      expect(fs.existsSync(inProject('temp', 'src', 'spec', 'openapi.json'))).to.be.true;
+      expect(fs.existsSync(inProject('temp', 'src', 'package-settings', 'package.json'))).to.be.true;
     });
 
     it('zips all of spec/ for validation, so a spec split across files keeps the ones it references', async () => {
@@ -152,6 +152,16 @@ describe('ProjectContext', () => {
         symlinks
       );
       expect(fs.readdirSync(inProject('temp'))).to.be.empty;
+    });
+
+    it('reports a spec/ it could not zip, naming the directory and why', async () => {
+      write('src/spec/openapi.yaml', 'openapi: 3.0.3');
+
+      const problem = (await project().specZip(new DirectoryPath(inProject('missing-temp'))))._unsafeUnwrapErr();
+
+      expect(problem.kind).to.equal('zipFailed');
+      expect(problem.kind === 'zipFailed' && problem.specDirectory.toString()).to.equal(inProject('src', 'spec'));
+      expect(problem.kind === 'zipFailed' && problem.reason).to.contain('ENOENT');
     });
   });
 
@@ -234,7 +244,7 @@ describe('ProjectContext', () => {
       fs.mkdirSync(empty.toString());
 
       const version = (await project().versionToBuild(undefined, ask()))._unsafeUnwrap();
-      const saved = await version.sdk(Language.TYPESCRIPT, version.sdkDirectory()).save(empty, false);
+      const saved = (await version.sdk(Language.TYPESCRIPT, version.sdkDirectory()).save(empty, false))._unsafeUnwrap();
 
       expect(version.sdkDirectory().toString()).to.equal(inProject('sdk'));
       expect(saved.toString()).to.equal(inProject('sdk', 'v1', 'typescript'));
@@ -244,7 +254,7 @@ describe('ProjectContext', () => {
       const empty = new DirectoryPath(inProject('empty'));
       fs.mkdirSync(empty.toString());
 
-      const saved = await project().sdk(Language.PYTHON, project().sdkDirectory()).save(empty, false);
+      const saved = (await project().sdk(Language.PYTHON, project().sdkDirectory()).save(empty, false))._unsafeUnwrap();
 
       expect(saved.toString()).to.equal(inProject('sdk', 'python'));
     });

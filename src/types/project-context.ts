@@ -5,6 +5,7 @@ import { BuildConfig } from './build/build.js';
 import { DirectoryPath } from './file/directoryPath.js';
 import { FileName } from './file/fileName.js';
 import { FilePath } from './file/filePath.js';
+import { FileProblem } from './file/file-problem.js';
 import { PluginConfigContext } from './plugin-config-context.js';
 import { PortalSourceContext } from './portal-source-context.js';
 import { OUTPUT_DIRECTORY_NAMES, SOURCE_DIRECTORY_NAME, SPEC_DIRECTORY_NAME } from './project-layout.js';
@@ -26,7 +27,8 @@ export type VersionProblem = 'noVersions' | 'versionNotFound';
 export type SpecZipProblem =
   | { kind: 'noSpec'; specDirectory: DirectoryPath }
   | { kind: 'unreadable'; specDirectory: DirectoryPath; reason: string }
-  | { kind: 'symlinks'; specDirectory: DirectoryPath; symlinks: FilePath[] };
+  | { kind: 'symlinks'; specDirectory: DirectoryPath; symlinks: FilePath[] }
+  | { kind: 'zipFailed'; specDirectory: DirectoryPath; reason: string };
 
 export class ProjectContext {
   private readonly fileService = new FileService();
@@ -105,11 +107,17 @@ export class ProjectContext {
     if (symlinks.value.length > 0) {
       return err({ kind: 'symlinks', specDirectory: this.specDirectory, symlinks: symlinks.value });
     }
-    return ok(await new TempContext(tempDirectory).zip(this.specDirectory));
+    const zipped = await new TempContext(tempDirectory).zip(this.specDirectory);
+    return zipped.mapErr(
+      ({ reason }): SpecZipProblem => ({ kind: 'zipFailed', specDirectory: this.specDirectory, reason })
+    );
   }
 
-  public async buildZip(tempDirectory: DirectoryPath, packageSettingsDirectory?: DirectoryPath): Promise<FilePath> {
-    const staged = tempDirectory.join('build');
+  public async srcDirZip(
+    tempDirectory: DirectoryPath,
+    packageSettingsDirectory?: DirectoryPath
+  ): Promise<Result<FilePath, FileProblem>> {
+    const staged = tempDirectory.join(SOURCE_DIRECTORY_NAME);
     await this.fileService.copyDirectoryContents(this.source, staged);
     if (packageSettingsDirectory) {
       await this.fileService.copyDirectoryContents(packageSettingsDirectory, staged.join('package-settings'));

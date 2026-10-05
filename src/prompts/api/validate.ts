@@ -105,6 +105,10 @@ export class ApiValidatePrompts {
         log.error(`${f.path(problem.specDirectory)} could not be read: ${problem.reason}`);
         return;
       }
+      case 'zipFailed': {
+        log.error(`${f.path(problem.specDirectory)} could not be zipped for upload: ${problem.reason}`);
+        return;
+      }
       case 'symlinks': {
         const names = listedInProse(
           problem.symlinks.map((symlink) => f.var(symlink.relativeTo(problem.specDirectory)))

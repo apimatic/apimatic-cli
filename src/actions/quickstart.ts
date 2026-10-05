@@ -14,8 +14,7 @@ import { OpenApiDocument, SpecFormat } from '../types/portal/openapi-document.js
 import { PortalScaffoldProblem } from '../types/portal/portal-source.js';
 import { PortalAuthorizationService } from '../infrastructure/services/portal-authorization-service.js';
 import { PortalProjectService } from '../infrastructure/portal-project-service.js';
-import { envInfo } from '../infrastructure/env-info.js';
-import { schemaUrlFor } from '../types/apimatic-config/document.js';
+import { APIMATIC_SCHEMA_URL } from '../types/apimatic-config/document.js';
 import { PLACEHOLDER_METADATA } from '../types/plugin/plugin-config.js';
 import { ProjectContext } from '../types/project-context.js';
 import { ResourceContext } from '../types/resource-context.js';
@@ -106,7 +105,7 @@ export class QuickstartAction {
     }
 
     this.prompts.createPortalStep();
-    const scaffolded = await portalSource.adopt(schemaUrlFor(envInfo.getCLIVersion()));
+    const scaffolded = await portalSource.adopt(APIMATIC_SCHEMA_URL);
     return await this.completeProject(project, projectDirectory, scaffolded);
   }
 
@@ -176,7 +175,7 @@ export class QuickstartAction {
       return ActionResult.cancelled();
     }
     const project = ProjectContext.in(projectDirectory);
-    const scaffolded = await project.portalSource().scaffold(specFile, schemaUrlFor(envInfo.getCLIVersion()));
+    const scaffolded = await project.portalSource().scaffold(specFile, APIMATIC_SCHEMA_URL);
     return await this.completeProject(project, projectDirectory, scaffolded);
   }
 

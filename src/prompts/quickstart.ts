@@ -11,7 +11,7 @@ import { APIMATIC_CONFIG_FILE_NAME } from '../types/apimatic-config/document.js'
 import { PluginConfigWriteFailure } from '../types/plugin-config-context.js';
 import { PortalScaffoldProblem, PortalSourceProblem } from '../types/portal/portal-source.js';
 import { GENERATED, GITIGNORE, GitignoreFailure } from '../types/project-context.js';
-import { DownloadProblem, FileProblem, ResourceKind } from '../types/resource-context.js';
+import { DownloadProblem, FileReadProblem, ResourceKind } from '../types/resource-context.js';
 import { AVAILABLE_LANGUAGES, Language, languageLabel, UPCOMING_LANGUAGES } from '../types/sdk/generate.js';
 import { noteWrapped, withSpinner } from './prompt.js';
 import { reportAuthorizationFailure } from './portal/authorization.js';
@@ -90,7 +90,7 @@ Let's get started!`);
   }
 
   /** Names the address that failed: without it the same message repeats for every retry. */
-  public specUnavailable(problem: DownloadProblem | FileProblem) {
+  public specUnavailable(problem: DownloadProblem | FileReadProblem) {
     if (problem.kind === 'fileUnreadable') {
       log.error('The specified file does not exist or is not a valid file. Please enter a valid file path.');
       return;
