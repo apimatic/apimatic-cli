@@ -18,7 +18,6 @@ import { errorMessage } from '../utils/error-utils.js';
 import { envInfo } from './env-info.js';
 import { FileService } from './file-service.js';
 import { PortalPagesService } from './portal-pages-service.js';
-import { canonical } from './tmp-extensions.js';
 
 // Copied, not linked: Tailwind rebases their `url()`s onto the project, and no relative path crosses drives.
 export const COPIED_DEPENDENCIES = ['@fontsource-variable/geist', '@fontsource-variable/geist-mono'];
@@ -51,13 +50,6 @@ export const LINKED_DEPENDENCIES = [
 
 export const TEMPLATE_DEPENDENCIES = [...COPIED_DEPENDENCIES, ...LINKED_DEPENDENCIES];
 
-/** Where a package's own dependencies are installed beside it: the pnpm store around it, else the `node_modules` holding it. */
-export function installationDirectory(packageDirectory: DirectoryPath, name: string): DirectoryPath {
-  const holding = packageDirectory.toString().split(path.sep).slice(0, -name.split('/').length);
-  const store = holding.lastIndexOf('.pnpm');
-  return new DirectoryPath((store === -1 ? holding : holding.slice(0, store + 1)).join(path.sep));
-}
-
 /** Beside `portal.config.json`; `src/lib/portal.ts` imports it. */
 const IDENTITY_FILE_NAME = 'portal.identity.json';
 
@@ -86,7 +78,6 @@ export interface PortalBuildPaths {
   generatedDir: string;
   staticDir: string | null;
   downloadsDir: string | null;
-  dependencyDirs: string[];
 }
 
 /**
@@ -127,12 +118,11 @@ export class PortalProjectService {
     }
 
     await this.fileService.copyDirectoryContents(template, projectDirectory);
-    const installations = await this.linkDependencies(projectDirectory);
+    await this.linkDependencies(projectDirectory);
     await this.copyDependencies(projectDirectory);
     await this.writeConfiguration(
       projectDirectory,
       source,
-      installations,
       await this.contentDirectory(projectDirectory, source),
       await this.writeCodeSamples(projectDirectory, artifacts.codeSampleCatalogs),
       await this.writeDownloads(projectDirectory, artifacts)
@@ -233,12 +223,10 @@ export class PortalProjectService {
     return downloads;
   }
 
-  /** Answers the installations the links lead into, which the dev server must be allowed to serve. */
-  private async linkDependencies(projectDirectory: DirectoryPath): Promise<DirectoryPath[]> {
+  private async linkDependencies(projectDirectory: DirectoryPath): Promise<void> {
     const modules = projectDirectory.join('node_modules');
     await this.fileService.createDirectoryIfNotExists(modules);
 
-    const installations = new Map<string, DirectoryPath>();
     for (const dependency of LINKED_DEPENDENCIES) {
       const target = this.packageDirectory(dependency);
       if (target === undefined) {
@@ -250,11 +238,7 @@ export class PortalProjectService {
       }
       // A junction is the only link type Windows grants without elevation.
       await fsExtra.symlink(target.toString(), link.toString(), process.platform === 'win32' ? 'junction' : 'dir');
-
-      const installation = installationDirectory(new DirectoryPath(canonical(target.toString())), dependency);
-      installations.set(installation.toString(), installation);
     }
-    return [...installations.values()];
   }
 
   private async copyDependencies(projectDirectory: DirectoryPath): Promise<void> {
@@ -280,7 +264,6 @@ export class PortalProjectService {
   private async writeConfiguration(
     projectDirectory: DirectoryPath,
     source: PortalSource,
-    installations: DirectoryPath[],
     contentDirectory: DirectoryPath,
     codeSamples: FilePath | null,
     downloads: DirectoryPath | null
@@ -298,8 +281,7 @@ export class PortalProjectService {
       contentDir: contentDirectory.toPosix(),
       generatedDir: projectDirectory.join(GENERATED_DIRECTORY_NAME).toPosix(),
       staticDir: source.staticDirectory === null ? null : source.staticDirectory.toPosix(),
-      downloadsDir: downloads === null ? null : downloads.toPosix(),
-      dependencyDirs: installations.map((installation) => installation.toPosix())
+      downloadsDir: downloads === null ? null : downloads.toPosix()
     };
 
     await this.fileService.writeContents(

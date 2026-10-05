@@ -7,8 +7,6 @@ import sinon from 'sinon';
 import { FileService } from '../../src/infrastructure/file-service';
 import {
   COPIED_DEPENDENCIES,
-  installationDirectory,
-  LINKED_DEPENDENCIES,
   PortalProjectService,
   TEMPLATE_DEPENDENCIES
 } from '../../src/infrastructure/portal-project-service';
@@ -156,7 +154,6 @@ describe('PortalProjectService', () => {
       expect(Object.keys(config).sort()).to.deep.equal([
         'codeSamples',
         'contentDir',
-        'dependencyDirs',
         'downloadsDir',
         'generatedDir',
         'specs',
@@ -164,23 +161,6 @@ describe('PortalProjectService', () => {
       ]);
       expect(Object.keys(config.specs)).to.deep.equal(['calculator']);
       expect(config.specs.calculator).to.contain('api.json');
-    });
-
-    it('names the installation every linked dependency is served from, spelt as the dev server resolves it', async () => {
-      (await service.prepare(project, sourceFor(), NO_ARTIFACTS))._unsafeUnwrap();
-      const posix = (location: string) => location.split(path.sep).join('/');
-      const installations: string[] = readConfig().dependencyDirs;
-
-      for (const installation of installations) {
-        expect(posix(fs.realpathSync.native(installation))).to.equal(installation);
-      }
-      for (const dependency of LINKED_DEPENDENCIES) {
-        const served = posix(fs.realpathSync.native(path.join(project.toString(), 'node_modules', dependency)));
-        expect(
-          installations.some((installation) => served.startsWith(`${installation}/`)),
-          `${dependency} is outside every installation`
-        ).to.be.true;
-      }
     });
 
     it('writes the generated pages into the project, and names their directory in the build-only config', async () => {
@@ -592,36 +572,5 @@ describe('PortalProjectService', () => {
         else process.env.NODE_OPTIONS = original;
       }
     });
-  });
-});
-
-describe('installationDirectory', () => {
-  const root = path.resolve('installed');
-  const at = (...segments: string[]) => new DirectoryPath(path.join(root, ...segments));
-
-  it('answers the node_modules holding a package, not the global one around the CLI', () => {
-    const cli = ['lib', 'node_modules', '@apimatic', 'cli', 'node_modules'];
-
-    expect(installationDirectory(at(...cli, 'vite'), 'vite')).to.deep.equal(at(...cli));
-  });
-
-  it('answers the node_modules holding a scoped package', () => {
-    expect(
-      installationDirectory(at('node_modules', '@tanstack', 'react-start'), '@tanstack/react-start')
-    ).to.deep.equal(at('node_modules'));
-  });
-
-  it('answers the pnpm store, where the package and its own dependencies sit side by side', () => {
-    const store = ['node_modules', '.pnpm'];
-
-    expect(installationDirectory(at(...store, 'vite@8.2.2', 'node_modules', 'vite'), 'vite')).to.deep.equal(
-      at(...store)
-    );
-    expect(
-      installationDirectory(
-        at(...store, '@tanstack+react-start@1.168.50', 'node_modules', '@tanstack', 'react-start'),
-        '@tanstack/react-start'
-      )
-    ).to.deep.equal(at(...store));
   });
 });
