@@ -67,13 +67,14 @@ export class PortalServeAction {
           onServing();
         }
 
-        // The content's tab names are checked against the generated tabs, which apimatic.json adds and removes.
+        // The content's tab names are checked against the generated sections, which apimatic.json
+        // adds and removes, and which the root nav.json makes tabs of or places in Home.
         let generatedPages = source.generatedPages;
         const contentWatch = this.watchContent(project, source, () => generatedPages, portalProject.projectDirectory);
         const configWatch = this.watchConfig(project, source, artifacts, portalProject.projectDirectory, (settings) => {
-          const tabsChanged = !settings.generatedPages.makesSameTabsAs(generatedPages);
+          const sectionsChanged = !settings.generatedPages.makesSameSectionsAs(generatedPages);
           generatedPages = settings.generatedPages;
-          if (tabsChanged) {
+          if (sectionsChanged) {
             contentWatch?.recheck();
           }
         });

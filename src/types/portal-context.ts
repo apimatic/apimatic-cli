@@ -55,17 +55,10 @@ export class PortalContext {
    * touched once the whole new one is on the same volume and what remains is a rename.
    */
   public async save(builtDirectory: DirectoryPath, asZip: boolean): Promise<Result<void, PortalSaveProblem>> {
-    try {
-      await this.addNotFoundPage(builtDirectory);
-      await this.fileService.cleanDirectory(this.stagingDirectory);
-      if (asZip) {
-        await this.zipService.archive(builtDirectory, new FilePath(this.stagingDirectory, new FileName(ZIP_FILE_NAME)));
-      } else {
-        await this.fileService.copyDirectoryContents(builtDirectory, this.stagingDirectory);
-      }
-    } catch (error) {
+    const staged = await this.stage(builtDirectory, asZip);
+    if (staged.isErr()) {
       await this.fileService.deleteDirectory(this.stagingDirectory).catch(() => undefined);
-      return err({ kind: 'stagingFailed', reason: errorMessage(error) });
+      return err({ kind: 'stagingFailed', reason: staged.error });
     }
 
     try {
@@ -91,6 +84,23 @@ export class PortalContext {
       return this.buildLogPath;
     } catch {
       return null;
+    }
+  }
+
+  private async stage(builtDirectory: DirectoryPath, asZip: boolean): Promise<Result<void, string>> {
+    try {
+      await this.addNotFoundPage(builtDirectory);
+      await this.fileService.cleanDirectory(this.stagingDirectory);
+      if (asZip) {
+        return await this.zipService.archive(
+          builtDirectory,
+          new FilePath(this.stagingDirectory, new FileName(ZIP_FILE_NAME))
+        );
+      }
+      await this.fileService.copyDirectoryContents(builtDirectory, this.stagingDirectory);
+      return ok(undefined);
+    } catch (error) {
+      return err(errorMessage(error));
     }
   }
 

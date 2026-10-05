@@ -7,10 +7,10 @@ import { containsUrl, docsRoute } from './shared';
  * transformer has run. Given to the layout rather than left to Fumadocs, which links a tab to
  * its folder's first direct page and so leaves out a tab holding only folders -- as the API
  * reference does whenever its operations are grouped. Each stays bound to its folder, which is
- * how the active tab is found.
+ * how the active tab is found. A switcher with one choice switches nothing, so one tab is none.
  */
 export function portalTabs(tree: PageTree.Root): LayoutTab[] {
-  return tree.children.flatMap((node) => {
+  const tabs = tree.children.flatMap((node) => {
     if (node.type !== 'folder' || node.root !== true) return [];
     // Home keeps the order the root nav.json gives, which need not put the home page first.
     const url = containsUrl([node], docsRoute) ? docsRoute : firstPageUrl(node);
@@ -18,6 +18,7 @@ export function portalTabs(tree: PageTree.Root): LayoutTab[] {
       ? []
       : [{ title: node.name, description: node.description, icon: node.icon, url, $folder: node }];
   });
+  return tabs.length > 1 ? tabs : [];
 }
 
 /**

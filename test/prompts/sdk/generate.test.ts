@@ -3,6 +3,7 @@ import { stripVTControlCharacters } from 'node:util';
 import { expect } from 'chai';
 import sinon from 'sinon';
 import { log } from '@clack/prompts';
+import { ServiceError } from '../../../src/infrastructure/service-error.js';
 import { SdkGeneratePrompts } from '../../../src/prompts/sdk/generate.js';
 import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
 import { VersionProblem } from '../../../src/types/project-context.js';
@@ -80,5 +81,21 @@ describe('SdkGeneratePrompts.noVersionToBuild', () => {
 
   it('says the chosen version is not one of them', () => {
     expect(messageFor('versionNotFound')).to.equal('The selected API version is invalid.');
+  });
+});
+
+describe('SdkGeneratePrompts.sdkNotUnzipped', () => {
+  afterEach(() => {
+    sinon.restore();
+  });
+
+  it('says what a bad response says, then why the SDK could not be unzipped', () => {
+    const error = sinon.stub(log, 'error');
+
+    new SdkGeneratePrompts().sdkNotUnzipped({ kind: 'unzipFailed', reason: 'Invalid or unsupported zip format' });
+
+    expect(error.firstCall.args[0]).to.equal(
+      `${ServiceError.InvalidResponse.errorMessage}\nInvalid or unsupported zip format`
+    );
   });
 });

@@ -4,10 +4,11 @@ import sinon from 'sinon';
 import { log } from '@clack/prompts';
 import { PortalServePrompts } from '../../../src/prompts/portal/serve.js';
 import {
-  reportFolderTabs,
+  reportNoTabsListed,
   reportShadowedFiles,
   reportSharedTabNames,
-  reportSourceProblem
+  reportSourceProblem,
+  reportUnseenHomeTitle
 } from '../../../src/prompts/portal/source.js';
 import { ContentProblem } from '../../../src/types/portal/portal-source.js';
 import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
@@ -353,34 +354,6 @@ describe('reportShadowedFiles', () => {
   });
 });
 
-describe('reportFolderTabs', () => {
-  let info: sinon.SinonStub;
-
-  beforeEach(() => {
-    info = sinon.stub(log, 'info');
-  });
-
-  afterEach(() => {
-    sinon.restore();
-  });
-
-  it('says nothing when the root nav.json lists no folder', () => {
-    reportFolderTabs([]);
-
-    expect(info.called).to.be.false;
-  });
-
-  // Listing a folder is all it takes to make a tab, so the output names each one it made.
-  it('names each folder the root nav.json makes a tab of, in its order', () => {
-    const content = new DirectoryPath('project', 'src', 'content');
-    reportFolderTabs([content.join('tutorials'), content.join('guides')]);
-
-    expect(stripVTControlCharacters(String(info.firstCall.args[0]))).to.equal(
-      "'content/nav.json' makes a tab of each folder it lists: 'tutorials' and 'guides'."
-    );
-  });
-});
-
 describe('reportSharedTabNames', () => {
   const source = new DirectoryPath('project').join('src');
   const content = source.join('content');
@@ -476,7 +449,96 @@ describe('reportSharedTabNames', () => {
         'SDK pages',
       "  • 'Home': the Home tab and the tab of the 'home' folder (named after the folder)",
       "Rename all but one tab of each name with a 'title' in its folder's 'nav.json', or in " +
-        "'content/nav.json' for the Home tab; the tabs of the SDK pages and the context plugin keep their names."
+        "'content/nav.json' for the Home tab; the SDKs and Context Plugin sections keep their names."
+    ]);
+  });
+});
+
+describe('reportNoTabsListed', () => {
+  const source = new DirectoryPath('project').join('src');
+  const rootNavigation = new FilePath(source.join('content'), new FileName('nav.json'));
+  let lines: string[];
+
+  beforeEach(() => {
+    lines = [];
+    sinon.stub(log, 'warn').callsFake((text?: string | string[]) => {
+      lines.push(stripVTControlCharacters(String(text)));
+    });
+  });
+
+  afterEach(() => {
+    sinon.restore();
+  });
+
+  it('says nothing when the root file lists its tabs, empty or not', () => {
+    reportNoTabsListed(undefined, source);
+
+    expect(lines).to.deep.equal([]);
+  });
+
+  // The line offered names what nothing places, so following it collides with nothing in `pages`.
+  it('names the file and the nodes nothing places, with both ways to say so on purpose', () => {
+    reportNoTabsListed(
+      {
+        file: rootNavigation,
+        unplaced: [
+          { kind: 'generated', section: SDK_SECTION },
+          { kind: 'generated', section: PLUGIN_SECTION },
+          { kind: 'apiReference' }
+        ]
+      },
+      source
+    );
+
+    expect(lines).to.deep.equal([
+      "'content/nav.json' has no 'tabs', so nothing is a tab: the header shows no tab bar, and SDKs, Context " +
+        "Plugin and the API reference are folders in Home's sidebar. Add " +
+        '\'"tabs": ["apimatic:sdks","apimatic:plugin","apimatic:api"]\' to show them as tabs, or \'"tabs": []\' ' +
+        'to keep this sidebar.'
+    ]);
+  });
+
+  it('says there is no root file when there is none, and names only the nodes there are', () => {
+    reportNoTabsListed(
+      { file: undefined, unplaced: [{ kind: 'generated', section: SDK_SECTION }, { kind: 'apiReference' }] },
+      source
+    );
+
+    expect(lines).to.deep.equal([
+      "There is no 'content/nav.json', so nothing is a tab: the header shows no tab bar, and SDKs and the API " +
+        'reference are folders in Home\'s sidebar. Add the file with \'"tabs": ["apimatic:sdks","apimatic:api"]\' ' +
+        'to show them as tabs, or \'"tabs": []\' to keep this sidebar.'
+    ]);
+  });
+});
+
+describe('reportUnseenHomeTitle', () => {
+  const source = new DirectoryPath('project').join('src');
+  let lines: string[];
+
+  beforeEach(() => {
+    lines = [];
+    sinon.stub(log, 'warn').callsFake((text?: string | string[]) => {
+      lines.push(stripVTControlCharacters(String(text)));
+    });
+  });
+
+  afterEach(() => {
+    sinon.restore();
+  });
+
+  it('says nothing when the title has a tab bar to show in', () => {
+    reportUnseenHomeTitle(undefined, source);
+
+    expect(lines).to.deep.equal([]);
+  });
+
+  it('says the title shows nowhere while Home is the only tab', () => {
+    reportUnseenHomeTitle(new FilePath(source.join('content'), new FileName('nav.json')), source);
+
+    expect(lines).to.deep.equal([
+      "'content/nav.json' names the Home tab with 'title', but Home is the only tab and one tab draws no tab bar, " +
+        "so the name shows nowhere. Name a tab in 'tabs', or remove the setting."
     ]);
   });
 });

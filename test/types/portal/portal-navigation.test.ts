@@ -1,4 +1,5 @@
 import { expect } from 'chai';
+import { SDK_SECTION } from '../../../src/types/portal/generated-pages';
 import { NavigationContext, PortalNavigation } from '../../../src/types/portal/portal-navigation';
 
 describe('PortalNavigation', () => {
@@ -8,11 +9,13 @@ describe('PortalNavigation', () => {
     isApiDirectory: false,
     becomesFolder: true,
     childNames: ['index', 'authentication', 'guides'],
+    folderNames: ['guides'],
     emptyFolders: [],
     homePageFolders: [],
     ...overrides
   });
 
+  /** A file ordering with `pages` alone. */
   const validate = (pages: unknown, overrides: Partial<NavigationContext> = {}) =>
     PortalNavigation.validate(JSON.stringify({ pages }), contextFor(overrides));
 
@@ -109,9 +112,12 @@ describe('PortalNavigation', () => {
       expect(errorsFor([1])[0]).to.contain("'pages' must be an array of strings.");
     });
 
-    it('points api at the token, since that is where the reference is mounted', () => {
-      expect(errorsFor(['api'])).to.deep.equal([
-        "content/nav.json: 'api' is not a page or folder in this directory. The API reference is positioned with 'apimatic:api'."
+    // The reference is mounted at the root of every portal, so `api` positions it whether or not
+    // a directory is there to see; a near miss of the name is pointed at the token.
+    it('positions the reference with api, and points a near miss of it at the token', () => {
+      expect(validate(['api']).isOk()).to.be.true;
+      expect(errorsFor(['Api'])).to.deep.equal([
+        "content/nav.json: 'Api' is not a page or folder in this directory. The API reference is positioned with 'apimatic:api'."
       ]);
     });
 
@@ -188,7 +194,7 @@ describe('PortalNavigation', () => {
 
     it('names an unknown setting and lists the settings there are', () => {
       expect(PortalNavigation.validate('{"colour":"red"}', contextFor())._unsafeUnwrapErr()).to.deep.equal([
-        "content/nav.json: 'colour' is not a nav.json setting. The settings are 'pages' and 'title'."
+        "content/nav.json: 'colour' is not a nav.json setting. The settings are 'pages', 'title' and 'tabs'."
       ]);
     });
   });
@@ -196,12 +202,15 @@ describe('PortalNavigation', () => {
   describe('tokens outside the content root', () => {
     const nested = { label: 'content/guides/nav.json', isContentRoot: false, childNames: ['index'] };
 
-    it('refuses every token, because the nodes they position live at the root', () => {
+    it('refuses every token, because the nodes they position live at the root, and names both places it can go', () => {
       for (const token of ['apimatic:api', 'apimatic:sdks', 'apimatic:plugin']) {
         const errors = errorsFor([token], nested);
 
         expect(errors).to.have.lengthOf(1);
         expect(errors[0]).to.contain(`'${token}' can only be used in the nav.json at the top`);
+        expect(errors[0]).to.contain(
+          "List it in that file's 'tabs' to make it a tab, or in its 'pages' to place it in Home."
+        );
       }
     });
 
@@ -299,23 +308,219 @@ describe('PortalNavigation', () => {
   });
 
   describe('the tabs', () => {
-    // The walk makes a tab of each folder the content root's entries name.
-    it('answers with its entries, trimmed', () => {
-      expect(validate(['  index ', 'guides'])._unsafeUnwrap().pages).to.deep.equal(['index', 'guides']);
-      expect(PortalNavigation.validate('{}', contextFor())._unsafeUnwrap().pages).to.deep.equal([]);
+    const validateFile = (file: Record<string, unknown>, overrides: Partial<NavigationContext> = {}) =>
+      PortalNavigation.validate(JSON.stringify(file), contextFor(overrides));
+    const fileErrors = (file: Record<string, unknown>, overrides: Partial<NavigationContext> = {}) =>
+      validateFile(file, overrides)._unsafeUnwrapErr();
+
+    // The CLI names the tabs from what it resolved each entry to, in the order the tab bar shows them.
+    it('answers with the pages trimmed, and the tabs resolved, in order', () => {
+      const settings = validateFile({
+        tabs: [' guides ', 'apimatic:api', 'apimatic:sdks'],
+        pages: ['  index ', 'authentication']
+      });
+
+      expect(settings._unsafeUnwrap()).to.deep.include({
+        tabs: [
+          { kind: 'folder', name: 'guides' },
+          { kind: 'apiReference' },
+          { kind: 'generated', section: SDK_SECTION }
+        ],
+        pages: ['index', 'authentication']
+      });
+      expect(validateFile({ tabs: ['api'] })._unsafeUnwrap().tabs).to.deep.equal([{ kind: 'apiReference' }]);
+      expect(PortalNavigation.validate('{}', contextFor())._unsafeUnwrap()).to.deep.include({
+        pages: [],
+        placedInHome: [],
+        tabs: undefined
+      });
+    });
+
+    // What `pages` places in Home is told apart from what nothing names, so a folder is not among them.
+    it('answers with the reference and the sections pages places, however the reference is spelled', () => {
+      const settings = validateFile({ tabs: [], pages: ['index', 'guides', 'api', 'apimatic:sdks', '...'] });
+
+      expect(settings._unsafeUnwrap().placedInHome).to.deep.equal([
+        { kind: 'apiReference' },
+        { kind: 'generated', section: SDK_SECTION }
+      ]);
+    });
+
+    it('accepts a folder, api or its token, and each section’s token as a tab', () => {
+      expect(validateFile({ tabs: ['guides', 'api', 'apimatic:sdks', 'apimatic:plugin'], pages: ['index'] }).isOk()).to
+        .be.true;
+      expect(validateFile({ tabs: ['apimatic:api'] }).isOk()).to.be.true;
+    });
+
+    // A token in `pages` places its section in Home's sidebar rather than in a tab of its own.
+    it('accepts every token and api in pages at the root, which places the section in Home', () => {
+      const withApi = { childNames: ['index', 'authentication', 'guides', 'api'] };
+
+      expect(validateFile({ tabs: [], pages: ['index', 'apimatic:sdks', 'api', 'apimatic:plugin'] }, withApi).isOk()).to
+        .be.true;
+      expect(validateFile({ tabs: ['guides'], pages: ['index', 'apimatic:api'] }).isOk()).to.be.true;
     });
 
     // The home page belongs to the Home tab, which opens on it.
     it('refuses to make a tab of a folder that serves the home page', () => {
-      const withStart = { childNames: ['index', '(start)'], homePageFolders: ['(start)'] };
+      const withStart = { childNames: ['index', '(start)'], folderNames: ['(start)'], homePageFolders: ['(start)'] };
 
-      expect(errorsFor(['index', '(start)'], withStart)).to.deep.equal([
+      expect(fileErrors({ tabs: ['(start)'], pages: ['index'] }, withStart)).to.deep.equal([
         "content/nav.json: '(start)' serves the home page, which belongs to the Home tab, so it cannot be a tab " +
           'of its own. Remove the entry, or move the page out of the folder.'
       ]);
     });
 
-    // Fumadocs' own key for a tab; here, listing the folder in the content root's file makes one.
+    // In Home, the folder is one more node to order.
+    it('accepts a folder that serves the home page in pages, with or without tabs', () => {
+      const withStart = { childNames: ['index', '(start)'], folderNames: ['(start)'], homePageFolders: ['(start)'] };
+
+      expect(validateFile({ tabs: [], pages: ['index', '(start)'] }, withStart).isOk()).to.be.true;
+      expect(validateFile({ pages: ['(start)', 'index'] }, withStart).isOk()).to.be.true;
+    });
+
+    it('refuses a page, and points at pages', () => {
+      expect(fileErrors({ tabs: ['authentication'] })).to.deep.equal([
+        "content/nav.json: 'authentication' is a page, and a tab is a folder. Order it in Home's sidebar with 'pages' instead."
+      ]);
+    });
+
+    // A tab for every unlisted folder is the design the file exists to avoid.
+    it('refuses the rest entry, even when pages holds it too', () => {
+      const sentence =
+        "content/nav.json: '...' cannot be a tab, since it would make a tab of every folder 'tabs' does not name. " +
+        'Name the folders meant as tabs; the rest stay in Home.';
+
+      expect(fileErrors({ tabs: ['...'] })).to.deep.equal([sentence]);
+      expect(fileErrors({ tabs: ['...'], pages: ['index', '...'] })).to.deep.equal([sentence]);
+    });
+
+    it('refuses an empty entry, one addressing another directory, and a value that is not an array of strings', () => {
+      expect(fileErrors({ tabs: [''] })[0]).to.contain("'tabs' must not contain an empty entry");
+      expect(fileErrors({ tabs: ['guides/deep'] })[0]).to.contain("'guides/deep' addresses another directory");
+      expect(fileErrors({ tabs: 'guides' })[0]).to.contain("'tabs' must be an array of strings.");
+      expect(fileErrors({ tabs: [1] })[0]).to.contain("'tabs' must be an array of strings.");
+      // One edit fixes the file: the other list's entries are still checked.
+      expect(fileErrors({ tabs: 'guides', pages: ['nope'] })).to.have.lengthOf(2);
+      expect(fileErrors({ tabs: ['nope'], pages: 'index' })).to.have.lengthOf(2);
+    });
+
+    it('refuses a folder with no page in it, and a name that is no folder with a hint tabs accepts', () => {
+      expect(fileErrors({ tabs: ['drafts'] }, { emptyFolders: ['drafts'] })[0]).to.contain(
+        "'drafts' is a folder with no page in it or below it"
+      );
+      expect(fileErrors({ tabs: ['Guides'] })).to.deep.equal([
+        "content/nav.json: 'Guides' is not a folder in this directory. Did you mean 'guides'?"
+      ]);
+      expect(fileErrors({ tabs: ['sdks'] })[0]).to.contain("'apimatic:sdks' makes the SDK pages a tab.");
+      expect(fileErrors({ tabs: ['apimatic:sdk'] })[0]).to.contain("'apimatic:sdk' is not a nav.json token");
+    });
+
+    // The page lookup strips a stray extension, and the folder lookup has to answer the same way.
+    it('matches a folder near miss with a stray extension too', () => {
+      expect(fileErrors({ tabs: ['Guides.md'] })).to.deep.equal([
+        "content/nav.json: 'Guides.md' is not a folder in this directory. Did you mean 'guides'?"
+      ]);
+    });
+
+    // The pages hint would send the user to an entry tabs then refuses, one error later.
+    it('answers a page near miss with where a page can go, in one message', () => {
+      expect(fileErrors({ tabs: ['Authentication'] })).to.deep.equal([
+        "content/nav.json: 'Authentication' is not a folder in this directory. 'authentication' is a page, and a " +
+          "tab is a folder. Order it in Home's sidebar with 'pages' instead."
+      ]);
+    });
+
+    it('names both accepted spellings of the reference for a near miss of api', () => {
+      expect(fileErrors({ tabs: ['API'] })).to.deep.equal([
+        "content/nav.json: 'API' is not a folder in this directory. The API reference is a tab as 'api' " +
+          "or 'apimatic:api'."
+      ]);
+    });
+
+    // `content/api.md` is a second child at the root, so `api` could position only the reference. The
+    // token never meant the page, and the scaffold writes it, so a page of that name does not fail the build.
+    it('refuses api when a page of that name is a second child, as pages does, and not the token', () => {
+      const withApiPage = { childNames: ['index', 'api', 'api'], folderNames: [] };
+      const sentence =
+        "content/nav.json: 'api' is where the API reference is mounted, so the entry positions the " +
+        'reference rather than the page of that name. Rename the page to position it.';
+
+      expect(fileErrors({ tabs: ['api'], pages: ['index'] }, withApiPage)).to.deep.equal([sentence]);
+      expect(fileErrors({ tabs: [], pages: ['index', 'api'] }, withApiPage)).to.deep.equal([sentence]);
+      expect(validateFile({ tabs: ['apimatic:api'], pages: ['index'] }, withApiPage).isOk()).to.be.true;
+      expect(validateFile({ tabs: [], pages: ['index', 'apimatic:api'] }, withApiPage).isOk()).to.be.true;
+      expect(validateFile({ tabs: ['api'], pages: ['index'] }, { childNames: ['index', 'api'] }).isOk()).to.be.true;
+    });
+
+    it('refuses a repeated entry, however the API reference is spelled', () => {
+      expect(fileErrors({ tabs: ['guides', 'guides'] })).to.deep.equal([
+        "content/nav.json: 'guides' is listed more than once."
+      ]);
+      expect(fileErrors({ tabs: ['api', 'apimatic:api'] })).to.deep.equal([
+        "content/nav.json: 'api' and 'apimatic:api' both position the API reference; keep one of them."
+      ]);
+    });
+
+    // A node is either a tab or in Home's sidebar, and the template would have to pick one without a word.
+    it('refuses a node named in both lists, however it is spelled', () => {
+      expect(fileErrors({ tabs: ['guides'], pages: ['index', 'guides'] })).to.deep.equal([
+        "content/nav.json: 'guides' is in both 'pages' and 'tabs', and a node is either a tab or in Home's sidebar. " +
+          'Keep one of them.'
+      ]);
+      expect(fileErrors({ tabs: ['apimatic:api'], pages: ['api'] }, { childNames: ['index', 'api'] })).to.deep.equal([
+        "content/nav.json: 'api' in 'pages' and 'apimatic:api' in 'tabs' both position the API reference, and a node " +
+          "is either a tab or in Home's sidebar. Keep one of them."
+      ]);
+    });
+
+    it('reports every bad entry of both lists at once', () => {
+      expect(fileErrors({ tabs: ['nope', 'authentication'], pages: ['also-nope'] })).to.have.lengthOf(3);
+    });
+
+    describe('below the content root', () => {
+      const nested = {
+        label: 'content/guides/nav.json',
+        isContentRoot: false,
+        childNames: ['intro', 'deep'],
+        folderNames: ['deep']
+      };
+
+      // The tabs are decided at the top of the content directory; nothing reads the setting anywhere else.
+      it('refuses the setting with a sentence of its own, and checks nothing in it', () => {
+        expect(fileErrors({ tabs: ['nonsense'], pages: ['intro'] }, nested)).to.deep.equal([
+          "content/guides/nav.json: 'tabs' is only read in the nav.json at the top of the content directory, where the " +
+            "tabs are decided. Remove it here; this file orders its own folder with 'pages'."
+        ]);
+      });
+
+      it('keeps listing pages and title as the settings for anything else unknown', () => {
+        expect(fileErrors({ tab: ['deep'] }, nested)).to.deep.equal([
+          "content/guides/nav.json: 'tab' is not a nav.json setting. The settings are 'pages' and 'title'."
+        ]);
+      });
+    });
+
+    it('lists tabs among the settings at the root, so a misspelt one is pointed at it', () => {
+      expect(fileErrors({ tab: ['guides'], pages: ['index'] })).to.deep.equal([
+        "content/nav.json: 'tab' is not a nav.json setting. The settings are 'pages', 'title' and 'tabs'."
+      ]);
+    });
+
+    // `tabs` is the whole tab bar after Home, so a file without it makes no tab, whatever `pages`
+    // names; it answers with no list, so the content tree can say so once.
+    it('accepts a root file with no tabs, whatever pages names, and answers with no list', () => {
+      const settings = validateFile({ pages: ['index', 'guides', 'apimatic:api', 'authentication'] });
+
+      expect(settings._unsafeUnwrap()).to.deep.include({
+        tabs: undefined,
+        pages: ['index', 'guides', 'apimatic:api', 'authentication']
+      });
+      expect(validateFile({ pages: ['api'] }, { childNames: ['index', 'api'] }).isOk()).to.be.true;
+      expect(validateFile({ title: 'Overview' }).isOk()).to.be.true;
+    });
+
+    // Fumadocs' own key for a tab; here, listing the folder in the content root's tabs makes one.
     it('reports a root setting as unknown', () => {
       const tutorials = { label: 'content/tutorials/nav.json', isContentRoot: false, childNames: ['first-call'] };
 
@@ -340,7 +545,7 @@ describe('PortalNavigation', () => {
         const errors = PortalNavigation.validate(`{"${field}":"x"}`, contextFor())._unsafeUnwrapErr();
 
         expect(errors).to.deep.equal([
-          `content/nav.json: '${field}' is not a nav.json setting. The settings are 'pages' and 'title'.`
+          `content/nav.json: '${field}' is not a nav.json setting. The settings are 'pages', 'title' and 'tabs'.`
         ]);
         expect(errors[0]).to.not.contain('native code');
       });

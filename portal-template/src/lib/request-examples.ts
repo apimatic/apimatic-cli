@@ -1,11 +1,9 @@
-import type { useOperationContext } from 'fumadocs-openapi/ui';
+import type { ParameterObject } from 'fumadocs-openapi';
+import type { ExampleRequest, OperationParameters } from 'fumadocs-openapi/operation';
 import { isJsonObject } from './json';
 
-export type RequestExample = Pick<
-  ReturnType<typeof useOperationContext>['examples'][number],
-  'id' | 'name' | 'description'
->;
-type Location = 'path' | 'query' | 'header' | 'cookie';
+export type RequestExample = Pick<ExampleRequest, 'id' | 'name' | 'description'>;
+type Location = OperationParameters['in'];
 type Resolve = (node: unknown) => unknown;
 
 interface Example {
@@ -25,22 +23,16 @@ export class Parameter {
     private readonly examples: Map<string, Example>
   ) {}
 
-  public static listIn(operation: unknown, pathItem: unknown, resolve: Resolve): Parameter[] {
-    return [...parametersOf(operation), ...parametersOf(pathItem)].flatMap(
-      (entry) => Parameter.from(resolve(entry), resolve) ?? []
-    );
+  // Takes the parameters Fumadocs has already resolved, deduplicated and grouped by location.
+  public static listIn(groups: OperationParameters[], resolve: Resolve): Parameter[] {
+    return groups.flatMap((group) => group.items.map((item) => Parameter.from(group.in, item, resolve)));
   }
 
-  private static from(entry: unknown, resolve: Resolve): Parameter | undefined {
-    if (!isJsonObject(entry) || !isLocation(entry.in) || typeof entry.name !== 'string') {
-      return undefined;
-    }
-    const examples = isJsonObject(entry.examples)
-      ? Object.entries(entry.examples)
-          .map(([id, example]): [string, unknown] => [id, resolve(example)])
-          .filter(isExampleEntry)
-      : [];
-    return new Parameter(entry.in, new Map(examples));
+  private static from(location: Location, item: ParameterObject, resolve: Resolve): Parameter {
+    const examples = Object.entries(item.examples ?? {})
+      .map(([id, example]): [string, unknown] => [id, resolve(example)])
+      .filter(isExampleEntry);
+    return new Parameter(location, new Map(examples));
   }
 
   public namedExamples(): [string, Example][] {
@@ -56,14 +48,6 @@ export function requestExamples(bodyExamples: RequestExample[], parameters: Para
     return bodyExamples;
   }
   return named.map(([id, { summary, description }]) => ({ id, name: summary || id, description }));
-}
-
-function parametersOf(node: unknown): unknown[] {
-  return isJsonObject(node) && Array.isArray(node.parameters) ? node.parameters : [];
-}
-
-function isLocation(value: unknown): value is Location {
-  return value === 'path' || value === 'query' || value === 'header' || value === 'cookie';
 }
 
 function isExampleEntry(entry: [string, unknown]): entry is [string, Example] {

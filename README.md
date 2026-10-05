@@ -50,12 +50,25 @@ Documentation portals are now built on your machine from a `src/` directory, and
 - Page order comes from a `nav.json` beside your pages, listing them by file name, and a
   `title` there names the folder it sits in. A folder links to its `index.md`; without one it
   is only a heading.
-- The top level of the portal is shown as tabs, which `src/content/nav.json` decides. Home
-  comes first and holds `index.md`, every other page at the top level and the folders the
-  file does not list, in the file's order, and opens on `index.md`; the file's `title` names
-  it. Each folder the file lists becomes a tab of its own after Home, in the file's order,
-  and so do the tabs the CLI makes, placed with `apimatic:sdks`, `apimatic:plugin` and
-  `apimatic:api`.
+- The top level of the portal is shown as tabs, which `src/content/nav.json` decides with two
+  lists. `tabs` names the tabs after Home, in order, and nothing else is one: a folder directly
+  under `src/content/`, and the sections the CLI makes, placed with `apimatic:sdks`,
+  `apimatic:plugin` and `apimatic:api`. Home comes first, opens on `index.md`, and holds
+  everything `tabs` does not name: every page at the top level, every other folder, and every
+  section not named as a tab, each at the address it always has. Its `pages` orders that sidebar
+  as any other `nav.json` orders its folder, a token standing for its section, and the file's
+  `title` names it; what `pages` does not name follows in alphabetical order, pages before
+  folders. A file with no `tabs`, or no file at all, makes no tab, so Home stands alone and
+  there is no tab bar; the build says so once, with the line that makes tabs of the sections
+  and the reference `pages` does not place. A new portal starts with the three sections as
+  tabs.
+  ```json
+  {
+    "title": "Overview",
+    "tabs": ["tutorials", "apimatic:sdks", "apimatic:api"],
+    "pages": ["index", "authentication", "guides", "apimatic:plugin", "..."]
+  }
+  ```
 - The SDKs tab lists a card per language in the `languages` block, offering its download and,
   once `sdk publish` records a release, its install command, source repository and package, and
   gives each language a page carrying its SDK's getting-started docs. The Context Plugin tab,

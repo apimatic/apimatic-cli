@@ -12,6 +12,7 @@ import {
   PluginIdentityData,
   PluginMetadata
 } from './plugin/plugin-config.js';
+import { SOURCE_DIRECTORY_NAME } from './project-layout.js';
 import { SemVersion } from './publish/version.js';
 import { isAvailableLanguage, Language } from './sdk/generate.js';
 
@@ -180,7 +181,7 @@ export class PluginConfigContext {
     into: DirectoryPath,
     languages: readonly Language[]
   ): Promise<Result<DirectoryPath, PluginConfigWriteFailure>> {
-    const staged = into.join('build');
+    const staged = into.join(SOURCE_DIRECTORY_NAME);
     await this.fileService.copyDirectoryContents(this.sourceDirectory, staged);
 
     const config = new ApimaticConfigContext(staged);

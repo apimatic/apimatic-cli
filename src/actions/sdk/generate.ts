@@ -71,11 +71,15 @@ export class GenerateAction {
 
     return await withDirPath(async (tempDirectory) => {
       const tempContext = new TempContext(tempDirectory);
-      const buildZipPath = await buildFrom.buildZip(tempDirectory, packageSettingsDirectory);
+      const srcDirZip = await buildFrom.srcDirZip(tempDirectory, packageSettingsDirectory);
+      if (srcDirZip.isErr()) {
+        this.prompts.srcDirNotZipped(sourceDirectory, srcDirZip.error);
+        return ActionResult.failed();
+      }
 
       const response = await this.prompts.generateSdk(
         this.sdkGenerationService.generateSdk(
-          buildZipPath,
+          srcDirZip.value,
           language,
           stability,
           this.configDir,
@@ -91,8 +95,18 @@ export class GenerateAction {
 
       const responseSdkZipPath = await tempContext.save(response.value);
       const tempSdk = await sdkContext.loadSdkInTempDirectory(tempDirectory, responseSdkZipPath);
-      this.prompts.sdkGenerated(await sdkContext.save(tempSdk, zipSdk));
+      if (tempSdk.isErr()) {
+        this.prompts.sdkNotUnzipped(tempSdk.error);
+        return ActionResult.failed();
+      }
 
+      const saved = await sdkContext.save(tempSdk.value, zipSdk);
+      if (saved.isErr()) {
+        this.prompts.sdkNotSaved(saved.error);
+        return ActionResult.failed();
+      }
+
+      this.prompts.sdkGenerated(saved.value);
       return ActionResult.success();
     });
   };

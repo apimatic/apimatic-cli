@@ -1,9 +1,13 @@
+import { ok, Result } from 'neverthrow';
 import { FileService } from '../infrastructure/file-service.js';
 import { DirectoryPath } from './file/directoryPath.js';
 import { FilePath } from './file/filePath.js';
 import { FileName } from './file/fileName.js';
+import { FileProblem } from './file/file-problem.js';
 import { Language } from './sdk/generate.js';
 import { ZipService } from '../infrastructure/zip-service.js';
+
+export type SdkSaveProblem = FileProblem & { sdkDirectory: DirectoryPath };
 
 export class SdkContext {
   private readonly fileService = new FileService();
@@ -22,20 +26,25 @@ export class SdkContext {
     return !(await this.fileService.directoryEmpty(this.sdkDirectory));
   }
 
-  public async save(tempSdkDirectory: DirectoryPath, zipSdk: boolean): Promise<DirectoryPath> {
+  public async save(tempSdkDirectory: DirectoryPath, zipSdk: boolean): Promise<Result<DirectoryPath, SdkSaveProblem>> {
     await this.fileService.cleanDirectory(this.sdkDirectory);
     if (!zipSdk) {
       await this.fileService.copyDirectoryContents(tempSdkDirectory, this.sdkDirectory);
-    } else {
-      await this.zipService.archive(tempSdkDirectory, this.zipPath);
+      return ok(this.sdkDirectory);
     }
-    return this.sdkDirectory;
+    const archived = await this.zipService.archive(tempSdkDirectory, this.zipPath);
+    return archived
+      .map(() => this.sdkDirectory)
+      .mapErr((reason): SdkSaveProblem => ({ kind: 'zipFailed', reason, sdkDirectory: this.sdkDirectory }));
   }
 
-  public async loadSdkInTempDirectory(tempDirectory: DirectoryPath, tempSdk: FilePath): Promise<DirectoryPath> {
+  public async loadSdkInTempDirectory(
+    tempDirectory: DirectoryPath,
+    tempSdk: FilePath
+  ): Promise<Result<DirectoryPath, FileProblem>> {
     const tempSdkDirectory = tempDirectory.join('sdk-original');
     await this.fileService.createDirectoryIfNotExists(tempSdkDirectory);
-    await this.zipService.unArchive(tempSdk, tempSdkDirectory);
-    return tempSdkDirectory;
+    const unpacked = await this.zipService.unArchive(tempSdk, tempSdkDirectory);
+    return unpacked.map(() => tempSdkDirectory).mapErr((reason): FileProblem => ({ kind: 'unzipFailed', reason }));
   }
 }
