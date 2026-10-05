@@ -540,6 +540,10 @@ It holds:
 - a spec, so the API reference's `/api/…` pages really collide with the base;
 - a content page linking `/authentication`, and that page;
 - a logo in `static/`;
+- the root `nav.json` that `quickstart` scaffolds, naming the three sections in `tabs`. Since #408,
+  a portal with no root `nav.json` has no tab bar, and the API reference is a collapsed folder in
+  Home whose pages the home page does not link to. The tab is the home page's link to a
+  colliding page (added at the merge of `dev`, 2026-10-05);
 - a Markdown image in the content page (step 2), which guards `useImport` (5.1). It is over
   Vite's 4 KiB inline limit, since an inlined `data:` URI would carry no base to check; the logo
   is 3.9 KB, so the image is a generated 12 KB `diagram.png`.
