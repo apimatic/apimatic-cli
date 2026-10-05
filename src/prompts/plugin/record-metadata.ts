@@ -30,7 +30,7 @@ export class PluginRecordMetadataPrompts {
 
   /**
    * Required fields get a `placeholder` but no `defaultValue`, so an empty answer re-prompts.
-   * Optional ones get both, so Enter accepts the suggestion — the same split `sdk quickstart` uses.
+   * Optional ones get both, so Enter accepts the suggestion — the same split `quickstart` uses.
    */
   public async inputPluginMetadata(defaults: PluginMetadata): Promise<PluginMetadataResult> {
     const pluginId = await text({
@@ -62,7 +62,7 @@ export class PluginRecordMetadataPrompts {
           return 'Please enter a valid version in the format major.minor.patch (e.g., 0.1.0).';
       }
     });
-    if (isCancel(pluginVersion)) return { cancelled: 'A plugin version is required' };
+    if (isCancel(pluginVersion)) return { cancelled: 'No plugin version was chosen' };
 
     return { metadata: { pluginId, pluginName, pluginVersion } };
   }

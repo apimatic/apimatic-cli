@@ -51,7 +51,7 @@ export class ServiceError {
     const message =
       `${apiMessage ?? 'Authorization has been denied for this request.'} ` +
       `Please run ${loginCommand} to log in via browser, ` +
-      `or provide a valid auth key using the ${loginCommand} ${f.flag('auth-key')}`;
+      `or ${loginCommand} ${f.flag('auth-key', '{api-key}')} to log in with an auth key.`;
     return new ServiceError(ServiceErrorCode.UnAuthorized, message, {});
   }
 

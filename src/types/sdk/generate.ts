@@ -47,13 +47,13 @@ export const LANGUAGE_NAMES: Readonly<Record<Language, string>> = {
 
 /** In display order, which `UPCOMING_LANGUAGES` inherits. */
 export const LANGUAGE_CHOICES: ReadonlyArray<{ label: string; value: Language }> = [
+  Language.CSHARP,
   Language.TYPESCRIPT,
-  Language.RUBY,
   Language.PYTHON,
   Language.JAVA,
-  Language.CSHARP,
-  Language.PHP,
-  Language.GO
+  Language.RUBY,
+  Language.GO,
+  Language.PHP
 ].map((value) => ({ label: LANGUAGE_NAMES[value], value }));
 
 /** What each generator offers for a language. A language absent from it cannot be generated. */

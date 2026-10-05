@@ -102,8 +102,7 @@ Let's get started!`);
   }
 
   public fixYourSpec() {
-    const message = `Good luck fixing your API Definition! Feel free to run this command again once you're done.`;
-    log.info(message);
+    log.info(`Fix your API Definition, then run ${f.cmdAlt('apimatic', 'quickstart')} again.`);
   }
 
   public validateSpecStep() {
