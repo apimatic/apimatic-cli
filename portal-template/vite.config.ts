@@ -58,8 +58,16 @@ export default defineConfig(async () => {
     // refused, failing the build; binding IPv4 leaves the fetch a single address to reach.
     preview: { host: '127.0.0.1' },
     // Spelled out because the default, the project alone, misses the CLI installation the
-    // dependencies are linked from. See `dependencyDirectories`.
-    server: { fs: { allow: [projectDirectory, ...dependencyDirectories(projectDirectory)] } },
+    // dependencies are linked from, and the static directory pages import images from.
+    server: {
+      fs: {
+        allow: [
+          projectDirectory,
+          ...dependencyDirectories(projectDirectory),
+          ...(paths.staticDir === null ? [] : [paths.staticDir])
+        ]
+      }
+    },
     resolve: {
       tsconfigPaths: true,
       alias: [

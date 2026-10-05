@@ -21,12 +21,12 @@ const enabled = process.env.APIMATIC_E2E === '1';
 (enabled ? describe : describe.skip)('portal serve (end to end)', function () {
   this.timeout(10 * 60 * 1000);
 
+  const fixture = new DirectoryPath(process.cwd()).join('test/resources/portal-inputs/default/src');
   let base: string;
   let root: string;
   let server: PortalDevServer | undefined;
 
   before(async () => {
-    const fixture = new DirectoryPath(process.cwd()).join('test/resources/portal-inputs/default/src');
     base = await ensurePortalProjectDirectoryBase(fixture);
     root = fs.mkdtempSync(path.join(base, 'portal-serve-e2e-'));
 
@@ -72,5 +72,17 @@ const enabled = process.env.APIMATIC_E2E === '1';
     const response = await globalThis.fetch(`${server?.url.toString()}/@fs/${entry}`);
 
     expect(response.status, await response.text()).to.equal(200);
+  });
+
+  // A page imports its images from the static directory, outside the project, by the same kind of address.
+  it('serves an image from the static directory to a browser that asks for it before the page', async () => {
+    const image = fs
+      .realpathSync(path.join(fixture.toString(), 'static', 'images', 'logo.png'))
+      .split(path.sep)
+      .join('/');
+
+    const response = await globalThis.fetch(`${server?.url.toString()}/@fs/${image}`);
+
+    expect(response.status).to.equal(200);
   });
 });
