@@ -106,6 +106,15 @@ describe('prerenderPages', () => {
     expect(await urlsFor('https://docs.test')).to.include('/robots.txt');
   });
 
+  it('lists the OAuth callback, without a Markdown twin', async () => {
+    write('index.md');
+
+    const urls = await urlsFor();
+
+    expect(urls).to.include('/oauth/callback');
+    expect(urls).to.not.include('/oauth/callback.md');
+  });
+
   it('does not ask for a Markdown twin of the generated files', async () => {
     write('index.md');
 

@@ -2,6 +2,7 @@ import { readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { getSlugs, loader } from 'fumadocs-core/source';
 import type { BuildPaths } from './portal-config.ts';
+import { oauthCallbackPath } from './src/lib/oauth-callback';
 import { openApiSection } from './src/lib/openapi-section.server';
 
 const CONTENT_EXTENSIONS = new Set(['.md', '.mdx']);
@@ -35,6 +36,8 @@ export async function prerenderPages(config: BuildPaths, siteUrl: string | null)
     if (url === '/') urls.add('/index.md');
     else if (!/\.(txt|xml|json)$/.test(url)) urls.add(`${url}.md`);
   }
+  // After the twins, since it is no page of the portal's and has none.
+  urls.add(oauthCallbackPath);
 
   return [...urls].map((url) => ({ path: url }));
 }
