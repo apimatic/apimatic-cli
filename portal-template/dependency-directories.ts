@@ -1,13 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-/**
- * The installations the project's dependencies resolve to. Vite serves a file from outside
- * its allow list only once the module importing it has been transformed, an order a browser
- * cache skips: Safari, holding the importer from an earlier preview on the same port, asked
- * for the TanStack dev entry first and was refused, leaving a blank page. Naming where the
- * links really lead keeps every dependency served whatever the browser asks for first.
- */
+// Safari runs a cached entry before its importer is transformed (apimatic-io#2287).
 export function dependencyDirectories(projectDirectory: string): string[] {
   const directories = new Set<string>();
   for (const packagePath of packagePaths(path.join(projectDirectory, 'node_modules'))) {

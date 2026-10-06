@@ -4,10 +4,6 @@ import path from 'path';
 import { expect } from 'chai';
 import { dependencyDirectories } from '../../portal-template/dependency-directories';
 
-/**
- * The directories `server.fs.allow` names so the dev server serves a linked dependency even
- * when the browser, from its cache, asks for it before the module importing it.
- */
 describe('dependencyDirectories', () => {
   let root: string;
 
