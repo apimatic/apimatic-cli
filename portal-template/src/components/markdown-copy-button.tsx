@@ -12,7 +12,7 @@ const LABELS: Record<CopyState, string> = {
   failed: 'Copy failed'
 };
 
-export function MarkdownCopyButton({ markdownUrl, base }: Readonly<{ markdownUrl: string; base: string }>) {
+export function MarkdownCopyButton({ markdownUrl }: Readonly<{ markdownUrl: string }>) {
   const [state, setState] = useState<CopyState>('idle');
 
   useEffect(() => {
@@ -23,7 +23,7 @@ export function MarkdownCopyButton({ markdownUrl, base }: Readonly<{ markdownUrl
 
   const copy = () => {
     setState('copying');
-    copyMarkdown(markdownUrl, base).then(
+    copyMarkdown(markdownUrl).then(
       () => setState('copied'),
       (error: unknown) => {
         console.error(error);

@@ -131,7 +131,7 @@ function Content({
   const pathname = usePathname();
   // Named, or the popover reads `window.location.href` and sends the reader's query and hash on.
   const pageUrl = fullAddress(pathname);
-  // Full, which Fumadocs passes through as it is, whether it adds the base to a path or not.
+  // The popover's: a full address, which Fumadocs passes through as it is whether it adds the base or not.
   const markdownAddress = fullAddress(markdownUrl);
 
   return (
@@ -140,7 +140,7 @@ function Content({
       <DocsDescription>{page.description}</DocsDescription>
       <div className="flex flex-row gap-2 items-center border-b -mt-4 pb-6">
         {/* Keyed so a new page starts at "Copy Markdown", not at the last page's result. */}
-        <MarkdownCopyButton key={markdownUrl} markdownUrl={markdownUrl} base={import.meta.env.BASE_URL} />
+        <MarkdownCopyButton key={markdownUrl} markdownUrl={markdownUrl} />
         {/* Sends the reader to an external AI vendor, so a portal published under someone
             else's brand can turn it off. */}
         {portal.pageActions ? <ViewOptionsPopover markdownUrl={markdownAddress} pageUrl={pageUrl} /> : null}

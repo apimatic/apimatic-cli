@@ -384,19 +384,20 @@ no other place that describes `site`.
     - the Markdown branch's `[Download SDK](…)` (line 25).
   - `components/sdk-cards.tsx`: the Markdown branch's `[${name}](${page})` (line 43). The HTML
     branch is a router `Link` and is left alone.
-  - `routes/$.tsx`: in the browser, `pageUrl` and the `markdownUrl` both page actions get are full
+  - `routes/$.tsx`: in the browser, `pageUrl` and the `markdownUrl` the popover gets are full
     addresses, from `fullAddress(path)` beside `withBasePath` in `base-path.ts`:
     `new URL(withBasePath(path), window.location.origin)`. On the server they stay paths, as
-    `pageUrl` is today; neither component renders them until it is used.
+    `pageUrl` is today; the popover renders them only when it is used.
     - `pageUrl` (line 138) needs the base because the router's pathname has it stripped.
-    - `markdownUrl` goes to both components as a full address because Fumadocs' own
+    - `markdownUrl` goes to `ViewOptionsPopover` as a full address because Fumadocs' own
       `withBasePath` leaves a full address alone (`page-actions.js:197`). So it is right whether
-      Fumadocs adds the base or not:
-      - `ViewOptionsPopover` stopped adding it in ui 16.15.13 and adds it again from 16.15.17
-        (fuma-nama/fumadocs#3620), which would have doubled a prefixed path;
-      - `MarkdownCopyButton` still adds it, and would lose it if it went the popover's way.
-    - An earlier draft prefixed the popover's URL and passed the copy button the bare one. That
-      was right only for today's Fumadocs, and an upgrade that fixed the popover would have
+      Fumadocs adds the base or not: the popover stopped adding it in ui 16.15.13 and adds it
+      again from 16.15.17 (fuma-nama/fumadocs#3620), which would have doubled a prefixed path.
+    - The copy button is the template's own since #419 (`components/markdown-copy-button.tsx`).
+      It takes the page's path, and `copyMarkdown` adds the base through `withBasePath`. Handed
+      the full address, it would fetch `/apihttp://…`.
+    - An earlier draft prefixed the popover's URL and passed Fumadocs' copy button the bare one.
+      That was right only for that Fumadocs, and an upgrade that fixed the popover would have
       doubled the path with nothing to catch it.
   - `lib/llms.server.ts`: the page headings' `(${page.url})`, and the index (5.4).
   - `components/plugin-install.tsx`: `fullAddress('/')` in the browser's snapshot (5.3).
@@ -630,7 +631,8 @@ strips the base once) until step 4 ran it (section 3). Some fixes are checked on
 browser and no automated test reaches them:
 - the search results' served URLs, which make a colliding base navigate. What they rely on is
   guarded by `search-navigation.test.ts`;
-- the page actions' full addresses;
+- the popover's full address, and the page's path for the copy button, whose base
+  `copy-markdown.test.ts` checks;
 - `pageUrl`;
 - the plugin install command's browser snapshot (5.3);
 - the playground's storage keys (5.9).
@@ -694,7 +696,7 @@ after each one. In all, roughly 400 lines of source and 500 of tests.
 
   | Relied on | On an upgrade that changes it |
   |---|---|
-  | The page actions' Markdown URL | Cannot break: a full address is right whether Fumadocs adds the base or not (5.2) |
+  | The popover's Markdown URL | Cannot break: a full address is right whether Fumadocs adds the base or not (5.2) |
   | Markdown images are bundled | Cannot break: `useImport` is written out (5.1); the e2e image checks it |
   | Fumadocs links are router links | The e2e fails (step 1's link assertions) |
   | `llms()` reads the loader methods we wrap | The e2e fails (`llms.txt` links) |
@@ -844,7 +846,7 @@ host's root until JavaScript runs:
   - colliding base paths (decision 6);
   - `llms.txt` links (5.4);
   - the SDK pages' Markdown copy links (5.2);
-  - the page actions' full addresses and `pageUrl` (5.2);
+  - the popover's full address and `pageUrl` (5.2);
   - search results (5.2);
   - `robots.txt` and the sitemap note (decision 7, 4.6);
   - the README line (4.7);
@@ -951,8 +953,16 @@ not also show were raw HTML and JSX URLs (section 9). Three gaps were fixed in t
 Images that Fumadocs leaves out were fixed in this PR too (5.10): images in the specification's
 descriptions, which crashed the page at the root too, and reference-style images.
 
+The open PRs #419 and #424 each add a URL that needs the base. They merge first, and this PR
+adds the base to each once it is on `dev`.
+
 The audit's other findings are left to follow-ups:
 - raw `<img>` in SDK docs;
 - links in the Markdown copies;
-- the open PRs #419 and #424, which each add a URL that needs `withBasePath`;
 - crashes and links that also break at the root.
+
+**After #419 merged** (2026-10-06). `dev` was merged in. #419 replaced Fumadocs' copy button with
+the template's own, which added `import.meta.env.BASE_URL` by hand, and the merge's conflict was
+over which address it gets. It now takes the page's path and adds the base through
+`withBasePath` (5.2). Headless Chrome copied a page loaded directly and one reached by a link,
+under `/api`, under `/Dev/v1.0` and at the root.
