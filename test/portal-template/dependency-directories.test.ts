@@ -7,20 +7,21 @@ import { dependencyDirectories } from '../../portal-template/dependency-director
 describe('dependencyDirectories', () => {
   let root: string;
 
-  const install = (relative: string): string => {
-    const directory = path.join(root, relative);
+  const install = (...segments: string[]): string => {
+    const directory = path.join(root, ...segments);
     fs.mkdirSync(directory, { recursive: true });
     return directory;
   };
 
   const link = (name: string, target: string) => {
-    const linkPath = path.join(root, 'project', 'node_modules', name);
+    const linkPath = path.join(root, 'project', 'node_modules', ...name.split('/'));
     fs.mkdirSync(path.dirname(linkPath), { recursive: true });
     // A junction is the only link type Windows grants without elevation.
     fs.symlinkSync(target, linkPath, process.platform === 'win32' ? 'junction' : 'dir');
   };
 
   const project = () => path.join(root, 'project');
+  const real = (...segments: string[]) => fs.realpathSync.native(path.join(root, ...segments));
 
   beforeEach(() => {
     root = fs.mkdtempSync(path.join(os.tmpdir(), 'dependency-directories-'));
@@ -31,35 +32,53 @@ describe('dependencyDirectories', () => {
     fs.rmSync(root, { recursive: true, force: true });
   });
 
-  it('answers the installation a linked dependency resolves to', () => {
-    link('vite', install(path.join('cli', 'node_modules', 'vite')));
+  it('answers the node_modules the linked dependencies are installed in, scoped ones included', () => {
+    link('vite', install('cli', 'node_modules', 'vite'));
+    link('@tanstack/react-start', install('cli', 'node_modules', '@tanstack', 'react-start'));
 
-    expect(dependencyDirectories(project())).to.deep.equal([fs.realpathSync(path.join(root, 'cli', 'node_modules'))]);
+    expect(dependencyDirectories(project())).to.deep.equal([real('cli', 'node_modules')]);
   });
 
-  it('answers one directory for dependencies installed side by side, scoped ones included', () => {
-    link('vite', install(path.join('cli', 'node_modules', 'vite')));
-    link(path.join('@tanstack', 'react-start'), install(path.join('cli', 'node_modules', '@tanstack', 'react-start')));
+  it("answers the CLI's own node_modules in an npm global install, not every global package around it", () => {
+    const cli = ['lib', 'node_modules', '@apimatic', 'cli', 'node_modules'];
+    install('lib', 'node_modules', 'some-other-global-package');
+    link('vite', install(...cli, 'vite'));
+    link('@tanstack/react-start', install(...cli, '@tanstack', 'react-start'));
 
-    expect(dependencyDirectories(project())).to.deep.equal([fs.realpathSync(path.join(root, 'cli', 'node_modules'))]);
+    expect(dependencyDirectories(project())).to.deep.equal([real(...cli)]);
   });
 
-  it('answers the store around a pnpm installation, not the one package inside it', () => {
-    link('vite', install(path.join('cli', 'node_modules', '.pnpm', 'vite@8.2.2', 'node_modules', 'vite')));
+  it('answers the whole pnpm store, where each dependency sits in a directory of its own', () => {
+    const store = ['global', 'node_modules', '.pnpm'];
+    link('vite', install(...store, 'vite@8.2.2', 'node_modules', 'vite'));
+    link(
+      '@tanstack/react-start',
+      install(...store, '@tanstack+react-start@1.168.50', 'node_modules', '@tanstack', 'react-start')
+    );
 
-    expect(dependencyDirectories(project())).to.deep.equal([fs.realpathSync(path.join(root, 'cli', 'node_modules'))]);
+    expect(dependencyDirectories(project())).to.deep.equal([real(...store)]);
   });
 
-  it('keeps a copied dependency where it is', () => {
-    install(path.join('project', 'node_modules', '@fontsource-variable', 'geist'));
+  it("answers the pnpm 11 global store's links directory, where each dependency sits under a hash of its own", () => {
+    const links = ['store', 'links'];
+    link('vite', install(...links, 'vite', '8.2.2', 'a1b2', 'node_modules', 'vite'));
+    link(
+      '@tanstack/react-start',
+      install(...links, '@tanstack', 'react-start', '1.168.50', 'c3d4', 'node_modules', '@tanstack', 'react-start')
+    );
 
-    expect(dependencyDirectories(project())).to.deep.equal([
-      fs.realpathSync(path.join(root, 'project', 'node_modules'))
-    ]);
+    expect(dependencyDirectories(project())).to.deep.equal([real(...links)]);
+  });
+
+  it('leaves a copied dependency to the workspace root, which already holds it', () => {
+    install('project', 'node_modules', '@fontsource-variable', 'geist');
+    link('vite', install('cli', 'node_modules', 'vite'));
+
+    expect(dependencyDirectories(project())).to.deep.equal([real('cli', 'node_modules')]);
   });
 
   it('leaves out a link leading nowhere rather than failing the server over it', () => {
-    link('vite', install(path.join('cli', 'node_modules', 'vite')));
+    link('vite', install('cli', 'node_modules', 'vite'));
     fs.rmdirSync(path.join(root, 'cli', 'node_modules', 'vite'));
 
     expect(dependencyDirectories(project())).to.deep.equal([]);
@@ -67,5 +86,12 @@ describe('dependencyDirectories', () => {
 
   it('answers nothing for a project without dependencies', () => {
     expect(dependencyDirectories(path.join(root, 'nowhere'))).to.deep.equal([]);
+  });
+
+  it('reports a node_modules it cannot read, rather than serving less than the page needs', () => {
+    fs.rmdirSync(path.join(root, 'project', 'node_modules'));
+    fs.writeFileSync(path.join(root, 'project', 'node_modules'), '');
+
+    expect(() => dependencyDirectories(project())).to.throw(/ENOTDIR/);
   });
 });
