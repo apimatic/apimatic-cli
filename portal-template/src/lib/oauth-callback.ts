@@ -1,6 +1,7 @@
 /**
  * The one redirect URI a portal owner registers with their OAuth provider, instead of the
- * address of every endpoint page that can start a sign-in.
+ * address of every endpoint page that can start a sign-in. The CLI keeps the user's pages off
+ * it, in `src/types/portal/content-tree.ts`.
  */
 export const oauthCallbackPath = '/oauth/callback';
 
@@ -24,5 +25,8 @@ export function oauthReturnUrl(cookie: string, location: Pick<Location, 'origin'
   }
   // Anything else is an open redirect, carrying the authorization code to another site.
   if (target.origin !== location.origin) return null;
-  return target.pathname + location.search + location.hash;
+  // Whole, not as a path: a path of `//evil.test/x` would be read as another site's address.
+  target.search = location.search;
+  target.hash = location.hash;
+  return target.href;
 }

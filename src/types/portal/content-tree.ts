@@ -18,10 +18,29 @@ import {
   PortalNavigation,
   TabEntry
 } from './portal-navigation.js';
-import { ContentProblem, MissingImage, PortalSpec, ReservedAddressPage, SharedAddress } from './portal-source.js';
+import {
+  ContentProblem,
+  MissingImage,
+  PortalSpec,
+  ReservedAddress,
+  ReservedAddressPage,
+  SharedAddress
+} from './portal-source.js';
 import { PortalTab, sharedTabNames, TabOwner, untitledTabName } from './portal-tabs.js';
 
 const NAVIGATION_FILE = new FileName(NAVIGATION_FILE_NAME);
+
+/**
+ * The page the API playground's OAuth sign-in returns through, which the template serves from a
+ * route of its own (`portal-template/src/lib/oauth-callback.ts`). That route wins over a content
+ * page at the address, so such a page would build and never be shown.
+ */
+export const OAUTH_CALLBACK_ADDRESS = '/oauth/callback';
+
+const OAUTH_CALLBACK: ReservedAddress = {
+  address: OAUTH_CALLBACK_ADDRESS,
+  description: "the API playground's OAuth sign-in"
+};
 
 /** Extensions the docs collection compiles, and so the ones an entry can address. */
 const PAGE_EXTENSIONS = ['.md', '.mdx'];
@@ -302,15 +321,19 @@ export class ContentTree {
 
   /**
    * Pages served at a generated section's address or below it, whether or not `apimatic.json`
-   * calls for the section. Judged by the address, as the content source computes it, rather
-   * than by the directories as written: a page in a `(group)` folder is served as if the folder
-   * were not there, and a folder's index page at the folder's own address.
+   * calls for the section, and at the OAuth callback's. Judged by the address, as the content
+   * source computes it, rather than by the directories as written: a page in a `(group)` folder
+   * is served as if the folder were not there, and a folder's index page at the folder's own address.
    */
   private static reservedAddressPages(pages: ContentPage[]): ReservedAddressPage[] {
     return pages.flatMap(({ file, segments }) => {
       const slugs = getSlugs(segments.join('/'));
+      const address = `/${slugs.join('/')}`;
+      if (address === OAUTH_CALLBACK.address) return [{ file, address, keptFor: OAUTH_CALLBACK }];
       const section = GENERATED_SECTIONS.find((candidate) => candidate.folder === slugs[0]);
-      return section === undefined ? [] : [{ file, address: `/${slugs.join('/')}`, section }];
+      return section === undefined
+        ? []
+        : [{ file, address, keptFor: { address: `/${section.folder}`, description: section.description } }];
     });
   }
 

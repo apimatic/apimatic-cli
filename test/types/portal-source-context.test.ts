@@ -777,7 +777,7 @@ describe('PortalSourceContext', () => {
         throw new Error(`expected a 'reservedAddresses' problem, got '${problem.kind}'`);
       }
       return problem.pages
-        .map(({ file, address, section }) => `${file.relativeTo(new DirectoryPath(root))} ${address} ${section.folder}`)
+        .map(({ file, address, keptFor }) => `${file.relativeTo(new DirectoryPath(root))} ${address} ${keptFor.address}`)
         .sort();
     };
 
@@ -789,10 +789,10 @@ describe('PortalSourceContext', () => {
       write('content/sdks/index.md', page('Index'));
 
       expect(reserved((await resolve())._unsafeUnwrapErr())).to.deep.equal([
-        'content/(intro)/sdks.md /sdks sdks',
-        'content/sdks.md /sdks sdks',
-        'content/sdks/index.md /sdks sdks',
-        'content/sdks/setup.mdx /sdks/setup sdks'
+        'content/(intro)/sdks.md /sdks /sdks',
+        'content/sdks.md /sdks /sdks',
+        'content/sdks/index.md /sdks /sdks',
+        'content/sdks/setup.mdx /sdks/setup /sdks'
       ]);
     });
 
@@ -802,8 +802,21 @@ describe('PortalSourceContext', () => {
       write('content/context-plugin/faq.md', page('FAQ'));
 
       expect(reserved((await resolve())._unsafeUnwrapErr())).to.deep.equal([
-        'content/context-plugin.md /context-plugin context-plugin',
-        'content/context-plugin/faq.md /context-plugin/faq context-plugin'
+        'content/context-plugin.md /context-plugin /context-plugin',
+        'content/context-plugin/faq.md /context-plugin/faq /context-plugin'
+      ]);
+    });
+
+    // The template's route wins over the page, which would build, sit in the sidebar and never be shown.
+    it('refuses a page at the OAuth callback address, and only there', async () => {
+      write('content/oauth/callback.md', page('Mine'));
+      write('content/(auth)/oauth/callback/index.mdx', page('Grouped'));
+      write('content/oauth/index.md', page('OAuth'));
+      write('content/oauth/callback/setup.md', page('Setup'));
+
+      expect(reserved((await resolve())._unsafeUnwrapErr())).to.deep.equal([
+        'content/(auth)/oauth/callback/index.mdx /oauth/callback /oauth/callback',
+        'content/oauth/callback.md /oauth/callback /oauth/callback'
       ]);
     });
 
