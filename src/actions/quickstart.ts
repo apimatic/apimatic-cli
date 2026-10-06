@@ -121,7 +121,7 @@ export class QuickstartAction {
         this.prompts.noSpecSpecified();
         return ActionResult.cancelled();
       }
-      const resolving = ResourceContext.resolveTo(input, tempDirectory);
+      const resolving = ResourceContext.resolveTo(input, tempDirectory.join('user-spec'));
       const resolved = input instanceof UrlPath ? await this.prompts.downloadSpecFile(resolving) : await resolving;
       if (resolved.isOk()) {
         spec = resolved.value;
