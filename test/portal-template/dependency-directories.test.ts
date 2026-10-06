@@ -2,7 +2,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { expect } from 'chai';
-import { dependencyDirectories } from '../../portal-template/dependency-directories';
+import { dependencyDirectories, narrowest } from '../../portal-template/dependency-directories';
 
 describe('dependencyDirectories', () => {
   let root: string;
@@ -82,6 +82,16 @@ describe('dependencyDirectories', () => {
     fs.rmdirSync(path.join(root, 'cli', 'node_modules', 'vite'));
 
     expect(dependencyDirectories(project())).to.deep.equal([]);
+  });
+
+  it('lists installations one by one rather than the whole disk, when only its root holds them all', () => {
+    const disk = path.parse(root).root;
+    const installations = [
+      path.join(disk, 'usr', 'lib', 'node_modules', '@apimatic', 'cli', 'node_modules'),
+      path.join(disk, 'home', 'me', 'src', 'node_modules')
+    ];
+
+    expect(narrowest(installations)).to.deep.equal(installations);
   });
 
   it('answers nothing for a project without dependencies', () => {

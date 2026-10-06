@@ -4,14 +4,25 @@ import path from 'node:path';
 // Safari runs a cached entry before its importer is transformed (apimatic-io#2287).
 export function dependencyDirectories(portalProjectDirectory: string): string[] {
   const modules = path.join(portalProjectDirectory, 'node_modules');
-  const installations = packageNames(modules)
-    .filter((name) => isLink(path.join(modules, name)))
-    .flatMap((name) => {
-      const installed = realPath(path.join(modules, name));
-      return installed === undefined ? [] : [holdingDirectory(installed, name)];
-    });
-  const [first, ...others] = installations;
-  return first === undefined ? [] : [others.reduce(commonDirectory, first)];
+  return narrowest(
+    packageNames(modules)
+      .filter((name) => isLink(path.join(modules, name)))
+      .flatMap((name) => {
+        const installed = realPath(path.join(modules, name));
+        return installed === undefined ? [] : [holdingDirectory(installed, name)];
+      })
+  );
+}
+
+/** The one directory holding them all: the CLI's `node_modules` under npm, the store under pnpm. Each alone when only the disk's root would. */
+export function narrowest(directories: string[]): string[] {
+  let common = directories[0];
+  for (const directory of directories.slice(1)) {
+    while (common !== undefined && !isWithin(common, directory)) {
+      common = isRoot(path.dirname(common)) ? undefined : path.dirname(common);
+    }
+  }
+  return common === undefined ? directories : [common];
 }
 
 function packageNames(modules: string): string[] {
@@ -25,13 +36,8 @@ function holdingDirectory(packageDirectory: string, name: string): string {
   return path.resolve(packageDirectory, ...name.split('/').map(() => '..'));
 }
 
-/** The narrowest directory holding both; over them all, the CLI's own `node_modules` under npm, the store under pnpm. */
-function commonDirectory(common: string, directory: string): string {
-  let candidate = common;
-  while (!isWithin(candidate, directory) && path.dirname(candidate) !== candidate) {
-    candidate = path.dirname(candidate);
-  }
-  return candidate;
+function isRoot(directory: string): boolean {
+  return path.dirname(directory) === directory;
 }
 
 function isWithin(directory: string, target: string): boolean {
