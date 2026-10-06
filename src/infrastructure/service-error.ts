@@ -37,9 +37,6 @@ export class ServiceError {
   static notFound(customMessage: string): ServiceError {
     return new ServiceError(ServiceErrorCode.NotFound, customMessage, {});
   }
-  static invalidResponse(customMessage: string): ServiceError {
-    return new ServiceError(ServiceErrorCode.InvalidResponse, customMessage, {});
-  }
   static timeout(customMessage: string): ServiceError {
     return new ServiceError(ServiceErrorCode.Timeout, customMessage, {});
   }
@@ -54,14 +51,6 @@ export class ServiceError {
       `or ${loginCommand} ${f.flag('auth-key', '{api-key}')} to log in with an auth key.`;
     return new ServiceError(ServiceErrorCode.UnAuthorized, message, {});
   }
-
-  static readonly values: ServiceError[] = [
-    ServiceError.NotFound,
-    ServiceError.ServerError,
-    ServiceError.NetworkError,
-    ServiceError.InvalidResponse,
-    ServiceError.UnAuthorized
-  ];
 
   private constructor(
     public readonly code: ServiceErrorCode,
