@@ -1,9 +1,5 @@
-const cache = new Map<string, string>();
-
 export async function copyMarkdown(rootRelativeUrl: string, base: string): Promise<void> {
   const url = `${base.replace(/\/$/, '')}${rootRelativeUrl}`;
-  const cached = cache.get(url);
-  if (cached !== undefined) return navigator.clipboard.writeText(cached);
   // Handed over unresolved, so Safari still counts the write as part of the click.
   const markdown = fetchMarkdown(url);
   await Promise.all([navigator.clipboard.write([new ClipboardItem({ 'text/plain': markdown })]), markdown]);
@@ -12,7 +8,5 @@ export async function copyMarkdown(rootRelativeUrl: string, base: string): Promi
 async function fetchMarkdown(url: string): Promise<string> {
   const response = await fetch(url);
   if (!response.ok) throw new Error(`Failed to fetch ${url}: ${response.status}`);
-  const markdown = await response.text();
-  cache.set(url, markdown);
-  return markdown;
+  return response.text();
 }
