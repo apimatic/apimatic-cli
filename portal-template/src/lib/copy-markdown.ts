@@ -1,12 +1,7 @@
 const cache = new Map<string, string>();
 
-/**
- * Puts a page's Markdown on the clipboard; rejects when it cannot be fetched or written.
- * `markdownUrl` is root-relative, starting with `/`, as `getPageMarkdownUrl` builds it:
- * it is appended to `base` as is.
- */
-export async function copyMarkdown(markdownUrl: string, base: string): Promise<void> {
-  const url = `${base.replace(/\/$/, '')}${markdownUrl}`;
+export async function copyMarkdown(rootRelativeUrl: string, base: string): Promise<void> {
+  const url = `${base.replace(/\/$/, '')}${rootRelativeUrl}`;
   const cached = cache.get(url);
   if (cached !== undefined) return navigator.clipboard.writeText(cached);
   // Handed over unresolved, so Safari still counts the write as part of the click.
