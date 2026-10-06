@@ -16,7 +16,7 @@ export function dependencyDirectories(portalProjectDirectory: string): string[] 
 
 /** The one directory holding them all: the CLI's `node_modules` under npm, the store under pnpm. Each alone when only the disk's root would. */
 export function narrowest(directories: string[]): string[] {
-  let common = directories[0];
+  let common: string | undefined = directories[0];
   for (const directory of directories.slice(1)) {
     while (common !== undefined && !isWithin(common, directory)) {
       common = isRoot(path.dirname(common)) ? undefined : path.dirname(common);
