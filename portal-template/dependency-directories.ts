@@ -10,7 +10,8 @@ export function dependencyDirectories(portalProjectDirectory: string): string[] 
       const installed = realPath(path.join(modules, name));
       return installed === undefined ? [] : [holdingDirectory(installed, name)];
     });
-  return installations.length === 0 ? [] : [commonDirectory(installations)];
+  const [first, ...others] = installations;
+  return first === undefined ? [] : [others.reduce(commonDirectory, first)];
 }
 
 function packageNames(modules: string): string[] {
@@ -24,15 +25,13 @@ function holdingDirectory(packageDirectory: string, name: string): string {
   return path.resolve(packageDirectory, ...name.split('/').map(() => '..'));
 }
 
-/** The narrowest directory holding all of them: the CLI's own `node_modules` under npm, the store under pnpm. */
-function commonDirectory(directories: string[]): string {
-  return directories.reduce((common, directory) => {
-    let candidate = common;
-    while (!isWithin(candidate, directory) && path.dirname(candidate) !== candidate) {
-      candidate = path.dirname(candidate);
-    }
-    return candidate;
-  });
+/** The narrowest directory holding both; over them all, the CLI's own `node_modules` under npm, the store under pnpm. */
+function commonDirectory(common: string, directory: string): string {
+  let candidate = common;
+  while (!isWithin(candidate, directory) && path.dirname(candidate) !== candidate) {
+    candidate = path.dirname(candidate);
+  }
+  return candidate;
 }
 
 function isWithin(directory: string, target: string): boolean {
