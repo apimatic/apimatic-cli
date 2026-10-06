@@ -36,7 +36,7 @@ interface Loaded {
   format: Format;
 }
 
-/** The `apimatic.json` in a project's `src/`, beside `APIMATIC-BUILD.json`. */
+/** The `apimatic.json` in a project's `src/`. */
 export class ApimaticConfigContext {
   private readonly fileService = new FileService();
 

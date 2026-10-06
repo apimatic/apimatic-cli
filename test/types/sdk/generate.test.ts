@@ -22,9 +22,7 @@ describe('the languages a generator renders', () => {
 
   // A language a user sees named has to be one the prompts can label.
   it('shows the upcoming ones in the order every other list uses', () => {
-    const shown = LANGUAGE_CHOICES.map((choice) => choice.value).filter((language) =>
-      UPCOMING_LANGUAGES.includes(language)
-    );
+    const shown = LANGUAGE_CHOICES.filter((language) => UPCOMING_LANGUAGES.includes(language));
 
     expect([...UPCOMING_LANGUAGES]).to.deep.equal(shown);
   });

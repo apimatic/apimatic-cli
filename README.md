@@ -434,14 +434,14 @@ _See code: [src/commands/publishing/profile/list.ts](https://github.com/apimatic
 
 ## `apimatic quickstart`
 
-Create your first API Documentation Portal, SDKs and Context Plugins.
+Create your API Documentation Portal, SDKs and Context Plugins.
 
 ```
 USAGE
   $ apimatic quickstart
 
 DESCRIPTION
-  Create your first API Documentation Portal, SDKs and Context Plugins.
+  Create your API Documentation Portal, SDKs and Context Plugins.
 
   Point the CLI at your API specification and it builds a documentation portal, SDKs, and a context plugin that teaches
   an AI coding assistant to use them.
@@ -481,7 +481,7 @@ DESCRIPTION
   Generate an SDK for your API
 
   Generate a Software Development Kit (SDK) from an API specification.
-  C#, TypeScript and Python are available; Java, Ruby, Go and PHP are on their way.
+  C#, TypeScript and Python are available; Java, Ruby, Go and PHP are coming soon.
 
 EXAMPLES
   apimatic sdk generate --language=typescript
