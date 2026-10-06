@@ -795,8 +795,21 @@ const stylesheetOf = (output: DirectoryPath) => {
     expect(read('index.html')).to.match(/<img[^>]* src="\/api\/assets\/diagram[^"]*\.png"/);
   });
 
+  // Fumadocs' `remarkImage` bundles inline images alone; the template writes this one inline first.
+  it('bundles a reference-style image too', () => {
+    expect(read('authentication/index.html')).to.match(/<img[^>]* src="\/api\/assets\/diagram[^"]*\.png"/);
+  });
+
+  // Fumadocs' own renderer fails the whole page over an image in a description.
+  it('renders an image in a description, from the static directory under the path', () => {
+    expect(read('api/apimatic-calculator/simple-calculator/Calculate/index.html')).to.match(
+      /<img[^>]* src="\/api\/images\/diagram\.png"/
+    );
+  });
+
+  // The pages' own links: a description after one is the author's Markdown, which keeps its spelling.
   it('links the pages under the path in llms.txt and llms-full.txt', () => {
-    const links = [...read('llms.txt').matchAll(/\]\(([^)]*)\)/g)].map((match) => match[1]);
+    const links = [...read('llms.txt').matchAll(/^\s*- \[[^\]]*\]\(([^)]*)\)/gm)].map((match) => match[1]);
 
     expect(links).to.include.members(['/api/authentication']);
     expect(links.some((link) => link.startsWith('/api/api/apimatic-calculator/'))).to.be.true;

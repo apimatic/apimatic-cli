@@ -20,7 +20,7 @@
           "Simple Calculator"
         ],
         "summary": "Calculate",
-        "description": "Calculates the expression using the specified operation.",
+        "description": "Calculates the expression using the specified operation.\n\n![How a calculation flows](/images/diagram.png)",
         "operationId": "Calculate",
         "parameters": [
           {

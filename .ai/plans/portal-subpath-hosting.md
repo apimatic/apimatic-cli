@@ -493,7 +493,28 @@ follow-up.
   - At the root it stays Fumadocs' own `fumadocs-openapi-`, so values readers saved before are
     kept, and the root build is unchanged (section 1).
 
-### 5.10 Unchanged, and why
+### 5.10 Images Fumadocs leaves out (added 2026-10-06)
+
+- **Images in the specification's descriptions.** Fumadocs renders descriptions with `img`
+  mapped to `undefined`, so one image fails the whole operation page, at the root too, with
+  React error #130. A root-relative image there would also miss the base.
+  - `api-page.tsx` passes `components.Markdown` = `ApiMarkdown` (`components/api-markdown.tsx`).
+    It is built on Fumadocs' own `createMarkdownRenderer` with `remarkGfm`, and its `img` gives a
+    root-relative `src` the base through `withBasePath`. Code blocks go through `DynamicCodeBlock`,
+    with the highlighter and themes of Fumadocs' default.
+  - The e2e fixture's operation has an image in its description.
+  - Drafted as an issue for Fumadocs, not yet filed. `ApiMarkdown` can go once Fumadocs renders
+    images and gives them the base.
+- **Reference-style images (`![alt][ref]`).** Fumadocs' `remarkImage` sizes and imports inline
+  images only, so a reference kept a root-relative `src` that misses the base.
+  - `remarkImageReferences` (`lib/remark-image-references.ts`) writes each one as an inline image
+    ahead of `remarkImage`. It is registered in the global options (`vite.config.ts`) and in the
+    generated collection, whose options replace them.
+  - `src/types/portal/page.ts` checks those images before a build too. A missing one is then
+    reported by the CLI, not by a failed build. A contract test holds the two to the same images.
+  - Like every imported image, it now reads `<img src="__imgN" />` in the Markdown copies (section 9).
+
+### 5.11 Unchanged, and why
 
 | File | Why |
 |---|---|
@@ -725,7 +746,11 @@ after each one. In all, roughly 400 lines of source and 500 of tests.
 **Images in the Markdown copies are broken on every portal** (measured 2026-09-30, root and
 path alike). `remarkImage` swaps the image for an import, and the copy and `llms-full.txt` carry
 `<img alt="…" src="__img0" />`, which leads nowhere. This predates the path: `useImport` is the
-default. It gets a ticket of its own.
+default. It gets a ticket of its own. Since 5.10, reference-style images read the same way.
+- It is Fumadocs' bug, drafted as an issue for them, not yet filed.
+- A workaround is possible: plugins on either side of `remarkImage`, plus the `stringify` hook
+  that `includeProcessedMarkdown` passes on. It is held back, because it would rest on
+  `remarkImage`'s internal `__img${n}` names.
 
 **API reference pages' Markdown copies keep the spec's own text:** its description and the YAML.
 A root-relative link inside a spec description is prefixed in the page's HTML, which renders it
@@ -923,8 +948,10 @@ not also show were raw HTML and JSX URLs (section 9). Three gaps were fixed in t
 - `portal serve --help` names the path edit. `portal generate --help` no longer says "anywhere".
   Next Steps says to check a portal locally under its path (4.5, 4.6).
 
+Images that Fumadocs leaves out were fixed in this PR too (5.10): images in the specification's
+descriptions, which crashed the page at the root too, and reference-style images.
+
 The audit's other findings are left to follow-ups:
-- images in the specification's descriptions, and reference-style images;
 - raw `<img>` in SDK docs;
 - links in the Markdown copies;
 - the open PRs #419 and #424, which each add a URL that needs `withBasePath`;

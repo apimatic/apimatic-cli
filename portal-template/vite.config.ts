@@ -9,6 +9,7 @@ import { generatedPagesReload } from './generated-pages-reload.ts';
 import { readBuildPaths, readPortalIdentity, viteBase } from './portal-config.ts';
 import { prerenderPages } from './prerender-pages.ts';
 import { specReload } from './spec-reload.ts';
+import { remarkImageReferences } from './src/lib/remark-image-references.ts';
 import { staticFunctionsBase } from './static-functions-base.ts';
 
 export default defineConfig(async () => {
@@ -28,7 +29,11 @@ export default defineConfig(async () => {
       // Imported, the default written out: a bundled image carries Vite's base, a linked one would not.
       fumadocsMdx({
         globalOptions: {
-          mdxOptions: { remarkImageOptions: { publicDir: publicDir || undefined, external: false, useImport: true } }
+          mdxOptions: {
+            remarkImageOptions: { publicDir: publicDir || undefined, external: false, useImport: true },
+            // A function, so it runs ahead of the preset's own plugins, `remarkImage` among them.
+            remarkPlugins: (plugins) => [remarkImageReferences, ...plugins]
+          }
         }
       }),
       specReload(paths.specs),

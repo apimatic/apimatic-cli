@@ -40,8 +40,8 @@ export function rehypeCodeTitles() {
       return;
     }
     const classes = Array.isArray(code.properties?.className) ? code.properties.className : [];
-    const languageClass = classes.find((name) => typeof name === 'string' && name.startsWith(LANGUAGE_CLASS));
-    const language = typeof languageClass === 'string' ? bundledLanguage(languageClass.slice(LANGUAGE_CLASS.length)) : null;
+    const name = languageOf(classes);
+    const language = name === undefined ? null : bundledLanguage(name);
     const meta = typeof code.properties?.metastring === 'string' ? code.properties.metastring : '';
     // Read as `rehypeCode` reads it, which shows no title for a bare or unquoted one.
     const { title } = parseCodeBlockAttributes(meta, ['title']).attributes;
@@ -50,4 +50,10 @@ export function rehypeCodeTitles() {
     }
   };
   return visit;
+}
+
+/** The language a fence names, from the class `remark-rehype` gives its `code`. */
+export function languageOf(classes: unknown[]): string | undefined {
+  const languageClass = classes.find((name) => typeof name === 'string' && name.startsWith(LANGUAGE_CLASS));
+  return typeof languageClass === 'string' ? languageClass.slice(LANGUAGE_CLASS.length) : undefined;
 }
