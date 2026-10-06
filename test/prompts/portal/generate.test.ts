@@ -28,6 +28,7 @@ describe('PortalGeneratePrompts', () => {
         expect(note).to.contain(`Upload the contents of '${portal}' to any static host.`);
         expect(note).to.contain("Configure '404.html' as the error document so deep links resolve.");
         expect(note).to.not.contain('robots.txt');
+        expect(note).to.not.contain('locally');
       }
     });
 
@@ -42,6 +43,10 @@ describe('PortalGeneratePrompts', () => {
       const note = printed(false, 'https://acme.github.io/docs/');
 
       expect(note).to.contain(`Upload the contents of '${portal}' so they are served at https://acme.github.io/docs/.`);
+      expect(note).to.contain(
+        "To check the portal locally, serve it under '/docs/': from the root of a local server, its pages load " +
+          'without their styles and scripts.'
+      );
       expect(note).to.contain("Serve '404.html' for missing pages under '/docs/', so deep links resolve.");
       expect(note).to.not.contain('any static host');
     });

@@ -28,7 +28,8 @@ describe('SiteAddress', () => {
           'https://example.com/Docs/v2.1/api_ref~x-y',
           '/Docs/v2.1/api_ref~x-y/'
         ],
-        ['https://example.com/...', 'https://example.com/...', '/.../']
+        ['https://example.com/...', 'https://example.com/...', '/.../'],
+        ['https://example.com/docs.htmlx', 'https://example.com/docs.htmlx', '/docs.htmlx/']
       ];
       for (const [value, site, path] of cases) {
         expect(address(value).toString(), value).to.equal(site);
@@ -42,7 +43,16 @@ describe('SiteAddress', () => {
     });
 
     it('refuses what is not a web address', () => {
-      for (const value of ['ftp://x.test', 'x.test', 'https:x.test', 'https://', '', 7]) {
+      for (const value of [
+        'ftp://x.test',
+        'x.test',
+        'https:x.test',
+        'https://',
+        'https:///x.test/docs',
+        'https://x\t.test',
+        '',
+        7
+      ]) {
         expect(refusal(value), String(value)).to.deep.equal([
           `'${SETTING}' must be the address the portal is hosted at, for example 'https://docs.example.com' or 'https://example.com/docs'.`
         ]);
@@ -86,6 +96,20 @@ describe('SiteAddress', () => {
       for (const [value, segment] of cases) {
         expect(refusal(value), value).to.deep.equal([
           `'${SETTING}' has '${segment}' in its path. Each part between '/'s can use only letters, digits, '.', '_', '~' and '-', and cannot be '.' or '..'.`
+        ]);
+      }
+    });
+
+    // A home page's address pasted whole would put every asset under `/docs/index.html/`.
+    it('refuses an address that names a page, naming its last part', () => {
+      const cases: [string, string][] = [
+        ['https://x.test/docs/index.html', 'index.html'],
+        ['https://x.test/INDEX.HTM/', 'INDEX.HTM'],
+        ['https://x.test/docs/home.htm', 'home.htm']
+      ];
+      for (const [value, page] of cases) {
+        expect(refusal(value), value).to.deep.equal([
+          `'${SETTING}' ends in '${page}', which names a page. Give the address the portal is hosted at, for example 'https://example.com/docs'.`
         ]);
       }
     });

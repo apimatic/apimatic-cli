@@ -237,22 +237,28 @@ Stopping it the way CTRL+C does left no project directory behind.
 - **What `parse` checks, on the raw text before `new URL` normalises it:**
   - it starts with `http://` or `https://`, in any case. `new URL` would take `https:x.test` as
     `https://x.test/`, and the refused list in `portal-config.test.ts` holds that out;
+  - a host before the path, with no whitespace in it. `new URL` reads past the extra slash of
+    `https:///x.test/docs` and drops a tab from a host, both of which the schema refuses;
   - no `?`, `#` or `\`;
   - each path segment is one or more of `[A-Za-z0-9._~-]`, and is not `.` or `..`;
-  - no empty segment, except one trailing slash.
+  - no empty segment, except one trailing slash;
+  - the last segment does not end in `.html` or `.htm`, in any case. A home page's address
+    pasted whole would put every asset under `/docs/index.html/`. Only these two: `v1.0` is a path.
 
   That keeps the same spelling in Vite's `base`, the router's prefix match, a host's folder name
   and the canonical address, with nothing percent-encoded to disagree on. GitHub repository names
   use only `[A-Za-z0-9._-]`, so every project site passes.
 - **The refusals.** Each one names what it found. `<path>` is the field's path, as in the other
   `portal` messages.
-  - Not an `http(s)` address: "'<path>' must be the address the portal is hosted at, for example
-    'https://docs.example.com' or 'https://example.com/docs'."
+  - Not an `http(s)` address, or no host: "'<path>' must be the address the portal is hosted at,
+    for example 'https://docs.example.com' or 'https://example.com/docs'."
   - A `?`, `#` or `\`: "'<path>' cannot contain '?'. Give the address the portal is hosted at,
     for example 'https://example.com/docs'." The message names the character that was found.
   - A segment outside the rule: "'<path>' has 'my docs' in its path. Each part between '/'s can
     use only letters, digits, '.', '_', '~' and '-', and cannot be '.' or '..'."
   - An empty segment: "'<path>' has an empty part ('//') in its path."
+  - A page: "'<path>' ends in 'index.html', which names a page. Give the address the portal is
+    hosted at, for example 'https://example.com/docs'." The message names the last segment.
 
 ### 4.2 `SiteConfig` (`src/types/portal/config/site-config.ts`)
 
@@ -275,12 +281,14 @@ Stopping it the way CTRL+C does left no project directory behind.
 ### 4.4 `apimatic.schema.json`
 
 - The `site.url` pattern becomes
-  `^\s*[hH][tT][tT][pP][sS]?://[^\s/?#\\]+(/(?!\.{1,2}(/|$))[A-Za-z0-9._~-]+)*/?\s*$`.
+  `^\s*[hH][tT][tT][pP][sS]?://[^\s/?#\\]+(/(?!\.{1,2}(/|$))(?![A-Za-z0-9._~-]*\.[hH][tT][mM][lL]?/?\s*$)[A-Za-z0-9._~-]+)*/?\s*$`.
+  The second lookahead refuses a last segment that names a page (4.1).
 - The description: "The address the portal is hosted at, for example 'https://docs.example.com'
   or 'https://example.com/docs'."
 - `test/types/apimatic-config/schema.test.ts` runs the pattern and `SiteAddress.parse` over one
   table. The table includes `docs?`, `docs#`, `docs\guides`, `docs/.`, `docs/..`, `docs//x`, `//docs`,
-  `%20`, a trailing slash and upper case.
+  `%20`, a trailing slash and upper case. It also includes `https:///x.test/docs`, a tab in the host,
+  `docs/index.html`, `INDEX.HTM/`, `docs/v1.0` and `docs.htmlx`.
 
 ### 4.5 `portal serve`
 
@@ -297,6 +305,8 @@ Stopping it the way CTRL+C does left no project directory behind.
   - A notice of its own for a moved path was planned and cut on 2026-09-29. Doing it without a
     sibling prompt meant folding `staticDirectoryNotServed` into one keyed prompt, about 100
     lines for an edit made once. It can come later as its own cleanup.
+- **The help.** The restart sentence of `portal serve --help`, and its copy in the README, name the
+  path edit too.
 
 ### 4.6 `portal generate` Next Steps (`src/prompts/portal/generate.ts:90`)
 
@@ -309,6 +319,9 @@ zipped line in place of the first one when zipped. The sitemap address is
 > (zipped) Unpack `portal.zip` in `<dir>` so its contents are served at
 > `https://acme.github.io/docs/`.
 >
+> To check the portal locally, serve it under `/docs/`: from the root of a local server, its
+> pages load without their styles and scripts.
+>
 > Serve `404.html` for missing pages under `/docs/`, so deep links resolve.
 >
 > Crawlers read `robots.txt` only at the root of a host, so none is generated. If you control
@@ -316,7 +329,12 @@ zipped line in place of the first one when zipped. The sitemap address is
 
 At the root, and without an address, the note is unchanged. The note matters most when someone
 previews the output from the root of a local server. The page then loads without its styles and
-scripts, which are requested under the path, and the terminal is where they look next.
+scripts, which are requested under the path, and the terminal is where they look next. The
+second line says so outright (added 2026-10-06).
+
+`portal generate --help`, and its copy in the README, said the files can be hosted "anywhere".
+They now say the files are served at a host's root, or at the path of `portal.site.url` when it
+has one.
 
 ### 4.7 README
 
@@ -463,7 +481,19 @@ follow-up.
     fails in dev as it would once built.
 - The build still copies the downloads to `dist/client/__downloads/`.
 
-### 5.9 Unchanged, and why
+### 5.9 The playground's saved values (`components/api-page.tsx`, added 2026-10-06)
+
+- **The problem.** Fumadocs saves what a reader types into the playground in `localStorage`:
+  credentials under `fumadocs-openapi-auth-<scheme id>`, and the chosen server. Portals under
+  paths of one host share an origin, such as two GitHub Pages project sites on
+  `acme.github.io`. Without a change, a key typed into one portal is filled in on the other
+  under a common scheme id like `bearerAuth`, and sent to that API.
+- **The change.** `storageKeyPrefix` is `fumadocs-openapi-` followed by the base path without
+  its leading slash: `fumadocs-openapi-docs/` under `/docs/`.
+  - At the root it stays Fumadocs' own `fumadocs-openapi-`, so values readers saved before are
+    kept, and the root build is unchanged (section 1).
+
+### 5.10 Unchanged, and why
 
 | File | Why |
 |---|---|
@@ -581,7 +611,8 @@ browser and no automated test reaches them:
   guarded by `search-navigation.test.ts`;
 - the page actions' full addresses;
 - `pageUrl`;
-- the plugin install command's browser snapshot (5.3).
+- the plugin install command's browser snapshot (5.3);
+- the playground's storage keys (5.9).
 
 The probes:
 - **Build, served at the base:**
@@ -881,3 +912,20 @@ path edit included (section 3).
 Linux, macOS and Windows under Node 24 and 26, the sub-path e2e build included. The planned
 TanStack comment became optional: SimYunSup's comments on PR #5970 already say what it would have
 said (section 10).
+
+**After a completeness audit** (2026-10-06). The audit built a richer fixture under `/api`, under
+`/Dev/v1.0` and at the root. It checked every URL in the output, and loaded and clicked through
+every page, both built and under `portal serve`. Under a path, the only failures a root build does
+not also show were raw HTML and JSX URLs (section 9). Three gaps were fixed in this PR:
+- The playground's saved values are kept per portal (5.9).
+- `SiteAddress.parse` refuses an address that names a page, has no host, or has a tab in its
+  host, and so does the schema (4.1, 4.4).
+- `portal serve --help` names the path edit. `portal generate --help` no longer says "anywhere".
+  Next Steps says to check a portal locally under its path (4.5, 4.6).
+
+The audit's other findings are left to follow-ups:
+- images in the specification's descriptions, and reference-style images;
+- raw `<img>` in SDK docs;
+- links in the Markdown copies;
+- the open PRs #419 and #424, which each add a URL that needs `withBasePath`;
+- crashes and links that also break at the root.

@@ -106,6 +106,8 @@ export class PortalGeneratePrompts {
       : `Upload the contents of ${f.path(portal)} so they are served at ${served}.`;
     const message = [
       upload,
+      `To check the portal locally, serve it under ${f.var(site.path())}: from the root of a local server, its ` +
+        'pages load without their styles and scripts.',
       `Serve ${f.var(NOT_FOUND_FILE_NAME)} for missing pages under ${f.var(site.path())}, so deep links resolve.`,
       `Crawlers read ${f.var('robots.txt')} only at the root of a host, so none is generated. If you control the ` +
         `root, add ${f.var(`Sitemap: ${site.addressOf('/sitemap.xml')}`)} to its ${f.var('robots.txt')}.`
