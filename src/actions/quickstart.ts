@@ -64,17 +64,13 @@ export class QuickstartAction {
       return ActionResult.failed();
     }
 
-    return await withDirPath<ActionResult>((tempDirectory: DirectoryPath) =>
-      this.runWizard(workingDirectory, tempDirectory)
-    );
+    return await withDirPath<ActionResult>(async (tempDirectory: DirectoryPath) => {
+      const here = ProjectContext.in(workingDirectory);
+      return (await here.specsExist())
+        ? await this.adoptProject(here, workingDirectory)
+        : await this.startProject(tempDirectory);
+    });
   };
-
-  private async runWizard(workingDirectory: DirectoryPath, tempDirectory: DirectoryPath): Promise<ActionResult> {
-    const here = ProjectContext.in(workingDirectory);
-    return (await here.specsExist())
-      ? await this.adoptProject(here, workingDirectory)
-      : await this.startProject(tempDirectory);
-  }
 
   // A build downloaded from the platform arrives with its specification in `src/spec/`, so it is not asked for again.
   private async adoptProject(project: ProjectContext, projectDirectory: DirectoryPath): Promise<ActionResult> {
