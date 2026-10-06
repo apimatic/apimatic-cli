@@ -630,13 +630,13 @@ describe('PluginGenerateAction', () => {
 
     it('reports the answer that was actually missing, not always the plugin id', async () => {
       await fsExtra.remove(configPath());
-      cancelsMetadata('A plugin version is required');
+      cancelsMetadata('No plugin version was chosen');
       sinon.stub(PluginService.prototype, 'generatePlugin');
       const metadataCancelled = sinon.stub(PluginRecordMetadataPrompts.prototype, 'metadataCancelled');
 
       await execute();
 
-      expect(metadataCancelled.firstCall.args[0]).to.equal('A plugin version is required');
+      expect(metadataCancelled.firstCall.args[0]).to.equal('No plugin version was chosen');
     });
 
     it('generates straight away when the config is already complete', async () => {

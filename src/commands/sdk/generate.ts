@@ -2,17 +2,27 @@ import { Command, Flags } from '@oclif/core';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { FlagsProvider } from '../../types/flags-provider.js';
 import { GenerateAction } from '../../actions/sdk/generate.js';
-import { CodeGenerationVersion, Language, Stability } from '../../types/sdk/generate.js';
+import {
+  AVAILABLE_LANGUAGES,
+  CodeGenerationVersion,
+  Language,
+  languageLabel,
+  Stability,
+  UPCOMING_LANGUAGES
+} from '../../types/sdk/generate.js';
 import { StabilityChoice } from '../../types/sdk/stability-choice.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { ProjectContext } from '../../types/project-context.js';
 import { format, intro, outro } from '../../prompts/format.js';
+import { listedInProse } from '../../utils/string-utils.js';
+
+const inProse = (languages: readonly Language[]) => listedInProse(languages.map(languageLabel));
 
 export default class SdkGenerate extends Command {
   static readonly summary = 'Generate an SDK for your API';
 
   static readonly description = `Generate a Software Development Kit (SDK) from an API specification.
-C#, TypeScript and Python are available; Java, Ruby, Go and PHP are on their way.`;
+${inProse(AVAILABLE_LANGUAGES)} are available; ${inProse(UPCOMING_LANGUAGES)} are coming soon.`;
 
   static readonly cmdTxt = format.cmd('apimatic', 'sdk', 'generate');
 

@@ -46,15 +46,15 @@ export const LANGUAGE_NAMES: Readonly<Record<Language, string>> = {
 };
 
 /** In display order, which `UPCOMING_LANGUAGES` inherits. */
-export const LANGUAGE_CHOICES: ReadonlyArray<{ label: string; value: Language }> = [
+export const LANGUAGE_CHOICES: readonly Language[] = [
+  Language.CSHARP,
   Language.TYPESCRIPT,
-  Language.RUBY,
   Language.PYTHON,
   Language.JAVA,
-  Language.CSHARP,
-  Language.PHP,
-  Language.GO
-].map((value) => ({ label: LANGUAGE_NAMES[value], value }));
+  Language.RUBY,
+  Language.GO,
+  Language.PHP
+];
 
 /** What each generator offers for a language. A language absent from it cannot be generated. */
 export class CodegenOption {
@@ -97,7 +97,7 @@ export const CODEGEN_OPTIONS: Readonly<Partial<Record<Language, Readonly<NonEmpt
 export const AVAILABLE_LANGUAGES: readonly Language[] = Object.keys(CODEGEN_OPTIONS) as Language[];
 
 /** The rest of the enum, so a language cannot be named by both lists or by neither. */
-export const UPCOMING_LANGUAGES: readonly Language[] = LANGUAGE_CHOICES.map((choice) => choice.value).filter(
+export const UPCOMING_LANGUAGES: readonly Language[] = LANGUAGE_CHOICES.filter(
   (language) => !AVAILABLE_LANGUAGES.includes(language)
 );
 
