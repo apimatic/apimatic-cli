@@ -18,6 +18,7 @@ import { errorMessage } from '../utils/error-utils.js';
 import { envInfo } from './env-info.js';
 import { FileService } from './file-service.js';
 import { PortalPagesService } from './portal-pages-service.js';
+import { canonical } from './tmp-extensions.js';
 
 // Copied, not linked: Tailwind rebases their `url()`s onto the project, and no relative path crosses drives.
 export const COPIED_DEPENDENCIES = ['@fontsource-variable/geist', '@fontsource-variable/geist-mono'];
@@ -393,8 +394,9 @@ export class PortalProjectService {
   private packageDirectory(name: string): DirectoryPath | undefined {
     for (const candidate of this.require.resolve.paths(name) ?? []) {
       const manifest = path.join(candidate, name, 'package.json');
+      // Vite refuses a Windows 8.3 short name, and resolves symlinks before comparing against its allow list.
       if (fsExtra.existsSync(manifest)) {
-        return new DirectoryPath(path.dirname(manifest));
+        return new DirectoryPath(canonical(path.dirname(manifest)));
       }
     }
     return undefined;

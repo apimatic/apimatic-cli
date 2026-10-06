@@ -7,6 +7,7 @@ import sinon from 'sinon';
 import { FileService } from '../../src/infrastructure/file-service';
 import {
   COPIED_DEPENDENCIES,
+  LINKED_DEPENDENCIES,
   PortalProjectService,
   TEMPLATE_DEPENDENCIES
 } from '../../src/infrastructure/portal-project-service';
@@ -127,6 +128,18 @@ describe('PortalProjectService', () => {
         const manifest = JSON.parse(fs.readFileSync(path.join(modules, name, 'package.json'), 'utf8'));
         expect(manifest.name, `${name} resolves to the wrong package`).to.equal(name);
       }
+    });
+
+    // Vite refuses an 8.3 short name outright, and compares the real path against its allow list.
+    it('links each dependency, and names the Vite binary, by its real path', async () => {
+      const prepared = (await service.prepare(project, sourceFor(), NO_ARTIFACTS))._unsafeUnwrap();
+
+      for (const name of LINKED_DEPENDENCIES) {
+        const link = path.join(project.toString(), 'node_modules', name);
+        expect(path.resolve(fs.readlinkSync(link)), name).to.equal(fs.realpathSync.native(link));
+      }
+      const binary = prepared.viteBinary.toString();
+      expect(binary).to.equal(fs.realpathSync.native(binary));
     });
 
     // Linked, their `url()`s would resolve from the CLI's install, which may be on another drive.
