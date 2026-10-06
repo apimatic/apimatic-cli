@@ -8,18 +8,12 @@ import { portal } from '@/lib/portal';
 import { absoluteUrl, canonicalLink } from '@/lib/seo';
 import { useFumadocsLoader } from 'fumadocs-core/source/client';
 import { usePathname } from 'fumadocs-core/framework';
-import {
-  DocsBody,
-  DocsDescription,
-  DocsPage,
-  DocsTitle,
-  MarkdownCopyButton,
-  ViewOptionsPopover
-} from 'fumadocs-ui/layouts/notebook/page';
+import { DocsBody, DocsDescription, DocsPage, DocsTitle, ViewOptionsPopover } from 'fumadocs-ui/layouts/notebook/page';
 import { staticFunctionMiddleware } from '@tanstack/start-static-server-functions';
 import { Suspense, use, type ReactNode } from 'react';
 import { useMDXComponents } from '@/components/mdx';
 import { OpenAPIPage } from '@/components/api-page';
+import { MarkdownCopyButton } from '@/components/markdown-copy-button';
 import { slimOpenAPIPageProps } from '@/lib/openapi-slim';
 
 const rootRoute = getRouteApi('__root__');
@@ -142,7 +136,8 @@ function Content({
       <DocsTitle>{page.title}</DocsTitle>
       <DocsDescription>{page.description}</DocsDescription>
       <div className="flex flex-row gap-2 items-center border-b -mt-4 pb-6">
-        <MarkdownCopyButton markdownUrl={markdownUrl} />
+        {/* Keyed so a new page starts at "Copy Markdown", not at the last page's result. */}
+        <MarkdownCopyButton key={markdownUrl} markdownUrl={markdownUrl} base={import.meta.env.BASE_URL} />
         {/* Sends the reader to an external AI vendor, so a portal published under someone
             else's brand can turn it off. */}
         {portal.pageActions ? <ViewOptionsPopover markdownUrl={markdownUrl} pageUrl={pageUrl} /> : null}
