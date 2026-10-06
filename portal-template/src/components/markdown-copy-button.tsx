@@ -16,7 +16,7 @@ export function MarkdownCopyButton({ markdownUrl }: Readonly<{ markdownUrl: stri
   const [state, setState] = useState<CopyState>('idle');
 
   useEffect(() => {
-    if (state !== 'copied') return;
+    if (state !== 'copied' && state !== 'failed') return;
     const timeout = window.setTimeout(() => setState('idle'), 1500);
     return () => window.clearTimeout(timeout);
   }, [state]);
