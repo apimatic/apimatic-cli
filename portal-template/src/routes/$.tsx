@@ -137,7 +137,7 @@ function Content({
       <DocsDescription>{page.description}</DocsDescription>
       <div className="flex flex-row gap-2 items-center border-b -mt-4 pb-6">
         {/* Keyed so a new page starts at "Copy Markdown", not at the last page's result. */}
-        <MarkdownCopyButton key={markdownUrl} markdownUrl={markdownUrl} />
+        <MarkdownCopyButton key={markdownUrl} markdownUrl={markdownUrl} base={import.meta.env.BASE_URL} />
         {/* Sends the reader to an external AI vendor, so a portal published under someone
             else's brand can turn it off. */}
         {portal.pageActions ? <ViewOptionsPopover markdownUrl={markdownUrl} pageUrl={pageUrl} /> : null}
