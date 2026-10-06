@@ -1,21 +1,19 @@
 import { useEffect, useState } from 'react';
-import { useTranslations } from '@fuma-translate/react';
 import { buttonVariants } from 'fumadocs-ui/components/ui/button';
 import { Check, Copy, X } from 'lucide-react';
 import { copyMarkdown } from '@/lib/copy-markdown';
 
 type CopyState = 'idle' | 'copying' | 'copied' | 'failed';
 
+const LABELS: Record<CopyState, string> = {
+  idle: 'Copy Markdown',
+  copying: 'Copy Markdown',
+  copied: 'Copied Markdown',
+  failed: 'Copy failed'
+};
+
 export function MarkdownCopyButton({ markdownUrl }: Readonly<{ markdownUrl: string }>) {
   const [state, setState] = useState<CopyState>('idle');
-  // fumadocs' own keys and note, so translations given for its button apply to this one.
-  const t = useTranslations({ note: 'page actions' });
-  const labels: Record<CopyState, string> = {
-    idle: t('Copy Markdown'),
-    copying: t('Copy Markdown'),
-    copied: t('Copied Markdown'),
-    failed: t('Copy failed')
-  };
 
   useEffect(() => {
     if (state !== 'copied') return;
@@ -47,11 +45,10 @@ export function MarkdownCopyButton({ markdownUrl }: Readonly<{ markdownUrl: stri
         })}
       >
         <StateIcon state={state} />
-        {labels[state]}
+        {LABELS[state]}
       </button>
-      {/* Screen readers don't reliably announce a change to the focused button's own text,
-          so the result goes to a live region: <output> is one, with the status role. */}
-      <output className="sr-only">{state === 'copied' || state === 'failed' ? labels[state] : ''}</output>
+      {/* A focused button's own text change isn't reliably announced. */}
+      <output className="sr-only">{state === 'copied' || state === 'failed' ? LABELS[state] : ''}</output>
     </>
   );
 }
