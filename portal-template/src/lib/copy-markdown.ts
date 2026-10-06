@@ -10,7 +10,8 @@ export async function copyMarkdown(markdownUrl: string, base: string): Promise<v
   const cached = cache.get(url);
   if (cached !== undefined) return navigator.clipboard.writeText(cached);
   // Handed over unresolved, so Safari still counts the write as part of the click.
-  await navigator.clipboard.write([new ClipboardItem({ 'text/plain': fetchMarkdown(url) })]);
+  const markdown = fetchMarkdown(url);
+  await Promise.all([navigator.clipboard.write([new ClipboardItem({ 'text/plain': markdown })]), markdown]);
 }
 
 async function fetchMarkdown(url: string): Promise<string> {

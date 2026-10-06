@@ -1,5 +1,6 @@
 import { expect } from 'chai';
 import sinon from 'sinon';
+import { setImmediate } from 'node:timers/promises';
 import { copyMarkdown } from '../../portal-template/src/lib/copy-markdown';
 
 class FakeClipboardItem {
@@ -95,6 +96,22 @@ describe('copying a page as Markdown', () => {
 
     expect(error).to.equal(denied);
     expect(clipboard).to.equal('before');
+  });
+
+  it('rejects with the refusal, and leaves no rejection unhandled, when the clipboard refuses before the fetch fails', async () => {
+    sinon.stub(globalThis, 'fetch').resolves(new globalThis.Response('<html>Not Found</html>', { status: 404 }));
+    const blocked = new globalThis.DOMException('Blocked by a permissions policy.', 'NotAllowedError');
+    sinon.stub(globalThis.navigator.clipboard, 'write').rejects(blocked);
+    const unhandled: unknown[] = [];
+    const record = (reason: unknown) => unhandled.push(reason);
+    process.prependListener('unhandledRejection', record);
+
+    const error = await copyMarkdown('/guides/blocked.md', '/').catch((reason: unknown) => reason);
+    await setImmediate();
+    process.off('unhandledRejection', record);
+
+    expect(error).to.equal(blocked);
+    expect(unhandled).to.be.empty;
   });
 
   it('keeps the Markdown it fetched when the clipboard refuses it, so the next click does not fetch it again', async () => {
