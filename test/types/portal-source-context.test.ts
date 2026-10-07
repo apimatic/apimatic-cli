@@ -777,47 +777,55 @@ describe('PortalSourceContext', () => {
         throw new Error(`expected a 'reservedAddresses' problem, got '${problem.kind}'`);
       }
       return problem.pages
-        .map(({ file, address, keptFor }) => `${file.relativeTo(new DirectoryPath(root))} ${address} ${keptFor.address}`)
+        .map(
+          ({ file, address, keptFor }) => `${file.relativeTo(new DirectoryPath(root))} ${address} ${keptFor.address}`
+        )
         .sort();
     };
 
-    // Three of them share /sdks as well, which is not said again.
-    it('refuses every page the SDK pages would share an address with, naming each', async () => {
-      write('content/sdks.md', page('Mine'));
-      write('content/sdks/setup.mdx', page('Setup'));
-      write('content/(intro)/sdks.md', page('Grouped'));
-      write('content/sdks/index.md', page('Index'));
+    (
+      [
+        [
+          // Three of them share /sdks as well, which is not said again.
+          'refuses every page the SDK pages would share an address with, naming each',
+          ['content/sdks.md', 'content/sdks/setup.mdx', 'content/(intro)/sdks.md', 'content/sdks/index.md'],
+          [
+            'content/(intro)/sdks.md /sdks /sdks',
+            'content/sdks.md /sdks /sdks',
+            'content/sdks/index.md /sdks /sdks',
+            'content/sdks/setup.mdx /sdks/setup /sdks'
+          ]
+        ],
+        [
+          // Reserved with or without a plugin block, so adding one never refuses a page that built.
+          'refuses a page at the context plugin address although there is no plugin block',
+          ['content/context-plugin.md', 'content/context-plugin/faq.md'],
+          [
+            'content/context-plugin.md /context-plugin /context-plugin',
+            'content/context-plugin/faq.md /context-plugin/faq /context-plugin'
+          ]
+        ],
+        [
+          // The template's route wins over the page, which would build, sit in the sidebar and never be shown.
+          'refuses a page at the OAuth callback address, and only there',
+          [
+            'content/oauth/callback.md',
+            'content/(auth)/oauth/callback/index.mdx',
+            'content/oauth/index.md',
+            'content/oauth/callback/setup.md'
+          ],
+          [
+            'content/(auth)/oauth/callback/index.mdx /oauth/callback /oauth/callback',
+            'content/oauth/callback.md /oauth/callback /oauth/callback'
+          ]
+        ]
+      ] as const
+    ).forEach(([name, files, refused]) => {
+      it(name, async () => {
+        files.forEach((file) => write(file, page('Page')));
 
-      expect(reserved((await resolve())._unsafeUnwrapErr())).to.deep.equal([
-        'content/(intro)/sdks.md /sdks /sdks',
-        'content/sdks.md /sdks /sdks',
-        'content/sdks/index.md /sdks /sdks',
-        'content/sdks/setup.mdx /sdks/setup /sdks'
-      ]);
-    });
-
-    // Reserved with or without a plugin block, so adding one never refuses a page that built.
-    it('refuses a page at the context plugin address although there is no plugin block', async () => {
-      write('content/context-plugin.md', page('Mine'));
-      write('content/context-plugin/faq.md', page('FAQ'));
-
-      expect(reserved((await resolve())._unsafeUnwrapErr())).to.deep.equal([
-        'content/context-plugin.md /context-plugin /context-plugin',
-        'content/context-plugin/faq.md /context-plugin/faq /context-plugin'
-      ]);
-    });
-
-    // The template's route wins over the page, which would build, sit in the sidebar and never be shown.
-    it('refuses a page at the OAuth callback address, and only there', async () => {
-      write('content/oauth/callback.md', page('Mine'));
-      write('content/(auth)/oauth/callback/index.mdx', page('Grouped'));
-      write('content/oauth/index.md', page('OAuth'));
-      write('content/oauth/callback/setup.md', page('Setup'));
-
-      expect(reserved((await resolve())._unsafeUnwrapErr())).to.deep.equal([
-        'content/(auth)/oauth/callback/index.mdx /oauth/callback /oauth/callback',
-        'content/oauth/callback.md /oauth/callback /oauth/callback'
-      ]);
+        expect(reserved((await resolve())._unsafeUnwrapErr())).to.deep.equal(refused);
+      });
     });
 
     // A group folder's name is not part of the address; only the folder it groups is.
