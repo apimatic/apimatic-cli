@@ -2,21 +2,21 @@ import { expect } from 'chai';
 import { createServer, type Plugin, type ViteDevServer } from 'vite';
 import type { OAuthCallbackFailure } from '../../portal-template/src/lib/oauth-callback';
 
-const ENTRY = 'virtual:sign-in-failure-fixture';
+const ENTRY = 'virtual:authorization-failure-fixture';
 
 const fixture = `
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { SignInFailure } from '/portal-template/src/components/sign-in-failure.tsx';
+import { AuthorizationFailure } from '/portal-template/src/components/authorization-failure.tsx';
 
 export function render(failure) {
-  return renderToStaticMarkup(createElement(SignInFailure, { failure }));
+  return renderToStaticMarkup(createElement(AuthorizationFailure, { failure }));
 }
 `;
 
 function signInFailureFixture(): Plugin {
   return {
-    name: 'sign-in-failure-fixture',
+    name: 'authorization-failure-fixture',
     enforce: 'pre',
     resolveId: (id) => (id === ENTRY ? `\0${ENTRY}` : null),
     load: (id) => (id === `\0${ENTRY}` ? fixture : null)
@@ -29,7 +29,7 @@ interface Shown {
   link: { label: string; href: string };
 }
 
-describe('the OAuth callback when it cannot finish the sign-in', function () {
+describe('the OAuth callback when it cannot complete the authorization', function () {
   this.timeout(60 * 1000);
 
   let server: ViteDevServer;
@@ -63,7 +63,7 @@ describe('the OAuth callback when it cannot finish the sign-in', function () {
     expect(
       shown({ kind: 'providerError', error: 'access_denied', description: 'The user said no.', page })
     ).to.deep.equal({
-      text: 'Sign-in could not be completed The provider ended the sign-in with access_denied: The user said no. Back to the endpoint',
+      text: 'Authorization could not be completed The provider ended the authorization with access_denied: The user said no. Back to the endpoint',
       link: { label: 'Back to the endpoint', href: page }
     });
   });
@@ -77,23 +77,23 @@ describe('the OAuth callback when it cannot finish the sign-in', function () {
       page: 'https://docs.test/'
     });
 
-    expect(text).to.contain('The provider ended the sign-in with server_error.');
+    expect(text).to.contain('The provider ended the authorization with server_error.');
   });
 
-  it('says no sign-in was started in this browser, and leads to the home page', () => {
+  it('says no authorization was started in this browser, and leads to the home page', () => {
     expect(shown({ kind: 'notStarted' })).to.deep.equal({
       text:
-        "Sign-in could not be completed This page finishes a sign-in started from an endpoint's playground, and none " +
-        "was started in this browser. Open the endpoint's page and sign in from there. Go to the home page",
+        "Authorization could not be completed This page completes an authorization started from an endpoint's playground, and none " +
+        "was started in this browser. Open the endpoint's page and authorize from there. Go to the home page",
       link: { label: 'Go to the home page', href: '/' }
     });
   });
 
-  it('says the sign-in was not started from a page of this site, and leads to the home page', () => {
+  it('says the authorization was not started from a page of this site, and leads to the home page', () => {
     expect(shown({ kind: 'unknownPage' })).to.deep.equal({
       text:
-        'Sign-in could not be completed The sign-in was not started from a page of this site, so it cannot be ' +
-        "finished here. Open the endpoint's page and sign in from there. Go to the home page",
+        'Authorization could not be completed The authorization was not started from a page of this site, so it cannot be ' +
+        "completed here. Open the endpoint's page and authorize from there. Go to the home page",
       link: { label: 'Go to the home page', href: '/' }
     });
   });

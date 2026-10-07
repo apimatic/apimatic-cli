@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { HomeLayout } from 'fumadocs-ui/layouts/home';
 import { useEffect, useState } from 'react';
-import { SignInFailure } from '@/components/sign-in-failure';
+import { AuthorizationFailure } from '@/components/authorization-failure';
 import { baseOptions } from '@/lib/layout.shared';
 import { forgetStartingPage, oauthCallback, type OAuthCallback, type OAuthCallbackFailure } from '@/lib/oauth-callback';
 import { portal } from '@/lib/portal';
@@ -9,7 +9,7 @@ import { portal } from '@/lib/portal';
 // Published portals are static, so this page does in the browser what Fumadocs'
 // `createOAuthHandler()` route does on a server.
 export const Route = createFileRoute('/oauth/callback')({
-  head: () => ({ meta: [{ title: `Sign-in | ${portal.name}` }, { name: 'robots', content: 'noindex' }] }),
+  head: () => ({ meta: [{ title: `Authorization | ${portal.name}` }, { name: 'robots', content: 'noindex' }] }),
   component: OAuthCallbackPage
 });
 
@@ -44,9 +44,9 @@ function OAuthCallbackPage() {
     <HomeLayout {...baseOptions()}>
       <div className="flex flex-col px-8 justify-center flex-1 text-center items-center gap-4">
         {failure === null ? (
-          <p className="text-fd-muted-foreground">Completing sign-in…</p>
+          <p className="text-fd-muted-foreground">Completing authorization…</p>
         ) : (
-          <SignInFailure failure={failure} />
+          <AuthorizationFailure failure={failure} />
         )}
       </div>
     </HomeLayout>

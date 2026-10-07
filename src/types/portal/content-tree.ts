@@ -39,7 +39,7 @@ export const OAUTH_CALLBACK_ADDRESS = '/oauth/callback';
 
 export const OAUTH_CALLBACK: ReservedAddress = {
   address: OAUTH_CALLBACK_ADDRESS,
-  description: "the API playground's OAuth sign-in"
+  description: "the API playground's OAuth authorization"
 };
 
 /** Extensions the docs collection compiles, and so the ones an entry can address. */

@@ -243,7 +243,7 @@ describe('reportSourceProblem', () => {
       expect(printed()).to.contain('Rename or move each page.');
     });
 
-    it("says a page at /oauth/callback is kept for the API playground's OAuth sign-in", () => {
+    it("says a page at /oauth/callback is kept for the API playground's OAuth authorization", () => {
       reportContent({
         kind: 'reservedAddresses',
         pages: [
@@ -256,7 +256,7 @@ describe('reportSourceProblem', () => {
       });
 
       expect(printed()).to.contain(
-        "  • 'content/oauth/callback.md', at '/oauth/callback', which is kept for the API playground's OAuth sign-in"
+        "  • 'content/oauth/callback.md', at '/oauth/callback', which is kept for the API playground's OAuth authorization"
       );
     });
   });
