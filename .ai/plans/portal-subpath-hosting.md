@@ -401,6 +401,10 @@ no other place that describes `site`.
       doubled the path with nothing to catch it.
   - `lib/llms.server.ts`: the page headings' `(${page.url})`, and the index (5.4).
   - `components/plugin-install.tsx`: `fullAddress('/')` in the browser's snapshot (5.3).
+  - `components/api-page.tsx`: `oauthRedirectUrl`, where the playground's OAuth sign-in returns
+    (from #424). Fumadocs resolves it against the host's origin, so it is
+    `withBasePath(oauthCallbackPath)`.
+  - `components/authorization-failure.tsx`: the OAuth callback's link to the home page.
 - **Users in Node, which pass the base:**
   - `prerender-pages.ts`, with `viteBase(identity)` (5.7). It already imports from `src/lib/`.
   - `downloads.ts`'s dev keys, with `server.config.base` (5.8).
@@ -515,7 +519,27 @@ follow-up.
     reported by the CLI, not by a failed build. A contract test holds the two to the same images.
   - Like every imported image, it now reads `<img src="__imgN" />` in the Markdown copies (section 9).
 
-### 5.11 Unchanged, and why
+### 5.11 The query on load (`lib/search-options.ts`, added 2026-10-07)
+
+- **The problem.** Under a base path, TanStack Router 1.171.28 rewrites the address when a page
+  loads, and the query goes through its JSON parsing on the way. A value that does not survive
+  that changes:
+  - the OAuth `state` Fumadocs sends, 39 digits, came back as `3.3941682453855677e+38`, so
+    Fumadocs skipped the token exchange and sign-in never completed under a path;
+  - `?v=1.0` came back as `?v=1`.
+
+  At the root nothing is rewritten. The `Transitioner` compares the address as loaded with the
+  one `buildLocation` gives. `parseLocation` keeps the raw address only when a rewrite, such as
+  the basepath, is set, so only then do the two differ (TanStack/router#8448).
+- **The change.** `router.tsx` takes `searchOptions`, which keep query values as text:
+  `parseSearchWith((value) => value)` and `stringifySearchWith(JSON.stringify)`. The portal reads
+  no typed search params. `search-options.test.ts` runs both on an OAuth return's query and gets
+  it back as written.
+  - A repeated key (`?a=1&a=2`) still comes back as one JSON value under a path. Nothing in the
+    portal or Fumadocs reads one.
+  - When TanStack's fix (PR #8450) ships, `searchOptions` can go (section 10).
+
+### 5.12 Unchanged, and why
 
 | File | Why |
 |---|---|
@@ -635,7 +659,9 @@ browser and no automated test reaches them:
   `copy-markdown.test.ts` checks;
 - `pageUrl`;
 - the plugin install command's browser snapshot (5.3);
-- the playground's storage keys (5.9).
+- the playground's storage keys (5.9);
+- an OAuth sign-in against a mock provider: the redirect URI, the return through the callback,
+  and the token exchange (5.2, 5.11).
 
 The probes:
 - **Build, served at the base:**
@@ -698,6 +724,7 @@ after each one. In all, roughly 400 lines of source and 500 of tests.
   |---|---|
   | The popover's Markdown URL | Cannot break: a full address is right whether Fumadocs adds the base or not (5.2) |
   | Markdown images are bundled | Cannot break: `useImport` is written out (5.1); the e2e image checks it |
+  | Query values on load under a base | `search-options.test.ts` fails: it runs TanStack's own helpers (5.11) |
   | Fumadocs links are router links | The e2e fails (step 1's link assertions) |
   | `llms()` reads the loader methods we wrap | The e2e fails (`llms.txt` links) |
   | Search navigates by `href`, stripped once | `search-navigation.test.ts` fails |
@@ -765,6 +792,7 @@ with the MDX components, but not in its copy.
 | TanStack/router#6152, PR #5970 | Both open (checked 2026-09-30). A maintainer (2026-07-17): the cache URL "should follow Start's public asset base"; the PR builds the URL with `path.join` and needs an e2e served from a sub-path. SimYunSup (2026-08-12, on the PR): a repro, `path.join` throwing in the browser, a string join returning 200, `import.meta.env.BASE_URL` working, and an offer of the e2e fixture. | When it ships, delete 5.6. |
 | fuma-nama/fumadocs#3620, from PR #3572 (ui 16.15.13) | Fixed 2026-09-29 in fumadocs-ui 16.15.17 (commit `6791d6f`): the popover prefixes `markdownUrl` with `withBasePath` again, in both `radix-ui` and `base-ui` | Nothing to undo. The full address we pass goes through that `withBasePath` unchanged, so it is right on 16.15.15 and on 16.15.17 (5.2). An upgrade needs no change here |
 | TanStack/router#4888, docs PR #7882 | Docs only | None |
+| TanStack/router#8448, PR #8450 | Both open (checked 2026-10-07); the PR has no review yet. The issue reports a second loader run; we saw the address rewritten too | When it ships, `searchOptions` can go (5.11) |
 
 **The fixes:**
 - **Fumadocs:** filed by the user as fuma-nama/fumadocs#3620, from the draft at
@@ -966,3 +994,10 @@ the template's own, which added `import.meta.env.BASE_URL` by hand, and the merg
 over which address it gets. It now takes the page's path and adds the base through
 `withBasePath` (5.2). Headless Chrome copied a page loaded directly and one reached by a link,
 under `/api`, under `/Dev/v1.0` and at the root.
+
+**After #424 merged** (2026-10-07). `dev` was merged in. #424 added the OAuth callback page and
+one redirect URI for the playground's sign-in, and left the base to this PR. The redirect URI and
+the callback's home link now get it (5.2), and the callback is prerendered under it with the
+other pages (5.7). A sign-in against a mock provider then found the router rewriting the query
+on load under a path, which kept sign-in from completing (5.11). After that fix, the sign-in
+completed under `/api`, under `/Dev/v1.0` and at the root.
