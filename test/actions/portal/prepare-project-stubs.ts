@@ -1,5 +1,10 @@
+import { Readable } from 'stream';
+import AdmZip from 'adm-zip';
 import { ok } from 'neverthrow';
 import sinon from 'sinon';
+import { ApiValidatePrompts } from '../../../src/prompts/api/validate';
+import { ValidationService } from '../../../src/infrastructure/services/validation-service';
+import { FileDownloadService } from '../../../src/infrastructure/services/file-download-service';
 import { PortalProjectService } from '../../../src/infrastructure/portal-project-service';
 import { PortalArtifactsService } from '../../../src/infrastructure/services/portal-artifacts-service';
 import { PreparePortalProjectPrompts } from '../../../src/prompts/portal/prepare-project';
@@ -10,8 +15,18 @@ import { CodeSampleCatalogs } from '../../../src/types/portal/code-samples';
 import { PortalArtifacts } from '../../../src/types/portal/portal-artifacts';
 import { PORTAL_LANGUAGES } from '../../../src/types/sdk/generate';
 
+export const PASSED = { isSuccess: true, blocking: [], errors: [], warnings: [], information: [] };
+/** A failed run with an issue in it, which a summary shown to the user would list. */
+export const FAILED = { ...PASSED, isSuccess: false, errors: [{ message: 'Missing response.' }] };
+const DEFAULT_META = '{"ValidationConfiguration":{}}';
+
 export interface PreparePortalProjectStubs {
   prompts: sinon.SinonStubbedInstance<PreparePortalProjectPrompts>;
+  validate: sinon.SinonStub;
+  summary: sinon.SinonStub;
+  /** What was in the archive sent for validation, read while it still existed. */
+  validatedEntries: () => string[];
+  download: sinon.SinonStub;
   artifacts: sinon.SinonStub;
   runtimeProblem: sinon.SinonStub;
   prepare: sinon.SinonStub;
@@ -42,9 +57,24 @@ export function stubPreparePortalProject(): PreparePortalProjectStubs {
   const prompts = sinon.stub(PreparePortalProjectPrompts.prototype);
   // The spinner would render to stdout; pass the underlying promise straight through.
   prompts.generateArtifacts.callsFake((fn) => fn);
+  prompts.downloadDefaultMeta.callsFake((fn) => fn);
+  sinon.stub(ApiValidatePrompts.prototype, 'validateApi').callsFake((fn) => fn);
+
+  let validatedEntries: string[] = [];
 
   return {
     prompts,
+    validate: sinon.stub(ValidationService.prototype, 'validateViaFile').callsFake(async ({ file }) => {
+      validatedEntries = new AdmZip(file.toString()).getEntries().map((entry) => entry.entryName);
+      return ok({ validation: PASSED, linting: PASSED } as never);
+    }),
+    validatedEntries: () => validatedEntries,
+    summary: sinon.stub(ApiValidatePrompts.prototype, 'displayValidationSummary'),
+    download: sinon
+      .stub(FileDownloadService.prototype, 'downloadFile')
+      .callsFake(async () =>
+        ok({ stream: Readable.from([DEFAULT_META]), filename: new FileName('APIMATIC-META.json') })
+      ),
     artifacts: sinon.stub(PortalArtifactsService.prototype, 'generate').resolves(ok(completeArtifacts())),
     runtimeProblem: sinon.stub(PortalProjectService.prototype, 'runtimeProblem').returns(null),
     prepare: sinon.stub(PortalProjectService.prototype, 'prepare').callsFake(async (projectDirectory, source) =>

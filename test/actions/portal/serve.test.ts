@@ -21,7 +21,7 @@ import { PortalSource } from '../../../src/types/portal/portal-source';
 import { Language } from '../../../src/types/sdk/generate';
 import { PortalSourceContext } from '../../../src/types/portal-source-context';
 import { ProjectContext } from '../../../src/types/project-context';
-import { completeArtifacts, stubPreparePortalProject } from './prepare-project-stubs';
+import { completeArtifacts, FAILED, PASSED, stubPreparePortalProject } from './prepare-project-stubs';
 
 const COMMAND_METADATA: CommandMetadata = { commandName: 'portal serve', shell: 'test' };
 const FIXTURE = new DirectoryPath(process.cwd()).join('test/resources/portal-inputs/default');
@@ -122,6 +122,30 @@ describe('PortalServeAction', () => {
 
     expect(result.isFailed()).to.be.true;
     expect(shared.prompts.sourceProblem.firstCall.args[0].kind).to.equal('missingConfig');
+    expect(shared.artifacts.called).to.be.false;
+    expect(start.called).to.be.false;
+  });
+
+  it("validates the zipped spec with the user's key before the artifacts run", async () => {
+    interrupt();
+
+    await execute();
+
+    expect(shared.validate.calledOnce).to.be.true;
+    const [{ file, authKey }] = shared.validate.firstCall.args;
+    expect(file.toString().endsWith('.zip')).to.be.true;
+    expect(authKey).to.equal('auth-key');
+    expect(shared.validate.calledBefore(shared.artifacts)).to.be.true;
+  });
+
+  it('does not start the preview when the spec is invalid', async () => {
+    shared.validate.resolves(ok({ validation: FAILED, linting: PASSED } as never));
+
+    const result = await execute();
+
+    expect(result.isFailed()).to.be.true;
+    expect(shared.prompts.specInvalid.calledOnceWith('portal serve')).to.be.true;
+    expect(shared.summary.called, 'the issues were listed').to.be.false;
     expect(shared.artifacts.called).to.be.false;
     expect(start.called).to.be.false;
   });

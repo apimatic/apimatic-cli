@@ -13,6 +13,12 @@ import { describeMissingArtifacts, generateArtifacts } from './artifacts.js';
 import { reportAuthorizationFailure } from './authorization.js';
 import { reportUnplacedSamples } from './code-samples.js';
 import { reportContentNotices, reportShadowedFiles, reportSourceProblem } from './source.js';
+import { FileDownloadResponse } from '../../infrastructure/services/file-download-service.js';
+import { FileProblem } from '../../types/file/file-problem.js';
+import { withSpinner } from '../prompt.js';
+import { reportInvalidSpec } from '../api/invalid-spec.js';
+
+const META_FILE_NAME = 'APIMATIC-META.json';
 
 /** What both `portal generate` and `portal serve` say while the project they share is prepared. */
 export class PreparePortalProjectPrompts {
@@ -22,6 +28,32 @@ export class PreparePortalProjectPrompts {
 
   public authorizationFailed(failure: PortalAuthorizationFailure) {
     reportAuthorizationFailure(failure);
+  }
+
+  public downloadDefaultMeta(fn: Promise<Result<FileDownloadResponse, ServiceError>>) {
+    return withSpinner(
+      `Downloading the default ${f.var(META_FILE_NAME)}`,
+      `Default ${f.var(META_FILE_NAME)} downloaded.`,
+      `Unable to download the default ${f.var(META_FILE_NAME)}.`,
+      fn
+    );
+  }
+
+  public defaultMetaNotDownloaded(error: ServiceError) {
+    log.error(
+      `${error.errorMessage} Your spec directory has no ${f.var(META_FILE_NAME)}, and the default one ` +
+        `could not be downloaded. Add an ${f.var(META_FILE_NAME)} to it and try again.`
+    );
+  }
+
+  public specNotArchived(problem: FileProblem) {
+    log.error(`The spec directory could not be zipped for validation: ${problem.reason}`);
+  }
+
+  /** `commandName` is the command to run again, as oclif names it (`portal:serve`). */
+  public specInvalid(commandName: string) {
+    reportInvalidSpec('file');
+    log.info(`Fix your API Definition, then run ${f.cmdAlt('apimatic', ...commandName.split(/[: ]/))} again.`);
   }
 
   public generateArtifacts(fn: Promise<Result<PortalArtifacts, ServiceError>>) {

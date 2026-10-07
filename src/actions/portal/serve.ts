@@ -22,6 +22,12 @@ import { PreparePortalProjectAction } from './prepare-project.js';
 
 export const DEFAULT_PORTAL_PORT = 23513;
 
+export interface ServeOptions {
+  onServing?: () => void;
+  /** True when the caller has validated the spec already, as quickstart has. */
+  specValidated?: boolean;
+}
+
 export class PortalServeAction {
   private readonly prompts: PortalServePrompts = new PortalServePrompts();
   private readonly networkService: NetworkService = new NetworkService();
@@ -43,9 +49,10 @@ export class PortalServeAction {
     project: ProjectContext,
     port: number,
     openInBrowser: boolean,
-    onServing?: () => void
+    { onServing, specValidated = false }: ServeOptions = {}
   ): Promise<ActionResult> => {
     return await new PreparePortalProjectAction(this.configDir, this.commandMetadata, this.authKey).execute(project, {
+      specValidated,
       onPrepared: async (portalProject, source, artifacts) => {
         const servePort = await this.networkService.getServerPort([port, 3000, 3001, 3002]);
         if (servePort !== port) {

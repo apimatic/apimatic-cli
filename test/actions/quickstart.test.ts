@@ -112,6 +112,10 @@ describe('QuickstartAction', () => {
     // prepares a project.
     expect(artifacts.called, 'the wizard asked for the artifacts').to.be.true;
     expect(prepare.called, 'the wizard reached the preview').to.be.true;
+    expect(
+      (ValidationService.prototype.validateViaFile as sinon.SinonStub).calledOnce,
+      'the preview validated the spec the wizard had already validated'
+    ).to.be.true;
   });
 
   it('asks for nothing more and stops when no language is chosen', async () => {

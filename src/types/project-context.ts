@@ -83,7 +83,11 @@ export class ProjectContext {
   }
 
   public async specsExist(): Promise<boolean> {
-    return await new SpecContext(this.source.join(SPEC_DIRECTORY_NAME)).validate();
+    return await this.spec().validate();
+  }
+
+  public spec(): SpecContext {
+    return new SpecContext(this.source.join(SPEC_DIRECTORY_NAME));
   }
 
   public async srcDirZip(

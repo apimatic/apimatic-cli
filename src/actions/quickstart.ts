@@ -162,7 +162,7 @@ export class QuickstartAction {
       project,
       DEFAULT_PORTAL_PORT,
       true,
-      () => this.prompts.nextSteps(scaffolded.value)
+      { onServing: () => this.prompts.nextSteps(scaffolded.value), specValidated: true }
     );
 
     return result.isFailed() ? ActionResult.failed() : ActionResult.success();

@@ -15,11 +15,12 @@ import { ServiceError } from '../../../src/infrastructure/service-error';
 import { DirectoryPath } from '../../../src/types/file/directoryPath';
 import { CommandMetadata } from '../../../src/types/common/command-metadata';
 import { ProjectContext } from '../../../src/types/project-context';
-import { completeArtifacts, stubPreparePortalProject } from './prepare-project-stubs';
+import { completeArtifacts, FAILED, PASSED, stubPreparePortalProject } from './prepare-project-stubs';
 
 const COMMAND_METADATA: CommandMetadata = { commandName: 'portal generate', shell: 'test' };
 const FIXTURE = new DirectoryPath(process.cwd()).join('test/resources/portal-inputs/default');
 const CODE_SAMPLES_FIXTURE = new DirectoryPath(process.cwd()).join('test/resources/portal-inputs/code-samples');
+const NO_META_FIXTURE = new DirectoryPath(process.cwd()).join('test/resources/portal-inputs/sections-in-home');
 
 /** The catalogs the merged fixture expects, read the way the service reads them. */
 const samplesFromFixture = (): CodeSampleCatalogs => {
@@ -251,7 +252,14 @@ describe('GenerateAction', () => {
 
   it('keeps the previous portal when the new one cannot be written', async () => {
     writeOldPortal();
-    sinon.stub(FileService.prototype, 'copyDirectoryContents').rejects(new Error('ENOSPC: no space left on device'));
+    sinon
+      .stub(FileService.prototype, 'copyDirectoryContents')
+      .callThrough()
+      .withArgs(
+        sinon.match.any,
+        sinon.match((destination: DirectoryPath) => portalDirectory.contains(destination))
+      )
+      .rejects(new Error('ENOSPC: no space left on device'));
 
     const result = await execute(FIXTURE, true);
 
@@ -315,5 +323,73 @@ describe('GenerateAction', () => {
     const [notices] = shared.prompts.contentNotices.firstCall.args;
     expect(result.isSuccess()).to.be.true;
     expect(notices.sharedTabNames).to.deep.equal([]);
+  });
+
+  describe('validating the spec', () => {
+    it("sends the spec directory as a .zip, with the user's key, once confirmed and before the artifacts run", async () => {
+      writeOldPortal();
+
+      const result = await execute();
+
+      expect(result.isSuccess()).to.be.true;
+      expect(shared.validate.calledOnce).to.be.true;
+      const [{ file, authKey }] = shared.validate.firstCall.args;
+      expect(file.toString().endsWith('.zip')).to.be.true;
+      expect(authKey).to.equal('auth-key');
+      expect(prompts.overwritePortal.calledBefore(shared.validate)).to.be.true;
+      expect(shared.validate.calledBefore(shared.artifacts)).to.be.true;
+    });
+
+    it('zips the APIMATIC-META.json the spec already has, without downloading the default', async () => {
+      await execute();
+
+      expect(shared.download.called).to.be.false;
+      expect(shared.validatedEntries()).to.have.members(['APIMATIC-META.json', 'Apimatic-Calculator.json']);
+    });
+
+    it('adds the default APIMATIC-META.json to a spec without one, leaving the source untouched', async () => {
+      const result = await execute(NO_META_FIXTURE);
+
+      expect(result.isSuccess()).to.be.true;
+      expect(shared.download.calledOnce).to.be.true;
+      expect(shared.download.firstCall.args[0].toString()).to.match(/\/src\/spec\/APIMATIC-META\.json$/);
+      expect(shared.validatedEntries()).to.have.members(['APIMATIC-META.json', 'Apimatic-Calculator.json']);
+      expect(fs.existsSync(path.join(NO_META_FIXTURE.toString(), 'src', 'spec', 'APIMATIC-META.json'))).to.be.false;
+    });
+
+    it('stops before validating when the default APIMATIC-META.json cannot be downloaded', async () => {
+      shared.download.resolves(err(ServiceError.ServerError));
+
+      const result = await execute(NO_META_FIXTURE);
+
+      expect(result.isFailed()).to.be.true;
+      expect(shared.prompts.defaultMetaNotDownloaded.calledOnceWith(ServiceError.ServerError)).to.be.true;
+      expect(shared.validate.called).to.be.false;
+      expect(shared.artifacts.called).to.be.false;
+    });
+
+    it('stops without uploading anything when the spec is invalid', async () => {
+      shared.validate.resolves(ok({ validation: FAILED, linting: PASSED } as never));
+
+      const result = await execute();
+
+      expect(result.isFailed()).to.be.true;
+      expect(shared.prompts.specInvalid.calledOnceWith('portal generate')).to.be.true;
+      expect(shared.summary.called, 'the issues were listed').to.be.false;
+      expect(shared.artifacts.called).to.be.false;
+      expect(build.called).to.be.false;
+    });
+
+    it('stops without uploading anything when the spec could not be validated', async () => {
+      shared.validate.resolves(
+        err({ kind: 'unavailable', message: 'Error 503: An error occurred during validation.' })
+      );
+
+      const result = await execute();
+
+      expect(result.isFailed()).to.be.true;
+      expect(shared.prompts.specInvalid.called).to.be.false;
+      expect(shared.artifacts.called).to.be.false;
+    });
   });
 });
