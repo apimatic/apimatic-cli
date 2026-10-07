@@ -422,11 +422,18 @@ describe('PluginConfigContext', () => {
       expect(writtenDocument().plugin).to.include(METADATA);
     });
 
-    it('refuses to replace a plugin block that is not an object', async () => {
-      withConfig({ plugin: 'acme' });
+    const refusedBlocks: [string, unknown][] = [
+      ['that is not an object', 'acme'],
+      ['whose id the plugin commands refuse', { pluginId: 'Bad Id', pluginName: 'Bad', pluginVersion: '1.0.0' }]
+    ];
 
-      expect((await context.addMetadataIfMissing(METADATA))._unsafeUnwrapErr()).to.equal('unreadable');
-      expect(writtenDocument().plugin).to.equal('acme');
+    refusedBlocks.forEach(([shape, plugin]) => {
+      it(`leaves a plugin block ${shape} for the commands that read it to report`, async () => {
+        withConfig({ plugin });
+
+        expect((await context.addMetadataIfMissing(METADATA)).isOk()).to.be.true;
+        expect(writtenDocument().plugin).to.deep.equal(plugin);
+      });
     });
   });
 

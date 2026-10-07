@@ -1,4 +1,4 @@
-import { Result, ResultAsync } from 'neverthrow';
+import { ok, Result, ResultAsync } from 'neverthrow';
 import { FileService } from '../infrastructure/file-service.js';
 import { ApimaticConfigContext, ApimaticConfigWriteFailure } from './apimatic-config-context.js';
 import { ApimaticConfigDocument, ConfigBlockName, findingClause } from './apimatic-config/document.js';
@@ -174,9 +174,11 @@ export class PluginConfigContext {
 
   // Merged against `plugin` alone: a file's `languages` is not what this write could spread or break.
   public async addMetadataIfMissing(metadata: PluginMetadata): Promise<Result<void, PluginConfigWriteFailure>> {
-    const merged = await this.configContext.merge(['plugin'], (document) =>
-      document.plugin() === undefined ? withMetadata(document, metadata) : document
-    );
+    const state = await this.configContext.read();
+    if (state.state === 'parsed' && state.document.has('plugin')) {
+      return ok(undefined);
+    }
+    const merged = await this.configContext.merge(['plugin'], (document) => withMetadata(document, metadata));
     return merged.map(() => undefined);
   }
 
