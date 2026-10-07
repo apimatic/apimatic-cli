@@ -230,6 +230,8 @@ const stylesheetOf = (output: DirectoryPath) => {
 
   it('writes the one OAuth redirect URI every endpoint page signs in through, kept out of search', () => {
     expect(read('oauth/callback/index.html')).to.contain('<meta name="robots" content="noindex"');
+    // The cookie it reads is the browser's, so the page is built to wait for it.
+    expect(read('oauth/callback/index.html')).to.contain('Completing sign-in…');
     expect(read('sitemap.xml')).to.not.contain('/oauth/callback');
   });
 

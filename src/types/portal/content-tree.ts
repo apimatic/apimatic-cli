@@ -37,7 +37,7 @@ const NAVIGATION_FILE = new FileName(NAVIGATION_FILE_NAME);
  */
 export const OAUTH_CALLBACK_ADDRESS = '/oauth/callback';
 
-const OAUTH_CALLBACK: ReservedAddress = {
+export const OAUTH_CALLBACK: ReservedAddress = {
   address: OAUTH_CALLBACK_ADDRESS,
   description: "the API playground's OAuth sign-in"
 };

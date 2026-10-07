@@ -15,6 +15,7 @@ import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
 import { FileName } from '../../../src/types/file/fileName.js';
 import { FilePath } from '../../../src/types/file/filePath.js';
 import { PLUGIN_SECTION, SDK_SECTION } from '../../../src/types/portal/generated-pages.js';
+import { OAUTH_CALLBACK } from '../../../src/types/portal/content-tree.js';
 
 describe('reportSourceProblem', () => {
   const source = new DirectoryPath('project').join('src');
@@ -240,6 +241,23 @@ describe('reportSourceProblem', () => {
         "  • 'content/context-plugin.mdx', at '/context-plugin', which is kept for the context plugin page"
       );
       expect(printed()).to.contain('Rename or move each page.');
+    });
+
+    it("says a page at /oauth/callback is kept for the API playground's OAuth sign-in", () => {
+      reportContent({
+        kind: 'reservedAddresses',
+        pages: [
+          {
+            file: new FilePath(content.join('oauth'), new FileName('callback.md')),
+            address: '/oauth/callback',
+            keptFor: OAUTH_CALLBACK
+          }
+        ]
+      });
+
+      expect(printed()).to.contain(
+        "  • 'content/oauth/callback.md', at '/oauth/callback', which is kept for the API playground's OAuth sign-in"
+      );
     });
   });
 

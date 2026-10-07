@@ -13,12 +13,15 @@ const PAGE_COOKIE = new RegExp(`(?:^|;\\s*)${PAGE_COOKIE_NAME}=([^;]+)`);
 export type OAuthCallback =
   /** Sends it back to the page that started the flow, with the provider's answer still attached. */
   | { kind: 'return'; url: string }
-  /** Stays, to say why the provider refused, with a link back to that page. */
+  /** Stays, to show the error the provider ended the sign-in with, and a link back to that page. */
   | { kind: 'providerError'; error: string; description: string | null; page: string }
   /** Stays, since the cookie names no page: no sign-in was started in this browser. */
   | { kind: 'notStarted' }
   /** Stays, since the cookie names a page on another site, or one that cannot be read. */
   | { kind: 'unknownPage' };
+
+/** Every outcome but sending the browser on, which leaves the callback before it renders again. */
+export type OAuthCallbackFailure = Exclude<OAuthCallback, { kind: 'return' }>;
 
 /**
  * The provider answers in the query for the authorization code flow and in the fragment for the
