@@ -508,7 +508,7 @@ follow-up.
     root-relative `src` the base through `withBasePath`. Code blocks go through `DynamicCodeBlock`,
     with the highlighter and themes of Fumadocs' default.
   - The e2e fixture's operation has an image in its description.
-  - Drafted as an issue for Fumadocs, not yet filed. `ApiMarkdown` can go once Fumadocs renders
+  - Filed as fuma-nama/fumadocs#3661 (section 10). `ApiMarkdown` can go once Fumadocs renders
     images and gives them the base.
 - **Reference-style images (`![alt][ref]`).** Fumadocs' `remarkImage` sizes and imports inline
   images only, so a reference kept a root-relative `src` that misses the base.
@@ -777,7 +777,7 @@ after each one. In all, roughly 400 lines of source and 500 of tests.
 path alike). `remarkImage` swaps the image for an import, and the copy and `llms-full.txt` carry
 `<img alt="…" src="__img0" />`, which leads nowhere. This predates the path: `useImport` is the
 default. It gets a ticket of its own. Since 5.10, reference-style images read the same way.
-- It is Fumadocs' bug, drafted as an issue for them, not yet filed.
+- It is Fumadocs' bug, filed as fuma-nama/fumadocs#3662 (section 10).
 - A workaround is possible: plugins on either side of `remarkImage`, plus the `stringify` hook
   that `includeProcessedMarkdown` passes on. It is held back, because it would rest on
   `remarkImage`'s internal `__img${n}` names.
@@ -794,10 +794,13 @@ with the MDX components, but not in its copy.
 | fuma-nama/fumadocs#3620, from PR #3572 (ui 16.15.13) | Fixed 2026-09-29 in fumadocs-ui 16.15.17 (commit `6791d6f`): the popover prefixes `markdownUrl` with `withBasePath` again, in both `radix-ui` and `base-ui` | Nothing to undo. The full address we pass goes through that `withBasePath` unchanged, so it is right on 16.15.15 and on 16.15.17 (5.2). An upgrade needs no change here |
 | TanStack/router#4888, docs PR #7882 | Docs only | None |
 | TanStack/router#8448, PR #8450 | Both open (checked 2026-10-07); the PR has no review yet. The issue reports a second loader run; we saw the address rewritten too | When it ships, `searchOptions` can go (5.11) |
+| fuma-nama/fumadocs#3661 | Filed 2026-10-07: an image in an operation's description crashes the page | When it ships with the base, `ApiMarkdown` can go (5.10) |
+| fuma-nama/fumadocs#3662 | Filed 2026-10-07: processed Markdown prints images as `__img0` | When it ships, ticket 5 is fixed by the upgrade (section 9) |
 
 **The fixes:**
 - **Fumadocs:** filed by the user as fuma-nama/fumadocs#3620, from the draft at
-  `C:\repos\fumadocs-issue-view-as-markdown-base-path.md`, and fixed as it proposed.
+  `C:\repos\fumadocs-issue-view-as-markdown-base-path.md`, and fixed as it proposed. The two image
+  bugs of 5.10 and section 9 were filed as #3661 and #3662. Reference-style images are not filed.
 - **TanStack:** the planned comment on #6152 would have given a repro and a fix that prefixes only
   the client fetch in `fetchItem`, `fetch(import.meta.env.BASE_URL.replace(/\/$/, '') + url)`,
   leaving `getStaticCacheUrl` alone. SimYunSup's comments on PR #5970 (2026-08-12) already say all
