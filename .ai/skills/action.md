@@ -173,7 +173,7 @@ export class {PascalName}Action {
       // 4. Resolve resources / prepare context
       //    const spec = await ResourceContext.resolveTo(resourcePath, tempDirectory);
       //    if (spec.isErr()) {
-      //      this.prompts.networkError(spec.error);
+      //      this.prompts.specUnavailable(spec.error);
       //      return ActionResult.failed();
       //    }
 

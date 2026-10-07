@@ -1,4 +1,3 @@
-import { Result } from 'neverthrow';
 import { getAuthInfo } from '../client-utils/auth-manager.js';
 import { FileService } from '../infrastructure/file-service.js';
 import { withDirPath } from '../infrastructure/tmp-extensions.js';
@@ -9,9 +8,9 @@ import { UrlPath } from '../types/file/urlPath.js';
 import { LoginAction } from './auth/login.js';
 import { ActionResult } from './action-result.js';
 import { CommandMetadata } from '../types/common/command-metadata.js';
-import { ValidateAction } from './api/validate.js';
+import { ValidateAction, ValidateActionFailure } from './api/validate.js';
 import { OpenApiDocument, SpecFormat } from '../types/portal/openapi-document.js';
-import { PortalScaffoldProblem } from '../types/portal/portal-source.js';
+import { ResourceInput } from '../types/file/resource-input.js';
 import { PortalAuthorizationService } from '../infrastructure/services/portal-authorization-service.js';
 import { PortalProjectService } from '../infrastructure/portal-project-service.js';
 import { APIMATIC_SCHEMA_URL } from '../types/apimatic-config/document.js';
@@ -82,7 +81,7 @@ export class QuickstartAction {
 
     this.prompts.importSpecStepAdopted(sourceDirectory);
     this.prompts.validateSpecStep();
-    const failure = (await new ValidateAction(this.configDir, this.commandMetadata).execute(project, false)).getError();
+    const failure = await this.validationFailure(project);
     if (failure === 'unchecked') {
       return ActionResult.failed();
     }
@@ -101,8 +100,18 @@ export class QuickstartAction {
     }
 
     this.prompts.createPortalStep();
-    const scaffolded = await portalSource.adopt(APIMATIC_SCHEMA_URL);
-    return await this.completeProject(project, projectDirectory, scaffolded);
+    const [namedAfter] = specs.value;
+    const adopted = await portalSource.adopt(namedAfter);
+    if (adopted.isErr()) {
+      this.prompts.scaffoldFailed(adopted.error, sourceDirectory);
+      return ActionResult.failed();
+    }
+    const pluginAdded = await project.pluginConfig().addMetadataIfMissing(PLACEHOLDER_METADATA);
+    if (pluginAdded.isErr()) {
+      this.prompts.pluginNotAdded(pluginAdded.error, sourceDirectory);
+      return ActionResult.failed();
+    }
+    return await this.completeProject(project, projectDirectory, adopted.value);
   }
 
   private async startProject(tempDirectory: DirectoryPath): Promise<ActionResult> {
@@ -130,7 +139,7 @@ export class QuickstartAction {
     }
 
     this.prompts.validateSpecStep();
-    const failure = (await new ValidateAction(this.configDir, this.commandMetadata).execute(spec, false)).getError();
+    const failure = await this.validationFailure(spec);
     // The service's own error is already on screen; the spec may be valid, so there is nothing to fix.
     if (failure === 'unchecked') {
       return ActionResult.failed();
@@ -171,16 +180,8 @@ export class QuickstartAction {
       return ActionResult.cancelled();
     }
     const project = ProjectContext.in(projectDirectory);
-    const scaffolded = await project.portalSource().scaffold(specFile, APIMATIC_SCHEMA_URL);
-    return await this.completeProject(project, projectDirectory, scaffolded);
-  }
-
-  private async completeProject(
-    project: ProjectContext,
-    projectDirectory: DirectoryPath,
-    scaffolded: Result<FilePath, PortalScaffoldProblem>
-  ): Promise<ActionResult> {
     const sourceDirectory = project.sourceDirectory();
+    const scaffolded = await project.portalSource().scaffold(specFile, APIMATIC_SCHEMA_URL);
     if (scaffolded.isErr()) {
       this.prompts.scaffoldFailed(scaffolded.error, sourceDirectory);
       return ActionResult.failed();
@@ -201,24 +202,36 @@ export class QuickstartAction {
       this.prompts.configNotWritten(pluginConfigRecorded.error, sourceDirectory);
       return ActionResult.failed();
     }
+    return await this.completeProject(project, projectDirectory, scaffolded.value);
+  }
 
+  private async completeProject(
+    project: ProjectContext,
+    projectDirectory: DirectoryPath,
+    configFile: FilePath
+  ): Promise<ActionResult> {
     // Reported rather than fatal: what Git tracks does not decide whether a portal can be built.
     const ignored = await project.upsertGitignore();
     if (ignored.isErr()) {
       this.prompts.gitignoreNotUpdated(ignored.error, projectDirectory);
     }
 
-    const structure = await this.fileService.getDirectory(sourceDirectory);
+    const structure = await this.fileService.getDirectory(project.sourceDirectory());
     this.prompts.printDirectoryStructure(projectDirectory, structure);
 
     const result = await new PortalServeAction(this.configDir, this.commandMetadata, null).execute(
       project,
       DEFAULT_PORTAL_PORT,
       true,
-      () => this.prompts.nextSteps(scaffolded.value)
+      () => this.prompts.nextSteps(configFile)
     );
 
     return result.isFailed() ? ActionResult.failed() : ActionResult.success();
+  }
+
+  private async validationFailure(spec: ResourceInput | ResourceContext): Promise<ValidateActionFailure | undefined> {
+    const validated = await new ValidateAction(this.configDir, this.commandMetadata).execute(spec, false);
+    return validated.isFailed() ? validated.getError() ?? 'unchecked' : undefined;
   }
 
   private async chooseProjectDirectory(): Promise<DirectoryPath | undefined> {

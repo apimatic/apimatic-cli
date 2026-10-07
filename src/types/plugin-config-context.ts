@@ -125,6 +125,22 @@ const keepsRecord = (language: string, entry: PluginLanguageEntry<Language> | un
 
 const isUnavailableLanguage = (language: string): boolean => !isAvailableLanguage(language);
 
+const withMetadata = (
+  document: ApimaticConfigDocument,
+  metadata: PluginMetadata,
+  author?: PluginAuthor
+): ApimaticConfigDocument => {
+  const plugin = (document.plugin() ?? {}) as PluginIdentityData;
+  return document.with('plugin', {
+    ...plugin,
+    pluginId: metadata.pluginId,
+    pluginName: metadata.pluginName,
+    pluginVersion: metadata.pluginVersion,
+    ...(!plugin.author && author && { author }),
+    license: plugin.license ?? DEFAULT_PLUGIN_LICENSE
+  });
+};
+
 export class PluginConfigContext {
   private readonly configContext: ApimaticConfigContext;
   private readonly fileService = new FileService();
@@ -153,17 +169,15 @@ export class PluginConfigContext {
     metadata: PluginMetadata,
     author?: PluginAuthor
   ): Promise<Result<PluginConfig, PluginConfigWriteFailure>> {
-    return await this.merge((document) => {
-      const plugin = (document.plugin() ?? {}) as PluginIdentityData;
-      return document.with('plugin', {
-        ...plugin,
-        pluginId: metadata.pluginId,
-        pluginName: metadata.pluginName,
-        pluginVersion: metadata.pluginVersion,
-        ...(!plugin.author && author && { author }),
-        license: plugin.license ?? DEFAULT_PLUGIN_LICENSE
-      });
-    });
+    return await this.merge((document) => withMetadata(document, metadata, author));
+  }
+
+  // Merged against `plugin` alone: a file's `languages` is not what this write could spread or break.
+  public async addMetadataIfMissing(metadata: PluginMetadata): Promise<Result<void, PluginConfigWriteFailure>> {
+    const merged = await this.configContext.merge(['plugin'], (document) =>
+      document.plugin() === undefined ? withMetadata(document, metadata) : document
+    );
+    return merged.map(() => undefined);
   }
 
   // A published entry survives a cleared checkbox: only `sdk publish` can write that record.

@@ -61,6 +61,12 @@ describe('QuickstartPrompts', () => {
     expect(stripVTControlCharacters(String(message.firstCall.args[0]))).to.contain('apimatic quickstart');
   });
 
+  it("says which block an adopted project's apimatic.json could not be given", () => {
+    prompts.pluginNotAdded('unreadable', new DirectoryPath('project').join('src'));
+
+    expect(printed()[0]).to.contain("could not be read, so its missing 'plugin' block was not added");
+  });
+
   it('gives a spec that names no OpenAPI version the fix portal generate gives', () => {
     prompts.specNotRecognised(new FilePath(specs, new FileName('calculator.raml')));
 

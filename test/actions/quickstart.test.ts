@@ -4,6 +4,7 @@ import path from 'path';
 import sinon from 'sinon';
 import { expect } from 'chai';
 import { err, ok } from 'neverthrow';
+import { ActionResult } from '../../src/actions/action-result';
 import { QuickstartAction } from '../../src/actions/quickstart';
 import { QuickstartPrompts } from '../../src/prompts/quickstart';
 import { ApiValidatePrompts } from '../../src/prompts/api/validate';
@@ -148,22 +149,39 @@ describe('QuickstartAction', () => {
       fs.writeFileSync(inSource('apimatic.json'), '{}');
     });
 
-    it('validates the specification it finds instead of asking for one', async () => {
-      prompts.selectLanguages.resolves([Language.TYPESCRIPT]);
+    it('validates the specification it finds instead of asking for one, or for its languages', async () => {
+      fs.writeFileSync(inSource('apimatic.json'), JSON.stringify({ languages: { typescript: {} } }));
       sinon.stub(PortalArtifactsService.prototype, 'generate').resolves(ok(completeArtifacts([Language.TYPESCRIPT])));
-      sinon.stub(PortalProjectService.prototype, 'prepare').resolves(err('stopped here'));
+      const prepare = sinon.stub(PortalProjectService.prototype, 'prepare').resolves(err('stopped here'));
 
       await execute(downloaded);
 
       expect(prompts.specPathPrompt.called, 'asked for a specification the project has').to.be.false;
       expect(prompts.projectDirectoryPrompt.called, 'asked where to put a project that exists').to.be.false;
+      expect(prompts.selectLanguages.called, 'asked for languages the project records itself').to.be.false;
 
       const written = JSON.parse(fs.readFileSync(inSource('apimatic.json'), 'utf8'));
       expect(written.languages).to.deep.equal({ typescript: {} });
-      expect(written.portal, 'the portal block is scaffolded into the project it adopted').to.not.be.undefined;
+      expect(written.portal.site, 'a site is added to the project it adopted').to.not.be.undefined;
+      expect(written.plugin).to.deep.equal({
+        pluginId: 'my-api-plugin',
+        pluginName: 'My API Plugin',
+        pluginVersion: '0.1.0',
+        license: 'MIT'
+      });
+      expect(prepare.called, 'the wizard reached the preview').to.be.true;
 
       // The one that was there, and no copy of it beside itself.
       expect(fs.readdirSync(inSource('spec'))).to.deep.equal(['Apimatic-Calculator.json']);
+    });
+
+    it('leaves the plugin block an adopted project carries as it is', async () => {
+      const config = JSON.stringify({ portal: { site: {} }, plugin: { pluginName: 'Ours' } });
+      fs.writeFileSync(inSource('apimatic.json'), config);
+
+      await execute(downloaded);
+
+      expect(fs.readFileSync(inSource('apimatic.json'), 'utf8')).to.equal(config);
     });
 
     it('refuses a project without apimatic.json before validating, and writes nothing', async () => {
@@ -323,6 +341,16 @@ describe('QuickstartAction', () => {
 
     expect((await execute()).isCancelled()).to.be.true;
     expect(prompts.specValidationFailed.calledOnceWith('file')).to.be.true;
+  });
+
+  it('treats a failed validation that carries no error as unchecked, never as a pass', async () => {
+    failValidation();
+    const failed = ActionResult.failed;
+    sinon.stub(ActionResult, 'failed').callsFake((message?: string) => failed(message));
+
+    expect((await execute()).isFailed()).to.be.true;
+    expect(prompts.specValidationFailed.called).to.be.false;
+    expect(prompts.projectDirectoryPrompt.called, 'went on to scaffold an unvalidated spec').to.be.false;
   });
 
   // The service's error is already shown, and the specification may be valid: there is nothing to fix.

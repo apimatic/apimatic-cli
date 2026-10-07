@@ -84,7 +84,7 @@ export function reportSourceProblem(
   sourceDirectory: DirectoryPath,
   { offerQuickstart = true }: { offerQuickstart?: boolean } = {}
 ): void {
-  const quickstart = `Run ${f.cmdAlt('apimatic', 'quickstart')} to set up a portal.`;
+  const quickstart = `Run ${f.cmdAlt('apimatic', 'quickstart')} in an empty directory to set up a portal.`;
   switch (problem.kind) {
     case 'missingConfig': {
       log.error(`No ${f.var(APIMATIC_CONFIG_FILE_NAME)} found in ${f.path(sourceDirectory)}.`);

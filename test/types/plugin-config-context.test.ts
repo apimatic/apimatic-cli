@@ -394,6 +394,42 @@ describe('PluginConfigContext', () => {
     });
   });
 
+  describe('addMetadataIfMissing', () => {
+    it('adds the plugin block, with a default licence, to a file that has none', async () => {
+      withConfig({ portal: {}, languages: { csharp: CSHARP_ENTRY } });
+
+      expect((await context.addMetadataIfMissing(METADATA)).isOk()).to.be.true;
+
+      expect(writtenDocument()).to.deep.equal({
+        portal: {},
+        languages: { csharp: CSHARP_ENTRY },
+        plugin: { ...METADATA, license: 'MIT' }
+      });
+    });
+
+    it('leaves a plugin block the file holds as it is, however little it says', async () => {
+      withFile('{"plugin":{"pluginName":"Ours"}}');
+
+      await context.addMetadataIfMissing(METADATA);
+
+      expect(written()).to.equal('{"plugin":{"pluginName":"Ours"}}');
+    });
+
+    it('adds the block beside a languages block it does not read', async () => {
+      withConfig({ languages: 'csharp' });
+
+      expect((await context.addMetadataIfMissing(METADATA)).isOk()).to.be.true;
+      expect(writtenDocument().plugin).to.include(METADATA);
+    });
+
+    it('refuses to replace a plugin block that is not an object', async () => {
+      withConfig({ plugin: 'acme' });
+
+      expect((await context.addMetadataIfMissing(METADATA))._unsafeUnwrapErr()).to.equal('unreadable');
+      expect(writtenDocument().plugin).to.equal('acme');
+    });
+  });
+
   describe('the state a write hands back', () => {
     it('reports the metadata it just wrote', async () => {
       const state = (await context.upsertMetadata(METADATA))._unsafeUnwrap();

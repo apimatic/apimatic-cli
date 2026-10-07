@@ -263,6 +263,14 @@ Let's get started!`);
     log.error(message);
   }
 
+  public pluginNotAdded(failure: PluginConfigWriteFailure, sourceDirectory: DirectoryPath) {
+    const problem = failure === 'unreadable' ? 'read' : 'written';
+    const message =
+      `${f.var(APIMATIC_CONFIG_FILE_NAME)} in ${f.path(sourceDirectory)} could not be ${problem}, ` +
+      `so its missing ${f.var('plugin')} block was not added. Check that it can be ${problem} and try again.`;
+    log.error(message);
+  }
+
   /** A warning, not an error: the portal is already written, and Git tracking it does not stop a build. */
   public gitignoreNotUpdated(failure: GitignoreFailure, projectDirectory: DirectoryPath) {
     const problem = failure === 'unreadable' ? 'read' : 'written';

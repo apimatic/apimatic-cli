@@ -9,7 +9,7 @@ import { ResourceContext } from '../../types/resource-context.js';
 import { ValidationSummary } from '@apimatic/sdk';
 
 /** `unchecked`: the spec never reached the validation service, or the service did not answer, so nothing is known of it. */
-export type ValidationFailure = 'invalid' | 'unchecked';
+export type ValidateActionFailure = 'invalid' | 'unchecked';
 
 export class ValidateAction {
   private readonly prompts: ApiValidatePrompts = new ApiValidatePrompts();
@@ -26,7 +26,7 @@ export class ValidateAction {
   public readonly execute = async (
     spec: ResourceInput | ResourceContext,
     displayValidationSummary = true
-  ): Promise<ActionResult<void, ValidationFailure>> => {
+  ): Promise<ActionResult<void, ValidateActionFailure>> => {
     if (!(spec instanceof ResourceContext)) {
       return await withDirPath(async (tempDirectory) => {
         const resolved = await ResourceContext.resolveTo(spec, tempDirectory);
