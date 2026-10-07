@@ -1,8 +1,9 @@
-import { basename, dirname } from 'node:path';
-import { parse as parseYaml } from 'yaml';
+import { err, ok, Result } from 'neverthrow';
+import { parse as parseYaml, YAMLParseError } from 'yaml';
 import { DirectoryPath } from '../file/directoryPath.js';
 import { FileName } from '../file/fileName.js';
 import { FilePath } from '../file/filePath.js';
+import { errorMessage } from '../../utils/error-utils.js';
 import { isJsonObject, JsonObject } from '../../utils/json-utils.js';
 import { stripByteOrderMark } from '../../utils/string-utils.js';
 import { PLACEHOLDER_SITE, SuggestedSite } from './config/site-config.js';
@@ -31,24 +32,38 @@ const URL_SCHEME = /^[a-z][a-z\d+.-]+:/i;
 // The options @scalar/json-magic bundles with, so a spec reads here as it does in the portal.
 const YAML_OPTIONS = { merge: true, maxAliasCount: 10000 };
 
+// The keys @scalar/json-magic writes what it has embedded under, which it does not read again.
+const BUNDLER_KEYS = new Set(['x-ext', 'x-ext-urls']);
+
 /** A specification as written to disk, read the one way the wizard and the build agree on. */
 export class OpenApiDocument {
   private constructor(private readonly document: JsonObject) {}
 
   /**
-   * Undefined when neither parser accepts the text. A document that parses to something other
-   * than an object is kept, and reports itself as no specification at all.
+   * Fails with what the parser said when it does not accept the text. A document that parses to
+   * something other than an object is kept, and reports itself as no specification at all.
    */
-  public static parse(fileName: FileName, contents: string): OpenApiDocument | undefined {
+  public static parse(fileName: FileName, contents: string): Result<OpenApiDocument, string> {
     try {
       // JSON is valid YAML, but the YAML parser is far slower and specs run to megabytes,
       // so each extension gets the parser built for it.
       const text = stripByteOrderMark(contents);
       const document: unknown = fileName.hasExtension('.json') ? JSON.parse(text) : parseYaml(text, YAML_OPTIONS);
-      return new OpenApiDocument(isJsonObject(document) ? document : {});
-    } catch {
-      return undefined;
+      return ok(new OpenApiDocument(isJsonObject(document) ? document : {}));
+    } catch (error) {
+      // A YAML error goes on to quote the lines around it, and V8 quotes the JSON it stopped at across line breaks.
+      const message = errorMessage(error);
+      const reason = error instanceof YAMLParseError ? message.split('\n')[0].replace(/:$/, '') : message;
+      return err(reason.replace(/\s+/g, ' ').trim());
     }
+  }
+
+  /** The local files this document's `$ref`s name, as the portal's bundler finds them, except by `$id`. */
+  public referencedFiles(directory: DirectoryPath): FilePath[] {
+    const ids = idsIn(this.document, new WeakSet(), new Set());
+    const references = referencesIn(this.document, new WeakSet(), new Set());
+    const names = new Set([...references].map((reference) => reference.split('#')[0]));
+    return [...names].filter((name) => !ids.has(name)).flatMap((name) => localFile(directory, name) ?? []);
   }
 
   /** Every operation declared inline or behind a `$ref` into this document; see `pathItemReferences` for the rest. */
@@ -60,11 +75,9 @@ export class OpenApiDocument {
   public pathItemReferences(directory: DirectoryPath): PathItemReference[] {
     return Object.entries(this.paths()).flatMap(([path, pathItem]) => {
       const reference = isJsonObject(pathItem) && typeof pathItem.$ref === 'string' ? pathItem.$ref : '';
-      const [file, pointer = ''] = reference.split('#');
-      if (file === '' || URL_SCHEME.test(file)) {
-        return [];
-      }
-      return [{ path, file: new FilePath(directory.resolve(dirname(file)), new FileName(basename(file))), pointer }];
+      const [name, pointer = ''] = reference.split('#');
+      const file = localFile(directory, name);
+      return file === undefined ? [] : [{ path, file, pointer }];
     });
   }
 
@@ -122,6 +135,45 @@ export class OpenApiDocument {
     seen.add($ref);
     return { ...this.followLocal(valueAt(this.document, $ref.slice(1)), seen), ...siblings };
   }
+}
+
+/** The file a `$ref` names before its `#`, resolved as the bundler resolves it; undefined for none, or a URL. */
+function localFile(directory: DirectoryPath, name: string): FilePath | undefined {
+  return name === '' || URL_SCHEME.test(name) ? undefined : FilePath.resolve(directory, name.replaceAll('\\', '/'));
+}
+
+// Both walks add to `found` rather than return arrays to merge, as a specification runs to megabytes.
+function referencesIn(node: unknown, seen: WeakSet<object>, found: Set<string>): Set<string> {
+  if (typeof node !== 'object' || node === null || seen.has(node)) {
+    return found;
+  }
+  seen.add(node);
+  if (isJsonObject(node) && typeof node.$id === 'string') {
+    return found;
+  }
+  if (isJsonObject(node) && typeof node.$ref === 'string') {
+    return found.add(node.$ref);
+  }
+  for (const [key, value] of Object.entries(node)) {
+    if (!BUNDLER_KEYS.has(key)) {
+      referencesIn(value, seen, found);
+    }
+  }
+  return found;
+}
+
+function idsIn(node: unknown, seen: WeakSet<object>, found: Set<string>): Set<string> {
+  if (typeof node !== 'object' || node === null || seen.has(node)) {
+    return found;
+  }
+  seen.add(node);
+  if (isJsonObject(node) && typeof node.$id === 'string') {
+    found.add(node.$id);
+  }
+  for (const value of Object.values(node)) {
+    idsIn(value, seen, found);
+  }
+  return found;
 }
 
 function valueAt(document: JsonObject, pointer: string): unknown {

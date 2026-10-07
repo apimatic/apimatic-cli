@@ -36,6 +36,11 @@ import { TRANSFORMATIONS_DIRECTORY_NAME, transformedFileName } from './transform
 
 const SPEC_EXTENSIONS = ['.json', '.yaml', '.yml'];
 
+interface SpecFile {
+  file: FilePath;
+  document: OpenApiDocument;
+}
+
 // Empty on purpose: the portal's own routes under /api/ are files with extensions --
 // /api/search.json -- so none can collide with a spec section, which is always a directory.
 // Pages the user puts under content/api/ share the directory, and `hiddenPages` reports the
@@ -386,7 +391,7 @@ export class PortalSourceContext {
       return PLACEHOLDER_SITE;
     }
     const document = await this.readDocument(specPath);
-    return document === undefined ? PLACEHOLDER_SITE : document.suggestedSite();
+    return document?.isOk() ? document.value.suggestedSite() : PLACEHOLDER_SITE;
   }
 
   /**
@@ -419,10 +424,15 @@ export class PortalSourceContext {
     const documentNames = fileNames.filter((name) => SPEC_EXTENSIONS.some((extension) => name.hasExtension(extension)));
     for (const fileName of documentNames) {
       const file = new FilePath(this.specDirectory, fileName);
-      const document = await this.readDocument(file);
-      if (document === undefined) {
-        return err({ kind: 'unreadableSpec', fileName });
+      const read = await this.readDocument(file);
+      // Gone since it was listed, as an editor that saves by renaming over the file leaves it for a moment.
+      if (read === undefined) {
+        continue;
       }
+      if (read.isErr()) {
+        return err({ kind: 'unreadableSpec', file, referencedBy: null, reason: read.error });
+      }
+      const document = read.value;
       const format = document.format();
       if (!format.supported) {
         if (format.format !== null) {
@@ -431,7 +441,16 @@ export class PortalSourceContext {
         continue;
       }
 
-      specs.push({ slug: this.uniqueSlug(fileName, usedSlugs), file, endpoints: await this.endpoints(document, file) });
+      const spec = { file, document };
+      const referenced = await this.referencedDocuments(spec);
+      if (referenced.isErr()) {
+        return err(referenced.error);
+      }
+      specs.push({
+        slug: this.uniqueSlug(fileName, usedSlugs),
+        file,
+        endpoints: PortalSourceContext.endpoints(spec, referenced.value)
+      });
       first ??= document;
     }
 
@@ -468,23 +487,62 @@ export class PortalSourceContext {
     };
   }
 
-  // A path item in another file is read from it; one that file refers on to again is not followed.
-  private async endpoints(document: OpenApiDocument, file: FilePath): Promise<Endpoint[]> {
-    const referenced = await Promise.all(
-      document.pathItemReferences(file.directory()).map(async ({ path, file: target, pointer }) => {
-        const targetDocument = await this.readDocument(target);
-        return targetDocument?.endpointsAt(path, pointer) ?? [];
-      })
-    );
-    return [...document.endpoints(), ...referenced.flat()];
+  // One the bundler cannot read fails the build, or leaves its reference empty, so it is refused.
+  private async referencedDocuments(spec: SpecFile): Promise<Result<SpecFile[], PortalSourceProblem>> {
+    const named = new Set([spec.file.toString()]);
+    const queue: {
+      file: FilePath;
+      referencedBy: FilePath;
+      read: Promise<Result<OpenApiDocument, string> | undefined>;
+    }[] = [];
+    // Each file is read once, starting when it is first named, as a split specification runs to thousands.
+    const enqueue = ({ file: referencedBy, document }: SpecFile) => {
+      for (const file of document.referencedFiles(referencedBy.directory())) {
+        if (!named.has(file.toString())) {
+          named.add(file.toString());
+          queue.push({ file, referencedBy, read: this.readDocument(file) });
+        }
+      }
+    };
+
+    const walked = [spec];
+    enqueue(spec);
+    // Grows as it is walked: each file read queues the ones it refers to.
+    for (const { file, referencedBy, read } of queue) {
+      const parsed = await read;
+      if (parsed === undefined) {
+        return err({ kind: 'missingSpecReference', file, referencedBy });
+      }
+      if (parsed.isErr()) {
+        return err({ kind: 'unreadableSpec', file, referencedBy, reason: parsed.error });
+      }
+      const referenced = { file, document: parsed.value };
+      walked.push(referenced);
+      enqueue(referenced);
+    }
+    return ok(walked);
   }
 
-  private async readDocument(file: FilePath): Promise<OpenApiDocument | undefined> {
+  // A path item in another file is read from it; one that file refers on to again is not followed.
+  private static endpoints(spec: SpecFile, referenced: SpecFile[]): Endpoint[] {
+    const mounted = spec.document
+      .pathItemReferences(spec.file.directory())
+      .flatMap(
+        ({ path, file, pointer }) =>
+          referenced.find((each) => each.file.isEqual(file))?.document.endpointsAt(path, pointer) ?? []
+      );
+    return [...spec.document.endpoints(), ...mounted];
+  }
+
+  /** Undefined when there is no such file; otherwise the document, or why it cannot be read. */
+  private async readDocument(file: FilePath): Promise<Result<OpenApiDocument, string> | undefined> {
+    let contents: string;
     try {
-      return OpenApiDocument.parse(file.name(), await this.fileService.getContents(file));
-    } catch {
-      return undefined;
+      contents = await this.fileService.getContents(file);
+    } catch (error) {
+      return (await this.fileService.fileExists(file)) ? err(errorMessage(error)) : undefined;
     }
+    return OpenApiDocument.parse(file.name(), contents);
   }
 
   private uniqueSlug(fileName: FileName, used: Set<string>): string {

@@ -24,6 +24,7 @@ import { FilePath } from '../../src/types/file/filePath';
 import { PLUGIN_SECTION, SDK_SECTION } from '../../src/types/portal/generated-pages';
 import { TabEntry } from '../../src/types/portal/portal-navigation';
 import { ZipService } from '../../src/infrastructure/zip-service';
+import { bundleSpec } from '../../portal-template/src/lib/openapi-bundle.server';
 
 const OPENAPI = JSON.stringify({ openapi: '3.0.0', info: { title: 'Calc', version: '1' }, paths: {} });
 
@@ -379,6 +380,19 @@ describe('PortalSourceContext', () => {
     });
   });
 
+  /** A file the specifications could not be read from: the kind, the file, and the file that refers to it. */
+  const specProblem = (problem: PortalSourceProblem): [string, string, string | null] => {
+    if (problem.kind !== 'unreadableSpec' && problem.kind !== 'missingSpecReference') {
+      throw new Error(`expected a file the specifications are read from, got ${JSON.stringify(problem)}`);
+    }
+    const relative = (file: FilePath) => file.relativeTo(new DirectoryPath(root));
+    return [
+      problem.kind,
+      relative(problem.file),
+      problem.referencedBy === null ? null : relative(problem.referencedBy)
+    ];
+  };
+
   describe('spec discovery', () => {
     beforeEach(() => writeConfig({ site: { name: 'Calc' } }));
 
@@ -466,10 +480,13 @@ describe('PortalSourceContext', () => {
       ]);
     });
 
-    it('reports a document it cannot parse', async () => {
+    it('reports a document it cannot parse, with what the parser said', async () => {
       write('spec/broken.json', '{ not json');
 
-      expect((await resolve())._unsafeUnwrapErr().kind).to.equal('unreadableSpec');
+      const problem = (await resolve())._unsafeUnwrapErr();
+
+      expect(specProblem(problem)).to.deep.equal(['unreadableSpec', 'spec/broken.json', null]);
+      expect(problem.kind === 'unreadableSpec' && problem.reason).to.contain('JSON');
     });
 
     it('reports an empty or absent spec directory', async () => {
@@ -518,8 +535,7 @@ describe('PortalSourceContext', () => {
           paths: {
             '/health': { get: {} },
             '/pets': { $ref: './paths/pets.yaml' },
-            '/owners': { $ref: 'shared.json#/items/owners' },
-            '/missing': { $ref: './nowhere.yaml' }
+            '/owners': { $ref: 'shared.json#/items/owners' }
           }
         })
       );
@@ -527,6 +543,193 @@ describe('PortalSourceContext', () => {
       const [spec] = (await resolve())._unsafeUnwrap().specs;
 
       expect(spec.endpoints.map(String)).to.deep.equal(['GET /health', 'GET /pets', 'POST /pets', 'DELETE /owners']);
+    });
+  });
+
+  describe('the files a specification refers to', () => {
+    beforeEach(() => writeConfig({ site: { name: 'Calc' } }));
+    afterEach(() => sinon.restore());
+
+    /** `spec/api.json`, whose schemas are the given ones. */
+    const writeSpec = (schemas: Record<string, unknown>, extra: Record<string, unknown> = {}) =>
+      write(
+        'spec/api.json',
+        JSON.stringify({
+          openapi: '3.0.0',
+          info: { title: 'Calc', version: '1' },
+          paths: {},
+          components: { schemas },
+          ...extra
+        })
+      );
+
+    it('refuses a file a specification refers to that is not there, naming the file that refers to it', async () => {
+      writeSpec({ Pet: { $ref: './schemas/Pet.yaml' } });
+
+      expect(specProblem((await resolve())._unsafeUnwrapErr())).to.deep.equal([
+        'missingSpecReference',
+        'spec/schemas/Pet.yaml',
+        'spec/api.json'
+      ]);
+    });
+
+    it('refuses a file referred to in turn that does not parse, naming the file that refers to it', async () => {
+      writeSpec({ Pet: { $ref: './schemas/Pet.yaml' } });
+      write('spec/schemas/Pet.yaml', 'type: object\nproperties:\n  owner:\n    $ref: ./Owner.yaml\n');
+      write('spec/schemas/Owner.yaml', 'type: object\nrequired: [name\n');
+
+      const problem = (await resolve())._unsafeUnwrapErr();
+
+      expect(specProblem(problem)).to.deep.equal([
+        'unreadableSpec',
+        'spec/schemas/Owner.yaml',
+        'spec/schemas/Pet.yaml'
+      ]);
+      expect(problem.kind === 'unreadableSpec' && problem.reason).to.match(/line \d+, column \d+$/);
+    });
+
+    it('follows a reference out of the spec directory, as the build does', async () => {
+      writeSpec({ Pet: { $ref: '../shared/Pet.yaml' } });
+
+      expect(specProblem((await resolve())._unsafeUnwrapErr())).to.deep.equal([
+        'missingSpecReference',
+        'shared/Pet.yaml',
+        'spec/api.json'
+      ]);
+
+      write('shared/Pet.yaml', 'type: object\n');
+      expect((await resolve()).isOk()).to.be.true;
+    });
+
+    it('reads each file once, however often it is referred to, and ends at a cycle', async () => {
+      writeSpec({ Pet: { $ref: './schemas/Pet.yaml' }, Pets: { items: { $ref: './schemas/Pet.yaml#/Pet' } } });
+      write('spec/schemas/Pet.yaml', 'Pet:\n  properties:\n    owner:\n      $ref: ./Owner.yaml\n');
+      write('spec/schemas/Owner.yaml', 'properties:\n  pets:\n    $ref: ./Pet.yaml\n');
+      const reads = sinon.spy(FileService.prototype, 'getContents');
+
+      expect((await resolve()).isOk()).to.be.true;
+      const specFiles = reads.args
+        .map(([file]) => file.relativeTo(new DirectoryPath(root)))
+        .filter((file) => file.startsWith('spec/'));
+      expect(specFiles.sort()).to.deep.equal(['spec/api.json', 'spec/schemas/Owner.yaml', 'spec/schemas/Pet.yaml']);
+    });
+
+    // Held to the bundler itself, since a file refused here would otherwise have built.
+    describe('as the portal bundles it', () => {
+      beforeEach(() => sinon.stub(globalThis.console, 'warn'));
+
+      const bundles = () =>
+        bundleSpec(path.join(root, 'spec', 'api.json')).then(
+          () => true,
+          () => false
+        );
+
+      const cases: [string, () => void, boolean][] = [
+        [
+          'a file that is there',
+          () => {
+            writeSpec({ Pet: { $ref: './schemas/Pet.yaml' } });
+            write('spec/schemas/Pet.yaml', 'type: object\n');
+          },
+          true
+        ],
+        ['a file that is not there', () => writeSpec({ Pet: { $ref: './schemas/Pet.yaml' } }), false],
+        [
+          'a file of half-written YAML',
+          () => {
+            writeSpec({ Pet: { $ref: './schemas/Pet.yaml' } });
+            write('spec/schemas/Pet.yaml', 'type: object\nrequired: [name\n');
+          },
+          false
+        ],
+        [
+          'a file named in example data',
+          () => writeSpec({ Pet: { type: 'object', example: { $ref: './examples/pet.json' } } }),
+          false
+        ],
+        [
+          'a file named beside a reference, which is not read',
+          () => {
+            writeSpec({ Pet: { $ref: './Pet.yaml', properties: { owner: { $ref: './Owner.yaml' } } } });
+            write('spec/Pet.yaml', 'type: object\n');
+          },
+          true
+        ],
+        [
+          'two files that refer to each other',
+          () => {
+            writeSpec({ Pet: { $ref: './Pet.yaml' } });
+            write('spec/Pet.yaml', 'properties:\n  owner:\n    $ref: ./Owner.yaml\n');
+            write('spec/Owner.yaml', 'properties:\n  pet:\n    $ref: ./Pet.yaml\n');
+          },
+          true
+        ],
+        [
+          'a file named from the folder of the file that refers to it',
+          () => {
+            writeSpec({ Pet: { $ref: './schemas/Pet.yaml' } });
+            write('spec/schemas/Pet.yaml', 'properties:\n  owner:\n    $ref: ./Owner.yaml\n');
+            write('spec/schemas/Owner.yaml', 'type: object\n');
+          },
+          true
+        ],
+        [
+          'a file named in a part of a file that no reference points into',
+          () => {
+            writeSpec({ Pet: { $ref: './schemas/models.yaml#/Pet' } });
+            write('spec/schemas/models.yaml', 'Pet:\n  type: object\nOwner:\n  $ref: ./Owner.yaml\n');
+          },
+          false
+        ],
+        [
+          'a file outside the spec directory',
+          () => {
+            writeSpec({ Pet: { $ref: '../shared/Pet.yaml' } });
+            write('shared/Pet.yaml', 'type: object\n');
+          },
+          true
+        ],
+        [
+          'a name written with a percent escape, which is not decoded',
+          () => {
+            writeSpec({ Pet: { $ref: './my%20pet.yaml' } });
+            write('spec/my pet.yaml', 'type: object\n');
+          },
+          false
+        ],
+        [
+          'a schema named by its $id',
+          () => writeSpec({ Pet: { $id: 'pet.json', type: 'object' }, Pets: { items: { $ref: 'pet.json' } } }),
+          true
+        ],
+        [
+          'a file named only under the keys the bundler writes',
+          () => writeSpec({}, { 'x-ext': { abc123: { $ref: './embedded.yaml' } } }),
+          true
+        ]
+      ];
+
+      cases.forEach(([label, arrange, builds]) => {
+        it(`${builds ? 'accepts' : 'refuses'} ${label}, as the bundler does`, async () => {
+          arrange();
+
+          expect(await bundles(), 'the bundler').to.equal(builds);
+          expect((await resolve()).isOk(), 'the check').to.equal(builds);
+        });
+      });
+
+      // The bundler leaves the reference pointing at nothing, and the page renders without it.
+      it('refuses a referenced JSON file it reads as nothing, where the bundler goes on without it', async () => {
+        writeSpec({ Pet: { $ref: './schemas/Pet.json' } });
+        write('spec/schemas/Pet.json', '{ "type": "obj');
+
+        expect(await bundles(), 'the bundler').to.be.true;
+        expect(specProblem((await resolve())._unsafeUnwrapErr())).to.deep.equal([
+          'unreadableSpec',
+          'spec/schemas/Pet.json',
+          'spec/api.json'
+        ]);
+      });
     });
   });
 

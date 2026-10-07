@@ -11,8 +11,8 @@ const BYTE_ORDER_MARK = '﻿';
 describe('OpenApiDocument', () => {
   const read = (contents: string, fileName = JSON_FILE): OpenApiDocument => {
     const document = OpenApiDocument.parse(fileName, contents);
-    expect(document, `unparsable: ${contents}`).to.not.be.undefined;
-    return document as OpenApiDocument;
+    expect(document.isOk(), `unparsable: ${contents}`).to.be.true;
+    return document._unsafeUnwrap();
   };
 
   const readJson = (document: unknown, prefix = '') => read(prefix + JSON.stringify(document));
@@ -24,9 +24,15 @@ describe('OpenApiDocument', () => {
       expect(read('openapi: 3.1.0\n', YAML_FILE).format()).to.deep.equal({ supported: true });
     });
 
-    it('is undefined for text neither parser accepts', () => {
-      expect(OpenApiDocument.parse(JSON_FILE, '{ not json')).to.be.undefined;
-      expect(OpenApiDocument.parse(YAML_FILE, 'key: [unclosed')).to.be.undefined;
+    // Matched loosely: the words are the parser's own, and change with its version.
+    it('fails with what the parser said, on one line, saying where it stopped', () => {
+      const yaml = OpenApiDocument.parse(YAML_FILE, 'openapi: 3.0.0\ninfo:\n  title: [unclosed\n')._unsafeUnwrapErr();
+      const json = OpenApiDocument.parse(JSON_FILE, '{\n  "a": 1\n  "b": 2\n}')._unsafeUnwrapErr();
+      const quoting = OpenApiDocument.parse(JSON_FILE, '[1,\n2,\n,3]')._unsafeUnwrapErr();
+
+      expect(yaml).to.match(/at line 4, column 1$/);
+      expect(json).to.contain('line 3 column 3');
+      [yaml, json, quoting].forEach((reason) => expect(reason).to.not.contain('\n'));
     });
 
     it('treats a document that is not an object as no specification', () => {
@@ -194,6 +200,70 @@ describe('OpenApiDocument', () => {
           '/remote': { $ref: 'https://example.com/pets.yaml' }
         })
       ).to.be.empty;
+    });
+  });
+
+  describe('referencedFiles', () => {
+    const specDirectory = new DirectoryPath('/project/src/spec');
+    const referenced = (document: Record<string, unknown>) =>
+      readJson(document).referencedFiles(specDirectory).map(String);
+    const inSpec = (file: string) => path.resolve('/project/src/spec', file);
+
+    it('finds a $ref on any object, in data, extensions and lists too, against the folder of the document', () => {
+      const files = referenced({
+        openapi: '3.0.0',
+        paths: { '/pets': { $ref: './paths/pets.yaml' } },
+        components: {
+          schemas: { Pet: { allOf: [{ $ref: 'schemas/Base.yaml' }] } },
+          examples: { Pet: { value: { $ref: 'examples/pet.json' } } }
+        },
+        'x-shared': { $ref: '../shared/owners.yaml#/Owner' }
+      });
+
+      expect(files).to.deep.equal([
+        inSpec('paths/pets.yaml'),
+        inSpec('schemas/Base.yaml'),
+        inSpec('examples/pet.json'),
+        path.resolve('/project/src/shared/owners.yaml')
+      ]);
+    });
+
+    it('reads no further into an object with a $ref, as the bundler does not', () => {
+      const files = referenced({ Pet: { $ref: './pet.yaml', properties: { owner: { $ref: './owner.yaml' } } } });
+
+      expect(files).to.deep.equal([inSpec('pet.yaml')]);
+    });
+
+    it('leaves out references into the document, URLs, and what the bundler has embedded', () => {
+      const files = referenced({
+        local: { $ref: '#/components/schemas/Pet' },
+        remote: { $ref: 'https://example.com/pet.yaml' },
+        'x-ext': { abc123: { $ref: './embedded.yaml' } },
+        'x-ext-urls': { abc123: { $ref: './mapped.yaml' } }
+      });
+
+      expect(files).to.be.empty;
+    });
+
+    it('leaves out a reference below an $id, or naming one, which the bundler resolves against the $id', () => {
+      const files = referenced({
+        Pet: { $id: 'pet.json', properties: { tag: { $ref: './tag.yaml' } } },
+        owner: { $ref: 'pet.json#/properties/tag' }
+      });
+
+      expect(files).to.be.empty;
+    });
+
+    it('reads a backslash as a slash, and leaves a percent escape as written', () => {
+      const files = referenced({ a: { $ref: '.\\schemas\\Pet.yaml' }, b: { $ref: './my%20pet.yaml' } });
+
+      expect(files).to.deep.equal([inSpec('schemas/Pet.yaml'), inSpec('my%20pet.yaml')]);
+    });
+
+    it('survives an alias that holds itself', () => {
+      const document = read('openapi: 3.0.0\nloop: &loop\n  again: *loop\n  next: { $ref: ./next.yaml }\n', YAML_FILE);
+
+      expect(document.referencedFiles(specDirectory).map(String)).to.deep.equal([inSpec('next.yaml')]);
     });
   });
 

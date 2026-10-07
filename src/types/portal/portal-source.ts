@@ -107,7 +107,9 @@ export type PortalSourceProblem =
   | { kind: 'invalidConfig'; errors: string[]; missingPortal: boolean }
   // Every problem found in `content/`, so that one run lists all that a build would refuse.
   | { kind: 'invalidContent'; problems: ContentProblem[] }
-  | { kind: 'unreadableSpec'; fileName: FileName }
+  // `referencedBy`: the file whose `$ref` names it; null for a document at the top of `spec/`.
+  | { kind: 'unreadableSpec'; file: FilePath; referencedBy: FilePath | null; reason: string }
+  | { kind: 'missingSpecReference'; file: FilePath; referencedBy: FilePath }
   // Its `folders` are not read, and `api transform` writes into one of its own.
   | { kind: 'emptySpecDirectory'; folders: DirectoryPath[] }
   | { kind: 'noOpenApiSpec'; conversion: SpecConversion }
