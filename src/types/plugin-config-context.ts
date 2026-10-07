@@ -125,6 +125,12 @@ const keepsRecord = (language: string, entry: PluginLanguageEntry<Language> | un
 
 const isUnavailableLanguage = (language: string): boolean => !isAvailableLanguage(language);
 
+/** As a portal build refuses it; a block of the wrong shape is the build's to report. */
+const namesNoLanguage = (document: ApimaticConfigDocument): boolean => {
+  const languages = document.has('languages') ? document.languages() : {};
+  return languages !== undefined && Object.keys(languages).length === 0;
+};
+
 const withMetadata = (
   document: ApimaticConfigDocument,
   metadata: PluginMetadata,
@@ -179,6 +185,19 @@ export class PluginConfigContext {
       return ok(undefined);
     }
     const merged = await this.configContext.merge(['plugin'], (document) => withMetadata(document, metadata));
+    return merged.map(() => undefined);
+  }
+
+  public async languagesMissing(): Promise<boolean> {
+    const state = await this.configContext.read();
+    return state.state === 'parsed' && namesNoLanguage(state.document);
+  }
+
+  // Merged against `languages` alone, as `addMetadataIfMissing` is against `plugin`.
+  public async addLanguagesIfMissing(languages: readonly Language[]): Promise<Result<void, PluginConfigWriteFailure>> {
+    const merged = await this.configContext.merge(['languages'], (document) =>
+      namesNoLanguage(document) ? document.with('languages', recorded(document, languages, keepsRecord)) : document
+    );
     return merged.map(() => undefined);
   }
 

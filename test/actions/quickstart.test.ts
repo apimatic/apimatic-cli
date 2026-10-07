@@ -175,9 +175,45 @@ describe('QuickstartAction', () => {
       expect(fs.readdirSync(inSource('spec'))).to.deep.equal(['Apimatic-Calculator.json']);
     });
 
+    const namingNoLanguage: [string, string][] = [
+      ['has no languages block', '{}'],
+      ['names no language', JSON.stringify({ languages: {} })]
+    ];
+
+    namingNoLanguage.forEach(([file, config]) => {
+      it(`asks for languages when the apimatic.json it adopts ${file}, and records the choice`, async () => {
+        fs.writeFileSync(inSource('apimatic.json'), config);
+        prompts.selectLanguages.resolves([Language.TYPESCRIPT]);
+        sinon.stub(PortalArtifactsService.prototype, 'generate').resolves(ok(completeArtifacts([Language.TYPESCRIPT])));
+        const prepare = sinon.stub(PortalProjectService.prototype, 'prepare').resolves(err('stopped here'));
+
+        await execute(downloaded);
+
+        expect(prompts.selectLanguages.calledOnce).to.be.true;
+        const written = JSON.parse(fs.readFileSync(inSource('apimatic.json'), 'utf8'));
+        expect(written.languages).to.deep.equal({ typescript: {} });
+        expect(prepare.called, 'the wizard reached the preview').to.be.true;
+      });
+    });
+
+    it('writes nothing into the project it adopts when no language is chosen', async () => {
+      prompts.selectLanguages.resolves([]);
+
+      expect((await execute(downloaded)).isCancelled()).to.be.true;
+      expect(prompts.noLanguagesSelected.calledOnce).to.be.true;
+      expect(fs.readFileSync(inSource('apimatic.json'), 'utf8')).to.equal('{}');
+      expect(fs.existsSync(inSource('content'))).to.be.false;
+    });
+
     it('leaves the plugin block an adopted project carries as it is', async () => {
-      const config = JSON.stringify({ portal: { site: { name: 'Our Docs' } }, plugin: { pluginName: 'Ours' } });
+      const config = JSON.stringify({
+        portal: { site: { name: 'Our Docs' } },
+        languages: { typescript: {} },
+        plugin: { pluginName: 'Ours' }
+      });
       fs.writeFileSync(inSource('apimatic.json'), config);
+      sinon.stub(PortalArtifactsService.prototype, 'generate').resolves(ok(completeArtifacts([Language.TYPESCRIPT])));
+      sinon.stub(PortalProjectService.prototype, 'prepare').resolves(err('stopped here'));
 
       await execute(downloaded);
 

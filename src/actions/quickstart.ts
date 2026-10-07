@@ -15,7 +15,9 @@ import { PortalAuthorizationService } from '../infrastructure/services/portal-au
 import { PortalProjectService } from '../infrastructure/portal-project-service.js';
 import { APIMATIC_SCHEMA_URL } from '../types/apimatic-config/document.js';
 import { PLACEHOLDER_METADATA } from '../types/plugin/plugin-config.js';
+import { PluginConfigContext } from '../types/plugin-config-context.js';
 import { ProjectContext } from '../types/project-context.js';
+import { Language } from '../types/sdk/generate.js';
 import { ResourceContext } from '../types/resource-context.js';
 import { DEFAULT_PORTAL_PORT, PortalServeAction } from './portal/serve.js';
 
@@ -100,18 +102,41 @@ export class QuickstartAction {
     }
 
     this.prompts.createPortalStep();
+    const pluginConfig = project.pluginConfig();
+    const languages = await this.missingLanguages(pluginConfig);
+    if (languages === 'noneChosen') {
+      return ActionResult.cancelled();
+    }
     const [namedAfter] = specs.value;
     const adopted = await portalSource.adopt(namedAfter);
     if (adopted.isErr()) {
       this.prompts.scaffoldFailed(adopted.error, sourceDirectory);
       return ActionResult.failed();
     }
-    const pluginAdded = await project.pluginConfig().addMetadataIfMissing(PLACEHOLDER_METADATA);
+    const pluginAdded = await pluginConfig.addMetadataIfMissing(PLACEHOLDER_METADATA);
     if (pluginAdded.isErr()) {
       this.prompts.pluginNotAdded(pluginAdded.error, sourceDirectory);
       return ActionResult.failed();
     }
+    const languagesAdded = await pluginConfig.addLanguagesIfMissing(languages);
+    if (languagesAdded.isErr()) {
+      this.prompts.configNotWritten(languagesAdded.error, sourceDirectory);
+      return ActionResult.failed();
+    }
     return await this.completeProject(project, projectDirectory, adopted.value);
+  }
+
+  // Asked only when the file names none, since a portal cannot be built without one.
+  private async missingLanguages(pluginConfig: PluginConfigContext): Promise<readonly Language[] | 'noneChosen'> {
+    if (!(await pluginConfig.languagesMissing())) {
+      return [];
+    }
+    const selection = await this.prompts.selectLanguages();
+    if (!selection?.length) {
+      this.prompts.noLanguagesSelected();
+      return 'noneChosen';
+    }
+    return selection;
   }
 
   private async startProject(tempDirectory: DirectoryPath): Promise<ActionResult> {
