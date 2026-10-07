@@ -1,9 +1,8 @@
 # Plan: hosting the portal under a sub-path
 
-Status: designed 2026-09-29 on `saeedjamshaid/portal-subpath-hosting` (worktree
-`C:\repos\apimatic-cli-subpath-hosting`), cut from `origin/dev` at `74ad5d2e`. Tracks
-apimatic-io#2275, whose design this follows except where section 14 says otherwise. Reviewed
-four times on 2026-09-29; section 15 records what each round changed.
+Status: designed 2026-09-29 on `saeedjamshaid/portal-subpath-hosting`, cut from `origin/dev` at
+`74ad5d2e`. Tracks apimatic-io#2275, whose design this follows except where section 14 says
+otherwise. Reviewed four times on 2026-09-29; section 15 records what each round changed.
 
 Implemented in steps 1–4 on 2026-09-29 and 30, and opened as apimatic/apimatic-cli#411, which
 supersedes #407. Step 5 (section 7) is the follow-up outside this repository.
@@ -20,7 +19,9 @@ served at that path: its pages, assets, client navigation, search, downloads, SE
   - a path given without `site.url`, as a setting or a flag;
   - one build that works at whatever path it is deployed to.
 - **Invariant:** a portal whose `site.url` has no path, or that has no `site.url`, emits the same
-  pages, files and addresses as today. The content hashes in chunk names are the only difference.
+  pages, files and addresses as today. The content hashes in chunk names are the only difference,
+  apart from the image fixes of 5.10, which apply at the root too: reference-style images are
+  bundled and checked like inline ones, and an image in a description no longer fails its page.
 
 **Terms:**
 - A **portal-relative path** is a page's path from the portal's own root (`/guides/intro`).
@@ -281,7 +282,7 @@ Stopping it the way CTRL+C does left no project directory behind.
 ### 4.4 `apimatic.schema.json`
 
 - The `site.url` pattern becomes
-  `^\s*[hH][tT][tT][pP][sS]?://[^\s/?#\\]+(/(?!\.{1,2}(/|$))(?![A-Za-z0-9._~-]*\.[hH][tT][mM][lL]?/?\s*$)[A-Za-z0-9._~-]+)*/?\s*$`.
+  `^\s*[hH][tT][tT][pP][sS]?://[^\s/?#\\]+(?:/(?!\.{1,2}(?:/|\s*$))(?![A-Za-z0-9._~-]*\.[hH][tT][mM][lL]?/?\s*$)[A-Za-z0-9._~-]+)*/?\s*$`.
   The second lookahead refuses a last segment that names a page (4.1).
 - The description: "The address the portal is hosted at, for example 'https://docs.example.com'
   or 'https://example.com/docs'."
@@ -507,14 +508,18 @@ follow-up.
     It is built on Fumadocs' own `createMarkdownRenderer` with `remarkGfm`, and its `img` gives a
     root-relative `src` the base through `withBasePath`. Code blocks go through `DynamicCodeBlock`,
     with the highlighter and themes of Fumadocs' default.
-  - The e2e fixture's operation has an image in its description.
+  - `languageOf`, which reads a fence's language, lives in `lib/code-titles.ts`. In
+    `rehype-code-titles.ts` it put the highlighter on every page, through the route's chunk.
+    The default e2e build checks that no page preloads `shiki-bundle`.
+  - The e2e fixture's operation has an image and a code block in its description.
   - Filed as fuma-nama/fumadocs#3661 (section 10). `ApiMarkdown` can go once Fumadocs renders
     images and gives them the base.
 - **Reference-style images (`![alt][ref]`).** Fumadocs' `remarkImage` sizes and imports inline
   images only, so a reference kept a root-relative `src` that misses the base.
   - `remarkImageReferences` (`lib/remark-image-references.ts`) writes each one as an inline image
-    ahead of `remarkImage`. It is registered in the global options (`vite.config.ts`) and in the
-    generated collection, whose options replace them.
+    ahead of `remarkImage`. It is registered in the global options (`vite.config.ts`), which the
+    content collection takes. The generated collection replaces them and leaves it out: with no
+    `publicDir`, an SDK page's root-relative image would fail the build once imported (measured).
   - `src/types/portal/page.ts` checks those images before a build too. A missing one is then
     reported by the CLI, not by a failed build. A contract test holds the two to the same images.
   - Like every imported image, it now reads `<img src="__imgN" />` in the Markdown copies (section 9).
@@ -537,6 +542,8 @@ follow-up.
   it back as written.
   - A repeated key (`?a=1&a=2`) still comes back as one JSON value under a path. Nothing in the
     portal or Fumadocs reads one.
+  - The address is still written anew, so `%20` becomes `+` and a bare `?a` becomes `?a=`. Each
+    value reads back the same.
   - When TanStack's fix (PR #8450) ships, `searchOptions` can go (section 10).
 
 ### 5.12 Unchanged, and why
@@ -718,13 +725,16 @@ after each one. In all, roughly 400 lines of source and 500 of tests.
 - **TanStack's prerender stops treating an already-prefixed path as prefixed.** Every page would
   then be fetched with the base twice and 404, failing the build. The colliding `subpath` fixture
   would catch that on the upgrade that brings it.
-- **Dependency upgrades.** Nothing here pins, patches or copies a Fumadocs or TanStack module.
-  Every behaviour the path relies on either cannot break on an upgrade or fails CI when it does:
+- **Dependency upgrades.** Nothing here pins a version or edits an installed package. Two pieces
+  stand in for upstream code until it is fixed: `static-functions-base.ts` rewrites one address in
+  TanStack's browser bundle (5.6), and `ApiMarkdown` renders descriptions as Fumadocs does, with
+  images (5.10). Every behaviour the path relies on either cannot break on an upgrade or fails CI
+  when it does:
 
   | Relied on | On an upgrade that changes it |
   |---|---|
   | The popover's Markdown URL | Cannot break: a full address is right whether Fumadocs adds the base or not (5.2) |
-  | Markdown images are bundled | Cannot break: `useImport` is written out (5.1); the e2e image checks it |
+  | Content pages' Markdown images are bundled | Cannot break: `useImport` is written out (5.1); the e2e image checks it |
   | Query values on load under a base | `search-options.test.ts` fails: it runs TanStack's own helpers (5.11) |
   | Fumadocs links are router links | The e2e fails (step 1's link assertions) |
   | `llms()` reads the loader methods we wrap | The e2e fails (`llms.txt` links) |
@@ -733,6 +743,9 @@ after each one. In all, roughly 400 lines of source and 500 of tests.
   | TanStack's cache literal | The build fails, and the unit guard (5.6) |
 
   A failure is a stop on that upgrade, not a broken portal, and it names what to change.
+
+  `ApiMarkdown` is the exception. If Fumadocs changes how it renders descriptions, ours keeps the
+  old way without failing. The e2e checks only that an image and a code block render (5.10).
 - **A base of `/spa-shell` exactly.** TanStack's own prefixing of the shell path would leave it
   alone, and the shell would be prerendered from the home page. Deep links would briefly show the
   home page before hydrating. Not refused, since no one names a docs path after an internal route.
@@ -798,9 +811,9 @@ with the MDX components, but not in its copy.
 | fuma-nama/fumadocs#3662 | Filed 2026-10-07: processed Markdown prints images as `__img0` | When it ships, ticket 5 is fixed by the upgrade (section 9) |
 
 **The fixes:**
-- **Fumadocs:** filed by the user as fuma-nama/fumadocs#3620, from the draft at
-  `C:\repos\fumadocs-issue-view-as-markdown-base-path.md`, and fixed as it proposed. The two image
-  bugs of 5.10 and section 9 were filed as #3661 and #3662. Reference-style images are not filed.
+- **Fumadocs:** filed by the user as fuma-nama/fumadocs#3620, from a draft made here, and fixed
+  as it proposed. The two image bugs of 5.10 and section 9 were filed as #3661 and #3662.
+  Reference-style images are not filed.
 - **TanStack:** the planned comment on #6152 would have given a repro and a fix that prefixes only
   the client fetch in `fetchItem`, `fetch(import.meta.env.BASE_URL.replace(/\/$/, '') + url)`,
   leaving `getStaticCacheUrl` alone. SimYunSup's comments on PR #5970 (2026-08-12) already say all
@@ -1005,3 +1018,13 @@ the callback's home link now get it (5.2), and the callback is prerendered under
 other pages (5.7). A sign-in against a mock provider then found the router rewriting the query
 on load under a path, which kept sign-in from completing (5.11). After that fix, the sign-in
 completed under `/api`, under `/Dev/v1.0` and at the root, and under `portal serve` at `/api`.
+
+**After a full review** (2026-10-07). An independent review of the whole PR found no blocker. Two
+regressions from 5.10 are fixed, each measured against `dev` and the PR's head:
+- every page preloaded the highlighter, at the root too, through `languageOf`. It moved to
+  `code-titles.ts`, and the e2e checks it;
+- a reference-style image in SDK docs failed the build. The generated collection leaves the
+  plugin out.
+
+It also corrected the invariant (section 1), the 4.4 pattern, section 8's claim about upstream
+code, and 5.11's note on the address.
