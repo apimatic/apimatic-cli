@@ -26,7 +26,7 @@
         "/apimatic.schema.json"
     ],
     "repository": "git://github.com/apimatic/apimatic-cli.git",
-    "homepage": "https://docs.apimatic.io/apimatic-cli/intro-and-install/",
+    "homepage": "https://docs.apimatic.io/v4/quickstart/",
     "keywords": [
         "apimatic",
         "cli",

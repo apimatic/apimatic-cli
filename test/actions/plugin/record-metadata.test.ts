@@ -4,6 +4,7 @@ import sinon from 'sinon';
 import { expect } from 'chai';
 import { err, ok } from 'neverthrow';
 import { dir as tmpDir, DirectoryResult } from 'tmp-promise';
+import { ActionResult } from '../../../src/actions/action-result.js';
 import { PluginRecordMetadataAction } from '../../../src/actions/plugin/record-metadata.js';
 import { PluginRecordMetadataPrompts } from '../../../src/prompts/plugin/record-metadata.js';
 import { ApiService } from '../../../src/infrastructure/services/api-service.js';
@@ -98,15 +99,18 @@ describe('PluginRecordMetadataAction', () => {
     expect(fsExtra.existsSync(configPath())).to.be.false;
   });
 
-  // The caller prints this to say which answer was missing, so it has to survive on the result.
-  it('carries the reason the prompts were abandoned', async () => {
+  // The outro prints the result's message, so a reason left on it would be shown twice.
+  it('names the missing answer once, in the warning', async () => {
     sinon
       .stub(PluginRecordMetadataPrompts.prototype, 'inputPluginMetadata')
-      .resolves({ cancelled: 'A plugin version is required' });
+      .resolves({ cancelled: 'No plugin version was chosen' });
+    const metadataCancelled = sinon.stub(PluginRecordMetadataPrompts.prototype, 'metadataCancelled');
 
     const result = await execute();
 
-    expect(result.getMessage()).to.equal('A plugin version is required');
+    expect(metadataCancelled.calledOnceWithExactly('No plugin version was chosen')).to.be.true;
+    expect(result.isCancelled()).to.be.true;
+    expect(result.getMessage()).to.equal(ActionResult.cancelled().getMessage());
   });
 
   it('still writes the config when the account lookup fails, leaving the author out', async () => {
