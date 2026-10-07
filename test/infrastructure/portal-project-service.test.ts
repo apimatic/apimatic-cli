@@ -52,6 +52,7 @@ describe('PortalProjectService', () => {
     config: configFor({ site: { name: 'My API' } }),
     generatedPages: pagesFor(),
     suggestedSite: null,
+    specDirectory: new DirectoryPath(root).join('spec'),
     specs: [
       {
         slug: 'calculator',

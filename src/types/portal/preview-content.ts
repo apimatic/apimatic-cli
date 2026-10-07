@@ -2,11 +2,12 @@ import { FilePath } from '../file/filePath.js';
 import { ContentNotices, NoTabsListed } from './content-notices.js';
 import { isSameTabEntry } from './portal-navigation.js';
 import { SharedTabName, TabOwner } from './portal-tabs.js';
+import { PreviewRefusal } from './preview-refusal.js';
 
 /** A notice is given once, on the save that brings it about, rather than on every save after it. */
 export class PreviewContent {
   private shown: ContentNotices;
-  private refused = false;
+  private readonly refusal = new PreviewRefusal();
 
   /** `startup`: what the checks before the preview started reported. */
   constructor(startup: ContentNotices) {
@@ -14,7 +15,7 @@ export class PreviewContent {
   }
 
   public refuse(): void {
-    this.refused = true;
+    this.refusal.refuse();
   }
 
   /**
@@ -22,8 +23,7 @@ export class PreviewContent {
    * and which notices to give: each kind in full when it holds something new, and none otherwise.
    */
   public show(notices: ContentNotices): { fixed: boolean; notices: ContentNotices } {
-    const shown = { fixed: this.refused, notices: PreviewContent.since(notices, this.shown) };
-    this.refused = false;
+    const shown = { fixed: this.refusal.accept(), notices: PreviewContent.since(notices, this.shown) };
     this.shown = notices;
     return shown;
   }

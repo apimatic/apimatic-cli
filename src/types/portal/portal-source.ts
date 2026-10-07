@@ -28,6 +28,7 @@ export interface PortalSource extends PortalSettings {
    * can judge an edited config without reading the specifications again.
    */
   suggestedSite: SuggestedSite | null;
+  specDirectory: DirectoryPath;
   specs: PortalSpec[];
   contentDirectory: DirectoryPath | null;
   staticDirectory: DirectoryPath | null;

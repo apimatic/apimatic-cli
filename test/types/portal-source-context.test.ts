@@ -404,6 +404,19 @@ describe('PortalSourceContext', () => {
       const source = (await resolve())._unsafeUnwrap();
 
       expect(source.specs.map((spec) => spec.slug)).to.deep.equal(['a', 'b', 'c']);
+      expect(source.specDirectory.toString()).to.equal(path.join(root, 'spec'));
+    });
+
+    // What `portal serve` reads again on each save.
+    it('finds the same documents, and the same problems, on their own', async () => {
+      write('spec/b.json', OPENAPI);
+      write('spec/a.yaml', 'openapi: 3.0.0\ninfo:\n  title: A\n  version: "1"\npaths: {}\n');
+      const specs = () => new PortalSourceContext(new DirectoryPath(root)).resolveSpecs();
+
+      expect((await specs())._unsafeUnwrap()).to.deep.equal((await resolve())._unsafeUnwrap().specs);
+
+      write('spec/b.json', '{ "openapi": ');
+      expect((await specs())._unsafeUnwrapErr()).to.deep.equal((await resolve())._unsafeUnwrapErr());
     });
 
     it('ignores documents that carry no version key', async () => {

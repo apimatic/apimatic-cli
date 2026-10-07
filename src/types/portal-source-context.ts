@@ -112,6 +112,7 @@ export class PortalSourceContext {
     return ok({
       ...settings.value,
       suggestedSite: suggested,
+      specDirectory: this.specDirectory,
       specs,
       contentDirectory,
       staticDirectory,
@@ -129,6 +130,11 @@ export class PortalSourceContext {
     generatedPages: GeneratedPages
   ): Promise<Result<AcceptedContent, ContentProblem[]>> {
     return await this.content(await this.existingContentDirectory(), specs, generatedPages);
+  }
+
+  /** The `spec/` half of `resolve`, for `portal serve` to run on each save. */
+  public async resolveSpecs(): Promise<Result<PortalSpec[], PortalSourceProblem>> {
+    return (await this.specs()).map(({ specs }) => specs);
   }
 
   private async existingContentDirectory(): Promise<DirectoryPath | null> {
