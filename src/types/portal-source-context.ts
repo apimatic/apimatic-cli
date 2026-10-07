@@ -342,11 +342,17 @@ export class PortalSourceContext {
   public async adopt(namedAfter: PortalSpec): Promise<Result<FilePath, PortalScaffoldProblem>> {
     try {
       const site = await this.suggestedSite(namedAfter.file);
-      // A block that is not an object is left for the build to report.
+      // A block or a site that is not an object is left for the build to report.
       const written = await this.mergeConfig((document) => {
         const portal = document.portal() ?? {};
-        return isJsonObject(portal) && portal.site === undefined
-          ? document.with('portal', { site: SiteConfig.suggested(site).toJSON(), ...portal })
+        if (!isJsonObject(portal)) {
+          return document;
+        }
+        if (portal.site === undefined) {
+          return document.with('portal', { site: SiteConfig.suggested(site).toJSON(), ...portal });
+        }
+        return isJsonObject(portal.site) && portal.site.name === undefined
+          ? document.with('portal', { ...portal, site: { name: site.name, ...portal.site } })
           : document;
       });
       if (written.isErr()) {

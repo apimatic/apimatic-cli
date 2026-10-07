@@ -176,7 +176,7 @@ describe('QuickstartAction', () => {
     });
 
     it('leaves the plugin block an adopted project carries as it is', async () => {
-      const config = JSON.stringify({ portal: { site: {} }, plugin: { pluginName: 'Ours' } });
+      const config = JSON.stringify({ portal: { site: { name: 'Our Docs' } }, plugin: { pluginName: 'Ours' } });
       fs.writeFileSync(inSource('apimatic.json'), config);
 
       await execute(downloaded);

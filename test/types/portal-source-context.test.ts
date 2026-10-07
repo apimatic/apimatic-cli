@@ -2041,13 +2041,30 @@ describe('PortalSourceContext', () => {
         expect(portalBlock()).to.deep.equal({ site: { name: 'Petstore' } });
       });
 
-      it('leaves a portal block that is not an object for the build to report', async () => {
-        writeSourceSpec('petstore.json', { info: { title: 'Petstore', version: '1' } });
-        writeSourceConfig({ portal: 'petstore' });
+      it('names a site that has no name, and keeps the rest of it where it was', async () => {
+        writeSourceSpec('petstore.json', { info: { title: 'Petstore', version: '1', description: 'All the pets.' } });
+        writeSourceConfig({ portal: { ai: { pageActions: false }, site: { url: 'https://docs.example.com' } } });
 
         await adopt();
 
-        expect(portalBlock()).to.equal('petstore');
+        expect(portalBlock().site).to.deep.equal({ name: 'Petstore', url: 'https://docs.example.com' });
+        expect(Object.keys(portalBlock())).to.deep.equal(['ai', 'site']);
+      });
+
+      const unreadBlocks: [string, unknown][] = [
+        ['a portal block', 'petstore'],
+        ['a site', { site: 'petstore' }]
+      ];
+
+      unreadBlocks.forEach(([what, portal]) => {
+        it(`leaves ${what} that is not an object for the build to report`, async () => {
+          writeSourceSpec('petstore.json', { info: { title: 'Petstore', version: '1' } });
+          writeSourceConfig({ portal });
+
+          await adopt();
+
+          expect(portalBlock()).to.deep.equal(portal);
+        });
       });
 
       it('writes the welcome page and the page order when there is no content/, named as the file names the site', async () => {
@@ -2101,15 +2118,22 @@ describe('PortalSourceContext', () => {
         });
       });
 
-      it('names a portal of several specs after the first, since the build then needs the name written', async () => {
-        writeSourceSpec('alpha.json', { info: { title: 'Alpha', version: '1' } });
-        writeSourceSpec('zebra.yaml', { info: { title: 'Zebra', version: '1' } });
-        writeSourceConfig({ portal: {}, languages: LANGUAGES });
+      const unnamedPortals: [string, object][] = [
+        ['no site', {}],
+        ['the empty site the template ships', { site: {} }]
+      ];
 
-        await adopt();
+      unnamedPortals.forEach(([shape, portal]) => {
+        it(`names a portal of several specs with ${shape} after the first, since the build then needs the name written`, async () => {
+          writeSourceSpec('alpha.json', { info: { title: 'Alpha', version: '1' } });
+          writeSourceSpec('zebra.yaml', { info: { title: 'Zebra', version: '1' } });
+          writeSourceConfig({ portal, languages: LANGUAGES });
 
-        expect(portalBlock().site.name).to.equal('Alpha');
-        expect((await new PortalSourceContext(source).resolve()).isOk()).to.be.true;
+          await adopt();
+
+          expect(portalBlock().site.name).to.equal('Alpha');
+          expect((await new PortalSourceContext(source).resolve()).isOk()).to.be.true;
+        });
       });
     });
   });
