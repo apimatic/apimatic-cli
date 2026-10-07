@@ -1,5 +1,6 @@
 import { buttonVariants } from 'fumadocs-ui/components/ui/button';
 import type { ReactNode } from 'react';
+import { withBasePath } from '@/lib/base-path';
 import type { OAuthCallbackFailure } from '@/lib/oauth-callback';
 
 /** What the OAuth callback says when it stays, instead of sending the browser back to the endpoint. */
@@ -49,9 +50,8 @@ function Explanation({ children }: { children: ReactNode }) {
 }
 
 // The page that started the authorization is unknown here, so the home page is the one way back.
-// It ignores a base path, as the callback's own address does (apimatic-io#2275).
 function HomeAction() {
-  return <Action href="/">Go to the home page</Action>;
+  return <Action href={withBasePath('/')}>Go to the home page</Action>;
 }
 
 function Action({ href, children }: { href: string; children: ReactNode }) {

@@ -39,6 +39,9 @@ describe('the OAuth callback when it cannot complete the authorization', functio
     server = await createServer({
       configFile: false,
       root: process.cwd(),
+      // Under a path, which the home link has to carry.
+      base: '/docs/',
+      resolve: { tsconfigPaths: true },
       logLevel: 'silent',
       appType: 'custom',
       server: { middlewareMode: true, hmr: false, ws: false, watch: null },
@@ -85,7 +88,7 @@ describe('the OAuth callback when it cannot complete the authorization', functio
       text:
         "Authorization could not be completed This page completes an authorization started from an endpoint's playground, and none " +
         "was started in this browser. Open the endpoint's page and authorize from there. Go to the home page",
-      link: { label: 'Go to the home page', href: '/' }
+      link: { label: 'Go to the home page', href: '/docs/' }
     });
   });
 
@@ -94,7 +97,7 @@ describe('the OAuth callback when it cannot complete the authorization', functio
       text:
         'Authorization could not be completed The authorization was not started from a page of this site, so it cannot be ' +
         "completed here. Open the endpoint's page and authorize from there. Go to the home page",
-      link: { label: 'Go to the home page', href: '/' }
+      link: { label: 'Go to the home page', href: '/docs/' }
     });
   });
 });

@@ -185,7 +185,8 @@ describe('prerenderPages', () => {
       '/api/api/search.json',
       '/api/api/overview',
       '/api/llms.txt',
-      '/api/sitemap.xml'
+      '/api/sitemap.xml',
+      '/api/oauth/callback'
     ]);
     expect(urls.filter((url) => !url.startsWith('/api/'))).to.be.empty;
   });

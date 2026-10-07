@@ -781,7 +781,8 @@ const stylesheetOf = (output: DirectoryPath) => {
       'api/apimatic-calculator/simple-calculator/Calculate/index.html',
       'sdks/index.html',
       'sdks/typescript/index.html',
-      'context-plugin/index.html'
+      'context-plugin/index.html',
+      'oauth/callback/index.html'
     ]) {
       const addresses = [...read(page).matchAll(/\s(?:src|href)="(\/[^"]*)"/g)].map((match) => match[1]);
 

@@ -12,7 +12,7 @@ export const OpenAPIPage = createOpenAPIPage({
   content: { renderAPIExampleLayout: renderExampleLayout, renderAPIExampleUsageTabs: renderUsageTabs },
   components: { Markdown: ApiMarkdown },
   mediaAdapters,
-  oauthRedirectUrl: oauthCallbackPath,
+  oauthRedirectUrl: withBasePath(oauthCallbackPath),
   // Portals under paths of one host keep their playground's saved values apart; at the root the keys stay Fumadocs' own.
   storageKeyPrefix: `fumadocs-openapi-${withBasePath('/').slice(1)}`
 });
