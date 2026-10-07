@@ -672,7 +672,8 @@ The probes:
 - **`portal serve` under the base:**
   - the printed link, client navigation, search, each onto a colliding page as well;
   - the plugin download;
-  - an edit that moves the path: it is applied, and the old path is served until a restart.
+  - an edit that moves the path: it is applied, and the old path is served until a restart;
+  - the OAuth sign-in, and a query kept as written on load.
 
 ## 7. Implementation steps
 
@@ -1000,4 +1001,4 @@ one redirect URI for the playground's sign-in, and left the base to this PR. The
 the callback's home link now get it (5.2), and the callback is prerendered under it with the
 other pages (5.7). A sign-in against a mock provider then found the router rewriting the query
 on load under a path, which kept sign-in from completing (5.11). After that fix, the sign-in
-completed under `/api`, under `/Dev/v1.0` and at the root.
+completed under `/api`, under `/Dev/v1.0` and at the root, and under `portal serve` at `/api`.
