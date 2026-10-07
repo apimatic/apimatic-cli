@@ -15,6 +15,7 @@ import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
 import { FileName } from '../../../src/types/file/fileName.js';
 import { FilePath } from '../../../src/types/file/filePath.js';
 import { PLUGIN_SECTION, SDK_SECTION } from '../../../src/types/portal/generated-pages.js';
+import { OAUTH_CALLBACK } from '../../../src/types/portal/content-tree.js';
 
 describe('reportSourceProblem', () => {
   const source = new DirectoryPath('project').join('src');
@@ -191,7 +192,7 @@ describe('reportSourceProblem', () => {
     });
   });
 
-  describe('a page at an address kept for the generated pages', () => {
+  describe("a page at an address kept for the portal's own pages", () => {
     const content = source.join('content');
 
     it('names the page, where it would be served, and what the address is kept for', () => {
@@ -201,14 +202,14 @@ describe('reportSourceProblem', () => {
           {
             file: new FilePath(content.join('(intro)'), new FileName('sdks.md')),
             address: '/sdks',
-            section: SDK_SECTION
+            keptFor: { address: '/sdks', description: SDK_SECTION.description }
           }
         ]
       });
 
       const [heading, ...rest] = printed().split('\n');
 
-      expect(heading).to.match(/^A page in .+ would be served where the portal puts the pages it generates:$/);
+      expect(heading).to.match(/^A page in .+ would be served where the portal puts pages of its own:$/);
       expect(rest).to.deep.equal([
         "  • 'content/(intro)/sdks.md', at '/sdks', which is kept for the SDK pages",
         'Rename or move the page.'
@@ -222,12 +223,12 @@ describe('reportSourceProblem', () => {
           {
             file: new FilePath(content.join('sdks'), new FileName('setup.md')),
             address: '/sdks/setup',
-            section: SDK_SECTION
+            keptFor: { address: '/sdks', description: SDK_SECTION.description }
           },
           {
             file: new FilePath(content, new FileName('context-plugin.mdx')),
             address: '/context-plugin',
-            section: PLUGIN_SECTION
+            keptFor: { address: '/context-plugin', description: PLUGIN_SECTION.description }
           }
         ]
       });
@@ -240,6 +241,23 @@ describe('reportSourceProblem', () => {
         "  • 'content/context-plugin.mdx', at '/context-plugin', which is kept for the context plugin page"
       );
       expect(printed()).to.contain('Rename or move each page.');
+    });
+
+    it("says a page at /oauth/callback is kept for the API playground's OAuth authorization", () => {
+      reportContent({
+        kind: 'reservedAddresses',
+        pages: [
+          {
+            file: new FilePath(content.join('oauth'), new FileName('callback.md')),
+            address: '/oauth/callback',
+            keptFor: OAUTH_CALLBACK
+          }
+        ]
+      });
+
+      expect(printed()).to.contain(
+        "  • 'content/oauth/callback.md', at '/oauth/callback', which is kept for the API playground's OAuth authorization"
+      );
     });
   });
 

@@ -3,6 +3,7 @@ import path from 'node:path';
 import { getSlugs, loader } from 'fumadocs-core/source';
 import { type BuildIdentity, type BuildPaths, viteBase } from './portal-config';
 import { withBasePath } from './src/lib/base-path';
+import { oauthCallbackPath } from './src/lib/oauth-callback';
 import { openApiSection } from './src/lib/openapi-section.server';
 
 const CONTENT_EXTENSIONS = new Set(['.md', '.mdx']);
@@ -38,6 +39,8 @@ export async function prerenderPages(config: BuildPaths, identity: BuildIdentity
     if (url === '/') urls.add('/index.md');
     else if (!/\.(txt|xml|json)$/.test(url)) urls.add(`${url}.md`);
   }
+  // After the twins, since it is no page of the portal's and has none.
+  urls.add(oauthCallbackPath);
 
   // Served paths, or TanStack takes a page starting like the base (`/api/…` under `/api`) as already under it.
   return [...urls].map((url) => ({ path: withBasePath(url, base) }));
