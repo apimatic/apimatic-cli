@@ -75,6 +75,20 @@ describe('ResourceContext', () => {
     expect(contentsOf(file)).to.equal('openapi: 3.0.3');
   });
 
+  it('keeps a download in the temporary directory whatever path its name carries', async () => {
+    nock(HOST)
+      .get('/download')
+      .reply(200, '{}', { 'Content-Disposition': 'attachment; filename="x/../../../escaped.json"' });
+    nock(HOST).get('/x%2F..%2F..%2F..%2Fescaped.json').reply(200, '{}');
+    nock(HOST).get('/nested').reply(200, '{}', { 'Content-Disposition': 'attachment; filename="specs/openapi.json"' });
+
+    for (const address of ['/download', '/x%2F..%2F..%2F..%2Fescaped.json', '/nested']) {
+      const file = (await resolve(new UrlPath(`${HOST}${address}`)))._unsafeUnwrap().file();
+
+      expect(path.dirname(file.toString())).to.equal(tempDirectory.toString());
+    }
+  });
+
   it('names a download the server does not name by its address, without the query', async () => {
     nock(HOST).get('/v1/openapi.json').query({ token: 'abc' }).reply(200, '{}');
 
