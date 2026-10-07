@@ -21,12 +21,17 @@ export default class Validate extends Command {
   ];
 
   static flags = {
-    file: Flags.string({ description: 'Path to the API specification file to validate', exclusive: ['url', 'input'] }),
+    file: Flags.string({
+      description: 'Path to the API specification file to validate',
+      exclusive: ['url', 'input'],
+      parse: FlagsProvider.nonEmpty
+    }),
     url: Flags.string({
       description: 'URL to the API specification file to validate (publicly accessible)',
-      exclusive: ['file', 'input']
+      exclusive: ['file', 'input'],
+      parse: FlagsProvider.nonEmpty
     }),
-    ...FlagsProvider.input,
+    ...FlagsProvider.nonEmptyInput,
     ...FlagsProvider.authKey
   };
 

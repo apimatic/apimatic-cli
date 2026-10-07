@@ -15,11 +15,6 @@ describe('createResourceInput', () => {
     expect(sourceOf(spec)).to.equal(path.resolve('project', 'src'));
   });
 
-  it('takes the project too when --file or --url is given empty, as an unset shell variable gives it', () => {
-    expect(sourceOf(createResourceInput('', undefined, 'project'))).to.equal(path.resolve('project', 'src'));
-    expect(sourceOf(createResourceInput(undefined, '', 'project'))).to.equal(path.resolve('project', 'src'));
-  });
-
   it('takes --file as a file on disk and --url as an address', () => {
     expect(createResourceInput('specs/openapi.json', undefined, 'project')).to.be.instanceOf(FilePath);
     expect(createResourceInput(undefined, 'https://example.org/openapi.json', 'project')).to.be.instanceOf(UrlPath);
