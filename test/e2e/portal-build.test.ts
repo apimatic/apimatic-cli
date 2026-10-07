@@ -228,6 +228,13 @@ const stylesheetOf = (output: DirectoryPath) => {
     expect(read('index.md')).to.contain('Hello from the fixture.');
   });
 
+  it('writes the one OAuth redirect URI every endpoint page authorizes through, kept out of search', () => {
+    expect(read('oauth/callback/index.html')).to.contain('<meta name="robots" content="noindex"');
+    // The cookie it reads is the browser's, so the page is built to wait for it.
+    expect(read('oauth/callback/index.html')).to.contain('Completing authorization…');
+    expect(read('sitemap.xml')).to.not.contain('/oauth/callback');
+  });
+
   it('writes a search index and the llms files', () => {
     expect(exists('api/search.json')).to.be.true;
     expect(read('llms.txt')).to.contain('Welcome');
