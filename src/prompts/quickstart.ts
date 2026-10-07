@@ -17,9 +17,7 @@ import { AVAILABLE_LANGUAGES, Language, languageLabel, UPCOMING_LANGUAGES } from
 import { noteWrapped, withSpinner } from './prompt.js';
 import { reportAuthorizationFailure } from './portal/authorization.js';
 import { convertToOpenApi3 } from './portal/source.js';
-
-const vscodeExtensionUrl =
-  'https://marketplace.visualstudio.com/items?itemName=apimatic-developers.apimatic-for-vscode';
+import { reportInvalidSpec } from './api/invalid-spec.js';
 
 export class QuickstartPrompts {
   public welcomeMessage() {
@@ -110,18 +108,7 @@ Let's get started!`);
   }
 
   public specValidationFailed(spec: ResourceInput) {
-    log.error(`Oops, it looks like there are some errors in your API Definition`);
-    // A placeholder rather than the user's own path or URL, which no quoting survives every shell with.
-    const specFlag = spec instanceof UrlPath ? f.flag('url', '<url>') : f.flag('file', '<path>');
-    const validateCommand = `${f.cmdAlt('apimatic', 'api', 'validate')} ${specFlag}`;
-    const message = [
-      `Ask an AI coding agent to run this command and fix what it reports:`,
-      validateCommand,
-      '',
-      `Or use APIMatic's interactive VS Code Extension:`,
-      f.link(vscodeExtensionUrl)
-    ].join('\n');
-    noteWrapped(message, 'How to fix');
+    reportInvalidSpec(spec instanceof UrlPath ? 'url' : 'file');
   }
 
   public createPortalStep() {
