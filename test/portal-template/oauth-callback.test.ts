@@ -75,13 +75,13 @@ describe('oauthCallback', () => {
     });
   });
 
-  it('says no sign-in was started without the cookie', () => {
+  it('says no authorization was started without the cookie', () => {
     expect(oauthCallback('theme=dark', answered('?code=abc'))).to.deep.equal({ kind: 'notStarted' });
     expect(oauthCallback('', answered('?code=abc'))).to.deep.equal({ kind: 'notStarted' });
   });
 
-  // Anyone can link here, so an error and its description are only shown for a sign-in this browser started.
-  it("shows no provider's error for a sign-in this browser did not start", () => {
+  // Anyone can link here, so an error and its description are only shown for an authorization this browser started.
+  it("shows no provider's error for an authorization this browser did not start", () => {
     const callback = oauthCallback('', answered('?error=access_denied&error_description=Call+this+number'));
 
     expect(callback).to.deep.equal({ kind: 'notStarted' });

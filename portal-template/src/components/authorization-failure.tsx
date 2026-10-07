@@ -48,8 +48,8 @@ function Explanation({ children }: { children: ReactNode }) {
   );
 }
 
-// The page that started the sign-in is unknown here, so the home page is the one way back. It
-// ignores a base path, as the callback's own address does (apimatic-io#2275).
+// The page that started the authorization is unknown here, so the home page is the one way back.
+// It ignores a base path, as the callback's own address does (apimatic-io#2275).
 function HomeAction() {
   return <Action href="/">Go to the home page</Action>;
 }

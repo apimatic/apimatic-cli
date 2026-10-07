@@ -31,9 +31,9 @@ import { PortalTab, sharedTabNames, TabOwner, untitledTabName } from './portal-t
 const NAVIGATION_FILE = new FileName(NAVIGATION_FILE_NAME);
 
 /**
- * The page the API playground's OAuth sign-in returns through, which the template serves from a
- * route of its own (`portal-template/src/lib/oauth-callback.ts`). That route wins over a content
- * page at the address, so such a page would build and never be shown.
+ * The page the API playground's OAuth authorization returns through, which the template serves
+ * from a route of its own (`portal-template/src/lib/oauth-callback.ts`). That route wins over a
+ * content page at the address, so such a page would build and never be shown.
  */
 export const OAUTH_CALLBACK_ADDRESS = '/oauth/callback';
 

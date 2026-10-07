@@ -22,7 +22,7 @@ let completion: OAuthCallback | undefined;
  * as Back after leaving through the header, shows the same outcome. Every arrival from a provider
  * is a new load.
  */
-function completeSignIn(): OAuthCallback {
+function completeAuthorization(): OAuthCallback {
   if (completion === undefined) {
     completion = oauthCallback(document.cookie, window.location);
     forgetStartingPage();
@@ -36,7 +36,7 @@ function OAuthCallbackPage() {
   const [failure, setFailure] = useState<OAuthCallbackFailure | null>(null);
 
   useEffect(() => {
-    const callback = completeSignIn();
+    const callback = completeAuthorization();
     if (callback.kind !== 'return') setFailure(callback);
   }, []);
 

@@ -14,7 +14,7 @@ export function render(failure) {
 }
 `;
 
-function signInFailureFixture(): Plugin {
+function authorizationFailureFixture(): Plugin {
   return {
     name: 'authorization-failure-fixture',
     enforce: 'pre',
@@ -43,7 +43,7 @@ describe('the OAuth callback when it cannot complete the authorization', functio
       appType: 'custom',
       server: { middlewareMode: true, hmr: false, ws: false, watch: null },
       optimizeDeps: { noDiscovery: true, include: [] },
-      plugins: [signInFailureFixture()]
+      plugins: [authorizationFailureFixture()]
     });
     ({ render } = (await server.ssrLoadModule(ENTRY)) as { render: typeof render });
   });
