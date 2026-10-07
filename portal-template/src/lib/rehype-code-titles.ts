@@ -1,5 +1,5 @@
 import { parseCodeBlockAttributes } from 'fumadocs-core/mdx-plugins/codeblock-utils';
-import { CODE_BLOCK_TITLES } from './code-titles';
+import { CODE_BLOCK_TITLES, languageOf } from './code-titles';
 import { bundledLanguage } from './shiki-bundle';
 
 interface HastNode {
@@ -10,8 +10,6 @@ interface HastNode {
   data?: { meta?: string | null };
   children?: HastNode[];
 }
-
-const LANGUAGE_CLASS = 'language-';
 
 /** Where `remarkCodeTab` puts a tabbed block, by its own tabs or an MDX `<Tabs>`: the tab already names it. */
 const CODE_TABS = new Set(['CodeBlockTab', 'Tab', 'TabsContent']);
@@ -50,10 +48,4 @@ export function rehypeCodeTitles() {
     }
   };
   return visit;
-}
-
-/** The language a fence names, from the class `remark-rehype` gives its `code`. */
-export function languageOf(classes: unknown[]): string | undefined {
-  const languageClass = classes.find((name) => typeof name === 'string' && name.startsWith(LANGUAGE_CLASS));
-  return typeof languageClass === 'string' ? languageClass.slice(LANGUAGE_CLASS.length) : undefined;
 }

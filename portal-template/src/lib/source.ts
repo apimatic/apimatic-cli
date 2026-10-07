@@ -3,7 +3,6 @@ import { applyMdxPreset } from 'fumadocs-mdx/config';
 import { rehypeCodeDefaultOptions } from 'fumadocs-core/mdx-plugins';
 import rehypeRaw from 'rehype-raw';
 import { rehypeCodeTitles, rehypeKeepCodeMeta } from './rehype-code-titles';
-import { remarkImageReferences } from './remark-image-references';
 import { navigationSchema } from './navigation-schema';
 
 // What `rehype-raw` must hand on untouched, being MDX's own nodes rather than HTML.
@@ -35,7 +34,6 @@ export const generated = defineDocs({
     mdxOptions: applyMdxPreset({
       // A remote image is never fetched for its size, which would make the build depend on its host.
       remarkImageOptions: { external: false },
-      remarkPlugins: (plugins) => [remarkImageReferences, ...plugins],
       // The SDK pages' design heads a block with its title alone, without Fumadocs' language icon.
       rehypeCodeOptions: { ...rehypeCodeDefaultOptions, icon: false },
       // The SDK docs' HTML fails the build unrendered; not sanitized, as it comes from the owner's own spec.

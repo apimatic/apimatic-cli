@@ -348,6 +348,11 @@ const stylesheetOf = (output: DirectoryPath) => {
     expect(assets.length, 'asset count').to.be.below(150);
   });
 
+  // Highlighting loads on demand; page code importing `shiki-bundle` would preload it on every page.
+  it('leaves the highlighter out of what a page preloads', () => {
+    expect(read('index.html')).to.not.contain('shiki-bundle');
+  });
+
   it('carries the code samples placed on the operation into its page data', () => {
     const page = read('api/apimatic-calculator/simple-calculator/Calculate/index.html');
 
@@ -808,11 +813,12 @@ const stylesheetOf = (output: DirectoryPath) => {
     expect(read('authentication/index.html')).to.match(/<img[^>]* src="\/api\/assets\/diagram[^"]*\.png"/);
   });
 
-  // Fumadocs' own renderer fails the whole page over an image in a description.
-  it('renders an image in a description, from the static directory under the path', () => {
-    expect(read('api/apimatic-calculator/simple-calculator/Calculate/index.html')).to.match(
-      /<img[^>]* src="\/api\/images\/diagram\.png"/
-    );
+  // Fumadocs' own renderer fails the whole page over an image in a description; `ApiMarkdown` stands in for it.
+  it('renders an image and a code block in a description, the image under the path', () => {
+    const page = read('api/apimatic-calculator/simple-calculator/Calculate/index.html');
+
+    expect(page).to.match(/<img[^>]* src="\/api\/images\/diagram\.png"/);
+    expect(page).to.match(/<pre[^>]*><code><span class="line">\{ &quot;calculated&quot;: 9 \}<\/span><\/code><\/pre>/);
   });
 
   // The pages' own links: a description after one is the author's Markdown, which keeps its spelling.

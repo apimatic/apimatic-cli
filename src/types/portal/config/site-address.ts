@@ -62,7 +62,7 @@ export class SiteAddress {
 
   /** A portal-relative path's address on the host: `/sitemap.xml` is `https://example.com/docs/sitemap.xml`. */
   public addressOf(portalPath: string): string {
-    return `${this}${portalPath}`;
+    return `${this.origin}${this.basePath}${portalPath}`;
   }
 
   /** The site address, with no trailing slash. */

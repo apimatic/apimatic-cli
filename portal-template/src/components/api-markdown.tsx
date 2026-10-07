@@ -4,7 +4,7 @@ import { DynamicCodeBlock } from 'fumadocs-ui/components/dynamic-codeblock';
 import defaultMdxComponents from 'fumadocs-ui/mdx';
 import { Children, type ComponentProps, type ReactElement } from 'react';
 import { withBasePath } from '@/lib/base-path';
-import { languageOf } from '@/lib/rehype-code-titles';
+import { languageOf } from '@/lib/code-titles';
 
 const { Markdown } = createMarkdownRenderer({ remarkPlugins: [remarkGfm] });
 
