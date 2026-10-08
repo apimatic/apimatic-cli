@@ -73,7 +73,7 @@ Let's get started!`);
   }
 
   public specsUnsupported(problem: PortalSourceProblem, sourceDirectory: DirectoryPath) {
-    reportSourceProblem(problem, sourceDirectory, { offerQuickstart: false });
+    reportSourceProblem(problem, sourceDirectory);
   }
 
   public configMissing(sourceDirectory: DirectoryPath) {

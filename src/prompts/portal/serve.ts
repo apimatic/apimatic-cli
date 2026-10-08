@@ -70,7 +70,7 @@ export class PortalServePrompts {
 
   /** Explained as `portal generate` would explain it, since the same rules refused it. */
   public configRejected(problem: PortalSourceProblem, sourceDirectory: DirectoryPath) {
-    reportSourceProblem(problem, sourceDirectory, { offerQuickstart: false });
+    reportSourceProblem(problem, sourceDirectory);
     log.message('The preview keeps showing what it last accepted until the file is fixed.');
   }
 

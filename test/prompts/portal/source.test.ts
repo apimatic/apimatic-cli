@@ -41,13 +41,6 @@ describe('reportSourceProblem', () => {
     sinon.restore();
   });
 
-  // Quickstart adopts a directory whose spec/ holds files, and refuses one without apimatic.json.
-  it('points at quickstart, run in an empty directory, for a directory with no apimatic.json', () => {
-    reportSourceProblem({ kind: 'missingConfig' }, source);
-
-    expect(printed()).to.contain('Run apimatic quickstart in an empty directory');
-  });
-
   // Quickstart refuses a directory that is not empty, which a running preview's is.
   it('does not point at quickstart for a file removed while the preview runs', () => {
     new PortalServePrompts().configRejected({ kind: 'missingConfig' }, source);
