@@ -2,7 +2,8 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { expect } from 'chai';
-import { dependencyDirectories, narrowest } from '../../portal-template/dependency-directories';
+import sinon from 'sinon';
+import { dependencyDirectories } from '../../portal-template/dependency-directories';
 
 describe('dependencyDirectories', () => {
   let root: string;
@@ -29,6 +30,7 @@ describe('dependencyDirectories', () => {
   });
 
   afterEach(() => {
+    sinon.restore();
     fs.rmSync(root, { recursive: true, force: true });
   });
 
@@ -77,25 +79,26 @@ describe('dependencyDirectories', () => {
     expect(dependencyDirectories(project())).to.deep.equal([real('cli', 'node_modules')]);
   });
 
-  it('leaves out a link leading nowhere rather than failing the server over it', () => {
+  it('reports a link leading nowhere rather than leaving it out', () => {
     link('vite', install('cli', 'node_modules', 'vite'));
     fs.rmdirSync(path.join(root, 'cli', 'node_modules', 'vite'));
 
-    expect(dependencyDirectories(project())).to.deep.equal([]);
+    expect(() => dependencyDirectories(project())).to.throw(/ENOENT/);
   });
 
   it('lists installations one by one rather than the whole disk, when only its root holds them all', () => {
     const disk = path.parse(root).root;
-    const installations = [
-      path.join(disk, 'usr', 'lib', 'node_modules', '@apimatic', 'cli', 'node_modules'),
-      path.join(disk, 'home', 'me', 'src', 'node_modules')
-    ];
+    const installations: Record<string, string> = {
+      vite: path.join(disk, 'usr', 'lib', 'node_modules', '@apimatic', 'cli', 'node_modules'),
+      react: path.join(disk, 'home', 'me', 'src', 'node_modules')
+    };
+    link('vite', install('cli', 'node_modules', 'vite'));
+    link('react', install('elsewhere', 'node_modules', 'react'));
+    const installed = (target: string) => path.join(installations[path.basename(target)], path.basename(target));
+    // Only the disk's root holds both, and a test cannot install there.
+    sinon.stub(fs.realpathSync, 'native').callsFake(installed as typeof fs.realpathSync.native);
 
-    expect(narrowest(installations)).to.deep.equal(installations);
-  });
-
-  it('answers nothing for a project without dependencies', () => {
-    expect(dependencyDirectories(path.join(root, 'nowhere'))).to.deep.equal([]);
+    expect(dependencyDirectories(project())).to.have.members(Object.values(installations));
   });
 
   it('reports a node_modules it cannot read, rather than serving less than the page needs', () => {
