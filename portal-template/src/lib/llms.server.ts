@@ -5,10 +5,9 @@ import { getMDXComponents } from '@/components/mdx';
 import { withBasePath } from './base-path';
 import { operationLabels } from './openapi-labels';
 import { slimOpenAPIPageProps } from './openapi-slim';
-import { source } from './source.server';
+import { type PortalPage, source } from './source.server';
 import { portal } from './portal';
 
-type PortalPage = ReturnType<typeof source.getPages>[number];
 type ReferencePage = Extract<PortalPage, { type: 'openapi' }>;
 
 // `llms()` links each page by its tree node's URL and has no base of its own; titles are found by `$ref`.

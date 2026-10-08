@@ -7,7 +7,7 @@ import { fumadocsMdx } from 'fumadocs-mdx/vite';
 import { dependencyDirectories } from './dependency-directories.ts';
 import { downloads } from './downloads.ts';
 import { generatedPagesReload } from './generated-pages-reload.ts';
-import { readBuildPaths, readPortalIdentity, viteBase } from './portal-config.ts';
+import { readBuildPaths, readPortalIdentity } from './portal-config.ts';
 import { prerenderPages } from './prerender-pages.ts';
 import { specReload } from './spec-reload.ts';
 import { remarkImageReferences } from './src/lib/remark-image-references.ts';
@@ -15,24 +15,23 @@ import { staticFunctionsBase } from './static-functions-base.ts';
 
 export default defineConfig(async () => {
   const [paths, identity] = await Promise.all([readBuildPaths(), readPortalIdentity()]);
-  const pages = await prerenderPages(paths, identity);
+  const pages = await prerenderPages(paths, identity.siteUrl);
   const publicDir: string | false = paths.staticDir ?? false;
   const projectDirectory = fileURLToPath(new URL('.', import.meta.url));
 
   return {
     // TanStack Start derives the router's basepath and every asset URL from it.
-    base: viteBase(identity),
+    base: paths.base,
     publicDir,
     plugins: [
       generatedPagesReload(),
       downloads(paths.downloadsDir),
       staticFunctionsBase(),
       // `/images/logo.png` is read from the static directory, and a remote image is never fetched for its size.
-      // Imported, the default written out: a bundled image carries Vite's base, a linked one would not.
       fumadocsMdx({
         globalOptions: {
           mdxOptions: {
-            remarkImageOptions: { publicDir: publicDir || undefined, external: false, useImport: true },
+            remarkImageOptions: { publicDir: publicDir || undefined, external: false },
             // A function, so it runs ahead of the preset's own plugins, `remarkImage` among them.
             remarkPlugins: (plugins) => [remarkImageReferences, ...plugins]
           }

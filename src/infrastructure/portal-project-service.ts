@@ -41,6 +41,7 @@ export const LINKED_DEPENDENCIES = [
   'react',
   'react-dom',
   'rehype-raw',
+  'remark',
   'shiki',
   'tailwindcss',
   'tslib',
@@ -72,6 +73,7 @@ export interface PortalProjectPaths {
 
 /** `portal.config.json`, which the template reads as `BuildPaths`; a test holds the two to one shape. */
 export interface PortalBuildPaths {
+  base: string;
   specs: Record<string, string>;
   codeSamples: string | null;
   contentDir: string;
@@ -273,9 +275,10 @@ export class PortalProjectService {
       specs[spec.slug] = spec.file.toPosix();
     }
 
-    // Everything here addresses this machine, so it stays behind `portal.server.ts` and the
-    // build's own config files.
+    // Everything here but `base` addresses this machine, so it stays behind `portal.server.ts`
+    // and the build's own config files.
     const configuration: PortalBuildPaths = {
+      base: source.config.siteAddress()?.path() ?? '/',
       specs,
       codeSamples: codeSamples === null ? null : codeSamples.toPosix(),
       contentDir: contentDirectory.toPosix(),

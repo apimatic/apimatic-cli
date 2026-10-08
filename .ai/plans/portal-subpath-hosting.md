@@ -20,8 +20,9 @@ served at that path: its pages, assets, client navigation, search, downloads, SE
   - one build that works at whatever path it is deployed to.
 - **Invariant:** a portal whose `site.url` has no path, or that has no `site.url`, emits the same
   pages, files and addresses as today. The content hashes in chunk names are the only difference,
-  apart from the image fixes of 5.10, which apply at the root too: reference-style images are
-  bundled and checked like inline ones, and an image in a description no longer fails its page.
+  apart from the image fixes of 5.10 and 5.12, which apply at the root too: reference-style images
+  are bundled and checked like inline ones, an image in a description no longer fails its page,
+  and search results show no image from a description.
 
 **Terms:**
 - A **portal-relative path** is a page's path from the portal's own root (`/guides/intro`).
@@ -46,11 +47,14 @@ renamed `portalPath()` (4.3).
    already carry the basepath. So `docsRoute` stays `/`; a Fumadocs `baseUrl` would double every
    link (`/docs/docs/guides`). TanStack's maintainer puts the split the same way on #4888: Vite
    `base` owns assets, and the router basepath owns routes.
-3. **One source in the template: `siteUrl`.**
+3. **One source for the path: the CLI's `SiteAddress`** (revised 2026-10-08, section 15).
    - `siteUrl` in `portal.identity.json` becomes the site address.
-   - `vite.config.ts` works out `base` from it once, through one function in
-     `portal-template/portal-config.ts`.
-   - Nothing else carries the path: no `basePath` field in either file.
+   - `portal.config.json` carries `base`, the address's `path()`, and `vite.config.ts` takes it as
+     it is. The CLI writes both files from one `SiteAddress` when it prepares the build.
+   - Not in `portal.identity.json`: the browser imports that file whole, and it already has the
+     base as `import.meta.env.BASE_URL` (decision 4).
+   - Until 2026-10-08 the template worked `base` out of `siteUrl` a second time, in `viteBase`, and
+     a contract test held that to `SiteAddress.path()`.
 4. **Portal-relative strings are prefixed in the template.** The strings the router never sees
    go through one helper, `withBasePath()`, which reads `import.meta.env.BASE_URL`.
    - The template is the layer that already adds the base to the router's URLs. Prefixing in the
@@ -229,7 +233,7 @@ Stopping it the way CTRL+C does left no project directory behind.
     `StaticAsset` do.
   - `toString()` is the site address with no trailing slash.
   - `path()` is where the portal is served, in the form Vite's `base` takes: `'/'` at the root,
-    `'/docs/'` under a path. The contract test of section 6 holds `viteBase` to it.
+    `'/docs/'` under a path. The build takes it from `portal.config.json` as Vite's `base` (5.1).
   - `hasPath()` says whether it is under a path.
   - `addressOf(portalPath)` is a portal-relative path's address on the host, so no caller
     appends to `toString()` itself.
@@ -348,15 +352,15 @@ no other place that describes `site`.
 
 ### 5.1 `portal-config.ts` and `vite.config.ts`
 
-- `portal-config.ts` exports `viteBase(identity: BuildIdentity): string`, which returns `'/'`, or
-  the path of `siteUrl` plus `/`. The contract test of section 6 holds it to the CLI's
-  `SiteAddress.path()`.
-- `vite.config.ts` sets `base: viteBase(identity)`, and passes `identity` to `prerenderPages`,
-  which needs it for the served paths and the robots rule (5.7).
-- `vite.config.ts` also sets `useImport: true` in `remarkImageOptions` (step 2). It is
-  Fumadocs' default today, and it is what gives a Markdown image the base: the image is
-  bundled, not linked. Written out, a changed default in an upgrade cannot quietly drop the base
-  from every Markdown image.
+- `BuildPaths` (`portal-config.ts`) and the CLI's `PortalBuildPaths` gain `base`, which
+  `PortalProjectService` writes as `siteAddress()?.path() ?? '/'` (decision 3). The `Equal<>`
+  check in `test/portal-template.test.ts` holds the two types to one shape.
+- `vite.config.ts` sets `base: paths.base`. `prerenderPages` reads `config.base` for the served
+  paths and the robots rule (5.7), and keeps its `siteUrl` argument for the sitemap.
+- `remarkImageOptions` leaves `useImport` at its default, which is true under Vite (fumadocs-mdx
+  sets `useImport ?? environment === 'bundler'`). It is what gives a Markdown image the base: the
+  image is bundled, not linked. The e2e image check fails on an upgrade that changes it (section 8).
+  It was written out until 2026-10-08.
 
 ### 5.2 `withBasePath`: `src/lib/base-path.ts` (new)
 
@@ -385,15 +389,17 @@ no other place that describes `site`.
     - the Markdown branch's `[Download SDK](…)` (line 25).
   - `components/sdk-cards.tsx`: the Markdown branch's `[${name}](${page})` (line 43). The HTML
     branch is a router `Link` and is left alone.
-  - `routes/$.tsx`: in the browser, `pageUrl` and the `markdownUrl` the popover gets are full
-    addresses, from `fullAddress(path)` beside `withBasePath` in `base-path.ts`:
-    `new URL(withBasePath(path), window.location.origin)`. On the server they stay paths, as
-    `pageUrl` is today; the popover renders them only when it is used.
-    - `pageUrl` (line 138) needs the base because the router's pathname has it stripped.
-    - `markdownUrl` goes to `ViewOptionsPopover` as a full address because Fumadocs' own
-      `withBasePath` leaves a full address alone (`page-actions.js:197`). So it is right whether
-      Fumadocs adds the base or not: the popover stopped adding it in ui 16.15.13 and adds it
-      again from 16.15.17 (fuma-nama/fumadocs#3620), which would have doubled a prefixed path.
+  - `routes/$.tsx`: in the browser, the `pageUrl` the popover gets is a full address, from
+    `fullAddress(path)` beside `withBasePath` in `base-path.ts`:
+    `new URL(withBasePath(path), window.location.origin)`. On the server it stays a path, as
+    `pageUrl` is today; the popover renders it only when it is used.
+    - `pageUrl` (line 133) needs the base because the router's pathname has it stripped.
+    - `markdownUrl` goes to `ViewOptionsPopover` as the page's path. fumadocs-ui 16.15.17 adds the
+      base itself (`withBasePath(markdownUrl)`, `page-actions.js:70`), and
+      `test/portal-template/page-actions.test.ts`, from #413, fails if an upgrade stops doing so.
+      Until 2026-10-08 it was a full address, which Fumadocs leaves alone, so that it was right
+      whether Fumadocs added the base or not: ui 16.15.13 to 16.15.15 did not
+      (fuma-nama/fumadocs#3620).
     - The copy button is the template's own since #419 (`components/markdown-copy-button.tsx`).
       It takes the page's path, and `copyMarkdown` adds the base through `withBasePath`. Handed
       the full address, it would fetch `/apihttp://…`.
@@ -407,7 +413,7 @@ no other place that describes `site`.
     `withBasePath(oauthCallbackPath)`.
   - `components/authorization-failure.tsx`: the OAuth callback's link to the home page.
 - **Users in Node, which pass the base:**
-  - `prerender-pages.ts`, with `viteBase(identity)` (5.7). It already imports from `src/lib/`.
+  - `prerender-pages.ts`, with `config.base` (5.7). It already imports from `src/lib/`.
   - `downloads.ts`'s dev keys, with `server.config.base` (5.8).
   - `static-functions-base.ts`'s literal, with the resolved `config.base` (5.6).
 
@@ -469,13 +475,13 @@ follow-up.
 
 ### 5.7 `prerender-pages.ts`
 
-- **Served paths.** `prerenderPages(config, identity)` takes the identity in place of today's
-  `siteUrl` argument. It returns every path as `withBasePath(url, viteBase(identity))`
-  (`/docs/guides/intro`). TanStack's `withBase` then leaves each one alone, and `withoutBase`
-  strips the base once for the filename, which keeps the output layout as it is at the root.
+- **Served paths.** `prerenderPages(config, siteUrl)` returns every path as
+  `withBasePath(url, config.base)` (`/docs/guides/intro`). TanStack's `withBase` then leaves each
+  one alone, and `withoutBase` strips the base once for the filename, which keeps the output
+  layout as it is at the root.
   - The SPA shell is not in the list: TanStack adds it itself and prefixes it.
   - That is what makes a colliding base build (decision 6).
-- **`robots.txt`** is listed only when `siteUrl` is set and `viteBase(identity)` is `'/'`.
+- **`robots.txt`** is listed only when `siteUrl` is set and `config.base` is `'/'`.
 
 ### 5.8 `downloads.ts`
 
@@ -546,7 +552,27 @@ follow-up.
     value reads back the same.
   - When TanStack's fix (PR #8450) ships, `searchOptions` can go (section 10).
 
-### 5.12 Unchanged, and why
+### 5.12 Images in search results (`routes/api/search[.]json.ts`, added 2026-10-08)
+
+- **The problem** (found in review, 2026-10-08). fumadocs-openapi puts an operation's description
+  in the search index as written (`toStaticData`), and the search dialog renders a result's
+  content as Markdown, images included. A root-relative image then loads from the host's root and
+  404s under a path. Fumadocs' own pages carry none: `remarkStructure`'s stringifier drops images.
+- **The change.** The search route hands `createFromSource` a copy of the loader whose reference
+  pages have their images taken out of the description and of each content entry, by
+  `withoutImages` (`lib/search-content.ts`). It parses without GFM, as the dialog renders a
+  result, and cuts each `image` and `imageReference` out of the text as written, so the rest
+  keeps its spelling.
+  - The description goes through it too. Fumadocs indexes the description again when no content
+    entry equals it.
+  - At the root too: results no longer show the image, and its address is no longer searched.
+  - Rejected: a `renderMarkdown` for the dialog with an `img` that adds the base. It would copy
+    the dialog's renderer, about 70 lines Fumadocs does not export.
+- `remark` joins the template's linked dependencies; the CLI already depends on it.
+- A raw `<img>` in a description is left in. The dialog renders raw HTML, so it would show
+  unprefixed, as raw HTML does elsewhere (section 9; read from the code, not measured).
+
+### 5.13 Unchanged, and why
 
 | File | Why |
 |---|---|
@@ -583,16 +609,16 @@ follow-up.
 - `test/prompts/portal/generate.test.ts` (new; the wording has no test today): both branches, at
   the root and under a path.
 
-**The CLI/template contract (`test/portal-template.test.ts`)**, beside the `Equal<>` checks
-already there: for a list of accepted addresses of its own (the root with and without a slash, a
-path, a deep path in mixed case, a segment of dots), `viteBase` given `identity().siteUrl` equals
-`SiteAddress.parse(url).path()`. The CLI and the template each derive
-the path from the address, so this holds them to one answer. It parses the address itself because
-`PortalConfig.siteAddress()`, like `hasPath()`, arrives in step 4 with Next Steps, its one caller.
+**The CLI/template contract:** the `Equal<>` check on `BuildPaths` (`test/portal-template.test.ts`)
+covers `base`, and `test/infrastructure/portal-project-service.test.ts` checks the value written
+under a path and without an address. Until 2026-10-08 a contract test held the template's
+`viteBase` to `SiteAddress.path()` over a list of addresses; it went with `viteBase` (decision 3).
 
 **Template unit tests (`test/portal-template/`):**
 - `base-path.test.ts` (new): the root, a base, an explicit base; `fullAddress` with a window and
   without one.
+- `search-content.test.ts` (new, 2026-10-08): `withoutImages` drops an inline image, a
+  reference-style one and one inside a link, and leaves Markdown without images as written (5.12).
 - `prerender-pages.test.ts`:
   - served paths under a base, including one that collides with it;
   - portal-relative paths at the root;
@@ -627,9 +653,9 @@ It holds:
   a portal with no root `nav.json` has no tab bar, and the API reference is a collapsed folder in
   Home whose pages the home page does not link to. The tab is the home page's link to a
   colliding page (added at the merge of `dev`, 2026-10-05);
-- a Markdown image in the content page (step 2), which guards `useImport` (5.1). It is over
-  Vite's 4 KiB inline limit, since an inlined `data:` URI would carry no base to check; the logo
-  is 3.9 KB, so the image is a generated 12 KB `diagram.png`.
+- a Markdown image in the content page (step 2), which guards the `useImport` default (5.1). It
+  is over Vite's 4 KiB inline limit, since an inlined `data:` URI would carry no base to check;
+  the logo is 3.9 KB, so the image is a generated 12 KB `diagram.png`.
 
 It is built with `{ plugin: true }` for the bundled plugin. It is the third real build in the
 file, after `default` and `branded`, and `test.yml` runs the e2e suite on
@@ -653,6 +679,8 @@ each step extends its assertions:
   - a client chunk contains `` `/api/__tsr/staticServerFnCache/ ``, and none contains
     `` `/__tsr/staticServerFnCache/ `` (the literal with its opening backtick);
   - the cache files sit at `__tsr/staticServerFnCache/` under the output's root.
+- **The 2026-10-08 review:** `api/search.json` holds the operation description's text and not its
+  image (5.12).
 
 **By hand, in a browser** (the 2026-09-29 headless Chrome probes). Each runs with the step that
 completes what it checks, so a bug is fixed in the commit that made it: the build probe with
@@ -662,8 +690,7 @@ strips the base once) until step 4 ran it (section 3). Some fixes are checked on
 browser and no automated test reaches them:
 - the search results' served URLs, which make a colliding base navigate. What they rely on is
   guarded by `search-navigation.test.ts`;
-- the popover's full address, and the page's path for the copy button, whose base
-  `copy-markdown.test.ts` checks;
+- the page's path for the copy button, whose base `copy-markdown.test.ts` checks;
 - `pageUrl`;
 - the plugin install command's browser snapshot (5.3);
 - the playground's storage keys (5.9);
@@ -728,13 +755,13 @@ after each one. In all, roughly 400 lines of source and 500 of tests.
 - **Dependency upgrades.** Nothing here pins a version or edits an installed package. Two pieces
   stand in for upstream code until it is fixed: `static-functions-base.ts` rewrites one address in
   TanStack's browser bundle (5.6), and `ApiMarkdown` renders descriptions as Fumadocs does, with
-  images (5.10). Every behaviour the path relies on either cannot break on an upgrade or fails CI
-  when it does:
+  images (5.10). Every behaviour the path relies on fails CI on an upgrade that changes it:
 
   | Relied on | On an upgrade that changes it |
   |---|---|
-  | The popover's Markdown URL | Cannot break: a full address is right whether Fumadocs adds the base or not (5.2) |
-  | Content pages' Markdown images are bundled | Cannot break: `useImport` is written out (5.1); the e2e image checks it |
+  | The popover adds the base to its Markdown URL | `page-actions.test.ts` fails (5.2) |
+  | Content pages' Markdown images are bundled | The e2e fails (the bundled image's `src`) (5.1) |
+  | The index takes a reference page's description and contents as the loader gives them | The e2e fails (the index names the image) (5.12) |
   | Query values on load under a base | `search-options.test.ts` fails: it runs TanStack's own helpers (5.11) |
   | Fumadocs links are router links | The e2e fails (step 1's link assertions) |
   | `llms()` reads the loader methods we wrap | The e2e fails (`llms.txt` links) |
@@ -761,6 +788,8 @@ after each one. In all, roughly 400 lines of source and 500 of tests.
 - A portal-relative link such as `[auth](/authentication)` is `/docs/authentication` in the page's
   HTML. It stays `/authentication` in the page's `.md` copy and in `llms-full.txt`, so an assistant
   reading the copy resolves it against the host's root.
+- `llms.txt` is the same for an operation's description, which it lists as written: a
+  root-relative image or link there keeps its spelling (found in review, 2026-10-08).
 - **The workaround:** write the full site address (`https://acme.github.io/docs/authentication`).
   It is right in both, at a cost. Fumadocs renders it as a plain `<a target="_blank">`, so in the
   HTML the link:
@@ -804,7 +833,7 @@ with the MDX components, but not in its copy.
 | Item | State (2026-09-29) | What it means for us |
 |---|---|---|
 | TanStack/router#6152, PR #5970 | Both open (checked 2026-09-30). A maintainer (2026-07-17): the cache URL "should follow Start's public asset base"; the PR builds the URL with `path.join` and needs an e2e served from a sub-path. SimYunSup (2026-08-12, on the PR): a repro, `path.join` throwing in the browser, a string join returning 200, `import.meta.env.BASE_URL` working, and an offer of the e2e fixture. | When it ships, delete 5.6. |
-| fuma-nama/fumadocs#3620, from PR #3572 (ui 16.15.13) | Fixed 2026-09-29 in fumadocs-ui 16.15.17 (commit `6791d6f`): the popover prefixes `markdownUrl` with `withBasePath` again, in both `radix-ui` and `base-ui` | Nothing to undo. The full address we pass goes through that `withBasePath` unchanged, so it is right on 16.15.15 and on 16.15.17 (5.2). An upgrade needs no change here |
+| fuma-nama/fumadocs#3620, from PR #3572 (ui 16.15.13) | Fixed 2026-09-29 in fumadocs-ui 16.15.17 (commit `6791d6f`): the popover prefixes `markdownUrl` with `withBasePath` again, in both `radix-ui` and `base-ui` | Since 2026-10-08 we pass the page's path and rely on that `withBasePath`; `page-actions.test.ts` fails if an upgrade drops it again (5.2) |
 | TanStack/router#4888, docs PR #7882 | Docs only | None |
 | TanStack/router#8448, PR #8450 | Both open (checked 2026-10-07); the PR has no review yet. The issue reports a second loader run; we saw the address rewritten too | When it ships, `searchOptions` can go (5.11) |
 | fuma-nama/fumadocs#3661 | Filed 2026-10-07: an image in an operation's description crashes the page | When it ships with the base, `ApiMarkdown` can go (5.10) |
@@ -831,7 +860,7 @@ the output's root, dotfiles included (measured with `.nojekyll`, 2026-09-29).
 
 | Host | Note |
 |---|---|
-| GitHub Pages | **Publishing from a branch runs Jekyll.** Jekyll drops every file and folder starting with `_`: `__tsr/` (every client navigation then shows the 404 page), `__downloads/` and `_shell.html`. Its optional-front-matter plugin, which cannot be disabled, renders the `.md` copies as HTML. Add an empty `static/.nojekyll`, beside the `static/CNAME` a custom domain needs, or deploy through GitHub Actions, which skips Jekyll. A project site serves its own `404.html` at any depth, with status 404, and redirects `/docs` to `/docs/`. |
+| GitHub Pages | **Publishing from a branch runs Jekyll.** Jekyll drops every file and folder starting with `_`: `__tsr/` (every client navigation then shows the 404 page), `__downloads/`, `_shell.html`, and `assets/_-<hash>.js`, the route chunk every page preloads, without which the app never starts: every link reloads the page, and search and the page actions do nothing (reviewer's measurement, 2026-10-08, with a local server hiding those names). Its optional-front-matter plugin, which cannot be disabled, renders the `.md` copies as HTML. Add an empty `static/.nojekyll`, beside the `static/CNAME` a custom domain needs, or deploy through GitHub Actions, which skips Jekyll. A project site serves its own `404.html` at any depth, with status 404, and redirects `/docs` to `/docs/`. |
 | nginx | `location /docs/ { alias …; }` plus `location = /docs { return 301 /docs/; }` and `error_page 404 /docs/404.html`. Add `text/markdown md;` to `mime.types`, or the `.md` copies download. |
 | Netlify | Nest the output under `docs/` in the publish directory or proxy it. `_redirects` is read only at the publish root. |
 | Cloudflare Pages | 25 MiB per file (SDK zips, `llms-full.txt`). With no top-level `404.html` it assumes an SPA. |
@@ -879,8 +908,9 @@ host's root until JavaScript runs:
 
 ## 14. Where this departs from #2275
 
-- **The base path is not a field.** It is not in `PortalIdentity` or `BuildPaths`; the template
-  derives Vite's `base` from `siteUrl` (decision 3).
+- **The base path is in the build config only.** The issue put `basePath` in `PortalIdentity`
+  and `BuildIdentity`. Here only `portal.config.json` carries it, as `base`, and the browser never
+  imports that file (decision 3).
 - **`portal serve` needs changes after all:** the address's slash and the restart list. The
   issue said none (4.5).
 - **`prerenderPages` does not stay portal-relative.** The issue said it could. It hands TanStack
@@ -891,8 +921,8 @@ host's root until JavaScript runs:
   - colliding base paths (decision 6);
   - `llms.txt` links (5.4);
   - the SDK pages' Markdown copy links (5.2);
-  - the popover's full address and `pageUrl` (5.2);
-  - search results (5.2);
+  - the popover's `pageUrl` as a full address (5.2);
+  - search results, and the images in them (5.2, 5.12);
   - `robots.txt` and the sitemap note (decision 7, 4.6);
   - the README line (4.7);
   - the address's character rule (4.1);
@@ -1028,3 +1058,14 @@ regressions from 5.10 are fixed, each measured against `dev` and the PR's head:
 
 It also corrected the invariant (section 1), the 4.4 pattern, section 8's claim about upstream
 code, and 5.11's note on the address.
+
+**After mehnoorsiddiqui's review** (2026-10-08):
+- Search results showed a description's image unprefixed under a path. The index now takes
+  reference pages without their images (5.12).
+- Decision 3 is revised. The CLI writes `base` into `portal.config.json`, and the template's
+  `viteBase` and its contract test are gone. The rule that reads the path out of the address now
+  has one home, `SiteAddress.path()`, where it had two held together by a test.
+- The popover gets the page's path again, since the pinned fumadocs-ui adds the base and #413's
+  test guards it (5.2). `useImport` is left at its default, which the e2e guards (5.1).
+- `llms.txt` joins the known limitation on links authors write (section 9). Jekyll also drops
+  the route chunk `assets/_-<hash>.js` (section 11).

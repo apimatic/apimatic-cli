@@ -131,8 +131,6 @@ function Content({
   const pathname = usePathname();
   // Named, or the popover reads `window.location.href` and sends the reader's query and hash on.
   const pageUrl = fullAddress(pathname);
-  // The popover's: a full address, which Fumadocs passes through as it is whether it adds the base or not.
-  const markdownAddress = fullAddress(markdownUrl);
 
   return (
     <DocsPage toc={toc} full={page.full}>
@@ -143,7 +141,7 @@ function Content({
         <MarkdownCopyButton key={markdownUrl} markdownUrl={markdownUrl} />
         {/* Sends the reader to an external AI vendor, so a portal published under someone
             else's brand can turn it off. */}
-        {portal.pageActions ? <ViewOptionsPopover markdownUrl={markdownAddress} pageUrl={pageUrl} /> : null}
+        {portal.pageActions ? <ViewOptionsPopover markdownUrl={markdownUrl} pageUrl={pageUrl} /> : null}
       </div>
       <DocsBody>
         <PageBody components={useMDXComponents()} />

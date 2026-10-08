@@ -821,6 +821,14 @@ const stylesheetOf = (output: DirectoryPath) => {
     expect(page).to.match(/<pre[^>]*><code><span class="line">\{ &quot;calculated&quot;: 9 \}<\/span><\/code><\/pre>/);
   });
 
+  // The dialog would load a result's image from the host's root, as Fumadocs prefixes none.
+  it("searches a description's text without its image", () => {
+    const index = read('api/search.json');
+
+    expect(index).to.contain('Calculates the expression using the specified operation.');
+    expect(index).to.not.contain('diagram.png');
+  });
+
   // The pages' own links: a description after one is the author's Markdown, which keeps its spelling.
   it('links the pages under the path in llms.txt and llms-full.txt', () => {
     const links = [...read('llms.txt').matchAll(/^\s*- \[[^\]]*\]\(([^)]*)\)/gm)].map((match) => match[1]);

@@ -152,6 +152,7 @@ describe('PortalProjectService', () => {
 
       const config = readConfig();
       expect(Object.keys(config).sort()).to.deep.equal([
+        'base',
         'codeSamples',
         'contentDir',
         'downloadsDir',
@@ -161,6 +162,20 @@ describe('PortalProjectService', () => {
       ]);
       expect(Object.keys(config.specs)).to.deep.equal(['calculator']);
       expect(config.specs.calculator).to.contain('api.json');
+    });
+
+    it('builds the portal under the path of its address', async () => {
+      const config = configFor({ site: { name: 'My API', url: 'https://example.com/Docs/v2.1/' } });
+
+      (await service.prepare(project, sourceFor({ config }), NO_ARTIFACTS))._unsafeUnwrap();
+
+      expect(readConfig().base).to.equal('/Docs/v2.1/');
+    });
+
+    it('builds the portal at the root when it has no address', async () => {
+      (await service.prepare(project, sourceFor(), NO_ARTIFACTS))._unsafeUnwrap();
+
+      expect(readConfig().base).to.equal('/');
     });
 
     it('writes the generated pages into the project, and names their directory in the build-only config', async () => {

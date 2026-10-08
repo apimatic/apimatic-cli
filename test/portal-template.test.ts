@@ -11,9 +11,8 @@ import {
   TEMPLATE_DEPENDENCIES
 } from '../src/infrastructure/portal-project-service';
 import { GENERATED_DIRECTORY_NAME, PAGE_TEMPLATES } from '../src/types/portal/generated-pages';
-import { SiteAddress } from '../src/types/portal/config/site-address';
-import { PortalConfig, PortalIdentity } from '../src/types/portal/portal-config';
-import { type BuildPaths, viteBase } from '../portal-template/portal-config';
+import { PortalIdentity } from '../src/types/portal/portal-config';
+import type { BuildPaths } from '../portal-template/portal-config';
 import type { Portal } from '../portal-template/src/lib/portal-types';
 
 /** True only when the two types are identical, every nested field and union member included. */
@@ -201,24 +200,6 @@ describe('portal template packaging', () => {
 
     expect(identity).to.equal(true);
     expect(paths).to.equal(true);
-  });
-
-  // Each side reads the path out of the address itself, so a spelling they read apart would
-  // serve the portal somewhere other than where the CLI says it is.
-  it('serves the portal under the path the CLI reads from its address', () => {
-    const suggested = { name: 'Calc', description: null };
-    for (const url of [
-      'https://docs.test',
-      'https://docs.test/',
-      'https://acme.github.io/docs/',
-      'HTTPS://x.test/Docs/v2.1/api_ref~x-y',
-      'https://x.test/...'
-    ]) {
-      const identity = PortalConfig.fromBlock({ site: { url } }, suggested)._unsafeUnwrap().identity();
-
-      expect(viteBase(identity), url).to.equal(SiteAddress.parse(url, 'portal.site.url')._unsafeUnwrap().path());
-    }
-    expect(viteBase({ siteUrl: null })).to.equal('/');
   });
 
   // The CLI writes these into the prepared project; a copy in the template would be a second

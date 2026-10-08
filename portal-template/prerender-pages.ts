@@ -1,7 +1,7 @@
 import { readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { getSlugs, loader } from 'fumadocs-core/source';
-import { type BuildIdentity, type BuildPaths, viteBase } from './portal-config';
+import type { BuildPaths } from './portal-config.ts';
 import { withBasePath } from './src/lib/base-path';
 import { oauthCallbackPath } from './src/lib/oauth-callback';
 import { openApiSection } from './src/lib/openapi-section.server';
@@ -16,14 +16,13 @@ const isSkippedByGlob = (segment: string) => segment.startsWith('.') || segment 
  * collapsed sidebar folders and never sees the `.md` URLs the page actions fetch, so
  * the list is computed here from the same sources the site is built from.
  */
-export async function prerenderPages(config: BuildPaths, identity: BuildIdentity): Promise<{ path: string }[]> {
-  const base = viteBase(identity);
+export async function prerenderPages(config: BuildPaths, siteUrl: string | null): Promise<{ path: string }[]> {
   const urls = new Set<string>(['/', '/api/search.json', '/llms.txt', '/llms-full.txt']);
   // Both need absolute URLs, so they are only emitted for a portal that declares its address.
-  if (identity.siteUrl) {
+  if (siteUrl) {
     urls.add('/sitemap.xml');
     // Crawlers read it only at the root of a host.
-    if (base === '/') urls.add('/robots.txt');
+    if (config.base === '/') urls.add('/robots.txt');
   }
 
   for (const url of await contentUrls(config.contentDir)) urls.add(url);
@@ -43,7 +42,7 @@ export async function prerenderPages(config: BuildPaths, identity: BuildIdentity
   urls.add(oauthCallbackPath);
 
   // Served paths, or TanStack takes a page starting like the base (`/api/…` under `/api`) as already under it.
-  return [...urls].map((url) => ({ path: withBasePath(url, base) }));
+  return [...urls].map((url) => ({ path: withBasePath(url, config.base) }));
 }
 
 async function contentUrls(contentDir: string): Promise<string[]> {

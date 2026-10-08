@@ -17,10 +17,10 @@ describe('prerenderPages', () => {
   };
   const write = (relative: string, body = '# page\n') => writeIn(contentDir, relative, body);
 
-  const urlsFor = async (siteUrl: string | null = null, specs: Record<string, string> = {}) => {
+  const urlsFor = async (siteUrl: string | null = null, base = '/', specs: Record<string, string> = {}) => {
     const pages = await prerenderPages(
-      { specs, codeSamples: null, contentDir, generatedDir, staticDir: null, downloadsDir: null },
-      { siteUrl }
+      { base, specs, codeSamples: null, contentDir, generatedDir, staticDir: null, downloadsDir: null },
+      siteUrl
     );
     return pages.map((page) => page.path);
   };
@@ -151,7 +151,7 @@ describe('prerenderPages', () => {
         }
       })
     );
-    const reference = (await urlsFor(null, { pets: spec })).filter((url) => url.startsWith('/api/pets/')).sort();
+    const reference = (await urlsFor(null, '/', { pets: spec })).filter((url) => url.startsWith('/api/pets/')).sort();
 
     expect(reference).to.deep.equal([
       '/api/pets/pets/createPet',
@@ -175,7 +175,7 @@ describe('prerenderPages', () => {
     write('guides.md');
     write('api/overview.md');
 
-    const urls = await urlsFor('https://docs.test/api');
+    const urls = await urlsFor('https://docs.test/api', '/api/');
 
     expect(urls).to.include.members([
       '/api/',
@@ -195,7 +195,7 @@ describe('prerenderPages', () => {
   it('emits no robots file for a portal under a path', async () => {
     write('index.md');
 
-    const urls = await urlsFor('https://docs.test/api');
+    const urls = await urlsFor('https://docs.test/api', '/api/');
 
     expect(urls).to.include('/api/sitemap.xml');
     expect(urls.filter((url) => url.endsWith('robots.txt'))).to.be.empty;
