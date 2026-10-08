@@ -21,63 +21,6 @@ To get started with APIMatic's CLI using a step by step wizard, run the followin
 $ apimatic quickstart
 ```
 
-# Upgrading from 1.x
-
-Documentation portals are now built on your machine from a `src/` directory, and
-`APIMATIC-BUILD.json` no longer configures them:
-
-- Describe the portal in the `portal` block of `src/apimatic.json`: `site` (its name, address
-  and description), `brand` (logo, favicon, primary colour and colour mode), `navigation`
-  (header links) and `ai` (the page actions). Running `apimatic quickstart` scaffolds the block
-  with every default spelled out, and the file's `$schema` lets your editor complete and check it.
-- A portal also needs the project's SDK languages, at least one, in the same file's
-  `languages` block, for example `"languages": { "typescript": {} }`; `csharp`, `python` and
-  `typescript` are available for now. `plugin generate` and `sdk publish` both write to it, and
-  the context plugin reads it too, so name only the languages you ship. The same file carries
-  the plugin's identity in `plugin`; `src/plugin-config.json` is no longer read, so run
-  `plugin generate` and `sdk publish` again after upgrading and delete the old file.
-- Put OpenAPI documents in `src/spec/`, Markdown pages in `src/content/` and images and other
-  files in `src/static/`.
-- Every page starts with front matter giving its `title`, which names it in the sidebar.
-  Pages written for 1.x had none; the CLI lists each page that needs one before it builds.
-  ```md
-  ---
-  title: Getting started
-  ---
-  ```
-- Page order comes from a `nav.json` beside your pages, listing them by file name, and a
-  `title` there names the folder it sits in. A folder links to its `index.md`; without one it
-  is only a heading.
-- The top level of the portal is shown as tabs, which `src/content/nav.json` decides with two
-  lists. `tabs` names the tabs after Home, in order, and nothing else is one: a folder directly
-  under `src/content/`, and the sections the CLI makes, placed with `apimatic:sdks`,
-  `apimatic:plugin` and `apimatic:api`. Home comes first, opens on `index.md`, and holds
-  everything `tabs` does not name: every page at the top level, every other folder, and every
-  section not named as a tab, each at the address it always has. Its `pages` orders that sidebar
-  as any other `nav.json` orders its folder, a token standing for its section, and the file's
-  `title` names it; what `pages` does not name follows in alphabetical order, pages before
-  folders. A file with no `tabs`, or no file at all, makes no tab, so Home stands alone and
-  there is no tab bar; the build says so once, with the line that makes tabs of the sections
-  and the reference `pages` does not place. A new portal starts with the three sections as
-  tabs.
-  ```json
-  {
-    "title": "Overview",
-    "tabs": ["tutorials", "apimatic:sdks", "apimatic:api"],
-    "pages": ["index", "authentication", "guides", "apimatic:plugin", "..."]
-  }
-  ```
-- The SDKs tab lists a card per language in the `languages` block, offering its download and,
-  once `sdk publish` records a release, its install command, source repository and package, and
-  gives each language a page carrying its SDK's getting-started docs. The Context Plugin tab,
-  with the plugin's install command, appears when there is a `plugin` block, or a `pluginUrl` in
-  the `portal` block for a plugin hosted elsewhere. Their addresses, `/sdks` and
-  `/context-plugin`, are kept for them, so a page in `src/content/` that would be served there
-  is refused.
-- `portal toc new`, `portal recipe new` and `portal copilot` are gone, and `portal serve` no
-  longer takes `--destination` or `--no-reload`. Run `apimatic autocomplete --refresh-cache`
-  to drop the removed commands from shell completion.
-
 # Usage
 <!-- usage -->
 ```sh-session
