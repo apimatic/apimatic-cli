@@ -109,7 +109,7 @@ export class QuickstartAction {
     const pluginConfig = project.pluginConfig();
     const pluginAdded = await pluginConfig.addMetadataIfMissing(PLACEHOLDER_METADATA);
     if (pluginAdded.isErr()) {
-      this.prompts.pluginNotAdded(pluginAdded.error, sourceDirectory);
+      this.prompts.configNotWritten(pluginAdded.error, sourceDirectory);
       return ActionResult.failed();
     }
 

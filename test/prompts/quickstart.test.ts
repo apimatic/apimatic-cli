@@ -61,10 +61,14 @@ describe('QuickstartPrompts', () => {
     expect(stripVTControlCharacters(String(message.firstCall.args[0]))).to.contain('apimatic quickstart');
   });
 
-  it("says which block an adopted project's apimatic.json could not be given", () => {
-    prompts.pluginNotAdded('unreadable', new DirectoryPath('project').join('src'));
+  it('says whether apimatic.json could not be read or could not be written', () => {
+    const source = new DirectoryPath('project').join('src');
 
-    expect(printed()[0]).to.contain("could not be read, so its missing 'plugin' block was not added");
+    prompts.configNotWritten('unreadable', source);
+    prompts.configNotWritten('unwritable', source);
+
+    expect(printed()[0]).to.contain('could not be read. Check that it can be read and try again.');
+    expect(printed()[1]).to.contain('could not be written. Check that it can be written and try again.');
   });
 
   it('gives a spec that names no OpenAPI version the fix portal generate gives', () => {
