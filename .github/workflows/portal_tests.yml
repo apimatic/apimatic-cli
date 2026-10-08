@@ -82,6 +82,7 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           repository: apimatic/v4-test-automation
+          ref: feat/functional-tests
           path: tests
 
       - name: install test dependencies
@@ -166,10 +167,25 @@ jobs:
           PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}\.playwright-browsers
         run: pnpm test:visual
 
-      - name: functional
-        if: ${{ !cancelled() && steps.generate.outcome == 'success' }}
+      # Functional runs against the suite's auth build, whose playground calls
+      # the API Tester (tests/api-tester/) on localhost:3000.
+      # Playwright starts the API Tester itself (webServer in playwright.config.ts),
+      # because a server started in its own step doesn't outlive that step.
+
+      - name: generate the auth portal
+        id: generate-auth
+        if: ${{ !cancelled() }}
         working-directory: tests
         env:
+          PORTAL: auth
+        run: pnpm portal:generate
+
+      - name: functional
+        if: ${{ !cancelled() && steps.generate-auth.outcome == 'success' }}
+        working-directory: tests
+        shell: bash
+        env:
+          PORTAL: auth
           PORTAL_PREBUILT: '1'
           PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}\.playwright-browsers
         run: pnpm test:functional
@@ -189,6 +205,7 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: test-results
-          path: tests/test-results/
+          path: |
+            tests/test-results/
           retention-days: 30
           if-no-files-found: ignore
