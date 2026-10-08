@@ -7,6 +7,7 @@ import { err, ok } from 'neverthrow';
 import { ActionResult } from '../../src/actions/action-result';
 import { QuickstartAction } from '../../src/actions/quickstart';
 import { QuickstartPrompts } from '../../src/prompts/quickstart';
+import { PreparePortalProjectPrompts } from '../../src/prompts/portal/prepare-project';
 import { ApiValidatePrompts } from '../../src/prompts/api/validate';
 import { PortalAuthorizationService } from '../../src/infrastructure/services/portal-authorization-service';
 import { PortalProjectService } from '../../src/infrastructure/portal-project-service';
@@ -196,13 +197,34 @@ describe('QuickstartAction', () => {
       });
     });
 
-    it('writes nothing into the project it adopts when no language is chosen', async () => {
+    it('records no language, and stops, when none is chosen for the project it adopts', async () => {
       prompts.selectLanguages.resolves([]);
 
       expect((await execute(downloaded)).isCancelled()).to.be.true;
       expect(prompts.noLanguagesSelected.calledOnce).to.be.true;
-      expect(fs.readFileSync(inSource('apimatic.json'), 'utf8')).to.equal('{}');
-      expect(fs.existsSync(inSource('content'))).to.be.false;
+      expect(JSON.parse(fs.readFileSync(inSource('apimatic.json'), 'utf8')).languages).to.be.undefined;
+    });
+
+    it('leaves a languages block of the wrong shape for the preview to report, writing nothing to it', async () => {
+      fs.writeFileSync(inSource('apimatic.json'), JSON.stringify({ languages: { typescript: true } }));
+      const sourceProblem = sinon.stub(PreparePortalProjectPrompts.prototype, 'sourceProblem');
+
+      await execute(downloaded);
+
+      expect(prompts.selectLanguages.called, 'asked for languages the project names').to.be.false;
+      expect(prompts.configNotWritten.called, 'blamed a file it had no languages to write to').to.be.false;
+      expect(JSON.parse(fs.readFileSync(inSource('apimatic.json'), 'utf8')).languages).to.deep.equal({
+        typescript: true
+      });
+      expect(sourceProblem.calledOnce, 'the preview reported the block').to.be.true;
+    });
+
+    it('refuses an apimatic.json of a schema version it does not know before asking for languages', async () => {
+      fs.writeFileSync(inSource('apimatic.json'), JSON.stringify({ schemaVersion: 2 }));
+
+      expect((await execute(downloaded)).isFailed()).to.be.true;
+      expect(prompts.scaffoldFailed.calledOnce).to.be.true;
+      expect(prompts.selectLanguages.called).to.be.false;
     });
 
     it('leaves the plugin block an adopted project carries as it is', async () => {
