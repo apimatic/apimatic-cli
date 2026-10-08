@@ -8,7 +8,6 @@ import { FilePath } from '../types/file/filePath.js';
 import { DirectoryPath } from '../types/file/directoryPath.js';
 import { Directory, DirectoryItem } from '../types/file/directory.js';
 import { FileName } from '../types/file/fileName.js';
-import { sleep } from './timer-extensions.js';
 
 /** `stat` follows a link, so a link to nothing fails as though the entry were not there. */
 function isDanglingLink(error: unknown): boolean {
@@ -27,15 +26,6 @@ export class FileService {
   public async fileExists(file: FilePath): Promise<boolean> {
     try {
       const stat = await fsExtra.stat(file.toString());
-      return stat.isFile();
-    } catch {
-      return false;
-    }
-  }
-
-  public fileExistsSync(file: FilePath): boolean {
-    try {
-      const stat = fsExtra.statSync(file.toString());
       return stat.isFile();
     } catch {
       return false;
@@ -243,25 +233,6 @@ export class FileService {
     }
   }
 
-  public async pollDeleteDirectory(dirPath: DirectoryPath, onDeleteFailurePersists: () => void): Promise<void> {
-    const timeoutMs = 5 * 60 * 1000;
-    const deadline = Date.now() + timeoutMs;
-    const deleteFailurePersistsMaxDelay = Date.now() + 5 * 1000;
-    let actionPerformed = false;
-    while (
-      Date.now() < deadline &&
-      (await this.deleteDirectory(dirPath)
-        .then(() => false)
-        .catch(() => true))
-    ) {
-      if (!actionPerformed && Date.now() > deleteFailurePersistsMaxDelay) {
-        onDeleteFailurePersists();
-        actionPerformed = true;
-      }
-      await sleep(500);
-    }
-  }
-
   public async getStream(filePath: FilePath) {
     return fs.createReadStream(filePath.toString());
   }
@@ -326,10 +297,6 @@ export class FileService {
     }
     await fsExtra.copy(source.toString(), destination.toString(), { preserveTimestamps: true });
     return true;
-  }
-
-  public async copyToDir(source: FilePath, destination: DirectoryPath) {
-    await fsExtra.copyFile(source.toString(), source.replaceDirectory(destination).toString());
   }
 
   public async isZipFile(filePath: FilePath): Promise<boolean> {
