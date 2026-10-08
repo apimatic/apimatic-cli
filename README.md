@@ -311,9 +311,10 @@ DESCRIPTION
 
   Builds a documentation portal from the OpenAPI documents and Markdown pages in your 'src' directory.
 
-  The portal is built on your machine and written as static files you can host anywhere. Configure it with
-  'src/apimatic.json', whose 'languages' block gives the portal a page for each SDK language, and whose 'plugin' block,
-  or a 'pluginUrl' in its 'portal' block for a plugin hosted elsewhere, a page for the context plugin.
+  The portal is built on your machine and written as static files for any static host, served at its root or, when
+  'portal.site.url' has a path such as 'https://example.com/docs', at that path. Configure it with 'src/apimatic.json',
+  whose 'languages' block gives the portal a page for each SDK language, and whose 'plugin' block, or a 'pluginUrl' in
+  its 'portal' block for a plugin hosted elsewhere, a page for the context plugin.
 
 EXAMPLES
   apimatic portal generate
@@ -347,8 +348,8 @@ DESCRIPTION
   pages in 'src/content', reorder them in a 'nav.json', or change the 'portal', 'languages' or 'plugin' block of
   'apimatic.json'.
 
-  Adding a language or a 'plugin' block, adding or removing a page in 'src/content', creating 'src/static', or changing
-  which documents are in 'src/spec', needs the preview restarted.
+  Adding a language or a 'plugin' block, adding or removing a page in 'src/content', creating 'src/static', changing
+  which documents are in 'src/spec', or changing the path in 'portal.site.url', needs the preview restarted.
 
   Nothing is written to disk; run 'apimatic portal generate' to produce the static files.
 
@@ -381,14 +382,14 @@ _See code: [src/commands/publishing/profile/list.ts](https://github.com/apimatic
 
 ## `apimatic quickstart`
 
-Create your first API Documentation Portal, SDKs and Context Plugins.
+Create your API Documentation Portal, SDKs and Context Plugins.
 
 ```
 USAGE
   $ apimatic quickstart
 
 DESCRIPTION
-  Create your first API Documentation Portal, SDKs and Context Plugins.
+  Create your API Documentation Portal, SDKs and Context Plugins.
 
   Point the CLI at your API specification and it builds a documentation portal, SDKs, and a context plugin that teaches
   an AI coding assistant to use them.
@@ -428,7 +429,7 @@ DESCRIPTION
   Generate an SDK for your API
 
   Generate a Software Development Kit (SDK) from an API specification.
-  C#, TypeScript and Python are available; Java, Ruby, Go and PHP are on their way.
+  C#, TypeScript and Python are available; Java, Ruby, Go and PHP are coming soon.
 
 EXAMPLES
   apimatic sdk generate --language=typescript

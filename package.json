@@ -26,7 +26,7 @@
         "/apimatic.schema.json"
     ],
     "repository": "git://github.com/apimatic/apimatic-cli.git",
-    "homepage": "https://docs.apimatic.io/apimatic-cli/intro-and-install/",
+    "homepage": "https://docs.apimatic.io/v4/quickstart/",
     "keywords": [
         "apimatic",
         "cli",
@@ -111,8 +111,8 @@
         "@commitlint/config-conventional": "^20.5.3",
         "@eslint/js": "^9.34.0",
         "@oclif/test": "^4.1.13",
-        "@semantic-release/changelog": "^6.0.3",
-        "@semantic-release/git": "^10.0.1",
+        "@semantic-release/commit-analyzer": "^13.0.1",
+        "@semantic-release/release-notes-generator": "^14.1.1",
         "@types/adm-zip": "^0.5.8",
         "@types/base-64": "^1.0.0",
         "@types/chai": "^4.3.20",
@@ -134,6 +134,7 @@
         "@typescript/native": "npm:typescript@^7.0.2",
         "ajv": "^8.20.0",
         "chai": "^4.5.0",
+        "conventional-changelog-conventionalcommits": "^9.3.1",
         "eslint": "^9.21.0",
         "eslint-config-prettier": "^8.3.0",
         "eslint-plugin-import": "^2.25.2",

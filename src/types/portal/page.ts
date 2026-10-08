@@ -35,6 +35,7 @@ const EXPECTED: Partial<Record<string, string>> = { string: 'text', boolean: 'tr
 interface MarkdownNode {
   type: string;
   url?: string;
+  identifier?: string;
   position?: { start: { line: number } };
   children?: MarkdownNode[];
 }
@@ -114,9 +115,26 @@ async function imagesIn(body: string, isMdx: boolean): Promise<PageImage[]> {
     return [];
   }
 
+  // The template writes `![a][ref]` as `![a](url)` before the build imports it (remark-image-references.ts).
+  const definitions = new Map<string, string>();
+  const define = (node: MarkdownNode) => {
+    // The first definition of a label wins, as CommonMark reads them.
+    if (node.type === 'definition' && node.identifier !== undefined && !definitions.has(node.identifier)) {
+      definitions.set(node.identifier, node.url ?? '');
+    }
+    node.children?.forEach(define);
+  };
+  define(tree);
+
   const images: PageImage[] = [];
   const visit = (node: MarkdownNode) => {
-    const image = node.type === 'image' && node.url !== undefined ? located(node.url) : null;
+    const url =
+      node.type === 'image'
+        ? node.url
+        : node.type === 'imageReference'
+        ? definitions.get(node.identifier ?? '')
+        : undefined;
+    const image = url !== undefined ? located(url) : null;
     if (image !== null) {
       images.push({ ...image, line: node.position?.start.line ?? 0 });
     }

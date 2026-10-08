@@ -145,19 +145,21 @@ jobs:
           apimatic auth status
 
       - name: generate the portal
+        id: generate
         working-directory: tests
         run: pnpm portal:generate
 
-      # PORTAL_PREBUILT tells the suite's web server to serve what was just
-      # generated instead of regenerating it for every project.
+      
       - name: artifacts — produced vs declared
         working-directory: tests
         env:
-          PORTAL_PREBUILT: '1'
           PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}\.playwright-browsers
         run: pnpm test:artifacts
 
+# PORTAL_PREBUILT tells the suite's web server to serve what was just
+      # generated instead of regenerating it for every project.
       - name: visual
+        if: ${{ !cancelled() && steps.generate.outcome == 'success' }}
         working-directory: tests
         env:
           PORTAL_PREBUILT: '1'
@@ -165,6 +167,7 @@ jobs:
         run: pnpm test:visual
 
       - name: functional
+        if: ${{ !cancelled() && steps.generate.outcome == 'success' }}
         working-directory: tests
         env:
           PORTAL_PREBUILT: '1'

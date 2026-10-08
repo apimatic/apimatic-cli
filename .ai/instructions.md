@@ -103,17 +103,23 @@ Supporting: **Types** (`src/types/`) for value objects, context objects, and dom
 
 ## Branching
 
-Always start work from `dev` — never from `main`. This applies to branches and worktrees alike.
+Always start work from `dev`, the default branch. This applies to branches and worktrees alike.
 
 - Make sure `dev` is current (`git fetch origin dev`) and branch from `origin/dev`.
 - Open pull requests against `dev`.
-- Never commit to, branch from, or target `main` directly. If a task appears to require it, stop and ask.
+- Never commit to `main`, and never branch from or target it unless the task is a hotfix you were asked for. If a task appears to require it otherwise, stop and ask.
 
-**Worktrees** — a new worktree starts from this repo's default branch, `beta`, so move it onto `dev` before making any changes: `git fetch origin dev && git reset --hard origin/dev` (fresh, clean worktrees only). Confirm with `git log --oneline -1` that HEAD matches the `origin/dev` tip.
+**Worktrees** — a new worktree may not start at the `origin/dev` tip, so move it there before making any changes: `git fetch origin dev && git reset --hard origin/dev` (fresh, clean worktrees only). Confirm with `git log --oneline -1` that HEAD matches the `origin/dev` tip.
+
+## Releases
+
+A merge into `main`, `beta` or `1.x` is the release: semantic-release picks the version from commit headers, publishes to npm and GitHub Releases, and commits nothing back. Never bump `version` or write a changelog by hand, and never name an npm dist-tag in code. For a promotion, hotfix or back-merge, follow section 8 of `.ai/plans/release-pipeline.md`; a 1.x fix follows its 7.6.
 
 ## Commit Conventions
 
 Uses [Conventional Commits](https://www.conventionalcommits.org/) enforced by commitlint + husky. Pre-commit runs lint-staged (ESLint + Prettier).
+
+A PR into `dev` is squash-merged, and its title alone becomes the commit header that decides the release and its line in the notes. Write it for users as a Conventional Commit header, title a revert `revert(scope): …`, and mark a breaking change with `!` (`feat(sdk)!: …`) in a title or any commit; a `BREAKING CHANGE:` footer alone is ignored by the release, and the checks refuse one under a header without `!`.
 
 **Do not commit or push automatically.** Always wait for explicit instruction from the user before running `git commit` or `git push`.
 
