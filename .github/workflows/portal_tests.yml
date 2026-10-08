@@ -82,6 +82,7 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           repository: apimatic/v4-test-automation
+          ref: feat/functional-tests
           path: tests
 
       - name: install test dependencies
@@ -166,13 +167,54 @@ jobs:
           PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}\.playwright-browsers
         run: pnpm test:visual
 
-      - name: functional
-        if: ${{ !cancelled() && steps.generate.outcome == 'success' }}
+      # Functional runs against the suite's auth build, whose playground calls
+      # the API Tester (tests/api-tester/) on localhost:3000.
+
+      # Start-Process detaches the server from this step, so it's still
+      # running when the functional step needs it. Its output goes to
+      # tests/api-tester*.log, which is uploaded if anything fails.
+      - name: start the api tester
+        if: ${{ !cancelled() }}
+        working-directory: tests
+        shell: pwsh
+        run: |
+          Start-Process -FilePath node -ArgumentList "api-tester/bin/www" `
+            -RedirectStandardOutput api-tester.log -RedirectStandardError api-tester.err.log
+          for ($i = 0; $i -lt 30; $i++) {
+            try {
+              Invoke-WebRequest http://localhost:3000/auth/skipAuthentication -UseBasicParsing | Out-Null
+              Write-Host "API Tester is up on port 3000"
+              exit 0
+            } catch { Start-Sleep -Seconds 1 }
+          }
+          Get-Content api-tester.log, api-tester.err.log
+          throw "API Tester did not start on port 3000"
+
+      - name: generate the auth portal
+        id: generate-auth
+        if: ${{ !cancelled() }}
         working-directory: tests
         env:
+          PORTAL: auth
+        run: pnpm portal:generate
+
+      - name: functional
+        if: ${{ !cancelled() && steps.generate-auth.outcome == 'success' }}
+        working-directory: tests
+        shell: bash
+        env:
+          PORTAL: auth
           PORTAL_PREBUILT: '1'
           PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}\.playwright-browsers
-        run: pnpm test:functional
+        run: |
+          # Fail with a clear message if the API Tester didn't outlive its step,
+          # rather than as a playground call that never got an answer.
+          if ! curl -sf http://localhost:3000/auth/skipAuthentication > /dev/null; then
+            echo "::error::The API Tester is not running on localhost:3000."
+            cat api-tester.log api-tester.err.log
+            exit 1
+          fi
+          pnpm test:functional
 
       - name: upload playwright report
         if: ${{ !cancelled() }}
@@ -189,6 +231,8 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: test-results
-          path: tests/test-results/
+          path: |
+            tests/test-results/
+            tests/api-tester*.log
           retention-days: 30
           if-no-files-found: ignore
