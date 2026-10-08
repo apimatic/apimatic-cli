@@ -76,30 +76,17 @@ function reportSpecConversion({ file, format, converted, others }: SpecConversio
 
 /**
  * Shared by `portal generate` and `portal serve`: both read the same source directory, so
- * a broken one has to be explained the same way in both. `offerQuickstart` is false once a
- * preview of the directory is running: quickstart refuses a directory that is not empty.
+ * a broken one has to be explained the same way in both.
  */
-export function reportSourceProblem(
-  problem: PortalSourceProblem,
-  sourceDirectory: DirectoryPath,
-  { offerQuickstart = true }: { offerQuickstart?: boolean } = {}
-): void {
-  const quickstart = `Run ${f.cmdAlt('apimatic', 'quickstart')} to set up a portal.`;
+export function reportSourceProblem(problem: PortalSourceProblem, sourceDirectory: DirectoryPath): void {
   switch (problem.kind) {
     case 'missingConfig': {
       log.error(`No ${f.var(APIMATIC_CONFIG_FILE_NAME)} found in ${f.path(sourceDirectory)}.`);
-      if (offerQuickstart) {
-        log.message(quickstart);
-      }
       return;
     }
     case 'invalidConfig': {
       log.error(`The ${f.var(APIMATIC_CONFIG_FILE_NAME)} in ${f.path(sourceDirectory)} is not valid:`);
       log.message(problem.errors.map((error) => `  • ${error}`).join('\n'));
-      // A file without the block is no worse off than no file: the same command sets it up.
-      if (problem.missingPortal && offerQuickstart) {
-        log.message(quickstart);
-      }
       return;
     }
     case 'invalidContent': {

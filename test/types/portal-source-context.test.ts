@@ -379,6 +379,23 @@ describe('PortalSourceContext', () => {
     });
   });
 
+  describe('resolveSpecs', () => {
+    const resolveSpecs = () => new PortalSourceContext(new DirectoryPath(root)).resolveSpecs();
+
+    it('answers with the specs a build would read, without an apimatic.json', async () => {
+      write('spec/api.json', OPENAPI);
+      write('spec/old.json', JSON.stringify({ swagger: '2.0', info: {}, paths: {} }));
+
+      expect((await resolveSpecs())._unsafeUnwrap().map((spec) => spec.slug)).to.deep.equal(['api']);
+    });
+
+    it('refuses a spec directory with no OpenAPI 3.x document, as resolve does', async () => {
+      write('spec/petstore.json', JSON.stringify({ swagger: '2.0', info: {}, paths: {} }));
+
+      expect((await resolveSpecs())._unsafeUnwrapErr().kind).to.equal('noOpenApiSpec');
+    });
+  });
+
   describe('spec discovery', () => {
     beforeEach(() => writeConfig({ site: { name: 'Calc' } }));
 
@@ -1985,18 +2002,24 @@ describe('PortalSourceContext', () => {
       });
     });
 
-    // What a build downloaded from the platform arrives as: `spec/` filled, and nothing else.
+    // What a build downloaded from the platform arrives as: `spec/` filled, beside its own `apimatic.json`.
     describe('adopt', () => {
-      const writeSourceSpec = (name: string, info: Record<string, unknown>): FilePath => {
-        write(path.join('project', 'src', 'spec', name), JSON.stringify({ openapi: '3.0.0', info, paths: {} }));
-        return new FilePath(source.join('spec'), new FileName(name));
+      const inSource = (relative: string) => path.join('project', 'src', relative);
+      const writeSourceSpec = (name: string, document: Record<string, unknown>) =>
+        write(inSource(path.join('spec', name)), JSON.stringify({ openapi: '3.0.0', paths: {}, ...document }));
+      const writeSourceConfig = (config: object) => write(inSource('apimatic.json'), JSON.stringify(config));
+      const adopt = async () => {
+        const context = new PortalSourceContext(source);
+        const [first] = (await context.resolveSpecs())._unsafeUnwrap();
+        return (await context.adopt(first))._unsafeUnwrap();
       };
+      const portalBlock = () => JSON.parse(read('apimatic.json')).portal;
 
       it('writes the tree around a specification already in the source directory', async () => {
-        const specPath = writeSourceSpec('petstore.json', { title: 'Petstore', version: '1' });
+        writeSourceSpec('petstore.json', { info: { title: 'Petstore', version: '1' } });
+        writeSourceConfig({ languages: LANGUAGES });
 
-        (await new PortalSourceContext(source).adopt(specPath, APIMATIC_SCHEMA_URL))._unsafeUnwrap();
-        addLanguages();
+        await adopt();
 
         const resolved = (await new PortalSourceContext(source).resolve())._unsafeUnwrap();
         expect(resolved.config.siteTitle()).to.equal('Petstore');
@@ -2004,24 +2027,134 @@ describe('PortalSourceContext', () => {
         expect(fs.readdirSync(path.join(source.toString(), 'spec'))).to.deep.equal(['petstore.json']);
       });
 
-      it('finds the document the portal speaks for, sorted as every other list sorts it', async () => {
-        writeSourceSpec('zebra.yaml', { title: 'Zebra', version: '1' });
-        writeSourceSpec('alpha.json', { title: 'Alpha', version: '1' });
-        write(path.join('project', 'src', 'spec', 'README.md'), '# not a specification');
+      it('leaves the apimatic.json and content/ the project carries as they are', async () => {
+        writeSourceSpec('petstore.json', { info: { title: 'Petstore', version: '1' } });
+        const config = JSON.stringify({ portal: { site: { name: 'My Company Docs', description: 'Ours' } } });
+        write(inSource('apimatic.json'), config);
+        write(inSource('content/index.md'), page('Our own welcome'));
+        write(inSource('content/nav.json'), JSON.stringify({ pages: ['index', 'guides'] }));
 
-        const found = await new PortalSourceContext(source).primarySpec();
+        await adopt();
 
-        expect(found?.name().toString()).to.equal('alpha.json');
+        expect(read('apimatic.json')).to.equal(config);
+        expect(read('content/index.md')).to.equal(page('Our own welcome'));
+        expect(read('content/nav.json')).to.equal(JSON.stringify({ pages: ['index', 'guides'] }));
       });
 
-      it('finds nothing in a project with no source directory', async () => {
-        expect(await new PortalSourceContext(source).primarySpec()).to.be.null;
+      it('adds a site to a portal block that has none, and keeps the rest of the block', async () => {
+        writeSourceSpec('petstore.json', { info: { title: 'Petstore', version: '1', description: 'All the pets.' } });
+        writeSourceConfig({ portal: { ai: { pageActions: false } } });
+
+        await adopt();
+
+        expect(portalBlock()).to.deep.equal({
+          site: { name: 'Petstore', description: 'All the pets.' },
+          ai: { pageActions: false }
+        });
       });
 
-      it('finds nothing when the specification directory holds no document', async () => {
-        write(path.join('project', 'src', 'spec', 'notes.txt'), 'nothing here');
+      it('adds a portal block holding only the site to a file that has none', async () => {
+        writeSourceSpec('petstore.json', { info: { title: 'Petstore', version: '1' } });
+        writeSourceConfig({ languages: LANGUAGES });
 
-        expect(await new PortalSourceContext(source).primarySpec()).to.be.null;
+        await adopt();
+
+        expect(portalBlock()).to.deep.equal({ site: { name: 'Petstore' } });
+      });
+
+      it('names a site that has no name, and keeps the rest of it where it was', async () => {
+        writeSourceSpec('petstore.json', { info: { title: 'Petstore', version: '1', description: 'All the pets.' } });
+        writeSourceConfig({ portal: { ai: { pageActions: false }, site: { url: 'https://docs.example.com' } } });
+
+        await adopt();
+
+        expect(portalBlock().site).to.deep.equal({ name: 'Petstore', url: 'https://docs.example.com' });
+        expect(Object.keys(portalBlock())).to.deep.equal(['ai', 'site']);
+      });
+
+      const unreadBlocks: [string, unknown][] = [
+        ['a portal block', 'petstore'],
+        ['a site', { site: 'petstore' }]
+      ];
+
+      unreadBlocks.forEach(([what, portal]) => {
+        it(`leaves ${what} that is not an object for the build to report`, async () => {
+          writeSourceSpec('petstore.json', { info: { title: 'Petstore', version: '1' } });
+          writeSourceConfig({ portal });
+
+          await adopt();
+
+          expect(portalBlock()).to.deep.equal(portal);
+        });
+      });
+
+      it('writes the welcome page and the page order when there is no content/, named as the file names the site', async () => {
+        writeSourceSpec('petstore.json', { info: { title: 'Petstore', version: '1' } });
+        writeSourceConfig({ portal: { site: { name: 'My Company Docs' } } });
+
+        await adopt();
+
+        expect(read('content/index.md')).to.contain('Welcome to the My Company Docs documentation.');
+        expect(fs.readdirSync(path.join(source.toString(), 'content')).sort()).to.deep.equal(['index.md', 'nav.json']);
+      });
+
+      // The spec the build reads first, which is not always the first file in `spec/`.
+      const layouts: [string, [string, Record<string, unknown>][], string][] = [
+        [
+          'shared schemas beside the spec',
+          [
+            ['components.yaml', { openapi: undefined, components: { schemas: {} } }],
+            ['openapi.yaml', { info: { title: 'Pets', version: '1' } }]
+          ],
+          'Pets'
+        ],
+        [
+          'the build settings beside the spec',
+          [
+            ['APIMATIC-META.json', { openapi: undefined, CodeGenSettings: {} }],
+            ['petstore.json', { info: { title: 'Petstore', version: '1' } }]
+          ],
+          'Petstore'
+        ],
+        [
+          'a Swagger 2.0 spec before its OpenAPI 3 conversion',
+          [
+            ['a-legacy.json', { openapi: undefined, swagger: '2.0', info: { title: 'Legacy Swagger', version: '1' } }],
+            ['b-current.json', { info: { title: 'Current API', version: '1' } }]
+          ],
+          'Current API'
+        ]
+      ];
+
+      layouts.forEach(([layout, specs, name]) => {
+        it(`names the portal as the build would, for ${layout}`, async () => {
+          specs.forEach(([fileName, document]) => writeSourceSpec(fileName, document));
+          writeSourceConfig({ portal: {}, languages: LANGUAGES });
+
+          await adopt();
+
+          expect(portalBlock().site.name).to.equal(name);
+          const resolved = (await new PortalSourceContext(source).resolve())._unsafeUnwrap();
+          expect(resolved.config.siteTitle()).to.equal(name);
+        });
+      });
+
+      const unnamedPortals: [string, object][] = [
+        ['no site', {}],
+        ['the empty site the template ships', { site: {} }]
+      ];
+
+      unnamedPortals.forEach(([shape, portal]) => {
+        it(`names a portal of several specs with ${shape} after the first, since the build then needs the name written`, async () => {
+          writeSourceSpec('alpha.json', { info: { title: 'Alpha', version: '1' } });
+          writeSourceSpec('zebra.yaml', { info: { title: 'Zebra', version: '1' } });
+          writeSourceConfig({ portal, languages: LANGUAGES });
+
+          await adopt();
+
+          expect(portalBlock().site.name).to.equal('Alpha');
+          expect((await new PortalSourceContext(source).resolve()).isOk()).to.be.true;
+        });
       });
     });
   });

@@ -158,6 +158,11 @@ export class ApimaticConfigDocument {
     return isJsonObject(this.root.languages) ? this.root.languages : undefined;
   }
 
+  /** Whether the file holds the block at all, in whatever shape. */
+  public has(block: ConfigBlockName): boolean {
+    return this.root[block] !== undefined;
+  }
+
   public findingsFor(...blocks: ConfigBlock[]): ConfigFinding[] {
     return this.findings.filter((finding) => blocks.includes(finding.block));
   }

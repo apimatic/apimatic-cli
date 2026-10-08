@@ -30,6 +30,14 @@ export class PreparePortalProjectPrompts {
 
   public sourceProblem(problem: PortalSourceProblem, sourceDirectory: DirectoryPath) {
     reportSourceProblem(problem, sourceDirectory);
+    const noPortalBlock =
+      problem.kind === 'missingConfig' || (problem.kind === 'invalidConfig' && problem.missingPortal);
+    if (noPortalBlock) {
+      log.message(
+        `Run ${f.cmdAlt('apimatic', 'quickstart')} in an empty directory with a sample spec to see an example of ` +
+          `a valid portal.`
+      );
+    }
   }
 
   public filesShadowedByStatic(shadowed: FileName[]) {
