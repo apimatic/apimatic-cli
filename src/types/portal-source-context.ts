@@ -338,7 +338,7 @@ export class PortalSourceContext {
     }
   }
 
-  /** Adds only what a build cannot do without; with several specs that includes the site's name. */
+  /** Names the site after the spec and writes a starter content/, each only where the project has none. */
   public async adopt(namedAfter: PortalSpec): Promise<Result<FilePath, PortalScaffoldProblem>> {
     try {
       const site = await this.suggestedSite(namedAfter.file);
