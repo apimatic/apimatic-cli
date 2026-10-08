@@ -219,12 +219,18 @@ describe('QuickstartAction', () => {
       expect(sourceProblem.calledOnce, 'the preview reported the block').to.be.true;
     });
 
-    it('refuses an apimatic.json of a schema version it does not know before asking for languages', async () => {
-      fs.writeFileSync(inSource('apimatic.json'), JSON.stringify({ schemaVersion: 2 }));
+    it('refuses an apimatic.json of a schema version it does not read by that version, before validating', async () => {
+      const config = JSON.stringify({ schemaVersion: 2 });
+      fs.writeFileSync(inSource('apimatic.json'), config);
 
       expect((await execute(downloaded)).isFailed()).to.be.true;
-      expect(prompts.scaffoldFailed.calledOnce).to.be.true;
-      expect(prompts.selectLanguages.called).to.be.false;
+      expect(prompts.configUnsupported.calledOnce).to.be.true;
+      expect(prompts.configUnsupported.firstCall.args[0].map((finding) => finding.field)).to.deep.equal([
+        'schemaVersion'
+      ]);
+      expect(validateViaFile.called).to.be.false;
+      expect(fs.readFileSync(inSource('apimatic.json'), 'utf8')).to.equal(config);
+      expect(fs.existsSync(inSource('content'))).to.be.false;
     });
 
     it('leaves the plugin block an adopted project carries as it is', async () => {

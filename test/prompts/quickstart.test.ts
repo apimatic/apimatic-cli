@@ -4,6 +4,7 @@ import sinon from 'sinon';
 import { log } from '@clack/prompts';
 import { QuickstartPrompts } from '../../src/prompts/quickstart.js';
 import { convertToOpenApi3 } from '../../src/prompts/portal/source.js';
+import { ApimaticConfigDocument } from '../../src/types/apimatic-config/document.js';
 import { DirectoryPath } from '../../src/types/file/directoryPath.js';
 import { FileName } from '../../src/types/file/fileName.js';
 import { FilePath } from '../../src/types/file/filePath.js';
@@ -59,6 +60,16 @@ describe('QuickstartPrompts', () => {
 
     expect(printed()[0]).to.contain('apimatic.json');
     expect(stripVTControlCharacters(String(message.firstCall.args[0]))).to.contain('apimatic quickstart');
+  });
+
+  it('names the schema version an apimatic.json is refused for, and the one it reads', () => {
+    const document = ApimaticConfigDocument.parse(JSON.stringify({ schemaVersion: 2 }))._unsafeUnwrap();
+
+    prompts.configUnsupported(document.findingsFor('root'), new DirectoryPath('project').join('src'));
+
+    expect(printed()[0]).to.contain(
+      "its 'schemaVersion' is 2, which this version of the CLI does not read; it reads 1."
+    );
   });
 
   it('says whether apimatic.json could not be read or could not be written', () => {

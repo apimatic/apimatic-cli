@@ -7,7 +7,7 @@ import { FilePath } from '../types/file/filePath.js';
 import { Directory } from '../types/file/directory.js';
 import { createFileOrUrlFromInput } from '../types/file/resource-input.js';
 import { PortalAuthorizationFailure } from '../infrastructure/services/portal-authorization-service.js';
-import { APIMATIC_CONFIG_FILE_NAME } from '../types/apimatic-config/document.js';
+import { APIMATIC_CONFIG_FILE_NAME, ConfigFinding, findingClause } from '../types/apimatic-config/document.js';
 import { PluginConfigWriteFailure } from '../types/plugin-config-context.js';
 import { PortalScaffoldProblem, PortalSourceProblem } from '../types/portal/portal-source.js';
 import { GENERATED, GITIGNORE, GitignoreFailure } from '../types/project-context.js';
@@ -83,6 +83,11 @@ Let's get started!`);
       `Add the project's ${configFile} there, or run ${f.cmdAlt('apimatic', 'quickstart')} from a directory ` +
         `with no ${f.var('src')} to start a new portal.`
     );
+  }
+
+  public configUnsupported(findings: readonly ConfigFinding[], sourceDirectory: DirectoryPath) {
+    const configFile = f.var(APIMATIC_CONFIG_FILE_NAME);
+    log.error(`The ${configFile} in ${f.path(sourceDirectory)} cannot be used: ${findingClause(findings)}.`);
   }
 
   public runtimeUnsupported(reason: string) {
