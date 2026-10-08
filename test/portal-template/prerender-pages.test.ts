@@ -17,9 +17,9 @@ describe('prerenderPages', () => {
   };
   const write = (relative: string, body = '# page\n') => writeIn(contentDir, relative, body);
 
-  const urlsFor = async (siteUrl: string | null = null, specs: Record<string, string> = {}) => {
+  const urlsFor = async (siteUrl: string | null = null, base = '/', specs: Record<string, string> = {}) => {
     const pages = await prerenderPages(
-      { specs, codeSamples: null, contentDir, generatedDir, staticDir: null, downloadsDir: null },
+      { base, specs, codeSamples: null, contentDir, generatedDir, staticDir: null, downloadsDir: null },
       siteUrl
     );
     return pages.map((page) => page.path);
@@ -151,7 +151,7 @@ describe('prerenderPages', () => {
         }
       })
     );
-    const reference = (await urlsFor(null, { pets: spec })).filter((url) => url.startsWith('/api/pets/')).sort();
+    const reference = (await urlsFor(null, '/', { pets: spec })).filter((url) => url.startsWith('/api/pets/')).sort();
 
     expect(reference).to.deep.equal([
       '/api/pets/pets/createPet',
@@ -159,6 +159,46 @@ describe('prerenderPages', () => {
       '/api/pets/pets/listPets',
       '/api/pets/pets/listPets.md'
     ]);
+  });
+
+  it('lists portal-relative paths for a portal at the root of its host', async () => {
+    write('index.md');
+    write('guides.md');
+
+    expect(await urlsFor('https://docs.test')).to.include.members(['/', '/guides', '/api/search.json']);
+  });
+
+  // TanStack prefixes a listed path with the base only when it does not already start with it,
+  // so `/api/search.json` under `/api` would otherwise be fetched as `/search.json`.
+  it('lists served paths for a portal under a path, the colliding ones included', async () => {
+    write('index.md');
+    write('guides.md');
+    write('api/overview.md');
+
+    const urls = await urlsFor('https://docs.test/api', '/api/');
+
+    expect(urls).to.include.members([
+      '/api/',
+      '/api/guides',
+      '/api/guides.md',
+      '/api/index.md',
+      '/api/api/search.json',
+      '/api/api/overview',
+      '/api/llms.txt',
+      '/api/sitemap.xml',
+      '/api/oauth/callback'
+    ]);
+    expect(urls.filter((url) => !url.startsWith('/api/'))).to.be.empty;
+  });
+
+  // A robots.txt anywhere but the root of a host is never read.
+  it('emits no robots file for a portal under a path', async () => {
+    write('index.md');
+
+    const urls = await urlsFor('https://docs.test/api', '/api/');
+
+    expect(urls).to.include('/api/sitemap.xml');
+    expect(urls.filter((url) => url.endsWith('robots.txt'))).to.be.empty;
   });
 
   it('suffixes each page once, however many pages there are', async () => {

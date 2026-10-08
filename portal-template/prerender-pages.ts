@@ -2,6 +2,7 @@ import { readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { getSlugs, loader } from 'fumadocs-core/source';
 import type { BuildPaths } from './portal-config.ts';
+import { withBasePath } from './src/lib/base-path';
 import { oauthCallbackPath } from './src/lib/oauth-callback';
 import { openApiSection } from './src/lib/openapi-section.server';
 
@@ -20,7 +21,8 @@ export async function prerenderPages(config: BuildPaths, siteUrl: string | null)
   // Both need absolute URLs, so they are only emitted for a portal that declares its address.
   if (siteUrl) {
     urls.add('/sitemap.xml');
-    urls.add('/robots.txt');
+    // Crawlers read it only at the root of a host.
+    if (config.base === '/') urls.add('/robots.txt');
   }
 
   for (const url of await contentUrls(config.contentDir)) urls.add(url);
@@ -39,7 +41,8 @@ export async function prerenderPages(config: BuildPaths, siteUrl: string | null)
   // After the twins, since it is no page of the portal's and has none.
   urls.add(oauthCallbackPath);
 
-  return [...urls].map((url) => ({ path: url }));
+  // Served paths, or TanStack takes a page starting like the base (`/api/…` under `/api`) as already under it.
+  return [...urls].map((url) => ({ path: withBasePath(url, config.base) }));
 }
 
 async function contentUrls(contentDir: string): Promise<string[]> {

@@ -30,6 +30,8 @@ Documentation portals are now built on your machine from a `src/` directory, and
   and description), `brand` (logo, favicon, primary colour and colour mode), `navigation`
   (header links) and `ai` (the page actions). Running `apimatic quickstart` scaffolds the block
   with every default spelled out, and the file's `$schema` lets your editor complete and check it.
+  The address may carry a path, such as `https://acme.github.io/docs`, and the portal is then
+  built to be served there.
 - A portal also needs the project's SDK languages, at least one, in the same file's
   `languages` block, for example `"languages": { "typescript": {} }`; `csharp`, `python` and
   `typescript` are available for now. `plugin generate` and `sdk publish` both write to it, and
@@ -361,9 +363,10 @@ DESCRIPTION
 
   Builds a documentation portal from the OpenAPI documents and Markdown pages in your 'src' directory.
 
-  The portal is built on your machine and written as static files you can host anywhere. Configure it with
-  'src/apimatic.json', whose 'languages' block gives the portal a page for each SDK language, and whose 'plugin' block,
-  or a 'pluginUrl' in its 'portal' block for a plugin hosted elsewhere, a page for the context plugin.
+  The portal is built on your machine and written as static files for any static host, served at its root or, when
+  'portal.site.url' has a path such as 'https://example.com/docs', at that path. Configure it with 'src/apimatic.json',
+  whose 'languages' block gives the portal a page for each SDK language, and whose 'plugin' block, or a 'pluginUrl' in
+  its 'portal' block for a plugin hosted elsewhere, a page for the context plugin.
 
 EXAMPLES
   apimatic portal generate
@@ -397,8 +400,8 @@ DESCRIPTION
   pages in 'src/content', reorder them in a 'nav.json', or change the 'portal', 'languages' or 'plugin' block of
   'apimatic.json'.
 
-  Adding a language or a 'plugin' block, adding or removing a page in 'src/content', creating 'src/static', or changing
-  which documents are in 'src/spec', needs the preview restarted.
+  Adding a language or a 'plugin' block, adding or removing a page in 'src/content', creating 'src/static', changing
+  which documents are in 'src/spec', or changing the path in 'portal.site.url', needs the preview restarted.
 
   Nothing is written to disk; run 'apimatic portal generate' to produce the static files.
 

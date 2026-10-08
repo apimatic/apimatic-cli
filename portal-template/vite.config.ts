@@ -10,6 +10,8 @@ import { generatedPagesReload } from './generated-pages-reload.ts';
 import { readBuildPaths, readPortalIdentity } from './portal-config.ts';
 import { prerenderPages } from './prerender-pages.ts';
 import { specReload } from './spec-reload.ts';
+import { remarkImageReferences } from './src/lib/remark-image-references.ts';
+import { staticFunctionsBase } from './static-functions-base.ts';
 
 export default defineConfig(async () => {
   const [paths, identity] = await Promise.all([readBuildPaths(), readPortalIdentity()]);
@@ -18,14 +20,21 @@ export default defineConfig(async () => {
   const portalProjectDirectory = fileURLToPath(new URL('.', import.meta.url));
 
   return {
+    // TanStack Start derives the router's basepath and every asset URL from it.
+    base: paths.base,
     publicDir,
     plugins: [
       generatedPagesReload(),
       downloads(paths.downloadsDir),
+      staticFunctionsBase(),
       // `/images/logo.png` is read from the static directory, and a remote image is never fetched for its size.
       fumadocsMdx({
         globalOptions: {
-          mdxOptions: { remarkImageOptions: { publicDir: publicDir || undefined, external: false } }
+          mdxOptions: {
+            remarkImageOptions: { publicDir: publicDir || undefined, external: false },
+            // A function, so it runs ahead of the preset's own plugins, `remarkImage` among them.
+            remarkPlugins: (plugins) => [remarkImageReferences, ...plugins]
+          }
         }
       }),
       specReload(paths.specs),
