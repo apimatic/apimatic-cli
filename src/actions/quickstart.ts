@@ -74,13 +74,12 @@ export class QuickstartAction {
   // A build downloaded from the platform arrives with its specification in `src/spec/`, so it is not asked for again.
   private async adoptProject(project: ProjectContext, projectDirectory: DirectoryPath): Promise<ActionResult> {
     const sourceDirectory = project.sourceDirectory();
-    const config = project.config();
-    if (!(await config.exists())) {
+    const config = await project.config().read();
+    if (config.state === 'missing') {
       this.prompts.configMissing(sourceDirectory);
       return ActionResult.failed();
     }
-    const state = await config.read();
-    const unsupported = state.state === 'parsed' ? state.document.findingsFor('root') : [];
+    const unsupported = config.state === 'parsed' ? config.document.findingsFor('root') : config.findings;
     if (unsupported.length > 0) {
       this.prompts.configUnsupported(unsupported, sourceDirectory);
       return ActionResult.failed();

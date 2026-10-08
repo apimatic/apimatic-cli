@@ -233,6 +233,21 @@ describe('QuickstartAction', () => {
       expect(fs.existsSync(inSource('content'))).to.be.false;
     });
 
+    it('refuses an apimatic.json that is not valid JSON, before validating', async () => {
+      const config = '{ "portal": ';
+      fs.writeFileSync(inSource('apimatic.json'), config);
+
+      expect((await execute(downloaded)).isFailed()).to.be.true;
+      expect(prompts.configUnsupported.calledOnce).to.be.true;
+      expect(prompts.configUnsupported.firstCall.args[0].map((finding) => finding.problem)).to.deep.equal([
+        'is not valid JSON'
+      ]);
+      expect(validateViaFile.called).to.be.false;
+      expect(prompts.scaffoldFailed.called).to.be.false;
+      expect(fs.readFileSync(inSource('apimatic.json'), 'utf8')).to.equal(config);
+      expect(fs.existsSync(inSource('content'))).to.be.false;
+    });
+
     it('leaves the plugin block an adopted project carries as it is', async () => {
       const config = JSON.stringify({
         portal: { site: { name: 'Our Docs' } },
