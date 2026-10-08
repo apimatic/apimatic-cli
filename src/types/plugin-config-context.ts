@@ -12,6 +12,7 @@ import {
   PluginIdentityData,
   PluginMetadata
 } from './plugin/plugin-config.js';
+import { PortalLanguages } from './portal/portal-languages.js';
 import { SOURCE_DIRECTORY_NAME } from './project-layout.js';
 import { SemVersion } from './publish/version.js';
 import { isAvailableLanguage, Language } from './sdk/generate.js';
@@ -125,11 +126,8 @@ const keepsRecord = (language: string, entry: PluginLanguageEntry<Language> | un
 
 const isUnavailableLanguage = (language: string): boolean => !isAvailableLanguage(language);
 
-/** As a portal build refuses it; a block of the wrong shape is the build's to report. */
-const namesNoLanguage = (document: ApimaticConfigDocument): boolean => {
-  const languages = document.has('languages') ? document.languages() : {};
-  return languages !== undefined && Object.keys(languages).length === 0;
-};
+const namesNoLanguage = (document: ApimaticConfigDocument): boolean =>
+  PortalLanguages.namesNone(document.languages(), document.findingsFor('languages'));
 
 const withMetadata = (
   document: ApimaticConfigDocument,
