@@ -280,7 +280,7 @@ export class QuickstartAction {
       if (await this.fileService.isZipFile(specPath)) {
         return { supported: true };
       }
-      return OpenApiDocument.parse(specPath.name(), await this.fileService.getContents(specPath)).match(
+      return OpenApiDocument.parse(await this.fileService.getContents(specPath)).match(
         (document) => document.format(),
         (): SpecFormat => ({ supported: true })
       );

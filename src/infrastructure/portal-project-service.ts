@@ -2,7 +2,7 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 import fsExtra from 'fs-extra';
 import { err, ok, Result } from 'neverthrow';
-import { DirectoryPath } from '../types/file/directoryPath.js';
+import { DirectoryPath, posix } from '../types/file/directoryPath.js';
 import { FileName } from '../types/file/fileName.js';
 import { FilePath } from '../types/file/filePath.js';
 import { CodeSampleCatalogs } from '../types/portal/code-samples.js';
@@ -285,10 +285,7 @@ export class PortalProjectService {
       contentDir: contentDirectory.toPosix(),
       generatedDir: projectDirectory.join(GENERATED_DIRECTORY_NAME).toPosix(),
       // The dev server's allow list names it, and Vite resolves a symlink before comparing.
-      staticDir:
-        source.staticDirectory === null
-          ? null
-          : new DirectoryPath(canonical(source.staticDirectory.toString())).toPosix(),
+      staticDir: source.staticDirectory === null ? null : posix(canonical(source.staticDirectory.toString())),
       downloadsDir: downloads === null ? null : downloads.toPosix()
     };
 

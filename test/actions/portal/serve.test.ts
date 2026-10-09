@@ -52,6 +52,20 @@ describe('PortalServeAction', () => {
       openInBrowser
     );
 
+  /** Stands in for the watch on `directory`, answered by `watching`; any other tree's watch is left alone. */
+  const watchTreeAt = (directory: DirectoryPath, watching: { close: sinon.SinonStub; recheck: sinon.SinonStub }) =>
+    new Promise<{ onChange: () => Promise<void>; onFailed: (reason: string) => void }>((resolve) => {
+      watchTree.callsFake(
+        (watched: DirectoryPath, onChange: () => Promise<void>, onFailed: (reason: string) => void) => {
+          if (!watched.isEqual(directory)) {
+            return ok({ close: sinon.stub().resolves(), recheck: sinon.stub() });
+          }
+          resolve({ onChange, onFailed });
+          return ok(watching);
+        }
+      );
+    });
+
   beforeEach(() => {
     root = fs.mkdtempSync(path.join(os.tmpdir(), 'portal-serve-'));
 
@@ -227,18 +241,7 @@ describe('PortalServeAction', () => {
       closeWatch = sinon.stub().resolves();
       recheck = sinon.stub();
       applyContent = sinon.stub(PortalProjectService.prototype, 'applyContent').resolves(ok(undefined));
-      watched = new Promise((resolve) => {
-        watchTree.callsFake(
-          (directory: DirectoryPath, onChange: () => Promise<void>, onFailed: (reason: string) => void) => {
-            // `spec/` is watched as well, and these tests leave its watch alone.
-            if (!directory.isEqual(source.join('content'))) {
-              return ok({ close: sinon.stub().resolves(), recheck: sinon.stub() });
-            }
-            resolve({ onChange, onFailed });
-            return ok({ close: closeWatch, recheck });
-          }
-        );
-      });
+      watched = watchTreeAt(source.join('content'), { close: closeWatch, recheck });
     });
 
     // The preview itself turns every page into an HTTP 500 and says nothing.
@@ -454,18 +457,7 @@ describe('PortalServeAction', () => {
 
       closeWatch = sinon.stub().resolves();
       recheck = sinon.stub();
-      watched = new Promise((resolve) => {
-        watchTree.callsFake(
-          (directory: DirectoryPath, onChange: () => Promise<void>, onFailed: (reason: string) => void) => {
-            // `content/` is watched as well, and these tests leave its watch alone.
-            if (!directory.isEqual(source.join('spec'))) {
-              return ok({ close: sinon.stub().resolves(), recheck: sinon.stub() });
-            }
-            resolve({ onChange, onFailed });
-            return ok({ close: closeWatch, recheck });
-          }
-        );
-      });
+      watched = watchTreeAt(source.join('spec'), { close: closeWatch, recheck });
     });
 
     // The preview itself leaves the document's reference out, and says nothing.
@@ -535,7 +527,7 @@ describe('PortalServeAction', () => {
     });
 
     // An editor's swap file would only have the specifications checked again for nothing.
-    it('leaves out of the watch what the build never reads', async () => {
+    it("leaves dot files, as an editor's swap file is, and node_modules out of the watch", async () => {
       await whileServing(async () => {
         const call = watchTree.getCalls().find(({ args: [directory] }) => directory.isEqual(source.join('spec')));
         const isIgnored: (name: string) => boolean = call?.args[3];

@@ -28,7 +28,6 @@ export class PreviewConfig {
    * it is accepted again.
    */
   public show(config: PortalConfig, written: boolean): boolean {
-    // Not after `written ||`, which would skip it, and so say it is fixed again after the next save.
     const fixed = this.refusal.accept();
     this.shown = config;
     return written || fixed;

@@ -7,6 +7,7 @@ import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
 import { FileName } from '../../../src/types/file/fileName.js';
 import { FilePath } from '../../../src/types/file/filePath.js';
 import { UrlPath } from '../../../src/types/file/urlPath.js';
+import { PortalSourceProblem } from '../../../src/types/portal/portal-source.js';
 import { Language } from '../../../src/types/sdk/generate.js';
 
 describe('PortalServePrompts', () => {
@@ -52,10 +53,72 @@ describe('PortalServePrompts', () => {
       );
     });
 
-    it('says a saved specification updates its reference, and one with a mistake is reported and left out', () => {
+    it('says a saved specification updates its reference, and what it cannot read is reported and left out', () => {
       expect(printed()).to.match(
-        /Saving a document in '.*spec' updates its API reference; one with a mistake is reported, and left out until it is fixed\./
+        /Saving a document in '.*spec' updates its API reference; a mistake is reported on save, and the preview leaves what it cannot read out of the reference until it is fixed\./
       );
+    });
+  });
+
+  /** The last line `log[level]` printed for `say`, without its colours. */
+  const lastLine = (level: 'warn' | 'message', say: (prompts: PortalServePrompts) => void) => {
+    const stubs = {
+      warn: sinon.stub(log, 'warn'),
+      message: sinon.stub(log, 'message'),
+      error: sinon.stub(log, 'error')
+    };
+    say(new PortalServePrompts());
+    return stripVTControlCharacters(String(stubs[level].lastCall.args[0]));
+  };
+
+  // Content keeps what it last accepted; a specification has no earlier version to keep.
+  it('says a refused specification leaves what it cannot read out of the reference, and would stop a build', () => {
+    const problem: PortalSourceProblem = { kind: 'emptySpecDirectory', folders: [] };
+
+    expect(lastLine('message', (prompts) => prompts.specRejected(problem, new DirectoryPath('src')))).to.match(
+      /^The preview leaves what it cannot read out of the API reference until '.*spec' is fixed; a build would stop here\.$/
+    );
+  });
+
+  describe('a watch that cannot start, or stops', () => {
+    const source = new DirectoryPath('src');
+    const cases: [string, (prompts: PortalServePrompts) => void, RegExp][] = [
+      [
+        'apimatic.json, at the start',
+        (prompts) => prompts.configNotWatched('EMFILE'),
+        /^'apimatic\.json' cannot be watched \(EMFILE\), so edits to it need the preview restarted\.$/
+      ],
+      [
+        'apimatic.json, while serving',
+        (prompts) => prompts.configWatchFailed('EPERM'),
+        /^'apimatic\.json' is no longer watched \(EPERM\), so further edits to it need the preview restarted\.$/
+      ],
+      [
+        'the content, at the start',
+        (prompts) => prompts.contentNotWatched('EMFILE', source),
+        /^'.*content' cannot be watched \(EMFILE\), so a mistake in a page or a 'nav\.json' is only reported when the preview is restarted\.$/
+      ],
+      [
+        'the content, while serving',
+        (prompts) => prompts.contentWatchFailed('EPERM', source),
+        /^'.*content' is no longer watched \(EPERM\), so a mistake in a page or a 'nav\.json' is only reported when the preview is restarted\.$/
+      ],
+      [
+        'the specifications, at the start',
+        (prompts) => prompts.specNotWatched('EMFILE', source),
+        /^'.*spec' cannot be watched \(EMFILE\), so a mistake in a specification is only reported when the preview is restarted\.$/
+      ],
+      [
+        'the specifications, while serving',
+        (prompts) => prompts.specWatchFailed('EPERM', source),
+        /^'.*spec' is no longer watched \(EPERM\), so a mistake in a specification is only reported when the preview is restarted\.$/
+      ]
+    ];
+
+    cases.forEach(([label, say, expected]) => {
+      it(`says what is no longer reported on save for ${label}`, () => {
+        expect(lastLine('warn', say)).to.match(expected);
+      });
     });
   });
 
@@ -77,14 +140,14 @@ describe('PortalServePrompts', () => {
       }
     };
 
-    it('names each document added and removed, and that a restart shows them', () => {
+    it('names each document added and removed, and that a restart matches them', () => {
       const [warning, advice] = said(['orders.json'], ['pets.json']);
 
       expect(warning).to.match(
         /^The documents in '.*spec' are not the ones the preview started with: 'orders\.json' was added, and 'pets\.json' was removed\.$/
       );
       expect(advice).to.equal(
-        'Restart the preview to show them; until then it shows those it started with that are still there.'
+        'Restart the preview to match them; until then it shows the ones it started with that are still there.'
       );
     });
 

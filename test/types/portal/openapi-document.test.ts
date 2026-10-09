@@ -1,38 +1,46 @@
 import { expect } from 'chai';
 import path from 'path';
 import { OpenApiDocument, SpecFormat } from '../../../src/types/portal/openapi-document';
-import { FileName } from '../../../src/types/file/fileName';
 import { DirectoryPath } from '../../../src/types/file/directoryPath';
 
-const JSON_FILE = new FileName('spec.json');
-const YAML_FILE = new FileName('spec.yaml');
 const BYTE_ORDER_MARK = '﻿';
 
 describe('OpenApiDocument', () => {
-  const read = (contents: string, fileName = JSON_FILE): OpenApiDocument => {
-    const document = OpenApiDocument.parse(fileName, contents);
+  const read = (contents: string): OpenApiDocument => {
+    const document = OpenApiDocument.parse(contents);
     expect(document.isOk(), `unparsable: ${contents}`).to.be.true;
     return document._unsafeUnwrap();
   };
 
   const readJson = (document: unknown, prefix = '') => read(prefix + JSON.stringify(document));
   const withInfo = (info: Record<string, unknown>) => readJson({ openapi: '3.0.0', info, paths: {} });
+  const refused = (contents: string) => OpenApiDocument.parse(contents)._unsafeUnwrapErr();
 
   describe('parse', () => {
-    it('reads JSON by the .json extension and YAML by any other', () => {
+    it('reads JSON, and YAML, by what the text holds', () => {
       expect(readJson({ openapi: '3.1.0' }).format()).to.deep.equal({ supported: true });
-      expect(read('openapi: 3.1.0\n', YAML_FILE).format()).to.deep.equal({ supported: true });
+      expect(read('openapi: 3.1.0\n').format()).to.deep.equal({ supported: true });
     });
 
     // Matched loosely: the words are the parser's own, and change with its version.
     it('fails with what the parser said, on one line, saying where it stopped', () => {
-      const yaml = OpenApiDocument.parse(YAML_FILE, 'openapi: 3.0.0\ninfo:\n  title: [unclosed\n')._unsafeUnwrapErr();
-      const json = OpenApiDocument.parse(JSON_FILE, '{\n  "a": 1\n  "b": 2\n}')._unsafeUnwrapErr();
-      const quoting = OpenApiDocument.parse(JSON_FILE, '[1,\n2,\n,3]')._unsafeUnwrapErr();
+      const yaml = refused('openapi: 3.0.0\ninfo:\n  title: [unclosed\n');
+      const json = refused('{\n  "a": 1\n  "b": 2\n}');
+      const quoting = refused('[1,\n2,\n,3]');
 
       expect(yaml).to.match(/at line 4, column 1$/);
       expect(json).to.contain('line 3 column 3');
       [yaml, json, quoting].forEach((reason) => expect(reason).to.not.contain('\n'));
+    });
+
+    // The portal's bundler reads these as nothing, so a reference to one would be empty.
+    it('fails on text the bundler reads as nothing, saying why', () => {
+      expect(refused(' \n')).to.equal('it is empty');
+      expect(refused('# only a comment: here\n')).to.equal('it holds no value');
+      expect(refused('{ type: object }')).to.contain('JSON');
+      expect(refused('- active\n- inactive\n')).to.equal(
+        'it is not JSON, and the portal reads YAML only when it holds a key'
+      );
     });
 
     it('treats a document that is not an object as no specification', () => {
@@ -42,7 +50,7 @@ describe('OpenApiDocument', () => {
 
     it('reads a document written with a byte-order mark', () => {
       expect(readJson({ openapi: '3.0.0' }, BYTE_ORDER_MARK).format()).to.deep.equal({ supported: true });
-      expect(read(`${BYTE_ORDER_MARK}openapi: 3.0.0\n`, YAML_FILE).format()).to.deep.equal({ supported: true });
+      expect(read(`${BYTE_ORDER_MARK}openapi: 3.0.0\n`).format()).to.deep.equal({ supported: true });
     });
   });
 
@@ -143,7 +151,7 @@ describe('OpenApiDocument', () => {
         ...aliases
       ].join('\n');
 
-      expect(read(yaml, YAML_FILE).endpoints().map(String)).to.deep.equal(['GET /merged']);
+      expect(read(yaml).endpoints().map(String)).to.deep.equal(['GET /merged']);
     });
 
     it('lists the inline operations of every path, leaving a path item in another file to its reference', () => {
@@ -203,10 +211,18 @@ describe('OpenApiDocument', () => {
     });
   });
 
+  describe('schemaIds', () => {
+    it('names each $id the document declares, however deep', () => {
+      const document = readJson({ Pet: { $id: 'pet.json', properties: { tag: { $id: 'tag.json' } } } });
+
+      expect([...document.schemaIds()]).to.deep.equal(['pet.json', 'tag.json']);
+    });
+  });
+
   describe('referencedFiles', () => {
     const specDirectory = new DirectoryPath('/project/src/spec');
-    const referenced = (document: Record<string, unknown>) =>
-      readJson(document).referencedFiles(specDirectory).map(String);
+    const referenced = (document: unknown, rootIds = new Set<string>()) =>
+      readJson(document).referencedFiles(specDirectory, rootIds).map(String);
     const inSpec = (file: string) => path.resolve('/project/src/spec', file);
 
     it('finds a $ref on any object, in data, extensions and lists too, against the folder of the document', () => {
@@ -245,13 +261,24 @@ describe('OpenApiDocument', () => {
       expect(files).to.be.empty;
     });
 
-    it('leaves out a reference below an $id, or naming one, which the bundler resolves against the $id', () => {
-      const files = referenced({
-        Pet: { $id: 'pet.json', properties: { tag: { $ref: './tag.yaml' } } },
-        owner: { $ref: 'pet.json#/properties/tag' }
-      });
+    it('reads no further below an $id, against which the bundler resolves what is under it', () => {
+      expect(referenced({ Pet: { $id: 'pet.json', properties: { tag: { $ref: './tag.yaml' } } } })).to.be.empty;
+    });
 
-      expect(files).to.be.empty;
+    // The bundler takes the $ids of the document it starts from, and only those, as names of schemas.
+    it('leaves out a reference naming an $id of the root document, as a schema rather than a file', () => {
+      const files = referenced(
+        { owner: { $ref: 'pet.json#/properties/tag' }, tag: { $ref: './tag.yaml' } },
+        new Set(['pet.json'])
+      );
+
+      expect(files).to.deep.equal([inSpec('tag.yaml')]);
+    });
+
+    it('follows a reference in a document that is a list', () => {
+      expect(referenced([{ name: 'limit' }, { $ref: './parameters/offset.yaml' }])).to.deep.equal([
+        inSpec('parameters/offset.yaml')
+      ]);
     });
 
     it('reads a backslash as a slash, and leaves a percent escape as written', () => {
@@ -261,9 +288,9 @@ describe('OpenApiDocument', () => {
     });
 
     it('survives an alias that holds itself', () => {
-      const document = read('openapi: 3.0.0\nloop: &loop\n  again: *loop\n  next: { $ref: ./next.yaml }\n', YAML_FILE);
+      const document = read('openapi: 3.0.0\nloop: &loop\n  again: *loop\n  next: { $ref: ./next.yaml }\n');
 
-      expect(document.referencedFiles(specDirectory).map(String)).to.deep.equal([inSpec('next.yaml')]);
+      expect(document.referencedFiles(specDirectory, new Set()).map(String)).to.deep.equal([inSpec('next.yaml')]);
     });
   });
 

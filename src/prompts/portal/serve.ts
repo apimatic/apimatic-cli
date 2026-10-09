@@ -56,8 +56,8 @@ export class PortalServePrompts {
         `So does removing a language from ${f.var('languages')} (updates the SDK pages) or the ` +
           `${f.var('plugin')} block (removes the Context Plugin pages).`,
         'Mistakes in these files are reported on save, and the preview keeps what it last accepted.',
-        `Saving a document in ${specPath(sourceDirectory)} updates its API reference; one with a mistake is ` +
-          'reported, and left out until it is fixed.',
+        `Saving a document in ${specPath(sourceDirectory)} updates its API reference; a mistake is reported on ` +
+          'save, and the preview leaves what it cannot read out of the reference until it is fixed.',
         '',
         `Restart the preview after adding a language or a ${f.var('plugin')} block (its SDK or plugin is ` +
           `fetched at startup), adding or removing a page, creating ${staticPath(sourceDirectory)}, ` +
@@ -135,21 +135,19 @@ export class PortalServePrompts {
   }
 
   public contentNotWatched(reason: string, sourceDirectory: DirectoryPath) {
-    const until = reportedOnRestart(`a page or a ${f.var(NAVIGATION_FILE_NAME)}`);
-    this.notWatched(contentPath(sourceDirectory), reason, until);
+    this.notWatched(contentPath(sourceDirectory), reason, CONTENT_UNTIL_RESTART);
   }
 
   public contentWatchFailed(reason: string, sourceDirectory: DirectoryPath) {
-    const until = reportedOnRestart(`a page or a ${f.var(NAVIGATION_FILE_NAME)}`);
-    this.watchFailed(contentPath(sourceDirectory), reason, until);
+    this.watchFailed(contentPath(sourceDirectory), reason, CONTENT_UNTIL_RESTART);
   }
 
   /** Explained as `portal generate` would explain it, since the same rules refused it. */
   public specRejected(problem: PortalSourceProblem, sourceDirectory: DirectoryPath) {
     reportSourceProblem(problem, sourceDirectory);
     log.message(
-      `Until ${specPath(sourceDirectory)} is fixed, the preview leaves out the API reference it cannot read; ` +
-        'a build would stop here.'
+      `The preview leaves what it cannot read out of the API reference until ${specPath(sourceDirectory)} is ` +
+        'fixed; a build would stop here.'
     );
   }
 
@@ -159,12 +157,16 @@ export class PortalServePrompts {
 
   // The preview lists its documents once, when it starts.
   public specsNeedRestart(change: SpecsChange, sourceDirectory: DirectoryPath) {
-    const changes = [...filesWere(change.added, 'added'), ...filesWere(change.removed, 'removed')];
+    const changes = [filesWere(change.added, 'added'), filesWere(change.removed, 'removed')].filter(
+      (each) => each !== null
+    );
     log.warn(
       `The documents in ${specPath(sourceDirectory)} are not the ones the preview started with: ` +
         `${changes.join(', and ')}.`
     );
-    log.message('Restart the preview to show them; until then it shows those it started with that are still there.');
+    log.message(
+      'Restart the preview to match them; until then it shows the ones it started with that are still there.'
+    );
   }
 
   public specNotChecked(reason: string, sourceDirectory: DirectoryPath) {
@@ -172,11 +174,11 @@ export class PortalServePrompts {
   }
 
   public specNotWatched(reason: string, sourceDirectory: DirectoryPath) {
-    this.notWatched(specPath(sourceDirectory), reason, reportedOnRestart('a specification'));
+    this.notWatched(specPath(sourceDirectory), reason, SPEC_UNTIL_RESTART);
   }
 
   public specWatchFailed(reason: string, sourceDirectory: DirectoryPath) {
-    this.watchFailed(specPath(sourceDirectory), reason, reportedOnRestart('a specification'));
+    this.watchFailed(specPath(sourceDirectory), reason, SPEC_UNTIL_RESTART);
   }
 
   public stopping() {
@@ -215,9 +217,13 @@ export class PortalServePrompts {
 
 const reportedOnRestart = (mistakes: string) =>
   `a mistake in ${mistakes} is only reported when the preview is restarted`;
+const CONTENT_UNTIL_RESTART = reportedOnRestart(`a page or a ${f.var(NAVIGATION_FILE_NAME)}`);
+const SPEC_UNTIL_RESTART = reportedOnRestart('a specification');
 
-// `'a.yaml' was added`, or `'a.yaml' and 'b.yaml' were removed`; nothing for no files.
-function filesWere(files: FilePath[], done: string): string[] {
+function filesWere(files: FilePath[], done: string): string | null {
+  if (files.length === 0) {
+    return null;
+  }
   const names = listedInProse(files.map((file) => f.var(file.name().toString())));
-  return files.length === 0 ? [] : [`${names} ${files.length === 1 ? 'was' : 'were'} ${done}`];
+  return `${names} ${files.length === 1 ? 'was' : 'were'} ${done}`;
 }

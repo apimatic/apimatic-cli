@@ -414,8 +414,10 @@ export class PortalSourceContext {
     if (await this.fileService.isZipFile(specPath)) {
       return PLACEHOLDER_SITE;
     }
-    const document = await this.readDocument(specPath);
-    return document?.isOk() ? document.value.suggestedSite() : PLACEHOLDER_SITE;
+    return (await this.readDocument(specPath, null)).match(
+      (document) => document.suggestedSite(),
+      () => PLACEHOLDER_SITE
+    );
   }
 
   /**
@@ -448,13 +450,9 @@ export class PortalSourceContext {
     const documentNames = fileNames.filter((name) => SPEC_EXTENSIONS.some((extension) => name.hasExtension(extension)));
     for (const fileName of documentNames) {
       const file = new FilePath(this.specDirectory, fileName);
-      const read = await this.readDocument(file);
-      // Gone since it was listed, as an editor that saves by renaming over the file leaves it for a moment.
-      if (read === undefined) {
-        continue;
-      }
+      const read = await this.readDocument(file, null);
       if (read.isErr()) {
-        return err({ kind: 'unreadableSpec', file, referencedBy: null, reason: read.error });
+        return err(read.error);
       }
       const document = read.value;
       const format = document.format();
@@ -511,62 +509,65 @@ export class PortalSourceContext {
     };
   }
 
-  // One the bundler cannot read fails the build, or leaves its reference empty, so it is refused.
-  private async referencedDocuments(spec: SpecFile): Promise<Result<SpecFile[], PortalSourceProblem>> {
-    const named = new Set([spec.file.toString()]);
-    const queue: {
-      file: FilePath;
-      referencedBy: FilePath;
-      read: Promise<Result<OpenApiDocument, string> | undefined>;
-    }[] = [];
+  /**
+   * Every file `spec` is bundled from, by its path. One the bundler cannot read fails the build,
+   * or leaves its reference empty, so it is refused.
+   */
+  private async referencedDocuments(
+    spec: SpecFile
+  ): Promise<Result<Map<string, OpenApiDocument>, PortalSourceProblem>> {
+    const rootIds = spec.document.schemaIds();
+    const documents = new Map([[spec.file.toString(), spec.document]]);
+    const named = new Set(documents.keys());
+    const queue: { file: FilePath; read: Promise<Result<OpenApiDocument, PortalSourceProblem>> }[] = [];
     // Each file is read once, starting when it is first named, as a split specification runs to thousands.
     const enqueue = ({ file: referencedBy, document }: SpecFile) => {
-      for (const file of document.referencedFiles(referencedBy.directory())) {
+      for (const file of document.referencedFiles(referencedBy.directory(), rootIds)) {
         if (!named.has(file.toString())) {
           named.add(file.toString());
-          queue.push({ file, referencedBy, read: this.readDocument(file) });
+          queue.push({ file, read: this.readDocument(file, referencedBy) });
         }
       }
     };
 
-    const walked = [spec];
     enqueue(spec);
     // Grows as it is walked: each file read queues the ones it refers to.
-    for (const { file, referencedBy, read } of queue) {
-      const parsed = await read;
-      if (parsed === undefined) {
-        return err({ kind: 'missingSpecReference', file, referencedBy });
+    for (const { file, read } of queue) {
+      const referenced = await read;
+      if (referenced.isErr()) {
+        return err(referenced.error);
       }
-      if (parsed.isErr()) {
-        return err({ kind: 'unreadableSpec', file, referencedBy, reason: parsed.error });
-      }
-      const referenced = { file, document: parsed.value };
-      walked.push(referenced);
-      enqueue(referenced);
+      documents.set(file.toString(), referenced.value);
+      enqueue({ file, document: referenced.value });
     }
-    return ok(walked);
+    return ok(documents);
   }
 
   // A path item in another file is read from it; one that file refers on to again is not followed.
-  private static endpoints(spec: SpecFile, referenced: SpecFile[]): Endpoint[] {
+  private static endpoints(spec: SpecFile, documents: Map<string, OpenApiDocument>): Endpoint[] {
     const mounted = spec.document
       .pathItemReferences(spec.file.directory())
-      .flatMap(
-        ({ path, file, pointer }) =>
-          referenced.find((each) => each.file.isEqual(file))?.document.endpointsAt(path, pointer) ?? []
-      );
+      .flatMap(({ path, file, pointer }) => documents.get(file.toString())?.endpointsAt(path, pointer) ?? []);
     return [...spec.document.endpoints(), ...mounted];
   }
 
-  /** Undefined when there is no such file; otherwise the document, or why it cannot be read. */
-  private async readDocument(file: FilePath): Promise<Result<OpenApiDocument, string> | undefined> {
+  private async readDocument(
+    file: FilePath,
+    referencedBy: FilePath | null
+  ): Promise<Result<OpenApiDocument, PortalSourceProblem>> {
     let contents: string;
     try {
       contents = await this.fileService.getContents(file);
     } catch (error) {
-      return (await this.fileService.fileExists(file)) ? err(errorMessage(error)) : undefined;
+      if (referencedBy !== null && !(await this.fileService.fileExists(file))) {
+        return err({ kind: 'missingSpecReference', file, referencedBy });
+      }
+      // Also a listed document gone mid-save, which the next save fixes, as it would a half-written one.
+      return err({ kind: 'unreadableSpec', file, referencedBy, reason: errorMessage(error) });
     }
-    return OpenApiDocument.parse(file.name(), contents);
+    return OpenApiDocument.parse(contents).mapErr(
+      (reason): PortalSourceProblem => ({ kind: 'unreadableSpec', file, referencedBy, reason })
+    );
   }
 
   private uniqueSlug(fileName: FileName, used: Set<string>): string {
