@@ -60,8 +60,9 @@ export class PortalServePrompts {
           'reported, and left out until it is fixed.',
         '',
         `Restart the preview after adding a language or a ${f.var('plugin')} block (its SDK or plugin is ` +
-          `fetched at startup), adding or removing a page, creating ${staticPath(sourceDirectory)}, or ` +
-          `changing which documents are in ${specPath(sourceDirectory)}.`,
+          `fetched at startup), adding or removing a page, creating ${staticPath(sourceDirectory)}, ` +
+          `changing which documents are in ${specPath(sourceDirectory)}, or changing the path in ` +
+          `${f.var('portal.site.url')}.`,
         '',
         'Press CTRL+C to stop the server.'
       ].join('\n'),
@@ -75,7 +76,7 @@ export class PortalServePrompts {
 
   /** Explained as `portal generate` would explain it, since the same rules refused it. */
   public configRejected(problem: PortalSourceProblem, sourceDirectory: DirectoryPath) {
-    reportSourceProblem(problem, sourceDirectory, { offerQuickstart: false });
+    reportSourceProblem(problem, sourceDirectory);
     log.message('The preview keeps showing what it last accepted until the file is fixed.');
   }
 
@@ -145,7 +146,7 @@ export class PortalServePrompts {
 
   /** Explained as `portal generate` would explain it, since the same rules refused it. */
   public specRejected(problem: PortalSourceProblem, sourceDirectory: DirectoryPath) {
-    reportSourceProblem(problem, sourceDirectory, { offerQuickstart: false });
+    reportSourceProblem(problem, sourceDirectory);
     log.message(
       `Until ${specPath(sourceDirectory)} is fixed, the preview leaves out the API reference it cannot read; ` +
         'a build would stop here.'

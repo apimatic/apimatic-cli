@@ -13,7 +13,7 @@ export default class PortalServe extends Command {
 
   static readonly description = `Serves the portal described by 'src/apimatic.json' from your machine, reloading the browser as you edit the Markdown pages in 'src/content', reorder them in a 'nav.json', edit the documents in 'src/spec', or change the 'portal', 'languages' or 'plugin' block of 'apimatic.json'.
 
-Adding a language or a 'plugin' block, adding or removing a page in 'src/content', creating 'src/static', or changing which documents are in 'src/spec', needs the preview restarted.
+Adding a language or a 'plugin' block, adding or removing a page in 'src/content', creating 'src/static', changing which documents are in 'src/spec', or changing the path in 'portal.site.url', needs the preview restarted.
 
 Nothing is written to disk; run 'apimatic portal generate' to produce the static files.`;
 

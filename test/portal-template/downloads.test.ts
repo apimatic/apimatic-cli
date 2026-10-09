@@ -36,17 +36,17 @@ describe('downloads', () => {
   });
 
   describe('in the preview', () => {
-    const middlewareFor = async (downloadsDirectory: string | null): Promise<Middleware | undefined> => {
+    const middlewareFor = async (downloadsDirectory: string | null, base = '/'): Promise<Middleware | undefined> => {
       let middleware: Middleware | undefined;
-      const server = { middlewares: { use: (handler: Middleware) => (middleware = handler) } };
+      const server = { config: { base }, middlewares: { use: (handler: Middleware) => (middleware = handler) } };
       const configureServer = downloads(downloadsDirectory).configureServer as (server: ViteDevServer) => Promise<void>;
       await configureServer(server as unknown as ViteDevServer);
       return middleware;
     };
 
     /** The body served for `url`, or `undefined` when the request is passed on. */
-    const request = async (url: string): Promise<string | undefined> => {
-      const middleware = (await middlewareFor(directory))!;
+    const request = async (url: string, base = '/'): Promise<string | undefined> => {
+      const middleware = (await middlewareFor(directory, base))!;
       const response = Object.assign(new PassThrough(), { setHeader: () => {} });
       let passedOn = false;
       middleware({ url }, response, () => (passedOn = true));
@@ -72,6 +72,13 @@ describe('downloads', () => {
       expect(await request('/sdk/python.zip')).to.be.undefined;
       expect(await request('/__downloads/sdk/java.zip')).to.be.undefined;
       expect(await request('/__downloads/../plugin.zip')).to.be.undefined;
+    });
+
+    // A link that forgot the base would 404 once built, so the preview does not answer it either.
+    it('serves each under the base when the portal has one, and passes on the address without it', async () => {
+      expect(await request('/docs/__downloads/sdk/python.zip', '/docs/')).to.equal('PK python');
+      expect(await request('/docs/__downloads/plugin.zip', '/docs/')).to.equal('PK plugin');
+      expect(await request('/__downloads/plugin.zip', '/docs/')).to.be.undefined;
     });
 
     it('adds nothing when the run carried no downloads', async () => {

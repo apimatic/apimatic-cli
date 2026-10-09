@@ -142,4 +142,49 @@ describe('FileService', () => {
       expect(await fileService.spelledOnDisk(root, fileAt('static', 'images'))).to.be.null;
     });
   });
+
+  describe('findSymlinks', () => {
+    const fileService = new FileService();
+    let root: DirectoryPath;
+    const symlink = (target: string, ...at: string[]) =>
+      fs.symlinkSync(
+        root.join(target).toString(),
+        root.join(...at).toString(),
+        process.platform === 'win32' ? 'junction' : 'dir'
+      );
+
+    beforeEach(() => {
+      root = new DirectoryPath(fs.mkdtempSync(path.join(os.tmpdir(), 'file-service-')));
+      fs.mkdirSync(root.join('spec', 'schemas').toString(), { recursive: true });
+      fs.writeFileSync(path.join(root.toString(), 'spec', 'openapi.yaml'), '');
+    });
+
+    afterEach(() => {
+      fs.rmSync(root.toString(), { recursive: true, force: true });
+    });
+
+    it('answers every symlink at any depth, without following one', async () => {
+      fs.mkdirSync(root.join('shared').toString());
+      symlink('shared', 'shared', 'back');
+      symlink('shared', 'spec', 'common');
+      symlink('shared', 'spec', 'schemas', 'shared');
+
+      const found = (await fileService.findSymlinks(root.join('spec')))._unsafeUnwrap();
+
+      expect(found.map((file) => file.toString())).to.have.members([
+        root.join('spec', 'common').toString(),
+        root.join('spec', 'schemas', 'shared').toString()
+      ]);
+    });
+
+    it('answers an empty list when there is none', async () => {
+      expect((await fileService.findSymlinks(root.join('spec')))._unsafeUnwrap()).to.deep.equal([]);
+    });
+
+    it('answers why, rather than throwing, when the directory cannot be read', async () => {
+      const missing = await fileService.findSymlinks(root.join('missing'));
+
+      expect(missing._unsafeUnwrapErr()).to.contain('ENOENT');
+    });
+  });
 });

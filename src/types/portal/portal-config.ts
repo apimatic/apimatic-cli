@@ -6,6 +6,7 @@ import { BrandConfig, ColorMode } from './config/brand-config.js';
 import { allOf, optional, Parsed, unknownKeys } from './config/fields.js';
 import { Link } from './config/link.js';
 import { NavigationConfig } from './config/navigation-config.js';
+import { SiteAddress } from './config/site-address.js';
 import { SiteConfig, SuggestedSite } from './config/site-config.js';
 import { StaticAsset } from './config/static-asset.js';
 
@@ -24,11 +25,11 @@ export interface PortalLink {
 export interface PortalIdentity {
   name: string;
   description: string | null;
-  /** Origin only, with no trailing slash. */
+  /** The site address, with no trailing slash. */
   siteUrl: string | null;
-  /** Site-relative, one per colour mode; the same URL twice when one image serves both. */
+  /** Portal-relative, one per colour mode; the same URL twice when one image serves both. */
   logo: { light: string; dark: string } | null;
-  /** Site-relative, with the image type its extension names, when it names one. */
+  /** Portal-relative, with the image type its extension names, when it names one. */
   favicon: { url: string; type: string | null } | null;
   colorMode: ColorMode;
   links: PortalLink[];
@@ -94,6 +95,11 @@ export class PortalConfig {
     return this.site.siteName();
   }
 
+  /** Where the portal is hosted, or null when `site.url` is left out. */
+  public siteAddress(): SiteAddress | null {
+    return this.site.siteAddress();
+  }
+
   /** Where the context plugin is hosted when it is not bundled into the portal, or null when it is. */
   public pluginUrl(): UrlPath | null {
     return this.pluginAddress;
@@ -108,15 +114,15 @@ export class PortalConfig {
   }
 
   public identity(): PortalIdentity {
-    const origin = this.site.origin();
+    const address = this.site.siteAddress();
     const logo = this.brand.logoImages();
     const favicon = this.brand.faviconImage();
     return {
       name: this.site.siteName(),
       description: this.site.siteDescription(),
-      siteUrl: origin === null ? null : origin.toString(),
-      logo: logo === null ? null : { light: logo.light().siteUrl(), dark: logo.dark().siteUrl() },
-      favicon: favicon === null ? null : { url: favicon.siteUrl(), type: favicon.imageType() },
+      siteUrl: address === null ? null : address.toString(),
+      logo: logo === null ? null : { light: logo.light().portalPath(), dark: logo.dark().portalPath() },
+      favicon: favicon === null ? null : { url: favicon.portalPath(), type: favicon.imageType() },
       colorMode: this.brand.mode(),
       links: this.navigation.headerLinks().map(portalLink),
       pageActions: this.ai.offersPageActions()

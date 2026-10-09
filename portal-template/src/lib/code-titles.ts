@@ -27,3 +27,11 @@ export const CODE_BLOCK_TITLES: Readonly<Record<BundledLanguage, string>> = {
   sql: 'SQL',
   tsx: 'TSX'
 };
+
+const LANGUAGE_CLASS = 'language-';
+
+/** The language a fence names, from the class `remark-rehype` gives its `code`. */
+export function languageOf(classes: unknown[]): string | undefined {
+  const languageClass = classes.find((name) => typeof name === 'string' && name.startsWith(LANGUAGE_CLASS));
+  return typeof languageClass === 'string' ? languageClass.slice(LANGUAGE_CLASS.length) : undefined;
+}

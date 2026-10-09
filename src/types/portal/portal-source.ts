@@ -4,7 +4,7 @@ import { FilePath } from '../file/filePath.js';
 import { Endpoint } from './endpoint.js';
 import { SuggestedSite } from './config/site-config.js';
 import { ContentNotices } from './content-notices.js';
-import { GeneratedPages, GeneratedSection } from './generated-pages.js';
+import { GeneratedPages } from './generated-pages.js';
 import { PortalConfig } from './portal-config.js';
 
 /** An OpenAPI document found in `src/spec/`, with the slug its section is mounted at. */
@@ -58,12 +58,19 @@ export interface MissingStaticFile extends MissingFile {
   setting: string;
 }
 
-/** A page of the user's served at an address the CLI keeps for the pages it generates. */
+/** An address the portal serves a page of its own at: a generated section's, and every one below it, or a single page's. */
+export interface ReservedAddress {
+  address: string;
+  /** What a message says the address is kept for. */
+  description: string;
+}
+
+/** A page of the user's served at an address the portal keeps for a page of its own. */
 export interface ReservedAddressPage {
   file: FilePath;
   /** Where the page would be served, which a `(group)` folder makes differ from its path. */
   address: string;
-  section: GeneratedSection;
+  keptFor: ReservedAddress;
 }
 
 /** Pages of the user's that would be served at one address, which only one of them can have. */

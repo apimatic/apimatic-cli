@@ -20,6 +20,7 @@ import { completeArtifacts, stubPreparePortalProject } from './prepare-project-s
 const COMMAND_METADATA: CommandMetadata = { commandName: 'portal generate', shell: 'test' };
 const FIXTURE = new DirectoryPath(process.cwd()).join('test/resources/portal-inputs/default');
 const CODE_SAMPLES_FIXTURE = new DirectoryPath(process.cwd()).join('test/resources/portal-inputs/code-samples');
+const SUBPATH_FIXTURE = new DirectoryPath(process.cwd()).join('test/resources/portal-inputs/subpath');
 
 /** The catalogs the merged fixture expects, read the way the service reads them. */
 const samplesFromFixture = (): CodeSampleCatalogs => {
@@ -247,6 +248,14 @@ describe('GenerateAction', () => {
     expect(inPortal('portal.zip')).to.be.true;
     expect(inPortal('index.html')).to.be.false;
     expect(prompts.nextSteps.calledOnceWith(portalDirectory, true)).to.be.true;
+  });
+
+  it('tells the next steps where the portal is hosted, path included', async () => {
+    const result = await execute(SUBPATH_FIXTURE);
+
+    expect(result.isSuccess()).to.be.true;
+    const [, , site] = prompts.nextSteps.firstCall.args;
+    expect(site?.toString()).to.equal('https://docs.test/api');
   });
 
   it('keeps the previous portal when the new one cannot be written', async () => {

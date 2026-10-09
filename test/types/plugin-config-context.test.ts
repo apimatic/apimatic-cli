@@ -394,6 +394,91 @@ describe('PluginConfigContext', () => {
     });
   });
 
+  describe('addMetadataIfMissing', () => {
+    it('adds the plugin block, with a default licence, to a file that has none', async () => {
+      withConfig({ portal: {}, languages: { csharp: CSHARP_ENTRY } });
+
+      expect((await context.addMetadataIfMissing(METADATA)).isOk()).to.be.true;
+
+      expect(writtenDocument()).to.deep.equal({
+        portal: {},
+        languages: { csharp: CSHARP_ENTRY },
+        plugin: { ...METADATA, license: 'MIT' }
+      });
+    });
+
+    it('leaves a plugin block the file holds as it is, however little it says', async () => {
+      withFile('{"plugin":{"pluginName":"Ours"}}');
+
+      await context.addMetadataIfMissing(METADATA);
+
+      expect(written()).to.equal('{"plugin":{"pluginName":"Ours"}}');
+    });
+
+    it('adds the block beside a languages block it does not read', async () => {
+      withConfig({ languages: 'csharp' });
+
+      expect((await context.addMetadataIfMissing(METADATA)).isOk()).to.be.true;
+      expect(writtenDocument().plugin).to.include(METADATA);
+    });
+
+    const refusedBlocks: [string, unknown][] = [
+      ['that is not an object', 'acme'],
+      ['whose id the plugin commands refuse', { pluginId: 'Bad Id', pluginName: 'Bad', pluginVersion: '1.0.0' }]
+    ];
+
+    refusedBlocks.forEach(([shape, plugin]) => {
+      it(`leaves a plugin block ${shape} for the commands that read it to report`, async () => {
+        withConfig({ plugin });
+
+        expect((await context.addMetadataIfMissing(METADATA)).isOk()).to.be.true;
+        expect(writtenDocument().plugin).to.deep.equal(plugin);
+      });
+    });
+  });
+
+  describe('languagesMissing', () => {
+    const files: [string, object, boolean][] = [
+      ['has no languages block', { portal: {} }, true],
+      ['names no language in its block', { languages: {} }, true],
+      ['names a language', { languages: { python: {} } }, false],
+      ['has a languages block that is not an object, which the build reports', { languages: 'csharp' }, false]
+    ];
+
+    files.forEach(([file, config, missing]) => {
+      it(`is ${missing} when the file ${file}`, async () => {
+        withConfig(config);
+
+        expect(await context.languagesMissing()).to.equal(missing);
+      });
+    });
+  });
+
+  describe('addLanguagesIfMissing', () => {
+    it('records the languages in a file that names none', async () => {
+      withConfig({ portal: {} });
+
+      expect((await context.addLanguagesIfMissing([Language.CSHARP, Language.TYPESCRIPT])).isOk()).to.be.true;
+
+      expect(writtenDocument()).to.deep.equal({ portal: {}, languages: { csharp: {}, typescript: {} } });
+    });
+
+    it('leaves a file that names a language as it is', async () => {
+      withFile('{"languages":{"python":{}}}');
+
+      await context.addLanguagesIfMissing([Language.CSHARP]);
+
+      expect(written()).to.equal('{"languages":{"python":{}}}');
+    });
+
+    it('records them beside a plugin block it does not read', async () => {
+      withConfig({ plugin: { pluginId: 'Bad Id' } });
+
+      expect((await context.addLanguagesIfMissing([Language.CSHARP])).isOk()).to.be.true;
+      expect(writtenDocument().languages).to.deep.equal({ csharp: {} });
+    });
+  });
+
   describe('the state a write hands back', () => {
     it('reports the metadata it just wrote', async () => {
       const state = (await context.upsertMetadata(METADATA))._unsafeUnwrap();

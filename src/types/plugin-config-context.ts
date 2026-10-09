@@ -1,4 +1,4 @@
-import { Result, ResultAsync } from 'neverthrow';
+import { ok, Result, ResultAsync } from 'neverthrow';
 import { FileService } from '../infrastructure/file-service.js';
 import { ApimaticConfigContext, ApimaticConfigWriteFailure } from './apimatic-config-context.js';
 import { ApimaticConfigDocument, ConfigBlockName, findingClause } from './apimatic-config/document.js';
@@ -12,6 +12,7 @@ import {
   PluginIdentityData,
   PluginMetadata
 } from './plugin/plugin-config.js';
+import { PortalLanguages } from './portal/portal-languages.js';
 import { SOURCE_DIRECTORY_NAME } from './project-layout.js';
 import { SemVersion } from './publish/version.js';
 import { isAvailableLanguage, Language } from './sdk/generate.js';
@@ -125,6 +126,25 @@ const keepsRecord = (language: string, entry: PluginLanguageEntry<Language> | un
 
 const isUnavailableLanguage = (language: string): boolean => !isAvailableLanguage(language);
 
+const namesNoLanguage = (document: ApimaticConfigDocument): boolean =>
+  PortalLanguages.namesNone(document.languages(), document.findingsFor('languages'));
+
+const withMetadata = (
+  document: ApimaticConfigDocument,
+  metadata: PluginMetadata,
+  author?: PluginAuthor
+): ApimaticConfigDocument => {
+  const plugin = (document.plugin() ?? {}) as PluginIdentityData;
+  return document.with('plugin', {
+    ...plugin,
+    pluginId: metadata.pluginId,
+    pluginName: metadata.pluginName,
+    pluginVersion: metadata.pluginVersion,
+    ...(!plugin.author && author && { author }),
+    license: plugin.license ?? DEFAULT_PLUGIN_LICENSE
+  });
+};
+
 export class PluginConfigContext {
   private readonly configContext: ApimaticConfigContext;
   private readonly fileService = new FileService();
@@ -153,17 +173,30 @@ export class PluginConfigContext {
     metadata: PluginMetadata,
     author?: PluginAuthor
   ): Promise<Result<PluginConfig, PluginConfigWriteFailure>> {
-    return await this.merge((document) => {
-      const plugin = (document.plugin() ?? {}) as PluginIdentityData;
-      return document.with('plugin', {
-        ...plugin,
-        pluginId: metadata.pluginId,
-        pluginName: metadata.pluginName,
-        pluginVersion: metadata.pluginVersion,
-        ...(!plugin.author && author && { author }),
-        license: plugin.license ?? DEFAULT_PLUGIN_LICENSE
-      });
-    });
+    return await this.merge((document) => withMetadata(document, metadata, author));
+  }
+
+  // Merged against `plugin` alone: a file's `languages` is not what this write could spread or break.
+  public async addMetadataIfMissing(metadata: PluginMetadata): Promise<Result<void, PluginConfigWriteFailure>> {
+    const state = await this.configContext.read();
+    if (state.state === 'parsed' && state.document.has('plugin')) {
+      return ok(undefined);
+    }
+    const merged = await this.configContext.merge(['plugin'], (document) => withMetadata(document, metadata));
+    return merged.map(() => undefined);
+  }
+
+  public async languagesMissing(): Promise<boolean> {
+    const state = await this.configContext.read();
+    return state.state === 'parsed' && namesNoLanguage(state.document);
+  }
+
+  // Merged against `languages` alone, as `addMetadataIfMissing` is against `plugin`.
+  public async addLanguagesIfMissing(languages: readonly Language[]): Promise<Result<void, PluginConfigWriteFailure>> {
+    const merged = await this.configContext.merge(['languages'], (document) =>
+      namesNoLanguage(document) ? document.with('languages', recorded(document, languages, keepsRecord)) : document
+    );
+    return merged.map(() => undefined);
   }
 
   // A published entry survives a cleared checkbox: only `sdk publish` can write that record.

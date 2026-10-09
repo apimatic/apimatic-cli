@@ -1,4 +1,3 @@
-import { err, ok, Result } from 'neverthrow';
 import { getAuthInfo } from '../client-utils/auth-manager.js';
 import { FileService } from '../infrastructure/file-service.js';
 import { withDirPath } from '../infrastructure/tmp-extensions.js';
@@ -6,29 +5,23 @@ import { QuickstartPrompts } from '../prompts/quickstart.js';
 import { DirectoryPath } from '../types/file/directoryPath.js';
 import { FilePath } from '../types/file/filePath.js';
 import { UrlPath } from '../types/file/urlPath.js';
-import { ResourceInput } from '../types/file/resource-input.js';
 import { LoginAction } from './auth/login.js';
 import { ActionResult } from './action-result.js';
 import { CommandMetadata } from '../types/common/command-metadata.js';
-import { SpecCheck, ValidateAction } from './api/validate.js';
-import { SpecContext } from '../types/spec-context.js';
+import { ValidateAction, ValidateActionFailure } from './api/validate.js';
 import { OpenApiDocument, SpecFormat } from '../types/portal/openapi-document.js';
-import { PortalScaffoldProblem } from '../types/portal/portal-source.js';
+import { ResourceInput } from '../types/file/resource-input.js';
 import { PortalAuthorizationService } from '../infrastructure/services/portal-authorization-service.js';
-import { FileDownloadService } from '../infrastructure/services/file-download-service.js';
 import { PortalProjectService } from '../infrastructure/portal-project-service.js';
 import { APIMATIC_SCHEMA_URL } from '../types/apimatic-config/document.js';
 import { PLACEHOLDER_METADATA } from '../types/plugin/plugin-config.js';
 import { ProjectContext } from '../types/project-context.js';
+import { ResourceContext } from '../types/resource-context.js';
 import { DEFAULT_PORTAL_PORT, PortalServeAction } from './portal/serve.js';
-
-/** A URL's `file` is a download in a temporary directory, so only `source` says what the user gave. */
-type ImportedSpec = { file: FilePath; source: ResourceInput };
 
 export class QuickstartAction {
   private readonly prompts: QuickstartPrompts = new QuickstartPrompts();
   private readonly fileService: FileService = new FileService();
-  private readonly fileDownloadService = new FileDownloadService();
   private readonly authorizationService = new PortalAuthorizationService();
   private readonly projectService = new PortalProjectService();
   private readonly configDir: DirectoryPath;
@@ -70,46 +63,136 @@ export class QuickstartAction {
       return ActionResult.failed();
     }
 
-    return await withDirPath<ActionResult>((tempDirectory: DirectoryPath) =>
-      this.runWizard(workingDirectory, tempDirectory)
-    );
+    return await withDirPath<ActionResult>(async (tempDirectory: DirectoryPath) => {
+      const here = ProjectContext.in(workingDirectory);
+      return (await here.specsExist())
+        ? await this.adoptProject(here, workingDirectory)
+        : await this.startProject(tempDirectory);
+    });
   };
 
-  private async runWizard(workingDirectory: DirectoryPath, tempDirectory: DirectoryPath): Promise<ActionResult> {
-    const here = ProjectContext.in(workingDirectory);
-    const adoptedSpec = await here.portalSource().primarySpec();
-    return adoptedSpec === null
-      ? await this.startProject(tempDirectory)
-      : await this.adoptProject(here, workingDirectory, adoptedSpec, tempDirectory);
-  }
-
   // A build downloaded from the platform arrives with its specification in `src/spec/`, so it is not asked for again.
-  private async adoptProject(
-    project: ProjectContext,
-    projectDirectory: DirectoryPath,
-    specPath: FilePath,
-    tempDirectory: DirectoryPath
-  ): Promise<ActionResult> {
-    this.prompts.importSpecStepAdopted(project.sourceDirectory());
-    const validated = await this.validate({ file: specPath, source: specPath }, tempDirectory, true);
-    if (validated.isErr()) {
-      return validated.error;
+  private async adoptProject(project: ProjectContext, projectDirectory: DirectoryPath): Promise<ActionResult> {
+    const sourceDirectory = project.sourceDirectory();
+    const config = await project.config().read();
+    if (config.state === 'missing') {
+      this.prompts.configMissing(sourceDirectory);
+      return ActionResult.failed();
+    }
+    const unsupported = config.state === 'parsed' ? config.document.findingsFor('root') : config.findings;
+    if (unsupported.length > 0) {
+      this.prompts.configUnsupported(unsupported, sourceDirectory);
+      return ActionResult.failed();
+    }
+
+    this.prompts.importSpecStepAdopted(sourceDirectory);
+    this.prompts.validateSpecStep();
+    const failure = await this.validationFailure(project);
+    if (failure === 'unchecked') {
+      return ActionResult.failed();
+    }
+    // No sample is offered: nothing here moves it into a `spec/` the project already fills.
+    if (failure === 'invalid') {
+      this.prompts.specValidationFailed('project');
+      this.prompts.fixYourSpec();
+      return ActionResult.cancelled();
+    }
+
+    const portalSource = project.portalSource();
+    const specs = await portalSource.resolveSpecs();
+    if (specs.isErr()) {
+      this.prompts.specsUnsupported(specs.error, sourceDirectory);
+      return ActionResult.failed();
     }
 
     this.prompts.createPortalStep();
-    const scaffolded = await project.portalSource().adopt(validated.value, APIMATIC_SCHEMA_URL);
-    return await this.completeProject(project, projectDirectory, scaffolded);
+    const [namedAfter] = specs.value;
+    const adopted = await portalSource.adopt(namedAfter);
+    if (adopted.isErr()) {
+      this.prompts.scaffoldFailed(adopted.error, sourceDirectory);
+      return ActionResult.failed();
+    }
+    const pluginConfig = project.pluginConfig();
+    const pluginAdded = await pluginConfig.addMetadataIfMissing(PLACEHOLDER_METADATA);
+    if (pluginAdded.isErr()) {
+      this.prompts.configNotWritten(pluginAdded.error, sourceDirectory);
+      return ActionResult.failed();
+    }
+
+    if (await pluginConfig.languagesMissing()) {
+      const languages = await this.prompts.selectLanguages();
+      if (!languages?.length) {
+        this.prompts.noLanguagesSelected();
+        return ActionResult.cancelled();
+      }
+      const languagesAdded = await pluginConfig.addLanguagesIfMissing(languages);
+      if (languagesAdded.isErr()) {
+        this.prompts.configNotWritten(languagesAdded.error, sourceDirectory);
+        return ActionResult.failed();
+      }
+    }
+
+    return await this.completeProject(project, projectDirectory, adopted.value);
   }
 
   private async startProject(tempDirectory: DirectoryPath): Promise<ActionResult> {
     this.prompts.importSpecStep();
-    const imported = await this.importSpec(tempDirectory);
-    if (imported === undefined) {
-      return ActionResult.cancelled();
+    // Dropped once the CLI's own sample has failed: re-offering the address the user just
+    // watched fail, pre-filled, is the one suggestion that cannot work.
+    let sampleUrl: UrlPath | null = this.defaultSpecUrl;
+    let spec: ResourceContext;
+    for (;;) {
+      const input = await this.prompts.specPathPrompt(sampleUrl);
+      if (!input) {
+        this.prompts.noSpecSpecified();
+        return ActionResult.cancelled();
+      }
+      const resolving = ResourceContext.resolveTo(input, tempDirectory.join('user-spec'));
+      const resolved = input instanceof UrlPath ? await this.prompts.downloadSpecFile(resolving) : await resolving;
+      if (resolved.isOk()) {
+        spec = resolved.value;
+        break;
+      }
+      this.prompts.specUnavailable(resolved.error);
+      if (resolved.error.kind === 'downloadFailed' && sampleUrl?.isEqual(resolved.error.url)) {
+        sampleUrl = null;
+      }
     }
-    const validated = await this.validate(imported, tempDirectory, false);
-    if (validated.isErr()) {
-      return validated.error;
+
+    this.prompts.validateSpecStep();
+    const failure = await this.validationFailure(spec);
+    // The service's own error is already on screen; the spec may be valid, so there is nothing to fix.
+    if (failure === 'unchecked') {
+      return ActionResult.failed();
+    }
+    if (failure === 'invalid') {
+      this.prompts.specValidationFailed(spec.kind());
+      if (!(await this.prompts.useDefaultSpecPrompt())) {
+        this.prompts.fixYourSpec();
+        return ActionResult.cancelled();
+      }
+      const sample = await this.prompts.downloadSpecFile(
+        ResourceContext.resolveTo(this.defaultSpecUrl, tempDirectory.join('sample'))
+      );
+      if (sample.isErr()) {
+        this.prompts.specUnavailable(sample.error);
+        return ActionResult.failed();
+      }
+      spec = sample.value;
+    }
+    const specFile = spec.file();
+
+    // The validation above accepts Swagger 2.0, which a portal cannot be built from. Asked
+    // here rather than left to `portal serve`, which refuses only once the project is
+    // written -- and running the wizard again then rejects the non-empty tree it created.
+    const format = await this.specFormat(specFile);
+    if (!format.supported) {
+      if (format.format === null) {
+        this.prompts.specNotRecognised(specFile);
+      } else {
+        this.prompts.specFormatUnsupported(specFile, format.format);
+      }
+      return ActionResult.failed();
     }
 
     this.prompts.createPortalStep();
@@ -118,16 +201,8 @@ export class QuickstartAction {
       return ActionResult.cancelled();
     }
     const project = ProjectContext.in(projectDirectory);
-    const scaffolded = await project.portalSource().scaffold(validated.value, APIMATIC_SCHEMA_URL);
-    return await this.completeProject(project, projectDirectory, scaffolded);
-  }
-
-  private async completeProject(
-    project: ProjectContext,
-    projectDirectory: DirectoryPath,
-    scaffolded: Result<FilePath, PortalScaffoldProblem>
-  ): Promise<ActionResult> {
     const sourceDirectory = project.sourceDirectory();
+    const scaffolded = await project.portalSource().scaffold(specFile, APIMATIC_SCHEMA_URL);
     if (scaffolded.isErr()) {
       this.prompts.scaffoldFailed(scaffolded.error, sourceDirectory);
       return ActionResult.failed();
@@ -148,107 +223,36 @@ export class QuickstartAction {
       this.prompts.configNotWritten(pluginConfigRecorded.error, sourceDirectory);
       return ActionResult.failed();
     }
+    return await this.completeProject(project, projectDirectory, scaffolded.value);
+  }
 
+  private async completeProject(
+    project: ProjectContext,
+    projectDirectory: DirectoryPath,
+    configFile: FilePath
+  ): Promise<ActionResult> {
     // Reported rather than fatal: what Git tracks does not decide whether a portal can be built.
     const ignored = await project.upsertGitignore();
     if (ignored.isErr()) {
       this.prompts.gitignoreNotUpdated(ignored.error, projectDirectory);
     }
 
-    const structure = await this.fileService.getDirectory(sourceDirectory);
+    const structure = await this.fileService.getDirectory(project.sourceDirectory());
     this.prompts.printDirectoryStructure(projectDirectory, structure);
 
     const result = await new PortalServeAction(this.configDir, this.commandMetadata, null).execute(
       project,
       DEFAULT_PORTAL_PORT,
       true,
-      () => this.prompts.nextSteps(scaffolded.value)
+      () => this.prompts.nextSteps(configFile)
     );
 
     return result.isFailed() ? ActionResult.failed() : ActionResult.success();
   }
 
-  private async importSpec(tempDirectory: DirectoryPath): Promise<ImportedSpec | undefined> {
-    // Dropped once the CLI's own sample has failed: re-offering the address the user just
-    // watched fail, pre-filled, is the one suggestion that cannot work.
-    let sampleUrl: UrlPath | null = this.defaultSpecUrl;
-    for (;;) {
-      const inputPath = await this.prompts.specPathPrompt(sampleUrl);
-      if (!inputPath) {
-        this.prompts.noSpecSpecified();
-        return undefined;
-      }
-
-      if (inputPath instanceof UrlPath) {
-        const downloaded = await this.prompts.downloadSpecFile(this.fileDownloadService.downloadFile(inputPath));
-        if (downloaded.isErr()) {
-          this.prompts.specDownloadFailed(inputPath, downloaded.error);
-          if (sampleUrl !== null && inputPath.isEqual(sampleUrl)) {
-            sampleUrl = null;
-          }
-          continue;
-        }
-        const file = await new SpecContext(tempDirectory).save(downloaded.value.stream, downloaded.value.filename);
-        return { file, source: inputPath };
-      }
-
-      if (await this.fileService.fileExists(inputPath)) {
-        return { file: inputPath, source: inputPath };
-      }
-      this.prompts.specFileDoesNotExist();
-    }
-  }
-
-  /**
-   * `adopted` decides what a failure offers. The sample can replace a specification the user
-   * named, but not one their project carries: an adopted `spec/` already holds the document the
-   * portal would be built from, and nothing here moves the sample into it.
-   */
-  private async validate(
-    spec: ImportedSpec,
-    tempDirectory: DirectoryPath,
-    adopted: boolean
-  ): Promise<Result<FilePath, ActionResult>> {
-    this.prompts.validateSpecStep();
-    let validation = 'unchecked' as SpecCheck;
-    await new ValidateAction(this.configDir, this.commandMetadata).execute(spec.file, false, (check) => {
-      validation = check;
-    });
-    // The service's own error is already on screen; the spec may be valid, so there is nothing to fix.
-    if (validation === 'unchecked') {
-      return err(ActionResult.failed());
-    }
-
-    let checked = spec.file;
-    if (validation === 'invalid') {
-      this.prompts.specValidationFailed(spec.source);
-      if (adopted || !(await this.prompts.useDefaultSpecPrompt())) {
-        this.prompts.fixYourSpec();
-        return err(ActionResult.cancelled());
-      }
-      const downloaded = await this.prompts.downloadSpecFile(
-        this.fileDownloadService.downloadFile(this.defaultSpecUrl)
-      );
-      if (downloaded.isErr()) {
-        this.prompts.serviceError(downloaded.error);
-        return err(ActionResult.failed());
-      }
-      checked = await new SpecContext(tempDirectory).save(downloaded.value.stream, downloaded.value.filename);
-    }
-
-    // The validation above accepts Swagger 2.0, which a portal cannot be built from. Asked
-    // here rather than left to `portal serve`, which refuses only once the project is
-    // written -- and running the wizard again then rejects the non-empty tree it created.
-    const format = await this.specFormat(checked);
-    if (!format.supported) {
-      if (format.format === null) {
-        this.prompts.specNotRecognised(checked);
-      } else {
-        this.prompts.specFormatUnsupported(checked, format.format);
-      }
-      return err(ActionResult.failed());
-    }
-    return ok(checked);
+  private async validationFailure(spec: ResourceInput | ResourceContext): Promise<ValidateActionFailure | undefined> {
+    const validated = await new ValidateAction(this.configDir, this.commandMetadata).execute(spec, false);
+    return validated.isFailed() ? validated.getError() ?? 'unchecked' : undefined;
   }
 
   private async chooseProjectDirectory(): Promise<DirectoryPath | undefined> {

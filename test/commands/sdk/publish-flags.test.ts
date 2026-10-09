@@ -1,20 +1,9 @@
 import { expect } from 'chai';
-import { Parser } from '@oclif/core';
 import SdkPublish from '../../../src/commands/sdk/publish.js';
 import { CodeGenerationVersion, Stability } from '../../../src/types/sdk/generate.js';
+import { flagParser } from '../flag-parser.js';
 
-const parse = (argv: string[]) => Parser.parse(argv, { flags: SdkPublish.flags as never, strict: true } as never);
-
-const rejects = async (argv: string[]): Promise<Error> => {
-  let thrown: unknown;
-  try {
-    await parse(argv);
-  } catch (error) {
-    thrown = error;
-  }
-  expect(thrown, `expected ${argv.join(' ')} to be rejected`).to.be.an('error');
-  return thrown as Error;
-};
+const { parse, rejects } = flagParser(SdkPublish);
 
 // Recording a publish is bookkeeping, not a decision, so the flag that asked is gone. A run that
 // still passes it is told it is unknown rather than having it quietly ignored — this pins that it

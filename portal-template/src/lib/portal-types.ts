@@ -10,14 +10,14 @@ export interface PortalLink {
   external: boolean;
 }
 
-/** Site-relative, one per colour mode; the same URL twice when one image serves both. */
+/** Portal-relative, one per colour mode; the same URL twice when one image serves both. */
 export interface PortalLogo {
   light: string;
   dark: string;
 }
 
 export interface PortalFavicon {
-  /** Site-relative, and inside the static directory. */
+  /** Portal-relative, and inside the static directory. */
   url: string;
   type: string | null;
 }
@@ -25,7 +25,7 @@ export interface PortalFavicon {
 export interface Portal {
   name: string;
   description: string | null;
-  /** Origin only, with no trailing slash. */
+  /** The site address, with no trailing slash. */
   siteUrl: string | null;
   logo: PortalLogo | null;
   favicon: PortalFavicon | null;
