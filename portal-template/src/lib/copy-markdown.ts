@@ -1,5 +1,7 @@
-export async function copyMarkdown(rootRelativeUrl: string, base: string): Promise<void> {
-  const url = `${base.replace(/\/$/, '')}${rootRelativeUrl}`;
+import { withBasePath } from './base-path';
+
+export async function copyMarkdown(rootRelativeUrl: string, base?: string): Promise<void> {
+  const url = withBasePath(rootRelativeUrl, base);
   // Handed over unresolved, so Safari still counts the write as part of the click.
   const markdown = fetchMarkdown(url);
   await Promise.all([navigator.clipboard.write([new ClipboardItem({ 'text/plain': markdown })]), markdown]);

@@ -4,19 +4,18 @@ import { UrlPath } from '../types/file/urlPath.js';
 import { format as f, getTree } from './format.js';
 import { DirectoryPath } from '../types/file/directoryPath.js';
 import { FilePath } from '../types/file/filePath.js';
-import { ServiceError } from '../infrastructure/service-error.js';
 import { Directory } from '../types/file/directory.js';
-import { createResourceInputFromInput, ResourceInput } from '../types/file/resource-input.js';
-import { FileDownloadResponse } from '../infrastructure/services/file-download-service.js';
+import { createFileOrUrlFromInput } from '../types/file/resource-input.js';
 import { PortalAuthorizationFailure } from '../infrastructure/services/portal-authorization-service.js';
-import { APIMATIC_CONFIG_FILE_NAME } from '../types/apimatic-config/document.js';
+import { APIMATIC_CONFIG_FILE_NAME, ConfigFinding, findingClause } from '../types/apimatic-config/document.js';
 import { PluginConfigWriteFailure } from '../types/plugin-config-context.js';
-import { PortalScaffoldProblem } from '../types/portal/portal-source.js';
+import { PortalScaffoldProblem, PortalSourceProblem } from '../types/portal/portal-source.js';
 import { GENERATED, GITIGNORE, GitignoreFailure } from '../types/project-context.js';
+import { DownloadProblem, FileReadProblem, ResourceKind } from '../types/resource-context.js';
 import { AVAILABLE_LANGUAGES, Language, languageLabel, UPCOMING_LANGUAGES } from '../types/sdk/generate.js';
 import { noteWrapped, withSpinner } from './prompt.js';
 import { reportAuthorizationFailure } from './portal/authorization.js';
-import { convertToOpenApi3 } from './portal/source.js';
+import { convertToOpenApi3, reportSourceProblem, specPath } from './portal/source.js';
 
 const vscodeExtensionUrl =
   'https://marketplace.visualstudio.com/items?itemName=apimatic-developers.apimatic-for-vscode';
@@ -38,7 +37,7 @@ Let's get started!`);
   }
 
   /** `defaultSpecUrl` is null once the sample has failed to download; it is not offered again. */
-  public async specPathPrompt(defaultSpecUrl: UrlPath | null): Promise<ResourceInput | undefined> {
+  public async specPathPrompt(defaultSpecUrl: UrlPath | null): Promise<FilePath | UrlPath | undefined> {
     const spec = await text({
       message: `Provide a local path or a public URL for your OpenAPI Definition file:`,
       placeholder: defaultSpecUrl
@@ -50,7 +49,7 @@ Let's get started!`);
         if (!value && defaultSpecUrl === null) {
           return 'Please enter a file path or URL.';
         }
-        if (value && !createResourceInputFromInput(value)) {
+        if (value && !createFileOrUrlFromInput(value)) {
           return 'Please enter a valid file path or URL.';
         }
       }
@@ -58,26 +57,50 @@ Let's get started!`);
     if (isCancel(spec)) {
       return undefined;
     }
-    return createResourceInputFromInput(spec);
+    return createFileOrUrlFromInput(spec);
   }
 
-  public specFormatUnsupported(specPath: FilePath, format: string) {
-    const message = `${f.path(specPath)} is ${format}, not OpenAPI 3.x. ` + convertToOpenApi3();
+  // Named rather than shown by path: the file checked is the wizard's own copy in a temporary directory.
+  public specFormatUnsupported(spec: FilePath, format: string) {
+    const message = `${f.var(spec.name().toString())} is ${format}, not OpenAPI 3.x. ` + convertToOpenApi3();
     log.error(message);
   }
 
   /** For a document that names no format at all: a Postman collection, a RAML file, arbitrary JSON. */
-  public specNotRecognised(specPath: FilePath) {
-    const message = `${f.path(specPath)} is not an OpenAPI 3.x document. ` + convertToOpenApi3();
+  public specNotRecognised(spec: FilePath) {
+    const message = `${f.var(spec.name().toString())} is not an OpenAPI 3.x document. ` + convertToOpenApi3();
     log.error(message);
+  }
+
+  public specsUnsupported(problem: PortalSourceProblem, sourceDirectory: DirectoryPath) {
+    reportSourceProblem(problem, sourceDirectory);
+  }
+
+  public configMissing(sourceDirectory: DirectoryPath) {
+    const configFile = f.var(APIMATIC_CONFIG_FILE_NAME);
+    log.error(`${specPath(sourceDirectory)} already holds files, but ${f.path(sourceDirectory)} has no ${configFile}.`);
+    log.message(
+      `Add the project's ${configFile} there, or run ${f.cmdAlt('apimatic', 'quickstart')} from a directory ` +
+        `with no ${f.var('src')} to start a new portal.`
+    );
+  }
+
+  public configUnsupported(findings: readonly ConfigFinding[], sourceDirectory: DirectoryPath) {
+    const configFile = f.var(APIMATIC_CONFIG_FILE_NAME);
+    log.error(`The ${configFile} in ${f.path(sourceDirectory)} cannot be used: ${findingClause(findings)}.`);
   }
 
   public runtimeUnsupported(reason: string) {
     log.error(reason);
   }
 
-  public specFileDoesNotExist() {
-    log.error('The specified file does not exist or is not a valid file. Please enter a valid file path.');
+  /** Names the address that failed: without it the same message repeats for every retry. */
+  public specUnavailable(problem: DownloadProblem | FileReadProblem) {
+    if (problem.kind === 'fileUnreadable') {
+      log.error('The specified file does not exist or is not a valid file. Please enter a valid file path.');
+      return;
+    }
+    log.error(`${problem.error.errorMessage} Could not download ${f.link(problem.url.toString())}.`);
   }
 
   public noSpecSpecified() {
@@ -109,19 +132,25 @@ Let's get started!`);
     log.info(`Step 2 of 3: Validate and Lint your OpenAPI Definition`);
   }
 
-  public specValidationFailed(spec: ResourceInput) {
+  public specValidationFailed(kind: ResourceKind) {
     log.error(`Oops, it looks like there are some errors in your API Definition`);
-    // A placeholder rather than the user's own path or URL, which no quoting survives every shell with.
-    const specFlag = spec instanceof UrlPath ? f.flag('url', '<url>') : f.flag('file', '<path>');
-    const validateCommand = `${f.cmdAlt('apimatic', 'api', 'validate')} ${specFlag}`;
     const message = [
-      `Ask an AI coding agent to run this command and fix what it reports:`,
-      validateCommand,
+      ...this.validateWithAgent(kind),
       '',
       `Or use APIMatic's interactive VS Code Extension:`,
       f.link(vscodeExtensionUrl)
     ].join('\n');
     noteWrapped(message, 'How to fix');
+  }
+
+  // A placeholder rather than the user's own path or URL, which no quoting survives every shell with.
+  private validateWithAgent(kind: ResourceKind): string[] {
+    const validate = f.cmdAlt('apimatic', 'api', 'validate');
+    if (kind === 'project') {
+      return [`Ask an AI coding agent to run ${validate} and fix what it reports.`];
+    }
+    const specFlag = kind === 'url' ? f.flag('url', '<url>') : f.flag('file', '<path>');
+    return [`Ask an AI coding agent to run this command and fix what it reports:`, `${validate} ${specFlag}`];
   }
 
   public createPortalStep() {
@@ -182,7 +211,7 @@ Let's get started!`);
     }
   }
 
-  public downloadSpecFile(fn: Promise<Result<FileDownloadResponse, ServiceError>>) {
+  public downloadSpecFile<T, E>(fn: Promise<Result<T, E>>) {
     return withSpinner(
       'Downloading API Definition',
       `API Definition downloaded`,
@@ -200,15 +229,6 @@ Let's get started!`);
       `Run ${f.cmdAlt('apimatic', 'portal', 'generate')} to produce static files you can host.`
     ].join('\n');
     noteWrapped(message, 'Next Steps');
-  }
-
-  public serviceError(serviceError: ServiceError) {
-    log.error(serviceError.errorMessage);
-  }
-
-  /** Names the address that failed: without it the same message repeats for every retry. */
-  public specDownloadFailed(url: UrlPath, serviceError: ServiceError) {
-    log.error(`${serviceError.errorMessage} Could not download ${f.link(url.toString())}.`);
   }
 
   public printDirectoryStructure(projectDirectory: DirectoryPath, structure: Directory) {
@@ -242,8 +262,8 @@ Let's get started!`);
   public configNotWritten(failure: PluginConfigWriteFailure, sourceDirectory: DirectoryPath) {
     const problem = failure === 'unreadable' ? 'read' : 'written';
     const message =
-      `${f.var(APIMATIC_CONFIG_FILE_NAME)} in ${f.path(sourceDirectory)} could not be ${problem}, ` +
-      `so the languages you chose were not recorded. Check that it can be ${problem} and try again.`;
+      `${f.var(APIMATIC_CONFIG_FILE_NAME)} in ${f.path(sourceDirectory)} could not be ${problem}. ` +
+      `Check that it can be ${problem} and try again.`;
     log.error(message);
   }
 

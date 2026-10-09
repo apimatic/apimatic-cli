@@ -22,6 +22,10 @@ _Avoid_: Build directory, build project, build tree
 One API description in `spec/`, in any format APIMatic can transform (OpenAPI 3.x, Swagger, Postman Collections, RAML, API Blueprint, etc.), which becomes one section of reference pages in the portal.
 _Avoid_: Specification file, API definition
 
+**Spec directory**:
+The `spec/` directory in the source directory: every spec, the files they reference, and anything else kept beside them.
+_Avoid_: Specs folder, spec folder
+
 **Endpoint**:
 An operation addressed by its HTTP method and path template, exactly as the spec writes them.
 _Avoid_: Operation ID, route

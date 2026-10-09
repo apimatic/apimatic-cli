@@ -14,16 +14,15 @@ import {
   removePortalProjectDirectoryBase
 } from '../../src/infrastructure/tmp-extensions';
 
-// A real Vite dev server takes a minute to compile the portal and needs every runtime
-// dependency installed, so it stays out of the default run, as the build test does.
+// Opt-in: a real dev server needs a minute and every runtime dependency.
 const enabled = process.env.APIMATIC_E2E === '1';
 
 (enabled ? describe : describe.skip)('portal serve (end to end)', function () {
   this.timeout(10 * 60 * 1000);
 
   const fixture = new DirectoryPath(process.cwd()).join('test/resources/portal-inputs/default/src');
-  let base: string;
-  let root: string;
+  let base: string | undefined;
+  let root: string | undefined;
   let server: PortalDevServer | undefined;
 
   before(async () => {
@@ -55,27 +54,22 @@ const enabled = process.env.APIMATIC_E2E === '1';
 
   after(async () => {
     await server?.stop();
-    fs.rmSync(root, { recursive: true, force: true });
-    await removePortalProjectDirectoryBase(base);
+    if (root !== undefined) fs.rmSync(root, { recursive: true, force: true });
+    if (base !== undefined) await removePortalProjectDirectoryBase(base);
   });
 
-  /**
-   * Safari keeps the entry module cached across previews on the fixed port and executes it
-   * without asking the fresh server, so its first request is the file the entry imports from
-   * the CLI's installation. Served only through its importer's transform, that first request
-   * is refused as outside the allow list, and the page stays blank (apimatic-io#2287).
-   */
-  it('serves the TanStack dev entry to a browser that asks for it before anything else', async () => {
-    const installed = fs.realpathSync(path.join(root, 'build', 'node_modules', '@tanstack', 'react-start'));
+  // A missing file answers 200 too, with the fallback page, so the type says what came back.
+  it('serves a dependency file asked for before its importer (apimatic-io#2287)', async () => {
+    const installed = fs.realpathSync(path.join(root!, 'build', 'node_modules', '@tanstack', 'react-start'));
     const entry = path.join(installed, 'dist', 'plugin', 'default-entry', 'client.tsx').split(path.sep).join('/');
 
     const response = await globalThis.fetch(`${server?.url.toString()}/@fs/${entry}`);
 
-    expect(response.status, await response.text()).to.equal(200);
+    expect(response.status, await response.clone().text()).to.equal(200);
+    expect(response.headers.get('content-type')).to.contain('javascript');
   });
 
-  // A page imports its images from the static directory, outside the project, by the same kind of address.
-  it('serves an image from the static directory to a browser that asks for it before the page', async () => {
+  it('serves an image from the static directory asked for before the page importing it', async () => {
     const image = fs
       .realpathSync(path.join(fixture.toString(), 'static', 'images', 'logo.png'))
       .split(path.sep)
@@ -84,5 +78,6 @@ const enabled = process.env.APIMATIC_E2E === '1';
     const response = await globalThis.fetch(`${server?.url.toString()}/@fs/${image}`);
 
     expect(response.status).to.equal(200);
+    expect(response.headers.get('content-type')).to.equal('image/png');
   });
 });
