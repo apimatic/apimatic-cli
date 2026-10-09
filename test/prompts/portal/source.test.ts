@@ -186,6 +186,40 @@ describe('reportSourceProblem', () => {
     });
   });
 
+  describe('a file a specification is read from', () => {
+    const spec = source.join('spec');
+    const api = new FilePath(spec, new FileName('api.yaml'));
+    const pet = new FilePath(spec.join('schemas'), new FileName('Pet.json'));
+
+    it('names a document it cannot read, and why', () => {
+      const reason =
+        'Flow sequence in block collection must be sufficiently indented and end with a ] at line 3, column 1';
+
+      reportSourceProblem({ kind: 'unreadableSpec', file: api, referencedBy: null, reason }, source);
+
+      expect(printed()).to.equal(`'spec/api.yaml' could not be read: ${reason}.`);
+    });
+
+    it('names the file that refers to one it cannot read', () => {
+      const reason = "Expected ',' or '}' after property value in JSON at position 13 (line 3 column 3)";
+
+      reportSourceProblem({ kind: 'unreadableSpec', file: pet, referencedBy: api, reason }, source);
+
+      expect(printed()).to.equal(
+        `'spec/schemas/Pet.json', which 'spec/api.yaml' refers to, could not be read: ${reason}.`
+      );
+    });
+
+    it('names a file referred to that is not there, and where a reference is resolved from', () => {
+      reportSourceProblem({ kind: 'missingSpecReference', file: pet, referencedBy: api }, source);
+
+      expect(printed()).to.equal(
+        "'spec/api.yaml' refers to 'spec/schemas/Pet.json', but there is no such file.\n" +
+          "A '$ref' names a file from the folder of the file it is written in."
+      );
+    });
+  });
+
   describe("a page at an address kept for the portal's own pages", () => {
     const content = source.join('content');
 

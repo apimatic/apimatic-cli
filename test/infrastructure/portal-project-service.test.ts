@@ -53,6 +53,7 @@ describe('PortalProjectService', () => {
     config: configFor({ site: { name: 'My API' } }),
     generatedPages: pagesFor(),
     suggestedSite: null,
+    specDirectory: new DirectoryPath(root).join('spec'),
     specs: [
       {
         slug: 'calculator',
@@ -256,6 +257,20 @@ describe('PortalProjectService', () => {
       const module = fs.readFileSync(path.join(project.toString(), 'src/lib/portal.ts'), 'utf8');
       expect(module).to.not.contain('__APIMATIC_');
       expect(module).to.contain("from '../../portal.identity.json'");
+    });
+
+    // The dev server compares a file's real path against its allow list, which names this directory.
+    it('names the static directory by its real path, when the source is reached through a link', async () => {
+      const real = path.join(root, 'real');
+      fs.mkdirSync(path.join(real, 'static'), { recursive: true });
+      fs.symlinkSync(real, path.join(root, 'linked'), 'junction');
+      const staticDirectory = new DirectoryPath(root).join('linked', 'static');
+
+      (await service.prepare(project, sourceFor({ staticDirectory }), NO_ARTIFACTS))._unsafeUnwrap();
+
+      expect(readConfig().staticDir).to.equal(
+        path.join(fs.realpathSync.native(real), 'static').split(path.sep).join('/')
+      );
     });
 
     it('reports no static directory when the project has none', async () => {

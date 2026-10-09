@@ -94,7 +94,20 @@ export function reportSourceProblem(problem: PortalSourceProblem, sourceDirector
       return;
     }
     case 'unreadableSpec': {
-      log.error(`${f.var(problem.fileName.toString())} could not be read as JSON or YAML.`);
+      const file = relative(problem.file, sourceDirectory);
+      const named =
+        problem.referencedBy === null
+          ? file
+          : `${file}, which ${relative(problem.referencedBy, sourceDirectory)} refers to,`;
+      log.error(`${named} could not be read: ${problem.reason}.`);
+      return;
+    }
+    case 'missingSpecReference': {
+      log.error(
+        `${relative(problem.referencedBy, sourceDirectory)} refers to ${relative(problem.file, sourceDirectory)}, ` +
+          'but there is no such file.'
+      );
+      log.message(`A ${f.var('$ref')} names a file from the folder of the file it is written in.`);
       return;
     }
     case 'missingStaticFiles': {

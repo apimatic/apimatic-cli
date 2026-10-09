@@ -52,6 +52,20 @@ describe('PortalServeAction', () => {
       openInBrowser
     );
 
+  /** Stands in for the watch on `directory`, answered by `watching`; any other tree's watch is left alone. */
+  const watchTreeAt = (directory: DirectoryPath, watching: { close: sinon.SinonStub; recheck: sinon.SinonStub }) =>
+    new Promise<{ onChange: () => Promise<void>; onFailed: (reason: string) => void }>((resolve) => {
+      watchTree.callsFake(
+        (watched: DirectoryPath, onChange: () => Promise<void>, onFailed: (reason: string) => void) => {
+          if (!watched.isEqual(directory)) {
+            return ok({ close: sinon.stub().resolves(), recheck: sinon.stub() });
+          }
+          resolve({ onChange, onFailed });
+          return ok(watching);
+        }
+      );
+    });
+
   beforeEach(() => {
     root = fs.mkdtempSync(path.join(os.tmpdir(), 'portal-serve-'));
 
@@ -227,15 +241,7 @@ describe('PortalServeAction', () => {
       closeWatch = sinon.stub().resolves();
       recheck = sinon.stub();
       applyContent = sinon.stub(PortalProjectService.prototype, 'applyContent').resolves(ok(undefined));
-      watched = new Promise((resolve) => {
-        watchTree.callsFake(
-          (directory: DirectoryPath, onChange: () => Promise<void>, onFailed: (reason: string) => void) => {
-            expect(directory.toString()).to.equal(source.join('content').toString());
-            resolve({ onChange, onFailed });
-            return ok({ close: closeWatch, recheck });
-          }
-        );
-      });
+      watched = watchTreeAt(source.join('content'), { close: closeWatch, recheck });
     });
 
     // The preview itself turns every page into an HTTP 500 and says nothing.
@@ -408,13 +414,164 @@ describe('PortalServeAction', () => {
       expect(closeWatch.calledBefore(prompts.previewStopped)).to.be.true;
     });
 
-    it('watches nothing when there is no content directory', async () => {
+    it('watches no content when there is no content directory', async () => {
       fs.rmSync(path.join(source.toString(), 'content'), { recursive: true });
       interrupt();
 
       await execute(new DirectoryPath(root));
 
-      expect(watchTree.called).to.be.false;
+      const watchedDirectories = watchTree.getCalls().map(({ args: [directory] }) => directory.toString());
+      expect(watchedDirectories).to.deep.equal([source.join('spec').toString()]);
+    });
+  });
+
+  // The preview reloads a saved specification itself; the CLI's part is saying what a build would refuse.
+  describe('checking a save in the spec directory', () => {
+    let source: DirectoryPath;
+    let watched: Promise<{ onChange: () => Promise<void>; onFailed: (reason: string) => void }>;
+    let closeWatch: sinon.SinonStub;
+    let recheck: sinon.SinonStub;
+    let written: string;
+
+    const specFile = (name: string) => path.join(source.toString(), 'spec', name);
+    const writeSpec = (name: string, contents: string) => fs.writeFileSync(specFile(name), contents);
+    const halfWritten = () => writeSpec('Apimatic-Calculator.json', written.slice(0, written.length / 2));
+    const restored = () => writeSpec('Apimatic-Calculator.json', written);
+
+    /** Runs the preview until `body` is done with it, then stops it as CTRL+C would. */
+    const whileServing = async (body: (saved: () => Promise<void>) => Promise<void>) => {
+      const running = execute(new DirectoryPath(root));
+      const { onChange } = await watched;
+      try {
+        await body(onChange);
+      } finally {
+        interrupt();
+        await running;
+      }
+    };
+
+    beforeEach(() => {
+      source = new DirectoryPath(root).join('src');
+      fs.cpSync(FIXTURE_SOURCE.toString(), source.toString(), { recursive: true });
+      written = fs.readFileSync(specFile('Apimatic-Calculator.json'), 'utf8');
+
+      closeWatch = sinon.stub().resolves();
+      recheck = sinon.stub();
+      watched = watchTreeAt(source.join('spec'), { close: closeWatch, recheck });
+    });
+
+    // The preview itself leaves the document's reference out, and says nothing.
+    it('reports a document saved half written, as a build would', async () => {
+      await whileServing(async (saved) => {
+        halfWritten();
+        await saved();
+
+        const [problem, sourceDirectory] = prompts.specRejected.firstCall.args;
+        expect(problem.kind === 'unreadableSpec' && problem.file.relativeTo(source)).to.equal(
+          'spec/Apimatic-Calculator.json'
+        );
+        expect(sourceDirectory.isEqual(source)).to.be.true;
+      });
+    });
+
+    it('reports a file a document refers to that is not there', async () => {
+      const document = JSON.parse(written);
+      document.components.schemas.Pet = { $ref: './schemas/Pet.yaml' };
+
+      await whileServing(async (saved) => {
+        writeSpec('Apimatic-Calculator.json', JSON.stringify(document));
+        await saved();
+
+        const [problem] = prompts.specRejected.firstCall.args;
+        expect(problem.kind === 'missingSpecReference' && problem.file.relativeTo(source)).to.equal(
+          'spec/schemas/Pet.yaml'
+        );
+      });
+    });
+
+    it('says once that the specifications are fixed, and nothing for a save a build accepts', async () => {
+      await whileServing(async (saved) => {
+        await saved();
+        expect(prompts.specRejected.called || prompts.specAccepted.called).to.be.false;
+
+        halfWritten();
+        await saved();
+        restored();
+        await saved();
+        await saved();
+
+        expect(prompts.specRejected.calledOnce).to.be.true;
+        expect(prompts.specAccepted.calledOnce).to.be.true;
+      });
+    });
+
+    it('warns once that a document added needs a restart, and not when it is taken out again', async () => {
+      await whileServing(async (saved) => {
+        writeSpec(
+          'orders.json',
+          JSON.stringify({ openapi: '3.0.0', info: { title: 'Orders', version: '1' }, paths: {} })
+        );
+        await saved();
+        await saved();
+
+        expect(prompts.specsNeedRestart.calledOnce).to.be.true;
+        const [change] = prompts.specsNeedRestart.firstCall.args;
+        expect(change.added.map((file) => file.relativeTo(source))).to.deep.equal(['spec/orders.json']);
+        expect(change.removed).to.be.empty;
+
+        fs.rmSync(specFile('orders.json'));
+        await saved();
+
+        expect(prompts.specsNeedRestart.calledOnce).to.be.true;
+      });
+    });
+
+    // An editor's swap file would only have the specifications checked again for nothing.
+    it("leaves dot files, as an editor's swap file is, and node_modules out of the watch", async () => {
+      await whileServing(async () => {
+        const call = watchTree.getCalls().find(({ args: [directory] }) => directory.isEqual(source.join('spec')));
+        const isIgnored: (name: string) => boolean = call?.args[3];
+
+        expect(['.Apimatic-Calculator.json.swp', 'node_modules'].every(isIgnored)).to.be.true;
+        expect(isIgnored('Apimatic-Calculator.json')).to.be.false;
+      });
+    });
+
+    // The specifications are read before the preview starts, which can take a minute.
+    it('checks the specifications again once they are watched, and stops watching when the preview stops', async () => {
+      await whileServing(async () => {
+        expect(recheck.calledOnce).to.be.true;
+      });
+
+      expect(closeWatch.calledBefore(prompts.stopping)).to.be.true;
+    });
+
+    it('says when the specifications cannot be watched, and serves regardless', async () => {
+      watchTree.returns(err('EMFILE: too many open files'));
+      interrupt();
+
+      const result = await execute(new DirectoryPath(root));
+
+      expect(prompts.specNotWatched.calledOnceWith('EMFILE: too many open files')).to.be.true;
+      expect(result.isCancelled()).to.be.true;
+    });
+
+    it('tells the user when the specifications stop being watched', async () => {
+      await whileServing(async () => {
+        (await watched).onFailed('EPERM: operation not permitted');
+
+        expect(prompts.specWatchFailed.calledOnceWith('EPERM: operation not permitted')).to.be.true;
+      });
+    });
+
+    it('says when a save could not be checked, rather than dropping it', async () => {
+      sinon.stub(PortalSourceContext.prototype, 'resolveSpecs').rejects(new Error('EIO: i/o error'));
+
+      await whileServing(async (saved) => {
+        await saved();
+
+        expect(prompts.specNotChecked.calledOnceWith('EIO: i/o error')).to.be.true;
+      });
     });
   });
 

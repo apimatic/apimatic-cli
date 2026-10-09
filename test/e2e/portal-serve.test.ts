@@ -13,6 +13,7 @@ import {
   ensurePortalProjectDirectoryBase,
   removePortalProjectDirectoryBase
 } from '../../src/infrastructure/tmp-extensions';
+import { sleep } from '../../src/infrastructure/timer-extensions';
 
 // Opt-in: a real dev server needs a minute and every runtime dependency.
 const enabled = process.env.APIMATIC_E2E === '1';
@@ -23,13 +24,17 @@ const enabled = process.env.APIMATIC_E2E === '1';
   const fixture = new DirectoryPath(process.cwd()).join('test/resources/portal-inputs/default/src');
   let base: string | undefined;
   let root: string | undefined;
+  let sourceDirectory: DirectoryPath;
   let server: PortalDevServer | undefined;
 
   before(async () => {
     base = await ensurePortalProjectDirectoryBase(fixture);
     root = fs.mkdtempSync(path.join(base, 'portal-serve-e2e-'));
+    // A copy, since a test edits the source while the preview reads it.
+    sourceDirectory = new DirectoryPath(root).join('src');
+    fs.cpSync(fixture.toString(), sourceDirectory.toString(), { recursive: true });
 
-    const source = (await new PortalSourceContext(fixture).resolve())._unsafeUnwrap();
+    const source = (await new PortalSourceContext(sourceDirectory).resolve())._unsafeUnwrap();
     const delivered = path.join(root, 'delivered');
     fs.mkdirSync(delivered, { recursive: true });
     fs.writeFileSync(path.join(delivered, 'typescript.zip'), 'PK typescript');
@@ -58,6 +63,24 @@ const enabled = process.env.APIMATIC_E2E === '1';
     if (base !== undefined) await removePortalProjectDirectoryBase(base);
   });
 
+  // Under `vite dev` a page that is not there is answered 200 too, so a Markdown twin is told by its type.
+  const servesMarkdown = async (address: string): Promise<boolean> => {
+    const response = await globalThis.fetch(`${server?.url.toString()}${address}`);
+    await response.arrayBuffer();
+    return response.ok && (response.headers.get('content-type') ?? '').startsWith('text/markdown');
+  };
+
+  // The preview reloads a saved specification in its own time.
+  const servesMarkdownOnceIt = async (address: string, expected: boolean): Promise<boolean> => {
+    const deadline = Date.now() + 60 * 1000;
+    let served = await servesMarkdown(address);
+    while (served !== expected && Date.now() < deadline) {
+      await sleep(250);
+      served = await servesMarkdown(address);
+    }
+    return served;
+  };
+
   // A missing file answers 200 too, with the fallback page, so the type says what came back.
   it('serves a dependency file asked for before its importer (apimatic-io#2287)', async () => {
     const installed = fs.realpathSync(path.join(root!, 'build', 'node_modules', '@tanstack', 'react-start'));
@@ -71,7 +94,7 @@ const enabled = process.env.APIMATIC_E2E === '1';
 
   it('serves an image from the static directory asked for before the page importing it', async () => {
     const image = fs
-      .realpathSync(path.join(fixture.toString(), 'static', 'images', 'logo.png'))
+      .realpathSync(path.join(sourceDirectory.toString(), 'static', 'images', 'logo.png'))
       .split(path.sep)
       .join('/');
 
@@ -79,5 +102,22 @@ const enabled = process.env.APIMATIC_E2E === '1';
 
     expect(response.status).to.equal(200);
     expect(response.headers.get('content-type')).to.equal('image/png');
+  });
+
+  it('leaves out the reference of a specification saved half written, serving the rest, until it is fixed', async () => {
+    const spec = path.join(sourceDirectory.toString(), 'spec', 'Apimatic-Calculator.json');
+    const written = fs.readFileSync(spec, 'utf8');
+    const reference = '/api/apimatic-calculator/simple-calculator/Calculate.md';
+    expect(await servesMarkdown(reference), 'the reference before the save').to.be.true;
+
+    fs.writeFileSync(spec, written.slice(0, written.length / 2));
+    try {
+      expect(await servesMarkdownOnceIt(reference, false), 'the reference while broken').to.be.false;
+      expect(await servesMarkdown('/authentication.md'), 'a Markdown page while broken').to.be.true;
+    } finally {
+      fs.writeFileSync(spec, written);
+    }
+
+    expect(await servesMarkdownOnceIt(reference, true), 'the reference once fixed').to.be.true;
   });
 });

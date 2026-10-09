@@ -12,6 +12,7 @@ import { PortalArtifacts } from '../../types/portal/portal-artifacts.js';
 import { PortalSettings, PortalSource } from '../../types/portal/portal-source.js';
 import { PreviewConfig } from '../../types/portal/preview-config.js';
 import { PreviewContent } from '../../types/portal/preview-content.js';
+import { PreviewSpecs } from '../../types/portal/preview-specs.js';
 import { FileWatch, FileWatchService } from '../../infrastructure/file-watch-service.js';
 import { NetworkService } from '../../infrastructure/network-service.js';
 import { LauncherService } from '../../infrastructure/launcher-service.js';
@@ -78,7 +79,9 @@ export class PortalServeAction {
             contentWatch?.recheck();
           }
         });
+        const specWatch = this.watchSpecs(project, source);
         const closeWatches = async () => {
+          await specWatch?.close();
           await configWatch?.close();
           await contentWatch?.close();
         };
@@ -220,6 +223,44 @@ export class PortalServeAction {
       {
         notWatched: (reason) => this.prompts.contentNotWatched(reason, sourceDirectory),
         thrown: (reason) => this.prompts.contentNotChecked(reason, sourceDirectory)
+      }
+    );
+  }
+
+  /** Held to a build's rules, as `content/` is, but the preview itself leaves out a reference it cannot read. */
+  private watchSpecs(project: ProjectContext, source: PortalSource): FileWatch | undefined {
+    const sourceDirectory = project.sourceDirectory();
+    const sourceContext = project.portalSource();
+    const preview = new PreviewSpecs(source.specs);
+
+    const check = async () => {
+      const checked = await sourceContext.resolveSpecs();
+      if (checked.isErr()) {
+        preview.refuse();
+        this.prompts.specRejected(checked.error, sourceDirectory);
+        return;
+      }
+      const shown = preview.show(checked.value);
+      if (shown.fixed) {
+        this.prompts.specAccepted(sourceDirectory);
+      }
+      if (shown.change !== null) {
+        this.prompts.specsNeedRestart(shown.change, sourceDirectory);
+      }
+    };
+
+    return this.startWatch(
+      (onChange) =>
+        this.fileWatchService.watchTree(
+          source.specDirectory,
+          onChange,
+          (reason) => this.prompts.specWatchFailed(reason, sourceDirectory),
+          isSkippedByGlob
+        ),
+      check,
+      {
+        notWatched: (reason) => this.prompts.specNotWatched(reason, sourceDirectory),
+        thrown: (reason) => this.prompts.specNotChecked(reason, sourceDirectory)
       }
     );
   }

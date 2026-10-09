@@ -28,6 +28,7 @@ export interface PortalSource extends PortalSettings {
    * can judge an edited config without reading the specifications again.
    */
   suggestedSite: SuggestedSite | null;
+  specDirectory: DirectoryPath;
   specs: PortalSpec[];
   contentDirectory: DirectoryPath | null;
   staticDirectory: DirectoryPath | null;
@@ -114,7 +115,8 @@ export type PortalSourceProblem =
   | { kind: 'invalidConfig'; errors: string[]; missingPortal: boolean }
   // Every problem found in `content/`, so that one run lists all that a build would refuse.
   | { kind: 'invalidContent'; problems: ContentProblem[] }
-  | { kind: 'unreadableSpec'; fileName: FileName }
+  | { kind: 'unreadableSpec'; file: FilePath; referencedBy: FilePath | null; reason: string }
+  | { kind: 'missingSpecReference'; file: FilePath; referencedBy: FilePath }
   // Its `folders` are not read, and `api transform` writes into one of its own.
   | { kind: 'emptySpecDirectory'; folders: DirectoryPath[] }
   | { kind: 'noOpenApiSpec'; conversion: SpecConversion }

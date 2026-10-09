@@ -2,12 +2,15 @@ import { log } from '@clack/prompts';
 import { once } from 'node:events';
 import { APIMATIC_CONFIG_FILE_NAME } from '../../types/apimatic-config/document.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
+import { FilePath } from '../../types/file/filePath.js';
 import { UrlPath } from '../../types/file/urlPath.js';
 import { ContentNotices } from '../../types/portal/content-notices.js';
 import { MissingArtifacts } from '../../types/portal/generated-pages.js';
 import { NAVIGATION_FILE_NAME } from '../../types/portal/portal-navigation.js';
 import { ContentProblem, PortalSourceProblem } from '../../types/portal/portal-source.js';
+import { SpecsChange } from '../../types/portal/preview-specs.js';
 import { PortalDevServer, PortalDevServerFailure } from '../../infrastructure/portal-dev-server-service.js';
+import { listedInProse } from '../../utils/string-utils.js';
 import { Result } from 'neverthrow';
 import { format as f } from '../format.js';
 import { logTail, noteWrapped, withSpinner } from '../prompt.js';
@@ -53,6 +56,8 @@ export class PortalServePrompts {
         `So does removing a language from ${f.var('languages')} (updates the SDK pages) or the ` +
           `${f.var('plugin')} block (removes the Context Plugin pages).`,
         'Mistakes in these files are reported on save, and the preview keeps what it last accepted.',
+        `Saving a document in ${specPath(sourceDirectory)} updates its API reference; a mistake is reported on ` +
+          'save, and the preview leaves what it cannot read out of the reference until it is fixed.',
         '',
         `Restart the preview after adding a language or a ${f.var('plugin')} block (its SDK or plugin is ` +
           `fetched at startup), adding or removing a page, creating ${staticPath(sourceDirectory)}, ` +
@@ -97,16 +102,11 @@ export class PortalServePrompts {
   }
 
   public configNotWatched(reason: string) {
-    log.warn(
-      `${f.var(APIMATIC_CONFIG_FILE_NAME)} cannot be watched (${reason}), so edits to it need the preview restarted.`
-    );
+    this.notWatched(f.var(APIMATIC_CONFIG_FILE_NAME), reason, 'edits to it need the preview restarted');
   }
 
   public configWatchFailed(reason: string) {
-    log.warn(
-      `${f.var(APIMATIC_CONFIG_FILE_NAME)} is no longer watched (${reason}), so further edits to it need the ` +
-        `preview restarted.`
-    );
+    this.watchFailed(f.var(APIMATIC_CONFIG_FILE_NAME), reason, 'further edits to it need the preview restarted');
   }
 
   /** Explained as `portal generate` would explain it, since the same rules refused it. */
@@ -123,11 +123,11 @@ export class PortalServePrompts {
   }
 
   public contentNotChecked(reason: string, sourceDirectory: DirectoryPath) {
-    log.warn(`The changes to ${contentPath(sourceDirectory)} could not be checked: ${reason}`);
+    this.notChecked(contentPath(sourceDirectory), reason);
   }
 
   public contentAccepted(sourceDirectory: DirectoryPath) {
-    log.success(`${contentPath(sourceDirectory)} is fixed; a build would accept it again.`);
+    this.fixed(contentPath(sourceDirectory));
   }
 
   public contentNotices(notices: ContentNotices, sourceDirectory: DirectoryPath) {
@@ -135,17 +135,50 @@ export class PortalServePrompts {
   }
 
   public contentNotWatched(reason: string, sourceDirectory: DirectoryPath) {
-    log.warn(
-      `${contentPath(sourceDirectory)} cannot be watched (${reason}), so a mistake in a page or a ` +
-        `${f.var(NAVIGATION_FILE_NAME)} is only reported when the preview is restarted.`
-    );
+    this.notWatched(contentPath(sourceDirectory), reason, CONTENT_UNTIL_RESTART);
   }
 
   public contentWatchFailed(reason: string, sourceDirectory: DirectoryPath) {
-    log.warn(
-      `${contentPath(sourceDirectory)} is no longer watched (${reason}), so a mistake in a page or ` +
-        `a ${f.var(NAVIGATION_FILE_NAME)} is only reported when the preview is restarted.`
+    this.watchFailed(contentPath(sourceDirectory), reason, CONTENT_UNTIL_RESTART);
+  }
+
+  /** Explained as `portal generate` would explain it, since the same rules refused it. */
+  public specRejected(problem: PortalSourceProblem, sourceDirectory: DirectoryPath) {
+    reportSourceProblem(problem, sourceDirectory);
+    log.message(
+      `The preview leaves what it cannot read out of the API reference until ${specPath(sourceDirectory)} is ` +
+        'fixed; a build would stop here.'
     );
+  }
+
+  public specAccepted(sourceDirectory: DirectoryPath) {
+    this.fixed(specPath(sourceDirectory));
+  }
+
+  // The preview lists its documents once, when it starts.
+  public specsNeedRestart(change: SpecsChange, sourceDirectory: DirectoryPath) {
+    const changes = [filesWere(change.added, 'added'), filesWere(change.removed, 'removed')].filter(
+      (each) => each !== null
+    );
+    log.warn(
+      `The documents in ${specPath(sourceDirectory)} are not the ones the preview started with: ` +
+        `${changes.join(', and ')}.`
+    );
+    log.message(
+      'Restart the preview to match them; until then it shows the ones it started with that are still there.'
+    );
+  }
+
+  public specNotChecked(reason: string, sourceDirectory: DirectoryPath) {
+    this.notChecked(specPath(sourceDirectory), reason);
+  }
+
+  public specNotWatched(reason: string, sourceDirectory: DirectoryPath) {
+    this.notWatched(specPath(sourceDirectory), reason, SPEC_UNTIL_RESTART);
+  }
+
+  public specWatchFailed(reason: string, sourceDirectory: DirectoryPath) {
+    this.watchFailed(specPath(sourceDirectory), reason, SPEC_UNTIL_RESTART);
   }
 
   public stopping() {
@@ -164,4 +197,33 @@ export class PortalServePrompts {
   public async blockExecution() {
     await Promise.race([once(process, 'SIGINT'), once(process, 'SIGTERM')]);
   }
+
+  private fixed(directory: string) {
+    log.success(`${directory} is fixed; a build would accept it again.`);
+  }
+
+  private notChecked(directory: string, reason: string) {
+    log.warn(`The changes to ${directory} could not be checked: ${reason}`);
+  }
+
+  private notWatched(watched: string, reason: string, until: string) {
+    log.warn(`${watched} cannot be watched (${reason}), so ${until}.`);
+  }
+
+  private watchFailed(watched: string, reason: string, until: string) {
+    log.warn(`${watched} is no longer watched (${reason}), so ${until}.`);
+  }
+}
+
+const reportedOnRestart = (mistakes: string) =>
+  `a mistake in ${mistakes} is only reported when the preview is restarted`;
+const CONTENT_UNTIL_RESTART = reportedOnRestart(`a page or a ${f.var(NAVIGATION_FILE_NAME)}`);
+const SPEC_UNTIL_RESTART = reportedOnRestart('a specification');
+
+function filesWere(files: FilePath[], done: string): string | null {
+  if (files.length === 0) {
+    return null;
+  }
+  const names = listedInProse(files.map((file) => f.var(file.name().toString())));
+  return `${names} ${files.length === 1 ? 'was' : 'were'} ${done}`;
 }
