@@ -284,7 +284,11 @@ export class PortalProjectService {
       codeSamples: codeSamples === null ? null : codeSamples.toPosix(),
       contentDir: contentDirectory.toPosix(),
       generatedDir: projectDirectory.join(GENERATED_DIRECTORY_NAME).toPosix(),
-      staticDir: source.staticDirectory === null ? null : source.staticDirectory.toPosix(),
+      // The dev server's allow list names it, and Vite resolves a symlink before comparing.
+      staticDir:
+        source.staticDirectory === null
+          ? null
+          : new DirectoryPath(canonical(source.staticDirectory.toString())).toPosix(),
       downloadsDir: downloads === null ? null : downloads.toPosix()
     };
 
