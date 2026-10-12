@@ -9,7 +9,6 @@ import { FilePath } from '../types/file/filePath.js';
 import { DirectoryPath } from '../types/file/directoryPath.js';
 import { Directory, DirectoryItem } from '../types/file/directory.js';
 import { FileName } from '../types/file/fileName.js';
-import { sleep } from './timer-extensions.js';
 import { errorMessage } from '../utils/error-utils.js';
 
 /** `stat` follows a link, so a link to nothing fails as though the entry were not there. */
