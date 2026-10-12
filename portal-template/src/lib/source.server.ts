@@ -25,3 +25,5 @@ export const source = loader(
     pageTree: { transformers: [navigationTransformer(), tabsTransformer()], generateFallback: false }
   }
 );
+
+export type PortalPage = ReturnType<typeof source.getPages>[number];

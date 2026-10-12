@@ -119,13 +119,22 @@ describe('parsePage', () => {
       expect(await images('<Callout>\n\n![a](/a.png)\n', 'page.mdx')).to.deep.equal([]);
     });
 
-    // Fumadocs imports only inline images; a reference, an address and a folder are left to the browser.
+    // An address and a folder are left to the browser, and so is a reference with no definition, which is text.
     it('leaves out what the build does not import', async () => {
       const markdown =
-        '![a][logo]\n\n[logo]: /logo.png\n\n![b](https://example.com/b.png)\n\n![c](//cdn.example.com/c.png)\n\n' +
-        '![d](data:image/png;base64,AA)\n\n![e](/images/)\n\n![f]()\n';
+        '![a][nowhere]\n\n![b](https://example.com/b.png)\n\n![c](//cdn.example.com/c.png)\n\n' +
+        '![d](data:image/png;base64,AA)\n\n![e](/images/)\n\n![f]()\n\n![g][remote]\n\n[remote]: https://example.com/g.png\n';
 
       expect(await images(markdown)).to.deep.equal([]);
+    });
+
+    // The template writes each as an inline image before the build imports it.
+    it('reads a reference-style image from the first definition of its label, at the reference', async () => {
+      const markdown = 'Intro.\n\n![a][Logo]\n\n[logo]: /images/logo.png "Logo"\n[logo]: /images/other.png\n';
+
+      expect(await images(markdown)).to.deep.equal([
+        { url: '/images/logo.png', line: 3, from: 'static', path: 'images/logo.png' }
+      ]);
     });
 
     it('reads a .md page as Markdown, where a tag is HTML and an image after it still counts', async () => {

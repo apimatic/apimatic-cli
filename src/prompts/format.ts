@@ -41,7 +41,7 @@ export const format = {
 export function intro(text: string) {
   i(format.intro(` ${text} `));
 }
-export function outro<T>(result: ActionResult<T>) {
+export function outro<T, E>(result: ActionResult<T, E>) {
   const exitCode = result.getExitCode();
   const message = result.getMessage();
 

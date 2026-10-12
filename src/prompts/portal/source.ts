@@ -76,30 +76,17 @@ function reportSpecConversion({ file, format, converted, others }: SpecConversio
 
 /**
  * Shared by `portal generate` and `portal serve`: both read the same source directory, so
- * a broken one has to be explained the same way in both. `offerQuickstart` is false once a
- * preview of the directory is running: quickstart refuses a directory that is not empty.
+ * a broken one has to be explained the same way in both.
  */
-export function reportSourceProblem(
-  problem: PortalSourceProblem,
-  sourceDirectory: DirectoryPath,
-  { offerQuickstart = true }: { offerQuickstart?: boolean } = {}
-): void {
-  const quickstart = `Run ${f.cmdAlt('apimatic', 'quickstart')} to set up a portal.`;
+export function reportSourceProblem(problem: PortalSourceProblem, sourceDirectory: DirectoryPath): void {
   switch (problem.kind) {
     case 'missingConfig': {
       log.error(`No ${f.var(APIMATIC_CONFIG_FILE_NAME)} found in ${f.path(sourceDirectory)}.`);
-      if (offerQuickstart) {
-        log.message(quickstart);
-      }
       return;
     }
     case 'invalidConfig': {
       log.error(`The ${f.var(APIMATIC_CONFIG_FILE_NAME)} in ${f.path(sourceDirectory)} is not valid:`);
       log.message(problem.errors.map((error) => `  • ${error}`).join('\n'));
-      // A file without the block is no worse off than no file: the same command sets it up.
-      if (problem.missingPortal && offerQuickstart) {
-        log.message(quickstart);
-      }
       return;
     }
     case 'invalidContent': {
@@ -225,17 +212,16 @@ function reportMissingImages(images: MissingImage[], sourceDirectory: DirectoryP
 
 function reportReservedAddresses(pages: ReservedAddressPage[], sourceDirectory: DirectoryPath): void {
   const one = pages.length === 1;
-  const lines = pages.map(({ file, address, section }) => {
-    const kept = `/${section.folder}`;
-    const within = address === kept ? '' : `, under ${f.var(kept)}`;
+  const lines = pages.map(({ file, address, keptFor }) => {
+    const within = address === keptFor.address ? '' : `, under ${f.var(keptFor.address)}`;
     return `  • ${relative(file, sourceDirectory)}, at ${f.var(address)}${within}, which is kept for ${
-      section.description
+      keptFor.description
     }`;
   });
   log.error(
     one
-      ? `A page in ${f.path(sourceDirectory)} would be served where the portal puts the pages it generates:`
-      : `Pages in ${f.path(sourceDirectory)} would be served where the portal puts the pages it generates:`
+      ? `A page in ${f.path(sourceDirectory)} would be served where the portal puts pages of its own:`
+      : `Pages in ${f.path(sourceDirectory)} would be served where the portal puts pages of its own:`
   );
   log.message(lines.join('\n'));
   log.message(one ? 'Rename or move the page.' : 'Rename or move each page.');

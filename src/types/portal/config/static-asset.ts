@@ -49,10 +49,10 @@ export class StaticAsset {
   }
 
   /**
-   * The `static/` prefix is the site root. Each name is escaped, since a `#`, `?` or `%` in it
+   * The `static/` prefix is the portal's root. Each name is escaped, since a `#`, `?` or `%` in it
    * would otherwise end or alter the path.
    */
-  public siteUrl(): string {
+  public portalPath(): string {
     return `/${this.relativePath.slice(STATIC_PREFIX.length).split('/').map(encodeURIComponent).join('/')}`;
   }
 

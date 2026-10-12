@@ -30,7 +30,7 @@ export class PortalLanguages {
   ): Result<PortalLanguages, string[]> {
     const errors = findingSentences(findings);
     const entries = Object.entries(block ?? {});
-    if (entries.length === 0 && findings.length === 0) {
+    if (PortalLanguages.namesNone(block, findings)) {
       errors.push(REQUIRED);
     }
     for (const [key] of entries.filter(([key]) => !SUPPORTED_LANGUAGES.includes(key))) {
@@ -44,6 +44,11 @@ export class PortalLanguages {
       return err(errors);
     }
     return ok(new PortalLanguages(entries.map(([key, entry]) => PortalSdk.fromEntry(key as Language, entry))));
+  }
+
+  /** False for a block of the wrong shape, which `findings` reports instead. */
+  public static namesNone(block: Record<string, unknown> | undefined, findings: readonly ConfigFinding[]): boolean {
+    return Object.keys(block ?? {}).length === 0 && findings.length === 0;
   }
 
   /** In the order the block lists them. */

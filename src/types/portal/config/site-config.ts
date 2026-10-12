@@ -1,6 +1,6 @@
 import { err, ok, Result } from 'neverthrow';
-import { UrlPath } from '../../file/urlPath.js';
-import { allOf, isWebAddress, namespace, nonEmptyString, Parsed, unknownKeys } from './fields.js';
+import { allOf, namespace, nonEmptyString, optional, Parsed, unknownKeys } from './fields.js';
+import { SiteAddress } from './site-address.js';
 
 /** What a specification says about itself, which is what a portal is called until the block says otherwise. */
 export interface SuggestedSite {
@@ -15,7 +15,7 @@ const KNOWN = ['name', 'url', 'description'];
 export class SiteConfig {
   private constructor(
     private readonly name: string,
-    private readonly url: UrlPath | null,
+    private readonly address: SiteAddress | null,
     private readonly description: string | null
   ) {}
 
@@ -29,10 +29,10 @@ export class SiteConfig {
         unknownKeys(data, KNOWN, path),
         Result.combineWithAllErrors([
           SiteConfig.validName(data.name, `${path}.name`, suggested),
-          SiteConfig.validUrl(data.url, `${path}.url`),
+          optional(data.url, (url) => SiteAddress.parse(url, `${path}.url`)),
           SiteConfig.validDescription(data.description, `${path}.description`, suggested)
         ])
-      ).map(([name, url, description]) => new SiteConfig(name, url, description))
+      ).map(([name, address, description]) => new SiteConfig(name, address, description))
     );
   }
 
@@ -48,14 +48,14 @@ export class SiteConfig {
     return this.description;
   }
 
-  public origin(): UrlPath | null {
-    return this.url;
+  public siteAddress(): SiteAddress | null {
+    return this.address;
   }
 
   public toJSON(): { name: string; url?: string; description?: string } {
     return {
       name: this.name,
-      ...(this.url === null ? {} : { url: this.url.toString() }),
+      ...(this.address === null ? {} : { url: this.address.toString() }),
       ...(this.description === null ? {} : { description: this.description })
     };
   }
@@ -83,30 +83,5 @@ export class SiteConfig {
     }
     const trimmed = description.trim();
     return ok(trimmed.length > 0 ? trimmed : null);
-  }
-
-  // Only the origin is accepted: the portal is hosted at the root of its host, so a path,
-  // query or fragment would produce canonical links that do not resolve.
-  private static validUrl(url: unknown, path: string): Parsed<UrlPath | null> {
-    if (url === undefined) {
-      return ok(null);
-    }
-    const origin = typeof url === 'string' ? SiteConfig.parseOrigin(url.trim()) : null;
-    return origin === null
-      ? err([
-          `'${path}' must be the address the portal is hosted at, without a path, for example 'https://docs.example.com'.`
-        ])
-      : ok(origin);
-  }
-
-  private static parseOrigin(value: string): UrlPath | null {
-    if (!isWebAddress(value)) {
-      return null;
-    }
-    const parsed = new URL(value);
-    if (parsed.pathname !== '/' || parsed.search !== '' || parsed.hash !== '') {
-      return null;
-    }
-    return new UrlPath(parsed.origin);
   }
 }

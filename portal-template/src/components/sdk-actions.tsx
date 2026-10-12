@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { asMarkdown } from 'fumadocs-core/server';
 import { buttonVariants } from 'fumadocs-ui/components/ui/button';
 import { Code, Download, Package } from 'lucide-react';
+import { withBasePath } from '@/lib/base-path';
 
 export interface SdkActionsProps {
   download: string;
@@ -22,7 +23,7 @@ export function SdkActions({ download, source, packageUrl, registry }: Readonly<
   // The page's Markdown twin, which the page actions and llms-full.txt hand to an AI assistant.
   if (asMarkdown()) {
     const links = [
-      `[Download SDK](${download})`,
+      `[Download SDK](${withBasePath(download)})`,
       source ? `[View source](${source})` : null,
       packageUrl ? `[View on ${registry}](${packageUrl})` : null
     ];
@@ -64,7 +65,7 @@ interface LinkProps {
 /** A plain link, not a route: the zip is a file the site serves beside its pages. */
 export function DownloadLink({ href, className, children }: Readonly<LinkProps>) {
   return (
-    <a href={href} download className={className}>
+    <a href={withBasePath(href)} download className={className}>
       {children}
     </a>
   );

@@ -1,10 +1,11 @@
 import { log } from '@clack/prompts';
 import { replaceHTML } from '../../utils/utils.js';
+import { listedInProse } from '../../utils/string-utils.js';
 import { ValidationMessages } from '../../types/utils.js';
 import { Result } from 'neverthrow';
 import { ValidateApiResult, ValidationEntry, ValidationSummary } from '@apimatic/sdk';
-import { ServiceError } from '../../infrastructure/service-error.js';
 import { FilePath } from '../../types/file/filePath.js';
+import { ResolveProblem } from '../../types/resource-context.js';
 import { format as f } from '../format.js';
 import { withSpinner } from '../prompt.js';
 
@@ -82,9 +83,44 @@ export class ApiValidatePrompts {
     log.error(error);
   }
 
-  public networkError(serviceError: ServiceError): void {
-    const message = serviceError.errorMessage;
-    log.error(message);
+  public specUnavailable(problem: ResolveProblem): void {
+    switch (problem.kind) {
+      case 'downloadFailed': {
+        log.error(problem.error.errorMessage);
+        return;
+      }
+      case 'fileUnreadable': {
+        log.error(`${f.path(problem.file)} does not exist or could not be read.`);
+        return;
+      }
+      case 'noSpec': {
+        const message =
+          `No API specification found in ${f.path(problem.specDirectory)}. Add yours there, point ` +
+          `${f.flag('input')} at the directory that holds ${f.var('src')}, or give a spec with ` +
+          `${f.flag('file')} or ${f.flag('url')}.`;
+        log.error(message);
+        return;
+      }
+      case 'unreadable': {
+        log.error(`${f.path(problem.specDirectory)} could not be read: ${problem.reason}`);
+        return;
+      }
+      case 'zipFailed': {
+        log.error(`${f.path(problem.specDirectory)} could not be zipped for upload: ${problem.reason}`);
+        return;
+      }
+      case 'symlinks': {
+        const names = listedInProse(
+          problem.symlinks.map((symlink) => f.var(symlink.relativeTo(problem.specDirectory)))
+        );
+        const one = problem.symlinks.length === 1;
+        const message =
+          `${names} in ${f.path(problem.specDirectory)} ${one ? 'is a symlink' : 'are symlinks'}, which cannot ` +
+          `be uploaded for validation. Replace ${one ? 'it' : 'each'} with a copy of the files it points to.`;
+        log.error(message);
+        return;
+      }
+    }
   }
 
   public transformedApiSaved(filePath: FilePath): void {

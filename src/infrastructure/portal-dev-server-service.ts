@@ -21,7 +21,8 @@ const OUTPUT_TAIL_BYTES = 64 * 1024;
 const DRAIN_TIMEOUT_MS = 2000;
 
 // Read after Vite's colour codes are stripped but not the line end, which proves the URL arrived whole.
-const LOCAL_URL_PATTERN = /Local:\s*(https?:\/\/\S+?)\/?[ \t]*[\r\n]/i;
+// A path keeps its trailing slash, since Vite answers `/docs` with a 404.
+const LOCAL_URL_PATTERN = /Local:\s*(https?:\/\/[^\s/]+(?:\/\S+\/)?)\/?[ \t]*[\r\n]/i;
 
 export interface PortalDevServer {
   url: UrlPath;

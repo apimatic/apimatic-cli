@@ -2,6 +2,7 @@ import { ExportFormats } from '@apimatic/sdk';
 import { err, ok, Result } from 'neverthrow';
 import { FileService } from '../infrastructure/file-service.js';
 import { errorMessage } from '../utils/error-utils.js';
+import { isJsonObject } from '../utils/json-utils.js';
 import { ApimaticConfigContext } from './apimatic-config-context.js';
 import { APIMATIC_CONFIG_FILE_NAME, ApimaticConfigDocument, findingSentences } from './apimatic-config/document.js';
 import { Directory } from './file/directory.js';
@@ -10,7 +11,7 @@ import { FileName } from './file/fileName.js';
 import { FilePath } from './file/filePath.js';
 import { NOT_FOUND_FILE_NAME, SHELL_FILE_NAME } from './portal-context.js';
 import { CONTENT_DIRECTORY_NAME, SPEC_DIRECTORY_NAME, STATIC_DIRECTORY_NAME } from './project-layout.js';
-import { PLACEHOLDER_SITE, SuggestedSite } from './portal/config/site-config.js';
+import { PLACEHOLDER_SITE, SiteConfig, SuggestedSite } from './portal/config/site-config.js';
 import { AcceptedContent, ContentFile, ContentTree, ReadPage } from './portal/content-tree.js';
 import { Endpoint } from './portal/endpoint.js';
 import { GeneratedPages, PluginSource } from './portal/generated-pages.js';
@@ -74,6 +75,10 @@ export class PortalSourceContext {
     return this.sourceDirectory.join(STATIC_DIRECTORY_NAME);
   }
 
+  private get configFile(): FilePath {
+    return new FilePath(this.sourceDirectory, new FileName(APIMATIC_CONFIG_FILE_NAME));
+  }
+
   /** Reads and validates the whole source directory, or reports the first problem found. */
   public async resolve(): Promise<Result<PortalSource, PortalSourceProblem>> {
     const document = await this.readConfigDocument();
@@ -113,6 +118,11 @@ export class PortalSourceContext {
       shadowedFiles: staticDirectory === null ? [] : await this.shadowedFiles(staticDirectory),
       contentNotices: accepted.value.notices
     });
+  }
+
+  /** The `spec/` half of `resolve`, for quickstart to refuse a project the build would refuse before writing into it. */
+  public async resolveSpecs(): Promise<Result<PortalSpec[], PortalSourceProblem>> {
+    return (await this.specs()).map(({ specs }) => specs);
   }
 
   /**
@@ -312,50 +322,64 @@ export class PortalSourceContext {
       if (installed.isErr()) {
         return err({ kind: 'sourceUnwritable', reason: installed.error.reason });
       }
+      const config = PortalConfig.scaffolded(await this.suggestedSite(specPath));
+      // Every default is spelled out, so the block shows what can be set, and the schema lets an
+      // editor complete and check the rest.
+      const written = await this.mergeConfig((document) =>
+        document.referencingSchema(schemaUrl).with('portal', config.toJSON())
+      );
+      if (written.isErr()) {
+        return err(written.error);
+      }
+      await this.writeContent(config.siteTitle());
+      return ok(this.configFile);
     } catch (error) {
       return err({ kind: 'sourceUnwritable', reason: errorMessage(error) });
     }
-    return await this.adopt(specPath, schemaUrl);
   }
 
-  /** The same tree around a specification the project already carries, which is left where it is. */
-  public async adopt(specPath: FilePath, schemaUrl: string): Promise<Result<FilePath, PortalScaffoldProblem>> {
+  /** Names the site after the spec and writes a starter content/, each only where the project has none. */
+  public async adopt(namedAfter: PortalSpec): Promise<Result<FilePath, PortalScaffoldProblem>> {
     try {
-      return await this.writeSourceTree(specPath, schemaUrl);
+      const site = await this.suggestedSite(namedAfter.file);
+      // A block or a site that is not an object is left for the build to report.
+      const written = await this.mergeConfig((document) => {
+        const portal = document.portal() ?? {};
+        if (!isJsonObject(portal)) {
+          return document;
+        }
+        if (portal.site === undefined) {
+          return document.with('portal', { site: SiteConfig.suggested(site).toJSON(), ...portal });
+        }
+        return isJsonObject(portal.site) && portal.site.name === undefined
+          ? document.with('portal', { ...portal, site: { name: site.name, ...portal.site } })
+          : document;
+      });
+      if (written.isErr()) {
+        return err(written.error);
+      }
+      if (!(await this.fileService.directoryExists(this.contentDirectory))) {
+        const config = PortalConfig.fromBlock(written.value.portal(), site);
+        await this.writeContent(config.isOk() ? config.value.siteTitle() : site.name);
+      }
+      return ok(this.configFile);
     } catch (error) {
       return err({ kind: 'sourceUnwritable', reason: errorMessage(error) });
     }
   }
 
-  /**
-   * The document the portal speaks for, and the one quickstart validates when it adopts a
-   * project someone downloaded rather than asking for a specification the project has.
-   */
-  public async primarySpec(): Promise<FilePath | null> {
-    const fileName = (await this.specDirectoryListing()).fileNames.find((name) =>
-      SPEC_EXTENSIONS.some((extension) => name.hasExtension(extension))
-    );
-    return fileName === undefined ? null : new FilePath(this.specDirectory, fileName);
+  private async mergeConfig(
+    apply: (document: ApimaticConfigDocument) => ApimaticConfigDocument
+  ): Promise<Result<ApimaticConfigDocument, PortalScaffoldProblem>> {
+    const written = await this.configContext.merge(['portal'], apply);
+    return written.mapErr((failure) => ({
+      kind: failure === 'unreadable' ? ('configUnreadable' as const) : ('configUnwritable' as const)
+    }));
   }
 
-  private async writeSourceTree(
-    specPath: FilePath,
-    schemaUrl: string
-  ): Promise<Result<FilePath, PortalScaffoldProblem>> {
-    const site = await this.suggestedSite(specPath);
-    const config = PortalConfig.scaffolded(site);
-    // A downloaded build carries `spec/` and no config, so the merge creates the file on both
-    // paths. Every default is spelled out, so the block shows what can be set, and the schema
-    // lets an editor complete and check the rest.
-    const written = await this.configContext.merge(['portal'], (document) =>
-      document.referencingSchema(schemaUrl).with('portal', config.toJSON())
-    );
-    if (written.isErr()) {
-      return err({ kind: written.error === 'unreadable' ? 'configUnreadable' : 'configUnwritable' });
-    }
-
+  private async writeContent(siteTitle: string): Promise<void> {
     await this.fileService.createDirectoryIfNotExists(this.contentDirectory);
-    const summary = `Getting started with ${config.siteTitle()}`;
+    const summary = `Getting started with ${siteTitle}`;
     await this.fileService.writeContents(
       new FilePath(this.contentDirectory, new FileName('index.md')),
       [
@@ -366,7 +390,7 @@ export class PortalSourceContext {
         `description: ${JSON.stringify(summary)}`,
         '---',
         '',
-        `Welcome to the ${config.siteTitle()} documentation.`,
+        `Welcome to the ${siteTitle} documentation.`,
         '',
         'Replace this page with your own introduction, and add more Markdown pages beside it.',
         ''
@@ -377,7 +401,6 @@ export class PortalSourceContext {
       new FilePath(this.contentDirectory, new FileName(NAVIGATION_FILE_NAME)),
       JSON.stringify({ tabs: TOKENS, pages: ['index', '...'] }, null, 2) + '\n'
     );
-    return ok(new FilePath(this.sourceDirectory, new FileName(APIMATIC_CONFIG_FILE_NAME)));
   }
 
   // A split specification arrives as an archive, whose parts are left to the build to read.

@@ -89,7 +89,7 @@ describe('PortalConfig', () => {
     it('reports them alongside every invalid setting, so one edit fixes the file', () => {
       const errors = errorsOf({
         theme: {},
-        site: { name: '', url: 'https://x.test/docs' },
+        site: { name: '', url: 'https://x.test/?a=1' },
         brand: { colorMode: 'sepia' },
         ai: { pageActions: 'no' }
       });
@@ -138,25 +138,27 @@ describe('PortalConfig', () => {
       expect(errorsOf({ site: { description: 5 } })).to.deep.equal(["'portal.site.description' must be a string."]);
     });
 
-    it('keeps only the origin of the address, dropping a trailing slash and keeping a port', () => {
+    it('keeps the path of the address, dropping a trailing slash and keeping a port', () => {
       expect(config({ site: { url: 'https://docs.example.com/' } }).identity().siteUrl).to.equal(
         'https://docs.example.com'
       );
       expect(config({ site: { url: 'https://docs.example.com:8443' } }).identity().siteUrl).to.equal(
         'https://docs.example.com:8443'
       );
+      expect(config({ site: { url: 'HTTPS://Example.com/Docs/v2/' } }).identity().siteUrl).to.equal(
+        'https://example.com/Docs/v2'
+      );
     });
 
-    it('refuses an address carrying a path, query or fragment, or one that is not http', () => {
-      for (const url of [
-        'https://x.test/docs',
-        'https://x.test/?a=1',
-        'https://x.test/#top',
-        'ftp://x.test',
-        'x.test',
-        'https:x.test',
-        ''
-      ]) {
+    it('hands over the address it parsed, or none without one', () => {
+      const address = config({ site: { url: 'https://acme.github.io/docs/' } }).siteAddress();
+
+      expect(address?.path()).to.equal('/docs/');
+      expect(config({}).siteAddress()).to.be.null;
+    });
+
+    it('refuses an address carrying a query or fragment, or one that is not http', () => {
+      for (const url of ['https://x.test/?a=1', 'https://x.test/#top', 'ftp://x.test', 'x.test', 'https:x.test', '']) {
         expect(errorsOf({ site: { url } }), url).to.have.lengthOf(1);
       }
     });
@@ -169,8 +171,8 @@ describe('PortalConfig', () => {
           .brandSettings()
           .logoImages();
 
-        expect(logo?.light().siteUrl()).to.equal('/images/logo.png');
-        expect(logo?.dark().siteUrl()).to.equal('/images/logo.png');
+        expect(logo?.light().portalPath()).to.equal('/images/logo.png');
+        expect(logo?.dark().portalPath()).to.equal('/images/logo.png');
       });
 
       it('takes a path per mode', () => {
@@ -178,8 +180,8 @@ describe('PortalConfig', () => {
           .brandSettings()
           .logoImages();
 
-        expect(logo?.light().siteUrl()).to.equal('/light.svg');
-        expect(logo?.dark().siteUrl()).to.equal('/dark.svg');
+        expect(logo?.light().portalPath()).to.equal('/light.svg');
+        expect(logo?.dark().portalPath()).to.equal('/dark.svg');
       });
 
       it('needs both modes once it names either', () => {
@@ -205,7 +207,7 @@ describe('PortalConfig', () => {
           .brandSettings()
           .logoImages();
 
-        expect(logo?.light().siteUrl()).to.equal('/images/logo.png');
+        expect(logo?.light().portalPath()).to.equal('/images/logo.png');
         expect(logo?.light().resolveIn(source).relativeTo(source)).to.equal('static/images/logo.png');
       });
 
@@ -228,7 +230,7 @@ describe('PortalConfig', () => {
           .brandSettings()
           .logoImages();
 
-        expect(logo?.light().siteUrl()).to.equal('/my%20logo%20%231%3F.png');
+        expect(logo?.light().portalPath()).to.equal('/my%20logo%20%231%3F.png');
         expect(logo?.light().resolveIn(source).relativeTo(source)).to.equal('static/my logo #1?.png');
       });
     });
@@ -239,13 +241,13 @@ describe('PortalConfig', () => {
           brand: { logo: { light: 'static/light.svg', dark: 'static/dark.svg' } }
         }).brandSettings();
 
-        expect(brand.faviconImage()?.siteUrl()).to.equal('/light.svg');
+        expect(brand.faviconImage()?.portalPath()).to.equal('/light.svg');
       });
 
       it('is the file the block names when it names one', () => {
         const brand = config({ brand: { logo: 'static/logo.svg', favicon: 'static/favicon.ico' } }).brandSettings();
 
-        expect(brand.faviconImage()?.siteUrl()).to.equal('/favicon.ico');
+        expect(brand.faviconImage()?.portalPath()).to.equal('/favicon.ico');
       });
 
       it('refuses a path outside static/', () => {

@@ -156,9 +156,11 @@ describe('portal template packaging', () => {
   // — tracking and preview parameters among them — reach the AI vendors it links out to.
   it('sends the AI vendors the page address and nothing the reader carried with them', () => {
     const route = fs.readFileSync(path.join(templateRoot, 'src/routes/$.tsx'), 'utf8');
+    const basePath = fs.readFileSync(path.join(templateRoot, 'src/lib/base-path.ts'), 'utf8');
 
     expect(route).to.match(/<ViewOptionsPopover [^>]*pageUrl=/);
-    expect(route).to.contain('new URL(pathname, window.location.origin)');
+    expect(route).to.contain('const pageUrl = fullAddress(pathname);');
+    expect(basePath).to.contain('new URL(withBasePath(path), window.location.origin)');
   });
 
   it('registers the plugin that reloads the generated pages under portal serve', () => {

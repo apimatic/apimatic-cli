@@ -1,54 +1,45 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-/**
- * The installations the project's dependencies resolve to. Vite serves a file from outside
- * its allow list only once the module importing it has been transformed, an order a browser
- * cache skips: Safari, holding the importer from an earlier preview on the same port, asked
- * for the TanStack dev entry first and was refused, leaving a blank page. Naming where the
- * links really lead keeps every dependency served whatever the browser asks for first.
- */
-export function dependencyDirectories(projectDirectory: string): string[] {
-  const directories = new Set<string>();
-  for (const packagePath of packagePaths(path.join(projectDirectory, 'node_modules'))) {
-    const installed = realPath(packagePath);
-    if (installed !== undefined) {
-      directories.add(outermostNodeModules(installed));
+// Safari runs a cached entry before its importer is transformed (apimatic-io#2287).
+export function dependencyDirectories(portalProjectDirectory: string): string[] {
+  const modules = path.join(portalProjectDirectory, 'node_modules');
+  return narrowest(
+    packageNames(modules)
+      .filter((name) => fs.lstatSync(path.join(modules, name)).isSymbolicLink())
+      .map((name) => holdingDirectory(fs.realpathSync.native(path.join(modules, name)), name))
+  );
+}
+
+/** The one directory holding them all: the CLI's `node_modules` under npm, the store under pnpm. Each alone when only the disk's root would. */
+function narrowest(directories: string[]): string[] {
+  let common: string | undefined = directories[0];
+  for (const directory of directories.slice(1)) {
+    while (common !== undefined && !isWithin(common, directory)) {
+      common = isRoot(path.dirname(common)) ? undefined : path.dirname(common);
     }
   }
-  return [...directories];
+  return common === undefined ? directories : [common];
 }
 
-function packagePaths(modules: string): string[] {
-  return entries(modules).flatMap((name) => {
-    const packagePath = path.join(modules, name);
-    return name.startsWith('@') ? entries(packagePath).map((scoped) => path.join(packagePath, scoped)) : [packagePath];
-  });
+function packageNames(modules: string): string[] {
+  return fs
+    .readdirSync(modules)
+    .flatMap((name) =>
+      name.startsWith('@') ? fs.readdirSync(path.join(modules, name)).map((scoped) => `${name}/${scoped}`) : [name]
+    );
 }
 
-function entries(directory: string): string[] {
-  try {
-    return fs.readdirSync(directory).filter((name) => !name.startsWith('.'));
-  } catch {
-    return [];
-  }
+/** Where a package and the dependencies installed beside it sit, its scope included. */
+function holdingDirectory(packageDirectory: string, name: string): string {
+  return path.resolve(packageDirectory, ...name.split('/').map(() => '..'));
 }
 
-function realPath(target: string): string | undefined {
-  try {
-    return fs.realpathSync(target);
-  } catch {
-    return undefined;
-  }
+function isRoot(directory: string): boolean {
+  return path.dirname(directory) === directory;
 }
 
-/** The widest installation around a package: under pnpm the whole store sits inside one `node_modules` too. */
-function outermostNodeModules(packageDirectory: string): string {
-  let found = packageDirectory;
-  for (let parent = path.dirname(packageDirectory); parent !== path.dirname(parent); parent = path.dirname(parent)) {
-    if (path.basename(parent) === 'node_modules') {
-      found = parent;
-    }
-  }
-  return found;
+function isWithin(directory: string, target: string): boolean {
+  const relative = path.relative(directory, target);
+  return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
 }

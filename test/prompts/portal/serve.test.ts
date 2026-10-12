@@ -37,10 +37,10 @@ describe('PortalServePrompts', () => {
       );
     });
 
-    // The artifacts are fetched once, so what they would have to carry anew waits for a restart.
-    it('says which additions need the preview restarted', () => {
+    // The artifacts are fetched once and Vite reads its base once, so these wait for a restart.
+    it('says which edits need the preview restarted', () => {
       expect(printed()).to.match(
-        /Restart the preview after adding a language or a 'plugin' block \(its SDK or plugin is fetched at startup\), adding or removing a page, creating '.*static', or changing which documents are in '.*spec'\./
+        /Restart the preview after adding a language or a 'plugin' block \(its SDK or plugin is fetched at startup\), adding or removing a page, creating '.*static', changing which documents are in '.*spec', or changing the path in 'portal\.site\.url'\./
       );
     });
 

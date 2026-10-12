@@ -3,7 +3,6 @@ import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { format as f } from "../format.js";
 import { Result } from "neverthrow";
 import { TransformationResultData } from "../../infrastructure/services/transformation-service.js";
-import { ServiceError } from "../../infrastructure/service-error.js";
 import { withSpinner } from "../prompt.js";
 
 export class ApiTransformPrompts {
@@ -31,9 +30,5 @@ export class ApiTransformPrompts {
 
   logTransformationError(error: string): void {
     log.error(error);
-  }
-
-  public networkError(serviceError: ServiceError): void {
-    log.error(serviceError.errorMessage);
   }
 }

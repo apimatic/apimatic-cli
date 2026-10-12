@@ -1,14 +1,15 @@
-import { DirectoryPath } from "../../types/file/directoryPath.js";
-import { ActionResult } from "../action-result.js";
-import { ApiTransformPrompts } from "../../prompts/api/transform.js";
-import { withDirPath } from "../../infrastructure/tmp-extensions.js";
-import { TransformationService } from "../../infrastructure/services/transformation-service.js";
-import { ExportFormats } from "@apimatic/sdk";
-import { ApiValidatePrompts } from "../../prompts/api/validate.js";
-import { CommandMetadata } from "../../types/common/command-metadata.js";
-import { TransformContext } from "../../types/transform-context.js";
-import { ResourceInput } from "../../types/file/resource-input.js";
-import { ResourceContext } from "../../types/resource-context.js";
+import { DirectoryPath } from '../../types/file/directoryPath.js';
+import { ActionResult } from '../action-result.js';
+import { ApiTransformPrompts } from '../../prompts/api/transform.js';
+import { withDirPath } from '../../infrastructure/tmp-extensions.js';
+import { TransformationService } from '../../infrastructure/services/transformation-service.js';
+import { ExportFormats } from '@apimatic/sdk';
+import { ApiValidatePrompts } from '../../prompts/api/validate.js';
+import { CommandMetadata } from '../../types/common/command-metadata.js';
+import { TransformContext } from '../../types/transform-context.js';
+import { FilePath } from '../../types/file/filePath.js';
+import { UrlPath } from '../../types/file/urlPath.js';
+import { ResourceContext } from '../../types/resource-context.js';
 
 export class TransformAction {
   private readonly prompts: ApiTransformPrompts = new ApiTransformPrompts();
@@ -25,19 +26,18 @@ export class TransformAction {
   }
 
   public readonly execute = async (
-    resourcePath: ResourceInput,
+    resourcePath: FilePath | UrlPath,
     format: ExportFormats,
     destination: DirectoryPath,
     force: boolean
   ): Promise<ActionResult> => {
     return await withDirPath(async (tempDirectory) => {
-      const resourceContext = new ResourceContext(tempDirectory);
-      const specFileDirResult = await resourceContext.resolveTo(resourcePath);
-      if (specFileDirResult.isErr()) {
-        this.prompts.networkError(specFileDirResult.error);
+      const spec = await ResourceContext.resolveTo(resourcePath, tempDirectory);
+      if (spec.isErr()) {
+        this.validatePrompts.specUnavailable(spec.error);
         return ActionResult.failed();
       }
-      const transformContext = new TransformContext(specFileDirResult.value, format, destination);
+      const transformContext = new TransformContext(spec.value.file(), format, destination);
       if (!force && (await transformContext.exists()) && !(await this.prompts.overwriteApi(destination))) {
         this.prompts.transformedApiAlreadyExists();
         return ActionResult.cancelled();
@@ -45,7 +45,7 @@ export class TransformAction {
 
       const result = await this.prompts.transformApi(
         this.transformationService.transformViaFile({
-          file: specFileDirResult.value,
+          file: spec.value.file(),
           format: format,
           configDir: this.configDir,
           commandMetadata: this.commandMetadata,

@@ -103,6 +103,12 @@ describe('apimatic.schema.json', () => {
         }
       ],
       ['an address with a port', { site: { url: 'https://docs.example.com:8443' } }],
+      ['an address with a path', { site: { url: 'https://x.test/docs' } }],
+      ['an address with a path and a trailing slash', { site: { url: 'https://x.test/docs/ ' } }],
+      ['an address with a deeper path in any case', { site: { url: 'HTTPS://x.test/Docs/v2.1/api_ref~x-y' } }],
+      ['an address with a path of dots alone', { site: { url: 'https://x.test/...' } }],
+      ['an address whose path ends in a version', { site: { url: 'https://x.test/docs/v1.0' } }],
+      ['an address whose path only starts like a page', { site: { url: 'https://x.test/docs.htmlx' } }],
       ['one logo for both modes', { brand: { logo: 'static/images/logo.png' } }],
       ['a logo path with its dots inside a name', { brand: { logo: 'static/..hidden/logo.png' } }],
       ['a three-digit hex primary', { brand: { colors: { primary: ' #FFF ' } } }],
@@ -122,11 +128,25 @@ describe('apimatic.schema.json', () => {
       ['a blank name', { site: { name: '   ' } }],
       ['a name that is not a string', { site: { name: 7 } }],
       ['an unknown site key', { site: { title: 'Calc' } }],
-      ['an address with a path', { site: { url: 'https://x.test/docs' } }],
       ['an address with a query', { site: { url: 'https://x.test/?a=1' } }],
+      ['an address with an empty query', { site: { url: 'https://x.test/docs?' } }],
       ['an address with a fragment', { site: { url: 'https://x.test/#top' } }],
+      ['an address with an empty fragment', { site: { url: 'https://x.test/docs#' } }],
+      ['an address with a backslash in its path', { site: { url: 'https://x.test/docs\\guides' } }],
+      ['an address with a backslash for its path', { site: { url: 'https://x.test\\docs' } }],
+      ['an address with a dot segment', { site: { url: 'https://x.test/docs/.' } }],
+      ['an address with a parent segment', { site: { url: 'https://x.test/docs/..' } }],
+      ['an address with a dot segment before trailing space', { site: { url: 'https://x.test/docs/. ' } }],
+      ['an address with an empty segment', { site: { url: 'https://x.test/docs//x' } }],
+      ['an address whose path starts with two slashes', { site: { url: 'https://x.test//docs' } }],
+      ['an address with an encoded path', { site: { url: 'https://x.test/my%20docs' } }],
+      ['an address with a space in its path', { site: { url: 'https://x.test/my docs' } }],
       ['an address that is not http', { site: { url: 'ftp://x.test' } }],
       ['an address without a scheme', { site: { url: 'x.test' } }],
+      ['an address without a host before its path', { site: { url: 'https:///x.test/docs' } }],
+      ['an address with a tab in its host', { site: { url: 'https://x\t.test/docs' } }],
+      ['an address naming a page', { site: { url: 'https://x.test/docs/index.html' } }],
+      ['an address naming a page in capitals, with a trailing slash', { site: { url: 'https://x.test/INDEX.HTM/ ' } }],
       ['a description that is not a string', { site: { description: 5 } }],
       ['a logo outside static', { brand: { logo: 'images/logo.png' } }],
       ['the static directory itself', { brand: { logo: 'static/' } }],
@@ -318,8 +338,9 @@ describe('apimatic.schema.json', () => {
 
         expect(schemaVerdict({ languages: { [language]: { publishing: { ...release, packageConfiguration } } } }).valid)
           .to.be.true;
-        expect(schemaVerdict({ languages: { [language]: { publishing: { ...release, packageConfiguration: {} } } } })
-          .valid).to.be.false;
+        expect(
+          schemaVerdict({ languages: { [language]: { publishing: { ...release, packageConfiguration: {} } } } }).valid
+        ).to.be.false;
       });
     }
 
@@ -328,7 +349,10 @@ describe('apimatic.schema.json', () => {
     const unknownKey: [string, object][] = [
       ['an entry', { csharp: { notes: 'x' } }],
       ['a publishing record', { csharp: { publishing: { future: 1 } } }],
-      ['a source', { csharp: { publishing: { source: { repositoryUrl: 'https://github.com/acme/calc', tag: 'v1' } } } }],
+      [
+        'a source',
+        { csharp: { publishing: { source: { repositoryUrl: 'https://github.com/acme/calc', tag: 'v1' } } } }
+      ],
       ['a release', { csharp: { publishing: { package: { version: '1.0.0', name: 'Acme.Calc' } } } }],
       [
         'package settings',

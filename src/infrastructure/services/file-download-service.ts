@@ -1,8 +1,8 @@
-import axios from "axios";
-import { UrlPath } from "../../types/file/urlPath.js";
-import { err, ok, Result } from "neverthrow";
-import { handleServiceError, ServiceError } from "../service-error.js";
-import { FileName } from "../../types/file/fileName.js";
+import axios from 'axios';
+import { UrlPath } from '../../types/file/urlPath.js';
+import { err, ok, Result } from 'neverthrow';
+import { handleServiceError, ServiceError } from '../service-error.js';
+import { FileName } from '../../types/file/fileName.js';
 
 export type FileDownloadResponse = {
   stream: NodeJS.ReadableStream;
@@ -13,10 +13,10 @@ export class FileDownloadService {
   public async downloadFile(url: UrlPath): Promise<Result<FileDownloadResponse, ServiceError>> {
     try {
       const response = await axios.get(url.toString(), {
-        responseType: "stream"
+        responseType: 'stream'
       });
 
-      const contentDisposition = response.headers["content-disposition"];
+      const contentDisposition = response.headers['content-disposition'];
       let filename: FileName | undefined;
 
       // Try to parse filename from Content-Disposition (supports filename* as per RFC 5987 and plain filename)
@@ -34,13 +34,13 @@ export class FileDownloadService {
         if (fromUrl) {
           filename = new FileName(fromUrl);
         } else {
-          filename = new FileName("file");
+          filename = new FileName('file');
         }
       }
 
       // Basic guard — responseType: "stream" should always yield a stream
       const data = response.data as unknown;
-      const isReadableStream = data && typeof (data as NodeJS.ReadableStream).pipe === "function";
+      const isReadableStream = data && typeof (data as NodeJS.ReadableStream).pipe === 'function';
 
       if (!isReadableStream) {
         return err(ServiceError.InvalidResponse);
@@ -80,7 +80,7 @@ export class FileDownloadService {
   private getFilenameFromUrl(rawUrl: string): string | null {
     try {
       const u = new URL(rawUrl);
-      const last = u.pathname.split("/").filter(Boolean).pop();
+      const last = u.pathname.split('/').filter(Boolean).pop();
       if (!last) return null;
 
       // Remove any spurious trailing spaces and decode
@@ -88,7 +88,7 @@ export class FileDownloadService {
       return this.sanitizeFilename(decoded);
     } catch {
       // Fallback for non-URL-safe strings
-      const parts = rawUrl.split("/").filter(Boolean);
+      const parts = rawUrl.split('/').filter(Boolean);
       const last = parts.pop();
       if (!last) return null;
       return this.sanitizeFilename(this.safeDecodeURIComponent(last));
@@ -106,11 +106,11 @@ export class FileDownloadService {
   private sanitizeFilename(name: string): string {
     // Replace characters not allowed in common filesystems and trim dots/spaces
     const sanitized = name
-      .replace('/[<>:"/\\|?*\x00-\x1F]/g', "_")
-      .replace(/\s+/g, " ")
+      .replace(/[<>:"/\\|?*\p{Cc}]/gu, '_')
+      .replace(/\s+/g, ' ')
       .trim();
     // Avoid names that are empty or only dots/spaces
-    const safe = sanitized.replace(/^[. ]+|[. ]+$/g, ""); // NOSONAR - safe regex for CLI use
-    return safe.length > 0 ? safe : "file";
+    const safe = sanitized.replace(/^[. ]+|[. ]+$/g, ''); // NOSONAR - safe regex for CLI use
+    return safe.length > 0 ? safe : 'file';
   }
 }

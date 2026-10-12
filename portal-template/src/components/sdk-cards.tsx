@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import Link from 'fumadocs-core/link';
 import { asMarkdown } from 'fumadocs-core/server';
 import { ArrowDownToLine, ArrowRight, ExternalLink as ExternalLinkIcon } from 'lucide-react';
+import { withBasePath } from '@/lib/base-path';
 import { CommandBlock } from './command-block';
 import { LanguageLogo, LogoTile } from './logos';
 import { DownloadLink, ExternalLink, LINK, QUIET_LINK, SdkActions, type SdkActionsProps } from './sdk-actions';
@@ -40,7 +41,7 @@ function LinkContext({ name }: Readonly<{ name: string }>) {
 export function SdkCard({ language, name, page, install, ...actions }: Readonly<SdkCardProps>) {
   if (asMarkdown()) {
     const command = install ? `\`${install}\` · ` : '';
-    return [`- [${name}](${page}): ${command}`, <SdkActions key="actions" {...actions} />];
+    return [`- [${name}](${withBasePath(page)}): ${command}`, <SdkActions key="actions" {...actions} />];
   }
   const { download, source, packageUrl, registry } = actions;
   return (

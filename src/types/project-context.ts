@@ -24,6 +24,12 @@ export type GitignoreFailure = 'unreadable' | 'unwritable';
 
 export type VersionProblem = 'noVersions' | 'versionNotFound';
 
+export type SpecZipProblem =
+  | { kind: 'noSpec'; specDirectory: DirectoryPath }
+  | { kind: 'unreadable'; specDirectory: DirectoryPath; reason: string }
+  | { kind: 'symlinks'; specDirectory: DirectoryPath; symlinks: FilePath[] }
+  | { kind: 'zipFailed'; specDirectory: DirectoryPath; reason: string };
+
 export class ProjectContext {
   private readonly fileService = new FileService();
 
@@ -47,6 +53,10 @@ export class ProjectContext {
 
   private get gitignore(): FilePath {
     return new FilePath(this.projectDirectory, new FileName(GITIGNORE));
+  }
+
+  private get specDirectory(): DirectoryPath {
+    return this.source.join(SPEC_DIRECTORY_NAME);
   }
 
   public sourceDirectory(): DirectoryPath {
@@ -83,7 +93,24 @@ export class ProjectContext {
   }
 
   public async specsExist(): Promise<boolean> {
-    return await new SpecContext(this.source.join(SPEC_DIRECTORY_NAME)).validate();
+    return await new SpecContext(this.specDirectory).validate();
+  }
+
+  public async specZip(tempDirectory: DirectoryPath): Promise<Result<FilePath, SpecZipProblem>> {
+    if (!(await this.specsExist())) {
+      return err({ kind: 'noSpec', specDirectory: this.specDirectory });
+    }
+    const symlinks = await this.fileService.findSymlinks(this.specDirectory);
+    if (symlinks.isErr()) {
+      return err({ kind: 'unreadable', specDirectory: this.specDirectory, reason: symlinks.error });
+    }
+    if (symlinks.value.length > 0) {
+      return err({ kind: 'symlinks', specDirectory: this.specDirectory, symlinks: symlinks.value });
+    }
+    const zipped = await new TempContext(tempDirectory).zip(this.specDirectory);
+    return zipped.mapErr(
+      ({ reason }): SpecZipProblem => ({ kind: 'zipFailed', specDirectory: this.specDirectory, reason })
+    );
   }
 
   public async srcDirZip(

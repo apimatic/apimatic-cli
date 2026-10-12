@@ -5,6 +5,7 @@ import { source } from '@/lib/source.server';
 import appCss from '@/styles/app.css?url';
 import { RootProvider } from 'fumadocs-ui/provider/tanstack';
 import SearchDialog from '@/components/search';
+import { withBasePath } from '@/lib/base-path';
 import { portal } from '@/lib/portal';
 
 // The sidebar tree is the same on every page. Loaded here, once, it is written to a single
@@ -15,7 +16,13 @@ const loadPageTree = createServerFn({ method: 'GET' })
 
 // Without one the browser tab shows the blank-document icon on every page.
 const iconLinks = portal.favicon
-  ? [{ rel: 'icon', href: portal.favicon.url, ...(portal.favicon.type ? { type: portal.favicon.type } : {}) }]
+  ? [
+      {
+        rel: 'icon',
+        href: withBasePath(portal.favicon.url),
+        ...(portal.favicon.type ? { type: portal.favicon.type } : {})
+      }
+    ]
   : [];
 
 // A portal fixed to one mode keeps to it whatever the visitor's system prefers, and offers no

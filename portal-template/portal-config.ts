@@ -3,6 +3,8 @@ import type { Portal } from './src/lib/portal-types';
 
 /** Written by the CLI next to this file before every build or dev-server start. */
 export interface BuildPaths {
+  /** Vite's `base`, the path of the site address that every page and asset is served under: `/`, or `/docs/`. */
+  base: string;
   /** Section slug -> absolute path of an OpenAPI document. */
   specs: Record<string, string>;
   /** Absolute path of the code samples, keyed by path then method; null when there are none. */

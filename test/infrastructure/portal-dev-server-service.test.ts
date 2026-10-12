@@ -58,6 +58,16 @@ describe('PortalDevServerService', () => {
     await server.stop();
   });
 
+  // Vite answers the path without its slash with a 404, which would end the first page's wait early.
+  it('keeps the trailing slash of an address under a path', async () => {
+    const binary = script(serving(`response.end('page');`, `  Local:   http://127.0.0.1:${port}/docs/guides/`));
+
+    const server = (await start(binary))._unsafeUnwrap();
+    await server.stop();
+
+    expect(server.url.toString()).to.equal(`http://127.0.0.1:${port}/docs/guides/`);
+  });
+
   it('reports the server started only once it has answered its first page', async () => {
     const binary = script(serving(`require('fs').writeFileSync('answered', ''); response.end('page');`));
 
