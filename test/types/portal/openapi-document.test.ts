@@ -24,23 +24,25 @@ describe('OpenApiDocument', () => {
 
     // Matched loosely: the words are the parser's own, and change with its version.
     it('fails with what the parser said, on one line, saying where it stopped', () => {
-      const yaml = refused('openapi: 3.0.0\ninfo:\n  title: [unclosed\n');
-      const json = refused('{\n  "a": 1\n  "b": 2\n}');
-      const quoting = refused('[1,\n2,\n,3]');
+      const said = (contents: string) => {
+        const failure = refused(contents);
+        return failure.kind === 'invalid' ? failure.message : `not invalid but ${failure.kind}`;
+      };
+      const yaml = said('openapi: 3.0.0\ninfo:\n  title: [unclosed\n');
+      const json = said('{\n  "a": 1\n  "b": 2\n}');
+      const quoting = said('[1,\n2,\n,3]');
 
       expect(yaml).to.match(/at line 4, column 1$/);
       expect(json).to.contain('line 3 column 3');
-      [yaml, json, quoting].forEach((reason) => expect(reason).to.not.contain('\n'));
+      [yaml, json, quoting].forEach((message) => expect(message).to.not.contain('\n'));
     });
 
     // The portal's bundler reads these as nothing, so a reference to one would be empty.
-    it('fails on text the bundler reads as nothing, saying why', () => {
-      expect(refused(' \n')).to.equal('it is empty');
-      expect(refused('# only a comment: here\n')).to.equal('it holds no value');
-      expect(refused('{ type: object }')).to.contain('JSON');
-      expect(refused('- active\n- inactive\n')).to.equal(
-        'it is not JSON, and the portal reads YAML only when it holds a key'
-      );
+    it('fails on text the bundler reads as nothing, saying which kind it is', () => {
+      expect(refused(' \n')).to.deep.equal({ kind: 'empty' });
+      expect(refused('# only a comment: here\n')).to.deep.equal({ kind: 'noValue' });
+      expect(refused('{ type: object }').kind).to.equal('invalid');
+      expect(refused('- active\n- inactive\n')).to.deep.equal({ kind: 'noKey' });
     });
 
     it('treats a document that is not an object as no specification', () => {

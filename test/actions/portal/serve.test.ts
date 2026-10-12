@@ -17,7 +17,7 @@ import { FileName } from '../../../src/types/file/fileName';
 import { FilePath } from '../../../src/types/file/filePath';
 import { UrlPath } from '../../../src/types/file/urlPath';
 import { CommandMetadata } from '../../../src/types/common/command-metadata';
-import { PortalSource } from '../../../src/types/portal/portal-source';
+import { PortalSource, WatchedSource } from '../../../src/types/portal/portal-source';
 import { Language } from '../../../src/types/sdk/generate';
 import { PortalSourceContext } from '../../../src/types/portal-source-context';
 import { ProjectContext } from '../../../src/types/project-context';
@@ -65,6 +65,16 @@ describe('PortalServeAction', () => {
         }
       );
     });
+
+  /** The reason `report` gave each time it was called for `watched`. */
+  const reasonsFor = (report: sinon.SinonStub, watched: WatchedSource) =>
+    report.getCalls().flatMap(({ args: [about, reason] }) => (about === watched ? [reason] : []));
+
+  /** How many of the saves `shown` was called for it said fix one refused. */
+  const fixesSaid = (shown: sinon.SinonStub) => shown.getCalls().filter(({ args: [{ fixed }] }) => fixed).length;
+
+  /** How many saves of `apimatic.json` it said were applied. */
+  const appliedSaid = () => prompts.configShown.getCalls().filter(({ args: [applied] }) => applied).length;
 
   beforeEach(() => {
     root = fs.mkdtempSync(path.join(os.tmpdir(), 'portal-serve-'));
@@ -270,14 +280,14 @@ describe('PortalServeAction', () => {
     it('says once that the content is fixed, and nothing for a save a build accepts', async () => {
       await whileServing(async (save) => {
         await save(JSON.stringify({ pages: ['intro'] }));
-        expect(prompts.contentRejected.called || prompts.contentAccepted.called).to.be.false;
+        expect(prompts.contentRejected.called || fixesSaid(prompts.contentShown) > 0).to.be.false;
 
         await save('{');
         await save(JSON.stringify({ pages: ['intro'] }));
         await save(JSON.stringify({ pages: ['intro', '...'] }));
 
         expect(prompts.contentRejected.calledOnce).to.be.true;
-        expect(prompts.contentAccepted.calledOnce).to.be.true;
+        expect(fixesSaid(prompts.contentShown)).to.equal(1);
       });
     });
 
@@ -305,8 +315,8 @@ describe('PortalServeAction', () => {
       await whileServing(async (save) => {
         await save(JSON.stringify({ title: 'Overview', pages: ['intro'] }));
 
-        expect(prompts.contentNotApplied.calledOnceWith('EACCES: permission denied')).to.be.true;
-        expect(prompts.contentNotices.called).to.be.false;
+        expect(reasonsFor(prompts.notApplied, 'content')).to.deep.equal(['EACCES: permission denied']);
+        expect(prompts.contentShown.called).to.be.false;
       });
     });
 
@@ -316,9 +326,9 @@ describe('PortalServeAction', () => {
         await save(JSON.stringify({ title: 'Overview', pages: ['intro'] }));
         await save(JSON.stringify({ title: 'Overview', pages: ['intro', '...'] }));
 
-        const names = prompts.contentNotices
+        const names = prompts.contentShown
           .getCalls()
-          .map(({ args: [notices] }) => notices.sharedTabNames.map(({ name }) => name));
+          .map(({ args: [{ notices }] }) => notices.sharedTabNames.map(({ name }) => name));
         expect(names).to.deep.equal([['Overview'], []]);
       });
     });
@@ -348,7 +358,7 @@ describe('PortalServeAction', () => {
         // What the watch does on a recheck: check the content as though it had just been saved.
         await (await watched).onChange();
 
-        const [notices] = prompts.contentNotices.lastCall.args;
+        const [{ notices }] = prompts.contentShown.lastCall.args;
         expect(notices.sharedTabNames.map(({ name }) => name)).to.deep.equal(['Context Plugin']);
 
         await saveConfig(config);
@@ -382,7 +392,7 @@ describe('PortalServeAction', () => {
 
       const result = await execute(new DirectoryPath(root));
 
-      expect(prompts.contentNotWatched.calledOnceWith('EMFILE: too many open files')).to.be.true;
+      expect(reasonsFor(prompts.notWatched, 'content')).to.deep.equal(['EMFILE: too many open files']);
       expect(result.isCancelled()).to.be.true;
     });
 
@@ -390,7 +400,7 @@ describe('PortalServeAction', () => {
       await whileServing(async () => {
         (await watched).onFailed('EPERM: operation not permitted');
 
-        expect(prompts.contentWatchFailed.calledOnceWith('EPERM: operation not permitted')).to.be.true;
+        expect(reasonsFor(prompts.watchFailed, 'content')).to.deep.equal(['EPERM: operation not permitted']);
       });
     });
 
@@ -400,7 +410,7 @@ describe('PortalServeAction', () => {
       await whileServing(async (save) => {
         await save(JSON.stringify({ pages: ['intro'] }));
 
-        expect(prompts.contentNotChecked.calledOnceWith('EIO: i/o error')).to.be.true;
+        expect(reasonsFor(prompts.notChecked, 'content')).to.deep.equal(['EIO: i/o error']);
       });
     });
 
@@ -483,7 +493,7 @@ describe('PortalServeAction', () => {
         await saved();
 
         const [problem] = prompts.specRejected.firstCall.args;
-        expect(problem.kind === 'missingSpecReference' && problem.file.relativeTo(source)).to.equal(
+        expect(problem.kind === 'missingSpecReference' && problem.missing.file.relativeTo(source)).to.equal(
           'spec/schemas/Pet.yaml'
         );
       });
@@ -492,7 +502,7 @@ describe('PortalServeAction', () => {
     it('says once that the specifications are fixed, and nothing for a save a build accepts', async () => {
       await whileServing(async (saved) => {
         await saved();
-        expect(prompts.specRejected.called || prompts.specAccepted.called).to.be.false;
+        expect(prompts.specRejected.called || fixesSaid(prompts.specsShown) > 0).to.be.false;
 
         halfWritten();
         await saved();
@@ -501,7 +511,7 @@ describe('PortalServeAction', () => {
         await saved();
 
         expect(prompts.specRejected.calledOnce).to.be.true;
-        expect(prompts.specAccepted.calledOnce).to.be.true;
+        expect(fixesSaid(prompts.specsShown)).to.equal(1);
       });
     });
 
@@ -514,15 +524,16 @@ describe('PortalServeAction', () => {
         await saved();
         await saved();
 
-        expect(prompts.specsNeedRestart.calledOnce).to.be.true;
-        const [change] = prompts.specsNeedRestart.firstCall.args;
+        const changes = () => prompts.specsShown.getCalls().flatMap(({ args: [{ change }] }) => change ?? []);
+        expect(changes()).to.have.length(1);
+        const [change] = changes();
         expect(change.added.map((file) => file.relativeTo(source))).to.deep.equal(['spec/orders.json']);
         expect(change.removed).to.be.empty;
 
         fs.rmSync(specFile('orders.json'));
         await saved();
 
-        expect(prompts.specsNeedRestart.calledOnce).to.be.true;
+        expect(changes()).to.have.length(1);
       });
     });
 
@@ -552,7 +563,7 @@ describe('PortalServeAction', () => {
 
       const result = await execute(new DirectoryPath(root));
 
-      expect(prompts.specNotWatched.calledOnceWith('EMFILE: too many open files')).to.be.true;
+      expect(reasonsFor(prompts.notWatched, 'spec')).to.deep.equal(['EMFILE: too many open files']);
       expect(result.isCancelled()).to.be.true;
     });
 
@@ -560,7 +571,7 @@ describe('PortalServeAction', () => {
       await whileServing(async () => {
         (await watched).onFailed('EPERM: operation not permitted');
 
-        expect(prompts.specWatchFailed.calledOnceWith('EPERM: operation not permitted')).to.be.true;
+        expect(reasonsFor(prompts.watchFailed, 'spec')).to.deep.equal(['EPERM: operation not permitted']);
       });
     });
 
@@ -570,7 +581,7 @@ describe('PortalServeAction', () => {
       await whileServing(async (saved) => {
         await saved();
 
-        expect(prompts.specNotChecked.calledOnceWith('EIO: i/o error')).to.be.true;
+        expect(reasonsFor(prompts.notChecked, 'spec')).to.deep.equal(['EIO: i/o error']);
       });
     });
   });
@@ -673,7 +684,7 @@ describe('PortalServeAction', () => {
         await (await watched).onChange();
 
         expect(readProject('src/styles/theme.css')).to.contain('--color-fd-primary: #1d4ed8;');
-        expect(prompts.configApplied.calledOnce).to.be.true;
+        expect(appliedSaid()).to.equal(1);
       });
     });
 
@@ -687,7 +698,7 @@ describe('PortalServeAction', () => {
 
         expect(readProject('src/styles/theme.css')).to.contain('--color-fd-primary: #1d4ed8;');
         expect(JSON.parse(readProject('portal.identity.json')).name).to.equal('Renamed API');
-        expect(prompts.configApplied.calledOnce).to.be.true;
+        expect(appliedSaid()).to.equal(1);
       });
     });
 
@@ -702,7 +713,7 @@ describe('PortalServeAction', () => {
         expect([readProject('portal.identity.json'), readProject('generated/sdks/typescript.mdx')]).to.deep.equal(
           before
         );
-        expect(prompts.configApplied.called).to.be.false;
+        expect(appliedSaid()).to.equal(0);
         expect(prompts.configRejected.called).to.be.false;
       });
     });
@@ -725,7 +736,7 @@ describe('PortalServeAction', () => {
           'packageUrl="https://www.npmjs.com/package/calc"'
         );
         expect(readProject('generated/sdks/index.mdx')).to.contain('install="npm install calc"');
-        expect(prompts.configApplied.calledOnce).to.be.true;
+        expect(appliedSaid()).to.equal(1);
       });
     });
 
@@ -750,11 +761,11 @@ describe('PortalServeAction', () => {
             })
           ).to.be.true;
           expect(projectHas('generated/sdks/python.mdx')).to.be.false;
-          expect(prompts.configApplied.called).to.be.false;
+          expect(appliedSaid()).to.equal(0);
 
           await save(originalConfig());
 
-          expect(prompts.configApplied.calledOnce).to.be.true;
+          expect(appliedSaid()).to.equal(1);
         });
       });
 
@@ -776,7 +787,7 @@ describe('PortalServeAction', () => {
 
           expect(readProject('generated/context-plugin/index.mdx')).to.contain('Context Plugin');
           expect(prompts.editNeedsRestart.called).to.be.false;
-          expect(prompts.configApplied.calledOnce).to.be.true;
+          expect(appliedSaid()).to.equal(1);
         });
       });
 
@@ -790,7 +801,7 @@ describe('PortalServeAction', () => {
           await save(originalConfig());
 
           expect(projectHas('generated/sdks/python.mdx')).to.be.false;
-          expect(prompts.configApplied.calledOnce).to.be.true;
+          expect(appliedSaid()).to.equal(1);
         });
       });
     });
@@ -823,11 +834,11 @@ describe('PortalServeAction', () => {
 
         await save(broken);
         expect(prompts.configRejected.firstCall.args[0].kind).to.equal('invalidConfig');
-        expect(prompts.configApplied.called).to.be.false;
+        expect(appliedSaid()).to.equal(0);
         expect([readProject('portal.identity.json'), readProject('src/styles/theme.css')]).to.deep.equal(before);
 
         await save(originalConfig());
-        expect(prompts.configApplied.calledOnce).to.be.true;
+        expect(appliedSaid()).to.equal(1);
       });
     });
 
@@ -873,7 +884,7 @@ describe('PortalServeAction', () => {
         await save(config);
 
         expect(prompts.staticDirectoryNotServed.called).to.be.false;
-        expect(prompts.configApplied.calledOnce).to.be.true;
+        expect(appliedSaid()).to.equal(1);
       });
     });
 
@@ -885,8 +896,8 @@ describe('PortalServeAction', () => {
 
         await save(config);
 
-        expect(prompts.configNotApplied.calledOnceWith('EACCES: permission denied')).to.be.true;
-        expect(prompts.configApplied.called).to.be.false;
+        expect(reasonsFor(prompts.notApplied, 'config')).to.deep.equal(['EACCES: permission denied']);
+        expect(appliedSaid()).to.equal(0);
       });
     });
 
@@ -900,10 +911,10 @@ describe('PortalServeAction', () => {
 
         await save(config);
 
-        expect(prompts.configNotApplied.calledOnceWith('EBUSY: resource busy or locked')).to.be.true;
+        expect(reasonsFor(prompts.notChecked, 'config')).to.deep.equal(['EBUSY: resource busy or locked']);
         resolveSettings.restore();
         await save(config);
-        expect(prompts.configApplied.calledOnce).to.be.true;
+        expect(appliedSaid()).to.equal(1);
       });
     });
 
@@ -911,7 +922,7 @@ describe('PortalServeAction', () => {
       await whileServing(async () => {
         (await watched).onFailed('EPERM: operation not permitted');
 
-        expect(prompts.configWatchFailed.calledOnceWith('EPERM: operation not permitted')).to.be.true;
+        expect(reasonsFor(prompts.watchFailed, 'config')).to.deep.equal(['EPERM: operation not permitted']);
       });
     });
 
@@ -921,7 +932,7 @@ describe('PortalServeAction', () => {
 
       const result = await execute(new DirectoryPath(root));
 
-      expect(prompts.configNotWatched.calledOnceWith('EMFILE: too many open files')).to.be.true;
+      expect(reasonsFor(prompts.notWatched, 'config')).to.deep.equal(['EMFILE: too many open files']);
       expect(result.isCancelled()).to.be.true;
     });
   });

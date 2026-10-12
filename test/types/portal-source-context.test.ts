@@ -386,11 +386,8 @@ describe('PortalSourceContext', () => {
       throw new Error(`expected a file the specifications are read from, got ${JSON.stringify(problem)}`);
     }
     const relative = (file: FilePath) => file.relativeTo(new DirectoryPath(root));
-    return [
-      problem.kind,
-      relative(problem.file),
-      problem.referencedBy === null ? null : relative(problem.referencedBy)
-    ];
+    const file = problem.kind === 'missingSpecReference' ? problem.missing.file : problem.file;
+    return [problem.kind, relative(file), problem.referencedBy === null ? null : relative(problem.referencedBy)];
   };
 
   describe('resolveSpecs', () => {
@@ -504,7 +501,9 @@ describe('PortalSourceContext', () => {
       const problem = (await resolve())._unsafeUnwrapErr();
 
       expect(specProblem(problem)).to.deep.equal(['unreadableSpec', 'spec/broken.json', null]);
-      expect(problem.kind === 'unreadableSpec' && problem.reason).to.contain('JSON');
+      expect(
+        problem.kind === 'unreadableSpec' && problem.reason.kind === 'invalid' && problem.reason.message
+      ).to.contain('JSON');
     });
 
     // As the portal's bundler reads it: by what it holds.
@@ -535,6 +534,23 @@ describe('PortalSourceContext', () => {
         const problem = (await new PortalSourceContext(new DirectoryPath(root)).resolveSpecs())._unsafeUnwrapErr();
 
         expect(specProblem(problem)).to.deep.equal(['unreadableSpec', 'spec/api.json', null]);
+        expect(problem.kind === 'unreadableSpec' && problem.reason).to.deep.equal({ kind: 'gone' });
+      } finally {
+        sinon.restore();
+      }
+    });
+
+    it('reports a document it cannot open with what the file system said', async () => {
+      write('spec/api.json', OPENAPI);
+      sinon.stub(FileService.prototype, 'getContents').rejects(new Error('EACCES: permission denied'));
+
+      try {
+        const problem = (await new PortalSourceContext(new DirectoryPath(root)).resolveSpecs())._unsafeUnwrapErr();
+
+        expect(problem.kind === 'unreadableSpec' && problem.reason).to.deep.equal({
+          kind: 'unopened',
+          message: 'EACCES: permission denied'
+        });
       } finally {
         sinon.restore();
       }
@@ -624,6 +640,26 @@ describe('PortalSourceContext', () => {
       ]);
     });
 
+    // As a file system that matches case, which the build may run on, would miss it.
+    it('names the file a missing reference is spelt as on disk, in another case', async () => {
+      writeSpec({ Pet: { $ref: './schemas/pet.yaml' } });
+      write('spec/schemas/Pet.yaml', 'type: object\n');
+      const named = sinon.match((file: FilePath) => file.toString() === path.join(root, 'spec', 'schemas', 'pet.yaml'));
+      sinon
+        .stub(FileService.prototype, 'getContents')
+        .callThrough()
+        .withArgs(named)
+        .rejects(new Error('ENOENT: no such file or directory'));
+      sinon.stub(FileService.prototype, 'fileExists').callThrough().withArgs(named).resolves(false);
+
+      const problem = (await resolve())._unsafeUnwrapErr();
+
+      expect(specProblem(problem)).to.deep.equal(['missingSpecReference', 'spec/schemas/pet.yaml', 'spec/api.json']);
+      expect(
+        problem.kind === 'missingSpecReference' && problem.missing.foundAs?.relativeTo(new DirectoryPath(root))
+      ).to.equal('spec/schemas/Pet.yaml');
+    });
+
     it('refuses a file referred to in turn that does not parse, naming the file that refers to it', async () => {
       writeSpec({ Pet: { $ref: './schemas/Pet.yaml' } });
       write('spec/schemas/Pet.yaml', 'type: object\nproperties:\n  owner:\n    $ref: ./Owner.yaml\n');
@@ -636,7 +672,9 @@ describe('PortalSourceContext', () => {
         'spec/schemas/Owner.yaml',
         'spec/schemas/Pet.yaml'
       ]);
-      expect(problem.kind === 'unreadableSpec' && problem.reason).to.match(/line \d+, column \d+$/);
+      expect(problem.kind === 'unreadableSpec' && problem.reason.kind === 'invalid' && problem.reason.message).to.match(
+        /line \d+, column \d+$/
+      );
     });
 
     it('follows a reference out of the spec directory, as the build does', async () => {
@@ -695,6 +733,11 @@ describe('PortalSourceContext', () => {
         ['a file of half-written JSON', () => writeReferenced('Pet.json', '{ "type": "obj'), 'empty'],
         ['a JSON file holding YAML', () => writeReferenced('Pet.json', 'type: object\n'), 'builds'],
         ['a YAML file that opens as JSON does', () => writeReferenced('Pet.yaml', '{ type: object }\n'), 'empty'],
+        [
+          'a YAML file that opens as JSON does only past its first 50 characters',
+          () => writeReferenced('Pet.yaml', `${' '.repeat(50)}{ type: object }\n`),
+          'builds'
+        ],
         ['a file left empty', () => writeReferenced('Pet.yaml', ''), 'empty'],
         ['a file holding only a comment', () => writeReferenced('Pet.yaml', '# type: object\n'), 'empty'],
         [

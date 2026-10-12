@@ -8,6 +8,12 @@ export interface SpecsChange {
   removed: FilePath[];
 }
 
+/** What to say of a save the preview accepts: whether it fixes a refused one, and a change not yet warned of. */
+export interface SpecsShown {
+  fixed: boolean;
+  change: SpecsChange | null;
+}
+
 /** The preview serves only the documents it started with, so a change to which are in `spec/` is said once. */
 export class PreviewSpecs {
   private readonly served: FilePath[];
@@ -24,8 +30,8 @@ export class PreviewSpecs {
     this.refusal.refuse();
   }
 
-  /** Records the documents as shown: whether `spec/` is fixed, having been refused, and a change not yet warned of. */
-  public show(specs: PortalSpec[]): { fixed: boolean; change: SpecsChange | null } {
+  /** Records the documents as shown, and answers what to say of them. */
+  public show(specs: PortalSpec[]): SpecsShown {
     const files = specs.map(({ file }) => file);
     const unchanged = isSameSet(files, this.shown) || isSameSet(files, this.served);
     this.shown = files;

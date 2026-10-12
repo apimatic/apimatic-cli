@@ -9,7 +9,7 @@ import { ProjectContext } from '../../types/project-context.js';
 import { isSkippedByGlob } from '../../types/portal/content-tree.js';
 import { GeneratedPages } from '../../types/portal/generated-pages.js';
 import { PortalArtifacts } from '../../types/portal/portal-artifacts.js';
-import { PortalSettings, PortalSource } from '../../types/portal/portal-source.js';
+import { PortalSettings, PortalSource, WatchedSource } from '../../types/portal/portal-source.js';
 import { PreviewConfig } from '../../types/portal/preview-config.js';
 import { PreviewContent } from '../../types/portal/preview-content.js';
 import { PreviewSpecs } from '../../types/portal/preview-specs.js';
@@ -150,25 +150,15 @@ export class PortalServeAction {
 
       const applied = await this.projectService.applyConfig(portalProjectDirectory, settings);
       if (applied.isErr()) {
-        this.prompts.configNotApplied(applied.error);
+        this.prompts.notApplied('config', applied.error, sourceDirectory);
         return;
       }
-      if (preview.show(config, applied.value)) {
-        this.prompts.configApplied();
-      }
+      this.prompts.configShown(preview.show(config, applied.value));
       onApplied(settings);
     };
 
-    return this.startWatch(
-      (onChange) =>
-        this.fileWatchService.watch(sourceDirectory, new FileName(APIMATIC_CONFIG_FILE_NAME), onChange, (reason) =>
-          this.prompts.configWatchFailed(reason)
-        ),
-      applyEdit,
-      {
-        notWatched: (reason) => this.prompts.configNotWatched(reason),
-        thrown: (reason) => this.prompts.configNotApplied(reason)
-      }
+    return this.startWatch('config', sourceDirectory, applyEdit, (onChange, onFailed) =>
+      this.fileWatchService.watch(sourceDirectory, new FileName(APIMATIC_CONFIG_FILE_NAME), onChange, onFailed)
     );
   }
 
@@ -200,30 +190,15 @@ export class PortalServeAction {
         checked.value.files
       );
       if (applied.isErr()) {
-        this.prompts.contentNotApplied(applied.error, sourceDirectory);
+        this.prompts.notApplied('content', applied.error, sourceDirectory);
         return;
       }
-      const shown = preview.show(checked.value.notices);
-      if (shown.fixed) {
-        this.prompts.contentAccepted(sourceDirectory);
-      }
-      this.prompts.contentNotices(shown.notices, sourceDirectory);
+      this.prompts.contentShown(preview.show(checked.value.notices), sourceDirectory);
     };
 
-    return this.startWatch(
-      (onChange) =>
-        this.fileWatchService.watchTree(
-          contentDirectory,
-          onChange,
-          (reason) => this.prompts.contentWatchFailed(reason, sourceDirectory),
-          // What the build never reads, as an editor's swap file, would only have the check run again.
-          isSkippedByGlob
-        ),
-      check,
-      {
-        notWatched: (reason) => this.prompts.contentNotWatched(reason, sourceDirectory),
-        thrown: (reason) => this.prompts.contentNotChecked(reason, sourceDirectory)
-      }
+    // What the build never reads, as an editor's swap file, would only have the check run again.
+    return this.startWatch('content', sourceDirectory, check, (onChange, onFailed) =>
+      this.fileWatchService.watchTree(contentDirectory, onChange, onFailed, isSkippedByGlob)
     );
   }
 
@@ -240,28 +215,12 @@ export class PortalServeAction {
         this.prompts.specRejected(checked.error, sourceDirectory);
         return;
       }
-      const shown = preview.show(checked.value);
-      if (shown.fixed) {
-        this.prompts.specAccepted(sourceDirectory);
-      }
-      if (shown.change !== null) {
-        this.prompts.specsNeedRestart(shown.change, sourceDirectory);
-      }
+      this.prompts.specsShown(preview.show(checked.value), sourceDirectory);
     };
 
-    return this.startWatch(
-      (onChange) =>
-        this.fileWatchService.watchTree(
-          source.specDirectory,
-          onChange,
-          (reason) => this.prompts.specWatchFailed(reason, sourceDirectory),
-          isSkippedByGlob
-        ),
-      check,
-      {
-        notWatched: (reason) => this.prompts.specNotWatched(reason, sourceDirectory),
-        thrown: (reason) => this.prompts.specNotChecked(reason, sourceDirectory)
-      }
+    // As for content: an editor's swap file, saved while a document is refused, would only repeat the refusal.
+    return this.startWatch('spec', sourceDirectory, check, (onChange, onFailed) =>
+      this.fileWatchService.watchTree(source.specDirectory, onChange, onFailed, isSkippedByGlob)
     );
   }
 
@@ -270,21 +229,22 @@ export class PortalServeAction {
    * before the preview started, which can take a minute, and a save made meanwhile reached no watch.
    */
   private startWatch(
-    watch: (onChange: () => Promise<void>) => Result<FileWatch, string>,
+    watched: WatchedSource,
+    sourceDirectory: DirectoryPath,
     handle: () => Promise<void>,
-    report: { notWatched: (reason: string) => void; thrown: (reason: string) => void }
+    watch: (onChange: () => Promise<void>, onFailed: (reason: string) => void) => Result<FileWatch, string>
   ): FileWatch | undefined {
     // The watch drops whatever its handler throws, which would leave the preview stale without a word.
     const onChange = async () => {
       try {
         await handle();
       } catch (error) {
-        report.thrown(errorMessage(error));
+        this.prompts.notChecked(watched, errorMessage(error), sourceDirectory);
       }
     };
-    const started = watch(onChange);
+    const started = watch(onChange, (reason) => this.prompts.watchFailed(watched, reason, sourceDirectory));
     if (started.isErr()) {
-      report.notWatched(started.error);
+      this.prompts.notWatched(watched, started.error, sourceDirectory);
       return undefined;
     }
     started.value.recheck();

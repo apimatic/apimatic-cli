@@ -4,6 +4,12 @@ import { isSameTabEntry } from './portal-navigation.js';
 import { SharedTabName, TabOwner } from './portal-tabs.js';
 import { PreviewRefusal } from './preview-refusal.js';
 
+/** What to say of a save the preview accepts: whether it fixes a refused one, and the notices it brings. */
+export interface ContentShown {
+  fixed: boolean;
+  notices: ContentNotices;
+}
+
 /** A notice is given once, on the save that brings it about, rather than on every save after it. */
 export class PreviewContent {
   private shown: ContentNotices;
@@ -18,11 +24,8 @@ export class PreviewContent {
     this.refusal.refuse();
   }
 
-  /**
-   * Records the content as shown, and answers whether to say it is fixed, having been refused,
-   * and which notices to give: each kind in full when it holds something new, and none otherwise.
-   */
-  public show(notices: ContentNotices): { fixed: boolean; notices: ContentNotices } {
+  /** Records the content as shown, and answers what to say: each kind of notice in full when any of it is new. */
+  public show(notices: ContentNotices): ContentShown {
     const shown = { fixed: this.refusal.accept(), notices: PreviewContent.since(notices, this.shown) };
     this.shown = notices;
     return shown;

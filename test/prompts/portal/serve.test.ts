@@ -7,6 +7,7 @@ import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
 import { FileName } from '../../../src/types/file/fileName.js';
 import { FilePath } from '../../../src/types/file/filePath.js';
 import { UrlPath } from '../../../src/types/file/urlPath.js';
+import { ContentNotices } from '../../../src/types/portal/content-notices.js';
 import { PortalSourceProblem } from '../../../src/types/portal/portal-source.js';
 import { Language } from '../../../src/types/sdk/generate.js';
 
@@ -85,32 +86,32 @@ describe('PortalServePrompts', () => {
     const cases: [string, (prompts: PortalServePrompts) => void, RegExp][] = [
       [
         'apimatic.json, at the start',
-        (prompts) => prompts.configNotWatched('EMFILE'),
+        (prompts) => prompts.notWatched('config', 'EMFILE', source),
         /^'apimatic\.json' cannot be watched \(EMFILE\), so edits to it need the preview restarted\.$/
       ],
       [
         'apimatic.json, while serving',
-        (prompts) => prompts.configWatchFailed('EPERM'),
-        /^'apimatic\.json' is no longer watched \(EPERM\), so further edits to it need the preview restarted\.$/
+        (prompts) => prompts.watchFailed('config', 'EPERM', source),
+        /^'apimatic\.json' is no longer watched \(EPERM\), so edits to it need the preview restarted\.$/
       ],
       [
         'the content, at the start',
-        (prompts) => prompts.contentNotWatched('EMFILE', source),
+        (prompts) => prompts.notWatched('content', 'EMFILE', source),
         /^'.*content' cannot be watched \(EMFILE\), so a mistake in a page or a 'nav\.json' is only reported when the preview is restarted\.$/
       ],
       [
         'the content, while serving',
-        (prompts) => prompts.contentWatchFailed('EPERM', source),
+        (prompts) => prompts.watchFailed('content', 'EPERM', source),
         /^'.*content' is no longer watched \(EPERM\), so a mistake in a page or a 'nav\.json' is only reported when the preview is restarted\.$/
       ],
       [
         'the specifications, at the start',
-        (prompts) => prompts.specNotWatched('EMFILE', source),
+        (prompts) => prompts.notWatched('spec', 'EMFILE', source),
         /^'.*spec' cannot be watched \(EMFILE\), so a mistake in a specification is only reported when the preview is restarted\.$/
       ],
       [
         'the specifications, while serving',
-        (prompts) => prompts.specWatchFailed('EPERM', source),
+        (prompts) => prompts.watchFailed('spec', 'EPERM', source),
         /^'.*spec' is no longer watched \(EPERM\), so a mistake in a specification is only reported when the preview is restarted\.$/
       ]
     ];
@@ -122,6 +123,22 @@ describe('PortalServePrompts', () => {
     });
   });
 
+  describe('a change it accepted that could not be applied to the preview', () => {
+    const source = new DirectoryPath('src');
+
+    it('names apimatic.json, and why', () => {
+      expect(lastLine('warn', (prompts) => prompts.notApplied('config', 'EACCES', source))).to.equal(
+        "The changes to 'apimatic.json' could not be applied to the preview: EACCES"
+      );
+    });
+
+    it('names the content directory, and why', () => {
+      expect(lastLine('warn', (prompts) => prompts.notApplied('content', 'EBUSY', source))).to.match(
+        /^The changes to '.*content' could not be applied to the preview: EBUSY$/
+      );
+    });
+  });
+
   describe('a change to which documents are in the spec directory', () => {
     const document = (name: string) => new FilePath(new DirectoryPath('src', 'spec'), new FileName(name));
 
@@ -130,8 +147,8 @@ describe('PortalServePrompts', () => {
       const warn = sinon.stub(log, 'warn');
       const message = sinon.stub(log, 'message');
       try {
-        new PortalServePrompts().specsNeedRestart(
-          { added: added.map(document), removed: removed.map(document) },
+        new PortalServePrompts().specsShown(
+          { fixed: false, change: { added: added.map(document), removed: removed.map(document) } },
           new DirectoryPath('src')
         );
         return [warn, message].map((stub) => stripVTControlCharacters(String(stub.firstCall.args[0])));
@@ -156,6 +173,55 @@ describe('PortalServePrompts', () => {
       expect(said([], ['a.json', 'b.json', 'c.json'])[0]).to.match(
         /: 'a\.json', 'b\.json' and 'c\.json' were removed\.$/
       );
+    });
+  });
+
+  describe('a save the preview accepts', () => {
+    const NO_NOTICES: ContentNotices = {
+      hiddenPages: [],
+      ignoredNavigationFiles: [],
+      sharedTabNames: [],
+      noTabsListed: undefined,
+      unseenHomeTitle: undefined
+    };
+
+    /** What `show` says succeeded, without its colours. */
+    const succeeded = (show: (prompts: PortalServePrompts, source: DirectoryPath) => void) => {
+      const success = sinon.stub(log, 'success');
+      try {
+        show(new PortalServePrompts(), new DirectoryPath('src'));
+        return success.getCalls().map((call) => stripVTControlCharacters(String(call.args[0])));
+      } finally {
+        success.restore();
+      }
+    };
+
+    it('says the content or the specifications are fixed, when the save fixes one refused', () => {
+      const content = succeeded((prompts, source) =>
+        prompts.contentShown({ fixed: true, notices: NO_NOTICES }, source)
+      );
+      const specs = succeeded((prompts, source) => prompts.specsShown({ fixed: true, change: null }, source));
+
+      expect(content).to.have.length(1);
+      expect(content[0]).to.match(/^'.*content' is fixed; a build would accept it again\.$/);
+      expect(specs).to.have.length(1);
+      expect(specs[0]).to.match(/^'.*spec' is fixed; a build would accept it again\.$/);
+    });
+
+    it('says nothing of a save that fixes nothing', () => {
+      const content = succeeded((prompts, source) =>
+        prompts.contentShown({ fixed: false, notices: NO_NOTICES }, source)
+      );
+      const specs = succeeded((prompts, source) => prompts.specsShown({ fixed: false, change: null }, source));
+
+      expect([...content, ...specs]).to.be.empty;
+    });
+
+    it('says the changes to apimatic.json were applied only when the preview says to', () => {
+      expect(succeeded((prompts) => prompts.configShown(true))).to.deep.equal([
+        "Applied the changes to 'apimatic.json'."
+      ]);
+      expect(succeeded((prompts) => prompts.configShown(false))).to.be.empty;
     });
   });
 

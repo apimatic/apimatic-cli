@@ -5,6 +5,7 @@ import { Endpoint } from './endpoint.js';
 import { SuggestedSite } from './config/site-config.js';
 import { ContentNotices } from './content-notices.js';
 import { GeneratedPages } from './generated-pages.js';
+import { ParseFailure } from './openapi-document.js';
 import { PortalConfig } from './portal-config.js';
 
 /** An OpenAPI document found in `src/spec/`, with the slug its section is mounted at. */
@@ -14,6 +15,9 @@ export interface PortalSpec {
   /** Its operations, including those behind a `$ref` path item. */
   endpoints: Endpoint[];
 }
+
+/** A part of the source directory that `portal serve` watches, and checks on each save. */
+export type WatchedSource = 'config' | 'content' | 'spec';
 
 /** What `apimatic.json` decides about a portal, which `portal serve` reads again on every edit. */
 export interface PortalSettings {
@@ -108,6 +112,9 @@ export interface SpecConversion {
   others: number;
 }
 
+/** Why a file a specification is read from could not be read; `unopened` carries what the file system said. */
+export type UnreadableSpecReason = ParseFailure | { kind: 'gone' } | { kind: 'unopened'; message: string };
+
 /** Why a source directory cannot be built; each variant maps to its own message. */
 export type PortalSourceProblem =
   | { kind: 'missingConfig' }
@@ -115,8 +122,8 @@ export type PortalSourceProblem =
   | { kind: 'invalidConfig'; errors: string[]; missingPortal: boolean }
   // Every problem found in `content/`, so that one run lists all that a build would refuse.
   | { kind: 'invalidContent'; problems: ContentProblem[] }
-  | { kind: 'unreadableSpec'; file: FilePath; referencedBy: FilePath | null; reason: string }
-  | { kind: 'missingSpecReference'; file: FilePath; referencedBy: FilePath }
+  | { kind: 'unreadableSpec'; file: FilePath; referencedBy: FilePath | null; reason: UnreadableSpecReason }
+  | { kind: 'missingSpecReference'; missing: MissingFile; referencedBy: FilePath }
   // Its `folders` are not read, and `api transform` writes into one of its own.
   | { kind: 'emptySpecDirectory'; folders: DirectoryPath[] }
   | { kind: 'noOpenApiSpec'; conversion: SpecConversion }

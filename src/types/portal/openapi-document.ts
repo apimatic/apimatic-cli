@@ -15,6 +15,13 @@ import { Endpoint } from './endpoint.js';
  */
 export type SpecFormat = { supported: true } | { supported: false; format: string | null };
 
+/** Why the portal's bundler would fail on a text, or read nothing from it; `invalid` carries what the parser said. */
+export type ParseFailure =
+  | { kind: 'empty' }
+  | { kind: 'noValue' }
+  | { kind: 'noKey' }
+  | { kind: 'invalid'; message: string };
+
 /** A path item kept in another file, where `pointer` locates it; empty for the whole file. */
 export interface PathItemReference {
   path: string;
@@ -28,53 +35,54 @@ const HTTP_METHODS = new Set(['get', 'put', 'post', 'delete', 'options', 'head',
 
 const URL_SCHEME = /^[a-z][a-z\d+.-]+:/i;
 
-// How @scalar/json-magic reads every file it bundles: JSON, else YAML, with these options, only
-// when the text holds a key and does not open as JSON does.
+// How @scalar/json-magic reads each file it bundles: as JSON, else as YAML with these options when it holds a key.
 const YAML_OPTIONS = { merge: true, maxAliasCount: 10000 };
 const YAML_KEY = /^[^:]+:/;
+// A text that opens as JSON does within this many characters is taken for JSON, and never read as YAML.
 const JSON_OPENING = /^\s*[[{]/;
+const JSON_OPENING_WITHIN = 50;
 
 // The keys @scalar/json-magic writes what it has embedded under, which it does not read again.
 const BUNDLER_KEYS = new Set(['x-ext', 'x-ext-urls']);
 
-/** A specification as written to disk, read the one way the wizard and the build agree on. */
+/** A specification's document, or a file its `$ref`s name, read the one way the wizard and the build agree on. */
 export class OpenApiDocument {
-  private constructor(private readonly value: unknown) {}
+  private readonly document: JsonObject;
 
-  /**
-   * Fails with the reason where the portal's bundler fails, or reads nothing. A document that
-   * reads as something other than an object is kept, and reports itself as no specification at all.
-   */
-  public static parse(contents: string): Result<OpenApiDocument, string> {
+  private constructor(private readonly value: unknown) {
+    this.document = isJsonObject(value) ? value : {};
+  }
+
+  /** Fails where the portal's bundler fails or reads nothing; a value other than an object is no specification. */
+  public static parse(contents: string): Result<OpenApiDocument, ParseFailure> {
     const text = stripByteOrderMark(contents);
     if (text.trim() === '') {
-      return err('it is empty');
+      return err({ kind: 'empty' });
     }
     let value: unknown;
     try {
       value = JSON.parse(text);
     } catch (error) {
-      // Only the first 50 characters, as the bundler looks no further.
-      if (JSON_OPENING.test(text.slice(0, 50))) {
-        return err(parseFailure(error));
+      if (JSON_OPENING.test(text.slice(0, JSON_OPENING_WITHIN))) {
+        return err(invalid(error));
       }
       if (!YAML_KEY.test(text)) {
-        return err('it is not JSON, and the portal reads YAML only when it holds a key');
+        return err({ kind: 'noKey' });
       }
       try {
         value = parseYaml(text, YAML_OPTIONS);
       } catch (yamlError) {
-        return err(parseFailure(yamlError));
+        return err(invalid(yamlError));
       }
     }
-    return value === null ? err('it holds no value') : ok(new OpenApiDocument(value));
+    return value === null ? err({ kind: 'noValue' }) : ok(new OpenApiDocument(value));
   }
 
   /** The `$id`s this document declares, which a `$ref` in any file bundled into it names a schema by. */
   public schemaIds(): Set<string> {
     const ids = new Set<string>();
     walk(this.value, (node) => {
-      if (isJsonObject(node) && typeof node.$id === 'string') {
+      if (typeof node.$id === 'string') {
         ids.add(node.$id);
       }
       return true;
@@ -85,16 +93,17 @@ export class OpenApiDocument {
   /** The local files this document's `$ref`s name, as the portal's bundler finds them, given the root's `$id`s. */
   public referencedFiles(directory: DirectoryPath, rootIds: ReadonlySet<string>): FilePath[] {
     const names = new Set<string>();
-    // Not below an `$id`: the bundler resolves what is under one against the `$id`, not the file.
     walk(this.value, (node) => {
-      if (isJsonObject(node) && typeof node.$id === 'string') {
+      // The bundler resolves what is below an `$id` against the `$id`, not the file.
+      if (typeof node.$id === 'string') {
         return false;
       }
-      if (isJsonObject(node) && typeof node.$ref === 'string') {
-        names.add(node.$ref.split('#')[0]);
-        return false;
+      const target = reference(node);
+      if (target === undefined) {
+        return true;
       }
-      return true;
+      names.add(target.name);
+      return false;
     });
     return [...names].filter((name) => !rootIds.has(name)).flatMap((name) => localFile(directory, name) ?? []);
   }
@@ -107,10 +116,9 @@ export class OpenApiDocument {
   /** The path items kept in other local files, resolved against the `directory` this document sits in. */
   public pathItemReferences(directory: DirectoryPath): PathItemReference[] {
     return Object.entries(this.paths()).flatMap(([path, pathItem]) => {
-      const reference = isJsonObject(pathItem) && typeof pathItem.$ref === 'string' ? pathItem.$ref : '';
-      const [name, pointer = ''] = reference.split('#');
-      const file = localFile(directory, name);
-      return file === undefined ? [] : [{ path, file, pointer }];
+      const target = reference(pathItem);
+      const file = target && localFile(directory, target.name);
+      return target && file ? [{ path, file, pointer: target.pointer }] : [];
     });
   }
 
@@ -146,10 +154,6 @@ export class OpenApiDocument {
     return { name, description: description === null ? null : cap(description, DESCRIPTION_LIMIT) };
   }
 
-  private get document(): JsonObject {
-    return isJsonObject(this.value) ? this.value : {};
-  }
-
   private paths(): JsonObject {
     return isJsonObject(this.document.paths) ? this.document.paths : {};
   }
@@ -174,25 +178,34 @@ export class OpenApiDocument {
   }
 }
 
-/** The file a `$ref` names before its `#`, resolved as the bundler resolves it; undefined for none, or a URL. */
+/** A node's `$ref`, split as the bundler splits it: the file it names, empty for its own, and the pointer into it. */
+function reference(node: unknown): { name: string; pointer: string } | undefined {
+  if (!isJsonObject(node) || typeof node.$ref !== 'string') {
+    return undefined;
+  }
+  const [name, pointer = ''] = node.$ref.split('#');
+  return { name, pointer };
+}
+
+/** The file a `$ref` names, resolved as the bundler resolves it; undefined for none, or a URL. */
 function localFile(directory: DirectoryPath, name: string): FilePath | undefined {
   return name === '' || URL_SCHEME.test(name) ? undefined : FilePath.resolve(directory, name.replaceAll('\\', '/'));
 }
 
 // A YAML error goes on to quote the lines around it, and V8 quotes the JSON it stopped at across line breaks.
-function parseFailure(error: unknown): string {
+function invalid(error: unknown): ParseFailure {
   const message = errorMessage(error);
-  const reason = error instanceof YAMLParseError ? message.split('\n')[0].replace(/:$/, '') : message;
-  return reason.replace(/\s+/g, ' ').trim();
+  const firstLine = error instanceof YAMLParseError ? message.split('\n')[0].replace(/:$/, '') : message;
+  return { kind: 'invalid', message: firstLine.replace(/\s+/g, ' ').trim() };
 }
 
-/** Each object and list once, going into one only when `visit` says so, and never into the keys the bundler writes. */
-function walk(node: unknown, visit: (node: object) => boolean, seen = new WeakSet<object>()): void {
+/** Each object and list once; into an object only when `visit` says so, and never into the keys the bundler writes. */
+function walk(node: unknown, visit: (node: JsonObject) => boolean, seen = new WeakSet<object>()): void {
   if (typeof node !== 'object' || node === null || seen.has(node)) {
     return;
   }
   seen.add(node);
-  if (!visit(node)) {
+  if (isJsonObject(node) && !visit(node)) {
     return;
   }
   for (const [key, value] of Object.entries(node)) {

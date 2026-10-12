@@ -11,7 +11,8 @@ import {
   PortalSourceProblem,
   ReservedAddressPage,
   SharedAddress,
-  SpecConversion
+  SpecConversion,
+  UnreadableSpecReason
 } from '../../types/portal/portal-source.js';
 import { TRANSFORMATIONS_DIRECTORY_NAME } from '../../types/transform-context.js';
 import { PortalTab, SharedTabName } from '../../types/portal/portal-tabs.js';
@@ -74,6 +75,22 @@ function reportSpecConversion({ file, format, converted, others }: SpecConversio
   );
 }
 
+function unreadableBecause(reason: UnreadableSpecReason): string {
+  switch (reason.kind) {
+    case 'empty':
+      return 'it is empty';
+    case 'noValue':
+      return 'it holds no value';
+    case 'noKey':
+      return 'it is not JSON, and the portal reads YAML only when it holds a key';
+    case 'gone':
+      return 'it is no longer there';
+    case 'invalid':
+    case 'unopened':
+      return reason.message;
+  }
+}
+
 /**
  * Shared by `portal generate` and `portal serve`: both read the same source directory, so
  * a broken one has to be explained the same way in both.
@@ -95,18 +112,23 @@ export function reportSourceProblem(problem: PortalSourceProblem, sourceDirector
     }
     case 'unreadableSpec': {
       const file = relative(problem.file, sourceDirectory);
-      const named =
+      const why = unreadableBecause(problem.reason);
+      log.error(
         problem.referencedBy === null
-          ? file
-          : `${file}, which ${relative(problem.referencedBy, sourceDirectory)} refers to,`;
-      log.error(`${named} could not be read: ${problem.reason}.`);
+          ? `${file} could not be read: ${why}.`
+          : `${file}, which ${relative(problem.referencedBy, sourceDirectory)} refers to, could not be read: ${why}.`
+      );
       return;
     }
     case 'missingSpecReference': {
-      log.error(
-        `${relative(problem.referencedBy, sourceDirectory)} refers to ${relative(problem.file, sourceDirectory)}, ` +
-          'but there is no such file.'
-      );
+      const { file, foundAs } = problem.missing;
+      const referencedBy = relative(problem.referencedBy, sourceDirectory);
+      const refersTo = `${referencedBy} refers to ${relative(file, sourceDirectory)}`;
+      if (foundAs !== null) {
+        log.error(`${refersTo}, but the file is ${spelt(foundAs, sourceDirectory)}.`);
+        return;
+      }
+      log.error(`${refersTo}, but there is no such file.`);
       log.message(`A ${f.var('$ref')} names a file from the folder of the file it is written in.`);
       return;
     }

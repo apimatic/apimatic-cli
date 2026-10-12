@@ -10,7 +10,7 @@ import {
   reportSourceProblem,
   reportUnseenHomeTitle
 } from '../../../src/prompts/portal/source.js';
-import { ContentProblem } from '../../../src/types/portal/portal-source.js';
+import { ContentProblem, UnreadableSpecReason } from '../../../src/types/portal/portal-source.js';
 import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
 import { FileName } from '../../../src/types/file/fileName.js';
 import { FilePath } from '../../../src/types/file/filePath.js';
@@ -191,31 +191,69 @@ describe('reportSourceProblem', () => {
     const api = new FilePath(spec, new FileName('api.yaml'));
     const pet = new FilePath(spec.join('schemas'), new FileName('Pet.json'));
 
-    it('names a document it cannot read, and why', () => {
-      const reason =
+    it('names a document it cannot read, and why, in the words of the parser that refused it', () => {
+      const message =
         'Flow sequence in block collection must be sufficiently indented and end with a ] at line 3, column 1';
 
-      reportSourceProblem({ kind: 'unreadableSpec', file: api, referencedBy: null, reason }, source);
+      reportSourceProblem(
+        { kind: 'unreadableSpec', file: api, referencedBy: null, reason: { kind: 'invalid', message } },
+        source
+      );
 
-      expect(printed()).to.equal(`'spec/api.yaml' could not be read: ${reason}.`);
+      expect(printed()).to.equal(`'spec/api.yaml' could not be read: ${message}.`);
     });
 
     it('names the file that refers to one it cannot read', () => {
-      const reason = "Expected ',' or '}' after property value in JSON at position 13 (line 3 column 3)";
+      const message = "Expected ',' or '}' after property value in JSON at position 13 (line 3 column 3)";
 
-      reportSourceProblem({ kind: 'unreadableSpec', file: pet, referencedBy: api, reason }, source);
+      reportSourceProblem(
+        { kind: 'unreadableSpec', file: pet, referencedBy: api, reason: { kind: 'invalid', message } },
+        source
+      );
 
       expect(printed()).to.equal(
-        `'spec/schemas/Pet.json', which 'spec/api.yaml' refers to, could not be read: ${reason}.`
+        `'spec/schemas/Pet.json', which 'spec/api.yaml' refers to, could not be read: ${message}.`
       );
     });
 
+    const reasons: [UnreadableSpecReason, string][] = [
+      [{ kind: 'empty' }, 'it is empty'],
+      [{ kind: 'noValue' }, 'it holds no value'],
+      [{ kind: 'noKey' }, 'it is not JSON, and the portal reads YAML only when it holds a key'],
+      [{ kind: 'gone' }, 'it is no longer there'],
+      [{ kind: 'unopened', message: 'EACCES: permission denied' }, 'EACCES: permission denied']
+    ];
+
+    reasons.forEach(([reason, said]) => {
+      it(`says why a file could not be read, when it is ${reason.kind}`, () => {
+        reportSourceProblem({ kind: 'unreadableSpec', file: api, referencedBy: null, reason }, source);
+
+        expect(printed()).to.equal(`'spec/api.yaml' could not be read: ${said}.`);
+      });
+    });
+
     it('names a file referred to that is not there, and where a reference is resolved from', () => {
-      reportSourceProblem({ kind: 'missingSpecReference', file: pet, referencedBy: api }, source);
+      reportSourceProblem(
+        { kind: 'missingSpecReference', missing: { file: pet, foundAs: null }, referencedBy: api },
+        source
+      );
 
       expect(printed()).to.equal(
         "'spec/api.yaml' refers to 'spec/schemas/Pet.json', but there is no such file.\n" +
           "A '$ref' names a file from the folder of the file it is written in."
+      );
+    });
+
+    it('names a file referred to that is there in another case, as it is spelt', () => {
+      const lowerCase = new FilePath(spec.join('schemas'), new FileName('pet.json'));
+
+      reportSourceProblem(
+        { kind: 'missingSpecReference', missing: { file: lowerCase, foundAs: pet }, referencedBy: api },
+        source
+      );
+
+      expect(printed()).to.equal(
+        "'spec/api.yaml' refers to 'spec/schemas/pet.json', but the file is spelt 'spec/schemas/Pet.json' on disk."
       );
     });
   });
