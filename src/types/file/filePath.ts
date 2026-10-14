@@ -31,7 +31,7 @@ export class FilePath {
 
   /** The same path, spelt the same way: `Logo.png` is not `logo.png`. */
   public isEqual(other: FilePath): boolean {
-    return this.directoryPath.isEqual(other.directoryPath) && this.fileName.compare(other.fileName) === 0;
+    return this.directoryPath.isEqual(other.directoryPath) && this.fileName.isEqual(other.fileName);
   }
 
   public toString(): string {

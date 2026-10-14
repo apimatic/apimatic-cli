@@ -141,6 +141,16 @@ describe('FileService', () => {
     it('does not take a directory for the file', async () => {
       expect(await fileService.spelledOnDisk(root, fileAt('static', 'images'))).to.be.null;
     });
+
+    it('answers with the spelling on disk of a directory, itself included, or null when it is not there', async () => {
+      const images = root.join('static', 'images');
+
+      expect((await fileService.directorySpelledOnDisk(root, root.join('Static', 'Images')))?.isEqual(images)).to.be
+        .true;
+      expect((await fileService.directorySpelledOnDisk(root, images))?.isEqual(images)).to.be.true;
+      expect((await fileService.directorySpelledOnDisk(root, root))?.isEqual(root)).to.be.true;
+      expect(await fileService.directorySpelledOnDisk(root, root.join('static', 'logos'))).to.be.null;
+    });
   });
 
   describe('findSymlinks', () => {

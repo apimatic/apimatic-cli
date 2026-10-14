@@ -5,6 +5,10 @@ export class Endpoint {
     this.method = method.toUpperCase();
   }
 
+  public isEqual(other: Endpoint): boolean {
+    return this.method === other.method && this.path === other.path;
+  }
+
   public toString(): string {
     return `${this.method} ${this.path}`;
   }
