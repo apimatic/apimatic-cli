@@ -312,8 +312,8 @@ DESCRIPTION
   Builds a documentation portal from the OpenAPI documents and Markdown pages in your 'src' directory.
 
   Each OpenAPI document at the top of 'src/spec' gets a section of the API reference, and the SDKs are built from one of
-  them. To build the SDKs from several, put each in a folder of its own and turn on 'MergeApis' in an
-  'APIMATIC-META.json' beside the folders; each folder then gets a section.
+  them. To build the SDKs from several, put each in a folder of its own and set 'MergeConfiguration.MergeApis' to true
+  in an 'APIMATIC-META.json' beside the folders; each folder then gets a section.
 
   The portal is built on your machine and written as static files for any static host, served at its root or, when
   'portal.site.url' has a path such as 'https://example.com/docs', at that path. Configure it with 'src/apimatic.json',

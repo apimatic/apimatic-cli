@@ -192,8 +192,7 @@ describe('reportSourceProblem', () => {
       expect(printed()).to.contain('has no API definition.');
       expect(printed()).to.contain(
         "A document in a folder inside it, such as 'alpha' and 'beta', is not read. Move it up, or to keep one " +
-          "API to a folder, turn on 'MergeApis' in an 'APIMATIC-META.json' beside the folders: " +
-          'https://docs.apimatic.io/manage-apis/api-merging/'
+          "API to a folder, set 'MergeConfiguration.MergeApis' to true in an 'APIMATIC-META.json' beside the folders."
       );
     });
 
@@ -714,8 +713,8 @@ describe('reportUnmergedSpecs', () => {
 
     expect(lines).to.deep.equal([
       "'spec/orders.json' and 'spec/items.json' are separate API definitions, and the SDKs are generated from one " +
-        "of them only. To cover them all, give each its own folder and turn on 'MergeApis' in an " +
-        "'APIMATIC-META.json' beside the folders: https://docs.apimatic.io/manage-apis/api-merging/"
+        "of them only. To cover them all, give each its own folder and set 'MergeConfiguration.MergeApis' to " +
+        "true in an 'APIMATIC-META.json' beside the folders."
     ]);
   });
 });

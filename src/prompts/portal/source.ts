@@ -33,11 +33,9 @@ const TITLE_EXAMPLE = ['---', 'title: Getting started', '---'].join('\n');
 
 const ROOT_NAVIGATION_FILE = `${CONTENT_DIRECTORY_NAME}/${NAVIGATION_FILE_NAME}`;
 
-const API_MERGING_URL = 'https://docs.apimatic.io/manage-apis/api-merging/';
-
 const mergeTheFolders = (): string =>
-  `turn on ${f.var(MERGE_SETTINGS.mergeApis)} in an ${f.var(METADATA_FILE_NAME)} beside the folders: ` +
-  f.link(API_MERGING_URL);
+  `set ${f.var(`${MERGE_SETTINGS.configuration}.${MERGE_SETTINGS.mergeApis}`)} to true in an ` +
+  `${f.var(METADATA_FILE_NAME)} beside the folders`;
 
 const addingToMergeOrder = (folders: string): string =>
   `adding ${folders} to ${f.var(MERGE_SETTINGS.order)} when the file lists folders`;
@@ -184,7 +182,7 @@ export function reportSourceProblem(problem: PortalSourceProblem, sourceDirector
         const folders = listedInProse(problem.folders.map((folder) => f.var(folder.leafName())));
         log.message(
           `A document in a folder inside it, such as ${folders}, is not read. Move it up, or to keep one API ` +
-            `to a folder, ${mergeTheFolders()}`
+            `to a folder, ${mergeTheFolders()}.`
         );
       }
       return;
@@ -348,7 +346,7 @@ export function reportUnmergedSpecs(files: FilePath[], sourceDirectory: Director
   const names = listed(files, sourceDirectory);
   log.warn(
     `${names} are separate API definitions, and the SDKs are generated from one of them only. To cover them all, ` +
-      `give each its own folder and ${mergeTheFolders()}`
+      `give each its own folder and ${mergeTheFolders()}.`
   );
 }
 

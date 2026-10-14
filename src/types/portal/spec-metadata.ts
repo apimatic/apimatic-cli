@@ -1,8 +1,12 @@
 import { isJsonObject, JsonObject } from '../../utils/json-utils.js';
 import { stripByteOrderMark } from '../../utils/string-utils.js';
 
-/** The settings of its `MergeConfiguration` a portal follows, by the names a message gives them. */
-export const MERGE_SETTINGS = { mergeApis: 'MergeApis', order: 'MergeOrderOfDirectories' } as const;
+/** The merge settings a portal follows, as the metadata file names them; `configuration` holds the other two. */
+export const MERGE_SETTINGS = {
+  configuration: 'MergeConfiguration',
+  mergeApis: 'MergeApis',
+  order: 'MergeOrderOfDirectories'
+} as const;
 
 // The platform matches a setting's name in any case, as its JSON reader does, the exact name first.
 const setting = (object: JsonObject, name: string): unknown =>
@@ -16,7 +20,7 @@ export class SpecMetadata {
   public static parse(contents: string): SpecMetadata | undefined {
     try {
       const document: unknown = JSON.parse(stripByteOrderMark(contents));
-      const mergeConfiguration = isJsonObject(document) ? setting(document, 'MergeConfiguration') : undefined;
+      const mergeConfiguration = isJsonObject(document) ? setting(document, MERGE_SETTINGS.configuration) : undefined;
       return new SpecMetadata(isJsonObject(mergeConfiguration) ? mergeConfiguration : {});
     } catch {
       return undefined;
