@@ -66,6 +66,14 @@ describe('OpenApiDocument', () => {
     });
   });
 
+  describe('isApiDefinition', () => {
+    it('is a definition in any format it names, and not a file of shared parts', () => {
+      expect(readJson({ openapi: '3.1.0' }).isApiDefinition()).to.be.true;
+      expect(readJson({ swagger: '2.0' }).isApiDefinition()).to.be.true;
+      expect(readJson({ components: { schemas: {} } }).isApiDefinition()).to.be.false;
+    });
+  });
+
   describe('suggestedSite', () => {
     it('takes the title and description from the document', () => {
       const site = withInfo({ title: 'Swagger Petstore', version: '1', description: 'Pets.' }).suggestedSite();

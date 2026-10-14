@@ -1,0 +1,24 @@
+{
+  "openapi": "3.0.3",
+  "info": { "title": "Inventory API", "version": "1.0.0" },
+  "servers": [{ "url": "https://inventory.store.test" }],
+  "tags": [{ "name": "Stock" }, { "name": "Health" }],
+  "paths": {
+    "/stock": {
+      "get": {
+        "operationId": "listStock",
+        "summary": "List stock levels",
+        "tags": ["Stock"],
+        "responses": { "200": { "description": "The stock levels." } }
+      }
+    },
+    "/status": {
+      "get": {
+        "operationId": "getInventoryStatus",
+        "summary": "Inventory service status",
+        "tags": ["Health"],
+        "responses": { "200": { "description": "The service is up." } }
+      }
+    }
+  }
+}

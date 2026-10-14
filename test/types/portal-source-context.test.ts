@@ -399,6 +399,9 @@ describe('PortalSourceContext', () => {
   describe('spec discovery', () => {
     beforeEach(() => writeConfig({ site: { name: 'Calc' } }));
 
+    /** A file as a problem or a warning names it, relative to the source directory. */
+    const relative = (file: FilePath) => file.relativeTo(new DirectoryPath(root));
+
     it('accepts json, yaml and yml documents, ordered by file name', async () => {
       write('spec/b.json', OPENAPI);
       write('spec/a.yaml', 'openapi: 3.0.0\ninfo:\n  title: A\n  version: "1"\npaths: {}\n');
@@ -440,7 +443,6 @@ describe('PortalSourceContext', () => {
         throw new Error(`expected no OpenAPI 3.x document, got '${problem.kind}'`);
       }
       const { file, format, converted, others } = problem.conversion;
-      const relative = (each: FilePath) => each.relativeTo(new DirectoryPath(root));
       return [relative(file), format, relative(converted), others];
     };
 
@@ -483,10 +485,19 @@ describe('PortalSourceContext', () => {
       ]);
     });
 
+    /** The document the problem names as unreadable, relative to the source directory. */
+    const unreadable = async () => {
+      const problem = (await resolve())._unsafeUnwrapErr();
+      if (problem.kind !== 'unreadableSpec') {
+        throw new Error(`expected an unreadable document, got '${problem.kind}'`);
+      }
+      return relative(problem.file);
+    };
+
     it('reports a document it cannot parse', async () => {
       write('spec/broken.json', '{ not json');
 
-      expect((await resolve())._unsafeUnwrapErr().kind).to.equal('unreadableSpec');
+      expect(await unreadable()).to.equal('spec/broken.json');
     });
 
     it('reports an empty or absent spec directory', async () => {
@@ -544,6 +555,269 @@ describe('PortalSourceContext', () => {
       const [spec] = (await resolve())._unsafeUnwrap().specs;
 
       expect(spec.endpoints.map(String)).to.deep.equal(['GET /health', 'GET /pets', 'POST /pets', 'DELETE /owners']);
+    });
+
+    // The layout the platform merges several APIs into one SDK from: a folder to each, and a metadata file above them.
+    describe('the folders a metadata file merges', () => {
+      const merging = (settings: object = {}) =>
+        write('spec/APIMATIC-META.json', JSON.stringify({ MergeConfiguration: { MergeApis: true, ...settings } }));
+
+      /** Each spec's slug and the file it was read from, in the order the sections are built. */
+      const read = async () => (await resolve())._unsafeUnwrap().specs.map((spec) => [spec.slug, relative(spec.file)]);
+
+      /** The metadata file the problem names, and the folders it merges that hold nothing to read. */
+      const emptyFolders = async () => {
+        const problem = (await resolve())._unsafeUnwrapErr();
+        if (problem.kind !== 'emptyMergedFolders') {
+          throw new Error(`expected merged folders with nothing to read, got '${problem.kind}'`);
+        }
+        return [
+          relative(problem.metadata),
+          problem.folders.map((folder) => folder.relativeTo(new DirectoryPath(root)))
+        ];
+      };
+
+      it('reads the folders the file lists, in its order, and names each section after its folder', async () => {
+        merging({ MergeOrderOfDirectories: ['beta', 'alpha'] });
+        write('spec/alpha/openapi.json', OPENAPI);
+        write('spec/beta/openapi.json', OPENAPI);
+        write('spec/gamma/openapi.json', OPENAPI);
+
+        expect(await read()).to.deep.equal([
+          ['beta', 'spec/beta/openapi.json'],
+          ['alpha', 'spec/alpha/openapi.json']
+        ]);
+      });
+
+      // Read twice, its every operation would count as declared by two specs, and lose its SDK samples.
+      it('reads a folder the file lists twice once, where it is first listed', async () => {
+        merging({ MergeOrderOfDirectories: ['beta', 'alpha', './beta/'] });
+        write('spec/alpha/openapi.json', OPENAPI);
+        write('spec/beta/openapi.json', OPENAPI);
+
+        expect(await read()).to.deep.equal([
+          ['beta', 'spec/beta/openapi.json'],
+          ['alpha', 'spec/alpha/openapi.json']
+        ]);
+      });
+
+      it('reads every folder, by name, when the file lists none', async () => {
+        merging();
+        write('spec/beta/b.json', OPENAPI);
+        write('spec/alpha/a.json', OPENAPI);
+
+        expect(await read()).to.deep.equal([
+          ['alpha', 'spec/alpha/a.json'],
+          ['beta', 'spec/beta/b.json']
+        ]);
+
+        merging({ MergeOrderOfDirectories: [] });
+
+        expect(await read()).to.deep.equal([
+          ['alpha', 'spec/alpha/a.json'],
+          ['beta', 'spec/beta/b.json']
+        ]);
+      });
+
+      it("keeps the dots of a folder's name, which end no extension", async () => {
+        merging();
+        write('spec/orders.v2/openapi.json', OPENAPI);
+
+        expect(await read()).to.deep.equal([['orders-v2', 'spec/orders.v2/openapi.json']]);
+      });
+
+      it("reads neither a folder's own metadata file nor a document at the top of the spec directory", async () => {
+        merging();
+        write('spec/alpha/openapi.json', OPENAPI);
+        write('spec/alpha/APIMATIC-META.json', JSON.stringify({ CodeGenSettings: {} }));
+        write('spec/stray.json', OPENAPI);
+
+        expect(await read()).to.deep.equal([['alpha', 'spec/alpha/openapi.json']]);
+      });
+
+      // The platform leaves them out of the SDKs too, and nothing else would say so.
+      it('names each API definition at the top of the spec directory, in any format, as left out', async () => {
+        merging();
+        write('spec/alpha/openapi.json', OPENAPI);
+        write('spec/old.json', OPENAPI);
+        write('spec/older.yaml', JSON.stringify({ swagger: '2.0', info: {}, paths: {} }));
+        write('spec/shared-schemas.json', JSON.stringify({ components: { schemas: {} } }));
+        write('spec/broken.json', '{ not json');
+        write('spec/notes.md', '# Specs');
+
+        expect((await resolve())._unsafeUnwrap().leftOutSpecs.map(relative)).to.deep.equal([
+          'spec/old.json',
+          'spec/older.yaml'
+        ]);
+      });
+
+      it('names none left out when nothing merges the folders', async () => {
+        write('spec/a.json', OPENAPI);
+        write('spec/alpha/openapi.json', OPENAPI);
+
+        expect((await resolve())._unsafeUnwrap().leftOutSpecs).to.be.empty;
+      });
+
+      // The platform builds one API from a folder, so a second section would document what the SDK may lack.
+      it('refuses a folder holding two OpenAPI 3.x documents, naming both', async () => {
+        merging();
+        write('spec/alpha/a.json', OPENAPI);
+        write('spec/alpha/b.json', OPENAPI);
+
+        const problem = (await resolve())._unsafeUnwrapErr();
+
+        expect(problem.kind === 'severalSpecsInFolder' && problem.files.map(relative)).to.deep.equal([
+          'spec/alpha/a.json',
+          'spec/alpha/b.json'
+        ]);
+      });
+
+      // The platform also reads other names starting `APIMATIC-META`; a project for this CLI uses the one.
+      it('follows no metadata file under another name, which is read as any other file', async () => {
+        write('spec/APIMATIC-META-MAIN.json', JSON.stringify({ MergeConfiguration: { MergeApis: true } }));
+        write('spec/alpha/openapi.json', OPENAPI);
+
+        expect(await conversion()).to.deep.equal([
+          'spec/APIMATIC-META-MAIN.json',
+          null,
+          'spec/transformations/APIMATIC-META-MAIN_OpenApi3Yaml.yaml',
+          0
+        ]);
+      });
+
+      it('reads a folder whose other documents hold only parts of its definition', async () => {
+        merging();
+        write('spec/alpha/openapi.json', OPENAPI);
+        write('spec/alpha/components.json', JSON.stringify({ components: { schemas: {} } }));
+
+        expect(await read()).to.deep.equal([['alpha', 'spec/alpha/openapi.json']]);
+      });
+
+      it('reads a path item kept in another file of the folder', async () => {
+        merging();
+        write('spec/alpha/paths/pets.yaml', JSON.stringify({ get: {} }));
+        write(
+          'spec/alpha/openapi.json',
+          JSON.stringify({
+            openapi: '3.1.0',
+            info: { title: 'Calc', version: '1' },
+            paths: { '/pets': { $ref: './paths/pets.yaml' } }
+          })
+        );
+
+        const [spec] = (await resolve())._unsafeUnwrap().specs;
+
+        expect(spec.endpoints.map(String)).to.deep.equal(['GET /pets']);
+      });
+
+      // The metadata file is there for the SDK's settings alone, and is not offered for conversion.
+      it('leaves the folders unread when no metadata file merges them', async () => {
+        write('spec/APIMATIC-META.json', JSON.stringify({ CodeGenSettings: {} }));
+        write('spec/alpha/openapi.json', OPENAPI);
+
+        const problem = (await resolve())._unsafeUnwrapErr();
+
+        expect(
+          problem.kind === 'emptySpecDirectory' && problem.folders.map((folder) => folder.leafName())
+        ).to.deep.equal(['alpha']);
+      });
+
+      it('reports each merged folder with nothing to read: empty, misnamed, or outside the spec directory', async () => {
+        merging({ MergeOrderOfDirectories: ['alpha', 'empty', 'misnamed', '../content'] });
+        write('spec/alpha/openapi.json', OPENAPI);
+        fs.mkdirSync(path.join(root, 'spec', 'empty'));
+        write('content/openapi.json', OPENAPI);
+
+        expect(await emptyFolders()).to.deep.equal([
+          'spec/APIMATIC-META.json',
+          ['./spec/empty', './spec/misnamed', './content']
+        ]);
+      });
+
+      it('reports a file that merges where there is no folder to merge', async () => {
+        merging();
+        write('spec/api.json', OPENAPI);
+
+        expect(await emptyFolders()).to.deep.equal(['spec/APIMATIC-META.json', []]);
+      });
+
+      it('points a folder with no OpenAPI 3.x document at its conversion, inside that folder', async () => {
+        merging();
+        write('spec/alpha/openapi.json', OPENAPI);
+        write('spec/beta/swagger.json', JSON.stringify({ swagger: '2.0', info: {}, paths: {} }));
+
+        expect(await conversion()).to.deep.equal([
+          'spec/beta/swagger.json',
+          'Swagger 2.0',
+          'spec/beta/transformations/swagger_OpenApi3Yaml.yaml',
+          0
+        ]);
+      });
+
+      it('names a document it cannot parse with its folder', async () => {
+        merging();
+        write('spec/alpha/openapi.json', '{ not json');
+
+        expect(await unreadable()).to.equal('spec/alpha/openapi.json');
+      });
+
+      it('reports a metadata file it cannot parse', async () => {
+        write('spec/APIMATIC-META.json', '{ not json');
+        write('spec/alpha/openapi.json', OPENAPI);
+
+        const problem = (await resolve())._unsafeUnwrapErr();
+
+        expect(problem.kind === 'unreadableMetadata' && relative(problem.file)).to.equal('spec/APIMATIC-META.json');
+      });
+    });
+
+    // The platform builds the SDKs, and so the code samples, from one spec unless the specs are merged.
+    describe('what the SDKs and their samples cover', () => {
+      const withPaths = (paths: object) =>
+        JSON.stringify({ openapi: '3.0.0', info: { title: 'Calc', version: '1' }, paths });
+
+      it('names several specs at the top of the spec directory, which nothing merges', async () => {
+        write('spec/a.json', OPENAPI);
+        write('spec/b.json', OPENAPI);
+        write('spec/APIMATIC-META.json', JSON.stringify({ CodeGenSettings: {} }));
+
+        expect((await resolve())._unsafeUnwrap().unmergedSpecs.map(relative)).to.deep.equal([
+          'spec/a.json',
+          'spec/b.json'
+        ]);
+      });
+
+      it('names none when there is one spec, or the specs are merged', async () => {
+        write('spec/a.json', OPENAPI);
+
+        expect((await resolve())._unsafeUnwrap().unmergedSpecs).to.be.empty;
+
+        fs.rmSync(path.join(root, 'spec'), { recursive: true });
+        write('spec/APIMATIC-META.json', JSON.stringify({ MergeConfiguration: { MergeApis: true } }));
+        write('spec/alpha/openapi.json', OPENAPI);
+        write('spec/beta/openapi.json', OPENAPI);
+
+        expect((await resolve())._unsafeUnwrap().unmergedSpecs).to.be.empty;
+      });
+
+      it('names each operation more than one spec declares, with the specs that do', async () => {
+        write('spec/APIMATIC-META.json', JSON.stringify({ MergeConfiguration: { MergeApis: true } }));
+        write('spec/alpha/openapi.json', withPaths({ '/status': { get: {} }, '/alpha': { get: {} } }));
+        write('spec/beta/openapi.json', withPaths({ '/status': { get: {}, post: {} }, '/beta': { get: {} } }));
+
+        const shared = (await resolve())._unsafeUnwrap().sharedEndpoints;
+
+        expect(shared.map(({ endpoint, files }) => [`${endpoint}`, files.map(relative)])).to.deep.equal([
+          ['GET /status', ['spec/alpha/openapi.json', 'spec/beta/openapi.json']]
+        ]);
+      });
+
+      it('names none when no two specs declare the same operation', async () => {
+        write('spec/a.json', withPaths({ '/a': { get: {} } }));
+        write('spec/b.json', withPaths({ '/b': { get: {} } }));
+
+        expect((await resolve())._unsafeUnwrap().sharedEndpoints).to.be.empty;
+      });
     });
   });
 

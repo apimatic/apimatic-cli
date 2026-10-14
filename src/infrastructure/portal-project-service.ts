@@ -127,7 +127,10 @@ export class PortalProjectService {
       projectDirectory,
       source,
       await this.contentDirectory(projectDirectory, source),
-      await this.writeCodeSamples(projectDirectory, artifacts.codeSampleCatalogs),
+      await this.writeCodeSamples(
+        projectDirectory,
+        artifacts.codeSampleCatalogs.without(source.sharedEndpoints.map(({ endpoint }) => endpoint))
+      ),
       await this.writeDownloads(projectDirectory, artifacts)
     );
 

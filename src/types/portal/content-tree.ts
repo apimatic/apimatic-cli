@@ -137,9 +137,7 @@ export class ContentTree {
 
   /** The `nav.json` files the build reads, which its glob matches by code point. */
   public navigationFiles(): FilePath[] {
-    return this.tree
-      .getAllFiles()
-      .filter((file) => file.name().compare(NAVIGATION_FILE) === 0 && !this.isSkipped(file));
+    return this.tree.getAllFiles().filter((file) => file.name().isEqual(NAVIGATION_FILE) && !this.isSkipped(file));
   }
 
   /** Whether the build would read `file` as part of `content/`: below it, and not passed over. */
@@ -537,7 +535,7 @@ class NavigationWalk {
       } else if (!isSkippedByGlob(item.fileName.toString())) {
         const file = new FilePath(directory.directoryPath, item.fileName);
         const page = pageName(item.fileName);
-        if (item.fileName.compare(NAVIGATION_FILE) === 0) {
+        if (item.fileName.isEqual(NAVIGATION_FILE)) {
           listing.navigationFile = file;
         } else if (item.fileName.is(NAVIGATION_FILE_NAME)) {
           listing.ignoredFiles.push(file);

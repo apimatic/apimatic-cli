@@ -16,6 +16,7 @@ import { DirectoryPath } from '../../src/types/file/directoryPath';
 import { FileName } from '../../src/types/file/fileName';
 import { FilePath } from '../../src/types/file/filePath';
 import { CodeSampleCatalog, CodeSampleCatalogs } from '../../src/types/portal/code-samples';
+import { Endpoint } from '../../src/types/portal/endpoint';
 import { GENERATED_DIRECTORY_NAME, GeneratedPages } from '../../src/types/portal/generated-pages';
 import { PortalConfig, PortalIdentity } from '../../src/types/portal/portal-config';
 import { PortalArtifacts } from '../../src/types/portal/portal-artifacts';
@@ -60,6 +61,9 @@ describe('PortalProjectService', () => {
         endpoints: []
       }
     ],
+    unmergedSpecs: [],
+    leftOutSpecs: [],
+    sharedEndpoints: [],
     contentDirectory: null,
     staticDirectory: null,
     shadowedFiles: [],
@@ -296,6 +300,17 @@ describe('PortalProjectService', () => {
           GET: [{ lang: 'typescript', label: 'TypeScript', sources: { Example: 'await client.pets.list();' } }]
         }
       });
+    });
+
+    // The samples hold one per method and path, which would be another API's call on all but one of the pages.
+    it('leaves out the samples of an operation more than one spec declares', async () => {
+      const spec = new DirectoryPath(root).join('spec');
+      const files = ['alpha', 'beta'].map((folder) => new FilePath(spec.join(folder), new FileName('openapi.json')));
+      const source = sourceFor({ sharedEndpoints: [{ endpoint: new Endpoint('get', '/pets'), files }] });
+
+      (await service.prepare(project, source, withCatalogs))._unsafeUnwrap();
+
+      expect(JSON.parse(fs.readFileSync(readConfig().codeSamples, 'utf8'))).to.deep.equal({});
     });
 
     it('points each spec at its own file, samples or not', async () => {

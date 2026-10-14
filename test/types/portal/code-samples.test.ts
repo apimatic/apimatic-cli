@@ -85,6 +85,18 @@ describe('CodeSampleCatalogs', () => {
     expect(codeSampleCatalogs.unplacedIn([new Endpoint('get', '/pets')])).to.deep.equal(['GET /owners']);
   });
 
+  it('leaves out the samples of the given endpoints, in every language, and keeps the rest', () => {
+    const codeSampleCatalogs = new CodeSampleCatalogs([
+      catalog(Language.TYPESCRIPT, { '/pets': { GET: { Example: 'a' }, POST: { Example: 'b' } } }),
+      catalog(Language.CSHARP, { '/pets': { GET: { Example: 'c' } } })
+    ]).without([new Endpoint('get', '/pets')]);
+
+    expect(codeSampleCatalogs.samplesFor(new Endpoint('GET', '/pets'))).to.be.empty;
+    expect(samples(codeSampleCatalogs, new Endpoint('POST', '/pets'))).to.deep.equal([
+      { label: 'TypeScript', sources: { Example: 'b' } }
+    ]);
+  });
+
   it("writes each endpoint's samples keyed by path and upper-case method, languages in catalog order", () => {
     const codeSampleCatalogs = new CodeSampleCatalogs([
       catalog(Language.TYPESCRIPT, { '/pets': { get: { Example: 'a' }, POST: { Example: 'b' } } }),

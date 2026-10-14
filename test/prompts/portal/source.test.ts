@@ -4,12 +4,16 @@ import sinon from 'sinon';
 import { log } from '@clack/prompts';
 import { PortalServePrompts } from '../../../src/prompts/portal/serve.js';
 import {
+  reportLeftOutSpecs,
   reportNoTabsListed,
   reportShadowedFiles,
+  reportSharedEndpoints,
   reportSharedTabNames,
   reportSourceProblem,
+  reportUnmergedSpecs,
   reportUnseenHomeTitle
 } from '../../../src/prompts/portal/source.js';
+import { Endpoint } from '../../../src/types/portal/endpoint.js';
 import { ContentProblem } from '../../../src/types/portal/portal-source.js';
 import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
 import { FileName } from '../../../src/types/file/fileName.js';
@@ -179,10 +183,110 @@ describe('reportSourceProblem', () => {
       expect(printed()).to.contain('Convert the other 2 documents the same way.');
     });
 
-    it('says a document in a folder of it is not read', () => {
-      reportSourceProblem({ kind: 'emptySpecDirectory', folders: [spec.join('transformations')] }, source);
+    // A folder to an API is the layout merging needs, so the message cannot only say to undo it.
+    it('says a document in a folder of it is not read, and both ways to have it read', () => {
+      reportSourceProblem({ kind: 'emptySpecDirectory', folders: [spec.join('alpha'), spec.join('beta')] }, source);
 
-      expect(printed()).to.contain("such as 'transformations', is not read: move it up.");
+      expect(printed()).to.contain('has no API definition.');
+      expect(printed()).to.contain(
+        "A document in a folder inside it, such as 'alpha' and 'beta', is not read. Move it up, or to keep one " +
+          "API to a folder, turn on 'MergeApis' in an 'APIMATIC-META.json' beside the folders: " +
+          'https://docs.apimatic.io/manage-apis/api-merging/'
+      );
+    });
+
+    it('names the folder a conversion is for, and moves the result up into that folder', () => {
+      const folder = spec.join('orders');
+      reportSourceProblem(
+        {
+          kind: 'noOpenApiSpec',
+          conversion: {
+            file: new FilePath(folder, new FileName('orders.json')),
+            format: 'Swagger 2.0',
+            converted: new FilePath(folder.join('transformations'), new FileName('orders_OpenApi3Yaml.yaml')),
+            others: 0
+          }
+        },
+        source
+      );
+
+      expect(printed()).to.contain(`No OpenAPI 3.x document found in '${folder}'.`);
+      expect(printed()).to.contain('--destination=./project/src/spec/orders');
+      expect(printed()).to.contain(`up into '${folder}'.`);
+      expect(printed()).to.not.contain('only folder read');
+    });
+
+    it('names a document it cannot read by its folder', () => {
+      const file = new FilePath(spec.join('orders'), new FileName('openapi.yaml'));
+      reportSourceProblem({ kind: 'unreadableSpec', file }, source);
+
+      expect(printed()).to.equal("'spec/orders/openapi.yaml' could not be read as JSON or YAML.");
+    });
+
+    it('names a metadata file it cannot read, which is JSON only', () => {
+      reportSourceProblem(
+        { kind: 'unreadableMetadata', file: new FilePath(spec, new FileName('APIMATIC-META.json')) },
+        source
+      );
+
+      expect(printed()).to.equal("'spec/APIMATIC-META.json' could not be read as JSON.");
+    });
+  });
+
+  describe('folders a metadata file merges that hold nothing to read', () => {
+    const spec = source.join('spec');
+    const metadata = new FilePath(spec, new FileName('APIMATIC-META.json'));
+
+    it('names the file and one folder, and the two ways to put it right', () => {
+      reportSourceProblem({ kind: 'emptyMergedFolders', metadata, folders: [spec.join('orderz')] }, source);
+
+      expect(printed().split('\n')).to.deep.equal([
+        "'spec/APIMATIC-META.json' merges './spec/orderz', which holds no API definition the portal can read.",
+        `A merged folder sits inside '${spec}', with its OpenAPI 3.x document at its top. Add one to it, or ` +
+          "list only the folders to merge in 'MergeOrderOfDirectories'."
+      ]);
+    });
+
+    // A folder outside `spec/` may hold a document, which the platform is never sent.
+    it('names each folder by its path, so one nested or outside the spec directory reads as such', () => {
+      reportSourceProblem(
+        { kind: 'emptyMergedFolders', metadata, folders: [spec.join('apis', 'orders'), source.join('content')] },
+        source
+      );
+
+      expect(printed().split('\n')).to.deep.equal([
+        "'spec/APIMATIC-META.json' merges './spec/apis/orders' and './content', which hold no API definition the " +
+          'portal can read.',
+        `A merged folder sits inside '${spec}', with its OpenAPI 3.x document at its top. Add one to each, or ` +
+          "list only the folders to merge in 'MergeOrderOfDirectories'."
+      ]);
+    });
+
+    it('names each document of a merged folder that holds more than one, and how to split them', () => {
+      const orders = spec.join('orders');
+      reportSourceProblem(
+        {
+          kind: 'severalSpecsInFolder',
+          files: [new FilePath(orders, new FileName('orders.json')), new FilePath(orders, new FileName('returns.json'))]
+        },
+        source
+      );
+
+      expect(printed().split('\n')).to.deep.equal([
+        "'spec/orders/orders.json' and 'spec/orders/returns.json' are each an OpenAPI document, but a folder " +
+          "that 'APIMATIC-META.json' merges holds one API definition.",
+        'Keep one there and move each of the others into a folder of its own, adding the new folders to ' +
+          "'MergeOrderOfDirectories' when the file lists folders."
+      ]);
+    });
+
+    it('says so when the file merges and there is no folder at all', () => {
+      reportSourceProblem({ kind: 'emptyMergedFolders', metadata, folders: [] }, source);
+
+      expect(printed().split('\n')).to.deep.equal([
+        `'spec/APIMATIC-META.json' merges the folders of '${spec}', which has none.`,
+        "Put each API definition in a folder of its own there, or turn off 'MergeApis' in the file."
+      ]);
     });
   });
 
@@ -552,5 +656,136 @@ describe('reportUnseenHomeTitle', () => {
       "'content/nav.json' names the Home tab with 'title', but Home is the only tab and one tab draws no tab bar, " +
         "so the name shows nowhere. Name a tab in 'tabs', or remove the setting."
     ]);
+  });
+});
+
+describe('reportUnmergedSpecs', () => {
+  const source = new DirectoryPath('project').join('src');
+  const spec = source.join('spec');
+  let lines: string[];
+
+  beforeEach(() => {
+    lines = [];
+    sinon.stub(log, 'warn').callsFake((text?: string | string[]) => {
+      lines.push(stripVTControlCharacters(String(text)));
+    });
+  });
+
+  afterEach(() => {
+    sinon.restore();
+  });
+
+  it('says nothing when the specs are merged, or there is one', () => {
+    reportUnmergedSpecs([], source);
+
+    expect(lines).to.deep.equal([]);
+  });
+
+  it('names the specs, says the SDKs cover one of them, and how to cover them all', () => {
+    reportUnmergedSpecs(
+      [new FilePath(spec, new FileName('orders.json')), new FilePath(spec, new FileName('items.json'))],
+      source
+    );
+
+    expect(lines).to.deep.equal([
+      "'spec/orders.json' and 'spec/items.json' are separate API definitions, and the SDKs are generated from one " +
+        "of them only. To cover them all, give each its own folder and turn on 'MergeApis' in an " +
+        "'APIMATIC-META.json' beside the folders: https://docs.apimatic.io/manage-apis/api-merging/"
+    ]);
+  });
+});
+
+describe('reportLeftOutSpecs', () => {
+  const source = new DirectoryPath('project').join('src');
+  const spec = source.join('spec');
+  let lines: string[];
+
+  beforeEach(() => {
+    lines = [];
+    sinon.stub(log, 'warn').callsFake((text?: string | string[]) => {
+      lines.push(stripVTControlCharacters(String(text)));
+    });
+  });
+
+  afterEach(() => {
+    sinon.restore();
+  });
+
+  it('says nothing when no API definition sits beside the merged folders', () => {
+    reportLeftOutSpecs([], source);
+
+    expect(lines).to.deep.equal([]);
+  });
+
+  it('names the one left out, and how to include it', () => {
+    reportLeftOutSpecs([new FilePath(spec, new FileName('orders.json'))], source);
+
+    expect(lines).to.deep.equal([
+      "'spec/orders.json' is left out of the portal and the SDKs, as 'APIMATIC-META.json' merges only the folders " +
+        'beside it. To include it, move it into a folder of its own, adding the folder to ' +
+        "'MergeOrderOfDirectories' when the file lists folders."
+    ]);
+  });
+
+  it('names several as a sentence would', () => {
+    reportLeftOutSpecs(
+      [new FilePath(spec, new FileName('orders.json')), new FilePath(spec, new FileName('items.json'))],
+      source
+    );
+
+    expect(lines).to.deep.equal([
+      "'spec/orders.json' and 'spec/items.json' are left out of the portal and the SDKs, as 'APIMATIC-META.json' " +
+        'merges only the folders beside it. To include them, move each into a folder of its own, adding the ' +
+        "folders to 'MergeOrderOfDirectories' when the file lists folders."
+    ]);
+  });
+});
+
+describe('reportSharedEndpoints', () => {
+  const source = new DirectoryPath('project').join('src');
+  const spec = source.join('spec');
+  const files = ['alpha', 'beta'].map((folder) => new FilePath(spec.join(folder), new FileName('openapi.json')));
+  let lines: string[];
+
+  beforeEach(() => {
+    lines = [];
+    const record = (text?: string | string[]) => {
+      lines.push(stripVTControlCharacters(String(text)));
+    };
+    sinon.stub(log, 'warn').callsFake(record);
+    sinon.stub(log, 'message').callsFake(record);
+  });
+
+  afterEach(() => {
+    sinon.restore();
+  });
+
+  it('says nothing when no two specs declare the same operation', () => {
+    reportSharedEndpoints([], source);
+
+    expect(lines).to.deep.equal([]);
+  });
+
+  it('names each operation and the specs declaring it, and why it shows no SDK sample', () => {
+    reportSharedEndpoints(
+      [
+        { endpoint: new Endpoint('get', '/status'), files },
+        { endpoint: new Endpoint('post', '/status'), files }
+      ],
+      source
+    );
+
+    expect(lines.join('\n').split('\n')).to.deep.equal([
+      'More than one API definition declares these operations, so the portal shows no SDK sample on them:',
+      "  • 'GET /status': 'spec/alpha/openapi.json' and 'spec/beta/openapi.json'",
+      "  • 'POST /status': 'spec/alpha/openapi.json' and 'spec/beta/openapi.json'"
+    ]);
+  });
+
+  it('speaks of one operation when there is one', () => {
+    reportSharedEndpoints([{ endpoint: new Endpoint('get', '/status'), files }], source);
+
+    expect(lines[0]).to.contain('declares this operation,');
+    expect(lines[0]).to.contain('no SDK sample on it:');
   });
 });

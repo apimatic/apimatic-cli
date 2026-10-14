@@ -7,12 +7,18 @@ import { ContentNotices } from './content-notices.js';
 import { GeneratedPages } from './generated-pages.js';
 import { PortalConfig } from './portal-config.js';
 
-/** An OpenAPI document found in `src/spec/`, with the slug its section is mounted at. */
+/** An OpenAPI document found in `src/spec/` or in a folder merged there, with the slug its section is mounted at. */
 export interface PortalSpec {
   slug: string;
   file: FilePath;
   /** Its operations, including those behind a `$ref` path item. */
   endpoints: Endpoint[];
+}
+
+/** An operation more than one specification declares, which one code sample per method and path cannot serve. */
+export interface SharedEndpoint {
+  endpoint: Endpoint;
+  files: FilePath[];
 }
 
 /** What `apimatic.json` decides about a portal, which `portal serve` reads again on every edit. */
@@ -29,6 +35,12 @@ export interface PortalSource extends PortalSettings {
    */
   suggestedSite: SuggestedSite | null;
   specs: PortalSpec[];
+  /** Several specifications at the top of `spec/` that no `APIMATIC-META.json` merges, so the SDKs cover one; else none. */
+  unmergedSpecs: FilePath[];
+  /** API definitions at the top of `spec/` while its folders are merged, which the portal and the SDKs leave out. */
+  leftOutSpecs: FilePath[];
+  /** Shown with no SDK sample, since the samples hold one per method and path. */
+  sharedEndpoints: SharedEndpoint[];
   contentDirectory: DirectoryPath | null;
   staticDirectory: DirectoryPath | null;
   shadowedFiles: FileName[];
@@ -97,12 +109,12 @@ export type ContentProblem =
   | { kind: 'invalidNavigation'; errors: string[] }
   | { kind: 'missingImages'; images: MissingImage[] };
 
-/** How `api transform` would turn the first document in `spec/` into one the portal reads. */
+/** How `api transform` would turn the first document in a directory into one the portal reads. */
 export interface SpecConversion {
   file: FilePath;
   /** What the document is instead, when it says; null for one that names no format. */
   format: string | null;
-  /** Where `api transform --destination` of `spec/` writes it, which is one folder too deep. */
+  /** Where `api transform --destination` of the document's directory writes it, which is one folder too deep. */
   converted: FilePath;
   others: number;
 }
@@ -114,8 +126,13 @@ export type PortalSourceProblem =
   | { kind: 'invalidConfig'; errors: string[]; missingPortal: boolean }
   // Every problem found in `content/`, so that one run lists all that a build would refuse.
   | { kind: 'invalidContent'; problems: ContentProblem[] }
-  | { kind: 'unreadableSpec'; fileName: FileName }
-  // Its `folders` are not read, and `api transform` writes into one of its own.
+  | { kind: 'unreadableSpec'; file: FilePath }
+  | { kind: 'unreadableMetadata'; file: FilePath }
+  // Its `folders` are not read unless a metadata file merges them, and `api transform` writes into one of its own.
   | { kind: 'emptySpecDirectory'; folders: DirectoryPath[] }
+  // The `folders` that `metadata` merges and that hold no file to read; none when it has no folder to merge at all.
+  | { kind: 'emptyMergedFolders'; metadata: FilePath; folders: DirectoryPath[] }
+  // Every OpenAPI 3.x document at the top of a merged folder, which holds one API.
+  | { kind: 'severalSpecsInFolder'; files: FilePath[] }
   | { kind: 'noOpenApiSpec'; conversion: SpecConversion }
   | { kind: 'missingStaticFiles'; files: MissingStaticFile[] };

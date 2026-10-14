@@ -52,3 +52,16 @@ describe('DirectoryPath.fromUserInput', () => {
     expect(DirectoryPath.fromUserInput(typed).toString()).to.equal(path.resolve(typed));
   });
 });
+
+// What orders the folders of a spec directory that are merged without an order of their own.
+describe('DirectoryPath.compare', () => {
+  const spec = new DirectoryPath(path.join('/', 'projects', 'petstore-api', 'src', 'spec'));
+
+  it('orders sibling directories by name, by code point', () => {
+    const sorted = [spec.join('beta'), spec.join('alpha'), spec.join('Zeta')].sort((left, right) =>
+      left.compare(right)
+    );
+
+    expect(sorted.map((directory) => directory.leafName())).to.deep.equal(['Zeta', 'alpha', 'beta']);
+  });
+});

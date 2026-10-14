@@ -87,6 +87,12 @@ export class OpenApiDocument {
     return { supported: false, format: null };
   }
 
+  /** Whether it names the API format it is in, as a definition does and a file of shared parts does not. */
+  public isApiDefinition(): boolean {
+    const format = this.format();
+    return format.supported || format.format !== null;
+  }
+
   /**
    * Both fields are written into generated files, so each is collapsed to one line. The
    * description stops at its first blank line: past it a specification's description is

@@ -66,6 +66,11 @@ export class DirectoryPath {
     return this.directoryPath === other.directoryPath;
   }
 
+  /** By code point, as `FileName.compare` is and for its reason. */
+  public compare(other: DirectoryPath): number {
+    return this.directoryPath < other.directoryPath ? -1 : Number(this.directoryPath > other.directoryPath);
+  }
+
   /** True when `other` is this directory or sits anywhere inside it. */
   public contains(other: DirectoryPath) {
     const relative = path.relative(this.directoryPath, other.directoryPath);
