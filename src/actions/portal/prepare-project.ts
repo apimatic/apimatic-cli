@@ -64,6 +64,9 @@ export class PreparePortalProjectAction {
     }
     this.prompts.filesShadowedByStatic(source.value.shadowedFiles);
     this.prompts.contentNotices(source.value.contentNotices, sourceDirectory);
+    this.prompts.unmergedSpecs(source.value.unmergedSpecs, sourceDirectory);
+    this.prompts.leftOutSpecs(source.value.leftOutSpecs, sourceDirectory);
+    this.prompts.sharedEndpoints(source.value.sharedEndpoints, sourceDirectory);
 
     if (!(await confirm())) {
       return ActionResult.cancelled();

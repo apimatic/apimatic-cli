@@ -1,0 +1,7 @@
+{
+  "MergeConfiguration": {
+    "MergeApis": true,
+    "MergedApiName": "Store APIs",
+    "MergeOrderOfDirectories": ["orders", "inventory"]
+  }
+}

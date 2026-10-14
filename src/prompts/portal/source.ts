@@ -11,18 +11,34 @@ import {
   PortalSourceProblem,
   ReservedAddressPage,
   SharedAddress,
+  SharedEndpoint,
   SpecConversion
 } from '../../types/portal/portal-source.js';
+import { Shared } from '../../types/portal/shared.js';
+import { MERGE_SETTINGS } from '../../types/portal/spec-metadata.js';
 import { TRANSFORMATIONS_DIRECTORY_NAME } from '../../types/transform-context.js';
 import { PortalTab, SharedTabName } from '../../types/portal/portal-tabs.js';
 import { FileName } from '../../types/file/fileName.js';
 import { FilePath } from '../../types/file/filePath.js';
-import { CONTENT_DIRECTORY_NAME, SPEC_DIRECTORY_NAME, STATIC_DIRECTORY_NAME } from '../../types/project-layout.js';
+import {
+  CONTENT_DIRECTORY_NAME,
+  METADATA_FILE_NAME,
+  SPEC_DIRECTORY_NAME,
+  SPEC_EXTENSIONS,
+  STATIC_DIRECTORY_NAME
+} from '../../types/project-layout.js';
 import { format as f } from '../format.js';
 
 const TITLE_EXAMPLE = ['---', 'title: Getting started', '---'].join('\n');
 
 const ROOT_NAVIGATION_FILE = `${CONTENT_DIRECTORY_NAME}/${NAVIGATION_FILE_NAME}`;
+
+const mergeTheFolders = (): string =>
+  `set ${f.var(`${MERGE_SETTINGS.configuration}.${MERGE_SETTINGS.mergeApis}`)} to true in an ` +
+  `${f.var(METADATA_FILE_NAME)} beside the folders`;
+
+const addingToMergeOrder = (folders: string): string =>
+  `adding ${folders} to ${f.var(MERGE_SETTINGS.order)} when the file lists folders`;
 
 export const specPath = (sourceDirectory: DirectoryPath): string => f.path(sourceDirectory.join(SPEC_DIRECTORY_NAME));
 
@@ -33,6 +49,12 @@ export const staticPath = (sourceDirectory: DirectoryPath): string =>
   f.path(sourceDirectory.join(STATIC_DIRECTORY_NAME));
 
 const relative = (file: FilePath, sourceDirectory: DirectoryPath): string => f.var(file.relativeTo(sourceDirectory));
+
+const listed = (files: FilePath[], sourceDirectory: DirectoryPath): string =>
+  listedInProse(files.map((file) => relative(file, sourceDirectory)));
+
+const sharedLines = <Key>(claims: Shared<Key>[], sourceDirectory: DirectoryPath): string =>
+  claims.map(({ key, files }) => `  • ${f.var(String(key))}: ${listed(files, sourceDirectory)}`).join('\n');
 
 const spelt = (found: FilePath, sourceDirectory: DirectoryPath): string =>
   `spelt ${relative(found, sourceDirectory)} on disk`;
@@ -55,11 +77,10 @@ export const convertToOpenApi3 = (): string =>
   `Convert it with ${transformCommand([f.flag('file', '<your spec>')])}, and use the file it writes into a ` +
   `${f.var(TRANSFORMATIONS_DIRECTORY_NAME)} folder.`;
 
-function reportSpecConversion({ file, format, converted, others }: SpecConversion, sourceDirectory: DirectoryPath) {
+function reportSpecConversion({ file, format, converted, others }: SpecConversion) {
   const name = f.var(file.name().toString());
-  log.error(
-    `No OpenAPI 3.x document found in ${specPath(sourceDirectory)}.` + (format === null ? '' : ` ${name} is ${format}.`)
-  );
+  const directory = f.path(file.directory());
+  log.error(`No OpenAPI 3.x document found in ${directory}.` + (format === null ? '' : ` ${name} is ${format}.`));
   const command = transformCommand([
     f.flag('file', f.relative(file)),
     f.flag('destination', f.relative(file.directory()))
@@ -69,9 +90,35 @@ function reportSpecConversion({ file, format, converted, others }: SpecConversio
   log.message(
     `${convert} it with:\n` +
       `  ${command}\n` +
-      `then move ${f.relativePath(converted)} up into ${specPath(sourceDirectory)}, which is the only folder read.` +
+      `then move ${f.relativePath(converted)} up into ${directory}, in place of ${name}.` +
       (others === 0 ? '' : ` Convert the other ${documents} the same way.`)
   );
+}
+
+const folderNames = (folders: DirectoryPath[], sourceDirectory: DirectoryPath): string =>
+  listedInProse(folders.map((folder) => f.var(folder.relativeTo(sourceDirectory))));
+
+function reportMissingMergedFolders(metadata: FilePath, folders: DirectoryPath[], sourceDirectory: DirectoryPath) {
+  const [verb, noun] = folders.length === 1 ? ['is', 'a folder'] : ['are', 'folders'];
+  log.error(
+    `${relative(metadata, sourceDirectory)} merges ${folderNames(folders, sourceDirectory)}, which ${verb} not ` +
+      `${noun} inside ${specPath(sourceDirectory)}.`
+  );
+  log.message(
+    `Name each folder in ${f.var(MERGE_SETTINGS.order)} by its path from the file, spelt as on disk, case included.`
+  );
+}
+
+function reportEmptyMergedFolders(metadata: FilePath, folders: DirectoryPath[], sourceDirectory: DirectoryPath) {
+  const [verb, add] =
+    folders.length === 1
+      ? ['holds', 'its OpenAPI 3.x document to the top of the folder']
+      : ['hold', "each one's OpenAPI 3.x document to the top of its folder"];
+  log.error(
+    `${relative(metadata, sourceDirectory)} merges ${folderNames(folders, sourceDirectory)}, which ${verb} no API ` +
+      `definition.`
+  );
+  log.message(`Add ${add}, or list only the folders to merge in ${f.var(MERGE_SETTINGS.order)}.`);
 }
 
 /**
@@ -94,7 +141,11 @@ export function reportSourceProblem(problem: PortalSourceProblem, sourceDirector
       return;
     }
     case 'unreadableSpec': {
-      log.error(`${f.var(problem.fileName.toString())} could not be read as JSON or YAML.`);
+      log.error(`${relative(problem.file, sourceDirectory)} could not be read as JSON or YAML.`);
+      return;
+    }
+    case 'unreadableMetadata': {
+      log.error(`${relative(problem.file, sourceDirectory)} could not be read as JSON.`);
       return;
     }
     case 'missingStaticFiles': {
@@ -119,18 +170,56 @@ export function reportSourceProblem(problem: PortalSourceProblem, sourceDirector
       return;
     }
     case 'emptySpecDirectory': {
+      const extensions = listedInProse(
+        SPEC_EXTENSIONS.map((extension) => f.var(extension)),
+        'or'
+      );
       const message =
-        `${specPath(sourceDirectory)} has no files. Add your OpenAPI 3.x document to it as a ` +
-        `${f.var('.json')}, ${f.var('.yaml')} or ${f.var('.yml')} file.`;
+        `${specPath(sourceDirectory)} has no API definition. Add your OpenAPI 3.x document to it as a ` +
+        `${extensions} file.`;
       log.error(message);
       if (problem.folders.length > 0) {
         const folders = listedInProse(problem.folders.map((folder) => f.var(folder.leafName())));
-        log.message(`A document in a folder inside it, such as ${folders}, is not read: move it up.`);
+        log.message(
+          `A document in a folder inside it, such as ${folders}, is not read. Move it up, or to keep one API ` +
+            `to a folder, ${mergeTheFolders()}.`
+        );
       }
       return;
     }
+    case 'noFoldersToMerge': {
+      log.error(
+        `${relative(problem.metadata, sourceDirectory)} merges the folders of ${specPath(sourceDirectory)}, which ` +
+          `has none.`
+      );
+      log.message(
+        `Put each API definition in a folder of its own there, or turn off ${f.var(MERGE_SETTINGS.mergeApis)} in ` +
+          `the file.`
+      );
+      return;
+    }
+    case 'missingMergedFolders': {
+      reportMissingMergedFolders(problem.metadata, problem.folders, sourceDirectory);
+      return;
+    }
+    case 'emptyMergedFolders': {
+      reportEmptyMergedFolders(problem.metadata, problem.folders, sourceDirectory);
+      return;
+    }
+    case 'severalSpecsInFolder': {
+      const shared = f.var(problem.folder.join('shared').relativeTo(sourceDirectory));
+      log.error(
+        `${listed(problem.files, sourceDirectory)} are each an API definition, but a folder that ` +
+          `${f.var(METADATA_FILE_NAME)} merges holds one at its top, and the SDKs are built from one of them only.`
+      );
+      log.message(
+        `Keep the definition there and move each of the others: shared parts into a folder inside it, such as ` +
+          `${shared}, and another API into a folder of its own, ${addingToMergeOrder('the new folders')}.`
+      );
+      return;
+    }
     case 'noOpenApiSpec': {
-      reportSpecConversion(problem.conversion, sourceDirectory);
+      reportSpecConversion(problem.conversion);
       return;
     }
   }
@@ -153,7 +242,7 @@ function reportContentProblem(problem: ContentProblem, sourceDirectory: Director
       return;
     }
     case 'groupNamedPages': {
-      const names = listedInProse(problem.pages.map((page) => relative(page, sourceDirectory)));
+      const names = listed(problem.pages, sourceDirectory);
       const one = problem.pages.length === 1;
       log.error(
         `${names} ${one ? 'is' : 'are'} named like a ${f.var('(group)')} folder, which is left out of every ` +
@@ -229,15 +318,11 @@ function reportReservedAddresses(pages: ReservedAddressPage[], sourceDirectory: 
 
 function reportSharedAddresses(addresses: SharedAddress[], sourceDirectory: DirectoryPath): void {
   const one = addresses.length === 1;
-  const lines = addresses.map(
-    ({ address, pages }) =>
-      `  • ${f.var(address)}: ${listedInProse(pages.map((page) => relative(page, sourceDirectory)))}`
-  );
   log.error(
     `Pages in ${f.path(sourceDirectory)} would share ${one ? 'an address' : 'addresses'}, but only one page ` +
       `can be served at each:`
   );
-  log.message(lines.join('\n'));
+  log.message(sharedLines(addresses, sourceDirectory));
   log.message(
     `Rename or move all but one ${one ? 'of them' : 'page at each address'}. A page in a ${f.var(
       '(group)'
@@ -254,11 +339,47 @@ export function reportShadowedFiles(shadowed: FileName[]): void {
   log.warn(`${names} in ${f.var('static')} ${replaces} the portal would have generated.`);
 }
 
+export function reportUnmergedSpecs(files: FilePath[], sourceDirectory: DirectoryPath): void {
+  if (files.length === 0) {
+    return;
+  }
+  const names = listed(files, sourceDirectory);
+  log.warn(
+    `${names} are separate API definitions, and the SDKs are generated from one of them only. To cover them all, ` +
+      `give each its own folder and ${mergeTheFolders()}.`
+  );
+}
+
+export function reportLeftOutSpecs(files: FilePath[], sourceDirectory: DirectoryPath): void {
+  if (files.length === 0) {
+    return;
+  }
+  const [verb, pronoun, moved, folders] =
+    files.length === 1 ? ['is', 'it', 'it', 'folder'] : ['are', 'them', 'each', 'folders'];
+  log.warn(
+    `${listed(files, sourceDirectory)} ${verb} left out of the portal and the SDKs, as ` +
+      `${f.var(METADATA_FILE_NAME)} merges only the folders beside it. To include ${pronoun}, move ${moved} into ` +
+      `a folder of its own, ${addingToMergeOrder(`the ${folders}`)}.`
+  );
+}
+
+export function reportSharedEndpoints(shared: SharedEndpoint[], sourceDirectory: DirectoryPath): void {
+  if (shared.length === 0) {
+    return;
+  }
+  const one = shared.length === 1;
+  log.warn(
+    `More than one API definition declares ${one ? 'this operation' : 'these operations'}, so the portal shows no ` +
+      `SDK sample on ${one ? 'it' : 'them'}:`
+  );
+  log.message(sharedLines(shared, sourceDirectory));
+}
+
 export function reportIgnoredNavigationFiles(files: FilePath[], sourceDirectory: DirectoryPath): void {
   if (files.length === 0) {
     return;
   }
-  const names = listedInProse(files.map((file) => relative(file, sourceDirectory)));
+  const names = listed(files, sourceDirectory);
   const verb = files.length === 1 ? 'is' : 'are';
   // Not "rename it": on a case-sensitive filesystem a correctly named file may already sit
   // beside it, and the two would then need merging rather than renaming.
@@ -355,7 +476,7 @@ export function reportHiddenPages(files: FilePath[], sourceDirectory: DirectoryP
   if (files.length === 0) {
     return;
   }
-  const names = listedInProse(files.map((file) => relative(file, sourceDirectory)));
+  const names = listed(files, sourceDirectory);
   const [verb, pronoun] = files.length === 1 ? ['sits', 'it'] : ['sit', 'them'];
   log.warn(
     `${names} ${verb} inside a specification's section under ${f.var('content/api')}, which lists only ` +

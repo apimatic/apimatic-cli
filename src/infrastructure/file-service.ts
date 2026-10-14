@@ -165,20 +165,28 @@ export class FileService {
 
   // By code point first: Windows and macOS open `logo.png` for `Logo.PNG`, where a web server would not.
   public async spelledOnDisk(root: DirectoryPath, file: FilePath): Promise<FilePath | null> {
-    const names = path.relative(root.toString(), file.toString()).split(path.sep);
-    const fileName = names.pop() ?? '';
-    let directory = root;
-    for (const name of names) {
-      const { subDirectories } = await this.listEntries(directory);
+    const directory = await this.directorySpelledOnDisk(root, file.directory());
+    if (directory === null) {
+      return null;
+    }
+    const { fileNames } = await this.listEntries(directory);
+    const match = spelling(file.name().toString(), fileNames, (candidate) => candidate.toString());
+    return match === undefined ? null : new FilePath(directory, match);
+  }
+
+  /** `directory`, at or below `root`, as each folder below `root` is spelt on disk; null when one is not there. */
+  public async directorySpelledOnDisk(root: DirectoryPath, directory: DirectoryPath): Promise<DirectoryPath | null> {
+    const relative = path.relative(root.toString(), directory.toString());
+    let found = root;
+    for (const name of relative === '' ? [] : relative.split(path.sep)) {
+      const { subDirectories } = await this.listEntries(found);
       const match = spelling(name, subDirectories, (subDirectory) => path.basename(subDirectory.toString()));
       if (match === undefined) {
         return null;
       }
-      directory = match;
+      found = match;
     }
-    const { fileNames } = await this.listEntries(directory);
-    const match = spelling(fileName, fileNames, (candidate) => candidate.toString());
-    return match === undefined ? null : new FilePath(directory, match);
+    return found;
   }
 
   // The direct children of `dir`, split into files and directories; both empty when it cannot

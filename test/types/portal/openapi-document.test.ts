@@ -66,6 +66,26 @@ describe('OpenApiDocument', () => {
     });
   });
 
+  describe('namesApiFormat', () => {
+    // As the platform takes a merged folder's definition, paths or not.
+    it('names one for any version key, and none for a file without', () => {
+      expect(readJson({ openapi: '3.1.0', paths: {} }).namesApiFormat()).to.be.true;
+      expect(readJson({ swagger: '2.0' }).namesApiFormat()).to.be.true;
+      expect(readJson({ asyncapi: '2.6.0' }).namesApiFormat()).to.be.true;
+      expect(readJson({ components: { schemas: {} } }).namesApiFormat()).to.be.false;
+    });
+  });
+
+  describe('declaresOperations', () => {
+    it('declares them by paths, webhooks or channels, and not by shared parts alone', () => {
+      expect(readJson({ openapi: '3.1.0', paths: { '/pets': { $ref: './pets.yaml' } } }).declaresOperations()).to.be
+        .true;
+      expect(readJson({ openapi: '3.1.0', webhooks: { newPet: { post: {} } } }).declaresOperations()).to.be.true;
+      expect(readJson({ asyncapi: '2.6.0', channels: { pets: {} } }).declaresOperations()).to.be.true;
+      expect(readJson({ openapi: '3.1.0', paths: {}, components: { schemas: {} } }).declaresOperations()).to.be.false;
+    });
+  });
+
   describe('suggestedSite', () => {
     it('takes the title and description from the document', () => {
       const site = withInfo({ title: 'Swagger Petstore', version: '1', description: 'Pets.' }).suggestedSite();

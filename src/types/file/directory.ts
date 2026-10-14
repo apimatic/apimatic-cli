@@ -2,6 +2,7 @@ import { DirectoryPath } from './directoryPath.js';
 import { FileName } from './fileName.js';
 import { FilePath } from './filePath.js';
 import { TreeNode } from '../../prompts/format.js';
+import { METADATA_FILE_NAME } from '../project-layout.js';
 
 export type FileItem = { fileName: FileName; description?: string };
 export type DirectoryItem = FileItem | Directory;
@@ -24,7 +25,7 @@ export class Directory {
   private static readonly fileDescriptions: Record<string, string> = {
     'apimatic.json': '# Configures the documentation portal and the context plugin',
     'APIMATIC-BUILD.json': '# Defines all configurations for SDK generation',
-    'APIMATIC-META.json': '# Defines customization for SDK generation'
+    [METADATA_FILE_NAME]: '# Defines customization for SDK generation'
   };
 
   public toTreeNode(): TreeNode {

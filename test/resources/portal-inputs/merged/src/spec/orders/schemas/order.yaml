@@ -1,0 +1,8 @@
+type: object
+required: [orderId]
+properties:
+  orderId:
+    type: string
+  grandTotalCents:
+    type: integer
+    example: 1250
