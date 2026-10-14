@@ -6,15 +6,12 @@ export interface Shared<Key> {
   files: FilePath[];
 }
 
-/** The keys more than one file claims, each with its files in the order claimed; a file claiming a key twice counts once. */
+/** The keys more than one file claims, each with its files in the order claimed. */
 export function shared<Key>(claims: { key: Key; file: FilePath }[]): Shared<Key>[] {
   const byKey = new Map<string, Shared<Key>>();
   for (const { key, file } of claims) {
-    const claimed = byKey.get(String(key)) ?? { key, files: [] };
-    byKey.set(String(key), {
-      key: claimed.key,
-      files: claimed.files.some((other) => other.isEqual(file)) ? claimed.files : [...claimed.files, file]
-    });
+    const claimed = byKey.get(String(key));
+    byKey.set(String(key), { key, files: [...(claimed?.files ?? []), file] });
   }
   return [...byKey.values()].filter(({ files }) => files.length > 1);
 }

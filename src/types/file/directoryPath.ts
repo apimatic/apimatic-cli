@@ -74,10 +74,11 @@ export class DirectoryPath {
   /** True when `other` is this directory or sits anywhere inside it. */
   public contains(other: DirectoryPath) {
     const relative = path.relative(this.directoryPath, other.directoryPath);
-    return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
+    // A step up is `..` itself; a folder inside may still be named `..v2`.
+    const up = relative === '..' || relative.startsWith(`..${path.sep}`);
+    return relative === '' || (!up && !path.isAbsolute(relative));
   }
 
-  /** True when `other` sits anywhere inside this directory, and is not this directory itself. */
   public isAncestorOf(other: DirectoryPath) {
     return this.contains(other) && !this.isEqual(other);
   }

@@ -128,9 +128,10 @@ export type PortalSourceProblem =
   // Its `folders` are not read unless a metadata file merges them, and `api transform` writes into one of its own.
   | { kind: 'emptySpecDirectory'; folders: DirectoryPath[] }
   | { kind: 'noFoldersToMerge'; metadata: FilePath }
-  // Each of the `folders` that `metadata` merges and the platform would find no definition in.
+  // The `folders` that `metadata` names and the platform would not find: not there as spelt, or not inside `spec/`.
+  | { kind: 'missingMergedFolders'; metadata: FilePath; folders: DirectoryPath[] }
   | { kind: 'emptyMergedFolders'; metadata: FilePath; folders: DirectoryPath[] }
-  // Every OpenAPI 3.x document at the top of a merged folder, which holds one API.
-  | { kind: 'severalSpecsInFolder'; files: FilePath[] }
+  // Every file at the top of `folder` that names an API format; the platform builds the folder from one of them.
+  | { kind: 'severalSpecsInFolder'; folder: DirectoryPath; files: FilePath[] }
   | { kind: 'noOpenApiSpec'; conversion: SpecConversion }
   | { kind: 'missingStaticFiles'; files: MissingStaticFile[] };

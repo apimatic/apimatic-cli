@@ -63,6 +63,11 @@ describe('DirectoryPath.isAncestorOf', () => {
     expect(spec.isAncestorOf(spec.resolve('..'))).to.be.false;
     expect(spec.isAncestorOf(spec.resolve('../content'))).to.be.false;
   });
+
+  it('holds a directory whose name starts with two dots, which is no step up', () => {
+    expect(spec.isAncestorOf(spec.join('..v2'))).to.be.true;
+    expect(spec.contains(spec.join('..v2'))).to.be.true;
+  });
 });
 
 // What orders the folders of a spec directory that are merged without an order of their own.

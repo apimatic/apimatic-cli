@@ -173,6 +173,8 @@ describe('reportSourceProblem', () => {
           '--destination=./project/src/spec'
       );
       expect(printed()).to.contain("then move './project/src/spec/transformations/petstore_OpenApi3Yaml.yaml' up into");
+      // Left beside its conversion, the original would be a second definition of the API.
+      expect(printed()).to.contain(", in place of 'petstore.json'.");
       expect(printed()).to.not.contain('the same way');
     });
 
@@ -212,7 +214,7 @@ describe('reportSourceProblem', () => {
 
       expect(printed()).to.contain(`No OpenAPI 3.x document found in '${folder}'.`);
       expect(printed()).to.contain('--destination=./project/src/spec/orders');
-      expect(printed()).to.contain(`up into '${folder}'.`);
+      expect(printed()).to.contain(`up into '${folder}', in place of 'orders.json'.`);
       expect(printed()).to.not.contain('only folder read');
     });
 
@@ -237,36 +239,55 @@ describe('reportSourceProblem', () => {
     const spec = source.join('spec');
     const metadata = new FilePath(spec, new FileName('APIMATIC-META.json'));
 
-    it('names the file and one folder, and the two ways to put it right', () => {
-      reportSourceProblem({ kind: 'emptyMergedFolders', metadata, folders: [spec.join('orderz')] }, source);
+    it('names an empty folder, and the two ways to put it right', () => {
+      reportSourceProblem({ kind: 'emptyMergedFolders', metadata, folders: [spec.join('orders')] }, source);
 
       expect(printed().split('\n')).to.deep.equal([
-        "'spec/APIMATIC-META.json' merges './spec/orderz', which holds no API definition the portal can read.",
-        `A merged folder sits inside '${spec}', is named as it is spelt, case included, and holds its OpenAPI 3.x document at its top. Add one to it, or ` +
-          "list only the folders to merge in 'MergeOrderOfDirectories'."
+        "'spec/APIMATIC-META.json' merges './spec/orders', which holds no API definition.",
+        'Add its OpenAPI 3.x document to the top of the folder, or list only the folders to merge in ' +
+          "'MergeOrderOfDirectories'."
       ]);
     });
 
-    // A folder outside `spec/` may hold a document, which the platform is never sent.
-    it('names each folder by its path, so one nested or outside the spec directory reads as such', () => {
+    it('lists several empty folders as a sentence would', () => {
       reportSourceProblem(
-        { kind: 'emptyMergedFolders', metadata, folders: [spec.join('apis', 'orders'), source.join('content')] },
+        { kind: 'emptyMergedFolders', metadata, folders: [spec.join('orders'), spec.join('apis', 'items')] },
         source
       );
 
       expect(printed().split('\n')).to.deep.equal([
-        "'spec/APIMATIC-META.json' merges './spec/apis/orders' and './content', which hold no API definition the " +
-          'portal can read.',
-        `A merged folder sits inside '${spec}', is named as it is spelt, case included, and holds its OpenAPI 3.x document at its top. Add one to each, or ` +
-          "list only the folders to merge in 'MergeOrderOfDirectories'."
+        "'spec/APIMATIC-META.json' merges './spec/orders' and './spec/apis/items', which hold no API definition.",
+        "Add each one's OpenAPI 3.x document to the top of its folder, or list only the folders to merge in " +
+          "'MergeOrderOfDirectories'."
       ]);
     });
 
-    it('names each document of a merged folder that holds more than one, and where to move the others', () => {
+    // A folder outside `spec/`, or spelt in another case, may well hold a document; the platform still finds none.
+    it('names each folder the platform would not find by its path, and how folders are named', () => {
+      reportSourceProblem(
+        { kind: 'missingMergedFolders', metadata, folders: [spec.join('Orders'), source.join('content'), spec] },
+        source
+      );
+
+      expect(printed().split('\n')).to.deep.equal([
+        `'spec/APIMATIC-META.json' merges './spec/Orders', './content' and './spec', which are not folders inside ` +
+          `'${spec}'.`,
+        "Name each folder in 'MergeOrderOfDirectories' by its path from the file, spelt as on disk, case included."
+      ]);
+    });
+
+    it('speaks of one folder the platform would not find when there is one', () => {
+      reportSourceProblem({ kind: 'missingMergedFolders', metadata, folders: [spec.join('orderz')] }, source);
+
+      expect(printed()).to.contain("merges './spec/orderz', which is not a folder inside");
+    });
+
+    it('names each definition of a merged folder that holds more than one, and where to move the others', () => {
       const orders = spec.join('orders');
       reportSourceProblem(
         {
           kind: 'severalSpecsInFolder',
+          folder: orders,
           files: [
             new FilePath(orders, new FileName('components.json')),
             new FilePath(orders, new FileName('orders.json'))
@@ -276,9 +297,8 @@ describe('reportSourceProblem', () => {
       );
 
       expect(printed().split('\n')).to.deep.equal([
-        "'spec/orders/components.json' and 'spec/orders/orders.json' are each an OpenAPI document, but a folder " +
-          "that 'APIMATIC-META.json' merges holds one API definition at its top, and the SDKs are built from one " +
-          'of them only.',
+        "'spec/orders/components.json' and 'spec/orders/orders.json' are each an API definition, but a folder " +
+          "that 'APIMATIC-META.json' merges holds one at its top, and the SDKs are built from one of them only.",
         'Keep the definition there and move each of the others: shared parts into a folder inside it, such as ' +
           "'./spec/orders/shared', and another API into a folder of its own, adding the new folders to " +
           "'MergeOrderOfDirectories' when the file lists folders."

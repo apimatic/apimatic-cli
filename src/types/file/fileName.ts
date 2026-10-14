@@ -24,7 +24,6 @@ export class FileName {
     return this.name === other.name;
   }
 
-  /** Whether the name starts with a dot, as a placeholder or an operating system's own file does. */
   public isHidden(): boolean {
     return this.name.startsWith('.');
   }

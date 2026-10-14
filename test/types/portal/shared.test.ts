@@ -22,13 +22,4 @@ describe('shared', () => {
 
     expect(named(claims)).to.deep.equal([['GET /status', [alpha.toString(), beta.toString()]]]);
   });
-
-  it('counts a file that claims a key twice once', () => {
-    const claims = shared([
-      { key: new Endpoint('get', '/pets'), file: alpha },
-      { key: new Endpoint('get', '/pets'), file: alpha }
-    ]);
-
-    expect(claims).to.be.empty;
-  });
 });

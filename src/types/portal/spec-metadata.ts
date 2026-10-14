@@ -4,9 +4,9 @@ import { stripByteOrderMark } from '../../utils/string-utils.js';
 /** The settings of its `MergeConfiguration` a portal follows, by the names a message gives them. */
 export const MERGE_SETTINGS = { mergeApis: 'MergeApis', order: 'MergeOrderOfDirectories' } as const;
 
-// The platform matches a setting's name in any case, as its JSON reader does.
+// The platform matches a setting's name in any case, as its JSON reader does, the exact name first.
 const setting = (object: JsonObject, name: string): unknown =>
-  Object.entries(object).find(([key]) => key.toLowerCase() === name.toLowerCase())?.[1];
+  name in object ? object[name] : Object.entries(object).find(([key]) => key.toLowerCase() === name.toLowerCase())?.[1];
 
 /** The platform's metadata file beside API definitions, read for the one thing a portal follows: which folders it merges. */
 export class SpecMetadata {

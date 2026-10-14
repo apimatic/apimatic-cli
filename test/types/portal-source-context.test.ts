@@ -654,12 +654,16 @@ describe('PortalSourceContext', () => {
         write('spec/alpha/openapi.json', OPENAPI);
         write('spec/old.json', withPaths({ '/old': { get: {} } }));
         write('spec/older.yaml', JSON.stringify({ swagger: '2.0', info: {}, paths: { '/older': { get: {} } } }));
+        write('spec/events.yaml', JSON.stringify({ asyncapi: '2.6.0', info: {}, channels: { pets: {} } }));
+        write('spec/hooks.json', JSON.stringify({ openapi: '3.1.0', info: {}, webhooks: { newPet: { post: {} } } }));
         write('spec/common.json', JSON.stringify({ openapi: '3.0.3', info: {}, paths: {}, components: {} }));
         write('spec/shared-schemas.json', JSON.stringify({ components: { schemas: {} } }));
         write('spec/broken.json', '{ not json');
         write('spec/notes.md', '# Specs');
 
         expect((await resolve())._unsafeUnwrap().leftOutSpecs.map(relative)).to.deep.equal([
+          'spec/events.yaml',
+          'spec/hooks.json',
           'spec/old.json',
           'spec/older.yaml'
         ]);
@@ -697,6 +701,15 @@ describe('PortalSourceContext', () => {
         write('spec/alpha/openapi.json', withPaths({ '/pets': { get: {} } }));
 
         expect(await severalSpecs()).to.deep.equal(['spec/alpha/components.json', 'spec/alpha/openapi.json']);
+      });
+
+      // The platform takes any file with a version key, so it would build the SDKs from the Swagger file, which sorts first.
+      it('refuses a definition in another format beside the OpenAPI 3.x document', async () => {
+        merging();
+        write('spec/alpha/a-legacy.json', JSON.stringify({ swagger: '2.0', info: {}, paths: { '/a': { get: {} } } }));
+        write('spec/alpha/openapi.json', withPaths({ '/pets': { get: {} } }));
+
+        expect(await severalSpecs()).to.deep.equal(['spec/alpha/a-legacy.json', 'spec/alpha/openapi.json']);
       });
 
       // The platform looks for the definition at the top of the folder first, whatever the folder inside it is named.
@@ -759,19 +772,38 @@ describe('PortalSourceContext', () => {
       });
 
       // The platform is sent `spec/` alone, and finds a folder only by its exact name.
-      it('reports each merged folder the platform would find nothing in, wherever and however it is named', async () => {
-        merging({ MergeOrderOfDirectories: ['alpha', 'empty', 'hidden', 'misnamed', 'Beta', '.', '../content'] });
+      // The platform is sent `spec/` alone, and finds a folder only by its exact name.
+      it('reports each listed folder the platform would not find, wherever and however it is named', async () => {
+        merging({ MergeOrderOfDirectories: ['alpha', 'misnamed', 'Beta', '.', '../content', 'empty'] });
         write('spec/alpha/openapi.json', OPENAPI);
-        fs.mkdirSync(path.join(root, 'spec', 'empty'));
-        write('spec/hidden/.gitkeep', '');
         write('spec/beta/openapi.json', OPENAPI);
         write('spec/top.json', OPENAPI);
         write('content/openapi.json', OPENAPI);
+        fs.mkdirSync(path.join(root, 'spec', 'empty'));
 
-        expect(await emptyFolders()).to.deep.equal([
-          'spec/APIMATIC-META.json',
-          ['./spec/empty', './spec/hidden', './spec/misnamed', './spec/Beta', './spec', './content']
-        ]);
+        const problem = (await resolve())._unsafeUnwrapErr();
+
+        expect(
+          problem.kind === 'missingMergedFolders' &&
+            problem.folders.map((folder) => folder.relativeTo(new DirectoryPath(root)))
+        ).to.deep.equal(['./spec/misnamed', './spec/Beta', './spec', './content']);
+      });
+
+      it('reports each merged folder with nothing to read, hidden files aside', async () => {
+        merging({ MergeOrderOfDirectories: ['alpha', 'empty', 'hidden'] });
+        write('spec/alpha/openapi.json', OPENAPI);
+        fs.mkdirSync(path.join(root, 'spec', 'empty'));
+        write('spec/hidden/.gitkeep', '');
+
+        expect(await emptyFolders()).to.deep.equal(['spec/APIMATIC-META.json', ['./spec/empty', './spec/hidden']]);
+      });
+
+      // Named `..v2`, it sits inside the spec directory, however much it reads like a step up.
+      it('reads a folder whose name starts with two dots', async () => {
+        merging({ MergeOrderOfDirectories: ['..v2'] });
+        write('spec/..v2/openapi.json', OPENAPI);
+
+        expect(await read()).to.deep.equal([['v2', 'spec/..v2/openapi.json']]);
       });
 
       it('reports a file that merges where there is no folder to merge', async () => {
@@ -859,13 +891,13 @@ describe('PortalSourceContext', () => {
       });
 
       // A path item's own method beside its `$ref` declares the operation a second time, in the one spec.
-      it('names none for an operation that one spec declares twice', async () => {
+      it('reads an operation one spec declares twice once, and names none shared', async () => {
         write('spec/paths/pets.json', JSON.stringify({ get: {} }));
         write('spec/api.json', withPaths({ '/pets': { $ref: './paths/pets.json', get: {} } }));
 
         const source = (await resolve())._unsafeUnwrap();
 
-        expect(source.specs[0].endpoints.map(String)).to.deep.equal(['GET /pets', 'GET /pets']);
+        expect(source.specs[0].endpoints.map(String)).to.deep.equal(['GET /pets']);
         expect(source.sharedEndpoints).to.be.empty;
       });
     });

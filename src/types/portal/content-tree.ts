@@ -49,6 +49,12 @@ const PAGE_EXTENSIONS = ['.md', '.mdx'];
 /** Passed over by Vite's `import.meta.glob`, which the build reads the content through. */
 export const isSkippedByGlob = (name: string) => name.startsWith('.') || name === 'node_modules';
 
+/** The slugs the content source gives a page, and the address they make: a `(group)` folder adds none. */
+const servedAt = (segments: string[]): { slugs: string[]; address: string } => {
+  const slugs = getSlugs(segments.join('/'));
+  return { slugs, address: `/${slugs.join('/')}` };
+};
+
 /** Whether the glob passes over `file` below `root`, which it does for a path with any such segment. */
 export const isSkippedWithin = (file: FilePath, root: DirectoryPath): boolean =>
   file.relativeTo(root).split('/').some(isSkippedByGlob);
@@ -309,11 +315,11 @@ export class ContentTree {
     }
 
     // The build fails on two pages at one address, or moves an index page to `<folder>/index`.
-    const shared = ContentTree.sharedAddresses(
+    const sharing = ContentTree.sharedAddresses(
       addressed.filter(({ file }) => !reserved.some((page) => page.file.isEqual(file)))
     );
-    if (shared.length > 0) {
-      problems.push({ kind: 'sharedAddresses', addresses: shared });
+    if (sharing.length > 0) {
+      problems.push({ kind: 'sharedAddresses', addresses: sharing });
     }
     return problems;
   }
@@ -326,8 +332,7 @@ export class ContentTree {
    */
   private static reservedAddressPages(pages: ContentPage[]): ReservedAddressPage[] {
     return pages.flatMap(({ file, segments }) => {
-      const slugs = getSlugs(segments.join('/'));
-      const address = `/${slugs.join('/')}`;
+      const { slugs, address } = servedAt(segments);
       if (address === OAUTH_CALLBACK.address) return [{ file, address, keptFor: OAUTH_CALLBACK }];
       const section = GENERATED_SECTIONS.find((candidate) => candidate.folder === slugs[0]);
       return section === undefined
@@ -338,7 +343,7 @@ export class ContentTree {
 
   /** Addresses more than one page would be served at, each with its pages in the order walked. */
   private static sharedAddresses(pages: ContentPage[]): SharedAddress[] {
-    return shared(pages.map(({ file, segments }) => ({ key: `/${getSlugs(segments.join('/')).join('/')}`, file })));
+    return shared(pages.map(({ file, segments }) => ({ key: servedAt(segments).address, file })));
   }
 
   /**

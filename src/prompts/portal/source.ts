@@ -24,6 +24,7 @@ import {
   CONTENT_DIRECTORY_NAME,
   METADATA_FILE_NAME,
   SPEC_DIRECTORY_NAME,
+  SPEC_EXTENSIONS,
   STATIC_DIRECTORY_NAME
 } from '../../types/project-layout.js';
 import { format as f } from '../format.js';
@@ -91,23 +92,35 @@ function reportSpecConversion({ file, format, converted, others }: SpecConversio
   log.message(
     `${convert} it with:\n` +
       `  ${command}\n` +
-      `then move ${f.relativePath(converted)} up into ${directory}.` +
+      `then move ${f.relativePath(converted)} up into ${directory}, in place of ${name}.` +
       (others === 0 ? '' : ` Convert the other ${documents} the same way.`)
   );
 }
 
-function reportEmptyMergedFolders(metadata: FilePath, folders: DirectoryPath[], sourceDirectory: DirectoryPath) {
-  const one = folders.length === 1;
-  const names = listedInProse(folders.map((folder) => f.var(folder.relativeTo(sourceDirectory))));
+const folderNames = (folders: DirectoryPath[], sourceDirectory: DirectoryPath): string =>
+  listedInProse(folders.map((folder) => f.var(folder.relativeTo(sourceDirectory))));
+
+function reportMissingMergedFolders(metadata: FilePath, folders: DirectoryPath[], sourceDirectory: DirectoryPath) {
+  const [verb, noun] = folders.length === 1 ? ['is', 'a folder'] : ['are', 'folders'];
   log.error(
-    `${relative(metadata, sourceDirectory)} merges ${names}, which ${one ? 'holds' : 'hold'} no API definition ` +
-      `the portal can read.`
+    `${relative(metadata, sourceDirectory)} merges ${folderNames(folders, sourceDirectory)}, which ${verb} not ` +
+      `${noun} inside ${specPath(sourceDirectory)}.`
   );
   log.message(
-    `A merged folder sits inside ${specPath(sourceDirectory)}, is named as it is spelt, case included, and holds ` +
-      `its OpenAPI 3.x document at its top. Add ${one ? 'one to it' : 'one to each'}, or list only the folders ` +
-      `to merge in ${f.var(MERGE_SETTINGS.order)}.`
+    `Name each folder in ${f.var(MERGE_SETTINGS.order)} by its path from the file, spelt as on disk, case included.`
   );
+}
+
+function reportEmptyMergedFolders(metadata: FilePath, folders: DirectoryPath[], sourceDirectory: DirectoryPath) {
+  const [verb, add] =
+    folders.length === 1
+      ? ['holds', 'its OpenAPI 3.x document to the top of the folder']
+      : ['hold', "each one's OpenAPI 3.x document to the top of its folder"];
+  log.error(
+    `${relative(metadata, sourceDirectory)} merges ${folderNames(folders, sourceDirectory)}, which ${verb} no API ` +
+      `definition.`
+  );
+  log.message(`Add ${add}, or list only the folders to merge in ${f.var(MERGE_SETTINGS.order)}.`);
 }
 
 /**
@@ -159,9 +172,13 @@ export function reportSourceProblem(problem: PortalSourceProblem, sourceDirector
       return;
     }
     case 'emptySpecDirectory': {
+      const extensions = listedInProse(
+        SPEC_EXTENSIONS.map((extension) => f.var(extension)),
+        'or'
+      );
       const message =
         `${specPath(sourceDirectory)} has no API definition. Add your OpenAPI 3.x document to it as a ` +
-        `${f.var('.json')}, ${f.var('.yaml')} or ${f.var('.yml')} file.`;
+        `${extensions} file.`;
       log.error(message);
       if (problem.folders.length > 0) {
         const folders = listedInProse(problem.folders.map((folder) => f.var(folder.leafName())));
@@ -183,17 +200,19 @@ export function reportSourceProblem(problem: PortalSourceProblem, sourceDirector
       );
       return;
     }
+    case 'missingMergedFolders': {
+      reportMissingMergedFolders(problem.metadata, problem.folders, sourceDirectory);
+      return;
+    }
     case 'emptyMergedFolders': {
       reportEmptyMergedFolders(problem.metadata, problem.folders, sourceDirectory);
       return;
     }
     case 'severalSpecsInFolder': {
-      const [first] = problem.files;
-      const shared = f.var(first.directory().join('shared').relativeTo(sourceDirectory));
+      const shared = f.var(problem.folder.join('shared').relativeTo(sourceDirectory));
       log.error(
-        `${listed(problem.files, sourceDirectory)} are each an OpenAPI document, but a folder that ` +
-          `${f.var(METADATA_FILE_NAME)} merges holds one API definition at its top, and the SDKs are built from ` +
-          `one of them only.`
+        `${listed(problem.files, sourceDirectory)} are each an API definition, but a folder that ` +
+          `${f.var(METADATA_FILE_NAME)} merges holds one at its top, and the SDKs are built from one of them only.`
       );
       log.message(
         `Keep the definition there and move each of the others: shared parts into a folder inside it, such as ` +

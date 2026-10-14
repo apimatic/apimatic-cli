@@ -33,6 +33,7 @@ describe('SpecMetadata', () => {
       expect(read({ MergeConfiguration: { MergeApis: 'true' } }).mergesApis()).to.be.true;
       expect(read({ MergeConfiguration: { MergeApis: 'True' } }).mergesApis()).to.be.true;
       expect(read({ MergeConfiguration: { MergeApis: 'yes' } }).mergesApis()).to.be.false;
+      expect(read({ MergeConfiguration: { mergeApis: false, MergeApis: true } }).mergesApis()).to.be.true;
       expect(
         read({ MERGECONFIGURATION: { MERGEAPIS: true, mergeorderofdirectories: ['beta'] } }).mergeOrder()
       ).to.deep.equal(['beta']);

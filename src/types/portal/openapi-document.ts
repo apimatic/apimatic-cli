@@ -87,10 +87,18 @@ export class OpenApiDocument {
     return { supported: false, format: null };
   }
 
-  /** Whether it names the API format it is in and declares paths, as a definition does and a file of shared parts does not. */
-  public isApiDefinition(): boolean {
+  /** Whether it carries a version key, which is what the platform takes a file of a merged folder for its definition by. */
+  public namesApiFormat(): boolean {
     const format = this.format();
-    return (format.supported || format.format !== null) && Object.keys(this.paths()).length > 0;
+    return format.supported || format.format !== null;
+  }
+
+  /** Whether it declares paths, webhooks or channels, as an API does and a file of its shared parts does not. */
+  public declaresOperations(): boolean {
+    return ['paths', 'webhooks', 'channels'].some((key) => {
+      const operations = this.document[key];
+      return isJsonObject(operations) && Object.keys(operations).length > 0;
+    });
   }
 
   /**
