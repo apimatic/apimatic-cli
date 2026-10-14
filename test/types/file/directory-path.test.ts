@@ -53,6 +53,18 @@ describe('DirectoryPath.fromUserInput', () => {
   });
 });
 
+describe('DirectoryPath.isAncestorOf', () => {
+  const spec = new DirectoryPath(path.join('/', 'projects', 'petstore-api', 'src', 'spec'));
+
+  it('holds a directory anywhere below it, but not itself, its parent, or a sibling', () => {
+    expect(spec.isAncestorOf(spec.join('alpha'))).to.be.true;
+    expect(spec.isAncestorOf(spec.join('apis', 'alpha'))).to.be.true;
+    expect(spec.isAncestorOf(spec)).to.be.false;
+    expect(spec.isAncestorOf(spec.resolve('..'))).to.be.false;
+    expect(spec.isAncestorOf(spec.resolve('../content'))).to.be.false;
+  });
+});
+
 // What orders the folders of a spec directory that are merged without an order of their own.
 describe('DirectoryPath.compare', () => {
   const spec = new DirectoryPath(path.join('/', 'projects', 'petstore-api', 'src', 'spec'));

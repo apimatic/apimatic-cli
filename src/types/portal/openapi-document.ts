@@ -87,10 +87,10 @@ export class OpenApiDocument {
     return { supported: false, format: null };
   }
 
-  /** Whether it names the API format it is in, as a definition does and a file of shared parts does not. */
+  /** Whether it names the API format it is in and declares paths, as a definition does and a file of shared parts does not. */
   public isApiDefinition(): boolean {
     const format = this.format();
-    return format.supported || format.format !== null;
+    return (format.supported || format.format !== null) && Object.keys(this.paths()).length > 0;
   }
 
   /**

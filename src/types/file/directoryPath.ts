@@ -77,6 +77,11 @@ export class DirectoryPath {
     return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
   }
 
+  /** True when `other` sits anywhere inside this directory, and is not this directory itself. */
+  public isAncestorOf(other: DirectoryPath) {
+    return this.contains(other) && !this.isEqual(other);
+  }
+
   public leafName() {
     return path.basename(this.directoryPath);
   }

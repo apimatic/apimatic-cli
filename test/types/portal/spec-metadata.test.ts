@@ -27,6 +27,17 @@ describe('SpecMetadata', () => {
       expect(read({ MergeConfiguration: {} }).mergesApis()).to.be.false;
     });
 
+    // As the platform reads the file, which merges for each of these.
+    it('reads the settings in any case, and the text "true" as on', () => {
+      expect(read({ mergeConfiguration: { mergeapis: true } }).mergesApis()).to.be.true;
+      expect(read({ MergeConfiguration: { MergeApis: 'true' } }).mergesApis()).to.be.true;
+      expect(read({ MergeConfiguration: { MergeApis: 'True' } }).mergesApis()).to.be.true;
+      expect(read({ MergeConfiguration: { MergeApis: 'yes' } }).mergesApis()).to.be.false;
+      expect(
+        read({ MERGECONFIGURATION: { MERGEAPIS: true, mergeorderofdirectories: ['beta'] } }).mergeOrder()
+      ).to.deep.equal(['beta']);
+    });
+
     // The file carries the SDK's settings too, and most projects have one for those alone.
     it('does not merge for a file with no merge configuration, or one that is not an object', () => {
       expect(read({ CodeGenSettings: { Timeout: 30 } }).mergesApis()).to.be.false;

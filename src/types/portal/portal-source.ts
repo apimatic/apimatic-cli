@@ -6,6 +6,7 @@ import { SuggestedSite } from './config/site-config.js';
 import { ContentNotices } from './content-notices.js';
 import { GeneratedPages } from './generated-pages.js';
 import { PortalConfig } from './portal-config.js';
+import { Shared } from './shared.js';
 
 /** An OpenAPI document found in `src/spec/` or in a folder merged there, with the slug its section is mounted at. */
 export interface PortalSpec {
@@ -16,10 +17,7 @@ export interface PortalSpec {
 }
 
 /** An operation more than one specification declares, which one code sample per method and path cannot serve. */
-export interface SharedEndpoint {
-  endpoint: Endpoint;
-  files: FilePath[];
-}
+export type SharedEndpoint = Shared<Endpoint>;
 
 /** What `apimatic.json` decides about a portal, which `portal serve` reads again on every edit. */
 export interface PortalSettings {
@@ -35,6 +33,8 @@ export interface PortalSource extends PortalSettings {
    */
   suggestedSite: SuggestedSite | null;
   specs: PortalSpec[];
+  /** `spec/`, whose every file the preview reloads on, as a specification may refer to any of them. */
+  specDirectory: DirectoryPath;
   /** Several specifications at the top of `spec/` that no `APIMATIC-META.json` merges, so the SDKs cover one; else none. */
   unmergedSpecs: FilePath[];
   /** API definitions at the top of `spec/` while its folders are merged, which the portal and the SDKs leave out. */
@@ -85,10 +85,7 @@ export interface ReservedAddressPage {
 }
 
 /** Pages of the user's that would be served at one address, which only one of them can have. */
-export interface SharedAddress {
-  address: string;
-  pages: FilePath[];
-}
+export type SharedAddress = Shared<string>;
 
 /** A page's Markdown image that the build would import and not find, which fails the whole build. */
 export interface MissingImage {
@@ -130,7 +127,8 @@ export type PortalSourceProblem =
   | { kind: 'unreadableMetadata'; file: FilePath }
   // Its `folders` are not read unless a metadata file merges them, and `api transform` writes into one of its own.
   | { kind: 'emptySpecDirectory'; folders: DirectoryPath[] }
-  // The `folders` that `metadata` merges and that hold no file to read; none when it has no folder to merge at all.
+  | { kind: 'noFoldersToMerge'; metadata: FilePath }
+  // Each of the `folders` that `metadata` merges and the platform would find no definition in.
   | { kind: 'emptyMergedFolders'; metadata: FilePath; folders: DirectoryPath[] }
   // Every OpenAPI 3.x document at the top of a merged folder, which holds one API.
   | { kind: 'severalSpecsInFolder'; files: FilePath[] }

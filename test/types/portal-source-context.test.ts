@@ -402,6 +402,10 @@ describe('PortalSourceContext', () => {
     /** A file as a problem or a warning names it, relative to the source directory. */
     const relative = (file: FilePath) => file.relativeTo(new DirectoryPath(root));
 
+    /** An OpenAPI 3.x document that declares these paths. */
+    const withPaths = (paths: object) =>
+      JSON.stringify({ openapi: '3.0.0', info: { title: 'Calc', version: '1' }, paths });
+
     it('accepts json, yaml and yml documents, ordered by file name', async () => {
       write('spec/b.json', OPENAPI);
       write('spec/a.yaml', 'openapi: 3.0.0\ninfo:\n  title: A\n  version: "1"\npaths: {}\n');
@@ -504,6 +508,14 @@ describe('PortalSourceContext', () => {
       expect((await resolve())._unsafeUnwrapErr()).to.deep.equal({ kind: 'emptySpecDirectory', folders: [] });
 
       fs.mkdirSync(path.join(root, 'spec'));
+      expect((await resolve())._unsafeUnwrapErr()).to.deep.equal({ kind: 'emptySpecDirectory', folders: [] });
+    });
+
+    // A placeholder, or a file the operating system keeps, is never an API definition to convert.
+    it('reads a spec directory holding only hidden files as empty', async () => {
+      write('spec/.gitkeep', '');
+      write('spec/.DS_Store', 'binary');
+
       expect((await resolve())._unsafeUnwrapErr()).to.deep.equal({ kind: 'emptySpecDirectory', folders: [] });
     });
 
@@ -635,12 +647,14 @@ describe('PortalSourceContext', () => {
         expect(await read()).to.deep.equal([['alpha', 'spec/alpha/openapi.json']]);
       });
 
-      // The platform leaves them out of the SDKs too, and nothing else would say so.
+      // The platform leaves them out of the SDKs too, and nothing else would say so. Shared parts the
+      // merged folders refer to may sit there too, with or without a version key.
       it('names each API definition at the top of the spec directory, in any format, as left out', async () => {
         merging();
         write('spec/alpha/openapi.json', OPENAPI);
-        write('spec/old.json', OPENAPI);
-        write('spec/older.yaml', JSON.stringify({ swagger: '2.0', info: {}, paths: {} }));
+        write('spec/old.json', withPaths({ '/old': { get: {} } }));
+        write('spec/older.yaml', JSON.stringify({ swagger: '2.0', info: {}, paths: { '/older': { get: {} } } }));
+        write('spec/common.json', JSON.stringify({ openapi: '3.0.3', info: {}, paths: {}, components: {} }));
         write('spec/shared-schemas.json', JSON.stringify({ components: { schemas: {} } }));
         write('spec/broken.json', '{ not json');
         write('spec/notes.md', '# Specs');
@@ -658,18 +672,40 @@ describe('PortalSourceContext', () => {
         expect((await resolve())._unsafeUnwrap().leftOutSpecs).to.be.empty;
       });
 
-      // The platform builds one API from a folder, so a second section would document what the SDK may lack.
+      /** The files a refused folder names as its candidate definitions. */
+      const severalSpecs = async () => {
+        const problem = (await resolve())._unsafeUnwrapErr();
+        if (problem.kind !== 'severalSpecsInFolder') {
+          throw new Error(`expected a folder with several definitions, got '${problem.kind}'`);
+        }
+        return problem.files.map(relative);
+      };
+
+      // The platform builds the folder from one of them and drops the other without a word.
       it('refuses a folder holding two OpenAPI 3.x documents, naming both', async () => {
         merging();
-        write('spec/alpha/a.json', OPENAPI);
-        write('spec/alpha/b.json', OPENAPI);
+        write('spec/alpha/a.json', withPaths({ '/a': { get: {} } }));
+        write('spec/alpha/b.json', withPaths({ '/b': { get: {} } }));
 
-        const problem = (await resolve())._unsafeUnwrapErr();
+        expect(await severalSpecs()).to.deep.equal(['spec/alpha/a.json', 'spec/alpha/b.json']);
+      });
 
-        expect(problem.kind === 'severalSpecsInFolder' && problem.files.map(relative)).to.deep.equal([
-          'spec/alpha/a.json',
-          'spec/alpha/b.json'
-        ]);
+      // Written as an OpenAPI document so that it passes a linter; the platform builds from it when it sorts first.
+      it('refuses an OpenAPI document of shared parts beside the definition', async () => {
+        merging();
+        write('spec/alpha/components.json', OPENAPI);
+        write('spec/alpha/openapi.json', withPaths({ '/pets': { get: {} } }));
+
+        expect(await severalSpecs()).to.deep.equal(['spec/alpha/components.json', 'spec/alpha/openapi.json']);
+      });
+
+      // The platform looks for the definition at the top of the folder first, whatever the folder inside it is named.
+      it('reads a definition whose OpenAPI document of shared parts sits in a folder inside it', async () => {
+        merging();
+        write('spec/alpha/common/components.json', OPENAPI);
+        write('spec/alpha/openapi.json', withPaths({ '/pets': { get: {} } }));
+
+        expect(await read()).to.deep.equal([['alpha', 'spec/alpha/openapi.json']]);
       });
 
       // The platform also reads other names starting `APIMATIC-META`; a project for this CLI uses the one.
@@ -722,15 +758,19 @@ describe('PortalSourceContext', () => {
         ).to.deep.equal(['alpha']);
       });
 
-      it('reports each merged folder with nothing to read: empty, misnamed, or outside the spec directory', async () => {
-        merging({ MergeOrderOfDirectories: ['alpha', 'empty', 'misnamed', '../content'] });
+      // The platform is sent `spec/` alone, and finds a folder only by its exact name.
+      it('reports each merged folder the platform would find nothing in, wherever and however it is named', async () => {
+        merging({ MergeOrderOfDirectories: ['alpha', 'empty', 'hidden', 'misnamed', 'Beta', '.', '../content'] });
         write('spec/alpha/openapi.json', OPENAPI);
         fs.mkdirSync(path.join(root, 'spec', 'empty'));
+        write('spec/hidden/.gitkeep', '');
+        write('spec/beta/openapi.json', OPENAPI);
+        write('spec/top.json', OPENAPI);
         write('content/openapi.json', OPENAPI);
 
         expect(await emptyFolders()).to.deep.equal([
           'spec/APIMATIC-META.json',
-          ['./spec/empty', './spec/misnamed', './content']
+          ['./spec/empty', './spec/hidden', './spec/misnamed', './spec/Beta', './spec', './content']
         ]);
       });
 
@@ -738,7 +778,9 @@ describe('PortalSourceContext', () => {
         merging();
         write('spec/api.json', OPENAPI);
 
-        expect(await emptyFolders()).to.deep.equal(['spec/APIMATIC-META.json', []]);
+        const problem = (await resolve())._unsafeUnwrapErr();
+
+        expect(problem.kind === 'noFoldersToMerge' && relative(problem.metadata)).to.equal('spec/APIMATIC-META.json');
       });
 
       it('points a folder with no OpenAPI 3.x document at its conversion, inside that folder', async () => {
@@ -773,9 +815,6 @@ describe('PortalSourceContext', () => {
 
     // The platform builds the SDKs, and so the code samples, from one spec unless the specs are merged.
     describe('what the SDKs and their samples cover', () => {
-      const withPaths = (paths: object) =>
-        JSON.stringify({ openapi: '3.0.0', info: { title: 'Calc', version: '1' }, paths });
-
       it('names several specs at the top of the spec directory, which nothing merges', async () => {
         write('spec/a.json', OPENAPI);
         write('spec/b.json', OPENAPI);
@@ -807,7 +846,7 @@ describe('PortalSourceContext', () => {
 
         const shared = (await resolve())._unsafeUnwrap().sharedEndpoints;
 
-        expect(shared.map(({ endpoint, files }) => [`${endpoint}`, files.map(relative)])).to.deep.equal([
+        expect(shared.map(({ key, files }) => [`${key}`, files.map(relative)])).to.deep.equal([
           ['GET /status', ['spec/alpha/openapi.json', 'spec/beta/openapi.json']]
         ]);
       });
@@ -817,6 +856,17 @@ describe('PortalSourceContext', () => {
         write('spec/b.json', withPaths({ '/b': { get: {} } }));
 
         expect((await resolve())._unsafeUnwrap().sharedEndpoints).to.be.empty;
+      });
+
+      // A path item's own method beside its `$ref` declares the operation a second time, in the one spec.
+      it('names none for an operation that one spec declares twice', async () => {
+        write('spec/paths/pets.json', JSON.stringify({ get: {} }));
+        write('spec/api.json', withPaths({ '/pets': { $ref: './paths/pets.json', get: {} } }));
+
+        const source = (await resolve())._unsafeUnwrap();
+
+        expect(source.specs[0].endpoints.map(String)).to.deep.equal(['GET /pets', 'GET /pets']);
+        expect(source.sharedEndpoints).to.be.empty;
       });
     });
   });
@@ -1161,9 +1211,7 @@ describe('PortalSourceContext', () => {
         throw new Error(`expected a 'sharedAddresses' problem, got '${problem.kind}'`);
       }
       return problem.addresses
-        .map(
-          ({ address, pages }) => `${address} ${pages.map((page) => page.relativeTo(new DirectoryPath(root))).sort()}`
-        )
+        .map(({ key, files }) => `${key} ${files.map((page) => page.relativeTo(new DirectoryPath(root))).sort()}`)
         .sort();
     };
 

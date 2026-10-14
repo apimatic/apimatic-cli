@@ -67,10 +67,11 @@ describe('OpenApiDocument', () => {
   });
 
   describe('isApiDefinition', () => {
-    it('is a definition in any format it names, and not a file of shared parts', () => {
-      expect(readJson({ openapi: '3.1.0' }).isApiDefinition()).to.be.true;
-      expect(readJson({ swagger: '2.0' }).isApiDefinition()).to.be.true;
-      expect(readJson({ components: { schemas: {} } }).isApiDefinition()).to.be.false;
+    it('is a definition in any format it names that declares paths, and not a file of shared parts', () => {
+      expect(readJson({ openapi: '3.1.0', paths: { '/pets': { get: {} } } }).isApiDefinition()).to.be.true;
+      expect(readJson({ swagger: '2.0', paths: { '/pets': { $ref: './pets.yaml' } } }).isApiDefinition()).to.be.true;
+      expect(readJson({ openapi: '3.1.0', paths: {}, components: { schemas: {} } }).isApiDefinition()).to.be.false;
+      expect(readJson({ components: { schemas: {} }, paths: { '/pets': {} } }).isApiDefinition()).to.be.false;
     });
   });
 

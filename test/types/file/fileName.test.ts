@@ -16,6 +16,14 @@ describe('FileName', () => {
     });
   });
 
+  describe('isHidden', () => {
+    it('is hidden when the name starts with a dot', () => {
+      expect(new FileName('.gitkeep').isHidden()).to.be.true;
+      expect(new FileName('.DS_Store').isHidden()).to.be.true;
+      expect(new FileName('openapi.json').isHidden()).to.be.false;
+    });
+  });
+
   describe('isEqual', () => {
     it('is the same name only when spelt the same, case included', () => {
       expect(new FileName('APIMATIC-META.json').isEqual(new FileName('APIMATIC-META.json'))).to.be.true;

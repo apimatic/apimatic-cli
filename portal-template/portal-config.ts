@@ -7,6 +7,8 @@ export interface BuildPaths {
   base: string;
   /** Section slug -> absolute path of an OpenAPI document. */
   specs: Record<string, string>;
+  /** Absolute: the `spec/` every document sits in, with the files they refer to. */
+  specDir: string;
   /** Absolute path of the code samples, keyed by path then method; null when there are none. */
   codeSamples: string | null;
   /** Absolute. Always exists, and may be empty. */

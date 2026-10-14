@@ -27,6 +27,7 @@ import {
   SharedAddress
 } from './portal-source.js';
 import { PortalTab, sharedTabNames, TabOwner, untitledTabName } from './portal-tabs.js';
+import { shared } from './shared.js';
 
 const NAVIGATION_FILE = new FileName(NAVIGATION_FILE_NAME);
 
@@ -337,14 +338,7 @@ export class ContentTree {
 
   /** Addresses more than one page would be served at, each with its pages in the order walked. */
   private static sharedAddresses(pages: ContentPage[]): SharedAddress[] {
-    const byAddress = new Map<string, FilePath[]>();
-    for (const { file, segments } of pages) {
-      const address = `/${getSlugs(segments.join('/')).join('/')}`;
-      byAddress.set(address, [...(byAddress.get(address) ?? []), file]);
-    }
-    return [...byAddress]
-      .filter(([, files]) => files.length > 1)
-      .map(([address, files]) => ({ address, pages: files }));
+    return shared(pages.map(({ file, segments }) => ({ key: `/${getSlugs(segments.join('/')).join('/')}`, file })));
   }
 
   /**

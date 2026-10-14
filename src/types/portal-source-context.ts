@@ -35,9 +35,9 @@ import {
   PortalSource,
   PortalSourceProblem,
   PortalSpec,
-  SharedEndpoint,
   SpecConversion
 } from './portal/portal-source.js';
+import { shared } from './portal/shared.js';
 import { SpecMetadata } from './portal/spec-metadata.js';
 import { SpecContext } from './spec-context.js';
 import { TRANSFORMATIONS_DIRECTORY_NAME, transformedFileName } from './transform-context.js';
@@ -46,28 +46,21 @@ const SPEC_EXTENSIONS = ['.json', '.yaml', '.yml'];
 
 const METADATA_FILE = new FileName(METADATA_FILE_NAME);
 
-/** The files of a directory that may be API definitions: all but the platform's metadata. */
-const definitionNames = (fileNames: FileName[]): FileName[] => fileNames.filter((name) => !name.isEqual(METADATA_FILE));
+const definitionNames = (fileNames: FileName[]): FileName[] =>
+  fileNames.filter((name) => !name.isEqual(METADATA_FILE) && !name.isHidden());
 
-/** Whether the portal would read the file as a document, by its extension. */
 const isDocumentName = (name: FileName): boolean => SPEC_EXTENSIONS.some((extension) => name.hasExtension(extension));
 
-/** The operations more than one specification declares, each with the files that do, in the order first declared. */
-function sharedEndpoints(specs: PortalSpec[]): SharedEndpoint[] {
-  const declared = new Map<string, SharedEndpoint>();
-  for (const { file, endpoints } of specs) {
-    for (const endpoint of endpoints) {
-      const files = declared.get(`${endpoint}`)?.files ?? [];
-      declared.set(`${endpoint}`, { endpoint, files: [...files, file] });
-    }
-  }
-  return [...declared.values()].filter(({ files }) => files.length > 1);
-}
-
-/** What `spec/` holds, as `resolve` hands it on. */
 type DiscoveredSpecs = Pick<PortalSource, 'specs' | 'suggestedSite' | 'unmergedSpecs' | 'leftOutSpecs'>;
 
-/** The specifications read from a directory, and the site the first of them suggests. */
+/** An OpenAPI 3.x document at the top of a directory, read for its operations and the site it suggests. */
+interface ReadDocument {
+  file: FilePath;
+  endpoints: Endpoint[];
+  site: SuggestedSite;
+}
+
+/** The specifications read from `spec/`, and the site the first of them suggests. */
 interface ReadSpecs {
   specs: PortalSpec[];
   suggested: SuggestedSite;
@@ -159,9 +152,10 @@ export class PortalSourceContext {
       ...settings.value,
       suggestedSite,
       specs,
+      specDirectory: this.specDirectory,
       unmergedSpecs,
       leftOutSpecs,
-      sharedEndpoints: sharedEndpoints(specs),
+      sharedEndpoints: shared(specs.flatMap(({ file, endpoints }) => endpoints.map((key) => ({ key, file })))),
       contentDirectory,
       staticDirectory,
       shadowedFiles: staticDirectory === null ? [] : await this.shadowedFiles(staticDirectory),
@@ -529,45 +523,63 @@ export class PortalSourceContext {
     if (names.length === 0) {
       return err({ kind: 'emptySpecDirectory', folders });
     }
-    return await this.definitions(this.specDirectory, names, (fileName) =>
-      this.uniqueSlug(fileName.normalize(), usedSlugs)
-    );
+    return (await this.definitions(this.specDirectory, names)).map((documents) => ({
+      specs: documents.map(({ file, endpoints }) => ({
+        slug: this.uniqueSlug(file.name().normalize(), usedSlugs),
+        file,
+        endpoints
+      })),
+      suggested: documents[0].site
+    }));
   }
 
-  /** The one document of each merged folder, a section named after the folder, as the platform builds the SDKs. */
+  /** The one definition of each merged folder, a section named after the folder, as the platform builds the SDKs. */
   private async mergedSpecs(
     { metadata, folders }: MergedFolders,
     usedSlugs: Set<string>
   ): Promise<Result<ReadSpecs, PortalSourceProblem>> {
+    if (folders.length === 0) {
+      return err({ kind: 'noFoldersToMerge', metadata });
+    }
     const listings = await Promise.all(
       folders.map(async (folder) => ({
         folder,
-        // A folder named outside `spec/` is not in the build the platform is sent, so it is read as empty.
-        fileNames: this.specDirectory.contains(folder)
+        fileNames: (await this.isMergeable(folder))
           ? definitionNames(await this.fileService.getFileNames(folder)).sort((left, right) => left.compare(right))
           : []
       }))
     );
     const empty = listings.filter(({ fileNames }) => fileNames.length === 0).map(({ folder }) => folder);
-    if (listings.length === 0 || empty.length > 0) {
+    if (empty.length > 0) {
       return err({ kind: 'emptyMergedFolders', metadata, folders: empty });
     }
 
     const specs: PortalSpec[] = [];
     const sites: SuggestedSite[] = [];
     for (const { folder, fileNames } of listings) {
-      const slug = new FileName(folder.leafName()).slugified();
-      const read = await this.definitions(folder, fileNames, () => this.uniqueSlug(slug, usedSlugs));
+      const read = await this.definitions(folder, fileNames);
       if (read.isErr()) {
         return err(read.error);
       }
-      if (read.value.specs.length > 1) {
-        return err({ kind: 'severalSpecsInFolder', files: read.value.specs.map(({ file }) => file) });
+      // The platform builds the folder from the first of them by name, which may be one of shared parts.
+      const [definition, ...others] = read.value;
+      if (others.length > 0) {
+        return err({ kind: 'severalSpecsInFolder', files: read.value.map(({ file }) => file) });
       }
-      specs.push(...read.value.specs);
-      sites.push(read.value.suggested);
+      const slug = this.uniqueSlug(new FileName(folder.leafName()).slugified(), usedSlugs);
+      specs.push({ slug, file: definition.file, endpoints: definition.endpoints });
+      sites.push(definition.site);
     }
     return ok({ specs, suggested: sites[0] });
+  }
+
+  /** Whether the platform finds `folder` in the build it is sent: below `spec/`, and spelt on disk as it is named. */
+  private async isMergeable(folder: DirectoryPath): Promise<boolean> {
+    if (!this.specDirectory.isAncestorOf(folder)) {
+      return false;
+    }
+    const spelt = await this.fileService.directorySpelledOnDisk(this.specDirectory, folder);
+    return spelt !== null && spelt.isEqual(folder);
   }
 
   /** The API definitions at the top of `spec/`, which a merge of its folders leaves out, as the platform does. */
@@ -584,13 +596,10 @@ export class PortalSourceContext {
   /** The OpenAPI 3.x documents at the top of a directory, or how to convert what is there instead. */
   private async definitions(
     directory: DirectoryPath,
-    fileNames: FileName[],
-    slugOf: (fileName: FileName) => string
-  ): Promise<Result<ReadSpecs, PortalSourceProblem>> {
-    const specs: PortalSpec[] = [];
-    // Only the first is kept: it is the one that speaks for the portal when it is alone, and
-    // specifications run to megabytes.
-    let first: OpenApiDocument | undefined;
+    fileNames: FileName[]
+  ): Promise<Result<ReadDocument[], PortalSourceProblem>> {
+    // The site each suggests rather than the document itself, as specifications run to megabytes.
+    const documents: ReadDocument[] = [];
 
     // What each one is, for the conversion a directory without an OpenAPI 3.x document is pointed to.
     const otherFormats: { file: FilePath; format: string }[] = [];
@@ -609,11 +618,10 @@ export class PortalSourceContext {
         continue;
       }
 
-      specs.push({ slug: slugOf(fileName), file, endpoints: await this.endpoints(document, file) });
-      first ??= document;
+      documents.push({ file, endpoints: await this.endpoints(document, file), site: document.suggestedSite() });
     }
 
-    if (first === undefined) {
+    if (documents.length === 0) {
       const [convertible] = otherFormats;
       // No document declares its format: one the portal would read, by extension, is named before any other file.
       const conversion =
@@ -622,7 +630,7 @@ export class PortalSourceContext {
           : this.conversion(convertible.file, convertible.format, otherFormats.length - 1);
       return err({ kind: 'noOpenApiSpec', conversion });
     }
-    return ok({ specs, suggested: first.suggestedSite() });
+    return ok(documents);
   }
 
   private conversion(file: FilePath, format: string | null, others: number): SpecConversion {

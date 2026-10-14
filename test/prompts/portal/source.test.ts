@@ -242,7 +242,7 @@ describe('reportSourceProblem', () => {
 
       expect(printed().split('\n')).to.deep.equal([
         "'spec/APIMATIC-META.json' merges './spec/orderz', which holds no API definition the portal can read.",
-        `A merged folder sits inside '${spec}', with its OpenAPI 3.x document at its top. Add one to it, or ` +
+        `A merged folder sits inside '${spec}', is named as it is spelt, case included, and holds its OpenAPI 3.x document at its top. Add one to it, or ` +
           "list only the folders to merge in 'MergeOrderOfDirectories'."
       ]);
     });
@@ -257,31 +257,36 @@ describe('reportSourceProblem', () => {
       expect(printed().split('\n')).to.deep.equal([
         "'spec/APIMATIC-META.json' merges './spec/apis/orders' and './content', which hold no API definition the " +
           'portal can read.',
-        `A merged folder sits inside '${spec}', with its OpenAPI 3.x document at its top. Add one to each, or ` +
+        `A merged folder sits inside '${spec}', is named as it is spelt, case included, and holds its OpenAPI 3.x document at its top. Add one to each, or ` +
           "list only the folders to merge in 'MergeOrderOfDirectories'."
       ]);
     });
 
-    it('names each document of a merged folder that holds more than one, and how to split them', () => {
+    it('names each document of a merged folder that holds more than one, and where to move the others', () => {
       const orders = spec.join('orders');
       reportSourceProblem(
         {
           kind: 'severalSpecsInFolder',
-          files: [new FilePath(orders, new FileName('orders.json')), new FilePath(orders, new FileName('returns.json'))]
+          files: [
+            new FilePath(orders, new FileName('components.json')),
+            new FilePath(orders, new FileName('orders.json'))
+          ]
         },
         source
       );
 
       expect(printed().split('\n')).to.deep.equal([
-        "'spec/orders/orders.json' and 'spec/orders/returns.json' are each an OpenAPI document, but a folder " +
-          "that 'APIMATIC-META.json' merges holds one API definition.",
-        'Keep one there and move each of the others into a folder of its own, adding the new folders to ' +
+        "'spec/orders/components.json' and 'spec/orders/orders.json' are each an OpenAPI document, but a folder " +
+          "that 'APIMATIC-META.json' merges holds one API definition at its top, and the SDKs are built from one " +
+          'of them only.',
+        'Keep the definition there and move each of the others: shared parts into a folder inside it, such as ' +
+          "'./spec/orders/shared', and another API into a folder of its own, adding the new folders to " +
           "'MergeOrderOfDirectories' when the file lists folders."
       ]);
     });
 
     it('says so when the file merges and there is no folder at all', () => {
-      reportSourceProblem({ kind: 'emptyMergedFolders', metadata, folders: [] }, source);
+      reportSourceProblem({ kind: 'noFoldersToMerge', metadata }, source);
 
       expect(printed().split('\n')).to.deep.equal([
         `'spec/APIMATIC-META.json' merges the folders of '${spec}', which has none.`,
@@ -401,8 +406,8 @@ describe('reportSourceProblem', () => {
       reportContent({
         kind: 'sharedAddresses',
         addresses: [
-          { address: '/guides', pages: [page(content, 'guides.md'), page(content.join('guides'), 'index.md')] },
-          { address: '/', pages: [page(content, 'index.md'), page(content.join('(start)'), 'index.md')] }
+          { key: '/guides', files: [page(content, 'guides.md'), page(content.join('guides'), 'index.md')] },
+          { key: '/', files: [page(content, 'index.md'), page(content.join('(start)'), 'index.md')] }
         ]
       });
 
@@ -420,7 +425,7 @@ describe('reportSourceProblem', () => {
     it('speaks of one address when there is one', () => {
       reportContent({
         kind: 'sharedAddresses',
-        addresses: [{ address: '/faq', pages: [page(content, 'faq.md'), page(content, 'faq.mdx')] }]
+        addresses: [{ key: '/faq', files: [page(content, 'faq.md'), page(content, 'faq.mdx')] }]
       });
 
       expect(printed()).to.contain('would share an address, but only one page can be served at each:');
@@ -769,8 +774,8 @@ describe('reportSharedEndpoints', () => {
   it('names each operation and the specs declaring it, and why it shows no SDK sample', () => {
     reportSharedEndpoints(
       [
-        { endpoint: new Endpoint('get', '/status'), files },
-        { endpoint: new Endpoint('post', '/status'), files }
+        { key: new Endpoint('get', '/status'), files },
+        { key: new Endpoint('post', '/status'), files }
       ],
       source
     );
@@ -783,7 +788,7 @@ describe('reportSharedEndpoints', () => {
   });
 
   it('speaks of one operation when there is one', () => {
-    reportSharedEndpoints([{ endpoint: new Endpoint('get', '/status'), files }], source);
+    reportSharedEndpoints([{ key: new Endpoint('get', '/status'), files }], source);
 
     expect(lines[0]).to.contain('declares this operation,');
     expect(lines[0]).to.contain('no SDK sample on it:');

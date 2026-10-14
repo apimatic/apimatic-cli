@@ -14,6 +14,7 @@ import {
   SharedEndpoint,
   SpecConversion
 } from '../../types/portal/portal-source.js';
+import { Shared } from '../../types/portal/shared.js';
 import { MERGE_SETTINGS } from '../../types/portal/spec-metadata.js';
 import { TRANSFORMATIONS_DIRECTORY_NAME } from '../../types/transform-context.js';
 import { PortalTab, SharedTabName } from '../../types/portal/portal-tabs.js';
@@ -37,6 +38,9 @@ const mergeTheFolders = (): string =>
   `turn on ${f.var(MERGE_SETTINGS.mergeApis)} in an ${f.var(METADATA_FILE_NAME)} beside the folders: ` +
   f.link(API_MERGING_URL);
 
+const addingToMergeOrder = (folders: string): string =>
+  `adding ${folders} to ${f.var(MERGE_SETTINGS.order)} when the file lists folders`;
+
 export const specPath = (sourceDirectory: DirectoryPath): string => f.path(sourceDirectory.join(SPEC_DIRECTORY_NAME));
 
 export const contentPath = (sourceDirectory: DirectoryPath): string =>
@@ -49,6 +53,9 @@ const relative = (file: FilePath, sourceDirectory: DirectoryPath): string => f.v
 
 const listed = (files: FilePath[], sourceDirectory: DirectoryPath): string =>
   listedInProse(files.map((file) => relative(file, sourceDirectory)));
+
+const sharedLines = <Key>(claims: Shared<Key>[], sourceDirectory: DirectoryPath): string =>
+  claims.map(({ key, files }) => `  • ${f.var(String(key))}: ${listed(files, sourceDirectory)}`).join('\n');
 
 const spelt = (found: FilePath, sourceDirectory: DirectoryPath): string =>
   `spelt ${relative(found, sourceDirectory)} on disk`;
@@ -90,19 +97,16 @@ function reportSpecConversion({ file, format, converted, others }: SpecConversio
 }
 
 function reportEmptyMergedFolders(metadata: FilePath, folders: DirectoryPath[], sourceDirectory: DirectoryPath) {
-  const file = relative(metadata, sourceDirectory);
-  if (folders.length === 0) {
-    log.error(`${file} merges the folders of ${specPath(sourceDirectory)}, which has none.`);
-    const mergeApis = f.var(MERGE_SETTINGS.mergeApis);
-    log.message(`Put each API definition in a folder of its own there, or turn off ${mergeApis} in the file.`);
-    return;
-  }
   const one = folders.length === 1;
   const names = listedInProse(folders.map((folder) => f.var(folder.relativeTo(sourceDirectory))));
-  log.error(`${file} merges ${names}, which ${one ? 'holds' : 'hold'} no API definition the portal can read.`);
+  log.error(
+    `${relative(metadata, sourceDirectory)} merges ${names}, which ${one ? 'holds' : 'hold'} no API definition ` +
+      `the portal can read.`
+  );
   log.message(
-    `A merged folder sits inside ${specPath(sourceDirectory)}, with its OpenAPI 3.x document at its top. Add ` +
-      `${one ? 'one to it' : 'one to each'}, or list only the folders to merge in ${f.var(MERGE_SETTINGS.order)}.`
+    `A merged folder sits inside ${specPath(sourceDirectory)}, is named as it is spelt, case included, and holds ` +
+      `its OpenAPI 3.x document at its top. Add ${one ? 'one to it' : 'one to each'}, or list only the folders ` +
+      `to merge in ${f.var(MERGE_SETTINGS.order)}.`
   );
 }
 
@@ -168,19 +172,32 @@ export function reportSourceProblem(problem: PortalSourceProblem, sourceDirector
       }
       return;
     }
+    case 'noFoldersToMerge': {
+      log.error(
+        `${relative(problem.metadata, sourceDirectory)} merges the folders of ${specPath(sourceDirectory)}, which ` +
+          `has none.`
+      );
+      log.message(
+        `Put each API definition in a folder of its own there, or turn off ${f.var(MERGE_SETTINGS.mergeApis)} in ` +
+          `the file.`
+      );
+      return;
+    }
     case 'emptyMergedFolders': {
       reportEmptyMergedFolders(problem.metadata, problem.folders, sourceDirectory);
       return;
     }
     case 'severalSpecsInFolder': {
-      const names = listed(problem.files, sourceDirectory);
+      const [first] = problem.files;
+      const shared = f.var(first.directory().join('shared').relativeTo(sourceDirectory));
       log.error(
-        `${names} are each an OpenAPI document, but a folder that ${f.var(METADATA_FILE_NAME)} merges holds ` +
-          `one API definition.`
+        `${listed(problem.files, sourceDirectory)} are each an OpenAPI document, but a folder that ` +
+          `${f.var(METADATA_FILE_NAME)} merges holds one API definition at its top, and the SDKs are built from ` +
+          `one of them only.`
       );
       log.message(
-        `Keep one there and move each of the others into a folder of its own, adding the new folders to ` +
-          `${f.var(MERGE_SETTINGS.order)} when the file lists folders.`
+        `Keep the definition there and move each of the others: shared parts into a folder inside it, such as ` +
+          `${shared}, and another API into a folder of its own, ${addingToMergeOrder('the new folders')}.`
       );
       return;
     }
@@ -284,12 +301,11 @@ function reportReservedAddresses(pages: ReservedAddressPage[], sourceDirectory: 
 
 function reportSharedAddresses(addresses: SharedAddress[], sourceDirectory: DirectoryPath): void {
   const one = addresses.length === 1;
-  const lines = addresses.map(({ address, pages }) => `  • ${f.var(address)}: ${listed(pages, sourceDirectory)}`);
   log.error(
     `Pages in ${f.path(sourceDirectory)} would share ${one ? 'an address' : 'addresses'}, but only one page ` +
       `can be served at each:`
   );
-  log.message(lines.join('\n'));
+  log.message(sharedLines(addresses, sourceDirectory));
   log.message(
     `Rename or move all but one ${one ? 'of them' : 'page at each address'}. A page in a ${f.var(
       '(group)'
@@ -326,7 +342,7 @@ export function reportLeftOutSpecs(files: FilePath[], sourceDirectory: Directory
   log.warn(
     `${listed(files, sourceDirectory)} ${verb} left out of the portal and the SDKs, as ` +
       `${f.var(METADATA_FILE_NAME)} merges only the folders beside it. To include ${pronoun}, move ${moved} into ` +
-      `a folder of its own, adding the ${folders} to ${f.var(MERGE_SETTINGS.order)} when the file lists folders.`
+      `a folder of its own, ${addingToMergeOrder(`the ${folders}`)}.`
   );
 }
 
@@ -339,9 +355,7 @@ export function reportSharedEndpoints(shared: SharedEndpoint[], sourceDirectory:
     `More than one API definition declares ${one ? 'this operation' : 'these operations'}, so the portal shows no ` +
       `SDK sample on ${one ? 'it' : 'them'}:`
   );
-  log.message(
-    shared.map(({ endpoint, files }) => `  • ${f.var(`${endpoint}`)}: ${listed(files, sourceDirectory)}`).join('\n')
-  );
+  log.message(sharedLines(shared, sourceDirectory));
 }
 
 export function reportIgnoredNavigationFiles(files: FilePath[], sourceDirectory: DirectoryPath): void {

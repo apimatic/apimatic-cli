@@ -1,20 +1,18 @@
-import path from 'node:path';
 import type { Plugin } from 'vite';
 
 /**
- * Reloads the preview when a file beside a specification changes. The specifications are read
- * at run time rather than imported, so Vite's module graph never learns of them, and the
- * reference pages are built once per server module evaluation.
+ * Reloads the preview when any file in the specification directory changes, as a document may refer
+ * to parts kept in another folder there. The specifications are read at run time rather than imported,
+ * so Vite's module graph never learns of them, and the reference pages are built once per evaluation.
  */
-export function specReload(specs: Record<string, string>): Plugin {
-  const directories = [...new Set(Object.values(specs).map((file) => path.posix.dirname(file)))];
-  const isInSpecDirectory = (file: string) => directories.some((directory) => file.startsWith(`${directory}/`));
+export function specReload(specDirectory: string): Plugin {
+  const isInSpecDirectory = (file: string) => file.startsWith(`${specDirectory}/`);
 
   return {
     name: 'apimatic:spec-reload',
     apply: 'serve',
     configureServer(server) {
-      server.watcher.add(directories);
+      server.watcher.add(specDirectory);
     },
     // Sent to each environment: the server runner re-evaluates every module, the browser reloads.
     hotUpdate({ file }) {

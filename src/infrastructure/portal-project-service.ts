@@ -76,6 +76,7 @@ export interface PortalProjectPaths {
 export interface PortalBuildPaths {
   base: string;
   specs: Record<string, string>;
+  specDir: string;
   codeSamples: string | null;
   contentDir: string;
   generatedDir: string;
@@ -129,7 +130,7 @@ export class PortalProjectService {
       await this.contentDirectory(projectDirectory, source),
       await this.writeCodeSamples(
         projectDirectory,
-        artifacts.codeSampleCatalogs.without(source.sharedEndpoints.map(({ endpoint }) => endpoint))
+        artifacts.codeSampleCatalogs.without(source.sharedEndpoints.map(({ key }) => key))
       ),
       await this.writeDownloads(projectDirectory, artifacts)
     );
@@ -284,6 +285,7 @@ export class PortalProjectService {
     const configuration: PortalBuildPaths = {
       base: source.config.siteAddress()?.path() ?? '/',
       specs,
+      specDir: source.specDirectory.toPosix(),
       codeSamples: codeSamples === null ? null : codeSamples.toPosix(),
       contentDir: contentDirectory.toPosix(),
       generatedDir: projectDirectory.join(GENERATED_DIRECTORY_NAME).toPosix(),
