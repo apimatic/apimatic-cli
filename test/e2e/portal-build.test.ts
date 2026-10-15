@@ -175,6 +175,28 @@ const scriptsOf = (output: DirectoryPath) =>
     .filter((name) => name.endsWith('.js'))
     .map((name) => ({ name, text: fs.readFileSync(path.join(output.toString(), 'assets', name), 'utf8') }));
 
+/** Code only the Ask AI chat carries: the address it opens a session at. */
+const CHAT_CODE = '/v1/sessions';
+
+/**
+ * The scripts a page loads before anything asks for more: those its HTML names, and every one
+ * they import in turn. A chunk reached only through `import()` is left out.
+ */
+function scriptsLoadedBy(output: DirectoryPath, page: string): string[] {
+  const assets = path.join(output.toString(), 'assets');
+  const named = (text: string, pattern: RegExp) =>
+    [...text.matchAll(pattern)].map((match) => path.basename(match[1]!)).filter((name) => name.endsWith('.js'));
+  const loaded = new Set<string>();
+  const pending = named(page, /(?:src|href)="[^"]*\/assets\/([^"]+)"/g);
+  while (pending.length > 0) {
+    const name = pending.pop()!;
+    if (loaded.has(name) || !fs.existsSync(path.join(assets, name))) continue;
+    loaded.add(name);
+    pending.push(...named(fs.readFileSync(path.join(assets, name), 'utf8'), /(?:from|import)\s*["']\.\/([^"']+)["']/g));
+  }
+  return [...loaded];
+}
+
 const stylesheetOf = (output: DirectoryPath) => {
   const assets = path.join(output.toString(), 'assets');
   return fs
@@ -474,6 +496,15 @@ const stylesheetOf = (output: DirectoryPath) => {
     expect(
       scripts.filter((script) => /contentDir|staticDir/.test(script.text)).map((script) => script.name)
     ).to.deep.equal([]);
+  });
+
+  it('loads no Ask AI chat code in a portal that offers no chat', () => {
+    const output = portal.output();
+    const loaded = scriptsLoadedBy(output, read('index.html'));
+
+    expect(loaded, 'the page names its scripts').to.not.be.empty;
+    expect(loaded.filter((name) => read('assets/' + name).includes(CHAT_CODE))).to.deep.equal([]);
+    expect(read('index.html')).to.not.contain('>Ask AI<');
   });
 
   it('bundles Geist and loads the neutral theme', () => {
@@ -882,5 +913,33 @@ const stylesheetOf = (output: DirectoryPath) => {
     expect(page).to.contain('<meta property="og:url" content="https://docs.test/api/"');
     expect(locations).to.include('https://docs.test/api/api/apimatic-calculator/simple-calculator/Calculate');
     expect(locations.filter((location) => !location.startsWith('https://docs.test/api/'))).to.deep.equal([]);
+  });
+});
+
+(enabled ? describe : describe.skip)('portal build, with the Ask AI chat (end to end)', function () {
+  this.timeout(10 * 60 * 1000);
+
+  const portal = portalBuilt('copilot');
+  const { read } = portal;
+
+  // The chat wraps the whole layout, so a prerender that did not wait for its chunk would leave the button out.
+  it('prerenders each page with the chat button', () => {
+    expect(read('index.html')).to.contain('>Ask AI<');
+  });
+
+  it('keeps the chat in its own chunk, out of what a page loads before it asks for the chat', () => {
+    const output = portal.output();
+    const chat = scriptsOf(output).filter((script) => script.text.includes(CHAT_CODE));
+    const loaded = scriptsLoadedBy(output, read('index.html'));
+
+    expect(chat, 'a chunk carries the chat').to.not.be.empty;
+    expect(loaded.filter((name) => chat.some((script) => script.name === name))).to.deep.equal([]);
+  });
+
+  it('tells the browser the public key and the service, and no more', () => {
+    const scripts = scriptsOf(portal.output());
+
+    expect(scripts.some((script) => script.text.includes('pk_test_e2e'))).to.be.true;
+    expect(scripts.some((script) => script.text.includes('https://ask.apimatic.io'))).to.be.true;
   });
 });

@@ -15,8 +15,28 @@ type Part = UIMessage['parts'][number];
 type SearchPart = Parameters<typeof AIChatSearch>[0]['part'];
 type Sources = Parameters<typeof AIChatSources>[0]['sources'];
 
+/**
+ * The docs layout with the Ask AI chat around it. The module's one export, so the layout can load
+ * it on its own, and only for a portal that offers the chat.
+ */
+export default function CopilotLayout({
+  copilot,
+  layout
+}: Readonly<{ copilot: PortalCopilot; layout: (aiChat: AIChatOptions) => ReactNode }>) {
+  return (
+    <CopilotProvider copilot={copilot}>
+      <WithPanel layout={layout} />
+    </CopilotProvider>
+  );
+}
+
+// Separate, because the panel state exists only inside `CopilotProvider`.
+function WithPanel({ layout }: Readonly<{ layout: (aiChat: AIChatOptions) => ReactNode }>) {
+  return layout(useCopilotPanel());
+}
+
 /** The chat state and the "Ask AI" button; wraps the layout so a conversation survives navigation. */
-export function CopilotProvider({ copilot, children }: Readonly<{ copilot: PortalCopilot; children: ReactNode }>) {
+function CopilotProvider({ copilot, children }: Readonly<{ copilot: PortalCopilot; children: ReactNode }>) {
   // Turned away by the service (disabled, unknown key, another website): the portal shows no Ask AI at all.
   const [available, setAvailable] = useState(true);
   const client = useMemo(() => new CopilotClient(copilot, () => setAvailable(false)), [copilot]);
@@ -32,7 +52,7 @@ export function CopilotProvider({ copilot, children }: Readonly<{ copilot: Porta
 }
 
 /** The docs layout's `aiChat` option: the panel and whether it is open. Call inside `CopilotProvider`. */
-export function useCopilotPanel(): AIChatOptions {
+function useCopilotPanel(): AIChatOptions {
   const { open, setOpen } = useAIChat();
   return { open, onOpenChange: setOpen, panel: <AIChatPanel /> };
 }
