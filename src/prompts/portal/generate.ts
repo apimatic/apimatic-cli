@@ -113,4 +113,10 @@ export class PortalGeneratePrompts {
     ].join('\n');
     noteWrapped(message, 'Next steps');
   }
+
+  public copilotSyncNextStep() {
+    log.info(
+      `Deploy the portal, then run ${f.cmdAlt('apimatic', 'portal', 'copilot', 'sync')} so Ask AI answers from it.`
+    );
+  }
 }

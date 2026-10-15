@@ -239,6 +239,7 @@ describe('GenerateAction', () => {
     expect(inPortal('404.html')).to.be.true;
     expect(prompts.portalGenerated.calledOnceWith(portalDirectory)).to.be.true;
     expect(prompts.nextSteps.calledOnceWith(portalDirectory, false)).to.be.true;
+    expect(prompts.copilotSyncNextStep.called, 'no Ask AI to sync').to.be.false;
   });
 
   it('writes an archive instead when asked', async () => {

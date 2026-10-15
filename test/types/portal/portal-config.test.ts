@@ -393,6 +393,55 @@ describe('PortalConfig', () => {
       expect(config({ ai: { pageActions: false } }).identity().pageActions).to.be.false;
       expect(errorsOf({ ai: { pageActions: 'no' } })).to.deep.equal(["'portal.ai.pageActions' must be true or false."]);
     });
+
+    describe('copilot', () => {
+      const PUBLIC_KEY = `askai_pk_ab12cd34_${'A'.repeat(43)}`;
+
+      it('offers the Ask AI chat only when the block sets one up', () => {
+        expect(config({}).identity().copilot).to.be.null;
+        const copilot = { key: PUBLIC_KEY, apiUrl: 'https://ask.example.com/v1' };
+        expect(config({ ai: { copilot } }).identity().copilot).to.deep.equal({
+          key: PUBLIC_KEY,
+          apiUrl: 'https://ask.example.com',
+          suggestions: []
+        });
+        expect(config({ ai: { copilot } }).toJSON().ai.copilot).to.deep.equal({
+          key: PUBLIC_KEY,
+          apiUrl: 'https://ask.example.com'
+        });
+        expect(config({}).toJSON().ai).to.not.have.property('copilot');
+      });
+
+      it('offers up to three starter questions, and writes them back only when set', () => {
+        const suggestions = [' How do I authenticate? ', 'How do I create an order?'];
+        const copilot = { key: PUBLIC_KEY, apiUrl: 'https://ask.example.com', suggestions };
+        expect(config({ ai: { copilot } }).identity().copilot?.suggestions).to.deep.equal([
+          'How do I authenticate?',
+          'How do I create an order?'
+        ]);
+        expect(config({ ai: { copilot } }).toJSON().ai.copilot?.suggestions).to.have.length(2);
+        const tooMany = { key: PUBLIC_KEY, apiUrl: 'https://ask.example.com', suggestions: ['a', 'b', 'c', 'd'] };
+        expect(errorsOf({ ai: { copilot: tooMany } })).to.deep.equal([
+          "'portal.ai.copilot.suggestions' must be a list of up to 3 questions, each a non-empty string of at most 120 characters."
+        ]);
+        expect(errorsOf({ ai: { copilot: { ...tooMany, suggestions: [''] } } })).to.have.length(1);
+      });
+
+      // The service validates the key and owns its design, so any non-empty key is passed through.
+      it('accepts any key, whatever its layout', () => {
+        const copilot = { key: ' v2-key_Zx9 ', apiUrl: 'https://ask.example.com' };
+        expect(config({ ai: { copilot } }).identity().copilot?.key).to.equal('v2-key_Zx9');
+      });
+
+      it('names every missing or malformed setting', () => {
+        expect(errorsOf({ ai: { copilot: { apiUrl: 'javascript:alert(1)', extra: true } } })).to.deep.equal([
+          "'portal.ai.copilot.extra' is not a 'portal' setting.",
+          "'portal.ai.copilot.key' must be a non-empty string.",
+          "'portal.ai.copilot.apiUrl' must be the Ask AI service's address, starting with 'https://' or 'http://'."
+        ]);
+        expect(errorsOf({ ai: { copilot: 'yes' } })).to.deep.equal(["'portal.ai.copilot' must be a JSON object."]);
+      });
+    });
   });
 
   describe('pluginUrl', () => {
@@ -486,7 +535,8 @@ describe('PortalConfig', () => {
           { label: 'Status', url: 'https://status.example.com', external: true },
           { label: 'Changelog', url: '/changelog', external: false }
         ],
-        pageActions: false
+        pageActions: false,
+        copilot: null
       });
     });
 
@@ -499,7 +549,8 @@ describe('PortalConfig', () => {
         favicon: null,
         colorMode: 'both',
         links: [],
-        pageActions: true
+        pageActions: true,
+        copilot: null
       });
     });
 

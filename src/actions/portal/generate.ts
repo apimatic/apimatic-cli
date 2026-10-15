@@ -44,7 +44,9 @@ export class GenerateAction {
     return await new PreparePortalProjectAction(this.configDir, this.commandMetadata, this.authKey).execute(project, {
       confirm: () => this.confirmOverwrite(portalContext, portalDirectory, force),
       onPrepared: (portalProject, source) =>
-        this.build(portalProject, source.config.siteAddress(), portalContext, portalDirectory, zipPortal)
+        this.build(portalProject, source.config.siteAddress(), portalContext, portalDirectory, zipPortal, {
+          copilot: source.config.identity().copilot !== null
+        })
     });
   };
 
@@ -65,7 +67,8 @@ export class GenerateAction {
     site: SiteAddress | null,
     portalContext: PortalContext,
     portalDirectory: DirectoryPath,
-    zipPortal: boolean
+    zipPortal: boolean,
+    { copilot }: { copilot: boolean }
   ): Promise<ActionResult> {
     const build = await this.prompts.buildPortal(this.buildService.build(portalProject));
 
@@ -83,6 +86,7 @@ export class GenerateAction {
 
     this.prompts.portalGenerated(portalDirectory);
     this.prompts.nextSteps(portalDirectory, zipPortal, site);
+    if (copilot) this.prompts.copilotSyncNextStep();
 
     return ActionResult.success();
   }
