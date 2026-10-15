@@ -3,6 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import net from 'node:net';
 import { stripVTControlCharacters } from 'node:util';
+import { Buffer } from 'node:buffer';
 import { gunzipSync } from 'node:zlib';
 import nock from 'nock';
 import { expect } from 'chai';
