@@ -49,11 +49,27 @@ export class CopilotConfig {
   }
 }
 
+const LOOPBACK_HOSTS = ['localhost', '127.0.0.1', '[::1]'];
+const APIMATIC_DOMAIN = 'apimatic.io';
+
+function isLoopback(url: URL): boolean {
+  return LOOPBACK_HOSTS.includes(url.hostname) || url.hostname.endsWith('.localhost');
+}
+
+/** Whether sync may send the saved APIMatic login to the service: only APIMatic's own, or one on this machine. */
+export function receivesSavedLogin(apiUrl: string): boolean {
+  const url = new URL(apiUrl);
+  const { hostname } = url;
+  return isLoopback(url) || hostname === APIMATIC_DOMAIN || hostname.endsWith(`.${APIMATIC_DOMAIN}`);
+}
+
 // Required while there is no hosted service; once there is, default to its address and keep this as an override.
+// Plain HTTP would expose the keys in transit, so it is only accepted for a service on this machine.
 function serviceOrigin(value: unknown, path: string): Parsed<string> {
-  return typeof value === 'string' && isWebAddress(value)
-    ? ok(new URL(value).origin)
-    : err([`'${path}' must be the Ask AI service's address, starting with 'https://' or 'http://'.`]);
+  const url = typeof value === 'string' && isWebAddress(value) ? new URL(value) : null;
+  return url !== null && (url.protocol === 'https:' || isLoopback(url))
+    ? ok(url.origin)
+    : err([`'${path}' must be the Ask AI service's address, starting with 'https://' ('http://' only for localhost).`]);
 }
 
 function suggestionList(value: unknown, path: string): Parsed<string[]> {

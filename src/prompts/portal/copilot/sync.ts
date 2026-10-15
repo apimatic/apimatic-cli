@@ -28,6 +28,15 @@ export class PortalCopilotSyncPrompts {
     log.error(message);
   }
 
+  public savedLoginWithheld(apiUrl: string) {
+    const message =
+      `The Ask AI service at ${f.link(
+        apiUrl
+      )} is not run by APIMatic, so your saved APIMatic login is not sent to it. ` +
+      `If you trust this service, pass your auth key with ${f.flag('auth-key', '{api-key}')}.`;
+    log.error(message);
+  }
+
   public portalNotGenerated(portalDirectory: DirectoryPath) {
     const message =
       `No generated portal was found at ${f.path(portalDirectory)}. ` +

@@ -3,6 +3,7 @@ import { CopilotIngestService } from '../../../infrastructure/services/copilot-i
 import { PortalCopilotSyncPrompts } from '../../../prompts/portal/copilot/sync.js';
 import { CommandMetadata } from '../../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../../types/file/directoryPath.js';
+import { receivesSavedLogin } from '../../../types/portal/config/copilot-config.js';
 import { PLACEHOLDER_SITE } from '../../../types/portal/config/site-config.js';
 import { GeneratedPortalContext } from '../../../types/portal/copilot/generated-portal-context.js';
 import { ProjectContext } from '../../../types/project-context.js';
@@ -34,6 +35,10 @@ export class PortalCopilotSyncAction {
     const copilot = config.identity().copilot;
     if (copilot === null) {
       this.prompts.copilotNotConfigured(project.sourceDirectory());
+      return ActionResult.failed();
+    }
+    if (this.authKey === null && !receivesSavedLogin(copilot.apiUrl)) {
+      this.prompts.savedLoginWithheld(copilot.apiUrl);
       return ActionResult.failed();
     }
 

@@ -14,7 +14,7 @@ import { CopilotBundle } from '../../../../src/types/portal/copilot/copilot-bund
 import { ProjectContext } from '../../../../src/types/project-context';
 
 const COMMAND_METADATA: CommandMetadata = { commandName: 'portal:copilot:sync', shell: 'test' };
-const COPILOT = { key: 'pk_test', apiUrl: 'http://copilot.test' };
+const COPILOT = { key: 'pk_test', apiUrl: 'https://copilot.test' };
 
 const indexed = (status: 'active' | 'superseded') => ({
   versionId: 'v-1',
@@ -53,9 +53,9 @@ describe('PortalCopilotSyncAction', () => {
     write('portal/guides/intro.md', '# Intro');
   };
 
-  const execute = (wait = true) => {
+  const execute = (wait = true, authKey: string | null = 'auth-key') => {
     const project = ProjectContext.in(new DirectoryPath(root));
-    return new PortalCopilotSyncAction(new DirectoryPath(root), COMMAND_METADATA, 'auth-key').execute(
+    return new PortalCopilotSyncAction(new DirectoryPath(root), COMMAND_METADATA, authKey).execute(
       project,
       project.portalDirectory(),
       wait
@@ -148,6 +148,26 @@ describe('PortalCopilotSyncAction', () => {
 
     expect(result.isFailed()).to.be.true;
     expect(prompts.syncFailed.calledOnceWith(failed, COPILOT.apiUrl)).to.be.true;
+  });
+
+  it('keeps the saved login from a service APIMatic does not run, unless a key is passed', async () => {
+    const withheld = await execute(true, null);
+
+    expect(withheld.isFailed()).to.be.true;
+    expect(prompts.savedLoginWithheld.calledOnceWith(COPILOT.apiUrl)).to.be.true;
+    expect(upload.called).to.be.false;
+
+    expect((await execute()).isSuccess()).to.be.true;
+  });
+
+  it("uses the saved login with APIMatic's own service and one on this machine", async () => {
+    for (const apiUrl of ['https://ask.apimatic.io', 'http://localhost:8787']) {
+      writeConfig({ copilot: { ...COPILOT, apiUrl } });
+
+      expect((await execute(true, null)).isSuccess(), apiUrl).to.be.true;
+    }
+    expect(upload.callCount).to.equal(2);
+    expect(prompts.savedLoginWithheld.called).to.be.false;
   });
 
   it('fails without uploading when the portal has no Ask AI chat', async () => {

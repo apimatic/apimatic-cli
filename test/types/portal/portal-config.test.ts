@@ -1,6 +1,7 @@
 import { expect } from 'chai';
 import { DirectoryPath } from '../../../src/types/file/directoryPath';
 import { PortalConfig } from '../../../src/types/portal/portal-config';
+import { receivesSavedLogin } from '../../../src/types/portal/config/copilot-config';
 import { SuggestedSite } from '../../../src/types/portal/config/site-config';
 
 describe('PortalConfig', () => {
@@ -437,9 +438,40 @@ describe('PortalConfig', () => {
         expect(errorsOf({ ai: { copilot: { apiUrl: 'javascript:alert(1)', extra: true } } })).to.deep.equal([
           "'portal.ai.copilot.extra' is not a 'portal' setting.",
           "'portal.ai.copilot.key' must be a non-empty string.",
-          "'portal.ai.copilot.apiUrl' must be the Ask AI service's address, starting with 'https://' or 'http://'."
+          "'portal.ai.copilot.apiUrl' must be the Ask AI service's address, starting with 'https://' ('http://' only for localhost)."
         ]);
         expect(errorsOf({ ai: { copilot: 'yes' } })).to.deep.equal(["'portal.ai.copilot' must be a JSON object."]);
+      });
+
+      // Plain HTTP would expose the keys in transit, except to a service on this machine.
+      it('accepts plain HTTP only for a service on this machine', () => {
+        const at = (apiUrl: string) => ({ ai: { copilot: { key: PUBLIC_KEY, apiUrl } } });
+        for (const local of [
+          'http://localhost:8787',
+          'http://127.0.0.1:8787',
+          'http://[::1]:8787',
+          'http://ask.localhost'
+        ]) {
+          expect(config(at(local)).identity().copilot?.apiUrl, local).to.equal(new URL(local).origin);
+        }
+        expect(errorsOf(at('http://ask.example.com'))).to.have.length(1);
+        expect(errorsOf(at('http://localhost.example.com'))).to.have.length(1);
+      });
+    });
+
+    describe('receivesSavedLogin', () => {
+      it("trusts only APIMatic's own services and those on this machine with the saved login", () => {
+        for (const trusted of [
+          'https://ask.apimatic.io',
+          'https://apimatic.io',
+          'http://localhost:8787',
+          'http://[::1]'
+        ]) {
+          expect(receivesSavedLogin(trusted), trusted).to.be.true;
+        }
+        for (const other of ['https://ask.example.com', 'https://apimatic.io.example.com', 'https://evilapimatic.io']) {
+          expect(receivesSavedLogin(other), other).to.be.false;
+        }
       });
     });
   });
