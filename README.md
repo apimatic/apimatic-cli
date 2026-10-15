@@ -315,6 +315,9 @@ DESCRIPTION
   The service is set by the 'ai.copilot' setting in the 'portal' block of 'src/apimatic.json'. The pages are swapped in
   at once, after all of them are indexed; until then Ask AI answers from the previous ones.
 
+  Your saved APIMatic login is sent only to an Ask AI service APIMatic runs, or to one on this machine. For any other
+  service, pass your auth key with --auth-key.
+
 EXAMPLES
   apimatic portal copilot sync
 

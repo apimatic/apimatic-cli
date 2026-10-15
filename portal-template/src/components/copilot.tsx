@@ -5,8 +5,8 @@ import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport, type UIMessage } from 'ai';
 import { AIChatPanel, AIChatProvider, AIChatSearch, AIChatSources, AIChatTrigger, useAIChat } from '@fumadocs/ai-chat';
 import type { AIChatOptions } from 'fumadocs-ui/layouts/shared';
-import { withBasePath } from '@/lib/base-path';
 import { CopilotClient } from '@/lib/copilot-client';
+import { servedSearch, servedSources } from '@/lib/copilot-links';
 import type { PortalCopilot } from '@/lib/portal-types';
 
 /** One part of a chat message: text, a tool call, a data part, and so on. */
@@ -67,18 +67,6 @@ function renderPart(part: Part, live: boolean): ReactNode {
   // The numbered source chips, matching the [1], [2] citations in the answer.
   if (part.type === 'data-sources') return <AIChatSources sources={servedSources(part.data as Sources)} />;
   return null;
-}
-
-// The service links pages by their path within the portal; the host serves them under the base path.
-function servedSearch(part: SearchPart): SearchPart {
-  return {
-    ...part,
-    output: part.output?.map((found) => ({ doc: found.doc && { ...found.doc, url: withBasePath(found.doc.url) } }))
-  };
-}
-
-function servedSources(sources: Sources): Sources {
-  return sources.map((source) => ({ ...source, url: withBasePath(source.url) }));
 }
 
 function chatTransport(client: CopilotClient): DefaultChatTransport<UIMessage> {

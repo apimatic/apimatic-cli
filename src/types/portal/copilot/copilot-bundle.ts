@@ -50,8 +50,4 @@ export class CopilotBundle {
   public gzipped(): Buffer {
     return gzipSync(JSON.stringify(this.document));
   }
-
-  public toJSON(): BundleDocument {
-    return this.document;
-  }
 }

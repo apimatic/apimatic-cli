@@ -69,7 +69,11 @@ describe('GeneratedPortalContext', () => {
 
     const built = (await bundle(SiteAddress.parse('https://example.com/docs', 'url')._unsafeUnwrap()))!;
 
-    const document = built.toJSON();
+    const document = JSON.parse(gunzipSync(built.gzipped()).toString('utf8')) as {
+      siteUrl: string | null;
+      basePath: string;
+      pages: { path: string; description?: string }[];
+    };
     expect(document.siteUrl).to.equal('https://example.com/docs');
     expect(document.basePath).to.equal('/docs/');
     expect(document.pages.map(({ path: page }) => page)).to.deep.equal(['/', '/guides/intro']);

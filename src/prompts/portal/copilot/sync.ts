@@ -73,11 +73,11 @@ export class PortalCopilotSyncPrompts {
   public syncFailed(error: ServiceError, apiUrl: string) {
     switch (error.code) {
       case ServiceErrorCode.NetworkError:
-        log.error(`The Copilot service at ${f.link(apiUrl)} could not be reached. Check the address and try again.`);
+        log.error(`The Ask AI service at ${f.link(apiUrl)} could not be reached. Check the address and try again.`);
         return;
       case ServiceErrorCode.Forbidden:
         log.error(
-          `${error.errorMessage} The account of the auth key must own the portal that the Copilot key belongs to.`
+          `${error.errorMessage} The account of the auth key must own the portal that the Ask AI key belongs to.`
         );
         return;
       case ServiceErrorCode.Timeout:

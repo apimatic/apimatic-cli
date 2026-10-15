@@ -81,7 +81,7 @@ describe('CopilotIngestService', () => {
       const result = await upload();
 
       expect(result._unsafeUnwrap()).to.deep.equal({ versionId: VERSION_ID, status: 'queued', pageCount: 1 });
-      expect(posted).to.deep.equal(bundle.toJSON());
+      expect(posted).to.deep.equal(JSON.parse(gunzipSync(bundle.gzipped()).toString('utf8')));
       expect(scope.isDone()).to.be.true;
     });
 

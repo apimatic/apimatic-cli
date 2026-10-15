@@ -29,7 +29,6 @@ export const COPIED_DEPENDENCIES = ['@fontsource-variable/geist', '@fontsource-v
 export const LINKED_DEPENDENCIES = [
   '@ai-sdk/react',
   '@fumadocs/ai-chat',
-  'ai',
   '@fumadocs/api-docs',
   '@scalar/json-magic',
   '@tailwindcss/vite',
@@ -37,6 +36,7 @@ export const LINKED_DEPENDENCIES = [
   '@tanstack/react-start',
   '@tanstack/start-static-server-functions',
   '@vitejs/plugin-react',
+  'ai',
   'fumadocs-core',
   'fumadocs-mdx',
   'fumadocs-openapi',

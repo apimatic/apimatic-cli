@@ -3,6 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import sinon from 'sinon';
 import { expect } from 'chai';
+import { gunzipSync } from 'node:zlib';
 import { err, ok } from 'neverthrow';
 import { PortalCopilotSyncAction } from '../../../../src/actions/portal/copilot/sync';
 import { CopilotIngestService } from '../../../../src/infrastructure/services/copilot-ingest-service';
@@ -12,6 +13,14 @@ import { CommandMetadata } from '../../../../src/types/common/command-metadata';
 import { DirectoryPath } from '../../../../src/types/file/directoryPath';
 import { CopilotBundle } from '../../../../src/types/portal/copilot/copilot-bundle';
 import { ProjectContext } from '../../../../src/types/project-context';
+
+/** The bundle as the service receives it. */
+const uploaded = (bundle: CopilotBundle) =>
+  JSON.parse(gunzipSync(bundle.gzipped()).toString('utf8')) as {
+    basePath: string;
+    siteUrl: string | null;
+    pages: { path: string }[];
+  };
 
 const COMMAND_METADATA: CommandMetadata = { commandName: 'portal:copilot:sync', shell: 'test' };
 const COPILOT = { key: 'pk_test', apiUrl: 'https://copilot.test' };
@@ -88,8 +97,8 @@ describe('PortalCopilotSyncAction', () => {
     const [copilot, bundle, , , authKey] = upload.firstCall.args as [unknown, CopilotBundle, unknown, unknown, string];
     expect(copilot).to.deep.include(COPILOT);
     expect(authKey).to.equal('auth-key');
-    expect(bundle.toJSON()).to.deep.include({ basePath: '/docs/', siteUrl: 'https://example.com/docs' });
-    expect(bundle.toJSON().pages.map(({ path: page }) => page)).to.deep.equal(['/', '/guides/intro']);
+    expect(uploaded(bundle)).to.deep.include({ basePath: '/docs/', siteUrl: 'https://example.com/docs' });
+    expect(uploaded(bundle).pages.map(({ path: page }) => page)).to.deep.equal(['/', '/guides/intro']);
     expect(awaitIndexing.firstCall.args[1]).to.equal('v-1');
     expect(prompts.indexed.calledOnceWith(indexed('active'))).to.be.true;
   });
