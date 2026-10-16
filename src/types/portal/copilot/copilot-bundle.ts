@@ -1,4 +1,5 @@
 import { Buffer } from 'node:buffer';
+import { createHash } from 'node:crypto';
 import { gzipSync } from 'node:zlib';
 import { SiteAddress } from '../config/site-address.js';
 import { ListedPage } from './llms-index.js';
@@ -25,7 +26,11 @@ const GENERATOR_NAME = 'apimatic-cli';
 
 /** The portal's pages as the Ask AI service ingests them, in its format version 1. */
 export class CopilotBundle {
-  private constructor(private readonly document: BundleDocument) {}
+  private readonly json: string;
+
+  private constructor(private readonly document: BundleDocument) {
+    this.json = JSON.stringify(document);
+  }
 
   public static of(pages: BundlePage[], site: SiteAddress | null, cliVersion: string, at: Date): CopilotBundle {
     return new CopilotBundle({
@@ -48,6 +53,16 @@ export class CopilotBundle {
   }
 
   public gzipped(): Buffer {
-    return gzipSync(JSON.stringify(this.document));
+    return gzipSync(this.json);
+  }
+
+  /** As the deployed portal serves it for the Ask AI service to fetch: plain, since hosts compress it themselves. */
+  public toJson(): string {
+    return this.json;
+  }
+
+  /** Names these exact bytes, so the Ask AI service fetches the bundle only when a deploy changed it. */
+  public buildManifest(): string {
+    return JSON.stringify({ formatVersion: 1, buildId: createHash('sha256').update(this.json).digest('hex') });
   }
 }

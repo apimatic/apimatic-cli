@@ -1,3 +1,4 @@
+import { envInfo } from '../../infrastructure/env-info.js';
 import { PortalBuildService } from '../../infrastructure/portal-build-service.js';
 import { PortalProjectPaths } from '../../infrastructure/portal-project-service.js';
 import { PortalGeneratePrompts } from '../../prompts/portal/generate.js';
@@ -5,6 +6,7 @@ import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { PortalContext } from '../../types/portal-context.js';
 import { SiteAddress } from '../../types/portal/config/site-address.js';
+import { GeneratedPortalContext } from '../../types/portal/copilot/generated-portal-context.js';
 import { ProjectContext } from '../../types/project-context.js';
 import { ActionResult } from '../action-result.js';
 import { PreparePortalProjectAction } from './prepare-project.js';
@@ -79,6 +81,9 @@ export class GenerateAction {
       return ActionResult.failed();
     }
 
+    // Added before saving, so a zipped portal carries the bundle too.
+    const copilotPublished = copilot && (await this.publishCopilotBundle(build.value.output, site));
+
     const saved = await this.prompts.savePortal(portalContext.save(build.value.output, zipPortal));
     if (saved.isErr()) {
       return ActionResult.failed();
@@ -86,8 +91,24 @@ export class GenerateAction {
 
     this.prompts.portalGenerated(portalDirectory);
     this.prompts.nextSteps(portalDirectory, zipPortal, site);
-    if (copilot) this.prompts.copilotSyncNextStep();
+    if (copilotPublished) this.prompts.copilotUpdatesAfterDeploy();
 
     return ActionResult.success();
+  }
+
+  /** The portal still saves without the bundle; Ask AI is then updated by `portal copilot sync`. */
+  private async publishCopilotBundle(builtDirectory: DirectoryPath, site: SiteAddress | null): Promise<boolean> {
+    const portal = new GeneratedPortalContext(builtDirectory);
+    const bundle = await portal.bundle(site, envInfo.getCLIVersion(), new Date());
+    if (bundle === null || bundle.pageCount() === 0) {
+      this.prompts.copilotPagesNotFound();
+      return false;
+    }
+    const published = await portal.publish(bundle);
+    if (published.isErr()) {
+      this.prompts.copilotBundleNotWritten(published.error);
+      return false;
+    }
+    return true;
   }
 }

@@ -11,6 +11,7 @@ import { DirectoryPath } from '../../src/types/file/directoryPath';
 import { FilePath } from '../../src/types/file/filePath';
 import { CodeSampleCatalog, CodeSampleCatalogs } from '../../src/types/portal/code-samples';
 import { PortalArtifacts } from '../../src/types/portal/portal-artifacts';
+import { GeneratedPortalContext } from '../../src/types/portal/copilot/generated-portal-context';
 import { Language } from '../../src/types/sdk/generate';
 import {
   ensurePortalProjectDirectoryBase,
@@ -934,6 +935,13 @@ const stylesheetOf = (output: DirectoryPath) => {
 
     expect(chat, 'a chunk carries the chat').to.not.be.empty;
     expect(loaded.filter((name) => chat.some((script) => script.name === name))).to.deep.equal([]);
+  });
+
+  // `generate` publishes these pages for the service to fetch, so a real build must list them with their Markdown.
+  it('lists the pages Ask AI answers from, each with its Markdown copy', async () => {
+    const bundle = await new GeneratedPortalContext(portal.output()).bundle(null, '0.0.0', new Date());
+
+    expect(bundle?.pageCount()).to.be.greaterThan(1);
   });
 
   it('tells the browser the public key and the service, and no more', () => {

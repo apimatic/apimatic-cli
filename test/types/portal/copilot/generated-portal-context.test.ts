@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
 import { gunzipSync } from 'node:zlib';
 import { expect } from 'chai';
 import { DirectoryPath } from '../../../../src/types/file/directoryPath';
@@ -84,5 +85,45 @@ describe('GeneratedPortalContext', () => {
     write('llms.txt', '- [Intro](/guides/intro)');
 
     expect((await bundle())!.pageCount()).to.equal(0);
+  });
+
+  describe('publish', () => {
+    const read = (relative: string) => fs.readFileSync(path.join(root, relative), 'utf8');
+
+    beforeEach(() => {
+      write('llms.txt', '- [Welcome](/)');
+      write('index.md', '# Welcome');
+    });
+
+    it('writes the bundle as plain JSON beside a build ID of its exact bytes', async () => {
+      const built = (await bundle())!;
+
+      expect((await new GeneratedPortalContext(new DirectoryPath(root)).publish(built)).isOk()).to.be.true;
+
+      const json = read('__copilot/bundle.json');
+      expect(JSON.parse(json)).to.deep.equal(JSON.parse(gunzipSync(built.gzipped()).toString('utf8')));
+      expect(JSON.parse(read('__copilot/build.json'))).to.deep.equal({
+        formatVersion: 1,
+        buildId: createHash('sha256').update(json).digest('hex')
+      });
+    });
+
+    it('names the same pages with the same build ID, and changed pages with another', async () => {
+      const buildId = async () => (JSON.parse((await bundle())!.buildManifest()) as { buildId: string }).buildId;
+      const first = await buildId();
+
+      expect(await buildId()).to.equal(first);
+      write('index.md', '# Welcome back');
+      expect(await buildId()).to.not.equal(first);
+    });
+
+    it('reports a portal it cannot write to rather than throwing', async () => {
+      const built = (await bundle())!;
+      write('__copilot', 'a file where the directory goes');
+
+      const published = await new GeneratedPortalContext(new DirectoryPath(root)).publish(built);
+
+      expect(published.isErr()).to.be.true;
+    });
   });
 });
