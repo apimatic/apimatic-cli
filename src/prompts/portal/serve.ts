@@ -6,6 +6,7 @@ import { UrlPath } from '../../types/file/urlPath.js';
 import { ContentNotices } from '../../types/portal/content-notices.js';
 import { MissingArtifacts } from '../../types/portal/generated-pages.js';
 import { NAVIGATION_FILE_NAME } from '../../types/portal/portal-navigation.js';
+import { METADATA_FILE_NAME } from '../../types/project-layout.js';
 import { ContentProblem, PortalSourceProblem } from '../../types/portal/portal-source.js';
 import { PortalDevServer, PortalDevServerFailure } from '../../infrastructure/portal-dev-server-service.js';
 import { Result } from 'neverthrow';
@@ -56,7 +57,8 @@ export class PortalServePrompts {
         '',
         `Restart the preview after adding a language or a ${f.var('plugin')} block (its SDK or plugin is ` +
           `fetched at startup), adding or removing a page, creating ${staticPath(sourceDirectory)}, ` +
-          `changing which documents are in ${specPath(sourceDirectory)}, or changing the path in ` +
+          `changing which documents are in ${specPath(sourceDirectory)} or which folders its ` +
+          `${f.var(METADATA_FILE_NAME)} merges, or changing the path in ` +
           `${f.var('portal.site.url')}.`,
         '',
         'Press CTRL+C to stop the server.'

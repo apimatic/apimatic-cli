@@ -917,11 +917,61 @@ const stylesheetOf = (output: DirectoryPath) => {
   });
 });
 
-(enabled ? describe : describe.skip)('portal build, with the Ask AI chat (end to end)', function () {
+/**
+ * The layout the platform merges several APIs into one SDK from: a folder to each API, named in
+ * `APIMATIC-META.json`. Both APIs declare `GET /status`, and the orders API keeps a schema in a
+ * file of its own folder.
+ */
+(enabled ? describe : describe.skip)('portal build, merged spec folders (end to end)', function () {
   this.timeout(10 * 60 * 1000);
 
-  const portal = portalBuilt('copilot');
-  const { read } = portal;
+  const sample = (call: string) => ({ Example: `const result = await ${call};` });
+  const portal = portalBuilt('merged', {
+    codeSampleCatalogs: new CodeSampleCatalogs([
+      CodeSampleCatalog.fromJson(Language.TYPESCRIPT, {
+        paths: {
+          '/orders': { GET: sample('client.orders.listOrders()') },
+          '/stock': { GET: sample('client.stock.listStock()') },
+          '/status': { GET: sample('client.health.getOrdersStatus()') }
+        }
+      }) as CodeSampleCatalog
+    ])
+  });
+  const { read, exists } = portal;
+
+  const LIST_ORDERS = 'api/orders/orders/listOrders';
+  const LIST_STOCK = 'api/inventory/stock/listStock';
+  const STATUS_PAGES = ['api/orders/health/getOrdersStatus', 'api/inventory/health/getInventoryStatus'];
+
+  it('writes a section per merged folder, named after it, with a page per operation', () => {
+    for (const page of [LIST_ORDERS, LIST_STOCK, ...STATUS_PAGES]) {
+      expect(exists(`${page}/index.html`), page).to.be.true;
+    }
+    expect(exists('api/apimatic-meta')).to.be.false;
+  });
+
+  it("shows each API's own SDK sample and server on an operation only it declares", () => {
+    const orders = read(`${LIST_ORDERS}/index.html`);
+    const stock = read(`${LIST_STOCK}/index.html`);
+
+    expect(orders).to.contain('client.orders.listOrders()');
+    expect(orders).to.contain('https://orders.store.test');
+    expect(orders).to.not.contain('inventory.store.test');
+    expect(stock).to.contain('client.stock.listStock()');
+    expect(stock).to.contain('https://inventory.store.test');
+  });
+
+  // The samples hold one per method and path: the inventory page would show the orders API's call.
+  it('shows no SDK sample on an operation both APIs declare', () => {
+    for (const page of STATUS_PAGES) {
+      expect(read(`${page}/index.html`), page).to.not.contain('x-apimatic-codeSamples');
+    }
+  });
+
+  it('reads a schema kept in another file of the folder', () => {
+    expect(read(`${LIST_ORDERS}/index.html`)).to.contain('grandTotalCents');
+    expect(read(`${LIST_ORDERS}.md`)).to.contain('grandTotalCents');
+  });
 
   // The chat wraps the whole layout, so a prerender that did not wait for its chunk would leave the button out.
   it('prerenders each page with the chat button', () => {
@@ -950,4 +1000,5 @@ const stylesheetOf = (output: DirectoryPath) => {
     expect(scripts.some((script) => script.text.includes('pk_test_e2e'))).to.be.true;
     expect(scripts.some((script) => script.text.includes('https://ask.apimatic.io'))).to.be.true;
   });
+
 });

@@ -49,6 +49,11 @@ export class CodeSampleCatalog {
   public endpoints(): Endpoint[] {
     return [...this.samplesByEndpoint.values()].map(({ endpoint }) => endpoint);
   }
+
+  public without(endpoints: Endpoint[]): CodeSampleCatalog {
+    const left = new Set(endpoints.map(String));
+    return new CodeSampleCatalog(new Map([...this.samplesByEndpoint].filter(([key]) => !left.has(key))));
+  }
 }
 
 export class CodeSampleCatalogs {
@@ -60,6 +65,10 @@ export class CodeSampleCatalogs {
 
   public samplesFor(endpoint: Endpoint): CodeSample[] {
     return this.catalogs.flatMap((catalog) => catalog.sampleFor(endpoint) ?? []);
+  }
+
+  public without(endpoints: Endpoint[]): CodeSampleCatalogs {
+    return new CodeSampleCatalogs(this.catalogs.map((catalog) => catalog.without(endpoints)));
   }
 
   public unplacedIn(documented: Endpoint[]): string[] {

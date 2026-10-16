@@ -1,0 +1,32 @@
+openapi: 3.0.3
+info:
+  title: Orders API
+  version: 1.0.0
+servers:
+  - url: https://orders.store.test
+tags:
+  - name: Orders
+  - name: Health
+paths:
+  /orders:
+    get:
+      operationId: listOrders
+      summary: List orders
+      tags: [Orders]
+      responses:
+        '200':
+          description: The orders.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: './schemas/order.yaml'
+  /status:
+    get:
+      operationId: getOrdersStatus
+      summary: Orders service status
+      tags: [Health]
+      responses:
+        '200':
+          description: The service is up.

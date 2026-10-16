@@ -367,6 +367,15 @@ describe('GenerateAction', () => {
     expect(shared.prompts.filesShadowedByStatic.firstCall.args[0].map(String)).to.deep.equal(['robots.txt']);
   });
 
+  it('reports the specs the SDKs do not cover and the operations two specs declare, none in the fixture', async () => {
+    const result = await execute();
+
+    expect(result.isSuccess()).to.be.true;
+    expect(shared.prompts.unmergedSpecs.firstCall.args[0]).to.deep.equal([]);
+    expect(shared.prompts.leftOutSpecs.firstCall.args[0]).to.deep.equal([]);
+    expect(shared.prompts.sharedEndpoints.firstCall.args[0]).to.deep.equal([]);
+  });
+
   // The fixture's root nav.json makes a tab of `guides`, and no two of its tabs share a name.
   it('reports the content notices, with no tab name shared in the fixture', async () => {
     const result = await execute();

@@ -16,6 +16,7 @@ import { DirectoryPath } from '../../src/types/file/directoryPath';
 import { FileName } from '../../src/types/file/fileName';
 import { FilePath } from '../../src/types/file/filePath';
 import { CodeSampleCatalog, CodeSampleCatalogs } from '../../src/types/portal/code-samples';
+import { Endpoint } from '../../src/types/portal/endpoint';
 import { GENERATED_DIRECTORY_NAME, GeneratedPages } from '../../src/types/portal/generated-pages';
 import { PortalConfig, PortalIdentity } from '../../src/types/portal/portal-config';
 import { PortalArtifacts } from '../../src/types/portal/portal-artifacts';
@@ -60,6 +61,10 @@ describe('PortalProjectService', () => {
         endpoints: []
       }
     ],
+    specDirectory: new DirectoryPath(root).join('spec'),
+    unmergedSpecs: [],
+    leftOutSpecs: [],
+    sharedEndpoints: [],
     contentDirectory: null,
     staticDirectory: null,
     shadowedFiles: [],
@@ -170,11 +175,14 @@ describe('PortalProjectService', () => {
         'contentDir',
         'downloadsDir',
         'generatedDir',
+        'specDir',
         'specs',
         'staticDir'
       ]);
       expect(Object.keys(config.specs)).to.deep.equal(['calculator']);
       expect(config.specs.calculator).to.contain('api.json');
+      // A spec in a merged folder may refer to parts in another folder of `spec/`, which the preview reloads on too.
+      expect(config.specDir).to.equal(new DirectoryPath(root).join('spec').toPosix());
     });
 
     it('builds the portal under the path of its address', async () => {
@@ -298,6 +306,17 @@ describe('PortalProjectService', () => {
       });
     });
 
+    // The samples hold one per method and path, which would be another API's call on all but one of the pages.
+    it('leaves out the samples of an operation more than one spec declares', async () => {
+      const spec = new DirectoryPath(root).join('spec');
+      const files = ['alpha', 'beta'].map((folder) => new FilePath(spec.join(folder), new FileName('openapi.json')));
+      const source = sourceFor({ sharedEndpoints: [{ key: new Endpoint('get', '/pets'), files }] });
+
+      (await service.prepare(project, source, withCatalogs))._unsafeUnwrap();
+
+      expect(JSON.parse(fs.readFileSync(readConfig().codeSamples, 'utf8'))).to.deep.equal({});
+    });
+
     it('points each spec at its own file, samples or not', async () => {
       const source = sourceFor();
 
@@ -305,7 +324,6 @@ describe('PortalProjectService', () => {
 
       expect(readConfig().specs.calculator).to.equal(source.specs[0].file.toString().split(path.sep).join('/'));
     });
-
     it('names no samples when there are none', async () => {
       (await service.prepare(project, sourceFor(), NO_ARTIFACTS))._unsafeUnwrap();
 
