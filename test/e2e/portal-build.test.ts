@@ -1,4 +1,5 @@
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 import { createRequire } from 'node:module';
 import { execa } from 'execa';
@@ -12,10 +13,7 @@ import { FilePath } from '../../src/types/file/filePath';
 import { CodeSampleCatalog, CodeSampleCatalogs } from '../../src/types/portal/code-samples';
 import { PortalArtifacts } from '../../src/types/portal/portal-artifacts';
 import { Language } from '../../src/types/sdk/generate';
-import {
-  ensurePortalProjectDirectoryBase,
-  removePortalProjectDirectoryBase
-} from '../../src/infrastructure/tmp-extensions';
+import { canonical } from '../../src/infrastructure/tmp-extensions';
 
 // A real Vite build takes tens of seconds and needs every runtime dependency installed,
 // so it stays out of the default run. CI switches it on for the platform matrix.
@@ -38,7 +36,6 @@ const SDK_DOCS =
   'Use **identical method names**, **(identical)** and *`code`* here.\n';
 
 interface BuiltPortal {
-  base: string;
   root: string;
   project: DirectoryPath;
   output: DirectoryPath;
@@ -70,8 +67,7 @@ function deliveredInto(
 /** Resolves, prepares, builds and saves a fixture as `portal generate` does. */
 async function buildFixture(name: string, delivered: Delivered = {}): Promise<BuiltPortal> {
   const fixture = new DirectoryPath(process.cwd()).join('test/resources/portal-inputs').join(name).join('src');
-  const base = await ensurePortalProjectDirectoryBase(fixture);
-  const root = fs.mkdtempSync(path.join(base, 'portal-e2e-'));
+  const root = canonical(fs.mkdtempSync(path.join(os.tmpdir(), 'portal-e2e-')));
 
   const source = (await new PortalSourceContext(fixture).resolve())._unsafeUnwrap();
 
@@ -89,13 +85,11 @@ async function buildFixture(name: string, delivered: Delivered = {}): Promise<Bu
 
   const output = new DirectoryPath(root).join('portal');
   (await new PortalContext(output).save(build.value.output, false))._unsafeUnwrap();
-  return { base, root, project, output };
+  return { root, project, output };
 }
 
-async function removeBuilt(built: BuiltPortal | undefined): Promise<void> {
-  if (built === undefined) return;
-  fs.rmSync(built.root, { recursive: true, force: true });
-  await removePortalProjectDirectoryBase(built.base);
+function removeBuilt(built: BuiltPortal | undefined): void {
+  if (built !== undefined) fs.rmSync(built.root, { recursive: true, force: true });
 }
 
 /**
@@ -113,9 +107,7 @@ function portalBuilt(name: string, delivered: Delivered = {}) {
     built = await buildFixture(name, delivered);
   });
 
-  after(async () => {
-    await removeBuilt(built);
-  });
+  after(() => removeBuilt(built));
 
   return {
     output: () => have().output,
@@ -522,6 +514,12 @@ const stylesheetOf = (output: DirectoryPath) => {
     expect(css).to.match(/--color-fd-primary:#171717/);
   });
 
+  // Tailwind reads the copy of the pages with the rest of the project, so a class a page uses has its rule.
+  it('generates the utility classes a page uses', () => {
+    expect(read('authentication/index.html')).to.contain('class="tracking-[0.3125em]"');
+    expect(stylesheetOf(portal.output())).to.contain('.tracking-\\[0\\.3125em\\]');
+  });
+
   // The counterpart of the branded portal's forced mode: the same label, present here.
   it('offers the colour-mode switch when both modes are allowed', () => {
     expect(read('index.html')).to.contain('aria-label="Toggle Theme"');
@@ -776,9 +774,7 @@ const stylesheetOf = (output: DirectoryPath) => {
     ({ output } = built);
   });
 
-  after(async () => {
-    await removeBuilt(built);
-  });
+  after(() => removeBuilt(built));
 
   const read = (relative: string) => fs.readFileSync(path.join(output.toString(), relative), 'utf8');
   const exists = (relative: string) => fs.existsSync(path.join(output.toString(), relative));

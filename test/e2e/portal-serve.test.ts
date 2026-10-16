@@ -1,4 +1,5 @@
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 import { expect } from 'chai';
 import getPort from 'get-port';
@@ -9,10 +10,7 @@ import { DirectoryPath } from '../../src/types/file/directoryPath';
 import { FilePath } from '../../src/types/file/filePath';
 import { CodeSampleCatalogs } from '../../src/types/portal/code-samples';
 import { PortalArtifacts } from '../../src/types/portal/portal-artifacts';
-import {
-  ensurePortalProjectDirectoryBase,
-  removePortalProjectDirectoryBase
-} from '../../src/infrastructure/tmp-extensions';
+import { canonical } from '../../src/infrastructure/tmp-extensions';
 
 // Opt-in: a real dev server needs a minute and every runtime dependency.
 const enabled = process.env.APIMATIC_E2E === '1';
@@ -21,13 +19,11 @@ const enabled = process.env.APIMATIC_E2E === '1';
   this.timeout(10 * 60 * 1000);
 
   const fixture = new DirectoryPath(process.cwd()).join('test/resources/portal-inputs/default/src');
-  let base: string | undefined;
   let root: string | undefined;
   let server: PortalDevServer | undefined;
 
   before(async () => {
-    base = await ensurePortalProjectDirectoryBase(fixture);
-    root = fs.mkdtempSync(path.join(base, 'portal-serve-e2e-'));
+    root = canonical(fs.mkdtempSync(path.join(os.tmpdir(), 'portal-serve-e2e-')));
 
     const source = (await new PortalSourceContext(fixture).resolve())._unsafeUnwrap();
     const delivered = path.join(root, 'delivered');
@@ -55,7 +51,6 @@ const enabled = process.env.APIMATIC_E2E === '1';
   after(async () => {
     await server?.stop();
     if (root !== undefined) fs.rmSync(root, { recursive: true, force: true });
-    if (base !== undefined) await removePortalProjectDirectoryBase(base);
   });
 
   // A missing file answers 200 too, with the fallback page, so the type says what came back.
@@ -69,14 +64,17 @@ const enabled = process.env.APIMATIC_E2E === '1';
     expect(response.headers.get('content-type')).to.contain('javascript');
   });
 
-  it('serves an image from the static directory asked for before the page importing it', async () => {
+  // The image comes from the static directory by its address, which Vite serves from any drive.
+  it("serves a page's static image at its public address, its module asked for before the page", async () => {
     const image = fs
       .realpathSync(path.join(fixture.toString(), 'static', 'images', 'logo.png'))
       .split(path.sep)
       .join('/');
 
-    const response = await globalThis.fetch(`${server?.url.toString()}/@fs/${image}`);
+    const module = await globalThis.fetch(`${server?.url.toString()}/@fs/${image}?import`);
+    const response = await globalThis.fetch(`${server?.url.toString()}/images/logo.png`);
 
+    expect(await module.text()).to.contain('export default "/images/logo.png"');
     expect(response.status).to.equal(200);
     expect(response.headers.get('content-type')).to.equal('image/png');
   });
