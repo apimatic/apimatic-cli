@@ -19,7 +19,7 @@ describe('prerenderPages', () => {
 
   const urlsFor = async (siteUrl: string | null = null, base = '/', specs: Record<string, string> = {}) => {
     const pages = await prerenderPages(
-      { base, specs, codeSamples: null, contentDir, generatedDir, staticDir: null, downloadsDir: null },
+      { base, specs, specDir: '', codeSamples: null, contentDir, generatedDir, staticDir: null, downloadsDir: null },
       siteUrl
     );
     return pages.map((page) => page.path);

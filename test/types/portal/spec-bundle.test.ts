@@ -48,4 +48,15 @@ describe('SpecBundle', () => {
 
     expect(bundle.endpoints().map(String)).to.deep.equal(['GET /health', 'GET /pets', 'POST /pets']);
   });
+
+  it('lists once an operation declared both beside the $ref of a path item and in the file it refers to', () => {
+    const bundle = new SpecBundle(
+      at('api.json'),
+      parsed({ openapi: '3.0.0', paths: { '/pets': { $ref: './paths.json#/pets', get: {} } } })
+    );
+
+    bundle.add(at('paths.json'), parsed({ pets: { get: {}, post: {} } }));
+
+    expect(bundle.endpoints().map(String)).to.deep.equal(['GET /pets', 'POST /pets']);
+  });
 });

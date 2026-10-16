@@ -4,15 +4,23 @@ import { ServiceError } from '../../infrastructure/service-error.js';
 import { PortalAuthorizationFailure } from '../../infrastructure/services/portal-authorization-service.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { FileName } from '../../types/file/fileName.js';
+import { FilePath } from '../../types/file/filePath.js';
 import { ContentNotices } from '../../types/portal/content-notices.js';
 import { MissingArtifacts } from '../../types/portal/generated-pages.js';
 import { PortalArtifacts } from '../../types/portal/portal-artifacts.js';
-import { PortalSourceProblem } from '../../types/portal/portal-source.js';
+import { PortalSourceProblem, SharedEndpoint } from '../../types/portal/portal-source.js';
 import { format as f } from '../format.js';
 import { describeMissingArtifacts, generateArtifacts } from './artifacts.js';
 import { reportAuthorizationFailure } from './authorization.js';
 import { reportUnplacedSamples } from './code-samples.js';
-import { reportContentNotices, reportShadowedFiles, reportSourceProblem } from './source.js';
+import {
+  reportContentNotices,
+  reportLeftOutSpecs,
+  reportShadowedFiles,
+  reportSharedEndpoints,
+  reportSourceProblem,
+  reportUnmergedSpecs
+} from './source.js';
 
 /** What both `portal generate` and `portal serve` say while the project they share is prepared. */
 export class PreparePortalProjectPrompts {
@@ -46,6 +54,18 @@ export class PreparePortalProjectPrompts {
 
   public contentNotices(notices: ContentNotices, sourceDirectory: DirectoryPath) {
     reportContentNotices(notices, sourceDirectory);
+  }
+
+  public unmergedSpecs(files: FilePath[], sourceDirectory: DirectoryPath) {
+    reportUnmergedSpecs(files, sourceDirectory);
+  }
+
+  public leftOutSpecs(files: FilePath[], sourceDirectory: DirectoryPath) {
+    reportLeftOutSpecs(files, sourceDirectory);
+  }
+
+  public sharedEndpoints(shared: SharedEndpoint[], sourceDirectory: DirectoryPath) {
+    reportSharedEndpoints(shared, sourceDirectory);
   }
 
   public unplacedSamples(endpoints: string[]) {

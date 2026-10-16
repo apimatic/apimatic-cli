@@ -19,6 +19,15 @@ export class FileName {
     return this.name.endsWith(extension);
   }
 
+  /** Whether this is `other` exactly, case included, as a host that serves or reads the file matches it. */
+  public isEqual(other: FileName): boolean {
+    return this.name === other.name;
+  }
+
+  public isHidden(): boolean {
+    return this.name.startsWith('.');
+  }
+
   /** Whether this is `name`, compared without regard to case. */
   public is(name: string): boolean {
     return this.name.toLowerCase() === name.toLowerCase();
@@ -36,13 +45,17 @@ export class FileName {
   }
 
   public normalize(): FileName {
-    const normalized = this.withoutExtension()
-      .toString()
+    return this.withoutExtension().slugified();
+  }
+
+  /** The whole name as a URL segment, for a folder's name, whose dots end no extension. */
+  public slugified(): FileName {
+    const slug = this.name
       .toLowerCase()
       .replace(/[^a-z0-9-]/g, '-')
       .replace(/-+/g, '-')
       .replace(/(^-|-$)/g, '');
-    return new FileName(normalized);
+    return new FileName(slug);
   }
 
   public toString(): string {

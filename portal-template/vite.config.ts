@@ -37,7 +37,7 @@ export default defineConfig(async () => {
           }
         }
       }),
-      specReload(paths.specs),
+      specReload(paths.specDir),
       tailwindcss(),
       tanstackStart({
         // Without a mask path the shell is rendered at "/" and no index.html is written;

@@ -27,6 +27,7 @@ import {
   SharedAddress
 } from './portal-source.js';
 import { PortalTab, sharedTabNames, TabOwner, untitledTabName } from './portal-tabs.js';
+import { shared } from './shared.js';
 
 const NAVIGATION_FILE = new FileName(NAVIGATION_FILE_NAME);
 
@@ -47,6 +48,12 @@ const PAGE_EXTENSIONS = ['.md', '.mdx'];
 
 /** Passed over by Vite's `import.meta.glob`, which the build reads the content through. */
 export const isSkippedByGlob = (name: string) => name.startsWith('.') || name === 'node_modules';
+
+/** The slugs the content source gives a page, and the address they make: a `(group)` folder adds none. */
+const servedAt = (segments: string[]): { slugs: string[]; address: string } => {
+  const slugs = getSlugs(segments.join('/'));
+  return { slugs, address: `/${slugs.join('/')}` };
+};
 
 /** Whether the glob passes over `file` below `root`, which it does for a path with any such segment. */
 export const isSkippedWithin = (file: FilePath, root: DirectoryPath): boolean =>
@@ -137,9 +144,7 @@ export class ContentTree {
 
   /** The `nav.json` files the build reads, which its glob matches by code point. */
   public navigationFiles(): FilePath[] {
-    return this.tree
-      .getAllFiles()
-      .filter((file) => file.name().compare(NAVIGATION_FILE) === 0 && !this.isSkipped(file));
+    return this.tree.getAllFiles().filter((file) => file.name().isEqual(NAVIGATION_FILE) && !this.isSkipped(file));
   }
 
   /** Whether the build would read `file` as part of `content/`: below it, and not passed over. */
@@ -310,11 +315,11 @@ export class ContentTree {
     }
 
     // The build fails on two pages at one address, or moves an index page to `<folder>/index`.
-    const shared = ContentTree.sharedAddresses(
+    const sharing = ContentTree.sharedAddresses(
       addressed.filter(({ file }) => !reserved.some((page) => page.file.isEqual(file)))
     );
-    if (shared.length > 0) {
-      problems.push({ kind: 'sharedAddresses', addresses: shared });
+    if (sharing.length > 0) {
+      problems.push({ kind: 'sharedAddresses', addresses: sharing });
     }
     return problems;
   }
@@ -327,8 +332,7 @@ export class ContentTree {
    */
   private static reservedAddressPages(pages: ContentPage[]): ReservedAddressPage[] {
     return pages.flatMap(({ file, segments }) => {
-      const slugs = getSlugs(segments.join('/'));
-      const address = `/${slugs.join('/')}`;
+      const { slugs, address } = servedAt(segments);
       if (address === OAUTH_CALLBACK.address) return [{ file, address, keptFor: OAUTH_CALLBACK }];
       const section = GENERATED_SECTIONS.find((candidate) => candidate.folder === slugs[0]);
       return section === undefined
@@ -339,14 +343,7 @@ export class ContentTree {
 
   /** Addresses more than one page would be served at, each with its pages in the order walked. */
   private static sharedAddresses(pages: ContentPage[]): SharedAddress[] {
-    const byAddress = new Map<string, FilePath[]>();
-    for (const { file, segments } of pages) {
-      const address = `/${getSlugs(segments.join('/')).join('/')}`;
-      byAddress.set(address, [...(byAddress.get(address) ?? []), file]);
-    }
-    return [...byAddress]
-      .filter(([, files]) => files.length > 1)
-      .map(([address, files]) => ({ address, pages: files }));
+    return shared(pages.map(({ file, segments }) => ({ key: servedAt(segments).address, file })));
   }
 
   /**
@@ -537,7 +534,7 @@ class NavigationWalk {
       } else if (!isSkippedByGlob(item.fileName.toString())) {
         const file = new FilePath(directory.directoryPath, item.fileName);
         const page = pageName(item.fileName);
-        if (item.fileName.compare(NAVIGATION_FILE) === 0) {
+        if (item.fileName.isEqual(NAVIGATION_FILE)) {
           listing.navigationFile = file;
         } else if (item.fileName.is(NAVIGATION_FILE_NAME)) {
           listing.ignoredFiles.push(file);

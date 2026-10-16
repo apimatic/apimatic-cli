@@ -4,7 +4,6 @@ import sinon from 'sinon';
 import { log } from '@clack/prompts';
 import { PortalServePrompts } from '../../../src/prompts/portal/serve.js';
 import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
-import { FileName } from '../../../src/types/file/fileName.js';
 import { FilePath } from '../../../src/types/file/filePath.js';
 import { UrlPath } from '../../../src/types/file/urlPath.js';
 import { ContentNotices } from '../../../src/types/portal/content-notices.js';
@@ -44,7 +43,7 @@ describe('PortalServePrompts', () => {
     // The artifacts are fetched once and Vite reads its base once, so these wait for a restart.
     it('says which edits need the preview restarted', () => {
       expect(printed()).to.match(
-        /Restart the preview after adding a language or a 'plugin' block \(its SDK or plugin is fetched at startup\), adding or removing a page, creating '.*static', changing which documents are in '.*spec', or changing the path in 'portal\.site\.url'\./
+        /Restart the preview after adding a language or a 'plugin' block \(its SDK or plugin is fetched at startup\), adding or removing a page, creating '.*static', changing which documents are in '.*spec' or which folders its 'APIMATIC-META\.json' merges, or changing the path in 'portal\.site\.url'\./
       );
     });
 
@@ -73,11 +72,11 @@ describe('PortalServePrompts', () => {
   };
 
   // Content keeps what it last accepted; a specification has no earlier version to keep.
-  it('says a refused specification leaves what it cannot read out of the reference, and would stop a build', () => {
+  it('says the preview shows what it can still read of a refused specification, and that a build would stop', () => {
     const problem: PortalSourceProblem = { kind: 'emptySpecDirectory', folders: [] };
 
     expect(lastLine('message', (prompts) => prompts.specRejected(problem, new DirectoryPath('src')))).to.match(
-      /^The preview leaves what it cannot read out of the API reference until '.*spec' is fixed; a build would stop here\.$/
+      /^The preview shows what it can still read until '.*spec' is fixed; a build would stop here\.$/
     );
   });
 
@@ -139,8 +138,8 @@ describe('PortalServePrompts', () => {
     });
   });
 
-  describe('a change to which documents are in the spec directory', () => {
-    const document = (name: string) => new FilePath(new DirectoryPath('src', 'spec'), new FileName(name));
+  describe('a change to which documents are read from the spec directory', () => {
+    const document = (name: string) => FilePath.resolve(new DirectoryPath('src', 'spec'), name);
 
     /** The warning, then the advice that follows it. */
     const said = (added: string[], removed: string[]) => {
@@ -157,21 +156,29 @@ describe('PortalServePrompts', () => {
       }
     };
 
-    it('names each document added and removed, and that a restart matches them', () => {
+    // Whether a file was added or removed, or `APIMATIC-META.json` changed which folders merge.
+    it('names each document now read and no longer read, and that a restart matches them', () => {
       const [warning, advice] = said(['orders.json'], ['pets.json']);
 
       expect(warning).to.match(
-        /^The documents in '.*spec' are not the ones the preview started with: 'orders\.json' was added, and 'pets\.json' was removed\.$/
+        /^The documents read from '.*spec' are not the ones the preview started with: 'orders\.json' is now read, and 'pets\.json' is no longer read\.$/
       );
       expect(advice).to.equal(
         'Restart the preview to match them; until then it shows the ones it started with that are still there.'
       );
     });
 
-    it('lists several documents, and says only what was done', () => {
-      expect(said(['a.json', 'b.json'], [])[0]).to.match(/: 'a\.json' and 'b\.json' were added\.$/);
+    it('lists several documents, and says only what changed', () => {
+      expect(said(['a.json', 'b.json'], [])[0]).to.match(/: 'a\.json' and 'b\.json' are now read\.$/);
       expect(said([], ['a.json', 'b.json', 'c.json'])[0]).to.match(
-        /: 'a\.json', 'b\.json' and 'c\.json' were removed\.$/
+        /: 'a\.json', 'b\.json' and 'c\.json' are no longer read\.$/
+      );
+    });
+
+    // Each folder `APIMATIC-META.json` merges may hold an `openapi.yaml`.
+    it('names a document in a folder by its path from the spec directory', () => {
+      expect(said(['payments/openapi.yaml'], ['orders/openapi.yaml'])[0]).to.match(
+        /: 'payments\/openapi\.yaml' is now read, and 'orders\/openapi\.yaml' is no longer read\.$/
       );
     });
   });

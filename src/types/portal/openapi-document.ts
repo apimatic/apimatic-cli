@@ -141,6 +141,20 @@ export class OpenApiDocument {
     return { supported: false, format: null };
   }
 
+  /** Whether it carries a version key, which is what the platform takes a file of a merged folder for its definition by. */
+  public namesApiFormat(): boolean {
+    const format = this.format();
+    return format.supported || format.format !== null;
+  }
+
+  /** Whether it declares paths, webhooks or channels, as an API does and a file of its shared parts does not. */
+  public declaresOperations(): boolean {
+    return ['paths', 'webhooks', 'channels'].some((key) => {
+      const operations = this.document[key];
+      return isJsonObject(operations) && Object.keys(operations).length > 0;
+    });
+  }
+
   /**
    * Both fields are written into generated files, so each is collapsed to one line. The
    * description stops at its first blank line: past it a specification's description is

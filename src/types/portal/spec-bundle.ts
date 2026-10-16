@@ -39,7 +39,9 @@ export class SpecBundle {
     const mounted = this.document
       .pathItemReferences(this.file.directory())
       .flatMap(({ path, file, pointer }) => this.documents.get(key(file))?.endpointsAt(path, pointer) ?? []);
-    return [...this.document.endpoints(), ...mounted];
+    // A method beside a path item's `$ref` declares again what the file it refers to declares.
+    const all = [...this.document.endpoints(), ...mounted];
+    return all.filter((endpoint, index) => index === all.findIndex((other) => other.isEqual(endpoint)));
   }
 }
 

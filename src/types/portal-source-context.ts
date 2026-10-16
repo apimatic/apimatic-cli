@@ -10,7 +10,13 @@ import { DirectoryPath } from './file/directoryPath.js';
 import { FileName } from './file/fileName.js';
 import { FilePath } from './file/filePath.js';
 import { NOT_FOUND_FILE_NAME, SHELL_FILE_NAME } from './portal-context.js';
-import { CONTENT_DIRECTORY_NAME, SPEC_DIRECTORY_NAME, STATIC_DIRECTORY_NAME } from './project-layout.js';
+import {
+  CONTENT_DIRECTORY_NAME,
+  METADATA_FILE_NAME,
+  SPEC_DIRECTORY_NAME,
+  SPEC_EXTENSIONS,
+  STATIC_DIRECTORY_NAME
+} from './project-layout.js';
 import { PLACEHOLDER_SITE, SiteConfig, SuggestedSite } from './portal/config/site-config.js';
 import { AcceptedContent, ContentFile, ContentTree, ReadPage } from './portal/content-tree.js';
 import { GeneratedPages, PluginSource } from './portal/generated-pages.js';
@@ -32,11 +38,44 @@ import {
   SpecConversion,
   UnreadableSpecReason
 } from './portal/portal-source.js';
+import { shared } from './portal/shared.js';
 import { SpecBundle } from './portal/spec-bundle.js';
+import { SpecMetadata } from './portal/spec-metadata.js';
 import { SpecContext } from './spec-context.js';
 import { TRANSFORMATIONS_DIRECTORY_NAME, transformedFileName } from './transform-context.js';
 
-const SPEC_EXTENSIONS = ['.json', '.yaml', '.yml'];
+const METADATA_FILE = new FileName(METADATA_FILE_NAME);
+
+const definitionNames = (fileNames: FileName[]): FileName[] =>
+  fileNames.filter((name) => !name.isEqual(METADATA_FILE) && !name.isHidden());
+
+const isDocumentName = (name: FileName): boolean => SPEC_EXTENSIONS.some((extension) => name.hasExtension(extension));
+
+type DiscoveredSpecs = Pick<PortalSource, 'specs' | 'suggestedSite' | 'unmergedSpecs' | 'leftOutSpecs'>;
+
+/** An OpenAPI 3.x document at the top of a directory, read as a spec yet to be given its slug, and the site it suggests. */
+interface ReadDocument {
+  spec: Omit<PortalSpec, 'slug'>;
+  site: SuggestedSite;
+}
+
+/** The top of a directory: its OpenAPI 3.x documents, and every file there that names an API format, in name order. */
+interface ReadDirectory {
+  documents: ReadDocument[];
+  definitions: FilePath[];
+}
+
+/** The specifications read from `spec/`, and the site the first of them suggests. */
+interface ReadSpecs {
+  specs: PortalSpec[];
+  suggested: SuggestedSite;
+}
+
+/** The folders `APIMATIC-META.json` merges, in the order the platform merges them. */
+interface MergedFolders {
+  metadata: FilePath;
+  folders: DirectoryPath[];
+}
 
 // Empty on purpose: the portal's own routes under /api/ are files with extensions --
 // /api/search.json -- so none can collide with a spec section, which is always a directory.
@@ -68,6 +107,10 @@ export class PortalSourceContext {
     return this.sourceDirectory.join(SPEC_DIRECTORY_NAME);
   }
 
+  private get metadataFile(): FilePath {
+    return new FilePath(this.specDirectory, METADATA_FILE);
+  }
+
   private get contentDirectory(): DirectoryPath {
     return this.sourceDirectory.join(CONTENT_DIRECTORY_NAME);
   }
@@ -93,9 +136,9 @@ export class PortalSourceContext {
     if (discovered.isErr()) {
       return err(discovered.error);
     }
-    const { specs, suggested } = discovered.value;
+    const { specs, suggestedSite, unmergedSpecs, leftOutSpecs } = discovered.value;
 
-    const settings = await this.settingsFrom(document.value, suggested);
+    const settings = await this.settingsFrom(document.value, suggestedSite);
     if (settings.isErr()) {
       return err(settings.error);
     }
@@ -112,9 +155,12 @@ export class PortalSourceContext {
 
     return ok({
       ...settings.value,
-      suggestedSite: suggested,
-      specDirectory: this.specDirectory,
+      suggestedSite,
       specs,
+      specDirectory: this.specDirectory,
+      unmergedSpecs,
+      leftOutSpecs,
+      sharedEndpoints: shared(specs.flatMap(({ file, endpoints }) => endpoints.map((key) => ({ key, file })))),
       contentDirectory,
       staticDirectory,
       shadowedFiles: staticDirectory === null ? [] : await this.shadowedFiles(staticDirectory),
@@ -427,30 +473,161 @@ export class PortalSourceContext {
   }
 
   // With several specifications there is no suggested site: no one of them speaks for the portal.
-  private async specs(): Promise<
-    Result<{ specs: PortalSpec[]; suggested: SuggestedSite | null }, PortalSourceProblem>
-  > {
-    const specs: PortalSpec[] = [];
-    // Only the first is kept: it is the one that speaks for the portal when it is alone, and
-    // specifications run to megabytes.
-    let first: OpenApiDocument | undefined;
-    const usedSlugs = new Set<string>(RESERVED_SPEC_SLUGS);
-
+  private async specs(): Promise<Result<DiscoveredSpecs, PortalSourceProblem>> {
     const { fileNames, folders } = await this.specDirectoryListing();
-    if (fileNames.length === 0) {
+    const merge = await this.mergedFolders(fileNames, folders);
+    if (merge.isErr()) {
+      return err(merge.error);
+    }
+
+    const usedSlugs = new Set<string>(RESERVED_SPEC_SLUGS);
+    const read =
+      merge.value === null
+        ? await this.topLevelSpecs(fileNames, folders, usedSlugs)
+        : await this.mergedSpecs(merge.value, usedSlugs);
+    if (read.isErr()) {
+      return err(read.error);
+    }
+    const { specs, suggested } = read.value;
+    const several = specs.length > 1;
+    return ok({
+      specs,
+      suggestedSite: several ? null : suggested,
+      unmergedSpecs: several && merge.value === null ? specs.map(({ file }) => file) : [],
+      leftOutSpecs: merge.value === null ? [] : await this.leftOutSpecs(fileNames)
+    });
+  }
+
+  /** The folders `APIMATIC-META.json` merges, or null when it is not there or does not merge. */
+  private async mergedFolders(
+    fileNames: FileName[],
+    folders: DirectoryPath[]
+  ): Promise<Result<MergedFolders | null, PortalSourceProblem>> {
+    // Found in the listing, so its name matches exactly where the file system ignores case.
+    if (!fileNames.some((name) => name.isEqual(METADATA_FILE))) {
+      return ok(null);
+    }
+    const metadata = await this.readMetadata(this.metadataFile);
+    if (metadata === undefined) {
+      return err({ kind: 'unreadableMetadata', file: this.metadataFile });
+    }
+    if (!metadata.mergesApis()) {
+      return ok(null);
+    }
+    const order = metadata.mergeOrder();
+    if (order === null) {
+      return folders.length === 0
+        ? err({ kind: 'noFoldersToMerge', metadata: this.metadataFile })
+        : ok({ metadata: this.metadataFile, folders });
+    }
+
+    const listed = order.map((folder) => this.specDirectory.resolve(folder));
+    // A folder the file names twice, as `alpha` and `./alpha`, is still one API.
+    const once = listed.filter((folder, index) => index === listed.findIndex((other) => other.isEqual(folder)));
+    const found = await Promise.all(once.map((folder) => this.isFoundByPlatform(folder)));
+    const missing = once.filter((_, index) => !found[index]);
+    if (missing.length > 0) {
+      return err({ kind: 'missingMergedFolders', metadata: this.metadataFile, folders: missing });
+    }
+    return ok({ metadata: this.metadataFile, folders: once });
+  }
+
+  /** Whether the platform finds a folder the metadata file names in the build it is sent: below `spec/`, spelt as named. */
+  private async isFoundByPlatform(folder: DirectoryPath): Promise<boolean> {
+    if (!this.specDirectory.isAncestorOf(folder)) {
+      return false;
+    }
+    const spelt = await this.fileService.directorySpelledOnDisk(this.specDirectory, folder);
+    return spelt !== null && spelt.isEqual(folder);
+  }
+
+  /** The documents at the top of `spec/`, each a section named after its file. */
+  private async topLevelSpecs(
+    fileNames: FileName[],
+    folders: DirectoryPath[],
+    usedSlugs: Set<string>
+  ): Promise<Result<ReadSpecs, PortalSourceProblem>> {
+    const names = definitionNames(fileNames);
+    if (names.length === 0) {
       return err({ kind: 'emptySpecDirectory', folders });
     }
+    return (await this.definitions(this.specDirectory, names)).map(({ documents }) => ({
+      specs: documents.map(({ spec }) => ({ ...spec, slug: this.uniqueSlug(spec.file.name().normalize(), usedSlugs) })),
+      suggested: documents[0].site
+    }));
+  }
+
+  /** The one definition of each merged folder, a section named after the folder, as the platform builds the SDKs. */
+  private async mergedSpecs(
+    { metadata, folders }: MergedFolders,
+    usedSlugs: Set<string>
+  ): Promise<Result<ReadSpecs, PortalSourceProblem>> {
+    const listings = await Promise.all(
+      folders.map(async (folder) => {
+        const fileNames = definitionNames(await this.fileService.getFileNames(folder));
+        return { folder, fileNames: fileNames.sort((left, right) => left.compare(right)) };
+      })
+    );
+    const empty = listings.filter(({ fileNames }) => fileNames.length === 0).map(({ folder }) => folder);
+    if (empty.length > 0) {
+      return err({ kind: 'emptyMergedFolders', metadata, folders: empty });
+    }
+
+    const specs: PortalSpec[] = [];
+    const sites: SuggestedSite[] = [];
+    for (const { folder, fileNames } of listings) {
+      const read = await this.definitions(folder, fileNames);
+      if (read.isErr()) {
+        return err(read.error);
+      }
+      // The platform builds the folder from the first of them by name, which may be a file of shared parts.
+      const { documents, definitions } = read.value;
+      if (definitions.length > 1) {
+        return err({ kind: 'severalSpecsInFolder', folder, files: definitions });
+      }
+      const [definition] = documents;
+      specs.push({ ...definition.spec, slug: this.uniqueSlug(new FileName(folder.leafName()).slugified(), usedSlugs) });
+      sites.push(definition.site);
+    }
+    return ok({ specs, suggested: sites[0] });
+  }
+
+  /** The APIs at the top of `spec/`, in any format, which a merge of its folders leaves out, as the platform does. */
+  private async leftOutSpecs(fileNames: FileName[]): Promise<FilePath[]> {
+    const files = definitionNames(fileNames)
+      .filter(isDocumentName)
+      .map((fileName) => new FilePath(this.specDirectory, fileName));
+    const apis = await Promise.all(
+      files.map(async (file) => {
+        const read = await this.readDocument(file);
+        return read.isOk() && read.value.namesApiFormat() && read.value.declaresOperations();
+      })
+    );
+    return files.filter((_, index) => apis[index]);
+  }
+
+  /** What the top of a directory holds, or how to convert what is there when it has no OpenAPI 3.x document. */
+  private async definitions(
+    directory: DirectoryPath,
+    fileNames: FileName[]
+  ): Promise<Result<ReadDirectory, PortalSourceProblem>> {
+    // The site each suggests rather than the document itself, as specifications run to megabytes.
+    const documents: ReadDocument[] = [];
+    const definitions: FilePath[] = [];
 
     // What each one is, for the conversion a directory without an OpenAPI 3.x document is pointed to.
     const otherFormats: { file: FilePath; format: string }[] = [];
-    const documentNames = fileNames.filter((name) => SPEC_EXTENSIONS.some((extension) => name.hasExtension(extension)));
+    const documentNames = fileNames.filter(isDocumentName);
     for (const fileName of documentNames) {
-      const file = new FilePath(this.specDirectory, fileName);
+      const file = new FilePath(directory, fileName);
       const read = await this.readDocument(file);
       if (read.isErr()) {
         return err(read.error);
       }
       const document = read.value;
+      if (document.namesApiFormat()) {
+        definitions.push(file);
+      }
       const format = document.format();
       if (!format.supported) {
         if (format.format !== null) {
@@ -463,24 +640,23 @@ export class PortalSourceContext {
       if (bundle.isErr()) {
         return err(bundle.error);
       }
-      specs.push({ slug: this.uniqueSlug(fileName, usedSlugs), file, endpoints: bundle.value.endpoints() });
-      first ??= document;
+      documents.push({ spec: { file, endpoints: bundle.value.endpoints() }, site: document.suggestedSite() });
     }
 
-    if (first === undefined) {
+    if (documents.length === 0) {
       const [convertible] = otherFormats;
       // No document declares its format: one the portal would read, by extension, is named before any other file.
       const conversion =
         convertible === undefined
-          ? this.conversion(new FilePath(this.specDirectory, documentNames[0] ?? fileNames[0]), null, 0)
+          ? this.conversion(new FilePath(directory, documentNames[0] ?? fileNames[0]), null, 0)
           : this.conversion(convertible.file, convertible.format, otherFormats.length - 1);
       return err({ kind: 'noOpenApiSpec', conversion });
     }
-    return ok({ specs, suggested: specs.length === 1 ? first.suggestedSite() : null });
+    return ok({ documents, definitions });
   }
 
   private conversion(file: FilePath, format: string | null, others: number): SpecConversion {
-    const into = this.specDirectory.join(TRANSFORMATIONS_DIRECTORY_NAME);
+    const into = file.directory().join(TRANSFORMATIONS_DIRECTORY_NAME);
     const converted = new FilePath(into, transformedFileName(file, ExportFormats.Openapi3Yaml));
     return { file, format, converted, others };
   }
@@ -496,7 +672,10 @@ export class PortalSourceContext {
       fileNames: directory.items
         .flatMap((item) => ('fileName' in item ? [item.fileName] : []))
         .sort((left, right) => left.compare(right)),
-      folders: directory.items.flatMap((item) => (item instanceof Directory ? [item.directoryPath] : []))
+      // Sorted because folders merged without an order of their own are merged by name.
+      folders: directory.items
+        .flatMap((item) => (item instanceof Directory ? [item.directoryPath] : []))
+        .sort((left, right) => left.compare(right))
     };
   }
 
@@ -543,8 +722,16 @@ export class PortalSourceContext {
     );
   }
 
-  private uniqueSlug(fileName: FileName, used: Set<string>): string {
-    const base = fileName.normalize().toString() || 'api';
+  private async readMetadata(file: FilePath): Promise<SpecMetadata | undefined> {
+    try {
+      return SpecMetadata.parse(await this.fileService.getContents(file));
+    } catch {
+      return undefined;
+    }
+  }
+
+  private uniqueSlug(name: FileName, used: Set<string>): string {
+    const base = name.toString() || 'api';
     let slug = base;
     let suffix = 2;
     while (used.has(slug)) {

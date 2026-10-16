@@ -2,7 +2,7 @@ import { FilePath } from '../file/filePath.js';
 import { PortalSpec } from './portal-source.js';
 import { PreviewRefusal } from './preview-refusal.js';
 
-/** The documents put in `spec/`, or taken out of it, since the preview started. */
+/** Since the preview started: the documents now read from `spec/`, and the ones no longer read. */
 export interface SpecsChange {
   added: FilePath[];
   removed: FilePath[];
@@ -14,7 +14,7 @@ export interface SpecsShown {
   change: SpecsChange | null;
 }
 
-/** The preview serves only the documents it started with, so a change to which are in `spec/` is said once. */
+/** The preview serves only the documents it started with, so a change to which are read from `spec/` is said once. */
 export class PreviewSpecs {
   private readonly served: FilePath[];
   private shown: FilePath[];

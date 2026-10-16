@@ -1,0 +1,10 @@
+{
+  "$schema": "https://cdn.jsdelivr.net/npm/@apimatic/cli@beta/apimatic.schema.json",
+  "schemaVersion": 1,
+  "portal": {
+    "site": { "name": "Store APIs" }
+  },
+  "languages": {
+    "typescript": {}
+  }
+}

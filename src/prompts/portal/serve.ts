@@ -6,6 +6,7 @@ import { FilePath } from '../../types/file/filePath.js';
 import { UrlPath } from '../../types/file/urlPath.js';
 import { MissingArtifacts } from '../../types/portal/generated-pages.js';
 import { NAVIGATION_FILE_NAME } from '../../types/portal/portal-navigation.js';
+import { METADATA_FILE_NAME } from '../../types/project-layout.js';
 import { ContentProblem, PortalSourceProblem, WatchedSource } from '../../types/portal/portal-source.js';
 import { ContentShown } from '../../types/portal/preview-content.js';
 import { SpecsShown } from '../../types/portal/preview-specs.js';
@@ -20,6 +21,7 @@ import {
   reportContentNotices,
   reportContentProblems,
   reportSourceProblem,
+  specDirectoryOf,
   specPath,
   staticPath
 } from './source.js';
@@ -64,7 +66,8 @@ export class PortalServePrompts {
         '',
         `Restart the preview after adding a language or a ${f.var('plugin')} block (its SDK or plugin is ` +
           `fetched at startup), adding or removing a page, creating ${staticPath(sourceDirectory)}, ` +
-          `changing which documents are in ${specPath(sourceDirectory)}, or changing the path in ` +
+          `changing which documents are in ${specPath(sourceDirectory)} or which folders its ` +
+          `${f.var(METADATA_FILE_NAME)} merges, or changing the path in ` +
           `${f.var('portal.site.url')}.`,
         '',
         'Press CTRL+C to stop the server.'
@@ -119,8 +122,7 @@ export class PortalServePrompts {
   public specRejected(problem: PortalSourceProblem, sourceDirectory: DirectoryPath) {
     reportSourceProblem(problem, sourceDirectory);
     log.message(
-      `The preview leaves what it cannot read out of the API reference until ${specPath(sourceDirectory)} is ` +
-        'fixed; a build would stop here.'
+      `The preview shows what it can still read until ${specPath(sourceDirectory)} is fixed; a build would stop here.`
     );
   }
 
@@ -131,11 +133,13 @@ export class PortalServePrompts {
     if (change === null) {
       return;
     }
-    const changes = [filesWere(change.added, 'added'), filesWere(change.removed, 'removed')].filter(
-      (each) => each !== null
-    );
+    const specDirectory = specDirectoryOf(sourceDirectory);
+    const changes = [
+      filesAre(change.added, 'now read', specDirectory),
+      filesAre(change.removed, 'no longer read', specDirectory)
+    ].filter((each) => each !== null);
     log.warn(
-      `The documents in ${specPath(sourceDirectory)} are not the ones the preview started with: ` +
+      `The documents read from ${specPath(sourceDirectory)} are not the ones the preview started with: ` +
         `${changes.join(', and ')}.`
     );
     log.message(
@@ -203,10 +207,10 @@ function describeWatched(
   }
 }
 
-function filesWere(files: FilePath[], done: string): string | null {
+function filesAre(files: FilePath[], state: string, specDirectory: DirectoryPath): string | null {
   if (files.length === 0) {
     return null;
   }
-  const names = listedInProse(files.map((file) => f.var(file.name().toString())));
-  return `${names} ${files.length === 1 ? 'was' : 'were'} ${done}`;
+  const names = listedInProse(files.map((file) => f.var(file.relativeTo(specDirectory))));
+  return `${names} ${files.length === 1 ? 'is' : 'are'} ${state}`;
 }

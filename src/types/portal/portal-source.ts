@@ -7,14 +7,18 @@ import { ContentNotices } from './content-notices.js';
 import { GeneratedPages } from './generated-pages.js';
 import { ParseFailure } from './openapi-document.js';
 import { PortalConfig } from './portal-config.js';
+import { Shared } from './shared.js';
 
-/** An OpenAPI document found in `src/spec/`, with the slug its section is mounted at. */
+/** An OpenAPI document found in `src/spec/` or in a folder merged there, with the slug its section is mounted at. */
 export interface PortalSpec {
   slug: string;
   file: FilePath;
   /** Its operations, including those behind a `$ref` path item. */
   endpoints: Endpoint[];
 }
+
+/** An operation more than one specification declares, which one code sample per method and path cannot serve. */
+export type SharedEndpoint = Shared<Endpoint>;
 
 /** A part of the source directory that `portal serve` watches, and checks on each save. */
 export type WatchedSource = 'config' | 'content' | 'spec';
@@ -32,8 +36,15 @@ export interface PortalSource extends PortalSettings {
    * can judge an edited config without reading the specifications again.
    */
   suggestedSite: SuggestedSite | null;
-  specDirectory: DirectoryPath;
   specs: PortalSpec[];
+  /** `spec/`, whose every file the preview reloads on, as a specification may refer to any of them. */
+  specDirectory: DirectoryPath;
+  /** Several specifications at the top of `spec/` that no `APIMATIC-META.json` merges, so the SDKs cover one; else none. */
+  unmergedSpecs: FilePath[];
+  /** API definitions at the top of `spec/` while its folders are merged, which the portal and the SDKs leave out. */
+  leftOutSpecs: FilePath[];
+  /** Shown with no SDK sample, since the samples hold one per method and path. */
+  sharedEndpoints: SharedEndpoint[];
   contentDirectory: DirectoryPath | null;
   staticDirectory: DirectoryPath | null;
   shadowedFiles: FileName[];
@@ -78,10 +89,7 @@ export interface ReservedAddressPage {
 }
 
 /** Pages of the user's that would be served at one address, which only one of them can have. */
-export interface SharedAddress {
-  address: string;
-  pages: FilePath[];
-}
+export type SharedAddress = Shared<string>;
 
 /** A page's Markdown image that the build would import and not find, which fails the whole build. */
 export interface MissingImage {
@@ -102,12 +110,12 @@ export type ContentProblem =
   | { kind: 'invalidNavigation'; errors: string[] }
   | { kind: 'missingImages'; images: MissingImage[] };
 
-/** How `api transform` would turn the first document in `spec/` into one the portal reads. */
+/** How `api transform` would turn the first document in a directory into one the portal reads. */
 export interface SpecConversion {
   file: FilePath;
   /** What the document is instead, when it says; null for one that names no format. */
   format: string | null;
-  /** Where `api transform --destination` of `spec/` writes it, which is one folder too deep. */
+  /** Where `api transform --destination` of the document's directory writes it, which is one folder too deep. */
   converted: FilePath;
   others: number;
 }
@@ -124,7 +132,14 @@ export type PortalSourceProblem =
   | { kind: 'invalidContent'; problems: ContentProblem[] }
   | { kind: 'unreadableSpec'; file: FilePath; referencedBy: FilePath | null; reason: UnreadableSpecReason }
   | { kind: 'missingSpecReference'; missing: MissingFile; referencedBy: FilePath }
-  // Its `folders` are not read, and `api transform` writes into one of its own.
+  | { kind: 'unreadableMetadata'; file: FilePath }
+  // Its `folders` are not read unless a metadata file merges them, and `api transform` writes into one of its own.
   | { kind: 'emptySpecDirectory'; folders: DirectoryPath[] }
+  | { kind: 'noFoldersToMerge'; metadata: FilePath }
+  // The `folders` that `metadata` names and the platform would not find: not there as spelt, or not inside `spec/`.
+  | { kind: 'missingMergedFolders'; metadata: FilePath; folders: DirectoryPath[] }
+  | { kind: 'emptyMergedFolders'; metadata: FilePath; folders: DirectoryPath[] }
+  // Every file at the top of `folder` that names an API format; the platform builds the folder from one of them.
+  | { kind: 'severalSpecsInFolder'; folder: DirectoryPath; files: FilePath[] }
   | { kind: 'noOpenApiSpec'; conversion: SpecConversion }
   | { kind: 'missingStaticFiles'; files: MissingStaticFile[] };
