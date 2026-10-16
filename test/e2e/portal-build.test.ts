@@ -972,6 +972,13 @@ const stylesheetOf = (output: DirectoryPath) => {
     expect(read(`${LIST_ORDERS}/index.html`)).to.contain('grandTotalCents');
     expect(read(`${LIST_ORDERS}.md`)).to.contain('grandTotalCents');
   });
+});
+
+(enabled ? describe : describe.skip)('portal build, with the Ask AI chat (end to end)', function () {
+  this.timeout(10 * 60 * 1000);
+
+  const portal = portalBuilt('copilot');
+  const { read } = portal;
 
   // The chat wraps the whole layout, so a prerender that did not wait for its chunk would leave the button out.
   it('prerenders each page with the chat button', () => {
@@ -1000,5 +1007,4 @@ const stylesheetOf = (output: DirectoryPath) => {
     expect(scripts.some((script) => script.text.includes('pk_test_e2e'))).to.be.true;
     expect(scripts.some((script) => script.text.includes('https://ask.apimatic.io'))).to.be.true;
   });
-
 });
