@@ -175,10 +175,14 @@ Not run: macOS (CI's job and a Safari check, section 8 step 5) and a source on a
     `BuiltPortal` and the clean-up.
   - `canonical` matters on GitHub's Windows runner, whose `%TEMP%` is the short name
     `C:\Users\RUNNER~1\…`. The CLI resolves it through `withDirPath`, and the tests must too.
-- **Build:** "generates the template's utility classes and a page's own".
-  - The default fixture's `content/guides/intro.md` gains one element with an arbitrary-value class
-    no other file uses.
-  - The built `assets/app-*.css` holds that rule, and `end-1.5`'s (`CommandBlock`, template only).
+- **Build:** "generates the utility classes a page uses".
+  - The default fixture's `content/authentication.md` becomes `authentication.mdx`, with one
+    element carrying an arbitrary-value class no other file uses (`tracking-[0.3125em]`). Content
+    pages have no `rehype-raw`, so only MDX renders an author's class. No test names that page,
+    whereas `guides/` is rewritten by the serve unit tests.
+  - The page carries the class and the built stylesheet holds its rule.
+  - The template's own classes need no new case: the branded build already asserts `dark:block`, a
+    template-only class #2301 lost (step 3, 2026-10-16).
 - **Serve:** "serves a page's static image at its public address, asked for before the page"
   replaces the raw-`/@fs/` case.
   - It asks for `/@fs/<static>/images/logo.png?import` first and gets

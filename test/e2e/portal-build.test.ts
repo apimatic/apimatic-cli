@@ -483,6 +483,12 @@ const stylesheetOf = (output: DirectoryPath) => {
     expect(css).to.match(/--color-fd-primary:#171717/);
   });
 
+  // Tailwind reads the copy of the pages with the rest of the project, so a class a page uses has its rule.
+  it('generates the utility classes a page uses', () => {
+    expect(read('authentication/index.html')).to.contain('class="tracking-[0.3125em]"');
+    expect(stylesheetOf(portal.output())).to.contain('.tracking-\\[0\\.3125em\\]');
+  });
+
   // The counterpart of the branded portal's forced mode: the same label, present here.
   it('offers the colour-mode switch when both modes are allowed', () => {
     expect(read('index.html')).to.contain('aria-label="Toggle Theme"');

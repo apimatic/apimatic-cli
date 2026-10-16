@@ -145,13 +145,6 @@ describe('portal template packaging', () => {
     }
   });
 
-  // Named to Tailwind from `src/styles/`; a rename that missed it would cost every utility class in a page, silently.
-  it('has Tailwind scan the copy of the pages, by its relative name', () => {
-    const stylesheet = fs.readFileSync(path.join(templateRoot, 'src/styles/app.css'), 'utf8');
-
-    expect(stylesheet).to.contain(`@source '../../${CONTENT_COPY_DIRECTORY_NAME}';`);
-  });
-
   // Left to itself the popover reads `window.location.href`, so a reader's query string and hash
   // — tracking and preview parameters among them — reach the AI vendors it links out to.
   it('sends the AI vendors the page address and nothing the reader carried with them', () => {
