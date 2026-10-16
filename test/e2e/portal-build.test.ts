@@ -441,7 +441,7 @@ const stylesheetOf = (output: DirectoryPath) => {
       'deprecatedField',
       'A guide from the fixture.'
     ]) {
-      expect(page, rendered).to.contain(rendered);
+      expect(page, `no ${rendered} on the page`).to.contain(rendered);
     }
   });
 
