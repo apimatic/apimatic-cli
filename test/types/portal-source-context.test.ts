@@ -2,6 +2,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { Buffer } from 'node:buffer';
+import { pathToFileURL } from 'node:url';
 import Ajv from 'ajv';
 import { expect } from 'chai';
 import { Result } from 'neverthrow';
@@ -519,15 +520,25 @@ describe('PortalSourceContext', () => {
       expect((await resolve())._unsafeUnwrap().specs.map((spec) => spec.slug)).to.deep.equal(['api']);
     });
 
-    it('reports a document left empty, as it does one half written', async () => {
+    // The build reads past a file that is no API, and never bundles it.
+    it('skips a file holding nothing, only comments, or no key beside a document', async () => {
       write('spec/api.json', OPENAPI);
       write('spec/orders.yaml', '');
+      write('spec/notes.yaml', '# orders: to come\n');
+      write('spec/states.yaml', '- active\n- inactive\n');
 
-      expect(specProblem((await resolve())._unsafeUnwrapErr())).to.deep.equal([
-        'unreadableSpec',
-        'spec/orders.yaml',
-        null
-      ]);
+      expect((await resolve())._unsafeUnwrap().specs.map((spec) => spec.slug)).to.deep.equal(['api']);
+    });
+
+    // As a document caught empty mid-save is; with nothing else to build from, it is not one to convert.
+    it('reports a document left empty when every document there holds nothing', async () => {
+      write('spec/api.yaml', '');
+      write('spec/notes.yaml', '# to come\n');
+
+      const problem = (await resolve())._unsafeUnwrapErr();
+
+      expect(specProblem(problem)).to.deep.equal(['unreadableSpec', 'spec/api.yaml', null]);
+      expect(problem.kind === 'unreadableSpec' && problem.reason).to.deep.equal({ kind: 'empty' });
     });
 
     // As an editor that saves by renaming over the file leaves it for a moment.
@@ -896,6 +907,22 @@ describe('PortalSourceContext', () => {
         ]);
       });
 
+      it('skips a file holding nothing beside the definition of a folder, and reports one alone', async () => {
+        merging();
+        write('spec/alpha/openapi.json', OPENAPI);
+        write('spec/alpha/notes.yaml', '');
+
+        expect(await read()).to.deep.equal([['alpha', 'spec/alpha/openapi.json']]);
+
+        fs.rmSync(path.join(root, 'spec', 'alpha', 'openapi.json'));
+
+        expect(specProblem((await resolve())._unsafeUnwrapErr())).to.deep.equal([
+          'unreadableSpec',
+          'spec/alpha/notes.yaml',
+          null
+        ]);
+      });
+
       it('reports a metadata file it cannot parse', async () => {
         write('spec/APIMATIC-META.json', '{ not json');
         write('spec/alpha/openapi.json', OPENAPI);
@@ -1011,6 +1038,48 @@ describe('PortalSourceContext', () => {
       ).to.equal('spec/schemas/Pet.yaml');
     });
 
+    // Read here on a file system that ignores case, as Windows and macOS do; a build on Linux would miss it.
+    it('refuses a file or a folder named in another case than on disk, wherever it reads', async () => {
+      write('spec/schemas/Pet.yaml', 'type: object\n');
+      const foundAs = async () => {
+        const problem = (await resolve())._unsafeUnwrapErr();
+        expect(specProblem(problem)[0]).to.equal('missingSpecReference');
+        return problem.kind === 'missingSpecReference'
+          ? problem.missing.foundAs?.relativeTo(new DirectoryPath(root))
+          : null;
+      };
+
+      writeSpec({ Pet: { $ref: './schemas/pet.yaml' } });
+      expect(await foundAs()).to.equal('spec/schemas/Pet.yaml');
+
+      writeSpec({ Pet: { $ref: './Schemas/Pet.yaml' } });
+      expect(await foundAs()).to.equal('spec/schemas/Pet.yaml');
+    });
+
+    // As a name stored in another Unicode form, or a folder that cannot be listed, is.
+    it('accepts a file it reads but finds in no listing, rather than calling it misspelt', async () => {
+      writeSpec({ Pet: { $ref: './schemas/Pet.yaml' } });
+      write('spec/schemas/Pet.yaml', 'type: object\n');
+      sinon
+        .stub(FileService.prototype, 'spellingsOnDisk')
+        .callsFake(async (_root: DirectoryPath, files: FilePath[]) => files.map(() => null));
+
+      expect((await resolve()).isOk()).to.be.true;
+    });
+
+    // Its folders above the source directory are where the build runs, not the user's to spell.
+    it('accepts a file outside the source directory', async () => {
+      const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'portal-shared-'));
+      try {
+        fs.writeFileSync(path.join(outside, 'Pet.yaml'), 'type: object\n');
+        writeSpec({ Pet: { $ref: path.relative(path.join(root, 'spec'), path.join(outside, 'Pet.yaml')) } });
+
+        expect((await resolve()).isOk()).to.be.true;
+      } finally {
+        fs.rmSync(outside, { recursive: true, force: true });
+      }
+    });
+
     it('refuses a file referred to in turn that does not parse, naming the file that refers to it', async () => {
       writeSpec({ Pet: { $ref: './schemas/Pet.yaml' } });
       write('spec/schemas/Pet.yaml', 'type: object\nproperties:\n  owner:\n    $ref: ./Owner.yaml\n');
@@ -1026,6 +1095,29 @@ describe('PortalSourceContext', () => {
       expect(problem.kind === 'unreadableSpec' && problem.reason.kind === 'invalid' && problem.reason.message).to.match(
         /line \d+, column \d+$/
       );
+    });
+
+    it('says a reference that names a folder names one', async () => {
+      writeSpec({ Pet: { $ref: './schemas/' } });
+      write('spec/schemas/Pet.yaml', 'type: object\n');
+
+      const problem = (await resolve())._unsafeUnwrapErr();
+
+      expect(specProblem(problem)).to.deep.equal(['unreadableSpec', 'spec/schemas', 'spec/api.json']);
+      expect(problem.kind === 'unreadableSpec' && problem.reason).to.deep.equal({ kind: 'folder' });
+    });
+
+    it('refuses an empty reference, naming the file it is written in', async () => {
+      writeSpec({ Pet: { $ref: './schemas/Pet.yaml' } });
+      write('spec/schemas/Pet.yaml', 'properties:\n  owner:\n    $ref: ""\n');
+
+      const problem = (await resolve())._unsafeUnwrapErr();
+      if (problem.kind !== 'unresolvableSpecReference') {
+        expect.fail(`expected a $ref the build cannot resolve, got '${problem.kind}'`);
+      }
+
+      const { file, ref } = problem.reference;
+      expect([file.relativeTo(new DirectoryPath(root)), ref]).to.deep.equal(['spec/schemas/Pet.yaml', '']);
     });
 
     it('follows a reference out of the spec directory, as the build does', async () => {
@@ -1169,6 +1261,48 @@ describe('PortalSourceContext', () => {
         [
           'a file named only under the keys the bundler writes',
           () => writeSpec({}, { 'x-ext': { abc123: { $ref: './embedded.yaml' } } }),
+          'builds'
+        ],
+        ['an empty reference', () => writeSpec({ Pet: { $ref: '' } }), 'fails'],
+        [
+          'an empty reference in a file named',
+          () => writeReferenced('Pet.yaml', 'properties:\n  owner:\n    $ref: ""\n'),
+          'fails'
+        ],
+        ['a bare # in the document bundled', () => writeSpec({ Pet: { $ref: '#' } }), 'fails'],
+        [
+          'a schema named by its $anchor in the document bundled',
+          () => writeSpec({ Pet: { $anchor: 'pet', type: 'object' }, Pets: { items: { $ref: '#pet' } } }),
+          'fails'
+        ],
+        [
+          'a bare # or an anchor in a file named, which the bundler turns into pointers',
+          () => writeReferenced('Pet.yaml', 'properties:\n  self:\n    $ref: "#"\n  tag:\n    $ref: "#tag"\n'),
+          'builds'
+        ],
+        [
+          'a file named by a file: URL, which the bundler reads as a path',
+          () => {
+            writeSpec({ Pet: { $ref: pathToFileURL(path.join(root, 'spec', 'Pet.yaml')).href } });
+            write('spec/Pet.yaml', 'type: object\n');
+          },
+          'fails'
+        ],
+        ['a name with another scheme', () => writeSpec({ Pet: { $ref: 'urn:pet' } }), 'fails'],
+        [
+          'a folder',
+          () => {
+            writeSpec({ Pet: { $ref: './schemas' } });
+            write('spec/schemas/Pet.yaml', 'type: object\n');
+          },
+          'fails'
+        ],
+        [
+          'a part of a file that is not there, which the page renders without',
+          () => {
+            writeSpec({ Pet: { $ref: './Pet.yaml#/nope' } });
+            write('spec/Pet.yaml', 'type: object\n');
+          },
           'builds'
         ]
       ];

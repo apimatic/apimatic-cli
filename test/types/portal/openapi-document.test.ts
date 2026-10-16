@@ -241,10 +241,10 @@ describe('OpenApiDocument', () => {
     });
   });
 
-  describe('referencedFiles', () => {
+  describe('references', () => {
     const specDirectory = new DirectoryPath('/project/src/spec');
     const referenced = (document: unknown, rootIds = new Set<string>()) =>
-      readJson(document).referencedFiles(specDirectory, rootIds).map(String);
+      readJson(document).references(specDirectory, rootIds).files.map(String);
     const inSpec = (file: string) => path.resolve('/project/src/spec', file);
 
     it('finds a $ref on any object, in data, extensions and lists too, against the folder of the document', () => {
@@ -283,6 +283,31 @@ describe('OpenApiDocument', () => {
       expect(files).to.be.empty;
     });
 
+    // The bundler fetches only these, and reads `C:/shared/pet.yaml` as a path, as it does any other scheme.
+    it('takes only http and https for URLs, and any other scheme for the name of a file', () => {
+      const files = referenced({
+        a: { $ref: 'file:///shared/pet.yaml' },
+        b: { $ref: 'urn:pet' },
+        c: { $ref: 'ab:c.yaml' },
+        d: { $ref: 'http://example.com/pet.yaml' }
+      });
+
+      expect(files).to.deep.equal([inSpec('file:///shared/pet.yaml'), inSpec('urn:pet'), inSpec('ab:c.yaml')]);
+    });
+
+    it('sets apart, as written, each $ref that names no file and no part of a document by a pointer', () => {
+      const { files, unnamed } = readJson({
+        empty: { $ref: '' },
+        whole: { $ref: '#' },
+        anchor: { $ref: '#pet' },
+        pointer: { $ref: '#/components/schemas/Pet' },
+        root: { $ref: '#/' }
+      }).references(specDirectory, new Set());
+
+      expect(files).to.be.empty;
+      expect(unnamed).to.deep.equal(['', '#', '#pet']);
+    });
+
     it('reads no further below an $id, against which the bundler resolves what is under it', () => {
       expect(referenced({ Pet: { $id: 'pet.json', properties: { tag: { $ref: './tag.yaml' } } } })).to.be.empty;
     });
@@ -312,7 +337,7 @@ describe('OpenApiDocument', () => {
     it('survives an alias that holds itself', () => {
       const document = read('openapi: 3.0.0\nloop: &loop\n  again: *loop\n  next: { $ref: ./next.yaml }\n');
 
-      expect(document.referencedFiles(specDirectory, new Set()).map(String)).to.deep.equal([inSpec('next.yaml')]);
+      expect(document.references(specDirectory, new Set()).files.map(String)).to.deep.equal([inSpec('next.yaml')]);
     });
   });
 

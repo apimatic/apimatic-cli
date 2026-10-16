@@ -22,6 +22,13 @@ export type ParseFailure =
   | { kind: 'noKey' }
   | { kind: 'invalid'; message: string };
 
+/** What a document's `$ref`s name, as the portal's bundler reads them. */
+export interface DocumentReferences {
+  files: FilePath[];
+  /** Each one, as written, that names no file and no part of a document by a JSON pointer: `''`, `'#'` or `'#pet'`. */
+  unnamed: string[];
+}
+
 /** A path item kept in another file, where `pointer` locates it; empty for the whole file. */
 export interface PathItemReference {
   path: string;
@@ -33,7 +40,8 @@ const DESCRIPTION_LIMIT = 300;
 
 const HTTP_METHODS = new Set(['get', 'put', 'post', 'delete', 'options', 'head', 'patch', 'trace']);
 
-const URL_SCHEME = /^[a-z][a-z\d+.-]+:/i;
+// The bundler fetches these, and reads any other `$ref`, `file:` and `urn:` included, as a path.
+const FETCHED_PROTOCOLS = new Set(['http:', 'https:']);
 
 // How @scalar/json-magic reads each file it bundles: as JSON, else as YAML with these options when it holds a key.
 const YAML_OPTIONS = { merge: true, maxAliasCount: 10000 };
@@ -90,9 +98,10 @@ export class OpenApiDocument {
     return ids;
   }
 
-  /** The local files this document's `$ref`s name, as the portal's bundler finds them, given the root's `$id`s. */
-  public referencedFiles(directory: DirectoryPath, rootIds: ReadonlySet<string>): FilePath[] {
+  /** What this document's `$ref`s name, as the portal's bundler finds them, given the root's `$id`s. */
+  public references(directory: DirectoryPath, rootIds: ReadonlySet<string>): DocumentReferences {
     const names = new Set<string>();
+    const unnamed: string[] = [];
     walk(this.value, (node) => {
       // The bundler resolves what is below an `$id` against the `$id`, not the file.
       if (typeof node.$id === 'string') {
@@ -102,10 +111,15 @@ export class OpenApiDocument {
       if (target === undefined) {
         return true;
       }
-      names.add(target.name);
+      if (target.name === '' && !target.pointer.startsWith('/')) {
+        unnamed.push(target.written);
+      } else {
+        names.add(target.name);
+      }
       return false;
     });
-    return [...names].filter((name) => !rootIds.has(name)).flatMap((name) => localFile(directory, name) ?? []);
+    const files = [...names].filter((name) => !rootIds.has(name)).flatMap((name) => localFile(directory, name) ?? []);
+    return { files, unnamed };
   }
 
   /** Every operation declared inline or behind a `$ref` into this document; see `pathItemReferences` for the rest. */
@@ -193,17 +207,18 @@ export class OpenApiDocument {
 }
 
 /** A node's `$ref`, split as the bundler splits it: the file it names, empty for its own, and the pointer into it. */
-function reference(node: unknown): { name: string; pointer: string } | undefined {
+function reference(node: unknown): { written: string; name: string; pointer: string } | undefined {
   if (!isJsonObject(node) || typeof node.$ref !== 'string') {
     return undefined;
   }
   const [name, pointer = ''] = node.$ref.split('#');
-  return { name, pointer };
+  return { written: node.$ref, name, pointer };
 }
 
-/** The file a `$ref` names, resolved as the bundler resolves it; undefined for none, or a URL. */
+/** The file a `$ref` names, resolved as the bundler resolves it; undefined for none, or a URL it fetches. */
 function localFile(directory: DirectoryPath, name: string): FilePath | undefined {
-  return name === '' || URL_SCHEME.test(name) ? undefined : FilePath.resolve(directory, name.replaceAll('\\', '/'));
+  const fetched = FETCHED_PROTOCOLS.has(URL.parse(name)?.protocol ?? '');
+  return name === '' || fetched ? undefined : FilePath.resolve(directory, name.replaceAll('\\', '/'));
 }
 
 // A YAML error goes on to quote the lines around it, and V8 quotes the JSON it stopped at across line breaks.

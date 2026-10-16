@@ -37,10 +37,19 @@ describe('PreviewSpecs', () => {
     ]);
   });
 
-  it('says nothing on a return to the documents it started with, and warns again of the change made anew', () => {
+  // The restart it was told it needs is no longer needed.
+  it('says once that nothing differs on a return to the documents it started with, and warns of the change made anew', () => {
     expect(
-      warnings(['pets.json'], [['orders.json', 'pets.json'], ['pets.json'], ['orders.json', 'pets.json']])
-    ).to.deep.equal([{ added: ['orders.json'], removed: [] }, null, { added: ['orders.json'], removed: [] }]);
+      warnings(
+        ['pets.json'],
+        [['orders.json', 'pets.json'], ['pets.json'], ['pets.json'], ['orders.json', 'pets.json']]
+      )
+    ).to.deep.equal([
+      { added: ['orders.json'], removed: [] },
+      { added: [], removed: [] },
+      null,
+      { added: ['orders.json'], removed: [] }
+    ]);
   });
 
   it('says the specifications are fixed once, on the first save it accepts after refusing one', () => {

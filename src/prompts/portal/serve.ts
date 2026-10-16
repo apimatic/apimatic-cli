@@ -138,6 +138,13 @@ export class PortalServePrompts {
       filesAre(change.added, 'now read', specDirectory),
       filesAre(change.removed, 'no longer read', specDirectory)
     ].filter((each) => each !== null);
+    if (changes.length === 0) {
+      log.success(
+        `The documents read from ${specPath(sourceDirectory)} are the ones the preview started with again; ` +
+          'it no longer needs a restart.'
+      );
+      return;
+    }
     log.warn(
       `The documents read from ${specPath(sourceDirectory)} are not the ones the preview started with: ` +
         `${changes.join(', and ')}.`

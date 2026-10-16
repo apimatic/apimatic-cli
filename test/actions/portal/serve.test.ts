@@ -515,7 +515,7 @@ describe('PortalServeAction', () => {
       });
     });
 
-    it('warns once that a document added needs a restart, and not when it is taken out again', async () => {
+    it('warns once that a document added needs a restart, and says once that nothing differs when it is taken out', async () => {
       await whileServing(async (saved) => {
         writeSpec(
           'orders.json',
@@ -532,8 +532,10 @@ describe('PortalServeAction', () => {
 
         fs.rmSync(specFile('orders.json'));
         await saved();
+        await saved();
 
-        expect(changes()).to.have.length(1);
+        expect(changes()).to.have.length(2);
+        expect(changes()[1]).to.deep.equal({ added: [], removed: [] });
       });
     });
 

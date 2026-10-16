@@ -175,6 +175,21 @@ describe('PortalServePrompts', () => {
       );
     });
 
+    it('says when the documents are the ones it started with again, which needs no restart', () => {
+      const success = sinon.stub(log, 'success');
+      const warn = sinon.stub(log, 'warn');
+
+      new PortalServePrompts().specsShown(
+        { fixed: false, change: { added: [], removed: [] } },
+        new DirectoryPath('src')
+      );
+
+      expect(warn.called).to.be.false;
+      expect(stripVTControlCharacters(String(success.firstCall.args[0]))).to.match(
+        /^The documents read from '.*spec' are the ones the preview started with again; it no longer needs a restart\.$/
+      );
+    });
+
     // Each folder `APIMATIC-META.json` merges may hold an `openapi.yaml`.
     it('names a document in a folder by its path from the spec directory', () => {
       expect(said(['payments/openapi.yaml'], ['orders/openapi.yaml'])[0]).to.match(

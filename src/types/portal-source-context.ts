@@ -39,7 +39,7 @@ import {
   UnreadableSpecReason
 } from './portal/portal-source.js';
 import { shared } from './portal/shared.js';
-import { SpecBundle } from './portal/spec-bundle.js';
+import { ReferencedFile, SpecBundle } from './portal/spec-bundle.js';
 import { SpecMetadata } from './portal/spec-metadata.js';
 import { SpecContext } from './spec-context.js';
 import { TRANSFORMATIONS_DIRECTORY_NAME, transformedFileName } from './transform-context.js';
@@ -50,6 +50,12 @@ const definitionNames = (fileNames: FileName[]): FileName[] =>
   fileNames.filter((name) => !name.isEqual(METADATA_FILE) && !name.isHidden());
 
 const isDocumentName = (name: FileName): boolean => SPEC_EXTENSIONS.some((extension) => name.hasExtension(extension));
+
+const NO_DOCUMENT = new Set<UnreadableSpecReason['kind']>(['empty', 'noValue', 'noKey']);
+
+/** A file at the top of a folder that holds no document, which the build reads past as it does any file that is no API. */
+const holdsNoDocument = (problem: PortalSourceProblem): boolean =>
+  problem.kind === 'unreadableSpec' && NO_DOCUMENT.has(problem.reason.kind);
 
 type DiscoveredSpecs = Pick<PortalSource, 'specs' | 'suggestedSite' | 'unmergedSpecs' | 'leftOutSpecs'>;
 
@@ -63,6 +69,12 @@ interface ReadDocument {
 interface ReadDirectory {
   documents: ReadDocument[];
   definitions: FilePath[];
+}
+
+/** A document at the top of a directory in a format the portal does not read, which `api transform` converts. */
+interface OtherFormat {
+  file: FilePath;
+  format: string;
 }
 
 /** The specifications read from `spec/`, and the site the first of them suggests. */
@@ -616,11 +628,16 @@ export class PortalSourceContext {
     const definitions: FilePath[] = [];
 
     // What each one is, for the conversion a directory without an OpenAPI 3.x document is pointed to.
-    const otherFormats: { file: FilePath; format: string }[] = [];
+    const otherFormats: OtherFormat[] = [];
+    const noDocument: PortalSourceProblem[] = [];
     const documentNames = fileNames.filter(isDocumentName);
     for (const fileName of documentNames) {
       const file = new FilePath(directory, fileName);
       const read = await this.readDocument(file);
+      if (read.isErr() && holdsNoDocument(read.error)) {
+        noDocument.push(read.error);
+        continue;
+      }
       if (read.isErr()) {
         return err(read.error);
       }
@@ -629,30 +646,41 @@ export class PortalSourceContext {
         definitions.push(file);
       }
       const format = document.format();
-      if (!format.supported) {
-        if (format.format !== null) {
-          otherFormats.push({ file, format: format.format });
+      if (format.supported) {
+        const bundle = await this.readBundle(file, document);
+        if (bundle.isErr()) {
+          return err(bundle.error);
         }
-        continue;
+        documents.push({ spec: { file, endpoints: bundle.value.endpoints() }, site: document.suggestedSite() });
+      } else if (format.format !== null) {
+        otherFormats.push({ file, format: format.format });
       }
-
-      const bundle = await this.readBundle(file, document);
-      if (bundle.isErr()) {
-        return err(bundle.error);
-      }
-      documents.push({ spec: { file, endpoints: bundle.value.endpoints() }, site: document.suggestedSite() });
     }
 
-    if (documents.length === 0) {
-      const [convertible] = otherFormats;
-      // No document declares its format: one the portal would read, by extension, is named before any other file.
-      const conversion =
-        convertible === undefined
-          ? this.conversion(new FilePath(directory, documentNames[0] ?? fileNames[0]), null, 0)
-          : this.conversion(convertible.file, convertible.format, otherFormats.length - 1);
-      return err({ kind: 'noOpenApiSpec', conversion });
+    return documents.length > 0
+      ? ok({ documents, definitions })
+      : err(this.withoutOpenApi(directory, fileNames, documentNames, otherFormats, noDocument));
+  }
+
+  /** Why a directory has no OpenAPI 3.x document: one to convert, or the first that holds nothing when they all do. */
+  private withoutOpenApi(
+    directory: DirectoryPath,
+    fileNames: FileName[],
+    documentNames: FileName[],
+    otherFormats: OtherFormat[],
+    noDocument: PortalSourceProblem[]
+  ): PortalSourceProblem {
+    // As a document caught empty mid-save is, rather than as one to convert.
+    if (noDocument.length > 0 && noDocument.length === documentNames.length) {
+      return noDocument[0];
     }
-    return ok({ documents, definitions });
+    const [convertible] = otherFormats;
+    // No document declares its format: one the portal would read, by extension, is named before any other file.
+    const conversion =
+      convertible === undefined
+        ? this.conversion(new FilePath(directory, documentNames[0] ?? fileNames[0]), null, 0)
+        : this.conversion(convertible.file, convertible.format, otherFormats.length - 1);
+    return { kind: 'noOpenApiSpec', conversion };
   }
 
   private conversion(file: FilePath, format: string | null, others: number): SpecConversion {
@@ -694,7 +722,25 @@ export class PortalSourceContext {
       }
       unread.forEach((next, index) => bundle.add(next.file, read.value[index]));
     }
-    return ok(bundle);
+    const [unresolvable] = bundle.unresolvable();
+    if (unresolvable !== undefined) {
+      return err({ kind: 'unresolvableSpecReference', reference: unresolvable });
+    }
+    const misspelt = await this.misspeltReference(bundle.referenced());
+    return misspelt === undefined ? ok(bundle) : err(misspelt);
+  }
+
+  /** The first file read only as this file system ignores case, which a build where case matters would miss. */
+  private async misspeltReference(referenced: ReferencedFile[]): Promise<PortalSourceProblem | undefined> {
+    const files = referenced.map(({ file }) => file);
+    const spelt = await this.fileService.spellingsOnDisk(this.sourceDirectory, files);
+    // Null outside `src/`, whose folders are not the user's, or in no listing, as a name in another Unicode form is.
+    const index = spelt.findIndex((foundAs, at) => foundAs !== null && !foundAs.isEqual(files[at]));
+    if (index === -1) {
+      return undefined;
+    }
+    const { file, referencedBy } = referenced[index];
+    return { kind: 'missingSpecReference', missing: { file, foundAs: spelt[index] }, referencedBy };
   }
 
   private async readDocument(
@@ -705,21 +751,26 @@ export class PortalSourceContext {
     try {
       contents = await this.fileService.getContents(file);
     } catch (error) {
-      const there = await this.fileService.fileExists(file);
-      if (!there && referencedBy !== null) {
+      const reason = await this.whyUnread(file, error);
+      if (reason.kind === 'gone' && referencedBy !== null) {
         // Null only for a name listed but not there as a file, as a dangling link is.
         const missing = (await this.missingFile(file)) ?? { file, foundAs: null };
         return err({ kind: 'missingSpecReference', missing, referencedBy });
       }
-      // A listed document gone is one caught mid-save, which the next save fixes.
-      const reason: UnreadableSpecReason = there
-        ? { kind: 'unopened', message: errorMessage(error) }
-        : { kind: 'gone' };
       return err({ kind: 'unreadableSpec', file, referencedBy, reason });
     }
     return OpenApiDocument.parse(contents).mapErr(
       (reason): PortalSourceProblem => ({ kind: 'unreadableSpec', file, referencedBy, reason })
     );
+  }
+
+  /** A listed document gone is one caught mid-save, which the next save fixes; a `$ref` may name a folder. */
+  private async whyUnread(file: FilePath, error: unknown): Promise<UnreadableSpecReason> {
+    if (await this.fileService.fileExists(file)) {
+      return { kind: 'unopened', message: errorMessage(error) };
+    }
+    const folder = file.directory().join(file.name().toString());
+    return (await this.fileService.directoryExists(folder)) ? { kind: 'folder' } : { kind: 'gone' };
   }
 
   private async readMetadata(file: FilePath): Promise<SpecMetadata | undefined> {

@@ -109,6 +109,8 @@ function unreadableBecause(reason: UnreadableSpecReason): string {
       return 'it is not JSON, and the portal reads YAML only when it holds a key';
     case 'gone':
       return 'it is no longer there';
+    case 'folder':
+      return 'it is a folder';
     case 'invalid':
     case 'unopened':
       return reason.message;
@@ -180,6 +182,20 @@ export function reportSourceProblem(problem: PortalSourceProblem, sourceDirector
       }
       log.error(`${refersTo}, but there is no such file.`);
       log.message(`A ${f.var('$ref')} names a file from the folder of the file it is written in.`);
+      return;
+    }
+    case 'unresolvableSpecReference': {
+      const { file, ref } = problem.reference;
+      const writtenIn = relative(file, sourceDirectory);
+      log.error(
+        ref === ''
+          ? `${writtenIn} has an empty ${f.var('$ref')}.`
+          : `${writtenIn} has the ${f.var('$ref')} ${f.var(ref)}, which the portal cannot resolve.`
+      );
+      log.message(
+        `A ${f.var('$ref')} names a part of the file it is in as ${f.var('#/components/schemas/Pet')}, ` +
+          `and a part of another as ${f.var('./pets.yaml#/Pet')}.`
+      );
       return;
     }
     case 'unreadableMetadata': {

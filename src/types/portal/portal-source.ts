@@ -8,6 +8,7 @@ import { GeneratedPages } from './generated-pages.js';
 import { ParseFailure } from './openapi-document.js';
 import { PortalConfig } from './portal-config.js';
 import { Shared } from './shared.js';
+import { UnresolvableReference } from './spec-bundle.js';
 
 /** An OpenAPI document found in `src/spec/` or in a folder merged there, with the slug its section is mounted at. */
 export interface PortalSpec {
@@ -121,7 +122,11 @@ export interface SpecConversion {
 }
 
 /** Why a file a specification is read from could not be read; `unopened` carries what the file system said. */
-export type UnreadableSpecReason = ParseFailure | { kind: 'gone' } | { kind: 'unopened'; message: string };
+export type UnreadableSpecReason =
+  | ParseFailure
+  | { kind: 'gone' }
+  | { kind: 'folder' }
+  | { kind: 'unopened'; message: string };
 
 /** Why a source directory cannot be built; each variant maps to its own message. */
 export type PortalSourceProblem =
@@ -132,6 +137,7 @@ export type PortalSourceProblem =
   | { kind: 'invalidContent'; problems: ContentProblem[] }
   | { kind: 'unreadableSpec'; file: FilePath; referencedBy: FilePath | null; reason: UnreadableSpecReason }
   | { kind: 'missingSpecReference'; missing: MissingFile; referencedBy: FilePath }
+  | { kind: 'unresolvableSpecReference'; reference: UnresolvableReference }
   | { kind: 'unreadableMetadata'; file: FilePath }
   // Its `folders` are not read unless a metadata file merges them, and `api transform` writes into one of its own.
   | { kind: 'emptySpecDirectory'; folders: DirectoryPath[] }

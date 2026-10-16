@@ -30,6 +30,21 @@ describe('SpecBundle', () => {
     expect(unread(bundle)).to.be.empty;
   });
 
+  // The bundler turns `#` and `#pet` in a file it embeds into pointers to where it put the file.
+  it('keeps each $ref the bundler fails on: an empty one anywhere, and a bare # or an anchor in the root only', () => {
+    const bundle = new SpecBundle(
+      at('api.json'),
+      parsed({ whole: { $ref: '#' }, anchor: { $ref: '#pet' }, Pet: { $ref: './Pet.json' } })
+    );
+    bundle.add(at('Pet.json'), parsed({ whole: { $ref: '#' }, anchor: { $ref: '#pet' }, empty: { $ref: '' } }));
+
+    expect(bundle.unresolvable().map(({ file, ref }) => [file.relativeTo(spec), ref])).to.deep.equal([
+      ['api.json', '#'],
+      ['api.json', '#pet'],
+      ['Pet.json', '']
+    ]);
+  });
+
   it('names what a file refers to from its own folder', () => {
     const bundle = new SpecBundle(at('api.json'), parsed({ Pet: { $ref: './schemas/Pet.json' } }));
 

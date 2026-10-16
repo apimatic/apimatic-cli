@@ -349,6 +349,7 @@ describe('reportSourceProblem', () => {
       [{ kind: 'noValue' }, 'it holds no value'],
       [{ kind: 'noKey' }, 'it is not JSON, and the portal reads YAML only when it holds a key'],
       [{ kind: 'gone' }, 'it is no longer there'],
+      [{ kind: 'folder' }, 'it is a folder'],
       [{ kind: 'unopened', message: 'EACCES: permission denied' }, 'EACCES: permission denied']
     ];
 
@@ -383,6 +384,24 @@ describe('reportSourceProblem', () => {
       expect(printed()).to.equal(
         "'spec/api.yaml' refers to 'spec/schemas/pet.json', but the file is spelt 'spec/schemas/Pet.json' on disk."
       );
+    });
+
+    const PART_NAMED =
+      "A '$ref' names a part of the file it is in as '#/components/schemas/Pet', and a part of another as " +
+      "'./pets.yaml#/Pet'.";
+
+    it('names the file a $ref the build cannot resolve is in, and how to name a part of a file', () => {
+      reportSourceProblem({ kind: 'unresolvableSpecReference', reference: { file: api, ref: '#pet' } }, source);
+
+      expect(printed()).to.equal(
+        `'spec/api.yaml' has the '$ref' '#pet', which the portal cannot resolve.\n${PART_NAMED}`
+      );
+    });
+
+    it('says a $ref is empty rather than quoting it', () => {
+      reportSourceProblem({ kind: 'unresolvableSpecReference', reference: { file: pet, ref: '' } }, source);
+
+      expect(printed()).to.equal(`'spec/schemas/Pet.json' has an empty '$ref'.\n${PART_NAMED}`);
     });
   });
 
