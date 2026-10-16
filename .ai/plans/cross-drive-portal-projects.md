@@ -5,6 +5,9 @@ Status: designed 2026-10-16 on `saeedjamshaid/cross-drive-portal-styles`, cut fr
 same day (section 4); this plan turns it into the change and its tests. Approved by the user on
 2026-10-16, with the title in section 12.
 
+Implemented the same day in steps 1–4: `c1c04efe`, `341d2f30`, `b198b89c`, `494ffaa5`, plus this
+note. Not yet pushed; steps 5 and 6 wait for the user. Section 13 records what the branch passed.
+
 ## 1. Goal and scope
 
 A portal built or previewed from an input on any Windows drive is the portal the same input gives
@@ -270,3 +273,13 @@ Each step stops for review, and each commit waits to be asked for.
   - The fix was researched and prototyped (sections 2–4).
   - The user chose the public address on every OS, a CI and Safari check for macOS, and drafts of
     the #2301 reply and the fumadocs issue.
+  - Steps 1–4 implemented. The branch passed:
+    - CI's job on Windows: 1919 passing, lint clean;
+    - the e2e suites from a `subst` drive and from a USB drive: 68/68 each;
+    - CI's job in Docker on `node:24` and `node:26`: 1918 passing each, lint clean.
+  - The final review found nothing to change, and two things to watch:
+    - CI's macOS job: the e2e roots now carry their real path (`/private/var/...`). The check that
+      no build-machine path reaches the output now searches for the spelling Vite embeds there, so
+      it is stricter on macOS than before.
+    - PR #437 bumps fumadocs-core to 16.17.1, whose `getImportPath` is unchanged, so the resolve
+      hook still applies.
