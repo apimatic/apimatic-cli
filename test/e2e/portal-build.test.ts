@@ -419,8 +419,6 @@ const stylesheetOf = (output: DirectoryPath) => {
 
     for (const rendered of [
       'Inline contents',
-      'Banner body.',
-      'id="dismissible-banner"',
       'Default callout body.',
       'Idea title',
       'Composed callout body.',

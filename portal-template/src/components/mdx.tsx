@@ -1,6 +1,5 @@
 import defaultMdxComponents from 'fumadocs-ui/mdx';
 import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
-import { Banner } from 'fumadocs-ui/components/banner';
 import { File, Files, Folder } from 'fumadocs-ui/components/files';
 import { InlineTOC } from 'fumadocs-ui/components/inline-toc';
 import { Step, Steps } from 'fumadocs-ui/components/steps';
@@ -19,7 +18,6 @@ export function getMDXComponents(components?: MDXComponents) {
     // Fumadocs' components beyond its defaults, so an author's page can use them without importing.
     Accordion,
     Accordions,
-    Banner,
     File,
     Files,
     Folder,
