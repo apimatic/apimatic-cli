@@ -1,8 +1,8 @@
-import { basename, dirname } from 'node:path';
-import { parse as parseYaml } from 'yaml';
+import { err, ok, Result } from 'neverthrow';
+import { parse as parseYaml, YAMLParseError } from 'yaml';
 import { DirectoryPath } from '../file/directoryPath.js';
-import { FileName } from '../file/fileName.js';
 import { FilePath } from '../file/filePath.js';
+import { errorMessage } from '../../utils/error-utils.js';
 import { isJsonObject, JsonObject } from '../../utils/json-utils.js';
 import { stripByteOrderMark } from '../../utils/string-utils.js';
 import { PLACEHOLDER_SITE, SuggestedSite } from './config/site-config.js';
@@ -15,6 +15,20 @@ import { Endpoint } from './endpoint.js';
  */
 export type SpecFormat = { supported: true } | { supported: false; format: string | null };
 
+/** Why the portal's bundler would fail on a text, or read nothing from it; `invalid` carries what the parser said. */
+export type ParseFailure =
+  | { kind: 'empty' }
+  | { kind: 'noValue' }
+  | { kind: 'noKey' }
+  | { kind: 'invalid'; message: string };
+
+/** What a document's `$ref`s name, as the portal's bundler reads them. */
+export interface DocumentReferences {
+  files: FilePath[];
+  /** Each one, as written, that names no file and no part of a document by a JSON pointer: `''`, `'#'` or `'#pet'`. */
+  unnamed: string[];
+}
+
 /** A path item kept in another file, where `pointer` locates it; empty for the whole file. */
 export interface PathItemReference {
   path: string;
@@ -26,29 +40,86 @@ const DESCRIPTION_LIMIT = 300;
 
 const HTTP_METHODS = new Set(['get', 'put', 'post', 'delete', 'options', 'head', 'patch', 'trace']);
 
-const URL_SCHEME = /^[a-z][a-z\d+.-]+:/i;
+// The bundler fetches these, and reads any other `$ref`, `file:` and `urn:` included, as a path.
+const FETCHED_PROTOCOLS = new Set(['http:', 'https:']);
 
-// The options @scalar/json-magic bundles with, so a spec reads here as it does in the portal.
+// How @scalar/json-magic reads each file it bundles: as JSON, else as YAML with these options when it holds a key.
 const YAML_OPTIONS = { merge: true, maxAliasCount: 10000 };
+const YAML_KEY = /^[^:]+:/;
+// A text that opens as JSON does within this many characters is taken for JSON, and never read as YAML.
+const JSON_OPENING = /^\s*[[{]/;
+const JSON_OPENING_WITHIN = 50;
 
-/** A specification as written to disk, read the one way the wizard and the build agree on. */
+// The keys @scalar/json-magic writes what it has embedded under, which it does not read again.
+const BUNDLER_KEYS = new Set(['x-ext', 'x-ext-urls']);
+
+/** A specification's document, or a file its `$ref`s name, read the one way the wizard and the build agree on. */
 export class OpenApiDocument {
-  private constructor(private readonly document: JsonObject) {}
+  private readonly document: JsonObject;
 
-  /**
-   * Undefined when neither parser accepts the text. A document that parses to something other
-   * than an object is kept, and reports itself as no specification at all.
-   */
-  public static parse(fileName: FileName, contents: string): OpenApiDocument | undefined {
-    try {
-      // JSON is valid YAML, but the YAML parser is far slower and specs run to megabytes,
-      // so each extension gets the parser built for it.
-      const text = stripByteOrderMark(contents);
-      const document: unknown = fileName.hasExtension('.json') ? JSON.parse(text) : parseYaml(text, YAML_OPTIONS);
-      return new OpenApiDocument(isJsonObject(document) ? document : {});
-    } catch {
-      return undefined;
+  private constructor(private readonly value: unknown) {
+    this.document = isJsonObject(value) ? value : {};
+  }
+
+  /** Fails where the portal's bundler fails or reads nothing; a value other than an object is no specification. */
+  public static parse(contents: string): Result<OpenApiDocument, ParseFailure> {
+    const text = stripByteOrderMark(contents);
+    if (text.trim() === '') {
+      return err({ kind: 'empty' });
     }
+    let value: unknown;
+    try {
+      value = JSON.parse(text);
+    } catch (error) {
+      if (JSON_OPENING.test(text.slice(0, JSON_OPENING_WITHIN))) {
+        return err(invalid(error));
+      }
+      if (!YAML_KEY.test(text)) {
+        return err({ kind: 'noKey' });
+      }
+      try {
+        value = parseYaml(text, YAML_OPTIONS);
+      } catch (yamlError) {
+        return err(invalid(yamlError));
+      }
+    }
+    return value === null ? err({ kind: 'noValue' }) : ok(new OpenApiDocument(value));
+  }
+
+  /** The `$id`s this document declares, which a `$ref` in any file bundled into it names a schema by. */
+  public schemaIds(): Set<string> {
+    const ids = new Set<string>();
+    walk(this.value, (node) => {
+      if (typeof node.$id === 'string') {
+        ids.add(node.$id);
+      }
+      return true;
+    });
+    return ids;
+  }
+
+  /** What this document's `$ref`s name, as the portal's bundler finds them, given the root's `$id`s. */
+  public references(directory: DirectoryPath, rootIds: ReadonlySet<string>): DocumentReferences {
+    const names = new Set<string>();
+    const unnamed: string[] = [];
+    walk(this.value, (node) => {
+      // The bundler resolves what is below an `$id` against the `$id`, not the file.
+      if (typeof node.$id === 'string') {
+        return false;
+      }
+      const target = reference(node);
+      if (target === undefined) {
+        return true;
+      }
+      if (target.name === '' && !target.pointer.startsWith('/')) {
+        unnamed.push(target.written);
+      } else {
+        names.add(target.name);
+      }
+      return false;
+    });
+    const files = [...names].filter((name) => !rootIds.has(name)).flatMap((name) => localFile(directory, name) ?? []);
+    return { files, unnamed };
   }
 
   /** Every operation declared inline or behind a `$ref` into this document; see `pathItemReferences` for the rest. */
@@ -59,12 +130,9 @@ export class OpenApiDocument {
   /** The path items kept in other local files, resolved against the `directory` this document sits in. */
   public pathItemReferences(directory: DirectoryPath): PathItemReference[] {
     return Object.entries(this.paths()).flatMap(([path, pathItem]) => {
-      const reference = isJsonObject(pathItem) && typeof pathItem.$ref === 'string' ? pathItem.$ref : '';
-      const [file, pointer = ''] = reference.split('#');
-      if (file === '' || URL_SCHEME.test(file)) {
-        return [];
-      }
-      return [{ path, file: new FilePath(directory.resolve(dirname(file)), new FileName(basename(file))), pointer }];
+      const target = reference(pathItem);
+      const file = target && localFile(directory, target.name);
+      return target && file ? [{ path, file, pointer: target.pointer }] : [];
     });
   }
 
@@ -135,6 +203,44 @@ export class OpenApiDocument {
     }
     seen.add($ref);
     return { ...this.followLocal(valueAt(this.document, $ref.slice(1)), seen), ...siblings };
+  }
+}
+
+/** A node's `$ref`, split as the bundler splits it: the file it names, empty for its own, and the pointer into it. */
+function reference(node: unknown): { written: string; name: string; pointer: string } | undefined {
+  if (!isJsonObject(node) || typeof node.$ref !== 'string') {
+    return undefined;
+  }
+  const [name, pointer = ''] = node.$ref.split('#');
+  return { written: node.$ref, name, pointer };
+}
+
+/** The file a `$ref` names, resolved as the bundler resolves it; undefined for none, or a URL it fetches. */
+function localFile(directory: DirectoryPath, name: string): FilePath | undefined {
+  const fetched = FETCHED_PROTOCOLS.has(URL.parse(name)?.protocol ?? '');
+  return name === '' || fetched ? undefined : FilePath.resolve(directory, name.replaceAll('\\', '/'));
+}
+
+// A YAML error goes on to quote the lines around it, and V8 quotes the JSON it stopped at across line breaks.
+function invalid(error: unknown): ParseFailure {
+  const message = errorMessage(error);
+  const firstLine = error instanceof YAMLParseError ? message.split('\n')[0].replace(/:$/, '') : message;
+  return { kind: 'invalid', message: firstLine.replace(/\s+/g, ' ').trim() };
+}
+
+/** Each object and list once; into an object only when `visit` says so, and never into the keys the bundler writes. */
+function walk(node: unknown, visit: (node: JsonObject) => boolean, seen = new WeakSet<object>()): void {
+  if (typeof node !== 'object' || node === null || seen.has(node)) {
+    return;
+  }
+  seen.add(node);
+  if (isJsonObject(node) && !visit(node)) {
+    return;
+  }
+  for (const [key, value] of Object.entries(node)) {
+    if (!BUNDLER_KEYS.has(key)) {
+      walk(value, visit, seen);
+    }
   }
 }
 

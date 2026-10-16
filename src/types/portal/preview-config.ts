@@ -1,9 +1,10 @@
 import { PortalConfig } from './portal-config.js';
+import { PreviewRefusal } from './preview-refusal.js';
 
 /** The notice is given once, on the save that brings it about, rather than on every save after it. */
 export class PreviewConfig {
   private shown: PortalConfig;
-  private refused = false;
+  private readonly refusal = new PreviewRefusal();
 
   /**
    * `servesStatic`: the dev server serves `static/` only if it was there at startup, and a
@@ -14,7 +15,7 @@ export class PreviewConfig {
   }
 
   public refuse(): void {
-    this.refused = true;
+    this.refusal.refuse();
   }
 
   public staticDirectoryNotServed(config: PortalConfig): boolean {
@@ -27,9 +28,8 @@ export class PreviewConfig {
    * it is accepted again.
    */
   public show(config: PortalConfig, written: boolean): boolean {
-    const announce = written || this.refused;
-    this.refused = false;
+    const fixed = this.refusal.accept();
     this.shown = config;
-    return announce;
+    return written || fixed;
   }
 }

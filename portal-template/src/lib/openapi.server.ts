@@ -11,6 +11,14 @@ export type OpenApiSource = StaticSource<{ pageData: OpenAPIPageData; metaData: 
  * Markdown page.
  */
 export async function openApiSource(): Promise<OpenApiSource> {
-  const sections = await Promise.all(Object.entries(specs).map(([slug, file]) => openApiSection(slug, file, codeSamplesFile)));
+  const loading = Object.entries(specs).map(([slug, file]) => openApiSection(slug, file, codeSamplesFile));
+  // Under `vite dev` a document saved half written would fail every page; a build must still fail on it.
+  const sections = import.meta.env.DEV
+    ? (await Promise.allSettled(loading)).flatMap((result) => {
+        if (result.status === 'fulfilled') return [result.value];
+        console.error('[OpenAPI] Leaving its reference pages out of the preview:', result.reason);
+        return [];
+      })
+    : await Promise.all(loading);
   return { files: sections.flatMap((section) => section.files) };
 }
