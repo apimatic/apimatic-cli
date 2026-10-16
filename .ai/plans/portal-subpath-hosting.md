@@ -836,8 +836,9 @@ with the MDX components, but not in its copy.
 | fuma-nama/fumadocs#3620, from PR #3572 (ui 16.15.13) | Fixed 2026-09-29 in fumadocs-ui 16.15.17 (commit `6791d6f`): the popover prefixes `markdownUrl` with `withBasePath` again, in both `radix-ui` and `base-ui` | Since 2026-10-08 we pass the page's path and rely on that `withBasePath`; `page-actions.test.ts` fails if an upgrade drops it again (5.2) |
 | TanStack/router#4888, docs PR #7882 | Docs only | None |
 | TanStack/router#8448, PR #8450 | Both open (checked 2026-10-07); the PR has no review yet. The issue reports a second loader run; we saw the address rewritten too | When it ships, `searchOptions` can go (5.11) |
-| fuma-nama/fumadocs#3661 | Filed 2026-10-07: an image in an operation's description crashes the page | When it ships with the base, `ApiMarkdown` can go (5.10) |
-| fuma-nama/fumadocs#3662 | Filed 2026-10-07: processed Markdown prints images as `__img0` | When it ships, ticket 5 is fixed by the upgrade (section 9) |
+| fuma-nama/fumadocs#3661 | Fixed 2026-10-09 in fumadocs-openapi 12.4.0, installed since 2026-10-16 (12.4.1): `img` maps to `'img'`, so the page no longer crashes. The image gets no base | `ApiMarkdown` stays for the base alone (5.10) |
+| fuma-nama/fumadocs#3662 | Fixed 2026-10-09 in fumadocs-core 16.17.0 and fumadocs-mdx 15.4.7, installed since 2026-10-16 (core 16.17.1): the processed Markdown is sliced from the authored source, so images keep their addresses | Ticket 5 is fixed by the upgrade (section 9); the subpath e2e checks the copies |
+| fuma-nama/fumadocs#3663 | Fixed 2026-10-09 in fumadocs-openapi 12.4.0, installed since 2026-10-16 (12.4.1): the OAuth panel shows the `redirect_uri` of the authorization code and implicit flows, with a copy button | It shows `oauthRedirectUrl`, which carries the base (5.2), against the page's origin: the one callback a portal owner registers |
 
 **The fixes:**
 - **Fumadocs:** filed by the user as fuma-nama/fumadocs#3620, from a draft made here, and fixed
