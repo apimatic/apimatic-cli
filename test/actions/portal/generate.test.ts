@@ -1,3 +1,4 @@
+import { createHash } from 'crypto';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -21,6 +22,7 @@ const COMMAND_METADATA: CommandMetadata = { commandName: 'portal generate', shel
 const FIXTURE = new DirectoryPath(process.cwd()).join('test/resources/portal-inputs/default');
 const CODE_SAMPLES_FIXTURE = new DirectoryPath(process.cwd()).join('test/resources/portal-inputs/code-samples');
 const SUBPATH_FIXTURE = new DirectoryPath(process.cwd()).join('test/resources/portal-inputs/subpath');
+const COPILOT_FIXTURE = new DirectoryPath(process.cwd()).join('test/resources/portal-inputs/copilot');
 
 /** The catalogs the merged fixture expects, read the way the service reads them. */
 const samplesFromFixture = (): CodeSampleCatalogs => {
@@ -37,6 +39,7 @@ describe('GenerateAction', () => {
   let shared: ReturnType<typeof stubPreparePortalProject>;
   let authorize: sinon.SinonStub;
   let build: sinon.SinonStub;
+  let builtSite: DirectoryPath;
 
   const execute = (projectDirectory = FIXTURE, force = false, zip = false) =>
     new GenerateAction(new DirectoryPath(root), COMMAND_METADATA, 'auth-key').execute(
@@ -58,7 +61,7 @@ describe('GenerateAction', () => {
     portalDirectory = new DirectoryPath(root).join('portal');
 
     // What a successful build hands back: a directory holding the finished site.
-    const builtSite = new DirectoryPath(root).join('site');
+    builtSite = new DirectoryPath(root).join('site');
     fs.mkdirSync(builtSite.toString(), { recursive: true });
     fs.writeFileSync(path.join(builtSite.toString(), 'index.html'), '<html></html>');
     fs.writeFileSync(path.join(builtSite.toString(), '_shell.html'), '<html></html>');
@@ -239,6 +242,53 @@ describe('GenerateAction', () => {
     expect(inPortal('404.html')).to.be.true;
     expect(prompts.portalGenerated.calledOnceWith(portalDirectory)).to.be.true;
     expect(prompts.nextSteps.calledOnceWith(portalDirectory, false)).to.be.true;
+    expect(prompts.copilotUpdatesAfterDeploy.called, 'no Ask AI to update').to.be.false;
+    expect(inPortal('__copilot')).to.be.false;
+  });
+
+  describe('with Ask AI', () => {
+    const readPortal = (relative: string) => fs.readFileSync(path.join(portalDirectory.toString(), relative), 'utf8');
+
+    const listPages = () => {
+      fs.writeFileSync(path.join(builtSite.toString(), 'llms.txt'), '- [Welcome](/): Start here');
+      fs.writeFileSync(path.join(builtSite.toString(), 'index.md'), '# Welcome');
+    };
+
+    it('deploys the pages with the portal, named by a build ID the service compares', async () => {
+      listPages();
+
+      const result = await execute(COPILOT_FIXTURE);
+
+      expect(result.isSuccess()).to.be.true;
+      const bundle = readPortal('__copilot/bundle.json');
+      const { pages } = JSON.parse(bundle) as { pages: unknown[] };
+      expect(pages).to.deep.equal([{ path: '/', title: 'Welcome', description: 'Start here', markdown: '# Welcome' }]);
+      expect(JSON.parse(readPortal('__copilot/build.json'))).to.deep.equal({
+        formatVersion: 1,
+        buildId: createHash('sha256').update(bundle).digest('hex')
+      });
+      expect(prompts.copilotUpdatesAfterDeploy.calledOnce).to.be.true;
+    });
+
+    it('puts the pages in the archive when the portal is zipped', async () => {
+      listPages();
+
+      const result = await execute(COPILOT_FIXTURE, false, true);
+
+      expect(result.isSuccess()).to.be.true;
+      expect(inPortal('__copilot')).to.be.false;
+      expect(fs.existsSync(path.join(builtSite.toString(), '__copilot', 'build.json'))).to.be.true;
+    });
+
+    it('still saves the portal when it lists no pages, pointing to sync instead', async () => {
+      const result = await execute(COPILOT_FIXTURE);
+
+      expect(result.isSuccess()).to.be.true;
+      expect(inPortal('index.html')).to.be.true;
+      expect(inPortal('__copilot')).to.be.false;
+      expect(prompts.copilotPagesNotFound.calledOnce).to.be.true;
+      expect(prompts.copilotUpdatesAfterDeploy.called).to.be.false;
+    });
   });
 
   it('writes an archive instead when asked', async () => {

@@ -2,6 +2,7 @@ import { err, ok, Result } from 'neverthrow';
 import { isJsonObject } from '../../utils/json-utils.js';
 import { UrlPath } from '../file/urlPath.js';
 import { AiConfig } from './config/ai-config.js';
+import { PortalCopilot } from './config/copilot-config.js';
 import { BrandConfig, ColorMode } from './config/brand-config.js';
 import { allOf, optional, Parsed, unknownKeys } from './config/fields.js';
 import { Link } from './config/link.js';
@@ -35,6 +36,8 @@ export interface PortalIdentity {
   links: PortalLink[];
   /** Whether each page offers to open itself in an external AI assistant. */
   pageActions: boolean;
+  /** The Ask AI chat, or null when the portal offers none. */
+  copilot: PortalCopilot | null;
 }
 
 const BLOCK = 'portal';
@@ -125,7 +128,8 @@ export class PortalConfig {
       favicon: favicon === null ? null : { url: favicon.portalPath(), type: favicon.imageType() },
       colorMode: this.brand.mode(),
       links: this.navigation.headerLinks().map(portalLink),
-      pageActions: this.ai.offersPageActions()
+      pageActions: this.ai.offersPageActions(),
+      copilot: this.ai.copilot()
     };
   }
 

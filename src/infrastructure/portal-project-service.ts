@@ -27,6 +27,8 @@ export const COPIED_DEPENDENCIES = ['@fontsource-variable/geist', '@fontsource-v
 // pnpm global install, `npx` or `pnpm dlx` the package has no nested `node_modules`, and a
 // single link also lets Vite write its scratch files into the CLI's own install directory.
 export const LINKED_DEPENDENCIES = [
+  '@ai-sdk/react',
+  '@fumadocs/ai-chat',
   '@fumadocs/api-docs',
   '@scalar/json-magic',
   '@tailwindcss/vite',
@@ -34,6 +36,7 @@ export const LINKED_DEPENDENCIES = [
   '@tanstack/react-start',
   '@tanstack/start-static-server-functions',
   '@vitejs/plugin-react',
+  'ai',
   'fumadocs-core',
   'fumadocs-mdx',
   'fumadocs-openapi',

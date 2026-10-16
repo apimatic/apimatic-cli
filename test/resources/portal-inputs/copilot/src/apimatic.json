@@ -1,0 +1,17 @@
+{
+  "$schema": "https://cdn.jsdelivr.net/npm/@apimatic/cli@beta/apimatic.schema.json",
+  "schemaVersion": 1,
+  "portal": {
+    "site": { "name": "Ask AI Pets" },
+    "ai": {
+      "copilot": {
+        "key": "pk_test_e2e",
+        "apiUrl": "https://ask.apimatic.io",
+        "suggestions": ["How do I list pets?"]
+      }
+    }
+  },
+  "languages": {
+    "typescript": {}
+  }
+}

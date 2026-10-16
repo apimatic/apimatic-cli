@@ -174,6 +174,30 @@
               "type": "boolean",
               "default": true,
               "description": "Whether each page offers to open itself in an external AI assistant."
+            },
+            "copilot": {
+              "type": "object",
+              "description": "The Ask AI chat the portal offers. Left out, the portal offers none.",
+              "additionalProperties": false,
+              "required": ["key", "apiUrl"],
+              "properties": {
+                "key": {
+                  "type": "string",
+                  "description": "A public Ask AI key, bound to this portal and to the origins allowed to use it.",
+                  "minLength": 1
+                },
+                "apiUrl": {
+                  "type": "string",
+                  "description": "The Ask AI service's address, for example 'https://ask.example.com'. Plain 'http://' is only accepted for a service on this machine, such as 'http://localhost:8787'.",
+                  "pattern": "^([hH][tT][tT][pP][sS]://\\S+|[hH][tT][tT][pP]://(localhost|127\\.0\\.0\\.1|\\[::1\\]|[^/:\\s]+\\.localhost)([:/]\\S*)?)$"
+                },
+                "suggestions": {
+                  "type": "array",
+                  "description": "Up to three starter questions shown on a new chat, such as 'How do I authenticate?'. Left out, the chat shows its own.",
+                  "maxItems": 3,
+                  "items": { "type": "string", "minLength": 1, "maxLength": 120 }
+                }
+              }
             }
           }
         },

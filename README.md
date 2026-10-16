@@ -47,6 +47,7 @@ USAGE
 * [`apimatic help [COMMAND]`](#apimatic-help-command)
 * [`apimatic plugin generate`](#apimatic-plugin-generate)
 * [`apimatic plugin publish`](#apimatic-plugin-publish)
+* [`apimatic portal copilot sync`](#apimatic-portal-copilot-sync)
 * [`apimatic portal generate`](#apimatic-portal-generate)
 * [`apimatic portal serve`](#apimatic-portal-serve)
 * [`apimatic publishing profile list`](#apimatic-publishing-profile-list)
@@ -289,6 +290,43 @@ EXAMPLES
 ```
 
 _See code: [src/commands/plugin/publish.ts](https://github.com/apimatic/apimatic-cli/blob/v1.3.1/src/commands/plugin/publish.ts)_
+
+## `apimatic portal copilot sync`
+
+Update the portal's Ask AI chat with the portal's current pages.
+
+```
+USAGE
+  $ apimatic portal copilot sync [--wait] [-d <value>] [-i <value>] [-k <value>]
+
+FLAGS
+  -d, --destination=<value>  [default: <input>/portal] path to the generated portal to sync.
+  -i, --input=<value>        [default: ./] path to the parent directory containing the 'src' directory, which includes
+                             API specifications and configuration files.
+  -k, --auth-key=<value>     override current authentication state with an authentication key.
+      --[no-]wait            wait until the pages are indexed; with --no-wait, return as soon as they are uploaded.
+
+DESCRIPTION
+  Update the portal's Ask AI chat with the portal's current pages.
+
+  Uploads the pages of a generated portal to the Ask AI service, so the portal's Ask AI chat answers from the docs as
+  they are now. Run it after deploying a portal generated with 'apimatic portal generate'.
+
+  The service is set by the 'ai.copilot' setting in the 'portal' block of 'src/apimatic.json'. The pages are swapped in
+  at once, after all of them are indexed; until then Ask AI answers from the previous ones.
+
+  Your saved APIMatic login is sent only to an Ask AI service APIMatic runs, or to one on this machine. For any other
+  service, pass your auth key with --auth-key.
+
+EXAMPLES
+  apimatic portal copilot sync
+
+  apimatic portal copilot sync --input=./ --destination=./portal
+
+  apimatic portal copilot sync --no-wait
+```
+
+_See code: [src/commands/portal/copilot/sync.ts](https://github.com/apimatic/apimatic-cli/blob/v1.3.1/src/commands/portal/copilot/sync.ts)_
 
 ## `apimatic portal generate`
 

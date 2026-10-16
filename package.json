@@ -54,11 +54,13 @@
         "test": "tsx node_modules/mocha/bin/_mocha --forbid-only \"test/**/*.test.ts\" --timeout 99999"
     },
     "dependencies": {
+        "@ai-sdk/react": "4.0.131",
         "@apimatic/sdk": "0.2.0-alpha.10",
         "@clack/core": "1.0.0-alpha.1",
         "@clack/prompts": "1.0.0-alpha.1",
         "@fontsource-variable/geist": "5.3.0",
         "@fontsource-variable/geist-mono": "5.3.0",
+        "@fumadocs/ai-chat": "0.1.0",
         "@fumadocs/api-docs": "0.2.8",
         "@oclif/core": "^4.2.8",
         "@oclif/plugin-autocomplete": "^3.2.24",
@@ -70,6 +72,7 @@
         "@tanstack/start-static-server-functions": "1.167.33",
         "@vitejs/plugin-react": "6.1.1",
         "adm-zip": "^0.5.17",
+        "ai": "7.0.128",
         "ansis": "^3.17.0",
         "async-mutex": "^0.5.0",
         "axios": "^1.8.1",
@@ -77,10 +80,10 @@
         "fast-levenshtein": "^3.0.0",
         "form-data": "^4.0.2",
         "fs-extra": "^11.3.0",
-        "fumadocs-core": "16.15.17",
+        "fumadocs-core": "16.16.2",
         "fumadocs-mdx": "15.4.0",
         "fumadocs-openapi": "12.1.1",
-        "fumadocs-ui": "16.15.17",
+        "fumadocs-ui": "16.16.2",
         "get-port": "^7.1.0",
         "is-in-ci": "^2.0.0",
         "isomorphic-git": "^1.37.2",
@@ -177,6 +180,9 @@
             },
             "portal": {
                 "description": "Build and serve an API Documentation portal for your APIs."
+            },
+            "portal:copilot": {
+                "description": "Keep your portal's Ask AI chat in sync with its pages."
             },
             "sdk": {
                 "description": "Generate and publish SDKs for your APIs in multiple languages."
