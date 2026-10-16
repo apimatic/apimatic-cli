@@ -195,8 +195,10 @@ Each step stops for review, and each commit waits to be asked for.
 1. **The plugin:** `static-images.ts`, its registration, and its unit tests (6.1, 6.2, 7.1).
    Nothing changes for users yet: the fallback still keeps the static directory on the project's
    drive.
-2. **The fallback goes:** 5.1, 5.2, their unit tests, and the e2e helpers (7.2).
-3. **The stylesheet:** 6.3, the packaging test's removal, and the two e2e cases (7.2).
+2. **The fallback goes:** 5.1, 5.2, their unit tests, the e2e helpers, and the serve case of 7.2.
+   The serve case moved here from step 3 (2026-10-16), because this is the step that makes the old
+   raw-`/@fs/` case fail across drives; every step then passes on every layout.
+3. **The stylesheet:** 6.3, the packaging test's removal, and the build case of 7.2.
 4. **Self-review and verification:**
    - Unit and e2e on Windows: C:, a `subst` drive, and the USB drive when it is attached.
    - CI's job in Docker on `node:24` and `node:26`; lint and type check.
