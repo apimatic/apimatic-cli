@@ -1,4 +1,4 @@
-@import 'tailwindcss';
+@import 'tailwindcss' source(none);
 @import 'fumadocs-ui/css/neutral.css';
 @import 'fumadocs-ui/css/preset.css';
 @import 'fumadocs-openapi/css/preset.css';
@@ -17,7 +17,11 @@
     'Courier New', monospace;
 }
 
-@source not '../../dist';
+/* Named, not detected: detection reads node_modules too wherever git ignores the temp directory. */
+@source '../';
+@source '../../content';
+@source '../../generated';
+@source '../../generated-includes';
 
 html {
   scrollbar-gutter: stable;

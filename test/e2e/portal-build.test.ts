@@ -514,10 +514,16 @@ const stylesheetOf = (output: DirectoryPath) => {
     expect(css).to.match(/--color-fd-primary:#171717/);
   });
 
-  // Tailwind reads the copy of the pages with the rest of the project, so a class a page uses has its rule.
-  it('generates the utility classes a page uses', () => {
+  // Tailwind reads the template and the copy of the pages, and nothing else. A scan that missed the
+  // template stacked the SDK cards; one that took in node_modules grew this from 93 KB to 134 KB.
+  it('builds the stylesheet from the template and the pages alone', () => {
+    const css = stylesheetOf(portal.output());
+
+    expect(read('sdks/index.html')).to.contain('@2xl:grid-cols-2');
+    expect(css).to.contain('.\\@2xl\\:grid-cols-2');
     expect(read('authentication/index.html')).to.contain('class="tracking-[0.3125em]"');
-    expect(stylesheetOf(portal.output())).to.contain('.tracking-\\[0\\.3125em\\]');
+    expect(css).to.contain('.tracking-\\[0\\.3125em\\]');
+    expect(css.length).to.be.below(100 * 1024);
   });
 
   // The counterpart of the branded portal's forced mode: the same label, present here.
@@ -561,8 +567,6 @@ const stylesheetOf = (output: DirectoryPath) => {
     expect(page).to.match(/<img src="\/logo-dark\.svg"[^>]*class="[^"]*hidden[^"]*dark:block/);
     expect(page).to.match(/<link rel="icon" href="\/favicon\.svg" type="image\/svg\+xml"/);
     expect(exists('logo-dark.svg')).to.be.true;
-    // Classes only the template uses, so they exist only if Tailwind scanned it.
-    expect(stylesheetOf(portal.output())).to.match(/\.dark\\:block/);
   });
 
   // The DOM itself, after hydration, is checked by hand in a browser; the page as served
