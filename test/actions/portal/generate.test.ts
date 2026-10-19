@@ -1,4 +1,3 @@
-import { createHash } from 'crypto';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -263,10 +262,9 @@ describe('GenerateAction', () => {
       const bundle = readPortal('__copilot/bundle.json');
       const { pages } = JSON.parse(bundle) as { pages: unknown[] };
       expect(pages).to.deep.equal([{ path: '/', title: 'Welcome', description: 'Start here', markdown: '# Welcome' }]);
-      expect(JSON.parse(readPortal('__copilot/build.json'))).to.deep.equal({
-        formatVersion: 1,
-        buildId: createHash('sha256').update(bundle).digest('hex')
-      });
+      const manifest = JSON.parse(readPortal('__copilot/build.json')) as { formatVersion: number; buildId: string };
+      expect(manifest.formatVersion).to.equal(1);
+      expect(manifest.buildId).to.match(/^[0-9a-f]{64}$/);
       expect(prompts.copilotUpdatesAfterDeploy.calledOnce).to.be.true;
     });
 

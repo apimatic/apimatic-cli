@@ -61,8 +61,14 @@ export class CopilotBundle {
     return this.json;
   }
 
-  /** Names these exact bytes, so the Ask AI service fetches the bundle only when a deploy changed it. */
+  /**
+   * Names what the service reads, so it fetches the bundle only when a deploy changed it. When it was
+   * generated, and by which CLI, are left out: regenerating the same pages keeps the same ID.
+   */
   public buildManifest(): string {
-    return JSON.stringify({ formatVersion: 1, buildId: createHash('sha256').update(this.json).digest('hex') });
+    const { formatVersion, siteUrl, basePath, pages } = this.document;
+    const content = JSON.stringify({ formatVersion, siteUrl, basePath, pages });
+    const buildId = createHash('sha256').update(content).digest('hex');
+    return JSON.stringify({ formatVersion: 1, buildId });
   }
 }

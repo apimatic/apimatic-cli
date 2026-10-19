@@ -1,7 +1,6 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createHash } from 'node:crypto';
 import { gunzipSync } from 'node:zlib';
 import { expect } from 'chai';
 import { DirectoryPath } from '../../../../src/types/file/directoryPath';
@@ -95,26 +94,48 @@ describe('GeneratedPortalContext', () => {
       write('index.md', '# Welcome');
     });
 
-    it('writes the bundle as plain JSON beside a build ID of its exact bytes', async () => {
+    it('writes the bundle as plain JSON beside its build ID', async () => {
       const built = (await bundle())!;
 
       expect((await new GeneratedPortalContext(new DirectoryPath(root)).publish(built)).isOk()).to.be.true;
 
       const json = read('__copilot/bundle.json');
       expect(JSON.parse(json)).to.deep.equal(JSON.parse(gunzipSync(built.gzipped()).toString('utf8')));
-      expect(JSON.parse(read('__copilot/build.json'))).to.deep.equal({
-        formatVersion: 1,
-        buildId: createHash('sha256').update(json).digest('hex')
-      });
+      expect(read('__copilot/build.json')).to.equal(built.buildManifest());
     });
 
-    it('names the same pages with the same build ID, and changed pages with another', async () => {
-      const buildId = async () => (JSON.parse((await bundle())!.buildManifest()) as { buildId: string }).buildId;
-      const first = await buildId();
+    describe('build ID', () => {
+      const buildId = async (site: SiteAddress | null = null, cliVersion = '9.9.9', at = AT) => {
+        const built = await new GeneratedPortalContext(new DirectoryPath(root)).bundle(site, cliVersion, at);
+        return (JSON.parse(built!.buildManifest()) as { formatVersion: number; buildId: string }).buildId;
+      };
 
-      expect(await buildId()).to.equal(first);
-      write('index.md', '# Welcome back');
-      expect(await buildId()).to.not.equal(first);
+      it('is a SHA-256 in hex', async () => {
+        expect(await buildId()).to.match(/^[0-9a-f]{64}$/);
+      });
+
+      it('stays the same when the same pages are generated again, at another time or by another CLI', async () => {
+        const first = await buildId();
+
+        expect(await buildId(null, '9.9.9', new Date('2027-01-01T00:00:00.000Z'))).to.equal(first);
+        expect(await buildId(null, '10.0.0')).to.equal(first);
+      });
+
+      it('changes with a page', async () => {
+        const first = await buildId();
+
+        write('index.md', '# Welcome back');
+
+        expect(await buildId()).to.not.equal(first);
+      });
+
+      it('changes with the address the pages are served at', async () => {
+        const at = (url: string) => SiteAddress.parse(url, 'url')._unsafeUnwrap();
+
+        expect(await buildId(at('https://example.com/docs'))).to.not.equal(
+          await buildId(at('https://example.com/api'))
+        );
+      });
     });
 
     it('reports a portal it cannot write to rather than throwing', async () => {
