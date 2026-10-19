@@ -22,7 +22,7 @@ export type CopilotIngestTimings = Partial<typeof COPILOT_INGEST_TIMINGS>;
 /** All the service needs of the portal's Ask AI settings: where it is, and which portal's chat it is. */
 export type CopilotTarget = Pick<PortalCopilot, 'key' | 'apiUrl'>;
 
-const STATES: readonly IndexingState[] = ['queued', 'building', 'active', 'superseded', 'failed'];
+const STATES = new Set<IndexingState>(['queued', 'building', 'active', 'superseded', 'failed']);
 
 /** Uploads a portal's pages to the Ask AI service, which swaps them in once it has indexed them all. */
 export class CopilotIngestService {
@@ -176,7 +176,7 @@ function isReceipt(body: unknown): body is IngestReceipt {
 
 // Only the state is needed to decide; the counts are reported, and a missing one reads as none.
 function statusOf(body: unknown): IngestStatus | null {
-  if (!isJsonObject(body) || typeof body.versionId !== 'string' || !STATES.includes(body.status as IndexingState)) {
+  if (!isJsonObject(body) || typeof body.versionId !== 'string' || !STATES.has(body.status as IndexingState)) {
     return null;
   }
   const count = (key: string): number => {
