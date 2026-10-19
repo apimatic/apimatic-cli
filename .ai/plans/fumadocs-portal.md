@@ -212,6 +212,8 @@ Tailwind 4 is mandatory for Fumadocs UI.
    directory and `path.relative` cannot express one across drives, so the content
    pages silently vanished (found on GitHub's Windows runners: workspace on D:,
    temp on C:; reproduced locally with `subst`).
+   Superseded 2026-10-16: the fallback is gone, and every project is built in the system temp
+   directory (`cross-drive-portal-projects.md`).
 3. Copy `portal-template/` into it.
 4. Create a real `tempDir/node_modules/` directory and add one junction
    (Windows) or symlink (elsewhere) per template dependency, each resolved to
@@ -418,6 +420,9 @@ the new-layout branch in the sample repository.
   fix belongs upstream: emit an absolute path (or `/@fs/`) when `path.relative`
   returns one. File an issue with fumadocs-mdx; remove the fallback once a fixed
   version is pinned.
+  Resolved 2026-10-16 another way: the content has been copied into the project since #375, and
+  the template's `static-images` plugin handles the one import still left across drives, a static
+  image's (`cross-drive-portal-projects.md`).
 - **Sidebar tree dominates at scale.** Whole-spec prerenders measured 2026-09-17:
   Stripe (594 operations) 2.2 GB in 375 s, GitHub (1,511 pages) 2.4 GB in 229 s.
   A GitHub page is 1,971 KB: 1,453 KB of inlined router state (almost all the

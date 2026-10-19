@@ -1,7 +1,7 @@
 import { PortalProjectPaths, PortalProjectService } from '../../infrastructure/portal-project-service.js';
 import { PortalArtifactsService } from '../../infrastructure/services/portal-artifacts-service.js';
 import { PortalAuthorizationService } from '../../infrastructure/services/portal-authorization-service.js';
-import { withPortalProjectDirectory, withDirPath } from '../../infrastructure/tmp-extensions.js';
+import { withDirPath } from '../../infrastructure/tmp-extensions.js';
 import { PreparePortalProjectPrompts } from '../../prompts/portal/prepare-project.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
@@ -43,6 +43,12 @@ export class PreparePortalProjectAction {
     const runtimeProblem = this.projectService.runtimeProblem();
     if (runtimeProblem !== null) {
       this.prompts.runtimeUnsupported(runtimeProblem);
+      return ActionResult.failed();
+    }
+
+    // Vite drops a slash from a share's `\\server`, so the portal would be built without its static files.
+    if (sourceDirectory.isOnNetworkShare()) {
+      this.prompts.networkShareUnsupported(sourceDirectory);
       return ActionResult.failed();
     }
 
@@ -98,7 +104,7 @@ export class PreparePortalProjectAction {
         return ActionResult.failed();
       }
 
-      return await withPortalProjectDirectory(sourceDirectory, async (tempDirectory) => {
+      return await withDirPath(async (tempDirectory) => {
         const portalProject = await this.projectService.prepare(tempDirectory, source.value, artifacts.value);
         if (portalProject.isErr()) {
           this.prompts.runtimeUnsupported(portalProject.error);
