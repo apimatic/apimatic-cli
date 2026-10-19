@@ -60,10 +60,6 @@ export class ActionResult<T = void, E = never> {
     return this.value!;
   }
 
-  public getValueOr(defaultValue: T): T {
-    return this.isSuccess() ? this.value! : defaultValue;
-  }
-
   public getError(): E | undefined {
     return this.error;
   }

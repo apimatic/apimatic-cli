@@ -124,13 +124,6 @@ describe('PluginGenerateAction', () => {
       expect((await execute()).isFailed()).to.be.true;
       expect(generatePlugin.called).to.be.false;
     });
-
-    it('generates without an APIMATIC-BUILD.json, which only SDK generation reads', async () => {
-      const generatePlugin = generated();
-
-      expect((await execute()).isSuccess()).to.be.true;
-      expect(generatePlugin.called).to.be.true;
-    });
   });
 
   describe('overwrite guard', () => {
@@ -175,12 +168,14 @@ describe('PluginGenerateAction', () => {
 
   // The server reads the plugin's identity and languages from the `apimatic.json` in the upload.
   describe('the upload', () => {
-    it('carries the apimatic.json in src', async () => {
+    it('is src as it stands, apimatic.json beside the spec', async () => {
       generated();
+      await fsExtra.outputFile(path.join(sourceDirectory, 'spec', 'openapi.json'), '{"openapi": "3.0.0"}');
 
       await execute();
 
       expect(JSON.parse(uploaded['apimatic.json'])).to.deep.equal({ plugin: PLUGIN, languages: LANGUAGES });
+      expect(uploaded['spec/openapi.json']).to.equal('{"openapi": "3.0.0"}');
     });
 
     it('synthesizes nothing: no plugin-config.json is written for the server', async () => {

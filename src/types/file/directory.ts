@@ -50,33 +50,6 @@ export class Directory {
     };
   }
 
-  public async mapFilesInDirectory(
-    map: (rootDir: DirectoryPath, fileItem: FileItem) => Promise<FileItem | undefined>
-  ): Promise<Directory> {
-    const mappedItems: DirectoryItem[] = [];
-
-    for (const item of this.items) {
-      if (item instanceof Directory) {
-        const mappedSubDir = await item.mapFilesInDirectory(map);
-        if (!mappedSubDir.isEmpty()) {
-          mappedItems.push(mappedSubDir);
-        }
-        continue;
-      }
-
-      const mappedItem = await map(this.directoryPath, item);
-      if (mappedItem) {
-        mappedItems.push(mappedItem);
-      }
-    }
-
-    return new Directory(this.directoryPath, mappedItems);
-  }
-
-  public isEmpty(): boolean {
-    return this.items.length === 0;
-  }
-
   public excluding(names: FileName[]): Directory {
     const excluded = names.map((name) => name.toString());
     const kept = this.items.filter((item) =>

@@ -64,10 +64,6 @@ export class CodegenOption {
     return new CodegenOption(version, stability);
   }
 
-  public codeGenerationVersion(): CodeGenerationVersion {
-    return this.version;
-  }
-
   public stabilityLevel(): Stability {
     return this.stability;
   }
