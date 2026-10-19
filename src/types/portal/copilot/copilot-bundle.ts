@@ -1,10 +1,14 @@
 import { Buffer } from 'node:buffer';
 import { createHash } from 'node:crypto';
 import { gzipSync } from 'node:zlib';
+import { isJsonObject } from '../../../utils/json-utils.js';
 import { SiteAddress } from '../config/site-address.js';
-import { ListedPage } from './llms-index.js';
 
-export interface BundlePage extends ListedPage {
+/** A page as Ask AI reads it: its portal-relative path, as the chat links it, and its Markdown. */
+export interface BundlePage {
+  path: string;
+  title: string;
+  description: string | null;
   markdown: string;
 }
 
@@ -26,10 +30,20 @@ const GENERATOR_NAME = 'apimatic-cli';
 
 /** The portal's pages as the Ask AI service ingests them, in its format version 1. */
 export class CopilotBundle {
-  private readonly json: string;
+  private constructor(
+    private readonly document: BundleDocument,
+    private readonly json: string = JSON.stringify(document)
+  ) {}
 
-  private constructor(private readonly document: BundleDocument) {
-    this.json = JSON.stringify(document);
+  /** A bundle `generate` wrote, kept as its exact bytes; null for one this CLI cannot read. */
+  public static parse(json: string): CopilotBundle | null {
+    let document: unknown;
+    try {
+      document = JSON.parse(json);
+    } catch {
+      return null;
+    }
+    return isBundleDocument(document) ? new CopilotBundle(document, json) : null;
   }
 
   public static of(pages: BundlePage[], site: SiteAddress | null, cliVersion: string, at: Date): CopilotBundle {
@@ -71,4 +85,27 @@ export class CopilotBundle {
     const buildId = createHash('sha256').update(content).digest('hex');
     return JSON.stringify({ formatVersion: 1, buildId });
   }
+}
+
+/** A page as the portal's build writes it for Ask AI; null for anything else. */
+export function bundlePageOf(value: unknown): BundlePage | null {
+  if (!isJsonObject(value)) return null;
+  const { path, title, description, markdown } = value;
+  if (typeof path !== 'string' || typeof title !== 'string' || typeof markdown !== 'string') return null;
+  if (description !== null && typeof description !== 'string') return null;
+  return { path, title, description, markdown };
+}
+
+function isBundleDocument(value: unknown): value is BundleDocument {
+  return (
+    isJsonObject(value) &&
+    value.formatVersion === 1 &&
+    isJsonObject(value.generator) &&
+    typeof value.generatedAt === 'string' &&
+    (value.siteUrl === null || typeof value.siteUrl === 'string') &&
+    typeof value.basePath === 'string' &&
+    Array.isArray(value.pages) &&
+    // A page without a description leaves the key out.
+    value.pages.every((page) => isJsonObject(page) && bundlePageOf({ description: null, ...page }) !== null)
+  );
 }

@@ -1,174 +1,124 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { gunzipSync } from 'node:zlib';
 import { expect } from 'chai';
 import sinon from 'sinon';
 import { FileService } from '../../../../src/infrastructure/file-service';
 import { DirectoryPath } from '../../../../src/types/file/directoryPath';
-import { SiteAddress } from '../../../../src/types/portal/config/site-address';
-import { GeneratedPortalContext } from '../../../../src/types/portal/copilot/generated-portal-context';
+import { BundlePage, CopilotBundle } from '../../../../src/types/portal/copilot/copilot-bundle';
+import {
+  COPILOT_PAGES_FILE,
+  GeneratedPortalContext
+} from '../../../../src/types/portal/copilot/generated-portal-context';
 
-const AT = new Date('2026-10-14T12:00:00.000Z');
+const PAGES: BundlePage[] = [
+  { path: '/', title: 'Welcome', description: 'Start here', markdown: '# Welcome' },
+  { path: '/guides/caf%C3%A9', title: 'Café', description: null, markdown: '# Café' }
+];
+
+const BUNDLE = CopilotBundle.of(PAGES, null, '9.9.9', new Date('2026-10-14T12:00:00.000Z'));
 
 describe('GeneratedPortalContext', () => {
   let root: string;
+  let portal: GeneratedPortalContext;
 
   const write = (relative: string, contents: string) => {
     const file = path.join(root, relative);
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(file, contents);
   };
+  const read = (relative: string) => fs.readFileSync(path.join(root, relative), 'utf8');
+  const exists = (relative: string) => fs.existsSync(path.join(root, relative));
 
-  const bundle = (site: SiteAddress | null = null) =>
-    new GeneratedPortalContext(new DirectoryPath(root))
-      .bundle(site, '9.9.9', AT)
-      .then((built) => built._unsafeUnwrap());
-
-  beforeEach(() => {
-    root = fs.mkdtempSync(path.join(os.tmpdir(), 'generated-portal-'));
-  });
-
-  afterEach(() => {
-    fs.rmSync(root, { recursive: true, force: true });
-  });
-
-  it('reports a page it cannot read rather than throwing', async () => {
-    write('llms.txt', '- [Welcome](/)');
-    write('index.md', '# Welcome');
+  /** Has `FileService` fail to read the files whose path ends with `suffix`. */
+  const unreadable = (suffix: string) => {
     const getContents = FileService.prototype.getContents;
-    const unreadable = sinon.stub(FileService.prototype, 'getContents').callsFake(function (this: FileService, file) {
-      return file.toString().endsWith('index.md')
+    return sinon.stub(FileService.prototype, 'getContents').callsFake(function (this: FileService, file) {
+      return file.toString().endsWith(suffix)
         ? Promise.reject(new Error('EACCES: permission denied'))
         : getContents.call(this, file);
     });
+  };
 
-    try {
-      const built = await new GeneratedPortalContext(new DirectoryPath(root)).bundle(null, '9.9.9', AT);
-
-      expect(built._unsafeUnwrapErr()).to.contain('EACCES: permission denied');
-    } finally {
-      unreadable.restore();
-    }
+  beforeEach(() => {
+    root = fs.mkdtempSync(path.join(os.tmpdir(), 'generated-portal-'));
+    portal = new GeneratedPortalContext(new DirectoryPath(root));
   });
 
-  it('is null for a directory with no generated portal in it', async () => {
-    expect(await bundle()).to.be.null;
+  afterEach(() => {
+    sinon.restore();
+    fs.rmSync(root, { recursive: true, force: true });
   });
 
-  it("bundles each listed page with its Markdown twin, the home page's being index.md", async () => {
-    write(
-      'llms.txt',
-      [
-        '- [Welcome](/): Start here',
-        '  - [Intro](/guides/intro): Install',
-        '  - [Missing](/guides/missing)',
-        '  - [SDK](/__downloads/sdk.zip)'
-      ].join('\n')
-    );
-    write('index.md', '# Welcome');
-    write('guides/intro.md', '# Intro');
+  describe('takePages', () => {
+    it('reads the pages the build wrote for Ask AI, and removes them so they are not deployed', async () => {
+      write(COPILOT_PAGES_FILE, JSON.stringify(PAGES));
 
-    const built = (await bundle())!;
-
-    expect(built.pageCount()).to.equal(2);
-    expect(JSON.parse(gunzipSync(built.gzipped()).toString('utf8'))).to.deep.equal({
-      formatVersion: 1,
-      generator: { name: 'apimatic-cli', version: '9.9.9' },
-      generatedAt: '2026-10-14T12:00:00.000Z',
-      siteUrl: null,
-      basePath: '/',
-      pages: [
-        { path: '/', title: 'Welcome', description: 'Start here', markdown: '# Welcome' },
-        { path: '/guides/intro', title: 'Intro', description: 'Install', markdown: '# Intro' }
-      ]
+      expect((await portal.takePages())._unsafeUnwrap()).to.deep.equal(PAGES);
+      expect(exists(COPILOT_PAGES_FILE)).to.be.false;
     });
-  });
 
-  it('reads a portal served under a path, with its pages addressed from that path', async () => {
-    write('llms.txt', ['- [Docs](/docs)', '- [Intro](/docs/guides/intro)'].join('\n'));
-    write('index.md', '# Docs');
-    write('guides/intro.md', '# Intro');
+    it('is null for a build that wrote none, as one of a portal without Ask AI', async () => {
+      expect((await portal.takePages())._unsafeUnwrap()).to.be.null;
+    });
 
-    const built = (await bundle(SiteAddress.parse('https://example.com/docs', 'url')._unsafeUnwrap()))!;
+    it('reports pages it cannot make out, and still removes them', async () => {
+      for (const contents of ['{', '{}', JSON.stringify([{ path: '/', title: 'Welcome' }])]) {
+        write(COPILOT_PAGES_FILE, contents);
 
-    const document = JSON.parse(gunzipSync(built.gzipped()).toString('utf8')) as {
-      siteUrl: string | null;
-      basePath: string;
-      pages: { path: string; description?: string }[];
-    };
-    expect(document.siteUrl).to.equal('https://example.com/docs');
-    expect(document.basePath).to.equal('/docs/');
-    expect(document.pages.map(({ path: page }) => page)).to.deep.equal(['/', '/guides/intro']);
-    expect(document.pages[0]).to.not.have.property('description');
-  });
+        expect((await portal.takePages()).isErr(), contents).to.be.true;
+        expect(exists(COPILOT_PAGES_FILE), contents).to.be.false;
+      }
+    });
 
-  it('has no pages when none of the listed ones has its Markdown twin', async () => {
-    write('llms.txt', '- [Intro](/guides/intro)');
+    it('reports pages it cannot read rather than throwing', async () => {
+      write(COPILOT_PAGES_FILE, JSON.stringify(PAGES));
+      unreadable('copilot-pages.json');
 
-    expect((await bundle())!.pageCount()).to.equal(0);
+      expect((await portal.takePages())._unsafeUnwrapErr()).to.contain('EACCES: permission denied');
+    });
   });
 
   describe('publish', () => {
-    const read = (relative: string) => fs.readFileSync(path.join(root, relative), 'utf8');
-
-    beforeEach(() => {
-      write('llms.txt', '- [Welcome](/)');
-      write('index.md', '# Welcome');
-    });
-
     it('writes the bundle as plain JSON beside its build ID', async () => {
-      const built = (await bundle())!;
+      expect((await portal.publish(BUNDLE)).isOk()).to.be.true;
 
-      expect((await new GeneratedPortalContext(new DirectoryPath(root)).publish(built)).isOk()).to.be.true;
-
-      const json = read('__copilot/bundle.json');
-      expect(JSON.parse(json)).to.deep.equal(JSON.parse(gunzipSync(built.gzipped()).toString('utf8')));
-      expect(read('__copilot/build.json')).to.equal(built.buildManifest());
-    });
-
-    describe('build ID', () => {
-      const buildId = async (site: SiteAddress | null = null, cliVersion = '9.9.9', at = AT) => {
-        const built = await new GeneratedPortalContext(new DirectoryPath(root)).bundle(site, cliVersion, at);
-        return (JSON.parse(built._unsafeUnwrap()!.buildManifest()) as { formatVersion: number; buildId: string })
-          .buildId;
-      };
-
-      it('is a SHA-256 in hex', async () => {
-        expect(await buildId()).to.match(/^[0-9a-f]{64}$/);
-      });
-
-      it('stays the same when the same pages are generated again, at another time or by another CLI', async () => {
-        const first = await buildId();
-
-        expect(await buildId(null, '9.9.9', new Date('2027-01-01T00:00:00.000Z'))).to.equal(first);
-        expect(await buildId(null, '10.0.0')).to.equal(first);
-      });
-
-      it('changes with a page', async () => {
-        const first = await buildId();
-
-        write('index.md', '# Welcome back');
-
-        expect(await buildId()).to.not.equal(first);
-      });
-
-      it('changes with the address the pages are served at', async () => {
-        const at = (url: string) => SiteAddress.parse(url, 'url')._unsafeUnwrap();
-
-        expect(await buildId(at('https://example.com/docs'))).to.not.equal(
-          await buildId(at('https://example.com/api'))
-        );
-      });
+      expect(read('__copilot/bundle.json')).to.equal(BUNDLE.toJson());
+      expect(read('__copilot/build.json')).to.equal(BUNDLE.buildManifest());
     });
 
     it('reports a portal it cannot write to rather than throwing', async () => {
-      const built = (await bundle())!;
       write('__copilot', 'a file where the directory goes');
 
-      const published = await new GeneratedPortalContext(new DirectoryPath(root)).publish(built);
+      expect((await portal.publish(BUNDLE)).isErr()).to.be.true;
+    });
+  });
 
-      expect(published.isErr()).to.be.true;
+  describe('bundle', () => {
+    it('reads back the bundle as it was published, byte for byte', async () => {
+      await portal.publish(BUNDLE);
+
+      const bundle = (await portal.bundle())._unsafeUnwrap()!;
+
+      expect(bundle.toJson()).to.equal(BUNDLE.toJson());
+      expect(bundle.buildManifest()).to.equal(BUNDLE.buildManifest());
+    });
+
+    it('is null for a portal without one', async () => {
+      expect((await portal.bundle())._unsafeUnwrap()).to.be.null;
+    });
+
+    it('reports a bundle it cannot make out', async () => {
+      write('__copilot/bundle.json', '{ "formatVersion": 2 }');
+
+      expect((await portal.bundle()).isErr()).to.be.true;
+    });
+
+    it('reports a bundle it cannot read rather than throwing', async () => {
+      await portal.publish(BUNDLE);
+      unreadable('bundle.json');
+
+      expect((await portal.bundle())._unsafeUnwrapErr()).to.contain('EACCES: permission denied');
     });
   });
 });

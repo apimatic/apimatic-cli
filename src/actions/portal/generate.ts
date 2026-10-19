@@ -6,6 +6,7 @@ import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { PortalContext } from '../../types/portal-context.js';
 import { SiteAddress } from '../../types/portal/config/site-address.js';
+import { CopilotBundle } from '../../types/portal/copilot/copilot-bundle.js';
 import { GeneratedPortalContext } from '../../types/portal/copilot/generated-portal-context.js';
 import { ProjectContext } from '../../types/project-context.js';
 import { ActionResult } from '../action-result.js';
@@ -96,20 +97,20 @@ export class GenerateAction {
     return ActionResult.success();
   }
 
-  /** The portal still saves without the bundle, whatever stops it; Ask AI is then updated by `portal copilot sync`. */
+  /** The portal still saves without the bundle, whatever stops it. */
   private async publishCopilotBundle(builtDirectory: DirectoryPath, site: SiteAddress | null): Promise<boolean> {
     const portal = new GeneratedPortalContext(builtDirectory);
-    const bundled = await portal.bundle(site, envInfo.getCLIVersion(), new Date());
-    if (bundled.isErr()) {
-      this.prompts.copilotBundleNotWritten(bundled.error);
+    const taken = await portal.takePages();
+    if (taken.isErr()) {
+      this.prompts.copilotBundleNotWritten(taken.error);
       return false;
     }
-    const bundle = bundled.value;
-    if (bundle === null || bundle.pageCount() === 0) {
+    const pages = taken.value;
+    if (pages === null || pages.length === 0) {
       this.prompts.copilotPagesNotFound();
       return false;
     }
-    const published = await portal.publish(bundle);
+    const published = await portal.publish(CopilotBundle.of(pages, site, envInfo.getCLIVersion(), new Date()));
     if (published.isErr()) {
       this.prompts.copilotBundleNotWritten(published.error);
       return false;

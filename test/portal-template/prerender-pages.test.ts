@@ -3,6 +3,10 @@ import os from 'os';
 import path from 'path';
 import { expect } from 'chai';
 import { prerenderPages } from '../../portal-template/prerender-pages';
+import type { PortalCopilot } from '../../portal-template/src/lib/portal-types';
+import { COPILOT_PAGES_FILE } from '../../src/types/portal/copilot/generated-portal-context';
+
+const COPILOT: PortalCopilot = { key: 'pk_test', apiUrl: 'https://ask.apimatic.io', suggestions: [] };
 
 // The list this builds is the whole of what a static build writes: TanStack's crawler is off,
 // so a URL missing here is a page that is never emitted, however many things link to it.
@@ -17,10 +21,15 @@ describe('prerenderPages', () => {
   };
   const write = (relative: string, body = '# page\n') => writeIn(contentDir, relative, body);
 
-  const urlsFor = async (siteUrl: string | null = null, base = '/', specs: Record<string, string> = {}) => {
+  const urlsFor = async (
+    siteUrl: string | null = null,
+    base = '/',
+    specs: Record<string, string> = {},
+    copilot: PortalCopilot | null = null
+  ) => {
     const pages = await prerenderPages(
       { base, specs, specDir: '', codeSamples: null, contentDir, generatedDir, staticDir: null, downloadsDir: null },
-      siteUrl
+      { siteUrl, copilot }
     );
     return pages.map((page) => page.path);
   };
@@ -104,6 +113,16 @@ describe('prerenderPages', () => {
     expect(await urlsFor(null)).to.not.include('/sitemap.xml');
     expect(await urlsFor('https://docs.test')).to.include('/sitemap.xml');
     expect(await urlsFor('https://docs.test')).to.include('/robots.txt');
+  });
+
+  it('emits the pages for Ask AI only for a portal that offers it, where the CLI reads them', async () => {
+    write('index.md');
+
+    expect(await urlsFor()).to.not.include(`/${COPILOT_PAGES_FILE}`);
+    const urls = await urlsFor(null, '/', {}, COPILOT);
+    expect(urls).to.include(`/${COPILOT_PAGES_FILE}`);
+    expect(urls).to.not.include(`/${COPILOT_PAGES_FILE}.md`);
+    expect(await urlsFor('https://docs.test/docs', '/docs/', {}, COPILOT)).to.include(`/docs/${COPILOT_PAGES_FILE}`);
   });
 
   it('lists the OAuth callback, without a Markdown twin', async () => {

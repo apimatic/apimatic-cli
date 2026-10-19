@@ -122,14 +122,15 @@ export class PortalGeneratePrompts {
   }
 
   public copilotPagesNotFound() {
-    log.warn(`The portal lists no pages for Ask AI to answer from. ${deployThenSync()}`);
+    log.warn('The portal has no pages for Ask AI to answer from, so none were added to it.');
   }
 
   public copilotBundleNotWritten(reason: string) {
-    log.warn(`The pages for Ask AI could not be added to the portal (${reason}). ${deployThenSync()}`);
+    log.warn(
+      `The pages for Ask AI could not be added to the portal (${reason}), so it is saved without them. ` +
+        `Generate the portal again for Ask AI to answer from it.`
+    );
   }
 }
 
 const syncCommand = () => f.cmdAlt('apimatic', 'portal', 'copilot', 'sync');
-
-const deployThenSync = () => `Deploy the portal, then run ${syncCommand()} so Ask AI answers from it.`;

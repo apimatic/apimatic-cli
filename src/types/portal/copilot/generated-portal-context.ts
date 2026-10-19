@@ -3,41 +3,51 @@ import { FileService } from '../../../infrastructure/file-service.js';
 import { DirectoryPath } from '../../file/directoryPath.js';
 import { FileName } from '../../file/fileName.js';
 import { FilePath } from '../../file/filePath.js';
-import { SiteAddress } from '../config/site-address.js';
-import { BundlePage, CopilotBundle } from './copilot-bundle.js';
-import { ListedPage, listedPages } from './llms-index.js';
+import { BundlePage, bundlePageOf, CopilotBundle } from './copilot-bundle.js';
 import { errorMessage } from '../../../utils/error-utils.js';
 
 /** Where the deployed portal serves its bundle, under the site's address, for the Ask AI service to fetch. */
 export const COPILOT_DIRECTORY_NAME = '__copilot';
 
-/** A portal `portal generate` wrote, read for the pages Ask AI answers from. */
+// Under `/api/`, where the portal's own routes are files with extensions and no page can collide with them.
+const PAGES_DIRECTORY_NAME = 'api';
+const PAGES_FILE_NAME = 'copilot-pages.json';
+
+/** Where a build of a portal with Ask AI writes its pages, for `generate` to bundle. Never deployed. */
+export const COPILOT_PAGES_FILE = `${PAGES_DIRECTORY_NAME}/${PAGES_FILE_NAME}`;
+
+/** A portal `portal generate` built or wrote, for the pages Ask AI answers from. */
 export class GeneratedPortalContext {
   private readonly fileService = new FileService();
 
   constructor(private readonly portalDirectory: DirectoryPath) {}
 
-  private get index(): FilePath {
-    return new FilePath(this.portalDirectory, new FileName('llms.txt'));
+  private get pagesFile(): FilePath {
+    return new FilePath(this.portalDirectory.join(PAGES_DIRECTORY_NAME), new FileName(PAGES_FILE_NAME));
+  }
+
+  private get directory(): DirectoryPath {
+    return this.portalDirectory.join(COPILOT_DIRECTORY_NAME);
+  }
+
+  private get bundleFile(): FilePath {
+    return new FilePath(this.directory, new FileName('bundle.json'));
   }
 
   /**
-   * Null when the directory holds no generated portal. A listed page without its Markdown twin is left out;
-   * a file that cannot be read is an error, so the caller decides whether that stops it.
+   * The pages a build wrote for Ask AI, removing their file so it is not deployed; null for a build
+   * that wrote none, as one of a portal without Ask AI.
    */
-  public async bundle(
-    site: SiteAddress | null,
-    cliVersion: string,
-    at: Date
-  ): Promise<Result<CopilotBundle | null, string>> {
+  public async takePages(): Promise<Result<BundlePage[] | null, string>> {
+    const file = this.pagesFile;
     try {
-      if (!(await this.fileService.fileExists(this.index))) {
+      if (!(await this.fileService.fileExists(file))) {
         return ok(null);
       }
-      const listed = listedPages(await this.fileService.getContents(this.index), site);
-      const read = await Promise.all(listed.map((page) => this.read(page)));
-      const pages = read.filter((page) => page !== null);
-      return ok(CopilotBundle.of(pages, site, cliVersion, at));
+      const contents = await this.fileService.getContents(file);
+      await this.fileService.deleteFile(file);
+      const pages = pagesOf(contents);
+      return pages === null ? err('the pages the build wrote could not be read') : ok(pages);
     } catch (error) {
       return err(errorMessage(error));
     }
@@ -45,32 +55,41 @@ export class GeneratedPortalContext {
 
   /** Writes the bundle into the portal, so it is deployed with the pages it holds. */
   public async publish(bundle: CopilotBundle): Promise<Result<void, string>> {
-    const directory = this.portalDirectory.join(COPILOT_DIRECTORY_NAME);
     try {
-      await this.fileService.createDirectoryIfNotExists(directory);
-      await this.fileService.writeContents(new FilePath(directory, new FileName('bundle.json')), bundle.toJson());
-      await this.fileService.writeContents(new FilePath(directory, new FileName('build.json')), bundle.buildManifest());
+      await this.fileService.createDirectoryIfNotExists(this.directory);
+      await this.fileService.writeContents(this.bundleFile, bundle.toJson());
+      await this.fileService.writeContents(
+        new FilePath(this.directory, new FileName('build.json')),
+        bundle.buildManifest()
+      );
       return ok(undefined);
     } catch (error) {
       return err(errorMessage(error));
     }
   }
 
-  /** The page with its Markdown twin, or null when it has none. */
-  private async read(page: ListedPage): Promise<BundlePage | null> {
-    const markdown = this.markdownOf(page);
-    if (!(await this.fileService.fileExists(markdown))) {
-      return null;
+  /** The bundle `generate` published into the portal; null for a portal without one. */
+  public async bundle(): Promise<Result<CopilotBundle | null, string>> {
+    try {
+      if (!(await this.fileService.fileExists(this.bundleFile))) {
+        return ok(null);
+      }
+      const bundle = CopilotBundle.parse(await this.fileService.getContents(this.bundleFile));
+      return bundle === null ? err('its Ask AI pages could not be read') : ok(bundle);
+    } catch (error) {
+      return err(errorMessage(error));
     }
-    return { ...page, markdown: await this.fileService.getContents(markdown) };
   }
+}
 
-  private markdownOf({ path }: ListedPage): FilePath {
-    if (path === '/') {
-      return new FilePath(this.portalDirectory, new FileName('index.md'));
-    }
-    const segments = path.slice(1).split('/');
-    const page = segments.pop()!;
-    return new FilePath(this.portalDirectory.join(...segments), new FileName(`${page}.md`));
+function pagesOf(contents: string): BundlePage[] | null {
+  let value: unknown;
+  try {
+    value = JSON.parse(contents);
+  } catch {
+    return null;
   }
+  if (!Array.isArray(value)) return null;
+  const pages = value.map(bundlePageOf);
+  return pages.every((page) => page !== null) ? pages : null;
 }

@@ -15,7 +15,7 @@ import { staticFunctionsBase } from './static-functions-base.ts';
 
 export default defineConfig(async () => {
   const [paths, identity] = await Promise.all([readBuildPaths(), readPortalIdentity()]);
-  const pages = await prerenderPages(paths, identity.siteUrl);
+  const pages = await prerenderPages(paths, identity);
   const publicDir: string | false = paths.staticDir ?? false;
   const portalProjectDirectory = fileURLToPath(new URL('.', import.meta.url));
 

@@ -11,7 +11,8 @@ import { DirectoryPath } from '../../src/types/file/directoryPath';
 import { FilePath } from '../../src/types/file/filePath';
 import { CodeSampleCatalog, CodeSampleCatalogs } from '../../src/types/portal/code-samples';
 import { PortalArtifacts } from '../../src/types/portal/portal-artifacts';
-import { GeneratedPortalContext } from '../../src/types/portal/copilot/generated-portal-context';
+import { BundlePage } from '../../src/types/portal/copilot/copilot-bundle';
+import { COPILOT_PAGES_FILE } from '../../src/types/portal/copilot/generated-portal-context';
 import { Language } from '../../src/types/sdk/generate';
 import {
   ensurePortalProjectDirectoryBase,
@@ -1011,6 +1012,9 @@ const stylesheetOf = (output: DirectoryPath) => {
   const portal = portalBuilt('copilot');
   const { read } = portal;
 
+  /** The pages as the build wrote them for `generate`, read without taking them. */
+  const builtPages = () => JSON.parse(read(COPILOT_PAGES_FILE)) as BundlePage[];
+
   // The chat wraps the whole layout, so a prerender that did not wait for its chunk would leave the button out.
   it('prerenders each page with the chat button', () => {
     expect(read('index.html')).to.contain('>Ask AI<');
@@ -1025,11 +1029,33 @@ const stylesheetOf = (output: DirectoryPath) => {
     expect(loaded.filter((name) => chat.some((script) => script.name === name))).to.deep.equal([]);
   });
 
-  // `generate` publishes these pages for the service to fetch, so a real build must list them with their Markdown.
-  it('lists the pages Ask AI answers from, each with its Markdown copy', async () => {
-    const bundle = await new GeneratedPortalContext(portal.output()).bundle(null, '0.0.0', new Date());
+  // `generate` bundles these for the service: every page the build renders, those the navigation leaves
+  // out and those whose names are not ASCII too, and no more.
+  it('writes every page Ask AI answers from, and no more', () => {
+    const pages = builtPages();
+    const twinOf = (page: string) => (page === '/' ? 'index.md' : `${decodeURIComponent(page.slice(1))}.md`);
+    const twins = fs
+      .readdirSync(portal.output().toString(), { recursive: true, encoding: 'utf8' })
+      .filter((file) => file.endsWith('.md'))
+      .map((file) => file.split(path.sep).join('/'));
 
-    expect(bundle._unsafeUnwrap()?.pageCount()).to.be.greaterThan(1);
+    expect(pages.map(({ path: page }) => twinOf(page).normalize()).sort()).to.deep.equal(
+      twins.map((twin) => twin.normalize()).sort()
+    );
+    expect(pages.find(({ title }) => title === 'Café')).to.deep.include({
+      description: 'A page whose name is not ASCII.'
+    });
+    expect(pages.map(({ title }) => title)).to.include('Unlisted');
+  });
+
+  // As `llms-full.txt` renders them: each operation's slice of the specification would repeat the schemas it shares.
+  it('renders each page without its specification', () => {
+    const operations = builtPages().filter(({ path: page }) => page.startsWith('/api/'));
+
+    expect(operations, 'the specification has operations').to.not.be.empty;
+    for (const { path: page, markdown } of operations) {
+      expect(markdown, page).to.contain(`(${page})`).and.not.contain('```yaml');
+    }
   });
 
   it('tells the browser the public key and the service, and no more', () => {

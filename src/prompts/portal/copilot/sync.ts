@@ -43,20 +43,13 @@ export class PortalCopilotSyncPrompts {
 
   public portalNotGenerated(portalDirectory: DirectoryPath) {
     const message =
-      `No generated portal was found at ${f.path(portalDirectory)}. ` +
-      `Generate the portal first: ${f.cmdAlt('apimatic', 'portal', 'generate')}.`;
+      `No pages for Ask AI were found in the portal at ${f.path(portalDirectory)}. ` +
+      `Generate the portal with its Ask AI chat set up first: ${f.cmdAlt('apimatic', 'portal', 'generate')}.`;
     log.error(message);
   }
 
   public portalNotRead(portalDirectory: DirectoryPath, reason: string) {
     log.error(`The portal at ${f.path(portalDirectory)} could not be read (${reason}).`);
-  }
-
-  public noPages(portalDirectory: DirectoryPath) {
-    const message =
-      `The portal at ${f.path(portalDirectory)} has no pages Ask AI can read. ` +
-      `Generate it again with ${f.cmdAlt('apimatic', 'portal', 'generate')}.`;
-    log.error(message);
   }
 
   public upload(fn: Promise<Result<IngestReceipt, ServiceError>>, pageCount: number) {

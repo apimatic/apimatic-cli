@@ -1,5 +1,4 @@
 import { getAuthInfo } from '../../../client-utils/auth-manager.js';
-import { envInfo } from '../../../infrastructure/env-info.js';
 import { CopilotIngestService } from '../../../infrastructure/services/copilot-ingest-service.js';
 import { PortalCopilotSyncPrompts } from '../../../prompts/portal/copilot/sync.js';
 import { CommandMetadata } from '../../../types/common/command-metadata.js';
@@ -43,11 +42,8 @@ export class PortalCopilotSyncAction {
       return ActionResult.failed();
     }
 
-    const bundled = await new GeneratedPortalContext(portalDirectory).bundle(
-      config.siteAddress(),
-      envInfo.getCLIVersion(),
-      new Date()
-    );
+    // As `generate` wrote it for the deploy, under the address the portal was built for.
+    const bundled = await new GeneratedPortalContext(portalDirectory).bundle();
     if (bundled.isErr()) {
       this.prompts.portalNotRead(portalDirectory, bundled.error);
       return ActionResult.failed();
@@ -55,10 +51,6 @@ export class PortalCopilotSyncAction {
     const bundle = bundled.value;
     if (bundle === null) {
       this.prompts.portalNotGenerated(portalDirectory);
-      return ActionResult.failed();
-    }
-    if (bundle.pageCount() === 0) {
-      this.prompts.noPages(portalDirectory);
       return ActionResult.failed();
     }
 

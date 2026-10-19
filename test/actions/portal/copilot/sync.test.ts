@@ -13,6 +13,7 @@ import { CommandMetadata } from '../../../../src/types/common/command-metadata';
 import { DirectoryPath } from '../../../../src/types/file/directoryPath';
 import { CopilotBundle } from '../../../../src/types/portal/copilot/copilot-bundle';
 import { ProjectContext } from '../../../../src/types/project-context';
+import { SiteAddress } from '../../../../src/types/portal/config/site-address';
 import { GeneratedPortalContext } from '../../../../src/types/portal/copilot/generated-portal-context';
 
 /** The bundle as the service receives it. */
@@ -48,22 +49,29 @@ describe('PortalCopilotSyncAction', () => {
     fs.writeFileSync(file, contents);
   };
 
-  const writeConfig = (ai: unknown) =>
+  const writeConfig = (ai: unknown, url = 'https://example.com/docs') =>
     write(
       'src/apimatic.json',
       JSON.stringify({
-        portal: { site: { name: 'Acme', url: 'https://example.com/docs' }, ...(ai ? { ai } : {}) },
+        portal: { site: { name: 'Acme', url }, ...(ai ? { ai } : {}) },
         languages: { typescript: {} }
       })
     );
 
   const writeSavedLogin = (authKey: string) => write('config.json', JSON.stringify({ email: 'a@b.c', authKey }));
 
-  const writePortal = () => {
-    write('portal/llms.txt', ['- [Docs](/docs)', '  - [Intro](/docs/guides/intro): Start'].join('\n'));
-    write('portal/index.md', '# Docs');
-    write('portal/guides/intro.md', '# Intro');
-  };
+  /** As `generate` writes it into a portal built for `https://example.com/docs`. */
+  const PUBLISHED = CopilotBundle.of(
+    [
+      { path: '/', title: 'Docs', description: null, markdown: '# Docs' },
+      { path: '/guides/intro', title: 'Intro', description: 'Start', markdown: '# Intro' }
+    ],
+    SiteAddress.parse('https://example.com/docs', 'url')._unsafeUnwrap(),
+    '9.9.9',
+    new Date('2026-10-14T12:00:00.000Z')
+  );
+
+  const writePortal = () => write('portal/__copilot/bundle.json', PUBLISHED.toJson());
 
   const execute = (wait = true, authKey: string | null = 'auth-key') => {
     const project = ProjectContext.in(new DirectoryPath(root));
@@ -93,15 +101,18 @@ describe('PortalCopilotSyncAction', () => {
     fs.rmSync(root, { recursive: true, force: true });
   });
 
-  it('uploads the portal under its base path and waits until Ask AI answers from it', async () => {
+  it('uploads the bundle generate wrote, as it is, and waits until Ask AI answers from it', async () => {
+    // The address has changed since the portal was generated: the bundle keeps the one it was built for.
+    writeConfig({ copilot: COPILOT }, 'https://example.com/api');
+
     const result = await execute();
 
     expect(result.isSuccess()).to.be.true;
     const [copilot, bundle, , authKey] = upload.firstCall.args as [unknown, CopilotBundle, unknown, string];
     expect(copilot).to.deep.include(COPILOT);
     expect(authKey).to.equal('auth-key');
+    expect(bundle.toJson()).to.equal(PUBLISHED.toJson());
     expect(uploaded(bundle)).to.deep.include({ basePath: '/docs/', siteUrl: 'https://example.com/docs' });
-    expect(uploaded(bundle).pages.map(({ path: page }) => page)).to.deep.equal(['/', '/guides/intro']);
     expect(awaitIndexing.firstCall.args[1]).to.equal('v-1');
     expect(prompts.indexed.calledOnceWith(indexed('active'))).to.be.true;
   });
@@ -238,24 +249,14 @@ describe('PortalCopilotSyncAction', () => {
     expect(upload.called).to.be.false;
   });
 
-  it('fails without uploading when the portal has not been generated', async () => {
-    fs.rmSync(path.join(root, 'portal'), { recursive: true });
+  it('fails without uploading when the portal has not been generated, or was without Ask AI', async () => {
+    fs.rmSync(path.join(root, 'portal', '__copilot'), { recursive: true });
+    write('portal/index.html', '<html></html>');
 
     const result = await execute();
 
     expect(result.isFailed()).to.be.true;
     expect(prompts.portalNotGenerated.calledOnce).to.be.true;
-    expect(upload.called).to.be.false;
-  });
-
-  it('fails without uploading when no listed page has its Markdown', async () => {
-    fs.rmSync(path.join(root, 'portal', 'index.md'));
-    fs.rmSync(path.join(root, 'portal', 'guides'), { recursive: true });
-
-    const result = await execute();
-
-    expect(result.isFailed()).to.be.true;
-    expect(prompts.noPages.calledOnce).to.be.true;
     expect(upload.called).to.be.false;
   });
 });
