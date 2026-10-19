@@ -28,6 +28,14 @@ export class CopilotClient {
 
   readonly chatAddress = (): string => `${this.copilot.apiUrl}/v1/chat`;
 
+  /**
+   * Opens the session ahead of the first question, as the panel opens, so a portal the service
+   * turns away hides Ask AI before a visitor types. Other failures wait for the question to show them.
+   */
+  readonly prepare = async (): Promise<void> => {
+    await this.currentSession().catch(() => undefined);
+  };
+
   /** The body for one question: only the latest message, since the service keeps the thread. */
   questionBody(messages: readonly unknown[], trigger: string): Record<string, unknown> {
     if (messages.length <= 1) this.thread = null;

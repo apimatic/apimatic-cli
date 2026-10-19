@@ -1,6 +1,6 @@
 // The Ask AI copilot: Fumadocs' AI chat panel, answered by the Ask AI service (the portal is static).
 // `@fumadocs/ai-chat` is 0.x and needs fumadocs-ui >= 16.16: keep it pinned and check the chat on every upgrade.
-import { useMemo, useState, type ComponentType, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useState, type ComponentType, type ReactNode } from 'react';
 import type * as PageTree from 'fumadocs-core/page-tree';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport, type UIMessage } from 'ai';
@@ -50,10 +50,24 @@ function CopilotProvider({ copilot, children }: Readonly<{ copilot: PortalCopilo
   const suggestions = copilot.suggestions.length > 0 ? copilot.suggestions : undefined;
   return (
     <AIChatProvider chat={chat} renderPart={renderPart} suggestions={suggestions}>
+      <SessionOnOpen client={client} available={available} />
       {children}
       {available && <AIChatTrigger />}
     </AIChatProvider>
   );
+}
+
+/** Opens the session as the panel opens, and keeps the panel shut once the service turns the portal away. */
+function SessionOnOpen({ client, available }: Readonly<{ client: CopilotClient; available: boolean }>) {
+  const { open, setOpen } = useAIChat();
+  useEffect(() => {
+    if (open) void client.prepare();
+  }, [open, client]);
+  // Before paint, so Ctrl+/ on a portal turned away never shows the panel at all.
+  useLayoutEffect(() => {
+    if (open && !available) setOpen(false);
+  }, [open, available, setOpen]);
+  return null;
 }
 
 /** The docs layout's `aiChat` option: the panel and whether it is open. Call inside `CopilotProvider`. */

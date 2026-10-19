@@ -21,7 +21,8 @@ function service(...replies: (Response | (() => Response))[]) {
 }
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
-const session = (token: string, inMs = 900_000) => json({ token, expiresAt: new Date(Date.now() + inMs).toISOString() });
+const session = (token: string, inMs = 900_000) =>
+  json({ token, expiresAt: new Date(Date.now() + inMs).toISOString() });
 
 describe('the Ask AI client', () => {
   it('opens a session with the public key, then asks with the session token only', async () => {
@@ -64,7 +65,10 @@ describe('the Ask AI client', () => {
   });
 
   it("shows the service's own message when it refuses a question", async () => {
-    const { send } = service(session('t1'), json({ code: 'quota_exceeded', message: 'Limit reached. Search still works.' }, 429));
+    const { send } = service(
+      session('t1'),
+      json({ code: 'quota_exceeded', message: 'Limit reached. Search still works.' }, 429)
+    );
     const client = new CopilotClient(COPILOT, () => undefined, send);
     const response = await client.fetch(client.chatAddress(), {});
     expect(response.status).to.equal(429);
@@ -81,6 +85,45 @@ describe('the Ask AI client', () => {
       expect(failed, code).to.be.true;
       expect(hidden, code).to.be.true;
     }
+  });
+
+  it('opens the session ahead of the first question, which then uses it', async () => {
+    const { calls, send } = service(session('t1'), new Response('ok'));
+    const client = new CopilotClient(COPILOT, () => undefined, send);
+
+    await client.prepare();
+    await client.fetch(client.chatAddress(), {});
+
+    expect(calls.map((call) => call.url.split('/v1/')[1])).to.deep.equal(['sessions', 'chat']);
+    expect(new Headers(calls[1]!.init.headers).get('authorization')).to.equal('Bearer t1');
+  });
+
+  it('hides Ask AI as the session opens, before any question, when the service turns the portal away', async () => {
+    let hidden = false;
+    const { send } = service(json({ code: 'invalid_key', message: 'no' }, 403));
+    const client = new CopilotClient(COPILOT, () => (hidden = true), send);
+
+    await client.prepare();
+
+    expect(hidden).to.be.true;
+  });
+
+  it('leaves any other failure to open the session to the first question, which tries again', async () => {
+    const { calls, send } = service(
+      () => {
+        throw new TypeError('Failed to fetch');
+      },
+      session('t1'),
+      new Response('ok')
+    );
+    let hidden = false;
+    const client = new CopilotClient(COPILOT, () => (hidden = true), send);
+
+    await client.prepare();
+
+    expect(hidden).to.be.false;
+    expect(await (await client.fetch(client.chatAddress(), {})).text()).to.equal('ok');
+    expect(calls).to.have.length(3);
   });
 
   it('says the service is unavailable when it cannot be reached, and tries again next time', async () => {
