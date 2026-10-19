@@ -7,7 +7,6 @@ import { DefaultChatTransport, type UIMessage } from 'ai';
 import { AIChatPanel, AIChatProvider, AIChatSearch, AIChatSources, AIChatTrigger, useAIChat } from '@fumadocs/ai-chat';
 import type { AIChatOptions } from 'fumadocs-ui/layouts/shared';
 import { CopilotClient } from '@/lib/copilot-client';
-import { servedSearch, servedSources } from '@/lib/copilot-links';
 import type { PortalCopilot } from '@/lib/portal-types';
 
 /** One part of a chat message: text, a tool call, a data part, and so on. */
@@ -66,12 +65,13 @@ function useCopilotPanel(): AIChatOptions {
 /**
  * Draws the non-text parts the service sends; the panel draws text itself.
  * A new part type from the service needs a branch here, or it is not shown.
+ * Pages are linked by their path within the portal, as the service sends them: the router adds the base path.
  */
 function renderPart(part: Part, live: boolean): ReactNode {
   // "Searched · N results", expandable to the pages the answer was based on.
-  if (part.type === 'tool-search') return <AIChatSearch part={servedSearch(part as SearchPart)} live={live} />;
+  if (part.type === 'tool-search') return <AIChatSearch part={part as SearchPart} live={live} />;
   // The numbered source chips, matching the [1], [2] citations in the answer.
-  if (part.type === 'data-sources') return <AIChatSources sources={servedSources(part.data as Sources)} />;
+  if (part.type === 'data-sources') return <AIChatSources sources={part.data as Sources} />;
   return null;
 }
 

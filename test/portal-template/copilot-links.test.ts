@@ -1,49 +1,46 @@
+import fs from 'node:fs';
+import { createRequire } from 'node:module';
+import { createElement } from 'react';
+import { renderToString } from 'react-dom/server';
 import { expect } from 'chai';
-import { servedSearch, servedSources, servedUrl } from '../../portal-template/src/lib/copilot-links';
 
-describe("the Ask AI chat's links", () => {
-  it("puts a portal page's path under the base path the host serves it at", () => {
-    expect(servedUrl('/guides/intro', '/docs/')).to.equal('/docs/guides/intro');
-    expect(servedUrl('/', '/docs/')).to.equal('/docs/');
-    expect(servedUrl('/guides/intro')).to.equal('/guides/intro');
-  });
+/** An installed module's code, as the portal's build bundles it. */
+const installed = (specifier: string) => fs.readFileSync(createRequire(import.meta.url).resolve(specifier), 'utf8');
 
-  it('leaves a full address, or one on another host, as it is', () => {
-    expect(servedUrl('https://docs.example.com/guides/intro', '/docs/')).to.equal(
-      'https://docs.example.com/guides/intro'
+// `copilot.tsx` hands the chat the service's paths unchanged, right only while the chat links them through
+// the router, which adds the base once: a failure here is an upgrade that changed that, which only a browser would show.
+describe("the Ask AI chat's links under a base", () => {
+  it('links a source by its path within the portal, served under the base once', async () => {
+    // Their ES module builds: the CommonJS ones warn of a circular require when loaded.
+    const { createMemoryHistory, createRootRoute, createRouter, RouterProvider } = await import(
+      '@tanstack/react-router'
     );
-    expect(servedUrl('//cdn.example.com/page', '/docs/')).to.equal('//cdn.example.com/page');
-  });
-
-  it('links each source chip under the base path, keeping its title and label', () => {
+    const { TanstackProvider } = await import('fumadocs-core/framework/tanstack');
+    const { AIChatSources } = await import('@fumadocs/ai-chat');
     const sources = [
-      { url: '/guides/auth', title: 'Authentication', label: '1' },
+      { url: '/guides/intro', title: 'Intro' },
       { url: 'https://status.example.com', title: 'Status' }
     ];
-
-    expect(servedSources(sources, '/docs/')).to.deep.equal([
-      { url: '/docs/guides/auth', title: 'Authentication', label: '1' },
-      { url: 'https://status.example.com', title: 'Status' }
-    ]);
-  });
-
-  it("links a search's found pages under the base path, keeping the rest of the search", () => {
-    const part = {
-      type: 'tool-search',
-      state: 'output-available',
-      input: { query: 'auth' },
-      output: [{ doc: { url: '/guides/auth', title: 'Authentication' } }, { doc: null }]
-    };
-
-    expect(servedSearch(part, '/docs/')).to.deep.equal({
-      ...part,
-      output: [{ doc: { url: '/docs/guides/auth', title: 'Authentication' } }, { doc: null }]
+    const root = createRootRoute({
+      component: () => createElement(TanstackProvider, null, createElement(AIChatSources, { sources }))
     });
+    const router = createRouter({
+      routeTree: root,
+      basepath: '/docs',
+      history: createMemoryHistory({ initialEntries: ['/docs/'] })
+    });
+    await router.load();
+
+    const html = renderToString(createElement(RouterProvider, { router }));
+
+    expect(html).to.contain('href="/docs/guides/intro"');
+    expect(html).to.contain('href="https://status.example.com"');
   });
 
-  it('leaves a search that has found nothing yet as it is', () => {
-    const running = { type: 'tool-search', state: 'input-streaming', output: undefined };
+  it("links a search's found pages the same way as the sources", () => {
+    const chat = installed('@fumadocs/ai-chat');
 
-    expect(servedSearch(running, '/docs/')).to.deep.equal(running);
+    expect(chat).to.match(/jsxs?\(Link, \{\s*href: source\.url,/);
+    expect(chat).to.match(/jsxs?\(Link, \{\s*href: doc\.url,/);
   });
 });
