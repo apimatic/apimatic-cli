@@ -1610,6 +1610,81 @@ describe('PortalSourceContext', () => {
     });
   });
 
+  // MDX compiles a component the portal does not provide, and the page fails only when a reader opens it.
+  describe('the components the pages use', () => {
+    beforeEach(() => {
+      writeConfig({ site: { name: 'Calc' } });
+      write('spec/api.json', OPENAPI);
+    });
+
+    it('refuses a component the portal does not provide, by its page and line', async () => {
+      write('content/components/banner.mdx', page('Banner') + '\n<Banner variant="rainbow">Out now.</Banner>\n');
+
+      const problem = contentProblem((await resolve())._unsafeUnwrapErr());
+
+      expect(problem.kind === 'unknownComponents' && problem.components).to.deep.equal([
+        {
+          page: new FilePath(new DirectoryPath(root, 'content', 'components'), new FileName('banner.mdx')),
+          line: 5,
+          name: 'Banner',
+          nearest: null
+        }
+      ]);
+    });
+
+    it('accepts the components the portal provides, and those a page imports', async () => {
+      write(
+        'content/index.mdx',
+        page('Home') +
+          "import { Banner } from 'fumadocs-ui/components/banner';\n\n" +
+          '<Banner>Out now.</Banner>\n\n<Callout>Note.</Callout>\n\n<Steps>\n<Step>One</Step>\n</Steps>\n'
+      );
+
+      expect((await resolve()).isOk()).to.be.true;
+    });
+  });
+
+  // `portal generate` would fail over the first only, naming its temporary copy; `portal serve`, over none.
+  describe('pages that are not valid MDX', () => {
+    const cards = () => new FilePath(new DirectoryPath(root, 'content', 'components'), new FileName('cards.mdx'));
+    const OPEN_CARDS = page('Cards') + '\n<Cards>\n  <Card title="a" />\n';
+
+    beforeEach(() => {
+      writeConfig({ site: { name: 'Calc' } });
+      write('spec/api.json', OPENAPI);
+      write('content/index.md', page('Home'));
+    });
+
+    it('refuses each one by its page, line and column', async () => {
+      write('content/components/cards.mdx', OPEN_CARDS);
+      write('content/components/steps.mdx', page('Steps') + '\nThen {oops(}.\n');
+
+      const problem = contentProblem((await resolve())._unsafeUnwrapErr());
+
+      expect(problem.kind === 'invalidMdx' && problem.pages).to.deep.equal([
+        { page: cards(), line: 5, column: 1, reason: 'Expected a closing tag for `<Cards>`' },
+        {
+          page: new FilePath(new DirectoryPath(root, 'content', 'components'), new FileName('steps.mdx')),
+          line: 5,
+          column: 12,
+          reason: 'Could not parse expression: Unexpected token'
+        }
+      ]);
+    });
+
+    it('refuses one saved while the preview runs, and accepts it once fixed', async () => {
+      const { specs, generatedPages } = (await resolve())._unsafeUnwrap();
+      const context = new PortalSourceContext(new DirectoryPath(root));
+
+      write('content/components/cards.mdx', OPEN_CARDS);
+      const refused = (await context.resolveContent(specs, generatedPages))._unsafeUnwrapErr();
+      write('content/components/cards.mdx', OPEN_CARDS + '</Cards>\n');
+
+      expect(refused.map(({ kind }) => kind)).to.deep.equal(['invalidMdx']);
+      expect((await context.resolveContent(specs, generatedPages)).isOk()).to.be.true;
+    });
+  });
+
   describe('nav.json', () => {
     beforeEach(() => {
       writeConfig({ site: { name: 'Calc' } });

@@ -6,6 +6,7 @@ import tailwindcss from '@tailwindcss/vite';
 import { fumadocsMdx } from 'fumadocs-mdx/vite';
 import { dependencyDirectories } from './dependency-directories.ts';
 import { downloads } from './downloads.ts';
+import { refuseFailedRenders } from './failed-renders.ts';
 import { generatedPagesReload } from './generated-pages-reload.ts';
 import { readBuildPaths, readPortalIdentity } from './portal-config.ts';
 import { prerenderPages } from './prerender-pages.ts';
@@ -13,7 +14,7 @@ import { specReload } from './spec-reload.ts';
 import { remarkImageReferences } from './src/lib/remark-image-references.ts';
 import { staticFunctionsBase } from './static-functions-base.ts';
 
-export default defineConfig(async () => {
+export default defineConfig(async ({ command }) => {
   const [paths, identity] = await Promise.all([readBuildPaths(), readPortalIdentity()]);
   const pages = await prerenderPages(paths, identity.siteUrl);
   const publicDir: string | false = paths.staticDir ?? false;
@@ -47,7 +48,8 @@ export default defineConfig(async () => {
         // The page list above is complete, and crawling would also follow root-relative links
         // in the rendered pages -- a description linking to "/docs/connect" on the author's
         // own site would fail the whole build with a 404.
-        prerender: { crawlLinks: false },
+        // Only a build prerenders, and only it should have its console watched.
+        prerender: { crawlLinks: false, onSuccess: command === 'build' ? refuseFailedRenders() : undefined },
         // Modules named *.server.* read the specification off disk; a client import ships
         // that code to the browser, where it throws before React can hydrate and leaves every
         // page inert. Fail the build rather than mocking the import.

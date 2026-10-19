@@ -6,14 +6,17 @@ import { ContentNotices, NoTabsListed } from '../../types/portal/content-notices
 import { API_REFERENCE_TOKEN, NAVIGATION_FILE_NAME, TabEntry } from '../../types/portal/portal-navigation.js';
 import {
   ContentProblem,
+  InvalidPage,
   MissingFile,
   MissingImage,
   PortalSourceProblem,
   ReservedAddressPage,
   SharedAddress,
   SharedEndpoint,
-  SpecConversion
+  SpecConversion,
+  UnknownComponent
 } from '../../types/portal/portal-source.js';
+import { FUMADOCS_COMPONENTS } from '../../types/portal/portal-components.js';
 import { Shared } from '../../types/portal/shared.js';
 import { MERGE_SETTINGS } from '../../types/portal/spec-metadata.js';
 import { TRANSFORMATIONS_DIRECTORY_NAME } from '../../types/transform-context.js';
@@ -273,7 +276,49 @@ function reportContentProblem(problem: ContentProblem, sourceDirectory: Director
       reportMissingImages(problem.images, sourceDirectory);
       return;
     }
+    case 'unknownComponents': {
+      reportUnknownComponents(problem.components, sourceDirectory);
+      return;
+    }
+    case 'invalidMdx': {
+      reportInvalidPages(problem.pages, sourceDirectory);
+      return;
+    }
   }
+}
+
+function reportInvalidPages(pages: InvalidPage[], sourceDirectory: DirectoryPath): void {
+  const lines = pages.map(
+    ({ page, line, column, reason }) =>
+      `  • ${relative(page, sourceDirectory)}, line ${line}, column ${column}: ${reason}`
+  );
+  log.error(
+    pages.length === 1
+      ? `A page in ${f.path(sourceDirectory)} is not valid MDX:`
+      : `Pages in ${f.path(sourceDirectory)} are not valid MDX:`
+  );
+  log.message(lines.join('\n'));
+  log.message('MDX stops at the first mistake in a page, so a page can have more after the one shown.');
+}
+
+function reportUnknownComponents(components: UnknownComponent[], sourceDirectory: DirectoryPath): void {
+  const lines = components.map(({ page, line, name, nearest }) => {
+    const where = `  • ${relative(page, sourceDirectory)}, line ${line}: ${f.var(`<${name}>`)}`;
+    return nearest === null ? where : `${where}. Did you mean ${f.var(`<${nearest}>`)}?`;
+  });
+  log.error(
+    components.length === 1
+      ? `A page in ${f.path(sourceDirectory)} uses a component the portal does not provide:`
+      : `Pages in ${f.path(sourceDirectory)} use components the portal does not provide:`
+  );
+  log.message(lines.join('\n'));
+  log.message(
+    `Readers would see an error in place of the page. Import the component in the page, or use one of ` +
+      `${listedInProse(
+        FUMADOCS_COMPONENTS.map((name) => f.var(`<${name}>`)),
+        'or'
+      )}.`
+  );
 }
 
 function reportMissingImages(images: MissingImage[], sourceDirectory: DirectoryPath): void {

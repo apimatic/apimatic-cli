@@ -1,0 +1,16 @@
+---
+title: Late
+---
+
+import { use } from 'react';
+
+export const arrived = new Promise((resolve) => setTimeout(resolve, 200));
+
+export function Late() {
+  use(arrived);
+  throw new Error('Late threw after the page was sent');
+}
+
+## Release notes
+
+<Late />

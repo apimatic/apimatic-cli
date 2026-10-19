@@ -11,6 +11,7 @@ import { DirectoryPath } from '../../src/types/file/directoryPath';
 import { FilePath } from '../../src/types/file/filePath';
 import { CodeSampleCatalog, CodeSampleCatalogs } from '../../src/types/portal/code-samples';
 import { PortalArtifacts } from '../../src/types/portal/portal-artifacts';
+import { logTail } from '../../src/prompts/prompt';
 import { Language } from '../../src/types/sdk/generate';
 import {
   ensurePortalProjectDirectoryBase,
@@ -83,7 +84,10 @@ async function buildFixture(name: string, delivered: Delivered = {}): Promise<Bu
 
   const build = await new PortalBuildService().build(prepared);
   if (build.isErr()) {
-    throw new Error(`${build.error.message}\n${build.error.log.split('\n').slice(-20).join('\n')}`);
+    fs.rmSync(root, { recursive: true, force: true });
+    await removePortalProjectDirectoryBase(base);
+    // What the CLI shows of the log, so a test can hold a failure to what its reader would see.
+    throw new Error(`${build.error.message}\n${logTail(build.error.log)}`);
   }
   expect(build.value.pageCount).to.be.greaterThan(1);
 
@@ -970,5 +974,36 @@ const stylesheetOf = (output: DirectoryPath) => {
   it('reads a schema kept in another file of the folder', () => {
     expect(read(`${LIST_ORDERS}/index.html`)).to.contain('grandTotalCents');
     expect(read(`${LIST_ORDERS}.md`)).to.contain('grandTotalCents');
+  });
+});
+
+/**
+ * A page that compiles and throws while it renders: React leaves its body for the browser, which
+ * throws the same and shows readers an error screen. A component inside an expression is one the
+ * content check does not look into.
+ */
+(enabled ? describe : describe.skip)('portal build, a page that fails to render (end to end)', function () {
+  this.timeout(10 * 60 * 1000);
+
+  const failureOf = (fixture: string) =>
+    buildFixture(fixture).then(
+      () => null,
+      (error: Error) => error.message
+    );
+
+  it('fails the build, naming the page and its error', async () => {
+    const failure = await failureOf('failed-render');
+
+    expect(failure).to.contain('The portal build failed.');
+    expect(failure).to.contain('/broken failed to render');
+    expect(failure).to.contain('Expected component `Banner` to be defined');
+  });
+
+  // Streamed to a reader, React would send the page first and switch the part in later.
+  it('fails the build over a page that throws once it has waited, naming its error', async () => {
+    const failure = await failureOf('failed-render-late');
+
+    expect(failure).to.contain('/late failed to render');
+    expect(failure).to.contain('Late threw after the page was sent');
   });
 });

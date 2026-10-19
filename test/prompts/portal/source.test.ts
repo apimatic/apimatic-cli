@@ -154,6 +154,70 @@ describe('reportSourceProblem', () => {
     });
   });
 
+  describe('components the portal does not provide', () => {
+    const page = new FilePath(source.join('content').join('components'), new FileName('banner.mdx'));
+
+    it('names each by its page and line, with the one a typo most likely meant, and the ones there are', () => {
+      reportContent({
+        kind: 'unknownComponents',
+        components: [
+          { page, line: 7, name: 'Banner', nearest: null },
+          { page, line: 9, name: 'Accordian', nearest: 'Accordion' }
+        ]
+      });
+
+      expect(printed()).to.contain('Pages in');
+      expect(printed()).to.contain("'content/components/banner.mdx', line 7: '<Banner>'\n");
+      expect(printed()).to.contain(
+        "'content/components/banner.mdx', line 9: '<Accordian>'. Did you mean '<Accordion>'?"
+      );
+      expect(printed()).to.contain("Import the component in the page, or use one of '<Accordion>', ");
+      expect(printed()).to.contain("'<Tabs>' or '<TypeTable>'.");
+    });
+
+    it('speaks of one page when there is one', () => {
+      reportContent({ kind: 'unknownComponents', components: [{ page, line: 7, name: 'Banner', nearest: null }] });
+
+      expect(printed()).to.contain('A page in');
+      expect(printed()).to.contain('uses a component the portal does not provide');
+    });
+  });
+
+  describe('pages that are not valid MDX', () => {
+    const cards = new FilePath(source.join('content').join('components'), new FileName('cards.mdx'));
+    const steps = new FilePath(source.join('content').join('components'), new FileName('steps.mdx'));
+
+    it('names each by its page, line and column, and says there can be more in a page', () => {
+      reportContent({
+        kind: 'invalidMdx',
+        pages: [
+          { page: cards, line: 55, column: 1, reason: 'Expected a closing tag for `<Cards>`' },
+          { page: steps, line: 9, column: 12, reason: 'Could not parse expression: Unexpected token' }
+        ]
+      });
+
+      expect(printed()).to.contain('Pages in');
+      expect(printed()).to.contain('are not valid MDX');
+      expect(printed()).to.contain(
+        "'content/components/cards.mdx', line 55, column 1: Expected a closing tag for `<Cards>`\n"
+      );
+      expect(printed()).to.contain(
+        "'content/components/steps.mdx', line 9, column 12: Could not parse expression: Unexpected token"
+      );
+      expect(printed()).to.contain('MDX stops at the first mistake in a page');
+    });
+
+    it('speaks of one page when there is one', () => {
+      reportContent({
+        kind: 'invalidMdx',
+        pages: [{ page: cards, line: 55, column: 1, reason: 'Expected a closing tag for `<Cards>`' }]
+      });
+
+      expect(printed()).to.contain('A page in');
+      expect(printed()).to.contain('is not valid MDX');
+    });
+  });
+
   describe('a spec directory the portal reads no document from', () => {
     const spec = source.join('spec');
     const conversion = (format: string | null, others = 0) => ({
