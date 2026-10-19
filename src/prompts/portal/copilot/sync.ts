@@ -74,7 +74,25 @@ export class PortalCopilotSyncPrompts {
     );
   }
 
-  public syncFailed(error: ServiceError, apiUrl: string) {
+  public uploadFailed(error: ServiceError, apiUrl: string) {
+    this.syncFailed(
+      error,
+      apiUrl,
+      `${error.errorMessage} The service may have received the pages all the same; sync again, and it answers ` +
+        `that nothing has changed if it did.`
+    );
+  }
+
+  public indexingFailed(error: ServiceError, apiUrl: string) {
+    this.syncFailed(
+      error,
+      apiUrl,
+      `${error.errorMessage} The service keeps indexing, and Ask AI answers from the previous pages until it ` +
+        `is done; check the portal's Ask AI again in a few minutes.`
+    );
+  }
+
+  private syncFailed(error: ServiceError, apiUrl: string, timedOut: string) {
     switch (error.code) {
       case ServiceErrorCode.NetworkError:
         log.error(`The Ask AI service at ${f.link(apiUrl)} could not be reached. Check the address and try again.`);
@@ -85,10 +103,7 @@ export class PortalCopilotSyncPrompts {
         );
         return;
       case ServiceErrorCode.Timeout:
-        log.error(
-          `${error.errorMessage} The service keeps indexing, and Ask AI answers from the previous pages until it ` +
-            `is done; check the portal's Ask AI again in a few minutes.`
-        );
+        log.error(timedOut);
         return;
       default:
         log.error(error.errorMessage);

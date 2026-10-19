@@ -95,6 +95,16 @@ describe('CopilotIngestService', () => {
 
       expect(result._unsafeUnwrapErr().code).to.equal(ServiceErrorCode.NetworkError);
     });
+
+    it('reports an upload that runs out of time as a timeout, not as a service it cannot reach', async () => {
+      nock(API_URL).post('/v1/ingest').delay(500).reply(200, { versionId: VERSION_ID, status: 'queued', pageCount: 1 });
+      const impatient = new CopilotIngestService({ uploadTimeoutMs: 50 });
+
+      const failure = (await impatient.upload(COPILOT, bundle, 'bash', 'auth-key'))._unsafeUnwrapErr();
+
+      expect(failure.code).to.equal(ServiceErrorCode.Timeout);
+      expect(failure.errorMessage).to.equal('The upload did not finish within 1 second.');
+    });
   });
 
   describe('awaitIndexing', () => {
@@ -140,6 +150,16 @@ describe('CopilotIngestService', () => {
       nock(API_URL).get(`/v1/ingest/${VERSION_ID}`).reply(200, { status: 'done' });
 
       expect((await awaitIndexing())._unsafeUnwrapErr().code).to.equal(ServiceErrorCode.InvalidResponse);
+    });
+
+    it('reports a status check that runs out of time as a timeout, not as a service it cannot reach', async () => {
+      nock(API_URL).get(`/v1/ingest/${VERSION_ID}`).delay(500).reply(200, statusBody('building'));
+      const impatient = new CopilotIngestService({ pollIntervalMs: 1, statusTimeoutMs: 50 });
+
+      const failure = (await impatient.awaitIndexing(COPILOT, VERSION_ID, 'bash', 'auth-key'))._unsafeUnwrapErr();
+
+      expect(failure.code).to.equal(ServiceErrorCode.Timeout);
+      expect(failure.errorMessage).to.equal('The Ask AI service did not answer within 1 second.');
     });
   });
 });

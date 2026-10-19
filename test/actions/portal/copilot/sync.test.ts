@@ -139,7 +139,7 @@ describe('PortalCopilotSyncAction', () => {
     const result = await execute();
 
     expect(result.isFailed()).to.be.true;
-    expect(prompts.syncFailed.calledOnceWith(forbidden, COPILOT.apiUrl)).to.be.true;
+    expect(prompts.uploadFailed.calledOnceWith(forbidden, COPILOT.apiUrl)).to.be.true;
   });
 
   it('fails when the service cannot be reached', async () => {
@@ -148,7 +148,7 @@ describe('PortalCopilotSyncAction', () => {
     const result = await execute();
 
     expect(result.isFailed()).to.be.true;
-    expect(prompts.syncFailed.firstCall.args[0].code).to.equal(ServiceErrorCode.NetworkError);
+    expect(prompts.uploadFailed.firstCall.args[0].code).to.equal(ServiceErrorCode.NetworkError);
   });
 
   it('fails when indexing fails', async () => {
@@ -158,7 +158,7 @@ describe('PortalCopilotSyncAction', () => {
     const result = await execute();
 
     expect(result.isFailed()).to.be.true;
-    expect(prompts.syncFailed.calledOnceWith(failed, COPILOT.apiUrl)).to.be.true;
+    expect(prompts.indexingFailed.calledOnceWith(failed, COPILOT.apiUrl)).to.be.true;
   });
 
   it('keeps the saved login from a service APIMatic does not run, unless a key is passed', async () => {

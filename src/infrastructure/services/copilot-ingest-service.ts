@@ -52,7 +52,8 @@ export class CopilotIngestService {
       const receipt = response.data as unknown;
       return isReceipt(receipt) ? ok(receipt) : err(ServiceError.InvalidResponse);
     } catch (error) {
-      return err(transportFailure(error));
+      const timedOut = `The upload did not finish within ${duration(this.timings.uploadTimeoutMs)}.`;
+      return err(transportFailure(error, timedOut));
     }
   }
 
@@ -80,10 +81,7 @@ export class CopilotIngestService {
       }
       // Read after the status, so a version that finished during the last wait still counts.
       if (Date.now() >= deadline) {
-        const minutes = Math.max(1, Math.round(this.timings.indexTimeoutMs / 60_000));
-        return err(
-          ServiceError.timeout(`Indexing did not finish within ${minutes} ${minutes === 1 ? 'minute' : 'minutes'}.`)
-        );
+        return err(ServiceError.timeout(`Indexing did not finish within ${duration(this.timings.indexTimeoutMs)}.`));
       }
     }
   }
@@ -104,7 +102,8 @@ export class CopilotIngestService {
       const status = statusOf(response.data);
       return status === null ? err(ServiceError.InvalidResponse) : ok(status);
     } catch (error) {
-      return err(transportFailure(error));
+      const timedOut = `The Ask AI service did not answer within ${duration(this.timings.statusTimeoutMs)}.`;
+      return err(transportFailure(error, timedOut));
     }
   }
 
@@ -113,6 +112,8 @@ export class CopilotIngestService {
       baseURL: copilot.apiUrl,
       timeout,
       validateStatus: () => true,
+      // A request that runs out of time then fails as ETIMEDOUT, apart from one that never got through.
+      transitional: { clarifyTimeoutError: true },
       headers: {
         'User-Agent': envInfo.getUserAgent(shell),
         Authorization: `X-Auth-Key ${token}`,
@@ -142,10 +143,20 @@ function failureOf(response: AxiosResponse): ServiceError {
 }
 
 // Every request answers with its status, so an axios error here is one that never got an answer.
-function transportFailure(error: unknown): ServiceError {
-  return axios.isAxiosError(error) && error.response === undefined
-    ? ServiceError.NetworkError
-    : handleServiceError(error);
+function transportFailure(error: unknown, timedOut: string): ServiceError {
+  if (!axios.isAxiosError(error) || error.response !== undefined) {
+    return handleServiceError(error);
+  }
+  return error.code === 'ETIMEDOUT' ? ServiceError.timeout(timedOut) : ServiceError.NetworkError;
+}
+
+function duration(ms: number): string {
+  if (ms < 60_000) {
+    const seconds = Math.max(1, Math.round(ms / 1000));
+    return `${seconds} ${seconds === 1 ? 'second' : 'seconds'}`;
+  }
+  const minutes = Math.round(ms / 60_000);
+  return `${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`;
 }
 
 function isReceipt(body: unknown): body is IngestReceipt {
