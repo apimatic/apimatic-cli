@@ -39,6 +39,17 @@ describe('PortalCopilotSyncPrompts', () => {
     expect(message).to.contain('keeps indexing');
   });
 
+  it("words failed indexing itself, with the service's reason when it gives one", () => {
+    prompts.indexingFailed(ServiceError.processingFailed('Embedding provider unavailable.'), API_URL);
+    prompts.indexingFailed(ServiceError.processingFailed(null), API_URL);
+
+    expect(printed()).to.deep.equal([
+      'The Ask AI service could not index the pages: Embedding provider unavailable. ' +
+        'Ask AI answers from the previous pages until a sync is indexed.',
+      'The Ask AI service could not index the pages. Ask AI answers from the previous pages until a sync is indexed.'
+    ]);
+  });
+
   it('tells either step that a service it could not reach may be at the wrong address', () => {
     prompts.uploadFailed(ServiceError.NetworkError, API_URL);
     prompts.indexingFailed(ServiceError.NetworkError, API_URL);

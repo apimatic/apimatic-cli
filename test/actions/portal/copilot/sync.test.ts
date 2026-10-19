@@ -152,7 +152,7 @@ describe('PortalCopilotSyncAction', () => {
   });
 
   it('fails when indexing fails', async () => {
-    const failed = ServiceError.badRequest('Embedding provider unavailable.', {});
+    const failed = ServiceError.processingFailed('Embedding provider unavailable.');
     awaitIndexing.resolves(err(failed));
 
     const result = await execute();

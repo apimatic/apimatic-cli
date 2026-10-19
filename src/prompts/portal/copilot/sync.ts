@@ -105,6 +105,14 @@ export class PortalCopilotSyncPrompts {
       case ServiceErrorCode.Timeout:
         log.error(timedOut);
         return;
+      case ServiceErrorCode.ProcessingFailed: {
+        const reason = error.errorMessage === '' ? '.' : `: ${error.errorMessage}`;
+        log.error(
+          `The Ask AI service could not index the pages${reason} ` +
+            `Ask AI answers from the previous pages until a sync is indexed.`
+        );
+        return;
+      }
       default:
         log.error(error.errorMessage);
     }

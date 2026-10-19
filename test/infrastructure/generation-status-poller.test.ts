@@ -1,7 +1,7 @@
 import { expect } from 'chai';
 import sinon from 'sinon';
 import { ok, Result } from 'neverthrow';
-import { pollUntilCompleted } from '../../src/infrastructure/generation-status-poller';
+import { pollUntilCompleted, pollUntilSettled } from '../../src/infrastructure/generation-status-poller';
 import { ServiceError, ServiceErrorCode } from '../../src/infrastructure/service-error';
 
 // The service suites reach the timeout with millisecond budgets, which only ever renders the
@@ -36,7 +36,9 @@ describe('pollUntilCompleted', () => {
   };
 
   it('names the budget in minutes', async () => {
-    expect(await timeoutAfter(5 * 60_000, 'Plugin generation')).to.equal('Plugin generation timed out after 5 minutes.');
+    expect(await timeoutAfter(5 * 60_000, 'Plugin generation')).to.equal(
+      'Plugin generation timed out after 5 minutes.'
+    );
   });
 
   it('says minute rather than minutes for a one-minute budget', async () => {
@@ -49,5 +51,22 @@ describe('pollUntilCompleted', () => {
 
   it('rounds down to whole minutes', async () => {
     expect(await timeoutAfter(90_000, 'Portal generation')).to.equal('Portal generation timed out after 1 minute.');
+  });
+});
+
+describe('pollUntilSettled', () => {
+  it('polls while the status is unsettled, and ends with what settles it', async () => {
+    const statuses = ['queued', 'building', 'active'];
+    let polls = 0;
+
+    const result = await pollUntilSettled({
+      pollIntervalMs: 1,
+      fetchStatus: async (): Promise<Result<string, ServiceError>> => ok(statuses[polls++]),
+      timeout: { budgetMs: 5000, label: 'Indexing' },
+      settle: (status) => (status === 'active' ? ok(`settled on ${status}`) : null)
+    });
+
+    expect(result._unsafeUnwrap()).to.equal('settled on active');
+    expect(polls).to.equal(3);
   });
 });

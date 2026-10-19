@@ -129,12 +129,26 @@ describe('CopilotIngestService', () => {
       expect((await awaitIndexing())._unsafeUnwrap().status).to.equal('superseded');
     });
 
-    it("fails with the service's reason when indexing failed", async () => {
+    it("fails as failed processing, carrying the service's reason, when indexing failed", async () => {
       nock(API_URL)
+        .get(`/v1/ingest/${VERSION_ID}`)
+        .reply(200, statusBody('building'))
         .get(`/v1/ingest/${VERSION_ID}`)
         .reply(200, statusBody('failed', { error: 'Embedding provider unavailable.' }));
 
-      expect((await awaitIndexing())._unsafeUnwrapErr().errorMessage).to.equal('Embedding provider unavailable.');
+      const failure = (await awaitIndexing())._unsafeUnwrapErr();
+
+      expect(failure.code).to.equal(ServiceErrorCode.ProcessingFailed);
+      expect(failure.errorMessage).to.equal('Embedding provider unavailable.');
+    });
+
+    it('fails as failed processing with no reason when the service gives none', async () => {
+      nock(API_URL).get(`/v1/ingest/${VERSION_ID}`).reply(200, statusBody('failed'));
+
+      const failure = (await awaitIndexing())._unsafeUnwrapErr();
+
+      expect(failure.code).to.equal(ServiceErrorCode.ProcessingFailed);
+      expect(failure.errorMessage).to.equal('');
     });
 
     it('times out on a version that never finishes', async () => {
@@ -144,6 +158,7 @@ describe('CopilotIngestService', () => {
       const result = await impatient.awaitIndexing(COPILOT, VERSION_ID, 'bash', 'auth-key');
 
       expect(result._unsafeUnwrapErr().code).to.equal(ServiceErrorCode.Timeout);
+      expect(result._unsafeUnwrapErr().errorMessage).to.equal('Indexing timed out.');
     });
 
     it('refuses a status body it cannot read', async () => {

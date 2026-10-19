@@ -5,8 +5,8 @@ import { CopilotBundle } from '../../types/portal/copilot/copilot-bundle.js';
 import { IndexedVersion, IndexingState, IngestReceipt, IngestStatus } from '../../types/portal/copilot/ingest.js';
 import { isJsonObject } from '../../utils/json-utils.js';
 import { envInfo } from '../env-info.js';
+import { pollUntilSettled } from '../generation-status-poller.js';
 import { handleServiceError, ServiceError } from '../service-error.js';
-import { sleep } from '../timer-extensions.js';
 
 export const COPILOT_INGEST_TIMINGS = {
   pollIntervalMs: 2000,
@@ -64,26 +64,18 @@ export class CopilotIngestService {
     shell: string,
     authKey: string
   ): Promise<Result<IndexedVersion, ServiceError>> {
-    const deadline = Date.now() + this.timings.indexTimeoutMs;
-    for (;;) {
-      await sleep(this.timings.pollIntervalMs);
-
-      const current = await this.status(copilot, versionId, shell, authKey);
-      if (current.isErr()) {
-        return err(current.error);
+    return pollUntilSettled({
+      pollIntervalMs: this.timings.pollIntervalMs,
+      fetchStatus: () => this.status(copilot, versionId, shell, authKey),
+      timeout: { budgetMs: this.timings.indexTimeoutMs, label: 'Indexing' },
+      settle: (current): Result<IndexedVersion, ServiceError> | null => {
+        const { status, error } = current;
+        if (status === 'failed') {
+          return err(ServiceError.processingFailed(error));
+        }
+        return status === 'queued' || status === 'building' ? null : ok({ ...current, status });
       }
-      const { status, error } = current.value;
-      if (status === 'active' || status === 'superseded') {
-        return ok({ ...current.value, status });
-      }
-      if (status === 'failed') {
-        return err(ServiceError.badRequest(error ?? 'The Ask AI service could not index the pages.', {}));
-      }
-      // Read after the status, so a version that finished during the last wait still counts.
-      if (Date.now() >= deadline) {
-        return err(ServiceError.timeout(`Indexing did not finish within ${duration(this.timings.indexTimeoutMs)}.`));
-      }
-    }
+    });
   }
 
   private async status(
