@@ -28,6 +28,13 @@ export class PreparePortalProjectPrompts {
     log.error(reason);
   }
 
+  public networkShareUnsupported(sourceDirectory: DirectoryPath) {
+    log.error(
+      `A portal can't be built or previewed from a network share, and ${f.path(sourceDirectory)} is on one. ` +
+        `Copy the folder to a local drive, or map the share to a drive letter, and use that path instead.`
+    );
+  }
+
   public authorizationFailed(failure: PortalAuthorizationFailure) {
     reportAuthorizationFailure(failure);
   }

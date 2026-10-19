@@ -46,6 +46,12 @@ export class PreparePortalProjectAction {
       return ActionResult.failed();
     }
 
+    // Vite drops a slash from a share's `\\server`, so the portal would be built without its static files.
+    if (sourceDirectory.isOnNetworkShare()) {
+      this.prompts.networkShareUnsupported(sourceDirectory);
+      return ActionResult.failed();
+    }
+
     const authorization = await this.authorizationService.authorize(
       this.configDir,
       this.commandMetadata.shell,

@@ -47,7 +47,7 @@ describe('staticImages', () => {
       return 'resolved';
     };
 
-    for (const source of ['./D:/site/x.png', './d:/site/x.png', './//server/share/x.png']) {
+    for (const source of ['./D:/site/x.png', './d:/site/x.png']) {
       expect(hook.filter.id.test(source), source).to.be.true;
     }
     const resolved = hook.handler.call({ resolve }, './D:/site/src/static/x.png', 'C:/project/content/page.md', {
@@ -60,10 +60,19 @@ describe('staticImages', () => {
     ]);
   });
 
+  // The CLI builds no portal from a network share, so Fumadocs' `.///server/share/…` is not taken either.
   it('leaves every other import to Vite', () => {
     const { filter } = resolveHook(staticImages(null));
 
-    for (const source of ['./local.png', '../static/x.png', 'D:/site/x.png', '/images/x.png', 'fumadocs-ui']) {
+    for (const source of [
+      './local.png',
+      './/local.png',
+      '../static/x.png',
+      'D:/site/x.png',
+      '/images/x.png',
+      'fumadocs-ui',
+      './//server/share/x.png'
+    ]) {
       expect(filter.id.test(source), source).to.be.false;
     }
   });

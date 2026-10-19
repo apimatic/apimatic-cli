@@ -103,6 +103,17 @@ describe('PortalServeAction', () => {
     expect(authorize.called).to.be.false;
   });
 
+  it('stops before signing in when the source is on a network share', async function () {
+    if (process.platform !== 'win32') this.skip();
+    const share = new DirectoryPath('\\\\server\\share\\api');
+
+    const result = await execute(share);
+
+    expect(result.isFailed()).to.be.true;
+    expect(shared.prompts.networkShareUnsupported.calledOnceWith(share.join('src'))).to.be.true;
+    expect(authorize.called).to.be.false;
+  });
+
   it('fails when the account may not build a portal, without starting the preview', async () => {
     authorize.resolves(err({ kind: 'notEntitled' as const }));
 

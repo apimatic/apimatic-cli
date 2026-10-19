@@ -8,8 +8,8 @@ export function staticImages(staticDirectory: string | null): Plugin[] {
     name: 'apimatic:static-images:resolve',
     enforce: 'pre',
     resolveId: {
-      // Fumadocs' import of a file on another drive: the absolute path, still behind a `./`.
-      filter: { id: /^\.\/(?:[A-Za-z]:\/|\/\/)/ },
+      // Fumadocs' import of a file on another drive: the absolute path, still behind a `./` (fuma-nama/fumadocs#3723).
+      filter: { id: /^\.\/[A-Za-z]:\// },
       handler(source, importer, options) {
         return this.resolve(source.slice(2), importer, { ...options, skipSelf: true });
       }
