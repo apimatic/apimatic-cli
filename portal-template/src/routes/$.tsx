@@ -10,9 +10,10 @@ import { absoluteUrl, canonicalLink } from '@/lib/seo';
 import { useFumadocsLoader } from 'fumadocs-core/source/client';
 import { usePathname } from 'fumadocs-core/framework';
 import { DocsBody, DocsDescription, DocsPage, DocsTitle, ViewOptionsPopover } from 'fumadocs-ui/layouts/notebook/page';
+import { InlineTOC, type InlineTocProps } from 'fumadocs-ui/components/inline-toc';
 import { staticFunctionMiddleware } from '@tanstack/start-static-server-functions';
-import { Suspense, use, type ReactNode } from 'react';
-import { useMDXComponents } from '@/components/mdx';
+import { Suspense, use, useMemo, type ReactNode } from 'react';
+import { getMDXComponents } from '@/components/mdx';
 import { OpenAPIPage } from '@/components/api-page';
 import { MarkdownCopyButton } from '@/components/markdown-copy-button';
 import { slimOpenAPIPageProps } from '@/lib/openapi-slim';
@@ -128,6 +129,12 @@ function Content({
 
   const { toc } = use(page.load());
   const PageBody = page.body;
+  // Given the page's headings, so an author's `<InlineTOC />` lists them rather than crashing the
+  // page for want of `items`. Memoized, or each render would remount it and close it again.
+  const components = useMemo(
+    () => getMDXComponents({ InlineTOC: (props: Partial<InlineTocProps>) => <InlineTOC items={toc} {...props} /> }),
+    [toc]
+  );
   const pathname = usePathname();
   // Named, or the popover reads `window.location.href` and sends the reader's query and hash on.
   const pageUrl = fullAddress(pathname);
@@ -144,7 +151,7 @@ function Content({
         {portal.pageActions ? <ViewOptionsPopover markdownUrl={markdownUrl} pageUrl={pageUrl} /> : null}
       </div>
       <DocsBody>
-        <PageBody components={useMDXComponents()} />
+        <PageBody components={components} />
       </DocsBody>
     </DocsPage>
   );

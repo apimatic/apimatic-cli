@@ -5,10 +5,6 @@ export class FileName {
     this.name = name;
   }
 
-  public isMarkDown() {
-    return this.hasExtension('.md');
-  }
-
   /** Whether the name ends in `extension`, compared without regard to case. */
   public hasExtension(extension: string): boolean {
     return this.name.toLowerCase().endsWith(extension.toLowerCase());
