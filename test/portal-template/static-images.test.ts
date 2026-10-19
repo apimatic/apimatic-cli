@@ -94,6 +94,12 @@ describe('staticImages', () => {
     expect(load(`${real}/images/x.png`)).to.equal('export default "/images/x.png";');
   });
 
+  it('knows the static directory on Windows whatever the case it is spelled in', function () {
+    if (process.platform !== 'win32') this.skip();
+
+    expect(previewLoad(real)(`${real.toUpperCase()}/images/x.png`)).to.equal('export default "/images/x.png";');
+  });
+
   it('leaves a query, a file that is no asset and a file elsewhere to Vite', () => {
     const load = previewLoad(real);
 

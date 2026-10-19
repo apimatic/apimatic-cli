@@ -17,8 +17,12 @@ export function staticImages(staticDirectory: string | null): Plugin[] {
   };
   if (staticDirectory === null) return [resolve];
 
+  // A Windows path names the same file in any case.
+  const folded = (path: string) => (process.platform === 'win32' ? path.toLowerCase() : path);
   // Vite names a module by its real path, but keeps the spelling of a `subst` drive.
-  const directories = [staticDirectory, realpathSync.native(staticDirectory)].map((dir) => `${normalizePath(dir)}/`);
+  const directories = [staticDirectory, realpathSync.native(staticDirectory)].map((dir) =>
+    folded(`${normalizePath(dir)}/`)
+  );
   let config: ResolvedConfig;
   return [
     resolve,
@@ -31,10 +35,11 @@ export function staticImages(staticDirectory: string | null): Plugin[] {
       },
       // Vite's dev server serves no file from another drive (vitejs/vite#10802), but its public directory from any.
       load(id) {
-        const directory = directories.find((dir) => id.startsWith(dir));
+        const directory = directories.find((dir) => folded(id).startsWith(dir));
         // A query such as `?raw` asks for more than the address, and stays Vite's to answer.
         if (directory === undefined || id.includes('?') || !config.assetsInclude(id)) return null;
-        return `export default ${JSON.stringify(withBasePath(`/${id.slice(directory.length)}`, config.base))};`;
+        const address = withBasePath(`/${id.slice(directory.length)}`, config.base);
+        return `export default ${JSON.stringify(address)};`;
       }
     }
   ];
