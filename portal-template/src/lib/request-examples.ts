@@ -1,5 +1,4 @@
-import type { ParameterObject } from 'fumadocs-openapi';
-import type { ExampleRequest, OperationParameters } from 'fumadocs-openapi/operation';
+import type { ExampleRequest, OperationParameter, OperationParameters } from 'fumadocs-openapi/operation';
 import { isJsonObject } from './json';
 
 export type RequestExample = Pick<ExampleRequest, 'id' | 'name' | 'description'>;
@@ -28,7 +27,7 @@ export class Parameter {
     return groups.flatMap((group) => group.items.map((item) => Parameter.from(group.in, item, resolve)));
   }
 
-  private static from(location: Location, item: ParameterObject, resolve: Resolve): Parameter {
+  private static from(location: Location, item: OperationParameter, resolve: Resolve): Parameter {
     const examples = Object.entries(item.examples ?? {})
       .map(([id, example]): [string, unknown] => [id, resolve(example)])
       .filter(isExampleEntry);

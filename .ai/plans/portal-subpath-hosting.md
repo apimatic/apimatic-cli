@@ -507,9 +507,10 @@ follow-up.
 
 ### 5.10 Images Fumadocs leaves out (added 2026-10-06)
 
-- **Images in the specification's descriptions.** Fumadocs renders descriptions with `img`
-  mapped to `undefined`, so one image fails the whole operation page, at the root too, with
-  React error #130. A root-relative image there would also miss the base.
+- **Images in the specification's descriptions.** Up to fumadocs-openapi 12.4.0, Fumadocs
+  rendered descriptions with `img` mapped to `undefined`, so one image failed the whole operation
+  page, at the root too, with React error #130. 12.4.0 maps it to a plain `img`, which no longer
+  crashes, but a root-relative image there still misses the base.
   - `api-page.tsx` passes `components.Markdown` = `ApiMarkdown` (`components/api-markdown.tsx`).
     It is built on Fumadocs' own `createMarkdownRenderer` with `remarkGfm`, and its `img` gives a
     root-relative `src` the base through `withBasePath`. Code blocks go through `DynamicCodeBlock`,
@@ -518,8 +519,8 @@ follow-up.
     `rehype-code-titles.ts` it put the highlighter on every page, through the route's chunk.
     The default e2e build checks that no page preloads `shiki-bundle`.
   - The e2e fixture's operation has an image and a code block in its description.
-  - Filed as fuma-nama/fumadocs#3661 (section 10). `ApiMarkdown` can go once Fumadocs renders
-    images and gives them the base.
+  - Filed as fuma-nama/fumadocs#3661, whose fix in 12.4.0 covers the crash alone (section 10).
+    `ApiMarkdown` can go once Fumadocs gives the image the base.
 - **Reference-style images (`![alt][ref]`).** Fumadocs' `remarkImage` sizes and imports inline
   images only, so a reference kept a root-relative `src` that misses the base.
   - `remarkImageReferences` (`lib/remark-image-references.ts`) writes each one as an inline image
@@ -836,8 +837,9 @@ with the MDX components, but not in its copy.
 | fuma-nama/fumadocs#3620, from PR #3572 (ui 16.15.13) | Fixed 2026-09-29 in fumadocs-ui 16.15.17 (commit `6791d6f`): the popover prefixes `markdownUrl` with `withBasePath` again, in both `radix-ui` and `base-ui` | Since 2026-10-08 we pass the page's path and rely on that `withBasePath`; `page-actions.test.ts` fails if an upgrade drops it again (5.2) |
 | TanStack/router#4888, docs PR #7882 | Docs only | None |
 | TanStack/router#8448, PR #8450 | Both open (checked 2026-10-07); the PR has no review yet. The issue reports a second loader run; we saw the address rewritten too | When it ships, `searchOptions` can go (5.11) |
-| fuma-nama/fumadocs#3661 | Filed 2026-10-07: an image in an operation's description crashes the page | When it ships with the base, `ApiMarkdown` can go (5.10) |
+| fuma-nama/fumadocs#3661 | Fixed 2026-10-09 in fumadocs-openapi 12.4.0, installed since 2026-10-19 (12.4.1): `img` maps to `'img'`, so the page no longer crashes. The image gets no base | `ApiMarkdown` stays for the base alone (5.10) |
 | fuma-nama/fumadocs#3662 | Filed 2026-10-07: processed Markdown prints images as `__img0` | When it ships, ticket 5 is fixed by the upgrade (section 9) |
+| fuma-nama/fumadocs#3663 | Fixed 2026-10-09 in fumadocs-openapi 12.4.0, installed since 2026-10-19 (12.4.1): the OAuth panel shows the `redirect_uri` of the authorization code and implicit flows, with a copy button | It shows `oauthRedirectUrl`, which carries the base (5.2), against the page's origin: the one callback a portal owner registers |
 
 **The fixes:**
 - **Fumadocs:** filed by the user as fuma-nama/fumadocs#3620, from a draft made here, and fixed
