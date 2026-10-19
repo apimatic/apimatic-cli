@@ -99,6 +99,61 @@ describe('ContentTree', () => {
     expect(problems[0]).to.deep.equal({ kind: 'missingImages', images: [image] });
   });
 
+  it('refuses a component the portal does not provide, with the one a typo most likely meant', async () => {
+    const page = inContent('guides', 'intro.mdx');
+    const withComponents = await parsed(
+      [inContent('index.md'), '---\ntitle: Home\n---\n'],
+      [page, '---\ntitle: Intro\n---\n\n<Banner>Out now.</Banner>\n\n<Accordian title="x">y</Accordian>\n\n<Steps />\n']
+    );
+
+    const navigationFiles = handed([inContent('nav.json'), '{}'], [inContent('guides', 'nav.json'), '{}']);
+
+    const problems = tree
+      .check({ pages: withComponents, navigationFiles, missingImages: [] }, [], GENERATED)
+      ._unsafeUnwrapErr();
+
+    expect(problems).to.deep.equal([
+      {
+        kind: 'unknownComponents',
+        components: [
+          { page, line: 5, name: 'Banner', nearest: null },
+          { page, line: 7, name: 'Accordian', nearest: 'Accordion' }
+        ]
+      }
+    ]);
+  });
+
+  it('refuses every page that is not valid MDX at once, alongside the components of the pages that are', async () => {
+    const cards = inContent('guides', 'cards.mdx');
+    const steps = inContent('guides', 'steps.mdx');
+    const banner = inContent('guides', 'banner.mdx');
+    const pages = await parsed(
+      [inContent('index.md'), '---\ntitle: Home\n---\n'],
+      [cards, '---\ntitle: Cards\n---\n\n<Cards>\n  <Card title="a" />\n'],
+      [steps, '---\ntitle: Steps\n---\n\n<Steps>\n</Step>\n'],
+      [banner, '---\ntitle: Banner\n---\n\n<Banner />\n']
+    );
+    const navigationFiles = handed([inContent('nav.json'), '{}'], [inContent('guides', 'nav.json'), '{}']);
+
+    const problems = tree.check({ pages, navigationFiles, missingImages: [] }, [], GENERATED)._unsafeUnwrapErr();
+
+    expect(problems).to.deep.equal([
+      {
+        kind: 'invalidMdx',
+        pages: [
+          { page: cards, line: 5, column: 1, reason: 'Expected a closing tag for `<Cards>`' },
+          {
+            page: steps,
+            line: 6,
+            column: 1,
+            reason: 'Unexpected closing tag `</Step>`, expected corresponding closing tag for `<Steps>` on line 5'
+          }
+        ]
+      },
+      { kind: 'unknownComponents', components: [{ page: banner, line: 5, name: 'Banner', nearest: null }] }
+    ]);
+  });
+
   it('names the tabs from what it is handed', () => {
     const navigationFiles = handed(
       [inContent('nav.json'), JSON.stringify({ title: 'Guides', tabs: ['guides'], pages: ['index'] })],

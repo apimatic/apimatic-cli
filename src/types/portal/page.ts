@@ -22,10 +22,28 @@ export interface PageImage {
   path: string;
 }
 
-/** A page as the build parses it: its front matter held to the build's schema, and the images the build imports. */
+/** A tag in an `.mdx` page naming a component the page neither imports nor defines, which the portal has to provide. */
+export interface PageComponent {
+  /** As the tag writes it: `Banner`, or `Icons.Star`. */
+  name: string;
+  line: number;
+}
+
+/** Where an `.mdx` page stops being valid MDX, which fails the build, or leaves the page an error screen in a preview. */
+export interface PageSyntaxError {
+  line: number;
+  column: number;
+  /** As MDX gives it, less the parser's own names. */
+  reason: string;
+}
+
+/** A page as the build parses it: its front matter held to the build's schema, the images the build imports, and the components it takes from the portal. */
 export interface ParsedPage {
   frontMatter: Result<PageFrontMatter, string[]>;
   images: PageImage[];
+  components: PageComponent[];
+  /** The first mistake in its body, if any: MDX reads no further. */
+  syntaxError: PageSyntaxError | null;
 }
 
 type SchemaIssue = NonNullable<ReturnType<typeof pageSchema.safeParse>['error']>['issues'][number];
@@ -36,27 +54,61 @@ interface MarkdownNode {
   type: string;
   url?: string;
   identifier?: string;
+  /** A JSX tag's name; null for a fragment. */
+  name?: string | null;
+  /** An ESM block's program, which remark-mdx parses it into. */
+  data?: { estree?: { body: EsmNode[] } };
   position?: { start: { line: number } };
   children?: MarkdownNode[];
+}
+
+/** As much of an ESM block's syntax tree as says what it defines. */
+interface EsmNode {
+  type: string;
+  name?: string;
+  id?: EsmNode | null;
+  local?: EsmNode;
+  specifiers?: EsmNode[];
+  declaration?: EsmNode | null;
+  declarations?: EsmNode[];
+}
+
+/** What MDX throws, a vfile message, as far as it says where and why. */
+interface ParseFailure {
+  reason?: unknown;
+  line?: unknown;
+  column?: unknown;
+  cause?: unknown;
 }
 
 // A scheme, a drive letter or a network path: none of them names a file the build imports.
 const NOT_A_FILE = /^(?:[a-z][a-z\d+.-]*:|\/\/)/i;
 
-/** Parsed once, as the build parses it, `.mdx` as MDX; a body that does not parse is the build's to report. */
+// A tag's place, as MDX writes it into a reason: `(3:1-3:8)`.
+const PLACE_IN_REASON = /\s*\((\d+):(\d+)-\d+:\d+\)$/;
+
+/** Parsed once, as the build parses it, `.mdx` as MDX. */
 export async function parsePage(contents: string, fileName: FileName, label: string): Promise<ParsedPage> {
   let parsed: { matter: string; data: unknown };
   try {
     parsed = frontmatter(contents);
   } catch (error) {
     const reason = errorMessage(error).split('\n')[0];
-    return { frontMatter: err([`${label}: its front matter is not valid YAML. ${reason}`]), images: [] };
+    return {
+      frontMatter: err([`${label}: its front matter is not valid YAML. ${reason}`]),
+      images: [],
+      components: [],
+      syntaxError: null
+    };
   }
   // Blanked rather than cut, so every line keeps its number.
   const body = '\n'.repeat(parsed.matter.split('\n').length - 1) + contents.slice(parsed.matter.length);
+  const tree = await parsedBody(body, fileName.hasExactExtension('.mdx'));
   return {
     frontMatter: await checkedFrontMatter(parsed, label),
-    images: await imagesIn(body, fileName.hasExactExtension('.mdx'))
+    images: tree.map(imagesIn).unwrapOr([]),
+    components: tree.map(componentsIn).unwrapOr([]),
+    syntaxError: tree.isErr() ? tree.error : null
   };
 }
 
@@ -104,17 +156,38 @@ function titleError(title: unknown, label: string): string {
   return `${label}: 'title' must be text. Put it in quotes if it looks like a number or true or false.`;
 }
 
-async function imagesIn(body: string, isMdx: boolean): Promise<PageImage[]> {
+async function parsedBody(body: string, isMdx: boolean): Promise<Result<MarkdownNode, PageSyntaxError>> {
   // On first use, as the schema is: most commands never read a page.
   const { remark } = await import('remark');
   const processor = isMdx ? remark().use((await import('remark-mdx')).default) : remark();
-  let tree: MarkdownNode;
   try {
-    tree = processor.parse(body) as MarkdownNode;
-  } catch {
-    return [];
+    return ok(processor.parse(body) as MarkdownNode);
+  } catch (error) {
+    return err(syntaxError(isJsonObject(error) ? error : {}));
   }
+}
 
+/**
+ * Where MDX stopped, and why. An unclosed tag is only found at the end of the page, so MDX names the
+ * tag's own place in its reason, and gives the error none.
+ */
+function syntaxError({ reason, line, column, cause }: ParseFailure): PageSyntaxError {
+  const text = typeof reason === 'string' ? reason : 'It could not be read as MDX.';
+  const tag = PLACE_IN_REASON.exec(text);
+  const said = text.replace(PLACE_IN_REASON, '').replace(/ with acorn$/, '');
+  // "Could not parse expression" says nothing of what was wrong with it; acorn's own reason does.
+  const detail = cause instanceof Error ? `: ${cause.message}` : '';
+  if (typeof line === 'number' && typeof column === 'number') {
+    return { line, column, reason: said + (tag === null ? '' : ` on line ${tag[1]}`) + detail };
+  }
+  return {
+    line: tag === null ? 1 : Number(tag[1]),
+    column: tag === null ? 1 : Number(tag[2]),
+    reason: said + detail
+  };
+}
+
+function imagesIn(tree: MarkdownNode): PageImage[] {
   // The template writes `![a][ref]` as `![a](url)` before the build imports it (remark-image-references.ts).
   const definitions = new Map<string, string>();
   const define = (node: MarkdownNode) => {
@@ -142,6 +215,54 @@ async function imagesIn(body: string, isMdx: boolean): Promise<PageImage[]> {
   };
   visit(tree);
   return images;
+}
+
+/**
+ * The tags MDX compiles to a lookup in the components the portal provides, which fails when a reader
+ * opens the page rather than when it builds: those naming nothing an import or export of the page defines.
+ */
+function componentsIn(tree: MarkdownNode): PageComponent[] {
+  const defined = new Set(tree.children?.flatMap(({ data }) => data?.estree?.body.flatMap(definedNames) ?? []));
+  const components: PageComponent[] = [];
+  const visit = (node: MarkdownNode) => {
+    const isTag = node.type === 'mdxJsxFlowElement' || node.type === 'mdxJsxTextElement';
+    const name = isTag ? node.name : null;
+    if (typeof name === 'string' && isComponentName(name) && !defined.has(name.split('.')[0])) {
+      components.push({ name, line: node.position?.start.line ?? 0 });
+    }
+    node.children?.forEach(visit);
+  };
+  visit(tree);
+  return components;
+}
+
+// MDX's own rule: `x.y` and a name that does not start with a lowercase letter are components; `b-ar` and `svg:rect` are HTML.
+function isComponentName(name: string): boolean {
+  return name.includes('.') || (!/^[a-z]/.test(name) && !/[-:]/.test(name));
+}
+
+function definedNames(statement: EsmNode): string[] {
+  if (statement.type === 'ImportDeclaration') {
+    return statement.specifiers?.flatMap(({ local }) => local?.name ?? []) ?? [];
+  }
+  const declaration = statement.type === 'ExportNamedDeclaration' ? statement.declaration : null;
+  if (declaration?.type === 'VariableDeclaration') {
+    return declaration.declarations?.flatMap(({ id }) => identifiersIn(id)) ?? [];
+  }
+  return declaration?.id?.name === undefined ? [] : [declaration.id.name];
+}
+
+// A destructuring pattern's keys and defaults too: more than it binds, which can let a tag through but never refuse one.
+function identifiersIn(pattern: unknown): string[] {
+  if (Array.isArray(pattern)) {
+    return pattern.flatMap(identifiersIn);
+  }
+  if (!isJsonObject(pattern)) {
+    return [];
+  }
+  return pattern.type === 'Identifier' && typeof pattern.name === 'string'
+    ? [pattern.name]
+    : Object.values(pattern).flatMap(identifiersIn);
 }
 
 function located(url: string): Omit<PageImage, 'line'> | null {

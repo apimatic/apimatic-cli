@@ -5,6 +5,7 @@ import { Endpoint } from './endpoint.js';
 import { SuggestedSite } from './config/site-config.js';
 import { ContentNotices } from './content-notices.js';
 import { GeneratedPages } from './generated-pages.js';
+import { PageSyntaxError } from './page.js';
 import { PortalConfig } from './portal-config.js';
 import { Shared } from './shared.js';
 
@@ -96,6 +97,20 @@ export interface MissingImage {
   missing: MissingFile | null;
 }
 
+/** A page's tag naming a component the portal does not provide, which builds, and leaves the page an error screen. */
+export interface UnknownComponent {
+  page: FilePath;
+  line: number;
+  name: string;
+  /** The component a typo most likely meant, or null when none is close. */
+  nearest: string | null;
+}
+
+/** A page that is not valid MDX, at its first mistake. */
+export interface InvalidPage extends PageSyntaxError {
+  page: FilePath;
+}
+
 /** Why `content/` cannot be built; each variant maps to its own message. */
 export type ContentProblem =
   | { kind: 'unreadableContent' }
@@ -104,7 +119,9 @@ export type ContentProblem =
   | { kind: 'sharedAddresses'; addresses: SharedAddress[] }
   | { kind: 'invalidFrontMatter'; errors: string[] }
   | { kind: 'invalidNavigation'; errors: string[] }
-  | { kind: 'missingImages'; images: MissingImage[] };
+  | { kind: 'missingImages'; images: MissingImage[] }
+  | { kind: 'unknownComponents'; components: UnknownComponent[] }
+  | { kind: 'invalidMdx'; pages: InvalidPage[] };
 
 /** How `api transform` would turn the first document in a directory into one the portal reads. */
 export interface SpecConversion {

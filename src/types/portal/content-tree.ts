@@ -7,6 +7,7 @@ import { FilePath } from '../file/filePath.js';
 import { ContentNotices } from './content-notices.js';
 import { GENERATED_SECTIONS, GeneratedPages } from './generated-pages.js';
 import { ParsedPage } from './page.js';
+import { isPortalComponent, nearestPortalComponent } from './portal-components.js';
 import {
   API_REFERENCE_NAME,
   GROUP_FOLDER,
@@ -20,11 +21,13 @@ import {
 } from './portal-navigation.js';
 import {
   ContentProblem,
+  InvalidPage,
   MissingImage,
   PortalSpec,
   ReservedAddress,
   ReservedAddressPage,
-  SharedAddress
+  SharedAddress,
+  UnknownComponent
 } from './portal-source.js';
 import { PortalTab, sharedTabNames, TabOwner, untitledTabName } from './portal-tabs.js';
 import { shared } from './shared.js';
@@ -170,6 +173,16 @@ export class ContentTree {
     if (read.missingImages.length > 0) {
       problems.push({ kind: 'missingImages', images: read.missingImages });
     }
+    // Refused here too, so a preview hears of them, and a build of every page at once rather than the first.
+    const invalidPages = ContentTree.invalidPages(read.pages);
+    if (invalidPages.length > 0) {
+      problems.push({ kind: 'invalidMdx', pages: invalidPages });
+    }
+    // Refused here because the build would not: MDX looks a component up only when the page renders.
+    const unknownComponents = ContentTree.unknownComponents(read.pages);
+    if (unknownComponents.length > 0) {
+      problems.push({ kind: 'unknownComponents', components: unknownComponents });
+    }
 
     // The walk takes each page to be served where it sits, so it would misjudge an entry naming one of these.
     if (addressProblems.length > 0) {
@@ -225,6 +238,18 @@ export class ContentTree {
       titled: read.flatMap((page) => (page.isOk() ? [page.value] : [])),
       errors: read.flatMap((page) => (page.isErr() ? page.error : []))
     };
+  }
+
+  private static invalidPages(pages: ReadPage[]): InvalidPage[] {
+    return pages.flatMap(({ file, parsed }) => (parsed?.syntaxError ? [{ page: file, ...parsed.syntaxError }] : []));
+  }
+
+  private static unknownComponents(pages: ReadPage[]): UnknownComponent[] {
+    return pages.flatMap(({ file, parsed }) =>
+      (parsed?.components ?? [])
+        .filter(({ name }) => !isPortalComponent(name))
+        .map(({ name, line }) => ({ page: file, line, name, nearest: nearestPortalComponent(name) }))
+    );
   }
 
   /**

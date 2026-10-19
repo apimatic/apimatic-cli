@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "portal": {
+    "site": {
+      "name": "Calculator API"
+    }
+  },
+  "languages": {
+    "typescript": {}
+  }
+}

@@ -113,7 +113,7 @@ describe('parsePage', () => {
       expect((await images('---\ntitle: Home\n---\n\n![a](/a.png)\n')).map(({ line }) => line)).to.deep.equal([5]);
     });
 
-    // The front matter check reports the first; the build reports the second.
+    // The front matter check reports the first; the syntax error, the second.
     it('finds nothing in a page that does not parse, rather than throwing', async () => {
       expect(await images('---\ntitle: [unclosed\n---\n![a](/a.png)\n')).to.deep.equal([]);
       expect(await images('<Callout>\n\n![a](/a.png)\n', 'page.mdx')).to.deep.equal([]);
@@ -148,5 +148,101 @@ describe('parsePage', () => {
 
       expect(found.map(({ path, line }) => [path, line])).to.deep.equal([['a.png', 3]]);
     });
+  });
+
+  // MDX looks each up in the components the portal provides, and only once a reader opens the page.
+  describe('the components', () => {
+    const components = async (markdown: string, name = 'page.mdx') => (await page(markdown, name)).components;
+
+    it('names each component tag with its line, inside other tags and text too', async () => {
+      const markdown =
+        '---\ntitle: Home\n---\n\n<Banner variant="rainbow">Out now.</Banner>\n\n' +
+        '<Tabs items={["a"]}>\n  <Tab>Text with <Badge /> in it.</Tab>\n</Tabs>\n';
+
+      expect(await components(markdown)).to.deep.equal([
+        { name: 'Banner', line: 5 },
+        { name: 'Tabs', line: 7 },
+        { name: 'Tab', line: 8 },
+        { name: 'Badge', line: 8 }
+      ]);
+    });
+
+    it('names a member tag whole, whatever the case of its object', async () => {
+      expect(await components('<Icons.Star />\n\n<motion.div>x</motion.div>\n')).to.deep.equal([
+        { name: 'Icons.Star', line: 1 },
+        { name: 'motion.div', line: 3 }
+      ]);
+    });
+
+    it('leaves out HTML tags and fragments', async () => {
+      expect(await components('<div>\n  <svg:rect />\n  <my-element />\n</div>\n\n<>Fragment</>\n')).to.deep.equal([]);
+    });
+
+    it('leaves out what the page imports or exports itself', async () => {
+      const markdown =
+        "import { Banner } from 'fumadocs-ui/components/banner';\n" +
+        "import Default, * as Icons from './icons';\n" +
+        "export function Local() { return 'local'; }\n" +
+        'export const Arrow = () => null, { Picked } = Icons;\n\n' +
+        '<Banner />\n\n<Default />\n\n<Icons.Star />\n\n<Local />\n\n<Arrow />\n\n<Picked />\n\n<Missing />\n';
+
+      expect((await components(markdown)).map(({ name }) => name)).to.deep.equal(['Missing']);
+    });
+
+    it('finds none in a .md page, where a tag is HTML', async () => {
+      expect(await components('<Banner>Out now.</Banner>\n', 'page.md')).to.deep.equal([]);
+    });
+
+    // The page's syntax error is reported in their place.
+    it('finds none in a page that does not parse, rather than throwing', async () => {
+      expect(await components('<Banner>\n\nUnclosed.\n')).to.deep.equal([]);
+      expect(await components('---\ntitle: [unclosed\n---\n<Banner />\n')).to.deep.equal([]);
+    });
+  });
+
+  // A preview leaves such a page an error screen, and the build fails over it naming its temporary copy.
+  describe('the first mistake in an .mdx page', () => {
+    const syntaxError = async (body: string, name = 'page.mdx') =>
+      (await page(`---\ntitle: Cards\n---\n\n${body}`, name)).syntaxError;
+
+    it('places a tag left open at the tag, which MDX finds only at the end of the page', async () => {
+      expect(await syntaxError('## One\n\n<Cards>\n  <Card title="a" />\n\n## Two\n')).to.deep.equal({
+        line: 7,
+        column: 1,
+        reason: 'Expected a closing tag for `<Cards>`'
+      });
+    });
+
+    it('places a closing tag that does not match at the closing tag, naming the line of the one it should close', async () => {
+      expect(await syntaxError('<Cards>\n  Text\n</Card>\n')).to.deep.equal({
+        line: 7,
+        column: 1,
+        reason: 'Unexpected closing tag `</Card>`, expected corresponding closing tag for `<Cards>` on line 5'
+      });
+    });
+
+    it("gives what is wrong with an expression in acorn's words, and not its name", async () => {
+      expect(await syntaxError('Then {oops(}.\n')).to.deep.equal({
+        line: 5,
+        column: 12,
+        reason: 'Could not parse expression: Unexpected token'
+      });
+    });
+
+    it('names an HTML comment as MDX does, with what to write instead', async () => {
+      const found = await syntaxError('<!-- note -->\n');
+
+      expect(found).to.include({ line: 5, column: 2 });
+      expect(found?.reason).to.contain('use `{/* text */}`');
+    });
+
+    for (const [description, body, name] of [
+      ['a valid page', '<Cards>\n  <Card title="a" />\n</Cards>\n\n{/* a comment */}\n', 'page.mdx'],
+      ['a .md page, which is not read as MDX', '<Cards>\n\n<!-- note -->\n\nIf a <5.\n', 'page.md']
+    ]) {
+      it(`finds none in ${description}`, async () => {
+        expect(await syntaxError(body, name)).to.be.null;
+      });
+    }
   });
 });
