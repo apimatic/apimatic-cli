@@ -55,10 +55,6 @@ export class SdkPublishInteractivePrompts {
     return DirectoryPath.fromUserInput(value);
   }
 
-  public sdkDirectoryCannotBeSameAsSourceDirectory() {
-    log.error(`SDK directory must be different from the ${f.var('src')} directory.`);
-  }
-
   public async noSdkDirectoryProvided() {
     log.error('No SDK directory was provided.');
   }
