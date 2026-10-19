@@ -412,6 +412,37 @@ const stylesheetOf = (output: DirectoryPath) => {
     expect(read('guides/intro/index.html')).to.not.contain('<figcaption');
   });
 
+  // The template registers them, so an author's page names them without importing them. Only what
+  // the server renders is here: an inactive tab, a closed folder or accordion is drawn in the browser.
+  it("renders Fumadocs' components on an author's page", () => {
+    const page = read('guides/components/index.html');
+
+    for (const rendered of [
+      'Inline contents',
+      'Default callout body.',
+      'Idea title',
+      'Composed callout body.',
+      'href="/guides/intro"',
+      'Plain card body.',
+      'client.ts',
+      'python tab body',
+      'Composed first',
+      'Tab one',
+      'First tab body.',
+      'Right tab body.',
+      'fd-step',
+      'Accordion title',
+      'Multiple two',
+      'file-name.ts',
+      'closed-folder',
+      'typeTableField',
+      'deprecatedField',
+      'A guide from the fixture.'
+    ]) {
+      expect(page, `no ${rendered} on the page`).to.contain(rendered);
+    }
+  });
+
   // Emphasis reaches these files through a Markdown serializer that has broken on it twice: once
   // mangling the markers, once looping over one until the stack ran out. It has to read as written.
   it("keeps the emphasis in a language's SDK docs, in its twin and in llms-full.txt", () => {
