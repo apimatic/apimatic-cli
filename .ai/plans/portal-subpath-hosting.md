@@ -528,7 +528,7 @@ follow-up.
     `publicDir`, an SDK page's root-relative image would fail the build once imported (measured).
   - `src/types/portal/page.ts` checks those images before a build too. A missing one is then
     reported by the CLI, not by a failed build. A contract test holds the two to the same images.
-  - Like every imported image, it now reads `<img src="__imgN" />` in the Markdown copies (section 9).
+  - The Markdown copies keep the reference as written, since fumadocs-core 16.17 (section 9).
 
 ### 5.11 The query on load (`lib/search-options.ts`, added 2026-10-07)
 
@@ -741,8 +741,6 @@ after each one. In all, roughly 400 lines of source and 500 of tests.
      - It names `robots.txt` (and `sitemap.xml`) even where none is generated: without
        `site.url`, and now under a path. `GENERATED_ROOT_FILES` lists them unconditionally.
      - Pre-existing, so not fixed here.
-   - a ticket for the `<img src="__img0">` placeholders in the Markdown copies (section 9),
-     found while checking the links there;
    - the optional TanStack reaction or comment of section 10, if the user wants one. The
      Fumadocs issue was filed by the user as fuma-nama/fumadocs#3620 and fixed in fumadocs-ui
      16.15.17 (section 10).
@@ -815,14 +813,15 @@ after each one. In all, roughly 400 lines of source and 500 of tests.
     - Open: how the handlers learn the base, given that `source.ts` goes through
       `fumadocs-mdx/macro`.
 
-**Images in the Markdown copies are broken on every portal** (measured 2026-09-30, root and
-path alike). `remarkImage` swaps the image for an import, and the copy and `llms-full.txt` carry
-`<img alt="…" src="__img0" />`, which leads nowhere. This predates the path: `useImport` is the
-default. It gets a ticket of its own. Since 5.10, reference-style images read the same way.
-- It is Fumadocs' bug, filed as fuma-nama/fumadocs#3662 (section 10).
-- A workaround is possible: plugins on either side of `remarkImage`, plus the `stringify` hook
-  that `includeProcessedMarkdown` passes on. It is held back, because it would rest on
-  `remarkImage`'s internal `__img${n}` names.
+**Root-relative images stay unprefixed in the Markdown copies**, as links do.
+- An image written `/images/diagram.png` is under the base in the page's HTML, but keeps its
+  spelling in the `.md` copy and in `llms-full.txt`, inline and by reference alike.
+- The `image` and `definition` handlers of the alternative above would prefix them along with
+  the links.
+- Until fumadocs-core 16.17, the copies carried `<img alt="…" src="__img0" />` instead, on every
+  portal (measured 2026-09-30, root and path alike). That was Fumadocs' bug, fuma-nama/fumadocs#3662,
+  fixed by the upgrade of 2026-10-16 (section 10). The subpath e2e checks that the copies keep the
+  images as written.
 
 **API reference pages' Markdown copies keep the spec's own text:** its description and the YAML.
 A root-relative link inside a spec description is prefixed in the page's HTML, which renders it
@@ -836,9 +835,8 @@ with the MDX components, but not in its copy.
 | fuma-nama/fumadocs#3620, from PR #3572 (ui 16.15.13) | Fixed 2026-09-29 in fumadocs-ui 16.15.17 (commit `6791d6f`): the popover prefixes `markdownUrl` with `withBasePath` again, in both `radix-ui` and `base-ui` | Since 2026-10-08 we pass the page's path and rely on that `withBasePath`; `page-actions.test.ts` fails if an upgrade drops it again (5.2) |
 | TanStack/router#4888, docs PR #7882 | Docs only | None |
 | TanStack/router#8448, PR #8450 | Both open (checked 2026-10-07); the PR has no review yet. The issue reports a second loader run; we saw the address rewritten too | When it ships, `searchOptions` can go (5.11) |
-| fuma-nama/fumadocs#3661 | Fixed 2026-10-09 in fumadocs-openapi 12.4.0, installed since 2026-10-16 (12.4.1): `img` maps to `'img'`, so the page no longer crashes. The image gets no base | `ApiMarkdown` stays for the base alone (5.10) |
-| fuma-nama/fumadocs#3662 | Fixed 2026-10-09 in fumadocs-core 16.17.0 and fumadocs-mdx 15.4.7, installed since 2026-10-16 (core 16.17.1): the processed Markdown is sliced from the authored source, so images keep their addresses | Ticket 5 is fixed by the upgrade (section 9); the subpath e2e checks the copies |
-| fuma-nama/fumadocs#3663 | Fixed 2026-10-09 in fumadocs-openapi 12.4.0, installed since 2026-10-16 (12.4.1): the OAuth panel shows the `redirect_uri` of the authorization code and implicit flows, with a copy button | It shows `oauthRedirectUrl`, which carries the base (5.2), against the page's origin: the one callback a portal owner registers |
+| fuma-nama/fumadocs#3661 | Filed 2026-10-07: an image in an operation's description crashes the page | When it ships with the base, `ApiMarkdown` can go (5.10) |
+| fuma-nama/fumadocs#3662 | Fixed 2026-10-09 in fumadocs-core 16.17.0 and fumadocs-mdx 15.4.7, installed since 2026-10-16 (core 16.17.1): the processed Markdown is sliced from the authored source, so images keep their addresses | The upgrade fixes it, so it needs no ticket; root-relative images stay unprefixed (section 9). The subpath e2e checks the copies |
 
 **The fixes:**
 - **Fumadocs:** filed by the user as fuma-nama/fumadocs#3620, from a draft made here, and fixed

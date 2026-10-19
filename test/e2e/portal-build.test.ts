@@ -823,7 +823,7 @@ const stylesheetOf = (output: DirectoryPath) => {
     expect(full).to.not.contain('__img');
   });
 
-  // Fumadocs renders a description's image without the path; `ApiMarkdown` gives it the path.
+  // Fumadocs' own renderer fails the whole page over an image in a description; `ApiMarkdown` stands in for it.
   it('renders an image and a code block in a description, the image under the path', () => {
     const page = read('api/apimatic-calculator/simple-calculator/Calculate/index.html');
 

@@ -17,7 +17,7 @@ const components = {
   pre: CodeBlock
 };
 
-/** The specification's descriptions as Fumadocs renders them, but with the base on a root-relative image, which Fumadocs leaves out. */
+/** The specification's descriptions as Fumadocs renders them, but for its `img: undefined`, which fails the page. */
 export function ApiMarkdown({ md }: { md: string }) {
   return <Markdown components={components}>{md}</Markdown>;
 }

@@ -79,7 +79,7 @@
         "fs-extra": "^11.3.0",
         "fumadocs-core": "16.17.1",
         "fumadocs-mdx": "15.4.7",
-        "fumadocs-openapi": "12.4.1",
+        "fumadocs-openapi": "12.1.1",
         "fumadocs-ui": "16.17.1",
         "get-port": "^7.1.0",
         "is-in-ci": "^2.0.0",
