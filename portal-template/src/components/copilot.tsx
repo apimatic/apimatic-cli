@@ -1,6 +1,7 @@
 // The Ask AI copilot: Fumadocs' AI chat panel, answered by the Ask AI service (the portal is static).
 // `@fumadocs/ai-chat` is 0.x and needs fumadocs-ui >= 16.16: keep it pinned and check the chat on every upgrade.
-import { useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useState, type ComponentType, type ReactNode } from 'react';
+import type * as PageTree from 'fumadocs-core/page-tree';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport, type UIMessage } from 'ai';
 import { AIChatPanel, AIChatProvider, AIChatSearch, AIChatSources, AIChatTrigger, useAIChat } from '@fumadocs/ai-chat';
@@ -15,24 +16,29 @@ type Part = UIMessage['parts'][number];
 type SearchPart = Parameters<typeof AIChatSearch>[0]['part'];
 type Sources = Parameters<typeof AIChatSources>[0]['sources'];
 
+/** The docs layout the chat goes around, handed the chat's `aiChat` option. */
+type ChatLayout = ComponentType<Readonly<{ tree: PageTree.Root; aiChat: AIChatOptions; children: ReactNode }>>;
+type LayoutProps = Readonly<{ layout: ChatLayout; tree: PageTree.Root; children: ReactNode }>;
+
 /**
  * The docs layout with the Ask AI chat around it. The module's one export, so the layout can load
  * it on its own, and only for a portal that offers the chat.
  */
-export default function CopilotLayout({
-  copilot,
-  layout
-}: Readonly<{ copilot: PortalCopilot; layout: (aiChat: AIChatOptions) => ReactNode }>) {
+export default function CopilotLayout({ copilot, ...layout }: LayoutProps & Readonly<{ copilot: PortalCopilot }>) {
   return (
     <CopilotProvider copilot={copilot}>
-      <WithPanel layout={layout} />
+      <WithPanel {...layout} />
     </CopilotProvider>
   );
 }
 
 // Separate, because the panel state exists only inside `CopilotProvider`.
-function WithPanel({ layout }: Readonly<{ layout: (aiChat: AIChatOptions) => ReactNode }>) {
-  return layout(useCopilotPanel());
+function WithPanel({ layout: Layout, tree, children }: LayoutProps) {
+  return (
+    <Layout tree={tree} aiChat={useCopilotPanel()}>
+      {children}
+    </Layout>
+  );
 }
 
 /** The chat state and the "Ask AI" button; wraps the layout so a conversation survives navigation. */

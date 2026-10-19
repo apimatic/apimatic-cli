@@ -16,14 +16,9 @@ export function PortalLayout({ tree, children }: LayoutProps) {
   // The prerender waits for the chunk, so the fallback only shows if it is slow on a client-side navigation.
   return (
     <Suspense fallback={<Notebook tree={tree}>{children}</Notebook>}>
-      <CopilotLayout
-        copilot={portal.copilot}
-        layout={(aiChat) => (
-          <Notebook tree={tree} aiChat={aiChat}>
-            {children}
-          </Notebook>
-        )}
-      />
+      <CopilotLayout copilot={portal.copilot} layout={Notebook} tree={tree}>
+        {children}
+      </CopilotLayout>
     </Suspense>
   );
 }
