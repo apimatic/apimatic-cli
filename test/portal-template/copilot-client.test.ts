@@ -108,6 +108,6 @@ describe('the Ask AI client', () => {
     });
     client.noteData({ type: 'data-thread', data: { threadId: 'th-1' } });
     expect(client.questionBody([{ id: 'q1' }, { id: 'a1' }, { id: 'q2' }], 'submit-message').threadId).to.equal('th-1');
-    expect(client.questionBody([{ id: 'q9' }], 'submit-message').threadId).to.equal(null);
+    expect(client.questionBody([{ id: 'q9' }], 'submit-message').threadId).to.be.null;
   });
 });
