@@ -13,6 +13,7 @@ import { CommandMetadata } from '../../../../src/types/common/command-metadata';
 import { DirectoryPath } from '../../../../src/types/file/directoryPath';
 import { CopilotBundle } from '../../../../src/types/portal/copilot/copilot-bundle';
 import { ProjectContext } from '../../../../src/types/project-context';
+import { GeneratedPortalContext } from '../../../../src/types/portal/copilot/generated-portal-context';
 
 /** The bundle as the service receives it. */
 const uploaded = (bundle: CopilotBundle) =>
@@ -224,6 +225,16 @@ describe('PortalCopilotSyncAction', () => {
 
     expect(result.isFailed()).to.be.true;
     expect(prompts.sourceProblem.firstCall.args[0]).to.deep.equal({ kind: 'missingConfig' });
+    expect(upload.called).to.be.false;
+  });
+
+  it('fails without uploading when the portal cannot be read', async () => {
+    sinon.stub(GeneratedPortalContext.prototype, 'bundle').resolves(err('EACCES: permission denied'));
+
+    const result = await execute();
+
+    expect(result.isFailed()).to.be.true;
+    expect(prompts.portalNotRead.calledOnceWith(sinon.match.any, 'EACCES: permission denied')).to.be.true;
     expect(upload.called).to.be.false;
   });
 

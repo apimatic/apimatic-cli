@@ -48,6 +48,10 @@ export class PortalCopilotSyncPrompts {
     log.error(message);
   }
 
+  public portalNotRead(portalDirectory: DirectoryPath, reason: string) {
+    log.error(`The portal at ${f.path(portalDirectory)} could not be read (${reason}).`);
+  }
+
   public noPages(portalDirectory: DirectoryPath) {
     const message =
       `The portal at ${f.path(portalDirectory)} has no pages Ask AI can read. ` +

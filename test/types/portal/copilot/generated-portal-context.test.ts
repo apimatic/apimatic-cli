@@ -3,6 +3,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { gunzipSync } from 'node:zlib';
 import { expect } from 'chai';
+import sinon from 'sinon';
+import { FileService } from '../../../../src/infrastructure/file-service';
 import { DirectoryPath } from '../../../../src/types/file/directoryPath';
 import { SiteAddress } from '../../../../src/types/portal/config/site-address';
 import { GeneratedPortalContext } from '../../../../src/types/portal/copilot/generated-portal-context';
@@ -19,7 +21,9 @@ describe('GeneratedPortalContext', () => {
   };
 
   const bundle = (site: SiteAddress | null = null) =>
-    new GeneratedPortalContext(new DirectoryPath(root)).bundle(site, '9.9.9', AT);
+    new GeneratedPortalContext(new DirectoryPath(root))
+      .bundle(site, '9.9.9', AT)
+      .then((built) => built._unsafeUnwrap());
 
   beforeEach(() => {
     root = fs.mkdtempSync(path.join(os.tmpdir(), 'generated-portal-'));
@@ -27,6 +31,25 @@ describe('GeneratedPortalContext', () => {
 
   afterEach(() => {
     fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  it('reports a page it cannot read rather than throwing', async () => {
+    write('llms.txt', '- [Welcome](/)');
+    write('index.md', '# Welcome');
+    const getContents = FileService.prototype.getContents;
+    const unreadable = sinon.stub(FileService.prototype, 'getContents').callsFake(function (this: FileService, file) {
+      return file.toString().endsWith('index.md')
+        ? Promise.reject(new Error('EACCES: permission denied'))
+        : getContents.call(this, file);
+    });
+
+    try {
+      const built = await new GeneratedPortalContext(new DirectoryPath(root)).bundle(null, '9.9.9', AT);
+
+      expect(built._unsafeUnwrapErr()).to.contain('EACCES: permission denied');
+    } finally {
+      unreadable.restore();
+    }
   });
 
   it('is null for a directory with no generated portal in it', async () => {
@@ -107,7 +130,8 @@ describe('GeneratedPortalContext', () => {
     describe('build ID', () => {
       const buildId = async (site: SiteAddress | null = null, cliVersion = '9.9.9', at = AT) => {
         const built = await new GeneratedPortalContext(new DirectoryPath(root)).bundle(site, cliVersion, at);
-        return (JSON.parse(built!.buildManifest()) as { formatVersion: number; buildId: string }).buildId;
+        return (JSON.parse(built._unsafeUnwrap()!.buildManifest()) as { formatVersion: number; buildId: string })
+          .buildId;
       };
 
       it('is a SHA-256 in hex', async () => {

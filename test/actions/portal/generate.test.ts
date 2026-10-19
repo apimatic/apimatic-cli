@@ -15,6 +15,7 @@ import { ServiceError } from '../../../src/infrastructure/service-error';
 import { DirectoryPath } from '../../../src/types/file/directoryPath';
 import { CommandMetadata } from '../../../src/types/common/command-metadata';
 import { ProjectContext } from '../../../src/types/project-context';
+import { GeneratedPortalContext } from '../../../src/types/portal/copilot/generated-portal-context';
 import { completeArtifacts, stubPreparePortalProject } from './prepare-project-stubs';
 
 const COMMAND_METADATA: CommandMetadata = { commandName: 'portal generate', shell: 'test' };
@@ -276,6 +277,19 @@ describe('GenerateAction', () => {
       expect(result.isSuccess()).to.be.true;
       expect(inPortal('__copilot')).to.be.false;
       expect(fs.existsSync(path.join(builtSite.toString(), '__copilot', 'build.json'))).to.be.true;
+    });
+
+    it('still saves the portal when its pages cannot be read, pointing to sync instead', async () => {
+      listPages();
+      sinon.stub(GeneratedPortalContext.prototype, 'bundle').resolves(err('EACCES: permission denied'));
+
+      const result = await execute(COPILOT_FIXTURE);
+
+      expect(result.isSuccess()).to.be.true;
+      expect(inPortal('index.html')).to.be.true;
+      expect(inPortal('__copilot')).to.be.false;
+      expect(prompts.copilotBundleNotWritten.calledOnceWith('EACCES: permission denied')).to.be.true;
+      expect(prompts.copilotUpdatesAfterDeploy.called).to.be.false;
     });
 
     it('still saves the portal when it lists no pages, pointing to sync instead', async () => {

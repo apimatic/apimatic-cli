@@ -43,11 +43,16 @@ export class PortalCopilotSyncAction {
       return ActionResult.failed();
     }
 
-    const bundle = await new GeneratedPortalContext(portalDirectory).bundle(
+    const bundled = await new GeneratedPortalContext(portalDirectory).bundle(
       config.siteAddress(),
       envInfo.getCLIVersion(),
       new Date()
     );
+    if (bundled.isErr()) {
+      this.prompts.portalNotRead(portalDirectory, bundled.error);
+      return ActionResult.failed();
+    }
+    const bundle = bundled.value;
     if (bundle === null) {
       this.prompts.portalNotGenerated(portalDirectory);
       return ActionResult.failed();

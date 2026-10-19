@@ -21,15 +21,26 @@ export class GeneratedPortalContext {
     return new FilePath(this.portalDirectory, new FileName('llms.txt'));
   }
 
-  /** Null when the directory holds no generated portal. A listed page without its Markdown twin is left out. */
-  public async bundle(site: SiteAddress | null, cliVersion: string, at: Date): Promise<CopilotBundle | null> {
-    if (!(await this.fileService.fileExists(this.index))) {
-      return null;
+  /**
+   * Null when the directory holds no generated portal. A listed page without its Markdown twin is left out;
+   * a file that cannot be read is an error, so the caller decides whether that stops it.
+   */
+  public async bundle(
+    site: SiteAddress | null,
+    cliVersion: string,
+    at: Date
+  ): Promise<Result<CopilotBundle | null, string>> {
+    try {
+      if (!(await this.fileService.fileExists(this.index))) {
+        return ok(null);
+      }
+      const listed = listedPages(await this.fileService.getContents(this.index), site);
+      const read = await Promise.all(listed.map((page) => this.read(page)));
+      const pages = read.filter((page) => page !== null);
+      return ok(CopilotBundle.of(pages, site, cliVersion, at));
+    } catch (error) {
+      return err(errorMessage(error));
     }
-    const listed = listedPages(await this.fileService.getContents(this.index), site);
-    const read = await Promise.all(listed.map((page) => this.read(page)));
-    const pages = read.filter((page) => page !== null);
-    return CopilotBundle.of(pages, site, cliVersion, at);
   }
 
   /** Writes the bundle into the portal, so it is deployed with the pages it holds. */

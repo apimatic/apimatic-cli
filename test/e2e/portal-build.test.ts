@@ -1029,7 +1029,7 @@ const stylesheetOf = (output: DirectoryPath) => {
   it('lists the pages Ask AI answers from, each with its Markdown copy', async () => {
     const bundle = await new GeneratedPortalContext(portal.output()).bundle(null, '0.0.0', new Date());
 
-    expect(bundle?.pageCount()).to.be.greaterThan(1);
+    expect(bundle._unsafeUnwrap()?.pageCount()).to.be.greaterThan(1);
   });
 
   it('tells the browser the public key and the service, and no more', () => {

@@ -96,10 +96,15 @@ export class GenerateAction {
     return ActionResult.success();
   }
 
-  /** The portal still saves without the bundle; Ask AI is then updated by `portal copilot sync`. */
+  /** The portal still saves without the bundle, whatever stops it; Ask AI is then updated by `portal copilot sync`. */
   private async publishCopilotBundle(builtDirectory: DirectoryPath, site: SiteAddress | null): Promise<boolean> {
     const portal = new GeneratedPortalContext(builtDirectory);
-    const bundle = await portal.bundle(site, envInfo.getCLIVersion(), new Date());
+    const bundled = await portal.bundle(site, envInfo.getCLIVersion(), new Date());
+    if (bundled.isErr()) {
+      this.prompts.copilotBundleNotWritten(bundled.error);
+      return false;
+    }
+    const bundle = bundled.value;
     if (bundle === null || bundle.pageCount() === 0) {
       this.prompts.copilotPagesNotFound();
       return false;
