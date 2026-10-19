@@ -446,16 +446,13 @@ describe('PortalConfig', () => {
       // Plain HTTP would expose the keys in transit, except to a service on this machine.
       it('accepts plain HTTP only for a service on this machine', () => {
         const at = (apiUrl: string) => ({ ai: { copilot: { key: PUBLIC_KEY, apiUrl } } });
-        for (const local of [
-          'http://localhost:8787',
-          'http://127.0.0.1:8787',
-          'http://[::1]:8787',
-          'http://ask.localhost'
-        ]) {
+        for (const local of ['http://localhost:8787', 'http://127.0.0.1:8787', 'http://[::1]:8787']) {
           expect(config(at(local)).identity().copilot?.apiUrl, local).to.equal(new URL(local).origin);
         }
-        expect(errorsOf(at('http://ask.example.com'))).to.have.length(1);
-        expect(errorsOf(at('http://localhost.example.com'))).to.have.length(1);
+        // `*.localhost` is resolved through DNS on some systems, so it may not be this machine.
+        for (const remote of ['http://ask.example.com', 'http://localhost.example.com', 'http://ask.localhost']) {
+          expect(errorsOf(at(remote)), remote).to.have.length(1);
+        }
       });
     });
 
@@ -469,7 +466,12 @@ describe('PortalConfig', () => {
         ]) {
           expect(receivesSavedLogin(trusted), trusted).to.be.true;
         }
-        for (const other of ['https://ask.example.com', 'https://apimatic.io.example.com', 'https://evilapimatic.io']) {
+        for (const other of [
+          'https://ask.example.com',
+          'https://apimatic.io.example.com',
+          'https://evilapimatic.io',
+          'https://ask.localhost'
+        ]) {
           expect(receivesSavedLogin(other), other).to.be.false;
         }
       });

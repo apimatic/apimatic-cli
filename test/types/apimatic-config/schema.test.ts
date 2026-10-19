@@ -117,10 +117,18 @@ describe('apimatic.schema.json', () => {
       ['a link through a parent segment', { navigation: { links: [{ label: 'Start', url: '/guides/../start' }] } }],
       ['a link with two slashes in its query', { navigation: { links: [{ label: 'Next', url: '/start?next=//x' }] } }],
       ['a context plugin hosted elsewhere', { pluginUrl: 'https://plugins.acme.test/calc.zip?v=2' }],
-      ['a plugin address with several query parameters', { pluginUrl: 'https://s3.test/calc.zip?a=1&b=2' }]
+      ['a plugin address with several query parameters', { pluginUrl: 'https://s3.test/calc.zip?a=1&b=2' }],
+      ['an Ask AI service over https', { ai: { copilot: { key: 'pk_test', apiUrl: 'https://ask.example.com' } } }],
+      ['an Ask AI service on this machine', { ai: { copilot: { key: 'pk_test', apiUrl: 'http://localhost:8787' } } }]
     ];
 
     const invalid: [string, object][] = [
+      ['an Ask AI service over http', { ai: { copilot: { key: 'pk_test', apiUrl: 'http://ask.example.com' } } }],
+      // Resolved through DNS on some systems, so it may not be this machine.
+      [
+        'an Ask AI service over http on a .localhost name',
+        { ai: { copilot: { key: 'pk_test', apiUrl: 'http://ask.localhost' } } }
+      ],
       ['an unknown namespace', { theme: {} }],
       ['a key from the flat block', { title: 'Calc' }],
       ['a namespace that is not an object', { site: 'Calc' }],
