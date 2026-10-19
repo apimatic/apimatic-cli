@@ -195,8 +195,9 @@ Not run: macOS (CI's job and a Safari check, section 8 step 5) and a source on a
   - It answers `null` for an id with a query (`?raw`), a non-asset (`.json`), and a file outside
     the directory.
 - **Network shares (D7):** `DirectoryPath.isOnNetworkShare` holds `\\server\share\…` and
-  `//server/share/…`, and not `C:\…` or `\\?\C:\…`. `portal generate` and `portal serve` stop on a
-  share before signing in. These run on Windows only.
+  `//server/share/…`, and not `C:\…` or `\\?\C:\…`. `PreparePortalProjectAction`, which both
+  commands run, stops on a share before signing in; its test is the action's own, since a copy in
+  each command's tests duplicated their neighbours (SonarCloud's gate). These run on Windows only.
 - **`test/portal-template.test.ts:148-152`**: delete "has Tailwind scan the copy of the pages, by
   its relative name"; 7.2 replaces it. Since D4's revision, "has Tailwind scan the directories the
   CLI writes pages into" checks each named folder against the CLI's constant.
@@ -249,6 +250,8 @@ Each step stops for review, and each commit waits to be asked for.
 5. **Pull request into `dev`:**
    - CI's matrix (ubuntu, windows, macos × Node 24, 26) and SonarCloud.
    - Before merge, someone with a Mac opens a `portal serve` page with a static image in Safari.
+     Deferred on 2026-10-19 (the user's choice: no one on the PR has a Mac) to QA's pass of the
+     `dev` build after merge; the steps are on apimatic-io#2301.
 6. **Follow-ups**, each drafted for approval before it is posted:
    - a reply on apimatic-io#2301 (cause, what the comment's notes got wrong, the fix);
    - a fumadocs issue for `remarkImage`'s cross-drive import path: fuma-nama/fumadocs#3723,
@@ -348,3 +351,7 @@ Each step stops for review, and each commit waits to be asked for.
     - `portal serve` through a mapped drive (`Z:` → `\\localhost\C$`): images from `/images/`, the
       logo and the full stylesheet;
     - both commands on `\\localhost\C$\…`: refused before signing in, with nothing written.
+  - SonarCloud's gate then failed on duplicated lines (8.5% of new code): the share test, copied
+    into both commands' tests, joined their neighbours into one 34-line block. It moved to a test
+    of the shared action (7.1).
+  - The Safari check went to QA, after merge (section 8, step 5).
