@@ -7,7 +7,7 @@ export interface ListedPage {
   description: string | null;
 }
 
-const LINK = /^\s*[-*]\s+\[(.*)\]\(([^)\s]+)\)(?::\s*(.*?))?\s*$/;
+const LINK = /^\s*[-*]\s+\[(.*)\]\(([^)\s]+)\)(?::(.*)|\s*)$/;
 
 const DOWNLOADS = '/__downloads/';
 
@@ -23,7 +23,7 @@ export function listedPages(llmsTxt: string, site: SiteAddress | null): ListedPa
     const [, title, href, description] = match;
     const path = portalPath(href, basePath);
     if (path !== null && !pages.has(path)) {
-      pages.set(path, { path, title: title.trim(), description: description ? description : null });
+      pages.set(path, { path, title: title.trim(), description: description?.trim() || null });
     }
   }
   return [...pages.values()];
