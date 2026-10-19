@@ -25,7 +25,7 @@ Your saved APIMatic login is sent only to an Ask AI service APIMatic runs, or to
     `${PortalCopilotSync.cmdTxt} ${format.flag('no-wait')}`
   ];
 
-  static flags = {
+  static readonly flags = {
     wait: Flags.boolean({
       default: true,
       allowNo: true,
