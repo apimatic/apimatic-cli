@@ -27,13 +27,8 @@ export class GeneratedPortalContext {
       return null;
     }
     const listed = listedPages(await this.fileService.getContents(this.index), site);
-    const pages: BundlePage[] = [];
-    for (const page of listed) {
-      const markdown = this.markdownOf(page);
-      if (await this.fileService.fileExists(markdown)) {
-        pages.push({ ...page, markdown: await this.fileService.getContents(markdown) });
-      }
-    }
+    const read = await Promise.all(listed.map((page) => this.read(page)));
+    const pages = read.filter((page) => page !== null);
     return CopilotBundle.of(pages, site, cliVersion, at);
   }
 
@@ -48,6 +43,15 @@ export class GeneratedPortalContext {
     } catch (error) {
       return err(errorMessage(error));
     }
+  }
+
+  /** The page with its Markdown twin, or null when it has none. */
+  private async read(page: ListedPage): Promise<BundlePage | null> {
+    const markdown = this.markdownOf(page);
+    if (!(await this.fileService.fileExists(markdown))) {
+      return null;
+    }
+    return { ...page, markdown: await this.fileService.getContents(markdown) };
   }
 
   private markdownOf({ path }: ListedPage): FilePath {
