@@ -56,6 +56,8 @@ describe('PortalCopilotSyncAction', () => {
       })
     );
 
+  const writeSavedLogin = (authKey: string) => write('config.json', JSON.stringify({ email: 'a@b.c', authKey }));
+
   const writePortal = () => {
     write('portal/llms.txt', ['- [Docs](/docs)', '  - [Intro](/docs/guides/intro): Start'].join('\n'));
     write('portal/index.md', '# Docs');
@@ -94,7 +96,7 @@ describe('PortalCopilotSyncAction', () => {
     const result = await execute();
 
     expect(result.isSuccess()).to.be.true;
-    const [copilot, bundle, , , authKey] = upload.firstCall.args as [unknown, CopilotBundle, unknown, unknown, string];
+    const [copilot, bundle, , authKey] = upload.firstCall.args as [unknown, CopilotBundle, unknown, string];
     expect(copilot).to.deep.include(COPILOT);
     expect(authKey).to.equal('auth-key');
     expect(uploaded(bundle)).to.deep.include({ basePath: '/docs/', siteUrl: 'https://example.com/docs' });
@@ -169,14 +171,40 @@ describe('PortalCopilotSyncAction', () => {
     expect((await execute()).isSuccess()).to.be.true;
   });
 
+  it('treats a blank --auth-key as no key, so the saved login stays withheld', async () => {
+    writeSavedLogin('saved-key');
+
+    for (const blank of ['', '   ']) {
+      expect((await execute(true, blank)).isFailed(), JSON.stringify(blank)).to.be.true;
+    }
+    expect(prompts.savedLoginWithheld.callCount).to.equal(2);
+    expect(upload.called).to.be.false;
+  });
+
   it("uses the saved login with APIMatic's own service and one on this machine", async () => {
+    writeSavedLogin('saved-key');
+
     for (const apiUrl of ['https://ask.apimatic.io', 'http://localhost:8787']) {
       writeConfig({ copilot: { ...COPILOT, apiUrl } });
 
       expect((await execute(true, null)).isSuccess(), apiUrl).to.be.true;
+      expect((await execute(true, '')).isSuccess(), apiUrl).to.be.true;
     }
-    expect(upload.callCount).to.equal(2);
+    expect(upload.args.map((args) => args[3])).to.deep.equal(Array(4).fill('saved-key'));
+    expect(awaitIndexing.args.map((args) => args[3])).to.deep.equal(Array(4).fill('saved-key'));
     expect(prompts.savedLoginWithheld.called).to.be.false;
+  });
+
+  it('asks the user to log in, without uploading, when no key is passed or saved', async () => {
+    writeConfig({ copilot: { ...COPILOT, apiUrl: 'https://ask.apimatic.io' } });
+    // `auth logout` leaves the file with a blank key.
+    writeSavedLogin('');
+
+    const result = await execute(true, null);
+
+    expect(result.isFailed()).to.be.true;
+    expect(prompts.notLoggedIn.calledOnce).to.be.true;
+    expect(upload.called).to.be.false;
   });
 
   it('fails without uploading when the portal has no Ask AI chat', async () => {

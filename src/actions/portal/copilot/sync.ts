@@ -1,3 +1,4 @@
+import { getAuthInfo } from '../../../client-utils/auth-manager.js';
 import { envInfo } from '../../../infrastructure/env-info.js';
 import { CopilotIngestService } from '../../../infrastructure/services/copilot-ingest-service.js';
 import { PortalCopilotSyncPrompts } from '../../../prompts/portal/copilot/sync.js';
@@ -37,8 +38,8 @@ export class PortalCopilotSyncAction {
       this.prompts.copilotNotConfigured(project.sourceDirectory());
       return ActionResult.failed();
     }
-    if (this.authKey === null && !receivesSavedLogin(copilot.apiUrl)) {
-      this.prompts.savedLoginWithheld(copilot.apiUrl);
+    const authKey = await this.authKeyFor(copilot.apiUrl);
+    if (authKey === null) {
       return ActionResult.failed();
     }
 
@@ -58,7 +59,7 @@ export class PortalCopilotSyncAction {
 
     const { shell } = this.commandMetadata;
     const receipt = await this.prompts.upload(
-      this.ingestService.upload(copilot, bundle, this.configDir, shell, this.authKey),
+      this.ingestService.upload(copilot, bundle, shell, authKey),
       bundle.pageCount()
     );
     if (receipt.isErr()) {
@@ -75,7 +76,7 @@ export class PortalCopilotSyncAction {
     }
 
     const indexed = await this.prompts.awaitIndexing(
-      this.ingestService.awaitIndexing(copilot, receipt.value.versionId, this.configDir, shell, this.authKey)
+      this.ingestService.awaitIndexing(copilot, receipt.value.versionId, shell, authKey)
     );
     if (indexed.isErr()) {
       this.prompts.syncFailed(indexed.error, copilot.apiUrl);
@@ -88,4 +89,24 @@ export class PortalCopilotSyncAction {
     }
     return ActionResult.success();
   };
+
+  /** The only place that decides which key the service receives: the passed one, else the saved login if it may have it. */
+  private async authKeyFor(apiUrl: string): Promise<string | null> {
+    // A blank `--auth-key` (say, from an unset variable) is no key, so it never lets the saved login through.
+    const passed = this.authKey?.trim() ?? '';
+    if (passed !== '') {
+      return passed;
+    }
+    if (!receivesSavedLogin(apiUrl)) {
+      this.prompts.savedLoginWithheld(apiUrl);
+      return null;
+    }
+    // `auth logout` blanks the stored key rather than deleting the file, so the key is checked, not the file.
+    const saved = (await getAuthInfo(this.configDir.toString()))?.authKey;
+    if (!saved) {
+      this.prompts.notLoggedIn();
+      return null;
+    }
+    return saved;
+  }
 }

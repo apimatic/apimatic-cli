@@ -1,15 +1,10 @@
-import fs from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
 import net from 'node:net';
-import { stripVTControlCharacters } from 'node:util';
 import { Buffer } from 'node:buffer';
 import { gunzipSync } from 'node:zlib';
 import nock from 'nock';
 import { expect } from 'chai';
 import { CopilotIngestService } from '../../../src/infrastructure/services/copilot-ingest-service';
 import { ServiceErrorCode } from '../../../src/infrastructure/service-error';
-import { DirectoryPath } from '../../../src/types/file/directoryPath';
 import { CopilotBundle } from '../../../src/types/portal/copilot/copilot-bundle';
 
 const API_URL = 'http://copilot.test';
@@ -44,23 +39,14 @@ const closedPort = async (): Promise<number> => {
 };
 
 describe('CopilotIngestService', () => {
-  let configRoot: string;
-  let configDir: DirectoryPath;
   const service = new CopilotIngestService({ pollIntervalMs: 1, indexTimeoutMs: 5000 });
 
-  const upload = (authKey: string | null = 'auth-key') => service.upload(COPILOT, bundle, configDir, 'bash', authKey);
-  const awaitIndexing = () => service.awaitIndexing(COPILOT, VERSION_ID, configDir, 'bash', 'auth-key');
+  const upload = () => service.upload(COPILOT, bundle, 'bash', 'auth-key');
+  const awaitIndexing = () => service.awaitIndexing(COPILOT, VERSION_ID, 'bash', 'auth-key');
 
-  beforeEach(() => {
-    configRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'copilot-ingest-'));
-    configDir = new DirectoryPath(configRoot);
-    nock.cleanAll();
-  });
+  beforeEach(() => nock.cleanAll());
 
-  afterEach(() => {
-    fs.rmSync(configRoot, { recursive: true, force: true });
-    nock.cleanAll();
-  });
+  afterEach(() => nock.cleanAll());
 
   describe('upload', () => {
     it('posts the gzipped bundle with both keys and answers with the queued version', async () => {
@@ -85,22 +71,6 @@ describe('CopilotIngestService', () => {
       expect(scope.isDone()).to.be.true;
     });
 
-    it('uses the stored key when no flag overrides it', async () => {
-      fs.writeFileSync(path.join(configRoot, 'config.json'), JSON.stringify({ email: 'a@b.c', authKey: 'stored' }));
-      nock(API_URL, { reqheaders: { authorization: 'X-Auth-Key stored' } })
-        .post('/v1/ingest')
-        .reply(200, { versionId: VERSION_ID, status: 'unchanged', pageCount: 1 });
-
-      expect((await upload(null))._unsafeUnwrap().status).to.equal('unchanged');
-    });
-
-    it('asks the user to sign in, without a request, when there is no key', async () => {
-      const result = await upload(null);
-
-      expect(result._unsafeUnwrapErr().code).to.equal(ServiceErrorCode.UnAuthorized);
-      expect(stripVTControlCharacters(result._unsafeUnwrapErr().errorMessage)).to.contain('apimatic auth login');
-    });
-
     it("surfaces the service's message for a refused upload", async () => {
       nock(API_URL)
         .post('/v1/ingest')
@@ -121,7 +91,7 @@ describe('CopilotIngestService', () => {
     it('reports a service that cannot be reached as a network error', async () => {
       const unreachable = { ...COPILOT, apiUrl: `http://127.0.0.1:${await closedPort()}` };
 
-      const result = await service.upload(unreachable, bundle, configDir, 'bash', 'auth-key');
+      const result = await service.upload(unreachable, bundle, 'bash', 'auth-key');
 
       expect(result._unsafeUnwrapErr().code).to.equal(ServiceErrorCode.NetworkError);
     });
@@ -161,7 +131,7 @@ describe('CopilotIngestService', () => {
       nock(API_URL).get(`/v1/ingest/${VERSION_ID}`).times(1000).reply(200, statusBody('building'));
       const impatient = new CopilotIngestService({ pollIntervalMs: 1, indexTimeoutMs: 20 });
 
-      const result = await impatient.awaitIndexing(COPILOT, VERSION_ID, configDir, 'bash', 'auth-key');
+      const result = await impatient.awaitIndexing(COPILOT, VERSION_ID, 'bash', 'auth-key');
 
       expect(result._unsafeUnwrapErr().code).to.equal(ServiceErrorCode.Timeout);
     });

@@ -37,6 +37,10 @@ export class PortalCopilotSyncPrompts {
     log.error(message);
   }
 
+  public notLoggedIn() {
+    log.error(ServiceError.unauthorizedWithHint(null).errorMessage);
+  }
+
   public portalNotGenerated(portalDirectory: DirectoryPath) {
     const message =
       `No generated portal was found at ${f.path(portalDirectory)}. ` +

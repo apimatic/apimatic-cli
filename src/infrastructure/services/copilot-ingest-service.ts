@@ -1,7 +1,5 @@
 import axios, { AxiosResponse } from 'axios';
 import { err, ok, Result } from 'neverthrow';
-import { getAuthInfo } from '../../client-utils/auth-manager.js';
-import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { PortalCopilot } from '../../types/portal/config/copilot-config.js';
 import { CopilotBundle } from '../../types/portal/copilot/copilot-bundle.js';
 import { IndexedVersion, IndexingState, IngestReceipt, IngestStatus } from '../../types/portal/copilot/ingest.js';
@@ -35,17 +33,11 @@ export class CopilotIngestService {
   public async upload(
     copilot: CopilotTarget,
     bundle: CopilotBundle,
-    configDir: DirectoryPath,
     shell: string,
-    authKey: string | null
+    authKey: string
   ): Promise<Result<IngestReceipt, ServiceError>> {
-    const token = await this.token(configDir, authKey);
-    if (token === null) {
-      return err(ServiceError.unauthorizedWithHint(null));
-    }
-
     try {
-      const response = await this.axiosInstance(copilot, shell, token, this.timings.uploadTimeoutMs).post(
+      const response = await this.axiosInstance(copilot, shell, authKey, this.timings.uploadTimeoutMs).post(
         '/v1/ingest',
         bundle.gzipped(),
         {
@@ -68,20 +60,14 @@ export class CopilotIngestService {
   public async awaitIndexing(
     copilot: CopilotTarget,
     versionId: string,
-    configDir: DirectoryPath,
     shell: string,
-    authKey: string | null
+    authKey: string
   ): Promise<Result<IndexedVersion, ServiceError>> {
-    const token = await this.token(configDir, authKey);
-    if (token === null) {
-      return err(ServiceError.unauthorizedWithHint(null));
-    }
-
     const deadline = Date.now() + this.timings.indexTimeoutMs;
     for (;;) {
       await sleep(this.timings.pollIntervalMs);
 
-      const current = await this.status(copilot, versionId, shell, token);
+      const current = await this.status(copilot, versionId, shell, authKey);
       if (current.isErr()) {
         return err(current.error);
       }
@@ -95,7 +81,9 @@ export class CopilotIngestService {
       // Read after the status, so a version that finished during the last wait still counts.
       if (Date.now() >= deadline) {
         const minutes = Math.max(1, Math.round(this.timings.indexTimeoutMs / 60_000));
-        return err(ServiceError.timeout(`Indexing did not finish within ${minutes} ${minutes === 1 ? 'minute' : 'minutes'}.`));
+        return err(
+          ServiceError.timeout(`Indexing did not finish within ${minutes} ${minutes === 1 ? 'minute' : 'minutes'}.`)
+        );
       }
     }
   }
@@ -118,11 +106,6 @@ export class CopilotIngestService {
     } catch (error) {
       return err(transportFailure(error));
     }
-  }
-
-  private async token(configDir: DirectoryPath, authKey: string | null): Promise<string | null> {
-    // `auth logout` blanks the stored key rather than deleting the file, so the key is checked, not the file.
-    return authKey || (await getAuthInfo(configDir.toString()))?.authKey || null;
   }
 
   private axiosInstance(copilot: CopilotTarget, shell: string, token: string, timeout: number) {
