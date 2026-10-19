@@ -49,11 +49,11 @@ export class CopilotConfig {
   }
 }
 
-const LOOPBACK_HOSTS = ['localhost', '127.0.0.1', '[::1]'];
+const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
 const APIMATIC_DOMAIN = 'apimatic.io';
 
 function isLoopback(url: URL): boolean {
-  return LOOPBACK_HOSTS.includes(url.hostname) || url.hostname.endsWith('.localhost');
+  return LOOPBACK_HOSTS.has(url.hostname) || url.hostname.endsWith('.localhost');
 }
 
 /** Whether sync may send the saved APIMatic login to the service: only APIMatic's own, or one on this machine. */
