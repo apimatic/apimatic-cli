@@ -51,33 +51,6 @@ export class Directory {
     };
   }
 
-  public async mapFilesInDirectory(
-    map: (rootDir: DirectoryPath, fileItem: FileItem) => Promise<FileItem | undefined>
-  ): Promise<Directory> {
-    const mappedItems: DirectoryItem[] = [];
-
-    for (const item of this.items) {
-      if (item instanceof Directory) {
-        const mappedSubDir = await item.mapFilesInDirectory(map);
-        if (!mappedSubDir.isEmpty()) {
-          mappedItems.push(mappedSubDir);
-        }
-        continue;
-      }
-
-      const mappedItem = await map(this.directoryPath, item);
-      if (mappedItem) {
-        mappedItems.push(mappedItem);
-      }
-    }
-
-    return new Directory(this.directoryPath, mappedItems);
-  }
-
-  public isEmpty(): boolean {
-    return this.items.length === 0;
-  }
-
   public excluding(names: FileName[]): Directory {
     const excluded = names.map((name) => name.toString());
     const kept = this.items.filter((item) =>
@@ -106,44 +79,5 @@ export class Directory {
       }
     }
     return files;
-  }
-
-  public static createFromRelativePaths(rootDir: DirectoryPath, fileItems: FileItem[]): Directory {
-    type PendingDirectoryItem = FileItem | PendingDir;
-    type PendingDir = { pendingDirPath: DirectoryPath; items: PendingDirectoryItem[] };
-
-    const buildDirectory = (pending: PendingDir): Directory =>
-      new Directory(
-        pending.pendingDirPath,
-        pending.items.map((item) => ('pendingDirPath' in item ? buildDirectory(item) : item))
-      );
-
-    const root: PendingDir = { pendingDirPath: rootDir, items: [] };
-    for (const file of fileItems) {
-      const parts = file.fileName.toString().split(/[\\/]/);
-      let currentDir = root;
-
-      for (let i = 0; i < parts.length; i++) {
-        const part = parts[i];
-        const isLastPart = i === parts.length - 1;
-
-        if (isLastPart) {
-          currentDir.items.push({ fileName: new FileName(part), description: file.description });
-        } else {
-          let existingDir = currentDir.items.find(
-            (item) => 'pendingDirPath' in item && item.pendingDirPath.leafName() === part
-          ) as PendingDir | undefined;
-
-          if (!existingDir) {
-            existingDir = { pendingDirPath: currentDir.pendingDirPath.join(part), items: [] };
-            currentDir.items.push(existingDir);
-          }
-
-          currentDir = existingDir;
-        }
-      }
-    }
-
-    return buildDirectory(root);
   }
 }

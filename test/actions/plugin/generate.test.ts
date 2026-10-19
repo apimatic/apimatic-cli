@@ -87,7 +87,6 @@ describe('PluginGenerateAction', () => {
     pluginArchive = await fsExtra.readFile(archivePath.toString());
 
     await fsExtra.ensureDir(sourceDirectory);
-    await fsExtra.writeJson(path.join(sourceDirectory, 'APIMATIC-BUILD.json'), {});
     await writeConfig({ plugin: PLUGIN, languages: LANGUAGES });
 
     // The spinner would render to stdout; pass the underlying promise straight through.
@@ -124,14 +123,6 @@ describe('PluginGenerateAction', () => {
 
       expect((await execute()).isFailed()).to.be.true;
       expect(generatePlugin.called).to.be.false;
-    });
-
-    it('generates without an APIMATIC-BUILD.json, which only portal and v3 SDK builds need', async () => {
-      const generatePlugin = generated();
-      await fsExtra.remove(path.join(sourceDirectory, 'APIMATIC-BUILD.json'));
-
-      expect((await execute()).isSuccess()).to.be.true;
-      expect(generatePlugin.called).to.be.true;
     });
   });
 
@@ -177,13 +168,14 @@ describe('PluginGenerateAction', () => {
 
   // The server reads the plugin's identity and languages from the `apimatic.json` in the upload.
   describe('the upload', () => {
-    it('is src as it stands, apimatic.json beside the build file', async () => {
+    it('is src as it stands, apimatic.json beside the spec', async () => {
       generated();
+      await fsExtra.outputFile(path.join(sourceDirectory, 'spec', 'openapi.json'), '{"openapi": "3.0.0"}');
 
       await execute();
 
       expect(JSON.parse(uploaded['apimatic.json'])).to.deep.equal({ plugin: PLUGIN, languages: LANGUAGES });
-      expect(uploaded).to.have.property('APIMATIC-BUILD.json');
+      expect(uploaded['spec/openapi.json']).to.equal('{"openapi": "3.0.0"}');
     });
 
     it('synthesizes nothing: no plugin-config.json is written for the server', async () => {

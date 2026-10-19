@@ -19,47 +19,6 @@ export class LauncherService {
     }
   }
 
-  public async isIdeAvailable(): Promise<boolean> {
-    try {
-      const command = process.platform === "win32" ? "where" : "which";
-      await execa(command, ["code"]);
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
-  public async openFolderInIdeWithWait(
-    directoryPath: DirectoryPath,
-    filesToOpen: FilePath[]
-  ): Promise<boolean> {
-    try {
-      const args = [directoryPath.toString(), ...filesToOpen.map(f => f.toString())];
-      await execa("code", ["--new-window", "--wait", ...args]);
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
-  public async openInEditor(filePath: FilePath): Promise<void> {
-    if (isInCi) return;
-    try {
-      await execa("code", ["--wait", filePath.toString()]);
-    } catch {
-      // TODO: check for fallback (start)
-      if (process.platform === "win32") {
-        await execa("cmd", ["/c", "start", "/wait", "notepad", filePath.toString()], { stdio: "ignore" });
-      } else if (process.platform === "darwin") {
-        await execa("vim", [filePath.toString()], { stdio: "inherit" });
-      }
-    }
-  }
-
-  public async openFile(filePath: FilePath): Promise<void> {
-    await this.openPath(filePath.toString());
-  }
-
   public async openDirectory(directoryPath: DirectoryPath): Promise<void> {
     await this.openPath(directoryPath.toString());
   }
