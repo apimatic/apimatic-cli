@@ -17,7 +17,7 @@ import { FileName } from '../../../src/types/file/fileName';
 import { FilePath } from '../../../src/types/file/filePath';
 import { UrlPath } from '../../../src/types/file/urlPath';
 import { CommandMetadata } from '../../../src/types/common/command-metadata';
-import { PortalSource } from '../../../src/types/portal/portal-source';
+import { PortalSource, WatchedSource } from '../../../src/types/portal/portal-source';
 import { Language } from '../../../src/types/sdk/generate';
 import { PortalSourceContext } from '../../../src/types/portal-source-context';
 import { ProjectContext } from '../../../src/types/project-context';
@@ -51,6 +51,30 @@ describe('PortalServeAction', () => {
       PORT,
       openInBrowser
     );
+
+  /** Stands in for the watch on `directory`, answered by `watching`; any other tree's watch is left alone. */
+  const watchTreeAt = (directory: DirectoryPath, watching: { close: sinon.SinonStub; recheck: sinon.SinonStub }) =>
+    new Promise<{ onChange: () => Promise<void>; onFailed: (reason: string) => void }>((resolve) => {
+      watchTree.callsFake(
+        (watched: DirectoryPath, onChange: () => Promise<void>, onFailed: (reason: string) => void) => {
+          if (!watched.isEqual(directory)) {
+            return ok({ close: sinon.stub().resolves(), recheck: sinon.stub() });
+          }
+          resolve({ onChange, onFailed });
+          return ok(watching);
+        }
+      );
+    });
+
+  /** The reason `report` gave each time it was called for `watched`. */
+  const reasonsFor = (report: sinon.SinonStub, watched: WatchedSource) =>
+    report.getCalls().flatMap(({ args: [about, reason] }) => (about === watched ? [reason] : []));
+
+  /** How many of the saves `shown` was called for it said fix one refused. */
+  const fixesSaid = (shown: sinon.SinonStub) => shown.getCalls().filter(({ args: [{ fixed }] }) => fixed).length;
+
+  /** How many saves of `apimatic.json` it said were applied. */
+  const appliedSaid = () => prompts.configShown.getCalls().filter(({ args: [applied] }) => applied).length;
 
   beforeEach(() => {
     root = fs.mkdtempSync(path.join(os.tmpdir(), 'portal-serve-'));
@@ -227,15 +251,7 @@ describe('PortalServeAction', () => {
       closeWatch = sinon.stub().resolves();
       recheck = sinon.stub();
       applyContent = sinon.stub(PortalProjectService.prototype, 'applyContent').resolves(ok(undefined));
-      watched = new Promise((resolve) => {
-        watchTree.callsFake(
-          (directory: DirectoryPath, onChange: () => Promise<void>, onFailed: (reason: string) => void) => {
-            expect(directory.toString()).to.equal(source.join('content').toString());
-            resolve({ onChange, onFailed });
-            return ok({ close: closeWatch, recheck });
-          }
-        );
-      });
+      watched = watchTreeAt(source.join('content'), { close: closeWatch, recheck });
     });
 
     // The preview itself turns every page into an HTTP 500 and says nothing.
@@ -264,14 +280,14 @@ describe('PortalServeAction', () => {
     it('says once that the content is fixed, and nothing for a save a build accepts', async () => {
       await whileServing(async (save) => {
         await save(JSON.stringify({ pages: ['intro'] }));
-        expect(prompts.contentRejected.called || prompts.contentAccepted.called).to.be.false;
+        expect(prompts.contentRejected.called || fixesSaid(prompts.contentShown) > 0).to.be.false;
 
         await save('{');
         await save(JSON.stringify({ pages: ['intro'] }));
         await save(JSON.stringify({ pages: ['intro', '...'] }));
 
         expect(prompts.contentRejected.calledOnce).to.be.true;
-        expect(prompts.contentAccepted.calledOnce).to.be.true;
+        expect(fixesSaid(prompts.contentShown)).to.equal(1);
       });
     });
 
@@ -299,8 +315,8 @@ describe('PortalServeAction', () => {
       await whileServing(async (save) => {
         await save(JSON.stringify({ title: 'Overview', pages: ['intro'] }));
 
-        expect(prompts.contentNotApplied.calledOnceWith('EACCES: permission denied')).to.be.true;
-        expect(prompts.contentNotices.called).to.be.false;
+        expect(reasonsFor(prompts.notApplied, 'content')).to.deep.equal(['EACCES: permission denied']);
+        expect(prompts.contentShown.called).to.be.false;
       });
     });
 
@@ -310,9 +326,9 @@ describe('PortalServeAction', () => {
         await save(JSON.stringify({ title: 'Overview', pages: ['intro'] }));
         await save(JSON.stringify({ title: 'Overview', pages: ['intro', '...'] }));
 
-        const names = prompts.contentNotices
+        const names = prompts.contentShown
           .getCalls()
-          .map(({ args: [notices] }) => notices.sharedTabNames.map(({ name }) => name));
+          .map(({ args: [{ notices }] }) => notices.sharedTabNames.map(({ name }) => name));
         expect(names).to.deep.equal([['Overview'], []]);
       });
     });
@@ -342,7 +358,7 @@ describe('PortalServeAction', () => {
         // What the watch does on a recheck: check the content as though it had just been saved.
         await (await watched).onChange();
 
-        const [notices] = prompts.contentNotices.lastCall.args;
+        const [{ notices }] = prompts.contentShown.lastCall.args;
         expect(notices.sharedTabNames.map(({ name }) => name)).to.deep.equal(['Context Plugin']);
 
         await saveConfig(config);
@@ -376,7 +392,7 @@ describe('PortalServeAction', () => {
 
       const result = await execute(new DirectoryPath(root));
 
-      expect(prompts.contentNotWatched.calledOnceWith('EMFILE: too many open files')).to.be.true;
+      expect(reasonsFor(prompts.notWatched, 'content')).to.deep.equal(['EMFILE: too many open files']);
       expect(result.isCancelled()).to.be.true;
     });
 
@@ -384,7 +400,7 @@ describe('PortalServeAction', () => {
       await whileServing(async () => {
         (await watched).onFailed('EPERM: operation not permitted');
 
-        expect(prompts.contentWatchFailed.calledOnceWith('EPERM: operation not permitted')).to.be.true;
+        expect(reasonsFor(prompts.watchFailed, 'content')).to.deep.equal(['EPERM: operation not permitted']);
       });
     });
 
@@ -394,7 +410,7 @@ describe('PortalServeAction', () => {
       await whileServing(async (save) => {
         await save(JSON.stringify({ pages: ['intro'] }));
 
-        expect(prompts.contentNotChecked.calledOnceWith('EIO: i/o error')).to.be.true;
+        expect(reasonsFor(prompts.notChecked, 'content')).to.deep.equal(['EIO: i/o error']);
       });
     });
 
@@ -408,13 +424,167 @@ describe('PortalServeAction', () => {
       expect(closeWatch.calledBefore(prompts.previewStopped)).to.be.true;
     });
 
-    it('watches nothing when there is no content directory', async () => {
+    it('watches no content when there is no content directory', async () => {
       fs.rmSync(path.join(source.toString(), 'content'), { recursive: true });
       interrupt();
 
       await execute(new DirectoryPath(root));
 
-      expect(watchTree.called).to.be.false;
+      const watchedDirectories = watchTree.getCalls().map(({ args: [directory] }) => directory.toString());
+      expect(watchedDirectories).to.deep.equal([source.join('spec').toString()]);
+    });
+  });
+
+  // The preview reloads a saved specification itself; the CLI's part is saying what a build would refuse.
+  describe('checking a save in the spec directory', () => {
+    let source: DirectoryPath;
+    let watched: Promise<{ onChange: () => Promise<void>; onFailed: (reason: string) => void }>;
+    let closeWatch: sinon.SinonStub;
+    let recheck: sinon.SinonStub;
+    let written: string;
+
+    const specFile = (name: string) => path.join(source.toString(), 'spec', name);
+    const writeSpec = (name: string, contents: string) => fs.writeFileSync(specFile(name), contents);
+    const halfWritten = () => writeSpec('Apimatic-Calculator.json', written.slice(0, written.length / 2));
+    const restored = () => writeSpec('Apimatic-Calculator.json', written);
+
+    /** Runs the preview until `body` is done with it, then stops it as CTRL+C would. */
+    const whileServing = async (body: (saved: () => Promise<void>) => Promise<void>) => {
+      const running = execute(new DirectoryPath(root));
+      const { onChange } = await watched;
+      try {
+        await body(onChange);
+      } finally {
+        interrupt();
+        await running;
+      }
+    };
+
+    beforeEach(() => {
+      source = new DirectoryPath(root).join('src');
+      fs.cpSync(FIXTURE_SOURCE.toString(), source.toString(), { recursive: true });
+      written = fs.readFileSync(specFile('Apimatic-Calculator.json'), 'utf8');
+
+      closeWatch = sinon.stub().resolves();
+      recheck = sinon.stub();
+      watched = watchTreeAt(source.join('spec'), { close: closeWatch, recheck });
+    });
+
+    // The preview itself leaves the document's reference out, and says nothing.
+    it('reports a document saved half written, as a build would', async () => {
+      await whileServing(async (saved) => {
+        halfWritten();
+        await saved();
+
+        const [problem, sourceDirectory] = prompts.specRejected.firstCall.args;
+        expect(problem.kind === 'unreadableSpec' && problem.file.relativeTo(source)).to.equal(
+          'spec/Apimatic-Calculator.json'
+        );
+        expect(sourceDirectory.isEqual(source)).to.be.true;
+      });
+    });
+
+    it('reports a file a document refers to that is not there', async () => {
+      const document = JSON.parse(written);
+      document.components.schemas.Pet = { $ref: './schemas/Pet.yaml' };
+
+      await whileServing(async (saved) => {
+        writeSpec('Apimatic-Calculator.json', JSON.stringify(document));
+        await saved();
+
+        const [problem] = prompts.specRejected.firstCall.args;
+        expect(problem.kind === 'missingSpecReference' && problem.missing.file.relativeTo(source)).to.equal(
+          'spec/schemas/Pet.yaml'
+        );
+      });
+    });
+
+    it('says once that the specifications are fixed, and nothing for a save a build accepts', async () => {
+      await whileServing(async (saved) => {
+        await saved();
+        expect(prompts.specRejected.called || fixesSaid(prompts.specsShown) > 0).to.be.false;
+
+        halfWritten();
+        await saved();
+        restored();
+        await saved();
+        await saved();
+
+        expect(prompts.specRejected.calledOnce).to.be.true;
+        expect(fixesSaid(prompts.specsShown)).to.equal(1);
+      });
+    });
+
+    it('warns once that a document added needs a restart, and says once that nothing differs when it is taken out', async () => {
+      await whileServing(async (saved) => {
+        writeSpec(
+          'orders.json',
+          JSON.stringify({ openapi: '3.0.0', info: { title: 'Orders', version: '1' }, paths: {} })
+        );
+        await saved();
+        await saved();
+
+        const changes = () => prompts.specsShown.getCalls().flatMap(({ args: [{ change }] }) => change ?? []);
+        expect(changes()).to.have.length(1);
+        const [change] = changes();
+        expect(change.added.map((file) => file.relativeTo(source))).to.deep.equal(['spec/orders.json']);
+        expect(change.removed).to.be.empty;
+
+        fs.rmSync(specFile('orders.json'));
+        await saved();
+        await saved();
+
+        expect(changes()).to.have.length(2);
+        expect(changes()[1]).to.deep.equal({ added: [], removed: [] });
+      });
+    });
+
+    // An editor's swap file would only have the specifications checked again for nothing.
+    it("leaves dot files, as an editor's swap file is, and node_modules out of the watch", async () => {
+      await whileServing(async () => {
+        const call = watchTree.getCalls().find(({ args: [directory] }) => directory.isEqual(source.join('spec')));
+        const isIgnored: (name: string) => boolean = call?.args[3];
+
+        expect(['.Apimatic-Calculator.json.swp', 'node_modules'].every(isIgnored)).to.be.true;
+        expect(isIgnored('Apimatic-Calculator.json')).to.be.false;
+      });
+    });
+
+    // The specifications are read before the preview starts, which can take a minute.
+    it('checks the specifications again once they are watched, and stops watching when the preview stops', async () => {
+      await whileServing(async () => {
+        expect(recheck.calledOnce).to.be.true;
+      });
+
+      expect(closeWatch.calledBefore(prompts.stopping)).to.be.true;
+    });
+
+    it('says when the specifications cannot be watched, and serves regardless', async () => {
+      watchTree.returns(err('EMFILE: too many open files'));
+      interrupt();
+
+      const result = await execute(new DirectoryPath(root));
+
+      expect(reasonsFor(prompts.notWatched, 'spec')).to.deep.equal(['EMFILE: too many open files']);
+      expect(result.isCancelled()).to.be.true;
+    });
+
+    it('tells the user when the specifications stop being watched', async () => {
+      await whileServing(async () => {
+        (await watched).onFailed('EPERM: operation not permitted');
+
+        expect(reasonsFor(prompts.watchFailed, 'spec')).to.deep.equal(['EPERM: operation not permitted']);
+      });
+    });
+
+    it('says when a save could not be checked, rather than dropping it', async () => {
+      sinon.stub(PortalSourceContext.prototype, 'resolveSpecs').rejects(new Error('EIO: i/o error'));
+
+      await whileServing(async (saved) => {
+        await saved();
+
+        expect(reasonsFor(prompts.notChecked, 'spec')).to.deep.equal(['EIO: i/o error']);
+      });
     });
   });
 
@@ -516,7 +686,7 @@ describe('PortalServeAction', () => {
         await (await watched).onChange();
 
         expect(readProject('src/styles/theme.css')).to.contain('--color-fd-primary: #1d4ed8;');
-        expect(prompts.configApplied.calledOnce).to.be.true;
+        expect(appliedSaid()).to.equal(1);
       });
     });
 
@@ -530,7 +700,7 @@ describe('PortalServeAction', () => {
 
         expect(readProject('src/styles/theme.css')).to.contain('--color-fd-primary: #1d4ed8;');
         expect(JSON.parse(readProject('portal.identity.json')).name).to.equal('Renamed API');
-        expect(prompts.configApplied.calledOnce).to.be.true;
+        expect(appliedSaid()).to.equal(1);
       });
     });
 
@@ -545,7 +715,7 @@ describe('PortalServeAction', () => {
         expect([readProject('portal.identity.json'), readProject('generated/sdks/typescript.mdx')]).to.deep.equal(
           before
         );
-        expect(prompts.configApplied.called).to.be.false;
+        expect(appliedSaid()).to.equal(0);
         expect(prompts.configRejected.called).to.be.false;
       });
     });
@@ -568,7 +738,7 @@ describe('PortalServeAction', () => {
           'packageUrl="https://www.npmjs.com/package/calc"'
         );
         expect(readProject('generated/sdks/index.mdx')).to.contain('install="npm install calc"');
-        expect(prompts.configApplied.calledOnce).to.be.true;
+        expect(appliedSaid()).to.equal(1);
       });
     });
 
@@ -593,11 +763,11 @@ describe('PortalServeAction', () => {
             })
           ).to.be.true;
           expect(projectHas('generated/sdks/python.mdx')).to.be.false;
-          expect(prompts.configApplied.called).to.be.false;
+          expect(appliedSaid()).to.equal(0);
 
           await save(originalConfig());
 
-          expect(prompts.configApplied.calledOnce).to.be.true;
+          expect(appliedSaid()).to.equal(1);
         });
       });
 
@@ -619,7 +789,7 @@ describe('PortalServeAction', () => {
 
           expect(readProject('generated/context-plugin/index.mdx')).to.contain('Context Plugin');
           expect(prompts.editNeedsRestart.called).to.be.false;
-          expect(prompts.configApplied.calledOnce).to.be.true;
+          expect(appliedSaid()).to.equal(1);
         });
       });
 
@@ -633,7 +803,7 @@ describe('PortalServeAction', () => {
           await save(originalConfig());
 
           expect(projectHas('generated/sdks/python.mdx')).to.be.false;
-          expect(prompts.configApplied.calledOnce).to.be.true;
+          expect(appliedSaid()).to.equal(1);
         });
       });
     });
@@ -666,11 +836,11 @@ describe('PortalServeAction', () => {
 
         await save(broken);
         expect(prompts.configRejected.firstCall.args[0].kind).to.equal('invalidConfig');
-        expect(prompts.configApplied.called).to.be.false;
+        expect(appliedSaid()).to.equal(0);
         expect([readProject('portal.identity.json'), readProject('src/styles/theme.css')]).to.deep.equal(before);
 
         await save(originalConfig());
-        expect(prompts.configApplied.calledOnce).to.be.true;
+        expect(appliedSaid()).to.equal(1);
       });
     });
 
@@ -716,7 +886,7 @@ describe('PortalServeAction', () => {
         await save(config);
 
         expect(prompts.staticDirectoryNotServed.called).to.be.false;
-        expect(prompts.configApplied.calledOnce).to.be.true;
+        expect(appliedSaid()).to.equal(1);
       });
     });
 
@@ -728,8 +898,8 @@ describe('PortalServeAction', () => {
 
         await save(config);
 
-        expect(prompts.configNotApplied.calledOnceWith('EACCES: permission denied')).to.be.true;
-        expect(prompts.configApplied.called).to.be.false;
+        expect(reasonsFor(prompts.notApplied, 'config')).to.deep.equal(['EACCES: permission denied']);
+        expect(appliedSaid()).to.equal(0);
       });
     });
 
@@ -743,10 +913,10 @@ describe('PortalServeAction', () => {
 
         await save(config);
 
-        expect(prompts.configNotApplied.calledOnceWith('EBUSY: resource busy or locked')).to.be.true;
+        expect(reasonsFor(prompts.notChecked, 'config')).to.deep.equal(['EBUSY: resource busy or locked']);
         resolveSettings.restore();
         await save(config);
-        expect(prompts.configApplied.calledOnce).to.be.true;
+        expect(appliedSaid()).to.equal(1);
       });
     });
 
@@ -754,7 +924,7 @@ describe('PortalServeAction', () => {
       await whileServing(async () => {
         (await watched).onFailed('EPERM: operation not permitted');
 
-        expect(prompts.configWatchFailed.calledOnceWith('EPERM: operation not permitted')).to.be.true;
+        expect(reasonsFor(prompts.watchFailed, 'config')).to.deep.equal(['EPERM: operation not permitted']);
       });
     });
 
@@ -764,7 +934,7 @@ describe('PortalServeAction', () => {
 
       const result = await execute(new DirectoryPath(root));
 
-      expect(prompts.configNotWatched.calledOnceWith('EMFILE: too many open files')).to.be.true;
+      expect(reasonsFor(prompts.notWatched, 'config')).to.deep.equal(['EMFILE: too many open files']);
       expect(result.isCancelled()).to.be.true;
     });
   });
