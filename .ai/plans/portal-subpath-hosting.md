@@ -807,17 +807,18 @@ after each one. In all, roughly 400 lines of source and 500 of tests.
       Markdown internals.
     - The cost is that content hard-codes the portal's address.
   - **Alternative: rewrite the copies' links.**
-    - Fumadocs' `remarkLLMs` takes mdast-to-markdown `handlers` through a collection's
-      `includeProcessedMarkdown` options. Handlers for `link`, `image` and `definition` would
-      prefix root-relative URLs in the copy alone.
-    - Open: how the handlers learn the base, given that `source.ts` goes through
+    - Since fumadocs-core 16.17, `remarkLLMs` slices the copy from the authored source and takes
+      no `handlers` or `stringify` (16.15.17 took both). A plugin changes the copy with
+      `replaceSource()` from `fumadocs-core/mdx-plugins/stringifier`.
+    - A remark plugin that calls `replaceSource()` on root-relative `link`, `image` and
+      `definition` nodes would prefix their URLs in the copy alone.
+    - Open: how the plugin learns the base, given that `source.ts` goes through
       `fumadocs-mdx/macro`.
 
 **Root-relative images stay unprefixed in the Markdown copies**, as links do.
 - An image written `/images/diagram.png` is under the base in the page's HTML, but keeps its
   spelling in the `.md` copy and in `llms-full.txt`, inline and by reference alike.
-- The `image` and `definition` handlers of the alternative above would prefix them along with
-  the links.
+- The `replaceSource()` plugin of the alternative above would prefix them along with the links.
 - Until fumadocs-core 16.17, the copies carried `<img alt="…" src="__img0" />` instead, on every
   portal (measured 2026-09-30, root and path alike). That was Fumadocs' bug, fuma-nama/fumadocs#3662,
   fixed by the upgrade of 2026-10-16 (section 10). The subpath e2e checks that the copies keep the

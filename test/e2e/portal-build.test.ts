@@ -850,6 +850,7 @@ const stylesheetOf = (output: DirectoryPath) => {
 
     expect(read('index.md')).to.contain('![How a calculation flows](/images/diagram.png)');
     expect(read('authentication.md')).to.contain('![The flow, by reference][flow]');
+    expect(read('authentication.md')).to.contain('[flow]: /images/diagram.png');
     expect(full).to.contain('![How a calculation flows](/images/diagram.png)');
     expect(full).to.not.contain('__img');
   });
