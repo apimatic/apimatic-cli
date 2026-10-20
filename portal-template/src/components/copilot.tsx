@@ -6,7 +6,7 @@ import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport, type UIMessage } from 'ai';
 import { AIChatPanel, AIChatProvider, AIChatSearch, AIChatSources, AIChatTrigger, useAIChat } from '@fumadocs/ai-chat';
 import type { AIChatOptions } from 'fumadocs-ui/layouts/shared';
-import { CopilotClient } from '@/lib/copilot-client';
+import { CopilotClient, questionMessage } from '@/lib/copilot-client';
 import type { PortalCopilot } from '@/lib/portal-types';
 
 /** One part of a chat message: text, a tool call, a data part, and so on. */
@@ -49,12 +49,17 @@ function CopilotProvider({ copilot, children }: Readonly<{ copilot: PortalCopilo
   const chat = useChat({ transport, onData: client.noteData });
   const suggestions = copilot.suggestions.length > 0 ? copilot.suggestions : undefined;
   return (
-    <AIChatProvider chat={chat} renderPart={renderPart} suggestions={suggestions}>
+    <AIChatProvider chat={chat} toMessage={askFromThisPage} renderPart={renderPart} suggestions={suggestions}>
       <SessionOnOpen client={client} available={available} />
       {children}
       {available && <AIChatTrigger />}
     </AIChatProvider>
   );
+}
+
+// The chat's own message would send the page's whole address, its query and fragment too.
+function askFromThisPage(text: string) {
+  return questionMessage(text, { href: location.href, title: document.title });
 }
 
 /** Opens the session as the panel opens, and keeps the panel shut once the service turns the portal away. */

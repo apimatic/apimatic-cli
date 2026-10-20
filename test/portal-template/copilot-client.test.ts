@@ -1,5 +1,5 @@
 import { expect } from 'chai';
-import { CopilotClient } from '../../portal-template/src/lib/copilot-client';
+import { CopilotClient, questionMessage } from '../../portal-template/src/lib/copilot-client';
 
 const COPILOT = { key: 'pk_live_abc', apiUrl: 'https://ask.example.com' };
 
@@ -152,5 +152,26 @@ describe('the Ask AI client', () => {
     client.noteData({ type: 'data-thread', data: { threadId: 'th-1' } });
     expect(client.questionBody([{ id: 'q1' }, { id: 'a1' }, { id: 'q2' }], 'submit-message').threadId).to.equal('th-1');
     expect(client.questionBody([{ id: 'q9' }], 'submit-message').threadId).to.be.null;
+  });
+});
+
+describe("the Ask AI question's page", () => {
+  it('names the page a question is asked from by its address, without its query or fragment', () => {
+    const message = questionMessage('How do I log in?', {
+      href: 'https://docs.example.com/docs/oauth/callback?code=secret&state=xyz#token=abc',
+      title: 'Signing in'
+    });
+
+    expect(message).to.deep.equal({
+      role: 'user',
+      parts: [
+        {
+          type: 'data-client',
+          data: { location: 'https://docs.example.com/docs/oauth/callback', title: 'Signing in' }
+        },
+        { type: 'text', text: 'How do I log in?' }
+      ]
+    });
+    expect(JSON.stringify(message)).to.not.contain('secret').and.not.contain('abc');
   });
 });

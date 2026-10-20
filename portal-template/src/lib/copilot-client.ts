@@ -10,6 +10,28 @@ interface Problem {
   message?: string;
 }
 
+/** The page a visitor asks from, as the browser reports it. */
+export interface AskingPage {
+  href: string;
+  title: string;
+}
+
+/**
+ * A visitor's question, with the page it was asked from, as the chat's own message would carry it. The
+ * address keeps only the page: its query and fragment can hold what is the visitor's alone, such as an
+ * OAuth callback's code, and the service needs neither.
+ */
+export function questionMessage(text: string, { href, title }: AskingPage) {
+  const page = new URL(href);
+  return {
+    role: 'user' as const,
+    parts: [
+      { type: 'data-client' as const, data: { location: `${page.origin}${page.pathname}`, title } },
+      { type: 'text' as const, text }
+    ]
+  };
+}
+
 /**
  * The Ask AI service as the chat panel sees it. The public key opens a short session; questions
  * carry the session's token, never the key, and the service names the conversation's thread.
