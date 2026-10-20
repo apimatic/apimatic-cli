@@ -11,6 +11,7 @@ import {
   TEMPLATE_DEPENDENCIES
 } from '../src/infrastructure/portal-project-service';
 import { GENERATED_DIRECTORY_NAME, PAGE_TEMPLATES } from '../src/types/portal/generated-pages';
+import { GENERATED_INCLUDES_DIRECTORY_NAME } from '../src/types/portal/page-fragments';
 import { PortalIdentity } from '../src/types/portal/portal-config';
 import type { BuildPaths } from '../portal-template/portal-config';
 import type { Portal } from '../portal-template/src/lib/portal-types';
@@ -145,11 +146,17 @@ describe('portal template packaging', () => {
     }
   });
 
-  // Named to Tailwind from `src/styles/`; a rename that missed it would cost every utility class in a page, silently.
-  it('has Tailwind scan the copy of the pages, by its relative name', () => {
+  // Tailwind reads only the folders `app.css` names, so each must be one the CLI writes pages into.
+  it('has Tailwind scan the directories the CLI writes pages into', () => {
     const stylesheet = fs.readFileSync(path.join(templateRoot, 'src/styles/app.css'), 'utf8');
 
-    expect(stylesheet).to.contain(`@source '../../${CONTENT_COPY_DIRECTORY_NAME}';`);
+    for (const directory of [
+      CONTENT_COPY_DIRECTORY_NAME,
+      GENERATED_DIRECTORY_NAME,
+      GENERATED_INCLUDES_DIRECTORY_NAME
+    ]) {
+      expect(stylesheet).to.contain(`@source '../../${directory}';`);
+    }
   });
 
   // Left to itself the popover reads `window.location.href`, so a reader's query string and hash

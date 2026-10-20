@@ -1,0 +1,132 @@
+---
+title: Components
+description: Every component an author can write without importing it.
+---
+
+<InlineTOC>Inline contents</InlineTOC>
+
+## Callouts
+
+<Callout>Default callout body.</Callout>
+
+<Callout type="warn" title="Warn title">Warn callout body.</Callout>
+
+<Callout type="error" title="Error title">Error callout body.</Callout>
+
+<Callout type="success" title="Success title">Success callout body.</Callout>
+
+<Callout type="idea" title="Idea title">Idea callout body.</Callout>
+
+<CalloutContainer type="info">
+  <CalloutTitle>Composed title</CalloutTitle>
+  <CalloutDescription>Composed callout body.</CalloutDescription>
+</CalloutContainer>
+
+## Cards
+
+<Cards>
+  <Card title="Internal card" description="Internal card description." href="/guides/intro" />
+  <Card title="External card" description="External card description." href="https://example.com/" external />
+  <Card title="Plain card">Plain card body.</Card>
+</Cards>
+
+## Code
+
+```ts title="client.ts" lineNumbers
+const client = new Client(); // [!code highlight]
+```
+
+```python tab="Python"
+print("python tab body")
+```
+
+```ts tab="TypeScript"
+console.log('typescript tab body');
+```
+
+```npm
+npm install calc
+```
+
+<CodeBlockTabs defaultValue="first">
+  <CodeBlockTabsList>
+    <CodeBlockTabsTrigger value="first">Composed first</CodeBlockTabsTrigger>
+    <CodeBlockTabsTrigger value="second">Composed second</CodeBlockTabsTrigger>
+  </CodeBlockTabsList>
+  <CodeBlockTab value="first">
+
+```bash
+echo composed-first
+```
+
+  </CodeBlockTab>
+  <CodeBlockTab value="second">
+
+```bash
+echo composed-second
+```
+
+  </CodeBlockTab>
+</CodeBlockTabs>
+
+## Tabs
+
+<Tabs items={['Tab one', 'Tab two']}>
+  <Tab>First tab body.</Tab>
+  <Tab>Second tab body.</Tab>
+</Tabs>
+
+<Tabs items={['Left', 'Right']} defaultIndex={1}>
+  <Tab>Left tab body.</Tab>
+  <Tab>Right tab body.</Tab>
+</Tabs>
+
+## Steps
+
+<Steps>
+  <Step>First step body.</Step>
+  <Step>Second step body.</Step>
+</Steps>
+
+## Accordions
+
+<Accordions type="single">
+  <Accordion title="Accordion title">Accordion body.</Accordion>
+  <Accordion title="Second accordion title">Second accordion body.</Accordion>
+</Accordions>
+
+<Accordions type="multiple">
+  <Accordion title="Multiple one">Multiple one body.</Accordion>
+  <Accordion title="Multiple two">Multiple two body.</Accordion>
+</Accordions>
+
+## Files
+
+<Files>
+  <Folder name="folder-name" defaultOpen>
+    <File name="file-name.ts" />
+    <Folder name="closed-folder">
+      <File name="nested-file.ts" />
+    </Folder>
+  </Folder>
+  <File name="root-file.json" />
+</Files>
+
+## Type table
+
+<TypeTable
+  type={{
+    typeTableField: {
+      type: 'string',
+      description: 'Type table description.',
+      typeDescription: 'string | undefined',
+      default: '"fallback"',
+      required: true
+    },
+    deprecatedField: { type: 'number', description: 'Deprecated description.', deprecated: true }
+  }}
+/>
+
+## Include
+
+<include>./intro.md</include>

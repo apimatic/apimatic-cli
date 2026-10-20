@@ -53,26 +53,11 @@ export class ActionResult<T = void, E = never> {
     return this.resultType === ResultType.Cancel;
   }
 
-  public match<R>(onSuccess: (value: T) => R, onFailure: (message: string) => R, onCancel: (message: string) => R): R {
-    switch (this.resultType) {
-      case ResultType.Success:
-        return onSuccess(this.value!);
-      case ResultType.Failure:
-        return onFailure(this.message);
-      case ResultType.Cancel:
-        return onCancel(this.message);
-    }
-  }
-
   public getValue(): T {
     if (!this.isSuccess()) {
       throw new Error(`Cannot unwrap ${ResultType[this.resultType]} result: ${this.message}`);
     }
     return this.value!;
-  }
-
-  public getValueOr(defaultValue: T): T {
-    return this.isSuccess() ? this.value! : defaultValue;
   }
 
   public getError(): E | undefined {

@@ -83,7 +83,6 @@
         "fumadocs-ui": "16.15.17",
         "get-port": "^7.1.0",
         "is-in-ci": "^2.0.0",
-        "isomorphic-git": "^1.37.2",
         "lucide-react": "1.47.0",
         "mustache": "^4.2.0",
         "neverthrow": "^8.2.0",

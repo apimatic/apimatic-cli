@@ -301,6 +301,9 @@ scans `generated/` as it scans `src/`, which step 1 confirmed in a plain
 directory and in one whose `.gitignore` is `*`, as the cross-drive
 `.apimatic-build/` fallback's is (section 16). `app.css` names the content
 directory with `@source` only because that directory lies outside the project.
+Corrected 2026-10-16: the `*` case was measured from outside the project. With Vite's working
+directory inside it, Oxide scans nothing under that rule outside a git repository, and everything,
+`node_modules` included, inside one (apimatic-io#2301, `cross-drive-portal-projects.md` section 2).
 
 ### Adding and removing pages under `portal serve`
 
@@ -881,6 +884,7 @@ the observations are in section 9. What they changed in the plan:
    `.apimatic-build/` fallback is, so the template gains no line in `app.css`.
    The end-to-end build on the cross-drive CI runner is where the fallback
    itself is exercised.
+   Corrected 2026-10-16: see the correction under "Tailwind" above; the fallback itself is gone.
 3. **The rest held as planned.** The relative `dir` literal publishes only the
    word `generated`, no path of the build machine reaches the output, the
    `.md` twins carry the page bodies through the collection split, a generated

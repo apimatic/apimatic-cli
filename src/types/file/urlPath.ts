@@ -1,4 +1,4 @@
-import { URL } from "url";
+import { URL } from 'url';
 
 export class UrlPath {
   private readonly url: string;
@@ -10,7 +10,7 @@ export class UrlPath {
   public static create(url: string): UrlPath | undefined {
     try {
       const parsed = new URL(url);
-      if (["http:", "https:"].includes(parsed.protocol)) {
+      if (['http:', 'https:'].includes(parsed.protocol)) {
         return new UrlPath(url);
       }
     } catch {
@@ -21,12 +21,6 @@ export class UrlPath {
 
   public toString(): string {
     return this.url;
-  }
-
-  /** True when the URL points at the local machine (`localhost` or `127.0.0.1`). */
-  public isLocalhost(): boolean {
-    const hostname = new URL(this.url).hostname;
-    return hostname === "localhost" || hostname === "127.0.0.1";
   }
 
   /** Structural equality against another URL. */
