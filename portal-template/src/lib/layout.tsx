@@ -1,18 +1,17 @@
-import { lazy, Suspense, useMemo, type ReactNode } from 'react';
+import { Suspense, useMemo, type ReactNode } from 'react';
 import type * as PageTree from 'fumadocs-core/page-tree';
 import { DocsLayout as NotebookLayout } from 'fumadocs-ui/layouts/notebook';
 import type { AIChatOptions } from 'fumadocs-ui/layouts/shared';
+import { CopilotLayout } from './copilot-entry';
 import { baseOptions } from './layout.shared';
 import { portal } from './portal';
 import { portalTabs } from './tabs';
 
 type LayoutProps = Readonly<{ tree: PageTree.Root; children: ReactNode }>;
 
-// Its own chunk, so a portal without `portal.ai.copilot` never downloads the chat.
-const CopilotLayout = lazy(() => import('@/components/copilot'));
-
 export function PortalLayout({ tree, children }: LayoutProps) {
-  if (portal.copilot === null) return <Notebook tree={tree}>{children}</Notebook>;
+  // Null for a portal without `portal.ai.copilot`, whose build then carries none of the chat.
+  if (CopilotLayout === null || portal.copilot === null) return <Notebook tree={tree}>{children}</Notebook>;
   // The prerender waits for the chunk, so the fallback only shows if it is slow on a client-side navigation.
   return (
     <Suspense fallback={<Notebook tree={tree}>{children}</Notebook>}>

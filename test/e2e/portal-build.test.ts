@@ -208,6 +208,9 @@ const scriptsOf = (output: DirectoryPath) =>
 /** Code only the Ask AI chat carries: the address it opens a session at. */
 const CHAT_CODE = '/v1/sessions';
 
+/** A class only the Ask AI chat uses, on its source chips' numbers. */
+const CHAT_CLASS = '.text-\\[10\\.5px\\]';
+
 /**
  * The scripts a page loads before anything asks for more: those its HTML names, and every one
  * they import in turn. A chunk reached only through `import()` is left out.
@@ -322,6 +325,15 @@ const stylesheetOf = (output: DirectoryPath) => {
   // `base`, which is why the project reads a copy of the content by a relative name.
   it('publishes no absolute path from the build machine at all', () => {
     expect(filesNaming(fixture.join('content').toString(), fixture.toString())).to.deep.equal([]);
+  });
+
+  // A portal without the chat ships none of its code, not even a chunk it never loads. That its stylesheet
+  // leaves out the chat's classes is held by the stylesheet's own tests: on Windows, a project built beside
+  // a source on another drive than the temp folder has Tailwind write classes nothing uses, the chat's among them.
+  it('ships none of the Ask AI chat', () => {
+    const chat = scriptsOf(portal.output()).filter((script) => script.text.includes(CHAT_CODE));
+
+    expect(chat.map(({ name }) => name)).to.deep.equal([]);
   });
 
   it('writes the sidebar tree to one cache file instead of into every page payload', () => {
@@ -1029,6 +1041,10 @@ const stylesheetOf = (output: DirectoryPath) => {
 
     expect(chat, 'a chunk carries the chat').to.not.be.empty;
     expect(loaded.filter((name) => chat.some((script) => script.name === name))).to.deep.equal([]);
+  });
+
+  it("styles the chat, its classes in the portal's stylesheet", () => {
+    expect(stylesheetOf(portal.output())).to.contain(CHAT_CLASS);
   });
 
   // `generate` bundles these for the service: every page the build renders, those the navigation leaves

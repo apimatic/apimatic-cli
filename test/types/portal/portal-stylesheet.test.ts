@@ -3,7 +3,12 @@ import path from 'path';
 import { expect } from 'chai';
 import { compile } from 'tailwindcss';
 import { PortalConfig } from '../../../src/types/portal/portal-config';
-import { DARK_SELECTOR, LIGHT_SELECTOR, PortalStylesheet } from '../../../src/types/portal/portal-stylesheet';
+import {
+  CHAT_PRESET,
+  DARK_SELECTOR,
+  LIGHT_SELECTOR,
+  PortalStylesheet
+} from '../../../src/types/portal/portal-stylesheet';
 
 describe('PortalStylesheet', () => {
   const stylesheetFor = (block: object) =>
@@ -49,6 +54,16 @@ describe('PortalStylesheet', () => {
 
   // A bare `:root` has the specificity of the theme's `.dark` block and comes after it, so a
   // colour meant for light mode would win in dark mode as well.
+  // The chat's classes would otherwise come with every portal's stylesheet, chat or not.
+  it("imports the Ask AI chat's preset only for a portal that offers the chat, before any rule", () => {
+    const copilot = { key: 'pk_test', apiUrl: 'https://ask.apimatic.io' };
+
+    expect(stylesheetFor({})).to.not.contain(CHAT_PRESET);
+    const css = stylesheetFor({ ai: { copilot }, brand: { colors: { primary: '#1d4ed8' } } });
+    expect(css).to.contain(CHAT_PRESET);
+    expect(css.indexOf(CHAT_PRESET)).to.be.below(css.indexOf(`${LIGHT_SELECTOR} {`));
+  });
+
   it('scopes the light rule away from dark mode', () => {
     const css = stylesheetFor({ brand: { colors: { primary: '#1d4ed8' } } });
 
@@ -66,7 +81,7 @@ describe('PortalStylesheet', () => {
      * `app.css` also imports set no colour outside `@theme`, and one of them loads a plugin, so
      * they are left out.
      */
-    const compiled = async (theme: string): Promise<string> => {
+    const compiler = async (theme: string) => {
       // As Node looks a package up, from the real directory of the file importing it: under
       // pnpm a package's own dependencies sit beside it, not at the top of `node_modules`.
       const resolvePackage = (id: string, base: string): string => {
@@ -85,8 +100,19 @@ describe('PortalStylesheet', () => {
         return { path: file, base: path.dirname(file), content: fs.readFileSync(file, 'utf8') };
       };
       const app = "@import 'tailwindcss';\n@import 'fumadocs-ui/css/neutral.css';\n@import './theme.css';\n";
-      return (await compile(app, { base: styles, loadStylesheet })).build([]);
+      return await compile(app, { base: styles, loadStylesheet });
     };
+    const compiled = async (theme: string): Promise<string> => (await compiler(theme)).build([]);
+
+    it("scans the Ask AI chat's code for its classes only for a portal that offers the chat", async () => {
+      const chatSources = async (block: object) =>
+        (await compiler(stylesheetFor(block))).sources.filter(({ base }) => base.includes('ai-chat'));
+
+      expect(await chatSources({})).to.be.empty;
+      expect(
+        await chatSources({ ai: { copilot: { key: 'pk_test', apiUrl: 'https://ask.apimatic.io' } } })
+      ).to.have.length(1);
+    });
 
     it("keeps each mode's primary, after the neutral theme's own rules", async () => {
       const output = await compiled(
