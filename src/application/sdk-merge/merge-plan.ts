@@ -1,3 +1,5 @@
+import { RelativeFilePath } from '../../types/file/relativeFilePath.js';
+
 export type ConflictKind =
   /** You and the generator changed the same lines; the file holds markers. */
   | 'bothChanged'
@@ -13,26 +15,26 @@ export type ConflictKind =
   | 'other';
 
 /** A file to write, as the blob the merged tree holds for it. */
-export type FileWrite = { path: string; blob: string };
+export type FileWrite = { path: RelativeFilePath; blob: string };
 
-export type Conflict = { path: string; kind: ConflictKind; message?: string };
+export type Conflict = { path: RelativeFilePath; kind: ConflictKind; message?: string };
 
-export type Rename = { from: string; to: string; by: 'generator' | 'you' };
+export type Rename = { from: RelativeFilePath; to: RelativeFilePath; by: 'generator' | 'you' };
 
 /** Every path the run touched or left alone, by what happened to it; conflicted paths are listed under `conflicts` instead. */
 export type MergeFiles = {
   /** Files the generator produced for the first time. */
-  added: readonly string[];
+  added: readonly RelativeFilePath[];
   /** Unedited files replaced by their new version, or moved to the generator's new name. */
-  updated: readonly string[];
+  updated: readonly RelativeFilePath[];
   /** Edited files the generator also changed, merged without conflict. */
-  merged: readonly string[];
+  merged: readonly RelativeFilePath[];
   /** Unedited files the generator stopped producing. */
-  removed: readonly string[];
+  removed: readonly RelativeFilePath[];
   /** Edited files the generator left alone. */
-  kept: readonly string[];
+  kept: readonly RelativeFilePath[];
   /** Files neither side changed. */
-  unchanged: readonly string[];
+  unchanged: readonly RelativeFilePath[];
 };
 
 /**
@@ -41,14 +43,14 @@ export type MergeFiles = {
  */
 export class MergePlan {
   public readonly writes: readonly FileWrite[];
-  public readonly deletes: readonly string[];
+  public readonly deletes: readonly RelativeFilePath[];
   public readonly conflicts: readonly Conflict[];
   public readonly renames: readonly Rename[];
   public readonly files: MergeFiles;
 
   constructor(
     writes: readonly FileWrite[],
-    deletes: readonly string[],
+    deletes: readonly RelativeFilePath[],
     conflicts: readonly Conflict[],
     renames: readonly Rename[],
     files: MergeFiles
@@ -64,7 +66,7 @@ export class MergePlan {
     return this.conflicts.length > 0;
   }
 
-  public conflictedPaths(): string[] {
+  public conflictedPaths(): RelativeFilePath[] {
     return this.conflicts.map((conflict) => conflict.path);
   }
 
@@ -84,9 +86,9 @@ export class MergePlan {
   }
 
   /** Whether the file at `path` is written with conflict markers in it. */
-  public hasMarkers(path: string): boolean {
+  public hasMarkers(path: RelativeFilePath): boolean {
     return this.conflicts.some(
-      (conflict) => conflict.path === path && (conflict.kind === 'bothChanged' || conflict.kind === 'bothAdded')
+      (conflict) => conflict.path.isEqual(path) && (conflict.kind === 'bothChanged' || conflict.kind === 'bothAdded')
     );
   }
 }

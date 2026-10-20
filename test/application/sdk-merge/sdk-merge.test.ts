@@ -1,3 +1,4 @@
+import { RelativeFilePath } from '../../../src/types/file/relativeFilePath.js';
 import { MergePlan } from '../../../src/application/sdk-merge/merge-plan.js';
 import { expect } from 'chai';
 import { MergeInputs, planMerge } from '../../../src/application/sdk-merge/sdk-merge.js';
@@ -18,43 +19,45 @@ const inputs = (overrides: Partial<MergeInputs>): MergeInputs => ({
   yours: [],
   generated: [],
   applied: [],
-  basePaths: [],
+  basePaths: [].map(rel),
   ...overrides
 });
 
 const counts = (plan: MergePlan) =>
   Object.fromEntries(Object.entries(plan.files).map(([kind, paths]) => [kind, paths.length]));
 
+const rel = (value: string) => RelativeFilePath.fromGit(value);
+
 describe('planMerge', () => {
   it('turns the diff from the disk to the merged tree into writes and deletions, counted by who changed what', () => {
     const plan = planMerge(
       inputs({
-        basePaths: ['a.ts', 'b.ts', 'c.ts', 'd.ts', 'e.ts'],
+        basePaths: ['a.ts', 'b.ts', 'c.ts', 'd.ts', 'e.ts'].map(rel),
         yours: [
-          { status: 'M', path: 'b.ts', blob: blob('by') },
-          { status: 'M', path: 'c.ts', blob: blob('cy') }
+          { status: 'M', path: rel('b.ts'), blob: blob('by') },
+          { status: 'M', path: rel('c.ts'), blob: blob('cy') }
         ],
         generated: [
-          { status: 'M', path: 'a.ts', blob: blob('ag') },
-          { status: 'M', path: 'b.ts', blob: blob('bg') },
-          { status: 'D', path: 'd.ts' },
-          { status: 'A', path: 'new.ts', blob: blob('ng') }
+          { status: 'M', path: rel('a.ts'), blob: blob('ag') },
+          { status: 'M', path: rel('b.ts'), blob: blob('bg') },
+          { status: 'D', path: rel('d.ts') },
+          { status: 'A', path: rel('new.ts'), blob: blob('ng') }
         ],
         applied: [
-          { status: 'M', path: 'a.ts', blob: blob('ag') },
-          { status: 'M', path: 'b.ts', blob: blob('bm') },
-          { status: 'D', path: 'd.ts' },
-          { status: 'A', path: 'new.ts', blob: blob('ng') }
+          { status: 'M', path: rel('a.ts'), blob: blob('ag') },
+          { status: 'M', path: rel('b.ts'), blob: blob('bm') },
+          { status: 'D', path: rel('d.ts') },
+          { status: 'A', path: rel('new.ts'), blob: blob('ng') }
         ]
       })
     );
 
     expect(plan.writes).to.deep.equal([
-      { path: 'a.ts', blob: blob('ag') },
-      { path: 'b.ts', blob: blob('bm') },
-      { path: 'new.ts', blob: blob('ng') }
+      { path: rel('a.ts'), blob: blob('ag') },
+      { path: rel('b.ts'), blob: blob('bm') },
+      { path: rel('new.ts'), blob: blob('ng') }
     ]);
-    expect(plan.deletes).to.deep.equal(['d.ts']);
+    expect(plan.deletes).to.deep.equal(['d.ts'].map(rel));
     expect(counts(plan)).to.deep.equal({ added: 1, updated: 1, merged: 1, removed: 1, kept: 1, unchanged: 1 });
     expect(plan.hasConflicts()).to.be.false;
   });
@@ -64,71 +67,71 @@ describe('planMerge', () => {
       inputs({
         merge: merge({
           stages: [
-            { mode: '100644', oid: blob('1'), stage: 1, path: 'deleted-by-you.ts' },
-            { mode: '100644', oid: blob('3'), stage: 3, path: 'deleted-by-you.ts' },
-            { mode: '100644', oid: blob('1'), stage: 1, path: 'dropped.ts' },
-            { mode: '100644', oid: blob('2'), stage: 2, path: 'dropped.ts' }
+            { mode: '100644', oid: blob('1'), stage: 1, path: rel('deleted-by-you.ts') },
+            { mode: '100644', oid: blob('3'), stage: 3, path: rel('deleted-by-you.ts') },
+            { mode: '100644', oid: blob('1'), stage: 1, path: rel('dropped.ts') },
+            { mode: '100644', oid: blob('2'), stage: 2, path: rel('dropped.ts') }
           ],
           messages: [
-            { paths: ['same.ts'], type: 'Auto-merging', message: 'Auto-merging same.ts' },
+            { paths: ['same.ts'].map(rel), type: 'Auto-merging', message: 'Auto-merging same.ts' },
             {
-              paths: ['same.ts'],
+              paths: ['same.ts'].map(rel),
               type: 'CONFLICT (contents)',
               message: 'CONFLICT (content): Merge conflict in same.ts'
             },
             {
-              paths: ['added.ts'],
+              paths: ['added.ts'].map(rel),
               type: 'CONFLICT (contents)',
               message: 'CONFLICT (add/add): Merge conflict in added.ts'
             },
-            { paths: ['logo.png'], type: 'CONFLICT (binary)', message: 'warning: Cannot merge binary files: logo.png' },
+            { paths: ['logo.png'].map(rel), type: 'CONFLICT (binary)', message: 'warning: Cannot merge binary files: logo.png' },
             {
-              paths: ['logo.png'],
+              paths: ['logo.png'].map(rel),
               type: 'CONFLICT (contents)',
               message: 'CONFLICT (content): Merge conflict in logo.png'
             },
-            { paths: ['deleted-by-you.ts'], type: 'CONFLICT (modify/delete)', message: 'CONFLICT (modify/delete): …' },
-            { paths: ['dropped.ts'], type: 'CONFLICT (modify/delete)', message: 'CONFLICT (modify/delete): …' },
+            { paths: ['deleted-by-you.ts'].map(rel), type: 'CONFLICT (modify/delete)', message: 'CONFLICT (modify/delete): …' },
+            { paths: ['dropped.ts'].map(rel), type: 'CONFLICT (modify/delete)', message: 'CONFLICT (modify/delete): …' },
             {
-              paths: ['x.ts', 'y.ts'],
+              paths: ['x.ts', 'y.ts'].map(rel),
               type: 'CONFLICT (rename/rename)',
               message: 'CONFLICT (rename/rename): a.ts renamed to x.ts and y.ts'
             }
           ]
         }),
         applied: [
-          { status: 'M', path: 'same.ts', blob: blob('m') },
-          { status: 'A', path: 'deleted-by-you.ts', blob: blob('3') }
+          { status: 'M', path: rel('same.ts'), blob: blob('m') },
+          { status: 'A', path: rel('deleted-by-you.ts'), blob: blob('3') }
         ]
       })
     );
 
     expect(plan.conflicts).to.deep.equal([
-      { path: 'same.ts', kind: 'bothChanged' },
-      { path: 'added.ts', kind: 'bothAdded' },
-      { path: 'logo.png', kind: 'binary' },
-      { path: 'deleted-by-you.ts', kind: 'deletedByYou' },
-      { path: 'dropped.ts', kind: 'noLongerGenerated' },
-      { path: 'x.ts', kind: 'other', message: 'CONFLICT (rename/rename): a.ts renamed to x.ts and y.ts' },
-      { path: 'y.ts', kind: 'other', message: 'CONFLICT (rename/rename): a.ts renamed to x.ts and y.ts' }
+      { path: rel('same.ts'), kind: 'bothChanged' },
+      { path: rel('added.ts'), kind: 'bothAdded' },
+      { path: rel('logo.png'), kind: 'binary' },
+      { path: rel('deleted-by-you.ts'), kind: 'deletedByYou' },
+      { path: rel('dropped.ts'), kind: 'noLongerGenerated' },
+      { path: rel('x.ts'), kind: 'other', message: 'CONFLICT (rename/rename): a.ts renamed to x.ts and y.ts' },
+      { path: rel('y.ts'), kind: 'other', message: 'CONFLICT (rename/rename): a.ts renamed to x.ts and y.ts' }
     ]);
-    expect(plan.hasMarkers('same.ts')).to.be.true;
-    expect(plan.hasMarkers('deleted-by-you.ts')).to.be.false;
+    expect(plan.hasMarkers(rel('same.ts'))).to.be.true;
+    expect(plan.hasMarkers(rel('deleted-by-you.ts'))).to.be.false;
     expect(counts(plan)).to.deep.equal({ added: 0, updated: 0, merged: 0, removed: 0, kept: 0, unchanged: 0 });
   });
 
   it('reports the renames each side made', () => {
     const plan = planMerge(
       inputs({
-        basePaths: ['a.ts', 'b.ts'],
-        yours: [{ status: 'R', from: 'a.ts', path: 'moved/a.ts', blob: blob('a') }],
-        generated: [{ status: 'R', from: 'b.ts', path: 'b-model.ts', blob: blob('b') }]
+        basePaths: ['a.ts', 'b.ts'].map(rel),
+        yours: [{ status: 'R', from: rel('a.ts'), path: rel('moved/a.ts'), blob: blob('a') }],
+        generated: [{ status: 'R', from: rel('b.ts'), path: rel('b-model.ts'), blob: blob('b') }]
       })
     );
 
     expect(plan.renames).to.deep.equal([
-      { from: 'b.ts', to: 'b-model.ts', by: 'generator' },
-      { from: 'a.ts', to: 'moved/a.ts', by: 'you' }
+      { from: rel('b.ts'), to: rel('b-model.ts'), by: 'generator' },
+      { from: rel('a.ts'), to: rel('moved/a.ts'), by: 'you' }
     ]);
   });
 });

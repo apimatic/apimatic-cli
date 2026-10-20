@@ -1,3 +1,4 @@
+import { RelativeFilePath } from '../../src/types/file/relativeFilePath.js';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -17,6 +18,8 @@ const TYPESCRIPT: SdkGeneration = {
   codegenVersion: CodeGenerationVersion.V4,
   stability: Stability.STABLE
 };
+
+const rel = (value: string) => RelativeFilePath.fromGit(value);
 
 describe('PristineStoreService', () => {
   let root: string;
@@ -246,14 +249,14 @@ describe('PristineStoreService', () => {
       const pristine = (await record(repository, { 'README.md': '# v1' }))._unsafeUnwrap();
       const written = GenerationRecord.written(TYPESCRIPT, pristine, new Date('2026-10-20T10:00:00Z'), '2.3.0', [
         'src/index.ts'
-      ]);
+      ].map(rel));
 
       const file = (await service.writeRecord(sdk, written))._unsafeUnwrap();
 
       expect(file.toString()).to.equal(path.join(sdk.toString(), '.apimatic', 'generation.json'));
       const read = (await service.readRecord(sdk))!;
       expect(read.pristineCommit().isEqual(pristine)).to.be.true;
-      expect(read.conflictedPaths()).to.deep.equal(['src/index.ts']);
+      expect(read.conflictedPaths().map(String)).to.deep.equal(['src/index.ts']);
       expect(read.isFor(TYPESCRIPT)).to.be.true;
       expect(read.toJson()).to.equal(written.toJson());
     });
@@ -270,7 +273,7 @@ describe('PristineStoreService', () => {
       const tree = (await service.snapshotGenerated(repository, generated({ 'README.md': '# v1' })))._unsafeUnwrap();
 
       const recorded = (
-        await service.recordGeneration(repository, tree, TYPESCRIPT, '2.3.0', ['src/index.ts'])
+        await service.recordGeneration(repository, tree, TYPESCRIPT, '2.3.0', ['src/index.ts'].map(rel))
       )._unsafeUnwrap();
 
       const read = (await service.readRecord(repository.sdkDirectory()))!;
@@ -331,7 +334,7 @@ describe('PristineStoreService', () => {
       const pristine = (await record(repository, { 'README.md': '# v1' }))._unsafeUnwrap();
       await service.writeRecord(
         sdk,
-        GenerationRecord.written(TYPESCRIPT, pristine, new Date(), '2.3.0', ['src/a.ts', 'src/b.ts', 'src/gone.ts'])
+        GenerationRecord.written(TYPESCRIPT, pristine, new Date(), '2.3.0', ['src/a.ts', 'src/b.ts', 'src/gone.ts'].map(rel))
       );
       write(sdk, 'src/a.ts', MARKED);
       write(sdk, 'src/b.ts', 'resolved\n');
@@ -339,14 +342,14 @@ describe('PristineStoreService', () => {
       const state = (await service.inspect(sdk, TYPESCRIPT))._unsafeUnwrap();
 
       expect(state).to.include({ kind: 'unresolved' });
-      expect(state.kind === 'unresolved' && state.paths).to.deep.equal(['src/a.ts']);
+      expect(state.kind === 'unresolved' && state.paths.map(String)).to.deep.equal(['src/a.ts']);
     });
 
     it('is ready to merge against the recorded snapshot once the markers are gone', async () => {
       const repository = await project();
       const sdk = repository.sdkDirectory();
       const pristine = (await record(repository, { 'README.md': '# v1' }))._unsafeUnwrap();
-      await service.writeRecord(sdk, GenerationRecord.written(TYPESCRIPT, pristine, new Date(), '2.3.0', ['src/a.ts']));
+      await service.writeRecord(sdk, GenerationRecord.written(TYPESCRIPT, pristine, new Date(), '2.3.0', ['src/a.ts'].map(rel)));
       write(sdk, 'src/a.ts', 'resolved\n');
 
       const state = (await service.inspect(sdk, TYPESCRIPT))._unsafeUnwrap();

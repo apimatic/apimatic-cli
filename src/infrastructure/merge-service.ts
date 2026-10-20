@@ -53,17 +53,17 @@ export class MergeService {
 
   /** Writes and removes what the plan says, in the SDK directory, with the CLI's labels on any markers. */
   public async apply(repository: SdkRepository, plan: MergePlan): Promise<Result<void, MergeProblem>> {
-    const sdk = repository.sdkDirectory().toString();
+    const sdk = repository.sdkDirectory();
     try {
       const blobs = await this.git.readBlobs(repository.root(), [...new Set(plan.writes.map((write) => write.blob))]);
       for (const write of plan.writes) {
         const content = blobs.get(write.blob)!;
-        const target = path.join(sdk, write.path);
+        const target = write.path.in(sdk).toString();
         await fs.promises.mkdir(path.dirname(target), { recursive: true });
         await fs.promises.writeFile(target, plan.hasMarkers(write.path) ? relabelMarkers(content) : content);
       }
       for (const relative of plan.deletes) {
-        await fs.promises.rm(path.join(sdk, relative), { force: true });
+        await fs.promises.rm(relative.in(sdk).toString(), { force: true });
       }
       return ok(undefined);
     } catch (error) {

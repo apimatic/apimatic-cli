@@ -1,3 +1,4 @@
+import { RelativeFilePath } from '../file/relativeFilePath.js';
 import { CommitId } from './commit-id.js';
 import { CodeGenerationVersion, Language, Stability } from './generate.js';
 
@@ -26,14 +27,14 @@ export class GenerationRecord {
   private readonly pristine: CommitId;
   private readonly generatedAt: Date;
   private readonly cliVersion: string;
-  private readonly conflicts: readonly string[];
+  private readonly conflicts: readonly RelativeFilePath[];
 
   private constructor(
     generation: SdkGeneration,
     pristine: CommitId,
     generatedAt: Date,
     cliVersion: string,
-    conflicts: readonly string[]
+    conflicts: readonly RelativeFilePath[]
   ) {
     this.generation = generation;
     this.pristine = pristine;
@@ -48,7 +49,7 @@ export class GenerationRecord {
     pristine: CommitId,
     generatedAt: Date,
     cliVersion: string,
-    conflicts: readonly string[] = []
+    conflicts: readonly RelativeFilePath[] = []
   ): GenerationRecord {
     return new GenerationRecord(generation, pristine, generatedAt, cliVersion, conflicts);
   }
@@ -79,12 +80,16 @@ export class GenerationRecord {
     ) {
       return undefined;
     }
+    const conflicts = record.conflicts.map((value) => RelativeFilePath.create(value));
+    if (!conflicts.every((path): path is RelativeFilePath => path !== undefined)) {
+      return undefined;
+    }
     return new GenerationRecord(
       { language: record.language, codegenVersion: record.codegenVersion, stability: record.stability },
       pristine,
       generatedAt,
       record.cliVersion,
-      record.conflicts
+      conflicts
     );
   }
 
@@ -96,7 +101,7 @@ export class GenerationRecord {
     return this.generation;
   }
 
-  public conflictedPaths(): readonly string[] {
+  public conflictedPaths(): readonly RelativeFilePath[] {
     return this.conflicts;
   }
 
@@ -123,7 +128,7 @@ export class GenerationRecord {
         pristine: this.pristine.toString(),
         generatedAt: this.generatedAt.toISOString(),
         cliVersion: this.cliVersion,
-        conflicts: this.conflicts
+        conflicts: this.conflicts.map((path) => path.toString())
       },
       null,
       2

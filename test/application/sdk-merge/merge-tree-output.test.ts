@@ -1,3 +1,4 @@
+import { RelativeFilePath } from '../../../src/types/file/relativeFilePath.js';
 import { TextEncoder } from 'node:util';
 import { expect } from 'chai';
 import { parseMergeTreeOutput } from '../../../src/application/sdk-merge/merge-tree-output.js';
@@ -9,6 +10,8 @@ const THEIRS = '0c02cccd4ca03aab5fcf3996660d5c0f5020a107';
 
 // As git 2.47 printed it for a content conflict in same.txt and a file deleted on one side.
 const output = (...fields: string[]) => new TextEncoder().encode(fields.join('\0'));
+
+const rel = (value: string) => RelativeFilePath.fromGit(value);
 
 describe('parseMergeTreeOutput', () => {
   it('reads the tree, the stages of each conflicted path and the messages', () => {
@@ -39,13 +42,13 @@ describe('parseMergeTreeOutput', () => {
 
     expect(parsed.tree).to.equal(TREE);
     expect(parsed.stages).to.deep.equal([
-      { mode: '100644', oid: BASE, stage: 1, path: 'same.txt' },
-      { mode: '100644', oid: OURS, stage: 2, path: 'same.txt' },
-      { mode: '100644', oid: THEIRS, stage: 3, path: 'same.txt' },
-      { mode: '100644', oid: BASE, stage: 1, path: 'gone.txt' },
-      { mode: '100644', oid: THEIRS, stage: 3, path: 'gone.txt' }
+      { mode: '100644', oid: BASE, stage: 1, path: rel('same.txt') },
+      { mode: '100644', oid: OURS, stage: 2, path: rel('same.txt') },
+      { mode: '100644', oid: THEIRS, stage: 3, path: rel('same.txt') },
+      { mode: '100644', oid: BASE, stage: 1, path: rel('gone.txt') },
+      { mode: '100644', oid: THEIRS, stage: 3, path: rel('gone.txt') }
     ]);
-    expect(parsed.messages.map((message) => [message.paths, message.type])).to.deep.equal([
+    expect(parsed.messages.map((message) => [message.paths.map(String), message.type])).to.deep.equal([
       [['same.txt'], 'Auto-merging'],
       [['same.txt'], 'CONFLICT (contents)'],
       [['gone.txt'], 'CONFLICT (modify/delete)']

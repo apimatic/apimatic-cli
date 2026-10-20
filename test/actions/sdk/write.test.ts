@@ -1,3 +1,4 @@
+import { RelativeFilePath } from '../../../src/types/file/relativeFilePath.js';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -43,6 +44,8 @@ const DECORATED = 'from dataclasses import dataclass\n\n\n@dataclass\n';
 const MODEL_V1_EDITED = MODEL_V1.replace('# Price in USD.', '# Price in USD, VAT included.');
 
 type Files = Record<string, string>;
+
+const rel = (value: string) => RelativeFilePath.fromGit(value);
 
 describe('SdkWriteAction', () => {
   let root: string;
@@ -182,7 +185,11 @@ describe('SdkWriteAction', () => {
       expect(read('README.md')).to.equal('# sdk v2');
       expect(read('models/author.py')).to.equal('class Author: ...');
       expect(read('notes.txt')).to.equal('mine');
-      expect(sdkMerged.firstCall.args[1].files).to.deep.include({
+      expect(
+        Object.fromEntries(
+          Object.entries(sdkMerged.firstCall.args[1].files).map(([kind, paths]) => [kind, paths.map(String)])
+        )
+      ).to.deep.include({
         added: ['models/author.py'],
         merged: ['models/book.py'],
         removed: [],
@@ -209,12 +216,12 @@ describe('SdkWriteAction', () => {
       expect(result.isFailed()).to.be.true;
       expect(result.getExitCode()).to.equal(1);
       expect(result.getMessage()).to.equal('Resolve the conflicts and rerun');
-      expect(conflicts.firstCall.args[0]).to.deep.equal([{ path: 'models/book.py', kind: 'bothChanged' }]);
+      expect(conflicts.firstCall.args[0]).to.deep.equal([{ path: rel('models/book.py'), kind: 'bothChanged' }]);
       expect(read('models/book.py')).to.contain(`${YOURS_MARKER}\n    # Price in USD, VAT included.\n=======\n`);
       expect(read('models/book.py')).to.contain('    # Retail price in US dollars.\n');
       expect(read('models/book.py')).to.contain(`${GENERATED_MARKER}\n`);
       expect(read('README.md')).to.equal('# sdk v2');
-      expect(record().conflictedPaths()).to.deep.equal(['models/book.py']);
+      expect(record().conflictedPaths().map(String)).to.deep.equal(['models/book.py']);
       expect(result.getError()?.conflictsByKind()).to.include({ bothChanged: 1, noLongerGenerated: 0 });
       const cwd = repository.root().toString();
       expect((await execa('git', ['status', '--porcelain'], { cwd })).stdout).to.contain(

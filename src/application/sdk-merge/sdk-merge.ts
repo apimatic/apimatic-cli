@@ -1,8 +1,14 @@
+import { RelativeFilePath } from '../../types/file/relativeFilePath.js';
 import { Conflict, ConflictKind, FileWrite, MergeFiles, MergePlan, Rename } from './merge-plan.js';
 import { MergeTreeOutput } from './merge-tree-output.js';
 
 /** How a path changed between two trees, as `diff-tree` reports it. */
-export type Change = { status: 'A' | 'M' | 'D' | 'T' | 'R' | 'C'; path: string; from?: string; blob?: string };
+export type Change = {
+  status: 'A' | 'M' | 'D' | 'T' | 'R' | 'C';
+  path: RelativeFilePath;
+  from?: RelativeFilePath;
+  blob?: string;
+};
 
 export type MergeInputs = {
   merge: MergeTreeOutput;
@@ -13,7 +19,7 @@ export type MergeInputs = {
   /** Disk to the merged tree: what the run writes and removes. No renames. */
   applied: readonly Change[];
   /** Every path the base holds. */
-  basePaths: readonly string[];
+  basePaths: readonly RelativeFilePath[];
 };
 
 const CONFLICT_PREFIX = 'CONFLICT (';
@@ -47,7 +53,8 @@ function kindOf(type: string, message: string, stages: ReadonlySet<number>): Con
 function conflictsOf(merge: MergeTreeOutput): Conflict[] {
   const stagesByPath = new Map<string, Set<number>>();
   for (const entry of merge.stages) {
-    stagesByPath.set(entry.path, (stagesByPath.get(entry.path) ?? new Set()).add(entry.stage));
+    const key = entry.path.toString();
+    stagesByPath.set(key, (stagesByPath.get(key) ?? new Set()).add(entry.stage));
   }
   const byPath = new Map<string, Conflict>();
   for (const { paths, type, message } of merge.messages) {
@@ -55,42 +62,45 @@ function conflictsOf(merge: MergeTreeOutput): Conflict[] {
       continue;
     }
     for (const path of paths) {
-      const kind = kindOf(type, message, stagesByPath.get(path) ?? new Set());
-      const known = byPath.get(path);
+      const key = path.toString();
+      const kind = kindOf(type, message, stagesByPath.get(key) ?? new Set());
+      const known = byPath.get(key);
       if (known === undefined || RANK[kind] > RANK[known.kind]) {
-        byPath.set(path, kind === 'other' ? { path, kind, message } : { path, kind });
+        byPath.set(key, kind === 'other' ? { path, kind, message } : { path, kind });
       }
     }
   }
   return [...byPath.values()];
 }
 
-const changedPaths = (changes: readonly Change[]) =>
+/** Each change under every path it names, so a rename is found by either name. */
+const changedPaths = (changes: readonly Change[]): Map<string, Change> =>
   new Map(
-    changes.flatMap((change) =>
+    changes.flatMap((change): [string, Change][] =>
       change.from === undefined
-        ? [[change.path, change]]
+        ? [[change.path.toString(), change]]
         : [
-            [change.from, change],
-            [change.path, change]
+            [change.from.toString(), change],
+            [change.path.toString(), change]
           ]
     )
   );
 
 /**
  * What git's merge means for the SDK directory: the writes and deletions that bring the disk
- * to the merged tree, the conflicts by kind, the renames each side made, and the counts.
+ * to the merged tree, the conflicts by kind, the renames each side made, and every other path
+ * by what happened to it.
  */
 export function planMerge(inputs: MergeInputs): MergePlan {
   const conflicts = conflictsOf(inputs.merge);
-  const conflicted = new Set(conflicts.map((conflict) => conflict.path));
+  const conflicted = new Set(conflicts.map((conflict) => conflict.path.toString()));
   const yours = changedPaths(inputs.yours);
   const generated = changedPaths(inputs.generated);
-  const base = new Set(inputs.basePaths);
+  const base = new Set(inputs.basePaths.map((path) => path.toString()));
 
   const writes: FileWrite[] = [];
-  const deletes: string[] = [];
-  const files: Record<keyof MergeFiles, string[]> = {
+  const deletes: RelativeFilePath[] = [];
+  const files: Record<keyof MergeFiles, RelativeFilePath[]> = {
     added: [],
     updated: [],
     merged: [],
@@ -100,33 +110,35 @@ export function planMerge(inputs: MergeInputs): MergePlan {
   };
 
   for (const change of inputs.applied) {
+    const key = change.path.toString();
     if (change.status === 'D') {
       deletes.push(change.path);
-      if (!conflicted.has(change.path)) {
+      if (!conflicted.has(key)) {
         files.removed.push(change.path);
       }
       continue;
     }
     writes.push({ path: change.path, blob: change.blob! });
-    if (conflicted.has(change.path)) {
+    if (conflicted.has(key)) {
       continue;
     }
-    if (!base.has(change.path) && generated.get(change.path)?.status === 'A') {
+    if (!base.has(key) && generated.get(key)?.status === 'A') {
       files.added.push(change.path);
-    } else if (yours.get(change.path)?.status === 'M' && generated.has(change.path)) {
+    } else if (yours.get(key)?.status === 'M' && generated.has(key)) {
       files.merged.push(change.path);
     } else {
       files.updated.push(change.path);
     }
   }
 
-  for (const [path, change] of yours) {
-    if (change.status === 'M' && !generated.has(path) && !conflicted.has(path)) {
-      files.kept.push(path);
+  for (const [key, change] of yours) {
+    if (change.status === 'M' && !generated.has(key) && !conflicted.has(key)) {
+      files.kept.push(change.path);
     }
   }
-  for (const path of base) {
-    if (!yours.has(path) && !generated.has(path)) {
+  for (const path of inputs.basePaths) {
+    const key = path.toString();
+    if (!yours.has(key) && !generated.has(key)) {
       files.unchanged.push(path);
     }
   }

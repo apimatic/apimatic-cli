@@ -5,6 +5,7 @@ import { MergeService } from '../../infrastructure/merge-service.js';
 import { PristineStoreProblem, PristineStoreService } from '../../infrastructure/pristine-store-service.js';
 import { SdkWritePrompts } from '../../prompts/sdk/write.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
+import { RelativeFilePath } from '../../types/file/relativeFilePath.js';
 import { SdkContext } from '../../types/sdk-context.js';
 import { CommitId } from '../../types/sdk/commit-id.js';
 import { SdkGeneration } from '../../types/sdk/generation-record.js';
@@ -33,7 +34,7 @@ export class SdkWriteAction {
       case 'record':
         return this.overwriteAndRecord(destination.repository, sdkContext, tempSdk, generation);
       case 'merge':
-        return this.merge(destination.repository, destination.base, sdkContext, tempSdk, generation);
+        return this.merge(destination.repository, destination.base, tempSdk, generation);
     }
   };
 
@@ -77,7 +78,6 @@ export class SdkWriteAction {
   private async merge(
     repository: SdkRepository,
     base: CommitId,
-    sdkContext: SdkContext,
     tempSdk: DirectoryPath,
     generation: SdkGeneration
   ): Promise<ActionResult<void, MergePlan>> {
@@ -126,7 +126,7 @@ export class SdkWriteAction {
     repository: SdkRepository,
     generated: Result<TreeId, PristineStoreProblem>,
     generation: SdkGeneration,
-    conflicts: readonly string[]
+    conflicts: readonly RelativeFilePath[]
   ): Promise<void> {
     const recorded = await generated.match(
       (tree) => this.store.recordGeneration(repository, tree, generation, envInfo.getCLIVersion(), conflicts),

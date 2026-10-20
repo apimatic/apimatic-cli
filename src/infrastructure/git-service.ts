@@ -1,8 +1,8 @@
 import { Buffer } from 'node:buffer';
 import fs from 'node:fs';
-import path from 'node:path';
 import { execa, ExecaError } from 'execa';
 import { StageEntry } from '../application/sdk-merge/merge-tree-output.js';
+import { RelativeFilePath } from '../types/file/relativeFilePath.js';
 import { DirectoryPath } from '../types/file/directoryPath.js';
 import { FileName } from '../types/file/fileName.js';
 import { FilePath } from '../types/file/filePath.js';
@@ -13,14 +13,14 @@ import { TreeId } from '../types/sdk/tree-id.js';
 import { errorMessage } from '../utils/error-utils.js';
 import { withDirPath } from './tmp-extensions.js';
 
-export type TreeEntry = { mode: string; type: 'blob' | 'tree' | 'commit'; oid: string; path: string };
+export type TreeEntry = { mode: string; type: 'blob' | 'tree' | 'commit'; oid: string; path: RelativeFilePath };
 
 /** One line of `diff-tree --raw`: how `path` differs between two trees, and the blob it holds in the second. */
 export type DiffEntry = {
   status: 'A' | 'M' | 'D' | 'T' | 'R' | 'C';
-  path: string;
+  path: RelativeFilePath;
   /** The path in the first tree, for a rename or copy. */
-  from?: string;
+  from?: RelativeFilePath;
   /** The blob in the second tree; absent for a deletion. */
   blob?: string;
 };
@@ -72,7 +72,7 @@ export class GitService {
   public async treeOf(
     root: DirectoryPath,
     directory: DirectoryPath,
-    include: 'all' | readonly string[]
+    include: 'all' | readonly RelativeFilePath[]
   ): Promise<TreeId> {
     const gitDir = await this.gitDir(root);
     return withDirPath(async (temporary) => {
@@ -81,9 +81,9 @@ export class GitService {
         this.run(directory, ['--git-dir', gitDir, '--work-tree', directory.toString(), ...args], env, temporary, input);
       await inWorkTree(['add', '--all', ...(include === 'all' ? ['--force'] : []), '--', '.']);
       const forced =
-        include === 'all' ? [] : include.filter((relative) => fs.existsSync(path.join(directory.toString(), relative)));
+        include === 'all' ? [] : include.filter((relative) => fs.existsSync(relative.in(directory).toString()));
       if (forced.length > 0) {
-        await inWorkTree(['add', '--force', '--pathspec-from-file=-', '--pathspec-file-nul'], forced.join('\0'));
+        await inWorkTree(['add', '--force', '--pathspec-from-file=-', '--pathspec-file-nul'], forced.map(String).join('\0'));
       }
       const { stdout } = await inWorkTree(['write-tree']);
       return TreeId.fromGit(stdout.trim());
@@ -162,7 +162,7 @@ export class GitService {
       .map((entry) => {
         const [meta, filePath] = entry.split('\t');
         const [mode, type, oid] = meta.split(' ');
-        return { mode, type: type as TreeEntry['type'], oid, path: filePath };
+        return { mode, type: type as TreeEntry['type'], oid, path: RelativeFilePath.fromGit(filePath) };
       });
   }
 
@@ -232,10 +232,15 @@ export class GitService {
       const status = statusWithScore[0] as DiffEntry['status'];
       const first = fields[index + 1];
       if (status === 'R' || status === 'C') {
-        entries.push({ status, from: first, path: fields[index + 2], blob: dstBlob });
+        entries.push({
+          status,
+          from: RelativeFilePath.fromGit(first),
+          path: RelativeFilePath.fromGit(fields[index + 2]),
+          blob: dstBlob
+        });
         index += 3;
       } else {
-        entries.push({ status, path: first, ...(status === 'D' ? {} : { blob: dstBlob }) });
+        entries.push({ status, path: RelativeFilePath.fromGit(first), ...(status === 'D' ? {} : { blob: dstBlob }) });
         index += 2;
       }
     }
@@ -249,7 +254,7 @@ export class GitService {
    * keep it beside the others.
    */
   public async stageConflicts(root: DirectoryPath, entries: readonly StageEntry[]): Promise<void> {
-    const removals = [...new Set(entries.map((entry) => entry.path))].map((path) => `0 ${'0'.repeat(40)} 0\t${path}`);
+    const removals = [...new Set(entries.map((entry) => entry.path.toString()))].map((path) => `0 ${'0'.repeat(40)} 0\t${path}`);
     const stages = entries.map((entry) => `${entry.mode} ${entry.oid} ${entry.stage}\t${entry.path}`);
     await this.run(
       root,

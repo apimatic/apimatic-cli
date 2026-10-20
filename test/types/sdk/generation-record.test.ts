@@ -1,3 +1,4 @@
+import { RelativeFilePath } from '../../../src/types/file/relativeFilePath.js';
 import { expect } from 'chai';
 import { CommitId } from '../../../src/types/sdk/commit-id.js';
 import { CodeGenerationVersion, Language, Stability } from '../../../src/types/sdk/generate.js';
@@ -18,6 +19,8 @@ const json = (overrides: Record<string, unknown> = {}) =>
     ...overrides
   });
 
+const rel = (value: string) => RelativeFilePath.fromGit(value);
+
 describe('GenerationRecord', () => {
   it('round-trips through its file form', () => {
     const record = GenerationRecord.written(
@@ -25,7 +28,7 @@ describe('GenerationRecord', () => {
       CommitId.create(SHA)!,
       new Date('2026-10-20T10:00:00Z'),
       '2.3.0',
-      ['src/models/book.py']
+      [rel('src/models/book.py')]
     );
 
     const parsed = GenerationRecord.parse(record.toJson())!;

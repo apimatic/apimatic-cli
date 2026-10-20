@@ -1,3 +1,4 @@
+import { RelativeFilePath } from '../../../src/types/file/relativeFilePath.js';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -23,6 +24,8 @@ const STABLE: SdkGeneration = {
   stability: Stability.STABLE
 };
 const BETA: SdkGeneration = { ...STABLE, stability: Stability.BETA };
+
+const rel = (value: string) => RelativeFilePath.fromGit(value);
 
 describe('SdkPrepareAction', () => {
   let root: string;
@@ -53,7 +56,7 @@ describe('SdkPrepareAction', () => {
     await git.init(new DirectoryPath(root));
     const repository = (await store.findRepository(sdk()))!;
     const tree = (await store.snapshotGenerated(repository, sdk()))._unsafeUnwrap();
-    (await store.recordGeneration(repository, tree, STABLE, '0.0.0', conflicts))._unsafeUnwrap();
+    (await store.recordGeneration(repository, tree, STABLE, '0.0.0', conflicts.map(rel)))._unsafeUnwrap();
     return repository;
   };
 
@@ -173,7 +176,7 @@ describe('SdkPrepareAction', () => {
     const conflictsUnresolved = sinon.stub(SdkPreparePrompts.prototype, 'conflictsUnresolved');
 
     expect((await execute()).isFailed()).to.be.true;
-    expect(conflictsUnresolved.firstCall.args[0]).to.deep.equal(['a.py']);
+    expect(conflictsUnresolved.firstCall.args[0].map(String)).to.deep.equal(['a.py']);
   });
 
   it('refuses an SDK directory nested in one that has snapshots', async () => {

@@ -1,23 +1,34 @@
-import path from 'node:path';
 import { stripVTControlCharacters } from 'node:util';
 import { expect } from 'chai';
 import sinon from 'sinon';
 import { log } from '@clack/prompts';
-import { MergePlan } from '../../../src/application/sdk-merge/merge-plan.js';
+import { ConflictKind, MergePlan } from '../../../src/application/sdk-merge/merge-plan.js';
 import { SdkWritePrompts } from '../../../src/prompts/sdk/write.js';
 import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
+import { RelativeFilePath } from '../../../src/types/file/relativeFilePath.js';
 import { SdkRepository } from '../../../src/types/sdk/sdk-repository.js';
 
-const plan = (files: Partial<MergePlan['files']>, conflicts: MergePlan['conflicts'] = []) =>
-  new MergePlan([], [], conflicts, [], {
-    added: [],
-    updated: [],
-    merged: [],
-    removed: [],
-    kept: [],
-    unchanged: [],
-    ...files
-  });
+const rel = (value: string) => RelativeFilePath.fromGit(value);
+
+const plan = (
+  files: Partial<Record<keyof MergePlan['files'], string[]>>,
+  conflicts: { path: string; kind: ConflictKind }[] = []
+) =>
+  new MergePlan(
+    [],
+    [],
+    conflicts.map((conflict) => ({ ...conflict, path: rel(conflict.path) })),
+    [],
+    {
+      added: [],
+      updated: [],
+      merged: [],
+      removed: [],
+      kept: [],
+      unchanged: [],
+      ...Object.fromEntries(Object.entries(files).map(([kind, paths]) => [kind, paths.map(rel)]))
+    }
+  );
 
 describe('SdkWritePrompts.sdkMerged', () => {
   const root = new DirectoryPath(process.cwd());

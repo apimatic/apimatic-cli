@@ -1,5 +1,6 @@
 import { isCancel, confirm, log } from '@clack/prompts';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
+import { RelativeFilePath } from '../../types/file/relativeFilePath.js';
 import { CommitId } from '../../types/sdk/commit-id.js';
 import { describeGeneration, SdkGeneration } from '../../types/sdk/generation-record.js';
 import { GitVersion } from '../../types/sdk/git-version.js';
@@ -62,12 +63,12 @@ export class SdkPreparePrompts {
     log.warn(message);
   }
 
-  public conflictsUnresolved(paths: readonly string[], repository: SdkRepository) {
+  public conflictsUnresolved(paths: readonly RelativeFilePath[], repository: SdkRepository) {
     const one = paths.length === 1;
     const message =
       `${plural(paths.length, 'file')} still hold${one ? 's' : ''} conflict markers from the last run. ` +
       `Resolve ${one ? 'it' : 'them'} and remove the markers, then rerun:\n` +
-      paths.map((path) => `  ${f.relativePath(repository.file(path))}`).join('\n');
+      paths.map((path) => `  ${f.relativePath(path.in(repository.sdkDirectory()))}`).join('\n');
     log.error(message);
   }
 }

@@ -1,3 +1,4 @@
+import { RelativeFilePath } from '../../src/types/file/relativeFilePath.js';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -8,6 +9,8 @@ import { DirectoryPath } from '../../src/types/file/directoryPath.js';
 
 const text = (content: Uint8Array | undefined) =>
   content === undefined ? undefined : new TextDecoder().decode(content);
+
+const rel = (value: string) => RelativeFilePath.fromGit(value);
 
 describe('GitService', () => {
   let root: string;
@@ -32,7 +35,7 @@ describe('GitService', () => {
       repo,
       entries.map((entry) => entry.oid)
     );
-    return new Map(entries.map((entry) => [entry.path, text(blobs.get(entry.oid))]));
+    return new Map(entries.map((entry) => [entry.path.toString(), text(blobs.get(entry.oid))]));
   };
 
   beforeEach(() => {
@@ -74,7 +77,7 @@ describe('GitService', () => {
       write(sdk, 'dist/generated.js', 'generated\n');
       write(sdk, 'debug.log', 'noise\n');
 
-      const files = await filesOf(repo, await git.treeOf(repo, sdk, ['dist/generated.js', 'missing.txt']));
+      const files = await filesOf(repo, await git.treeOf(repo, sdk, ['dist/generated.js', 'missing.txt'].map(rel)));
 
       expect([...files.keys()]).to.have.members(['.gitignore', 'src/index.ts', 'dist/generated.js']);
     });
@@ -140,7 +143,7 @@ describe('GitService', () => {
     const paired = await git.diffTrees(repo, from, to, true);
     const plain = await git.diffTrees(repo, from, to, false);
 
-    expect(paired.map(({ status, path: changed, from: origin }) => [status, changed, origin])).to.deep.equal(
+    expect(paired.map(({ status, path: changed, from: origin }) => [status, changed.toString(), origin?.toString()])).to.deep.equal(
       [
         ['M', 'b.txt', undefined],
         ['C', 'c.txt', undefined],
@@ -150,12 +153,12 @@ describe('GitService', () => {
         .concat([['A', 'c.txt', undefined]])
         .sort((x, y) => String(x[1]).localeCompare(String(y[1])))
     );
-    expect(plain.map(({ status, path: changed }) => [status, changed])).to.deep.equal([
+    expect(plain.map(({ status, path: changed }) => [status, changed.toString()])).to.deep.equal([
       ['D', 'a.txt'],
       ['M', 'b.txt'],
       ['A', 'c.txt'],
       ['A', 'moved/a.txt']
     ]);
-    expect(plain.find((change) => change.path === 'b.txt')?.blob).to.have.lengthOf(40);
+    expect(plain.find((change) => change.path.toString() === 'b.txt')?.blob).to.have.lengthOf(40);
   });
 });

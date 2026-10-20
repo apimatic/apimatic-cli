@@ -1,6 +1,7 @@
 import { log } from '@clack/prompts';
 import { Conflict, ConflictKind, MergeFiles, MergePlan } from '../../application/sdk-merge/merge-plan.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
+import { RelativeFilePath } from '../../types/file/relativeFilePath.js';
 import { SdkSaveProblem } from '../../types/sdk-context.js';
 import { SdkRepository } from '../../types/sdk/sdk-repository.js';
 import { listedInProse } from '../../utils/string-utils.js';
@@ -27,8 +28,8 @@ const YOUR_FILES: Readonly<Partial<Record<keyof MergeFiles, string>>> = {
 
 const plural = (count: number, noun: string) => `${count} ${noun}${count === 1 ? '' : 's'}`;
 
-const listed = (repository: SdkRepository, paths: readonly string[]) =>
-  paths.map((relative) => `  ${f.relativePath(repository.file(relative))}`);
+const listed = (repository: SdkRepository, paths: readonly RelativeFilePath[]) =>
+  paths.map((relative) => `  ${f.relativePath(relative.in(repository.sdkDirectory()))}`);
 
 export class SdkWritePrompts {
   public sdkNotSaved(problem: SdkSaveProblem) {
@@ -84,7 +85,9 @@ export class SdkWritePrompts {
   public conflicts(conflicts: readonly Conflict[], repository: SdkRepository) {
     const lines = conflicts.map(
       (conflict) =>
-        `${f.relativePath(repository.file(conflict.path))}\n  ${conflict.message ?? CONFLICT_LABELS[conflict.kind]}`
+        `${f.relativePath(conflict.path.in(repository.sdkDirectory()))}\n  ${
+          conflict.message ?? CONFLICT_LABELS[conflict.kind]
+        }`
     );
     const marked = conflicts.some((conflict) => MARKED_KINDS.includes(conflict.kind));
     const unmarked = conflicts.some((conflict) => !MARKED_KINDS.includes(conflict.kind));

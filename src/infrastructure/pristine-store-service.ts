@@ -5,6 +5,7 @@ import { hasConflictMarkers } from '../application/sdk-merge/markers.js';
 import { DirectoryPath } from '../types/file/directoryPath.js';
 import { FileName } from '../types/file/fileName.js';
 import { FilePath } from '../types/file/filePath.js';
+import { RelativeFilePath } from '../types/file/relativeFilePath.js';
 import { CommitId } from '../types/sdk/commit-id.js';
 import { describeGeneration, GenerationRecord, SdkGeneration } from '../types/sdk/generation-record.js';
 import { SdkRepository } from '../types/sdk/sdk-repository.js';
@@ -27,7 +28,7 @@ export type SdkDirectoryState =
   | { kind: 'noRecord'; repository: SdkRepository }
   | { kind: 'otherGeneration'; repository: SdkRepository; recorded: SdkGeneration }
   | { kind: 'snapshotMissing'; repository: SdkRepository; commit: CommitId }
-  | { kind: 'unresolved'; repository: SdkRepository; paths: string[] }
+  | { kind: 'unresolved'; repository: SdkRepository; paths: RelativeFilePath[] }
   | { kind: 'ready'; repository: SdkRepository; base: CommitId };
 
 const RECORD_DIRECTORY = '.apimatic';
@@ -173,7 +174,7 @@ export class PristineStoreService {
     generated: TreeId,
     generation: SdkGeneration,
     cliVersion: string,
-    conflicts: readonly string[]
+    conflicts: readonly RelativeFilePath[]
   ): Promise<Result<GenerationRecord, PristineStoreProblem>> {
     const pristine = await this.recordPristine(repository, generated, generation);
     if (pristine.isErr()) {
@@ -212,7 +213,7 @@ export class PristineStoreService {
       }
       const entries = (await this.git.listTree(root, commit)).filter((entry) => entry.type === 'blob');
       const blobs = await this.git.readBlobs(root, [...new Set(entries.map((entry) => entry.oid))]);
-      return ok(new Map(entries.map((entry) => [entry.path, blobs.get(entry.oid)!])));
+      return ok(new Map(entries.map((entry) => [entry.path.toString(), blobs.get(entry.oid)!])));
     } catch (error) {
       return err(gitFailed(errorMessage(error)));
     }
@@ -256,10 +257,10 @@ export class PristineStoreService {
   }
 
   // The files the record lists as conflicted that still hold the markers, so a run never merges over them.
-  private async unresolvedConflicts(repository: SdkRepository, record: GenerationRecord): Promise<string[]> {
-    const unresolved: string[] = [];
+  private async unresolvedConflicts(repository: SdkRepository, record: GenerationRecord): Promise<RelativeFilePath[]> {
+    const unresolved: RelativeFilePath[] = [];
     for (const relative of record.conflictedPaths()) {
-      const file = repository.file(relative);
+      const file = relative.in(repository.sdkDirectory());
       if ((await this.fileService.fileExists(file)) && hasConflictMarkers(await this.fileService.getContents(file))) {
         unresolved.push(relative);
       }
