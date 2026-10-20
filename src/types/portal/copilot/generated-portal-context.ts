@@ -1,13 +1,16 @@
 import { err, ok, Result } from 'neverthrow';
 import { FileService } from '../../../infrastructure/file-service.js';
+import { ZipService } from '../../../infrastructure/zip-service.js';
 import { DirectoryPath } from '../../file/directoryPath.js';
 import { FileName } from '../../file/fileName.js';
 import { FilePath } from '../../file/filePath.js';
+import { ZIP_FILE_NAME } from '../../portal-context.js';
 import { BundlePage, bundlePageOf, CopilotBundle } from './copilot-bundle.js';
 import { errorMessage } from '../../../utils/error-utils.js';
 
 /** Where the deployed portal serves its bundle, under the site's address, for the Ask AI service to fetch. */
 export const COPILOT_DIRECTORY_NAME = '__copilot';
+const BUNDLE_FILE_NAME = 'bundle.json';
 
 // Under `/api/`, where the portal's own routes are files with extensions and no page can collide with them.
 const PAGES_DIRECTORY_NAME = 'api';
@@ -19,6 +22,7 @@ export const COPILOT_PAGES_FILE = `${PAGES_DIRECTORY_NAME}/${PAGES_FILE_NAME}`;
 /** A portal `portal generate` built or wrote, for the pages Ask AI answers from. */
 export class GeneratedPortalContext {
   private readonly fileService = new FileService();
+  private readonly zipService = new ZipService();
 
   constructor(private readonly portalDirectory: DirectoryPath) {}
 
@@ -31,7 +35,7 @@ export class GeneratedPortalContext {
   }
 
   private get bundleFile(): FilePath {
-    return new FilePath(this.directory, new FileName('bundle.json'));
+    return new FilePath(this.directory, new FileName(BUNDLE_FILE_NAME));
   }
 
   /**
@@ -68,14 +72,30 @@ export class GeneratedPortalContext {
     }
   }
 
-  /** The bundle `generate` published into the portal; null for a portal without one. */
+  /**
+   * The bundle `generate` published into the portal, whether saved as a directory or, with `--zip`, as an
+   * archive; null for a portal without one.
+   */
   public async bundle(): Promise<Result<CopilotBundle | null, string>> {
+    const json = await this.bundleJson();
+    if (json.isErr() || json.value === null) {
+      return json.map(() => null);
+    }
+    const bundle = CopilotBundle.parse(json.value);
+    return bundle === null ? err('its Ask AI pages could not be read') : ok(bundle);
+  }
+
+  private async bundleJson(): Promise<Result<string | null, string>> {
     try {
-      if (!(await this.fileService.fileExists(this.bundleFile))) {
+      if (await this.fileService.fileExists(this.bundleFile)) {
+        return ok(await this.fileService.getContents(this.bundleFile));
+      }
+      const archive = new FilePath(this.portalDirectory, new FileName(ZIP_FILE_NAME));
+      if (!(await this.fileService.fileExists(archive))) {
         return ok(null);
       }
-      const bundle = CopilotBundle.parse(await this.fileService.getContents(this.bundleFile));
-      return bundle === null ? err('its Ask AI pages could not be read') : ok(bundle);
+      // Archived from the built directory, so the bundle is at the same path inside.
+      return await this.zipService.readEntry(archive, `${COPILOT_DIRECTORY_NAME}/${BUNDLE_FILE_NAME}`);
     } catch (error) {
       return err(errorMessage(error));
     }

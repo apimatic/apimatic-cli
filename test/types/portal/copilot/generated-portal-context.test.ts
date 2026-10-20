@@ -4,6 +4,9 @@ import path from 'node:path';
 import { expect } from 'chai';
 import sinon from 'sinon';
 import { FileService } from '../../../../src/infrastructure/file-service';
+import { ZipService } from '../../../../src/infrastructure/zip-service';
+import { FilePath } from '../../../../src/types/file/filePath';
+import { FileName } from '../../../../src/types/file/fileName';
 import { DirectoryPath } from '../../../../src/types/file/directoryPath';
 import { BundlePage, CopilotBundle } from '../../../../src/types/portal/copilot/copilot-bundle';
 import {
@@ -106,6 +109,35 @@ describe('GeneratedPortalContext', () => {
 
     it('is null for a portal without one', async () => {
       expect((await portal.bundle())._unsafeUnwrap()).to.be.null;
+    });
+
+    describe('of a portal saved as an archive', () => {
+      /** Saves what is in `built` as `portal generate --zip` does: as the portal's only file. */
+      const zipPortal = async (built: string) => {
+        const archive = new FilePath(new DirectoryPath(root), new FileName('portal.zip'));
+        (await new ZipService().archive(new DirectoryPath(path.join(root, built)), archive))._unsafeUnwrap();
+        fs.rmSync(path.join(root, built), { recursive: true });
+      };
+
+      it('reads the bundle from inside the archive', async () => {
+        await new GeneratedPortalContext(new DirectoryPath(path.join(root, 'built'))).publish(BUNDLE);
+        await zipPortal('built');
+
+        expect((await portal.bundle())._unsafeUnwrap()!.toJson()).to.equal(BUNDLE.toJson());
+      });
+
+      it('is null for an archive without one', async () => {
+        write('built/index.html', '<html></html>');
+        await zipPortal('built');
+
+        expect((await portal.bundle())._unsafeUnwrap()).to.be.null;
+      });
+
+      it('reports an archive it cannot read', async () => {
+        write('portal.zip', 'not a zip');
+
+        expect((await portal.bundle()).isErr()).to.be.true;
+      });
     });
 
     it('reports a bundle it cannot make out', async () => {

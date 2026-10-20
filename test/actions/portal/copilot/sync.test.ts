@@ -11,6 +11,9 @@ import { ServiceError, ServiceErrorCode } from '../../../../src/infrastructure/s
 import { PortalCopilotSyncPrompts } from '../../../../src/prompts/portal/copilot/sync';
 import { CommandMetadata } from '../../../../src/types/common/command-metadata';
 import { DirectoryPath } from '../../../../src/types/file/directoryPath';
+import { FileName } from '../../../../src/types/file/fileName';
+import { FilePath } from '../../../../src/types/file/filePath';
+import { ZipService } from '../../../../src/infrastructure/zip-service';
 import { CopilotBundle } from '../../../../src/types/portal/copilot/copilot-bundle';
 import { ProjectContext } from '../../../../src/types/project-context';
 import { SiteAddress } from '../../../../src/types/portal/config/site-address';
@@ -115,6 +118,20 @@ describe('PortalCopilotSyncAction', () => {
     expect(uploaded(bundle)).to.deep.include({ basePath: '/docs/', siteUrl: 'https://example.com/docs' });
     expect(awaitIndexing.firstCall.args[1]).to.equal('v-1');
     expect(prompts.indexed.calledOnceWith(indexed('active'))).to.be.true;
+  });
+
+  it('uploads the bundle of a portal generated with --zip, which holds only the archive', async () => {
+    const portal = path.join(root, 'portal');
+    const archive = new FilePath(new DirectoryPath(root), new FileName('portal.zip'));
+    (await new ZipService().archive(new DirectoryPath(portal), archive))._unsafeUnwrap();
+    fs.rmSync(portal, { recursive: true });
+    fs.mkdirSync(portal);
+    fs.renameSync(archive.toString(), path.join(portal, 'portal.zip'));
+
+    const result = await execute();
+
+    expect(result.isSuccess()).to.be.true;
+    expect((upload.firstCall.args[1] as CopilotBundle).toJson()).to.equal(PUBLISHED.toJson());
   });
 
   it('reports a portal Ask AI already answers from, without waiting', async () => {

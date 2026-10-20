@@ -80,6 +80,31 @@ describe('ZipService', () => {
     });
   });
 
+  describe('readEntry', () => {
+    it('reads one file of what archive packed, by its path inside', async () => {
+      write(path.join('__copilot', 'bundle.json'), '{"pages":[]}');
+      write('index.html', '<html></html>');
+      (await new ZipService().archive(source, archive))._unsafeUnwrap();
+
+      expect((await new ZipService().readEntry(archive, '__copilot/bundle.json'))._unsafeUnwrap()).to.equal(
+        '{"pages":[]}'
+      );
+    });
+
+    it('is null for a file the archive does not hold', async () => {
+      write('index.html', '<html></html>');
+      (await new ZipService().archive(source, archive))._unsafeUnwrap();
+
+      expect((await new ZipService().readEntry(archive, '__copilot/bundle.json'))._unsafeUnwrap()).to.be.null;
+    });
+
+    it('reports a file that is not an archive', async () => {
+      fs.writeFileSync(archive.toString(), 'not a zip');
+
+      expect((await new ZipService().readEntry(archive, 'index.html'))._unsafeUnwrapErr()).to.not.be.empty;
+    });
+  });
+
   describe('unArchive', () => {
     it('expands what archive packed', async () => {
       write('openapi.json', '{}');
