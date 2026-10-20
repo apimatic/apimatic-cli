@@ -844,6 +844,17 @@ const stylesheetOf = (output: DirectoryPath) => {
     expect(read('authentication/index.html')).to.match(/<img[^>]* src="\/api\/assets\/diagram[^"]*\.png"/);
   });
 
+  // Fumadocs swapped a bundled image for its import's name, `<img src="__img0" />` (fuma-nama/fumadocs#3662).
+  it('keeps the images as written in the Markdown twins and llms-full.txt', () => {
+    const full = read('llms-full.txt');
+
+    expect(read('index.md')).to.contain('![How a calculation flows](/images/diagram.png)');
+    expect(read('authentication.md')).to.contain('![The flow, by reference][flow]');
+    expect(read('authentication.md')).to.contain('[flow]: /images/diagram.png');
+    expect(full).to.contain('![How a calculation flows](/images/diagram.png)');
+    expect(full).to.not.contain('__img');
+  });
+
   // Fumadocs' own renderer fails the whole page over an image in a description; `ApiMarkdown` stands in for it.
   it('renders an image and a code block in a description, the image under the path', () => {
     const page = read('api/apimatic-calculator/simple-calculator/Calculate/index.html');
