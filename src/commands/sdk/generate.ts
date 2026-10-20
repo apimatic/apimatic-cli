@@ -10,6 +10,7 @@ import {
   Stability,
   UPCOMING_LANGUAGES
 } from '../../types/sdk/generate.js';
+import { GitVersion } from '../../types/sdk/git-version.js';
 import { StabilityChoice } from '../../types/sdk/stability-choice.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { ProjectContext } from '../../types/project-context.js';
@@ -24,7 +25,8 @@ export default class SdkGenerate extends Command {
   static readonly summary = 'Generate an SDK for your API';
 
   static readonly description = `Generate a Software Development Kit (SDK) from an API specification.
-${inProse(AVAILABLE_LANGUAGES)} are available; ${inProse(UPCOMING_LANGUAGES)} are coming soon.`;
+${inProse(AVAILABLE_LANGUAGES)} are available; ${inProse(UPCOMING_LANGUAGES)} are coming soon.
+With git ${GitVersion.required()} or newer installed, your edits to the generated SDK are kept when you regenerate it.`;
 
   static readonly cmdTxt = format.cmd('apimatic', 'sdk', 'generate');
 
