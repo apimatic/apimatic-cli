@@ -844,7 +844,7 @@ const stylesheetOf = (output: DirectoryPath) => {
     expect(read('authentication/index.html')).to.match(/<img[^>]* src="\/api\/assets\/diagram[^"]*\.png"/);
   });
 
-  // Fumadocs' own renderer fails the whole page over an image in a description; `ApiMarkdown` stands in for it.
+  // Fumadocs renders a description's image without the path; `ApiMarkdown` gives it the path.
   it('renders an image and a code block in a description, the image under the path', () => {
     const page = read('api/apimatic-calculator/simple-calculator/Calculate/index.html');
 
