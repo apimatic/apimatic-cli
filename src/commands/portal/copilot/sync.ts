@@ -11,7 +11,9 @@ import { ProjectContext } from '../../../types/project-context.js';
 export default class PortalCopilotSync extends Command {
   static readonly summary = "Update the portal's Ask AI chat with the portal's current pages.";
 
-  static readonly description = `Uploads the pages of a generated portal to the Ask AI service, so the portal's Ask AI chat answers from the docs as they are now. Run it after deploying a portal generated with 'apimatic portal generate'.
+  static readonly description = `Uploads the pages of a generated portal to the Ask AI service, so the portal's Ask AI chat answers from the docs as they are now.
+
+The service picks up the pages by itself from a portal deployed at its 'site.url'. Run this command after deploying a portal generated with 'apimatic portal generate' when it cannot: for a portal without 'site.url', or one the service cannot reach, such as one on a private network.
 
 The service is set by the 'ai.copilot' setting in the 'portal' block of 'src/apimatic.json': APIMatic's Ask AI service, or one on this machine. The pages are swapped in at once, after all of them are indexed; until then Ask AI answers from the previous ones.
 

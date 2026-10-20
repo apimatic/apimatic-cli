@@ -114,10 +114,21 @@ export class PortalGeneratePrompts {
     noteWrapped(message, 'Next steps');
   }
 
-  public copilotUpdatesAfterDeploy() {
+  /**
+   * The service fetches a deployed portal's pages from the portal's address, so only a portal with one
+   * updates Ask AI by itself; `sync` is the way for the rest.
+   */
+  public copilotUpdatesAfterDeploy(site: SiteAddress | null) {
+    if (site === null) {
+      log.info(
+        `Deploy the portal, then run ${syncCommand()} so Ask AI answers from these pages: without ` +
+          `${f.var('site.url')}, the Ask AI service cannot find the portal by itself.`
+      );
+      return;
+    }
     log.info(
-      'Ask AI picks up these pages by itself once the portal is deployed. ' +
-        `If the Ask AI service cannot reach the portal, run ${syncCommand()} after deploying instead.`
+      `Ask AI picks up these pages by itself once the portal is deployed at ${f.link(`${site}`)}. ` +
+        `If the Ask AI service cannot reach it there, run ${syncCommand()} after deploying instead.`
     );
   }
 

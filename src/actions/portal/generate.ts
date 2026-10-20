@@ -92,7 +92,7 @@ export class GenerateAction {
 
     this.prompts.portalGenerated(portalDirectory);
     this.prompts.nextSteps(portalDirectory, zipPortal, site);
-    if (copilotPublished) this.prompts.copilotUpdatesAfterDeploy();
+    if (copilotPublished) this.prompts.copilotUpdatesAfterDeploy(site);
 
     return ActionResult.success();
   }

@@ -271,7 +271,8 @@ describe('GenerateAction', () => {
       const manifest = JSON.parse(readPortal('__copilot/build.json')) as { formatVersion: number; buildId: string };
       expect(manifest.formatVersion).to.equal(1);
       expect(manifest.buildId).to.match(/^[0-9a-f]{64}$/);
-      expect(prompts.copilotUpdatesAfterDeploy.calledOnce).to.be.true;
+      // The fixture gives no `site.url`, so the service cannot find the portal by itself.
+      expect(prompts.copilotUpdatesAfterDeploy.calledOnceWith(null)).to.be.true;
     });
 
     it('puts the pages in the archive when the portal is zipped', async () => {
