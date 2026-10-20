@@ -2,12 +2,7 @@ import { PortalConfig } from './portal-config.js';
 
 const HEADER = "// Written by the APIMatic CLI from the 'portal' block of src/apimatic.json. Edit that instead.";
 
-/**
- * The build project's `src/lib/copilot-entry.ts`, which the layout takes the Ask AI chat from. The chat's
- * `import()` is written only for a portal that offers it: the build makes a chunk of any `import()` it
- * finds, so a portal without the chat would otherwise ship the chat's code. Rewritten whole, as
- * `portal serve` does when the block changes; rendered here so the module is tested without a build.
- */
+/** The layout's `copilot-entry.ts`: the chat's `import()` only where offered, as a build chunks every one it finds. */
 export class PortalCopilotEntry {
   private constructor(private readonly chat: boolean) {}
 
@@ -18,8 +13,7 @@ export class PortalCopilotEntry {
   public toString(): string {
     const body = this.chat
       ? [
-          '// In a chunk of its own, loaded only by this portal, which offers the chat. Asked for as this',
-          "// module runs, with the page's own scripts, rather than once the page has rendered.",
+          "// Asked for as the page's own scripts run, so it loads alongside them.",
           "import { lazy } from 'react';",
           '',
           "const chat = import('@/components/copilot');",

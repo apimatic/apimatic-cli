@@ -23,11 +23,7 @@ export type CopilotChatProps = Readonly<{
   panel: HTMLElement | null;
 }>;
 
-/**
- * The Ask AI chat, beside the docs layout rather than around it, so the page hydrates without waiting for
- * this chunk. The module's one export, so the layout can load it on its own, and only for a portal that
- * offers the chat.
- */
+/** The module's one export, so the layout can load it on its own, and only for a portal that offers the chat. */
 export default function CopilotChat({ copilot, open, onOpenChange, panel }: CopilotChatProps) {
   return (
     <CopilotProvider copilot={copilot}>
@@ -37,11 +33,7 @@ export default function CopilotChat({ copilot, open, onOpenChange, panel }: Copi
   );
 }
 
-/**
- * Keeps the chat's open state and the layout's as one: either side may open or close the panel. Each
- * side passes on only a change of its own (both setters are stable), and setting a state to the value it
- * holds changes nothing, so the two settle at once.
- */
+/** Either side may open or close the panel; each passes on only its own change, so the two settle at once. */
 function FollowLayout({ open, onOpenChange }: Readonly<{ open: boolean; onOpenChange: (open: boolean) => void }>) {
   const chat = useAIChat();
   // The layout's own control closed or opened it.

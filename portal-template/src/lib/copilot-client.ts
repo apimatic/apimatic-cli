@@ -16,11 +16,7 @@ export interface AskingPage {
   title: string;
 }
 
-/**
- * A visitor's question, with the page it was asked from, as the chat's own message would carry it. The
- * address keeps only the page: its query and fragment can hold what is the visitor's alone, such as an
- * OAuth callback's code, and the service needs neither.
- */
+/** The chat's own question, its page named without query or fragment, which can hold an OAuth callback's code. */
 export function questionMessage(text: string, { href, title }: AskingPage) {
   const page = new URL(href);
   return {
@@ -50,10 +46,7 @@ export class CopilotClient {
 
   readonly chatAddress = (): string => `${this.copilot.apiUrl}/v1/chat`;
 
-  /**
-   * Opens the session ahead of the first question, as the panel opens, so a portal the service
-   * turns away hides Ask AI before a visitor types. Other failures wait for the question to show them.
-   */
+  /** Opens the session as the panel opens, so a portal the service turns away hides Ask AI before anyone types. */
   readonly prepare = async (): Promise<void> => {
     await this.currentSession().catch(() => undefined);
   };

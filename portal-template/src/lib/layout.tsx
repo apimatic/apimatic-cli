@@ -22,10 +22,7 @@ export function PortalLayout({ tree, children }: LayoutProps) {
 
 type ChatProps = LayoutProps & Readonly<{ chat: NonNullable<typeof CopilotChat>; copilot: PortalCopilot }>;
 
-/**
- * The layout with the Ask AI chat beside it, not around it: a page hydrates as soon as its own scripts
- * have run, and the chat's chunk, loading meanwhile, fills the panel the layout keeps a place for.
- */
+/** The chat beside the layout, not around it, so a page hydrates without waiting for the chat's chunk. */
 function WithChat({ chat: Chat, copilot, tree, children }: ChatProps) {
   const [open, setOpen] = useState(false);
   const [panel, setPanel] = useState<HTMLElement | null>(null);
