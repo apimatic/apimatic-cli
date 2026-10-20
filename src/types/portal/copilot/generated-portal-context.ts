@@ -38,20 +38,19 @@ export class GeneratedPortalContext {
     return new FilePath(this.directory, new FileName(BUNDLE_FILE_NAME));
   }
 
-  /**
-   * The pages a build wrote for Ask AI, removing their file so it is not deployed; null for a build
-   * that wrote none, as one of a portal without Ask AI.
-   */
+  /** The pages a build wrote for Ask AI, their file removed however it reads, so it is never deployed. */
   public async takePages(): Promise<Result<BundlePage[] | null, string>> {
     const file = this.pagesFile;
     try {
       if (!(await this.fileService.fileExists(file))) {
         return ok(null);
       }
-      const contents = await this.fileService.getContents(file);
-      await this.fileService.deleteFile(file);
-      const pages = pagesOf(contents);
-      return pages === null ? err('the pages the build wrote could not be read') : ok(pages);
+      try {
+        const pages = pagesOf(await this.fileService.getContents(file));
+        return pages === null ? err('the pages the build wrote could not be read') : ok(pages);
+      } finally {
+        await this.fileService.deleteFile(file);
+      }
     } catch (error) {
       return err(errorMessage(error));
     }
@@ -72,10 +71,7 @@ export class GeneratedPortalContext {
     }
   }
 
-  /**
-   * The bundle `generate` published into the portal, whether saved as a directory or, with `--zip`, as an
-   * archive; null for a portal without one.
-   */
+  /** The bundle `generate` published, from the portal's directory or its `--zip` archive; null for none. */
   public async bundle(): Promise<Result<CopilotBundle | null, string>> {
     const json = await this.bundleJson();
     if (json.isErr() || json.value === null) {

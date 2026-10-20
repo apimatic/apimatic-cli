@@ -75,11 +75,12 @@ describe('GeneratedPortalContext', () => {
       }
     });
 
-    it('reports pages it cannot read rather than throwing', async () => {
+    it('reports pages it cannot read rather than throwing, and still removes them', async () => {
       write(COPILOT_PAGES_FILE, JSON.stringify(PAGES));
       unreadable('copilot-pages.json');
 
       expect((await portal.takePages())._unsafeUnwrapErr()).to.contain('EACCES: permission denied');
+      expect(exists(COPILOT_PAGES_FILE)).to.be.false;
     });
   });
 
