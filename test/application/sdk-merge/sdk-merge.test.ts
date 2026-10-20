@@ -1,3 +1,4 @@
+import { MergePlan } from '../../../src/application/sdk-merge/merge-plan.js';
 import { expect } from 'chai';
 import { MergeInputs, planMerge } from '../../../src/application/sdk-merge/sdk-merge.js';
 import { MergeTreeOutput } from '../../../src/application/sdk-merge/merge-tree-output.js';
@@ -20,6 +21,9 @@ const inputs = (overrides: Partial<MergeInputs>): MergeInputs => ({
   basePaths: [],
   ...overrides
 });
+
+const counts = (plan: MergePlan) =>
+  Object.fromEntries(Object.entries(plan.files).map(([kind, paths]) => [kind, paths.length]));
 
 describe('planMerge', () => {
   it('turns the diff from the disk to the merged tree into writes and deletions, counted by who changed what', () => {
@@ -51,7 +55,7 @@ describe('planMerge', () => {
       { path: 'new.ts', blob: blob('ng') }
     ]);
     expect(plan.deletes).to.deep.equal(['d.ts']);
-    expect(plan.counts).to.deep.equal({ added: 1, updated: 1, merged: 1, removed: 1, kept: 1, unchanged: 1 });
+    expect(counts(plan)).to.deep.equal({ added: 1, updated: 1, merged: 1, removed: 1, kept: 1, unchanged: 1 });
     expect(plan.hasConflicts()).to.be.false;
   });
 
@@ -110,7 +114,7 @@ describe('planMerge', () => {
     ]);
     expect(plan.hasMarkers('same.ts')).to.be.true;
     expect(plan.hasMarkers('deleted-by-you.ts')).to.be.false;
-    expect(plan.counts).to.deep.equal({ added: 0, updated: 0, merged: 0, removed: 0, kept: 0, unchanged: 0 });
+    expect(counts(plan)).to.deep.equal({ added: 0, updated: 0, merged: 0, removed: 0, kept: 0, unchanged: 0 });
   });
 
   it('reports the renames each side made', () => {

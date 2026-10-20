@@ -103,7 +103,7 @@ export class SdkWriteAction {
       return this.customCodeFailed(applied.error);
     }
     await this.record(repository, generated, generation, plan.conflictedPaths());
-    this.prompts.sdkMerged(sdkContext.directory(), plan);
+    this.prompts.sdkMerged(repository, plan);
     if (!plan.hasConflicts()) {
       return ActionResult.success();
     }

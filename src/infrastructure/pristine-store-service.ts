@@ -83,7 +83,7 @@ export class PristineStoreService {
     if (!(await this.git.hasCommit(repository.root(), base))) {
       return ok({ kind: 'snapshotMissing', repository, commit: base });
     }
-    const paths = await this.unresolvedConflicts(sdkDirectory, record);
+    const paths = await this.unresolvedConflicts(repository, record);
     return ok(paths.length > 0 ? { kind: 'unresolved', repository, paths } : { kind: 'ready', repository, base });
   }
 
@@ -138,7 +138,7 @@ export class PristineStoreService {
     }
   }
 
-  /** Records `generated` as the next pristine snapshot of the SDK directory, chained on the last one. */
+  /** Records `generated` as the next pristine snapshot of the SDK directory, chained on the last one; an identical generation keeps the last. */
   public async recordPristine(
     repository: SdkRepository,
     generated: TreeId,
@@ -151,6 +151,9 @@ export class PristineStoreService {
     const ref = repository.pristineRef();
     try {
       const parent = await this.git.resolveRef(repository.root(), ref);
+      if (parent !== undefined && (await this.git.treeOfCommit(repository.root(), parent)).isEqual(generated)) {
+        return ok(parent);
+      }
       const commit = await this.git.commitTree(
         repository.root(),
         generated,
@@ -253,13 +256,10 @@ export class PristineStoreService {
   }
 
   // The files the record lists as conflicted that still hold the markers, so a run never merges over them.
-  private async unresolvedConflicts(sdkDirectory: DirectoryPath, record: GenerationRecord): Promise<string[]> {
+  private async unresolvedConflicts(repository: SdkRepository, record: GenerationRecord): Promise<string[]> {
     const unresolved: string[] = [];
     for (const relative of record.conflictedPaths()) {
-      const file = new FilePath(
-        sdkDirectory.join(path.posix.dirname(relative)),
-        new FileName(path.posix.basename(relative))
-      );
+      const file = repository.file(relative);
       if ((await this.fileService.fileExists(file)) && hasConflictMarkers(await this.fileService.getContents(file))) {
         unresolved.push(relative);
       }

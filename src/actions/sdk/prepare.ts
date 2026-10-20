@@ -73,7 +73,7 @@ export class SdkPrepareAction {
         this.prompts.snapshotMissing(state.value.commit, state.value.repository);
         return ActionResult.success<SdkDestination>({ kind: 'record', repository: state.value.repository });
       case 'unresolved':
-        this.prompts.conflictsUnresolved(state.value.paths);
+        this.prompts.conflictsUnresolved(state.value.paths, state.value.repository);
         return ActionResult.failed();
       case 'ready':
         return ActionResult.success<SdkDestination>({

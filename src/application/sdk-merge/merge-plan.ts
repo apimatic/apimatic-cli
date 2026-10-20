@@ -19,19 +19,20 @@ export type Conflict = { path: string; kind: ConflictKind; message?: string };
 
 export type Rename = { from: string; to: string; by: 'generator' | 'you' };
 
-export type MergeCounts = {
+/** Every path the run touched or left alone, by what happened to it; conflicted paths are listed under `conflicts` instead. */
+export type MergeFiles = {
   /** Files the generator produced for the first time. */
-  added: number;
+  added: readonly string[];
   /** Unedited files replaced by their new version, or moved to the generator's new name. */
-  updated: number;
+  updated: readonly string[];
   /** Edited files the generator also changed, merged without conflict. */
-  merged: number;
+  merged: readonly string[];
   /** Unedited files the generator stopped producing. */
-  removed: number;
+  removed: readonly string[];
   /** Edited files the generator left alone. */
-  kept: number;
+  kept: readonly string[];
   /** Files neither side changed. */
-  unchanged: number;
+  unchanged: readonly string[];
 };
 
 /**
@@ -43,20 +44,20 @@ export class MergePlan {
   public readonly deletes: readonly string[];
   public readonly conflicts: readonly Conflict[];
   public readonly renames: readonly Rename[];
-  public readonly counts: MergeCounts;
+  public readonly files: MergeFiles;
 
   constructor(
     writes: readonly FileWrite[],
     deletes: readonly string[],
     conflicts: readonly Conflict[],
     renames: readonly Rename[],
-    counts: MergeCounts
+    files: MergeFiles
   ) {
     this.writes = writes;
     this.deletes = deletes;
     this.conflicts = conflicts;
     this.renames = renames;
-    this.counts = counts;
+    this.files = files;
   }
 
   public hasConflicts(): boolean {

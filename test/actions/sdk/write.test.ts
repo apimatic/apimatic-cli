@@ -182,7 +182,12 @@ describe('SdkWriteAction', () => {
       expect(read('README.md')).to.equal('# sdk v2');
       expect(read('models/author.py')).to.equal('class Author: ...');
       expect(read('notes.txt')).to.equal('mine');
-      expect(sdkMerged.firstCall.args[1].counts).to.include({ added: 1, updated: 1, merged: 1, removed: 0, kept: 0 });
+      expect(sdkMerged.firstCall.args[1].files).to.deep.include({
+        added: ['models/author.py'],
+        merged: ['models/book.py'],
+        removed: [],
+        kept: []
+      });
       expect(record().pristineCommit().isEqual(base)).to.be.false;
       expect(record().hasConflicts()).to.be.false;
       expect((await git.describe(repository.root(), record().pristineCommit())).parents).to.deep.equal([base]);

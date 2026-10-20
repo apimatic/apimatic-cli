@@ -1,5 +1,7 @@
 import path from 'node:path';
 import { DirectoryPath, posix } from '../file/directoryPath.js';
+import { FileName } from '../file/fileName.js';
+import { FilePath } from '../file/filePath.js';
 import { SnapshotRef } from './snapshot-ref.js';
 
 /** An SDK directory together with the git repository that encloses it, which is where its snapshots live. */
@@ -35,6 +37,11 @@ export class SdkRepository {
 
   public previousRef(): SnapshotRef {
     return SnapshotRef.previous(this.sdkPath());
+  }
+
+  /** The file at `relative` in the SDK directory, where `relative` has `/` between its segments as git and the record name it. */
+  public file(relative: string): FilePath {
+    return new FilePath(this.sdk.join(path.posix.dirname(relative)), new FileName(path.posix.basename(relative)));
   }
 
   /** A path below the SDK directory, with `/` between segments, as git names it from the repository root. */

@@ -58,6 +58,9 @@ type Run = {
   paths: () => string[];
 };
 
+const counts = (plan: MergePlan) =>
+  Object.fromEntries(Object.entries(plan.files).map(([kind, paths]) => [kind, paths.length]));
+
 describe('MergeService', () => {
   let root: string;
   let counter = 0;
@@ -133,7 +136,7 @@ describe('MergeService', () => {
       const { plan, read } = await run({ 'a.ts': 'v1\n' }, { 'a.ts': 'v1\n' }, { 'a.ts': 'v2\n' });
 
       expect(read('a.ts')).to.equal('v2\n');
-      expect(plan.counts.updated).to.equal(1);
+      expect(plan.files.updated).to.have.length(1);
       expect(plan.hasConflicts()).to.be.false;
     });
 
@@ -142,7 +145,7 @@ describe('MergeService', () => {
 
       expect(read('a.ts')).to.equal('v1 edited\n');
       expect(plan.writes).to.be.empty;
-      expect(plan.counts.kept).to.equal(1);
+      expect(plan.files.kept).to.have.length(1);
     });
 
     it('does nothing when neither side changed, or when you already made the generator’s change', async () => {
@@ -150,7 +153,7 @@ describe('MergeService', () => {
       const ahead = await run({ 'a.ts': 'v1\n' }, { 'a.ts': 'v2\n' }, { 'a.ts': 'v2\n' });
 
       expect(same.plan.writes).to.be.empty;
-      expect(same.plan.counts.unchanged).to.equal(1);
+      expect(same.plan.files.unchanged).to.have.length(1);
       expect(ahead.plan.writes).to.be.empty;
       expect(ahead.plan.hasConflicts()).to.be.false;
     });
@@ -163,7 +166,7 @@ describe('MergeService', () => {
       );
 
       expect(read('book.ts')).to.equal(MODEL_V2 + HELPER);
-      expect(plan.counts.merged).to.equal(1);
+      expect(plan.files.merged).to.have.length(1);
       expect(plan.hasConflicts()).to.be.false;
     });
 
@@ -222,7 +225,7 @@ describe('MergeService', () => {
 
       expect(exists('authors.ts')).to.be.false;
       expect(plan.deletes).to.deep.equal(['authors.ts']);
-      expect(plan.counts.removed).to.equal(1);
+      expect(plan.files.removed).to.have.length(1);
     });
 
     it('keeps a file the generator stopped producing when you edited it, as a conflict', async () => {
@@ -247,7 +250,7 @@ describe('MergeService', () => {
 
       expect(read('delete-book.ts')).to.equal('new\n');
       expect(read('custom/format.ts')).to.equal('mine\n');
-      expect(plan.counts.added).to.equal(1);
+      expect(plan.files.added).to.have.length(1);
       expect(plan.writes.map((write) => write.path)).to.deep.equal(['delete-book.ts']);
     });
 
@@ -310,7 +313,7 @@ describe('MergeService', () => {
 
       expect(read('a.ts')).to.equal('zero\none\ntwo\nthree\n');
       expect(read('b.ts')).to.equal('b\r\n');
-      expect(plan.counts.merged).to.equal(1);
+      expect(plan.files.merged).to.have.length(1);
       expect(plan.hasConflicts()).to.be.false;
     });
 
@@ -322,7 +325,7 @@ describe('MergeService', () => {
       const both = await run({ 'logo.png': BINARY }, { 'logo.png': edited }, { 'logo.png': changed });
 
       expect(replaced.bytes('logo.png')).to.deep.equal(changed);
-      expect(replaced.plan.counts.updated).to.equal(1);
+      expect(replaced.plan.files.updated).to.have.length(1);
       expect(both.bytes('logo.png')).to.deep.equal(edited);
       expect(both.plan.conflicts).to.deep.equal([{ path: 'logo.png', kind: 'binary' }]);
     });
@@ -361,7 +364,7 @@ describe('MergeService', () => {
       ]);
       expect(read('src/models/book.ts')).to.equal(MODEL_V2 + HELPER);
       expect(plan.conflicts).to.deep.equal([{ path: 'docs/models/book.md', kind: 'deletedByYou' }]);
-      expect(plan.counts).to.deep.equal({ added: 1, updated: 0, merged: 1, removed: 0, kept: 0, unchanged: 1 });
+      expect(counts(plan)).to.deep.equal({ added: 1, updated: 0, merged: 1, removed: 0, kept: 0, unchanged: 1 });
     });
 
     it('keeps an edited file the v3 spec drops, and removes nothing else it did not produce', async () => {
@@ -380,7 +383,7 @@ describe('MergeService', () => {
       expect(exists('src/sdk/authors.ts')).to.be.true;
       expect(read('src/models/book.ts')).to.equal(MODEL_V2);
       expect(plan.conflicts).to.deep.equal([{ path: 'src/sdk/authors.ts', kind: 'noLongerGenerated' }]);
-      expect(plan.counts.updated).to.equal(2);
+      expect(plan.files.updated).to.have.length(2);
     });
   });
 });

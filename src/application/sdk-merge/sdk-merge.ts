@@ -1,4 +1,4 @@
-import { Conflict, ConflictKind, FileWrite, MergeCounts, MergePlan, Rename } from './merge-plan.js';
+import { Conflict, ConflictKind, FileWrite, MergeFiles, MergePlan, Rename } from './merge-plan.js';
 import { MergeTreeOutput } from './merge-tree-output.js';
 
 /** How a path changed between two trees, as `diff-tree` reports it. */
@@ -90,13 +90,20 @@ export function planMerge(inputs: MergeInputs): MergePlan {
 
   const writes: FileWrite[] = [];
   const deletes: string[] = [];
-  const counts: MergeCounts = { added: 0, updated: 0, merged: 0, removed: 0, kept: 0, unchanged: 0 };
+  const files: Record<keyof MergeFiles, string[]> = {
+    added: [],
+    updated: [],
+    merged: [],
+    removed: [],
+    kept: [],
+    unchanged: []
+  };
 
   for (const change of inputs.applied) {
     if (change.status === 'D') {
       deletes.push(change.path);
       if (!conflicted.has(change.path)) {
-        counts.removed += 1;
+        files.removed.push(change.path);
       }
       continue;
     }
@@ -105,22 +112,22 @@ export function planMerge(inputs: MergeInputs): MergePlan {
       continue;
     }
     if (!base.has(change.path) && generated.get(change.path)?.status === 'A') {
-      counts.added += 1;
+      files.added.push(change.path);
     } else if (yours.get(change.path)?.status === 'M' && generated.has(change.path)) {
-      counts.merged += 1;
+      files.merged.push(change.path);
     } else {
-      counts.updated += 1;
+      files.updated.push(change.path);
     }
   }
 
   for (const [path, change] of yours) {
     if (change.status === 'M' && !generated.has(path) && !conflicted.has(path)) {
-      counts.kept += 1;
+      files.kept.push(path);
     }
   }
   for (const path of base) {
     if (!yours.has(path) && !generated.has(path)) {
-      counts.unchanged += 1;
+      files.unchanged.push(path);
     }
   }
 
@@ -133,5 +140,5 @@ export function planMerge(inputs: MergeInputs): MergePlan {
       .map((change) => ({ from: change.from!, to: change.path, by: 'you' as const }))
   ];
 
-  return new MergePlan(writes, deletes, conflicts, renames, counts);
+  return new MergePlan(writes, deletes, conflicts, renames, files);
 }

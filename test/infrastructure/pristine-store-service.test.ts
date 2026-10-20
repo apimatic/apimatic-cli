@@ -148,6 +148,17 @@ describe('PristineStoreService', () => {
       expect(text((await service.readSnapshot(repository, first))._unsafeUnwrap().get('README.md'))).to.equal('# v1');
     });
 
+    it('keeps the last snapshot when the generation is identical, so the record names the same commit', async () => {
+      const repository = await project();
+      const first = (await record(repository, { 'README.md': '# v1' }))._unsafeUnwrap();
+
+      const again = (await record(repository, { 'README.md': '# v1' }))._unsafeUnwrap();
+      const changed = (await record(repository, { 'README.md': '# v2' }))._unsafeUnwrap();
+
+      expect(again.isEqual(first)).to.be.true;
+      expect((await git.describe(repository.root(), changed)).parents).to.deep.equal([first]);
+    });
+
     it('refuses an SDK directory inside one that already has snapshots, and the reverse', async () => {
       const outer = await project();
       (await record(outer, { 'README.md': '# outer' }))._unsafeUnwrap();

@@ -1,5 +1,5 @@
 import { log } from '@clack/prompts';
-import { Conflict, ConflictKind, MergeCounts, MergePlan } from '../../application/sdk-merge/merge-plan.js';
+import { Conflict, ConflictKind, MergeFiles, MergePlan } from '../../application/sdk-merge/merge-plan.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { SdkSaveProblem } from '../../types/sdk-context.js';
 import { SdkRepository } from '../../types/sdk/sdk-repository.js';
@@ -16,16 +16,19 @@ const CONFLICT_LABELS: Record<ConflictKind, string> = {
   other: ''
 };
 
-const COUNT_LABELS: Record<keyof MergeCounts, string> = {
-  added: 'added',
-  updated: 'updated',
-  merged: 'merged with your changes',
-  removed: 'removed',
-  kept: 'kept as you edited',
-  unchanged: 'unchanged'
+const MARKED_KINDS: readonly ConflictKind[] = ['bothChanged', 'bothAdded'];
+
+/** The generator's own files are a count; the developer's are named. */
+const GENERATOR_FILES: readonly (keyof MergeFiles)[] = ['added', 'updated', 'removed'];
+const YOUR_FILES: Readonly<Partial<Record<keyof MergeFiles, string>>> = {
+  merged: 'Merged with your changes:',
+  kept: 'Kept as you edited:'
 };
 
 const plural = (count: number, noun: string) => `${count} ${noun}${count === 1 ? '' : 's'}`;
+
+const listed = (repository: SdkRepository, paths: readonly string[]) =>
+  paths.map((relative) => `  ${f.relativePath(repository.file(relative))}`);
 
 export class SdkWritePrompts {
   public sdkNotSaved(problem: SdkSaveProblem) {
@@ -61,21 +64,44 @@ export class SdkWritePrompts {
     log.warn(message);
   }
 
-  public sdkMerged(sdk: DirectoryPath, plan: MergePlan) {
-    const counts = (Object.keys(COUNT_LABELS) as (keyof MergeCounts)[])
-      .filter((key) => key !== 'unchanged' && plan.counts[key] > 0)
-      .map((key) => `${plan.counts[key]} ${COUNT_LABELS[key]}`);
-    const summary = counts.length === 0 ? 'nothing changed' : listedInProse(counts);
-    log.info(`Regenerated the SDK at ${f.relativePath(sdk)} with your customizations: ${summary}.`);
+  public sdkMerged(repository: SdkRepository, plan: MergePlan) {
+    const generated = GENERATOR_FILES.filter((kind) => plan.files[kind].length > 0).map(
+      (kind) => `${plural(plan.files[kind].length, 'file')} ${kind}`
+    );
+    if (plan.hasConflicts()) {
+      generated.push(`${plural(plan.conflicts.length, 'file')} in conflict`);
+    }
+    const summary = listedInProse(generated) || 'nothing changed';
+    const lines = [`Regenerated the SDK at ${f.relativePath(repository.sdkDirectory())}: ${summary}.`];
+    for (const [kind, heading] of Object.entries(YOUR_FILES) as [keyof MergeFiles, string][]) {
+      if (plan.files[kind].length > 0) {
+        lines.push(heading, ...listed(repository, plan.files[kind]));
+      }
+    }
+    log.info(lines.join('\n'));
   }
 
   public conflicts(conflicts: readonly Conflict[], repository: SdkRepository) {
     const lines = conflicts.map(
-      (conflict) => `${f.var(conflict.path)}\n  ${conflict.message ?? CONFLICT_LABELS[conflict.kind]}`
+      (conflict) =>
+        `${f.relativePath(repository.file(conflict.path))}\n  ${conflict.message ?? CONFLICT_LABELS[conflict.kind]}`
     );
+    const marked = conflicts.some((conflict) => MARKED_KINDS.includes(conflict.kind));
+    const unmarked = conflicts.some((conflict) => !MARKED_KINDS.includes(conflict.kind));
     const steps = [
-      `Open each file, keep what is right, and remove the markers; ${f.cmd('git', 'status')} lists them as ` +
-        `both modified and ${f.cmd('git', 'mergetool')} opens them.`,
+      ...(marked
+        ? [
+            `Open each marked file, keep what is right, and remove the markers; ${f.cmd('git', 'status')} lists ` +
+              `them as both modified and ${f.cmd('git', 'mergetool')} opens them.`
+          ]
+        : []),
+      ...(unmarked
+        ? [
+            `For each ${
+              marked ? 'other ' : ''
+            }file, decide whether it stays or goes: delete it again, or keep it as your own.`
+          ]
+        : []),
       'Rerun the command; nothing needs committing first.',
       `The directory as it was before this run is under ${f.var(repository.previousRef().toString())}.`
     ];

@@ -62,12 +62,12 @@ export class SdkPreparePrompts {
     log.warn(message);
   }
 
-  public conflictsUnresolved(paths: readonly string[]) {
+  public conflictsUnresolved(paths: readonly string[], repository: SdkRepository) {
     const one = paths.length === 1;
     const message =
       `${plural(paths.length, 'file')} still hold${one ? 's' : ''} conflict markers from the last run. ` +
       `Resolve ${one ? 'it' : 'them'} and remove the markers, then rerun:\n` +
-      paths.map((path) => `  ${f.var(path)}`).join('\n');
+      paths.map((path) => `  ${f.relativePath(repository.file(path))}`).join('\n');
     log.error(message);
   }
 }
