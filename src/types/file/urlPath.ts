@@ -1,4 +1,4 @@
-import { URL } from "url";
+import { URL } from 'url';
 
 export class UrlPath {
   private readonly url: string;
@@ -10,7 +10,7 @@ export class UrlPath {
   public static create(url: string): UrlPath | undefined {
     try {
       const parsed = new URL(url);
-      if (["http:", "https:"].includes(parsed.protocol)) {
+      if (['http:', 'https:'].includes(parsed.protocol)) {
         return new UrlPath(url);
       }
     } catch {

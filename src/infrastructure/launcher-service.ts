@@ -1,18 +1,18 @@
-import { FilePath } from "../types/file/filePath.js";
-import { execa } from "execa";
-import os from "os";
-import { spawn } from "child_process";
-import open from "open";
-import { UrlPath } from "../types/file/urlPath.js";
-import isInCi from "is-in-ci";
-import { DirectoryPath } from "../types/file/directoryPath.js";
+import { FilePath } from '../types/file/filePath.js';
+import { execa } from 'execa';
+import os from 'os';
+import { spawn } from 'child_process';
+import open from 'open';
+import { UrlPath } from '../types/file/urlPath.js';
+import isInCi from 'is-in-ci';
+import { DirectoryPath } from '../types/file/directoryPath.js';
 
 export class LauncherService {
   public async openFolderInIde(directoryPath: DirectoryPath, fileToOpen: FilePath): Promise<boolean> {
     if (isInCi) return false;
     try {
       const args = [directoryPath.toString(), fileToOpen.toString()];
-      await execa("code", args);
+      await execa('code', args);
       return true;
     } catch {
       return false;
@@ -36,22 +36,22 @@ export class LauncherService {
     let args: string[];
 
     switch (os.platform()) {
-      case "win32":
-        command = "cmd";
-        args = ["/c", "start", "", targetPath];
+      case 'win32':
+        command = 'cmd';
+        args = ['/c', 'start', '', targetPath];
         break;
-      case "darwin":
-        command = "open";
+      case 'darwin':
+        command = 'open';
         args = [targetPath];
         break;
       default:
-        command = "xdg-open";
+        command = 'xdg-open';
         args = [targetPath];
         break;
     }
 
     try {
-      const child = spawn(command, args, { stdio: "ignore", detached: true });
+      const child = spawn(command, args, { stdio: 'ignore', detached: true });
       child.unref(); // Let it run without blocking
     } catch {
       // Silently ignore errors

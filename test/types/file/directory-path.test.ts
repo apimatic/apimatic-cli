@@ -30,6 +30,17 @@ describe('DirectoryPath.relativeTo', () => {
   });
 });
 
+describe('DirectoryPath.isOnNetworkShare', () => {
+  it('holds a Windows share, however its slashes are typed, and no local path', function () {
+    if (process.platform !== 'win32') this.skip();
+
+    expect(new DirectoryPath('\\\\server\\share\\api').isOnNetworkShare()).to.equal(true);
+    expect(new DirectoryPath('//server/share/api').isOnNetworkShare()).to.equal(true);
+    expect(new DirectoryPath('C:\\api').isOnNetworkShare()).to.equal(false);
+    expect(new DirectoryPath('\\\\?\\C:\\api').isOnNetworkShare()).to.equal(false);
+  });
+});
+
 // What a file the build reads, and a log a reader compares to one, spell a path as on every platform.
 describe('DirectoryPath.toPosix', () => {
   it('keeps the whole path with forward slashes between its segments', () => {

@@ -1,4 +1,5 @@
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 import { createRequire } from 'node:module';
 import { execa } from 'execa';
@@ -14,10 +15,7 @@ import { PortalArtifacts } from '../../src/types/portal/portal-artifacts';
 import { BundlePage } from '../../src/types/portal/copilot/copilot-bundle';
 import { COPILOT_PAGES_FILE } from '../../src/types/portal/copilot/generated-portal-context';
 import { Language } from '../../src/types/sdk/generate';
-import {
-  ensurePortalProjectDirectoryBase,
-  removePortalProjectDirectoryBase
-} from '../../src/infrastructure/tmp-extensions';
+import { canonical } from '../../src/infrastructure/tmp-extensions';
 
 // A real Vite build takes tens of seconds and needs every runtime dependency installed,
 // so it stays out of the default run. CI switches it on for the platform matrix.
@@ -40,7 +38,6 @@ const SDK_DOCS =
   'Use **identical method names**, **(identical)** and *`code`* here.\n';
 
 interface BuiltPortal {
-  base: string;
   root: string;
   project: DirectoryPath;
   output: DirectoryPath;
@@ -72,8 +69,7 @@ function deliveredInto(
 /** Resolves, prepares, builds and saves a fixture as `portal generate` does. */
 async function buildFixture(name: string, delivered: Delivered = {}): Promise<BuiltPortal> {
   const fixture = new DirectoryPath(process.cwd()).join('test/resources/portal-inputs').join(name).join('src');
-  const base = await ensurePortalProjectDirectoryBase(fixture);
-  const root = fs.mkdtempSync(path.join(base, 'portal-e2e-'));
+  const root = canonical(fs.mkdtempSync(path.join(os.tmpdir(), 'portal-e2e-')));
 
   const source = (await new PortalSourceContext(fixture).resolve())._unsafeUnwrap();
 
@@ -91,13 +87,11 @@ async function buildFixture(name: string, delivered: Delivered = {}): Promise<Bu
 
   const output = new DirectoryPath(root).join('portal');
   (await new PortalContext(output).save(build.value.output, false))._unsafeUnwrap();
-  return { base, root, project, output };
+  return { root, project, output };
 }
 
-async function removeBuilt(built: BuiltPortal | undefined): Promise<void> {
-  if (built === undefined) return;
-  fs.rmSync(built.root, { recursive: true, force: true });
-  await removePortalProjectDirectoryBase(built.base);
+function removeBuilt(built: BuiltPortal | undefined): void {
+  if (built !== undefined) fs.rmSync(built.root, { recursive: true, force: true });
 }
 
 /**
@@ -115,9 +109,7 @@ function portalBuilt(name: string, delivered: Delivered = {}) {
     built = await buildFixture(name, delivered);
   });
 
-  after(async () => {
-    await removeBuilt(built);
-  });
+  after(() => removeBuilt(built));
 
   return {
     output: () => have().output,
@@ -569,6 +561,18 @@ const stylesheetOf = (output: DirectoryPath) => {
     expect(css).to.match(/--color-fd-primary:#171717/);
   });
 
+  // Tailwind reads the template and the copy of the pages, and nothing else. A scan that missed the
+  // template stacked the SDK cards; one that took in node_modules grew this from 93 KB to 134 KB.
+  it('builds the stylesheet from the template and the pages alone', () => {
+    const css = stylesheetOf(portal.output());
+
+    expect(read('sdks/index.html')).to.contain('@2xl:grid-cols-2');
+    expect(css).to.contain('.\\@2xl\\:grid-cols-2');
+    expect(read('authentication/index.html')).to.contain('class="tracking-[0.3125em]"');
+    expect(css).to.contain('.tracking-\\[0\\.3125em\\]');
+    expect(css.length).to.be.below(100 * 1024);
+  });
+
   // The counterpart of the branded portal's forced mode: the same label, present here.
   it('offers the colour-mode switch when both modes are allowed', () => {
     expect(read('index.html')).to.contain('aria-label="Toggle Theme"');
@@ -610,8 +614,6 @@ const stylesheetOf = (output: DirectoryPath) => {
     expect(page).to.match(/<img src="\/logo-dark\.svg"[^>]*class="[^"]*hidden[^"]*dark:block/);
     expect(page).to.match(/<link rel="icon" href="\/favicon\.svg" type="image\/svg\+xml"/);
     expect(exists('logo-dark.svg')).to.be.true;
-    // Classes only the template uses, so they exist only if Tailwind scanned it.
-    expect(stylesheetOf(portal.output())).to.match(/\.dark\\:block/);
   });
 
   // The DOM itself, after hydration, is checked by hand in a browser; the page as served
@@ -823,9 +825,7 @@ const stylesheetOf = (output: DirectoryPath) => {
     ({ output } = built);
   });
 
-  after(async () => {
-    await removeBuilt(built);
-  });
+  after(() => removeBuilt(built));
 
   const read = (relative: string) => fs.readFileSync(path.join(output.toString(), relative), 'utf8');
   const exists = (relative: string) => fs.existsSync(path.join(output.toString(), relative));
@@ -889,6 +889,17 @@ const stylesheetOf = (output: DirectoryPath) => {
   // Fumadocs' `remarkImage` bundles inline images alone; the template writes this one inline first.
   it('bundles a reference-style image too', () => {
     expect(read('authentication/index.html')).to.match(/<img[^>]* src="\/api\/assets\/diagram[^"]*\.png"/);
+  });
+
+  // Fumadocs swapped a bundled image for its import's name, `<img src="__img0" />` (fuma-nama/fumadocs#3662).
+  it('keeps the images as written in the Markdown twins and llms-full.txt', () => {
+    const full = read('llms-full.txt');
+
+    expect(read('index.md')).to.contain('![How a calculation flows](/images/diagram.png)');
+    expect(read('authentication.md')).to.contain('![The flow, by reference][flow]');
+    expect(read('authentication.md')).to.contain('[flow]: /images/diagram.png');
+    expect(full).to.contain('![How a calculation flows](/images/diagram.png)');
+    expect(full).to.not.contain('__img');
   });
 
   // Fumadocs' own renderer fails the whole page over an image in a description; `ApiMarkdown` stands in for it.
