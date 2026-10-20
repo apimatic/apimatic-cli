@@ -1043,6 +1043,13 @@ const stylesheetOf = (output: DirectoryPath) => {
     expect(loaded.filter((name) => chat.some((script) => script.name === name))).to.deep.equal([]);
   });
 
+  // The layout takes the chat from a module the CLI writes per portal: this is the one build that has the chat's.
+  it('type-checks with the chat', async () => {
+    const result = await typeCheck(portal.project());
+
+    expect(result.exitCode, result.all).to.equal(0);
+  });
+
   it("styles the chat, its classes in the portal's stylesheet", () => {
     expect(stylesheetOf(portal.output())).to.contain(CHAT_CLASS);
   });

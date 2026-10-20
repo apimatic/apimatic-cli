@@ -15,7 +15,8 @@ describe('PortalCopilotEntry', () => {
   it('imports the Ask AI chat, lazily, for a portal that offers it', () => {
     const entry = entryFor({ ai: { copilot: { key: 'pk_test', apiUrl: 'https://ask.apimatic.io' } } });
 
-    expect(entry).to.contain(`export const CopilotLayout = lazy(() => ${CHAT_IMPORT});`);
+    expect(entry).to.contain(`const chat = ${CHAT_IMPORT};`);
+    expect(entry).to.contain('export const CopilotChat = lazy(() => chat);');
   });
 
   // The build makes a chunk of any `import()` it finds; a type-only import leaves nothing behind.
@@ -23,8 +24,8 @@ describe('PortalCopilotEntry', () => {
     const entry = entryFor({});
 
     expect(entry).to.not.contain(CHAT_IMPORT);
-    expect(entry).to.contain("import type CopilotLayoutComponent from '@/components/copilot';");
-    expect(entry).to.contain('export const CopilotLayout: typeof CopilotLayoutComponent | null = null;');
+    expect(entry).to.contain("import type CopilotChatComponent from '@/components/copilot';");
+    expect(entry).to.contain('export const CopilotChat: typeof CopilotChatComponent | null = null;');
   });
 
   it('is what the template ships, for a portal without the chat', () => {

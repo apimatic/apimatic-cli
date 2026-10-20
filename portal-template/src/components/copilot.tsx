@@ -1,11 +1,10 @@
 // The Ask AI copilot: Fumadocs' AI chat panel, answered by the Ask AI service (the portal is static).
 // `@fumadocs/ai-chat` is 0.x and needs fumadocs-ui >= 16.16: keep it pinned and check the chat on every upgrade.
-import { useEffect, useLayoutEffect, useMemo, useState, type ComponentType, type ReactNode } from 'react';
-import type * as PageTree from 'fumadocs-core/page-tree';
+import { useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport, type UIMessage } from 'ai';
 import { AIChatPanel, AIChatProvider, AIChatSearch, AIChatSources, AIChatTrigger, useAIChat } from '@fumadocs/ai-chat';
-import type { AIChatOptions } from 'fumadocs-ui/layouts/shared';
 import { CopilotClient, questionMessage } from '@/lib/copilot-client';
 import type { PortalCopilot } from '@/lib/portal-types';
 
@@ -15,32 +14,44 @@ type Part = UIMessage['parts'][number];
 type SearchPart = Parameters<typeof AIChatSearch>[0]['part'];
 type Sources = Parameters<typeof AIChatSources>[0]['sources'];
 
-/** The docs layout the chat goes around, handed the chat's `aiChat` option. */
-type ChatLayout = ComponentType<Readonly<{ tree: PageTree.Root; aiChat: AIChatOptions; children: ReactNode }>>;
-type LayoutProps = Readonly<{ layout: ChatLayout; tree: PageTree.Root; children: ReactNode }>;
+/** What the layout hands the chat: whether its panel is open, and where the layout keeps a place for it. */
+export type CopilotChatProps = Readonly<{
+  copilot: PortalCopilot;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  /** The element the layout keeps in its panel slot; null until the layout has rendered it. */
+  panel: HTMLElement | null;
+}>;
 
 /**
- * The docs layout with the Ask AI chat around it. The module's one export, so the layout can load
- * it on its own, and only for a portal that offers the chat.
+ * The Ask AI chat, beside the docs layout rather than around it, so the page hydrates without waiting for
+ * this chunk. The module's one export, so the layout can load it on its own, and only for a portal that
+ * offers the chat.
  */
-export default function CopilotLayout({ copilot, ...layout }: LayoutProps & Readonly<{ copilot: PortalCopilot }>) {
+export default function CopilotChat({ copilot, open, onOpenChange, panel }: CopilotChatProps) {
   return (
     <CopilotProvider copilot={copilot}>
-      <WithPanel {...layout} />
+      <FollowLayout open={open} onOpenChange={onOpenChange} />
+      {panel !== null && createPortal(<AIChatPanel />, panel)}
     </CopilotProvider>
   );
 }
 
-// Separate, because the panel state exists only inside `CopilotProvider`.
-function WithPanel({ layout: Layout, tree, children }: LayoutProps) {
-  return (
-    <Layout tree={tree} aiChat={useCopilotPanel()}>
-      {children}
-    </Layout>
-  );
+/**
+ * Keeps the chat's open state and the layout's as one: either side may open or close the panel. Each
+ * side passes on only a change of its own (both setters are stable), and setting a state to the value it
+ * holds changes nothing, so the two settle at once.
+ */
+function FollowLayout({ open, onOpenChange }: Readonly<{ open: boolean; onOpenChange: (open: boolean) => void }>) {
+  const chat = useAIChat();
+  // The layout's own control closed or opened it.
+  useEffect(() => chat.setOpen(open), [open, chat.setOpen]);
+  // The chat's button, Ctrl+/ or Escape did.
+  useEffect(() => onOpenChange(chat.open), [chat.open, onOpenChange]);
+  return null;
 }
 
-/** The chat state and the "Ask AI" button; wraps the layout so a conversation survives navigation. */
+/** The chat state and the "Ask AI" button; beside the layout, so a conversation survives navigation. */
 function CopilotProvider({ copilot, children }: Readonly<{ copilot: PortalCopilot; children: ReactNode }>) {
   // Turned away by the service (disabled, unknown key, another website): the portal shows no Ask AI at all.
   const [available, setAvailable] = useState(true);
@@ -73,12 +84,6 @@ function SessionOnOpen({ client, available }: Readonly<{ client: CopilotClient; 
     if (open && !available) setOpen(false);
   }, [open, available, setOpen]);
   return null;
-}
-
-/** The docs layout's `aiChat` option: the panel and whether it is open. Call inside `CopilotProvider`. */
-function useCopilotPanel(): AIChatOptions {
-  const { open, setOpen } = useAIChat();
-  return { open, onOpenChange: setOpen, panel: <AIChatPanel /> };
 }
 
 /**

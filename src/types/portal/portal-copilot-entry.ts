@@ -18,16 +18,19 @@ export class PortalCopilotEntry {
   public toString(): string {
     const body = this.chat
       ? [
-          '// In a chunk of its own, loaded only by this portal, which offers the chat.',
+          '// In a chunk of its own, loaded only by this portal, which offers the chat. Asked for as this',
+          "// module runs, with the page's own scripts, rather than once the page has rendered.",
           "import { lazy } from 'react';",
           '',
-          "export const CopilotLayout = lazy(() => import('@/components/copilot'));"
+          "const chat = import('@/components/copilot');",
+          '',
+          'export const CopilotChat = lazy(() => chat);'
         ]
       : [
           '// This portal offers no Ask AI chat, so nothing here imports it, and the build leaves it out.',
-          "import type CopilotLayoutComponent from '@/components/copilot';",
+          "import type CopilotChatComponent from '@/components/copilot';",
           '',
-          'export const CopilotLayout: typeof CopilotLayoutComponent | null = null;'
+          'export const CopilotChat: typeof CopilotChatComponent | null = null;'
         ];
     return [HEADER, ...body].join('\n').concat('\n');
   }
