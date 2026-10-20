@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { gunzipSync } from 'node:zlib';
 import { expect } from 'chai';
 import { SiteAddress } from '../../../../src/types/portal/config/site-address';
@@ -68,16 +69,19 @@ describe('CopilotBundle', () => {
     const buildId = (pages = PAGES, site: SiteAddress | null = null, cliVersion = '9.9.9', when = AT) =>
       (JSON.parse(CopilotBundle.of(pages, site, cliVersion, when).buildManifest()) as { buildId: string }).buildId;
 
-    it('is a SHA-256 in hex, in format version 1', () => {
-      const manifest = JSON.parse(CopilotBundle.of(PAGES, null, '9.9.9', AT).buildManifest()) as unknown;
+    // The service fetches a deployed bundle.json and refuses it unless it hashes to this ID.
+    it("is the SHA-256 of the bundle's exact bytes, in format version 1", () => {
+      const bundle = CopilotBundle.of(PAGES, null, '9.9.9', AT);
 
-      expect(manifest).to.deep.include({ formatVersion: 1 });
-      expect(buildId()).to.match(/^[0-9a-f]{64}$/);
+      expect(JSON.parse(bundle.buildManifest())).to.deep.equal({
+        formatVersion: 1,
+        buildId: createHash('sha256').update(bundle.toJson()).digest('hex')
+      });
     });
 
-    it('stays the same when the same pages are generated again, at another time or by another CLI', () => {
-      expect(buildId(PAGES, null, '9.9.9', new Date('2027-01-01T00:00:00.000Z'))).to.equal(buildId());
-      expect(buildId(PAGES, null, '10.0.0')).to.equal(buildId());
+    // The service finds the same pages then and indexes nothing again; it only fetches the bundle once more.
+    it('changes when the same pages are generated again, as the bytes do', () => {
+      expect(buildId(PAGES, null, '9.9.9', new Date('2027-01-01T00:00:00.000Z'))).to.not.equal(buildId());
     });
 
     it('changes with a page', () => {

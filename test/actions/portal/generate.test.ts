@@ -1,3 +1,4 @@
+import { createHash } from 'crypto';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -270,7 +271,8 @@ describe('GenerateAction', () => {
       expect(pages).to.deep.equal([PAGE]);
       const manifest = JSON.parse(readPortal('__copilot/build.json')) as { formatVersion: number; buildId: string };
       expect(manifest.formatVersion).to.equal(1);
-      expect(manifest.buildId).to.match(/^[0-9a-f]{64}$/);
+      // The service refuses a deployed bundle.json that does not hash to this.
+      expect(manifest.buildId).to.equal(createHash('sha256').update(bundle).digest('hex'));
       // The fixture gives no `site.url`, so the service cannot find the portal by itself.
       expect(prompts.copilotUpdatesAfterDeploy.calledOnceWith(null)).to.be.true;
     });

@@ -75,15 +75,9 @@ export class CopilotBundle {
     return this.json;
   }
 
-  /**
-   * Names what the service reads, so it fetches the bundle only when a deploy changed it. When it was
-   * generated, and by which CLI, are left out: regenerating the same pages keeps the same ID.
-   */
+  /** Names these exact bytes: the service checks a deployed bundle.json against it, so it never indexes half a deploy. */
   public buildManifest(): string {
-    const { formatVersion, siteUrl, basePath, pages } = this.document;
-    const content = JSON.stringify({ formatVersion, siteUrl, basePath, pages });
-    const buildId = createHash('sha256').update(content).digest('hex');
-    return JSON.stringify({ formatVersion: 1, buildId });
+    return JSON.stringify({ formatVersion: 1, buildId: createHash('sha256').update(this.json).digest('hex') });
   }
 }
 

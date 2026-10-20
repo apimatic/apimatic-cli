@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
 import { expect } from 'chai';
 import sinon from 'sinon';
 import { FileService } from '../../../../src/infrastructure/file-service';
@@ -88,6 +89,11 @@ describe('GeneratedPortalContext', () => {
 
       expect(read('__copilot/bundle.json')).to.equal(BUNDLE.toJson());
       expect(read('__copilot/build.json')).to.equal(BUNDLE.buildManifest());
+      // As the service checks a deployed portal: the build ID is the hash of bundle.json as written.
+      const written = fs.readFileSync(path.join(root, '__copilot', 'bundle.json'));
+      expect(JSON.parse(read('__copilot/build.json')).buildId).to.equal(
+        createHash('sha256').update(written).digest('hex')
+      );
     });
 
     it('reports a portal it cannot write to rather than throwing', async () => {
