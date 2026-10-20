@@ -54,6 +54,13 @@ export class SdkWritePrompts {
     log.warn(message);
   }
 
+  public conflictsNotStaged(reason: string) {
+    const message =
+      `The conflicted files could not be marked in git's index: ${reason}\n` +
+      `The markers in the files are still there; only ${f.cmd('git', 'status')} will not list them as both modified.`;
+    log.warn(message);
+  }
+
   public sdkMerged(sdk: DirectoryPath, plan: MergePlan) {
     const counts = (Object.keys(COUNT_LABELS) as (keyof MergeCounts)[])
       .filter((key) => key !== 'unchanged' && plan.counts[key] > 0)
@@ -67,7 +74,8 @@ export class SdkWritePrompts {
       (conflict) => `${f.var(conflict.path)}\n  ${conflict.message ?? CONFLICT_LABELS[conflict.kind]}`
     );
     const steps = [
-      'Open each file, keep what is right, and remove the markers.',
+      `Open each file, keep what is right, and remove the markers; ${f.cmd('git', 'status')} lists them as ` +
+        `both modified and ${f.cmd('git', 'mergetool')} opens them.`,
       'Rerun the command; nothing needs committing first.',
       `The directory as it was before this run is under ${f.var(repository.previousRef().toString())}.`
     ];

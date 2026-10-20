@@ -14,6 +14,8 @@ import { StabilityChoice } from '../../types/sdk/stability-choice.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { ProjectContext } from '../../types/project-context.js';
 import { format, intro, outro } from '../../prompts/format.js';
+import { TelemetryService } from '../../infrastructure/services/telemetry-service.js';
+import { SdkMergeConflictedEvent } from '../../types/events/sdk-merge-conflicted.js';
 import { listedInProse } from '../../utils/string-utils.js';
 
 const inProse = (languages: readonly Language[]) => listedInProse(languages.map(languageLabel));
@@ -102,6 +104,26 @@ ${inProse(AVAILABLE_LANGUAGES)} are available; ${inProse(UPCOMING_LANGUAGES)} ar
       apiVersion
     );
     outro(result);
+
+    await result.mapAll(
+      () => {},
+      async () => {
+        const conflicts = result.getError();
+        if (conflicts === undefined) {
+          return;
+        }
+        await new TelemetryService(this.getConfigDir()).trackEvent(
+          new SdkMergeConflictedEvent(conflicts.conflictsByKind(), SdkGenerate.id, {
+            language,
+            ...(force && { force }),
+            ...(stability && { stability }),
+            ...(apiVersion && { 'api-version': apiVersion })
+          }),
+          commandMetadata.shell
+        );
+      },
+      () => {}
+    );
   }
 
   private readonly getConfigDir = () => {

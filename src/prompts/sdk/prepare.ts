@@ -4,6 +4,7 @@ import { CommitId } from '../../types/sdk/commit-id.js';
 import { describeGeneration, SdkGeneration } from '../../types/sdk/generation-record.js';
 import { GitVersion } from '../../types/sdk/git-version.js';
 import { SdkRepository } from '../../types/sdk/sdk-repository.js';
+import { SnapshotRef } from '../../types/sdk/snapshot-ref.js';
 import { format as f } from '../format.js';
 
 const plural = (count: number, noun: string) => `${count} ${noun}${count === 1 ? '' : 's'}`;
@@ -51,10 +52,13 @@ export class SdkPreparePrompts {
   }
 
   public snapshotMissing(commit: CommitId, repository: SdkRepository) {
+    const refs = `'${SnapshotRef.pristineNamespace()}/*:${SnapshotRef.pristineNamespace()}/*'`;
     const message =
       `The snapshot this SDK was generated from, commit ${f.var(commit.toString())}, is not in the repository at ` +
-      `${f.relativePath(repository.root())}, so your customizations cannot be merged. ` +
-      `The SDK will be replaced and a fresh snapshot recorded.`;
+      `${f.relativePath(repository.root())}, so your customizations cannot be merged.\n` +
+      `Whoever generated it can share it with ${f.cmd('git', 'push', 'origin', refs)}\n` +
+      `and you can fetch it with ${f.cmd('git', 'fetch', 'origin', `'+${refs.slice(1)}`)}, then rerun.\n` +
+      `Otherwise the SDK will be replaced and a fresh snapshot recorded.`;
     log.warn(message);
   }
 

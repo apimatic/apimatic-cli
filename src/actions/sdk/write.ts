@@ -1,4 +1,5 @@
 import { err, ok, Result } from 'neverthrow';
+import { MergePlan } from '../../application/sdk-merge/merge-plan.js';
 import { envInfo } from '../../infrastructure/env-info.js';
 import { MergeService } from '../../infrastructure/merge-service.js';
 import { PristineStoreProblem, PristineStoreService } from '../../infrastructure/pristine-store-service.js';
@@ -25,7 +26,7 @@ export class SdkWriteAction {
     sdkContext: SdkContext,
     tempSdk: DirectoryPath,
     generation: SdkGeneration
-  ): Promise<ActionResult> => {
+  ): Promise<ActionResult<void, MergePlan>> => {
     switch (destination.kind) {
       case 'overwrite':
         return this.overwrite(sdkContext, tempSdk, destination.zip);
@@ -79,7 +80,7 @@ export class SdkWriteAction {
     sdkContext: SdkContext,
     tempSdk: DirectoryPath,
     generation: SdkGeneration
-  ): Promise<ActionResult> {
+  ): Promise<ActionResult<void, MergePlan>> {
     const generated = await this.store.snapshotGenerated(repository, tempSdk);
     if (generated.isErr()) {
       return this.customCodeFailed(generated.error);
@@ -103,11 +104,15 @@ export class SdkWriteAction {
     }
     await this.record(repository, generated, generation, plan.conflictedPaths());
     this.prompts.sdkMerged(sdkContext.directory(), plan);
-    if (plan.hasConflicts()) {
-      this.prompts.conflicts(plan.conflicts, repository);
-      return ActionResult.failed(MERGE_NEEDS_RESOLVING);
+    if (!plan.hasConflicts()) {
+      return ActionResult.success();
     }
-    return ActionResult.success();
+    const staged = await this.mergeService.stageConflicts(repository, merged.value);
+    if (staged.isErr()) {
+      this.prompts.conflictsNotStaged(staged.error.reason);
+    }
+    this.prompts.conflicts(plan.conflicts, repository);
+    return ActionResult.failed(MERGE_NEEDS_RESOLVING, plan);
   }
 
   private customCodeFailed(problem: { reason: string }): ActionResult {

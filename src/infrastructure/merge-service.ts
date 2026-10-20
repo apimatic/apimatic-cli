@@ -3,7 +3,7 @@ import path from 'node:path';
 import { err, ok, Result } from 'neverthrow';
 import { MergePlan } from '../application/sdk-merge/merge-plan.js';
 import { relabelMarkers } from '../application/sdk-merge/markers.js';
-import { parseMergeTreeOutput } from '../application/sdk-merge/merge-tree-output.js';
+import { parseMergeTreeOutput, StageEntry } from '../application/sdk-merge/merge-tree-output.js';
 import { planMerge } from '../application/sdk-merge/sdk-merge.js';
 import { CommitId } from '../types/sdk/commit-id.js';
 import { SdkRepository } from '../types/sdk/sdk-repository.js';
@@ -13,7 +13,8 @@ import { GitService } from './git-service.js';
 
 export type MergeProblem = { kind: 'gitFailed'; reason: string };
 
-export type MergeOutcome = { plan: MergePlan; merged: TreeId };
+/** The plan, the merged tree, and git's versions of every conflicted path, below the SDK directory. */
+export type MergeOutcome = { plan: MergePlan; merged: TreeId; stages: StageEntry[] };
 
 /**
  * The three-way merge of an SDK directory, done by git: the disk and the fresh generation are
@@ -44,7 +45,7 @@ export class MergeService {
         applied: await this.git.diffTrees(root, disk, merged, false),
         basePaths: (await this.git.listTree(root, baseTree)).map((entry) => entry.path)
       });
-      return ok({ plan, merged });
+      return ok({ plan, merged, stages: output.stages });
     } catch (error) {
       return err({ kind: 'gitFailed', reason: errorMessage(error) });
     }
@@ -64,6 +65,19 @@ export class MergeService {
       for (const relative of plan.deletes) {
         await fs.promises.rm(path.join(sdk, relative), { force: true });
       }
+      return ok(undefined);
+    } catch (error) {
+      return err({ kind: 'gitFailed', reason: errorMessage(error) });
+    }
+  }
+
+  /** Marks the conflicted paths in the repository's index the way a merge would, so git's own tools take over. */
+  public async stageConflicts(repository: SdkRepository, outcome: MergeOutcome): Promise<Result<void, MergeProblem>> {
+    try {
+      await this.git.stageConflicts(
+        repository.root(),
+        outcome.stages.map((entry) => ({ ...entry, path: repository.rootRelative(entry.path) }))
+      );
       return ok(undefined);
     } catch (error) {
       return err({ kind: 'gitFailed', reason: errorMessage(error) });

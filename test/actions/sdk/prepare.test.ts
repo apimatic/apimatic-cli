@@ -2,6 +2,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { expect } from 'chai';
+import { execa } from 'execa';
 import { err } from 'neverthrow';
 import sinon from 'sinon';
 import { SdkPrepareAction } from '../../../src/actions/sdk/prepare.js';
@@ -118,6 +119,38 @@ describe('SdkPrepareAction', () => {
 
     expect((await execute()).getValue().kind).to.equal('record');
     expect(snapshotMissing.firstCall.args[0].isEqual(missing)).to.be.true;
+  });
+
+  it('merges in a clone only once the pristine refs were fetched by hand, and says how', async () => {
+    const remote = fs.mkdtempSync(path.join(os.tmpdir(), 'prepare-sdk-remote-'));
+    const clone = fs.mkdtempSync(path.join(os.tmpdir(), 'prepare-sdk-clone-'));
+    const sh = (cwd: string, ...args: string[]) =>
+      execa('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...args], { cwd });
+    try {
+      await recorded({ 'README.md': '# sdk' });
+      const base = (await store.readRecord(sdk()))!.pristineCommit();
+      await sh(root, 'add', '.');
+      await sh(root, 'commit', '-qm', 'sdk');
+      await sh(root, 'init', '-q', '--bare', remote);
+      await sh(root, 'remote', 'add', 'origin', remote);
+      await sh(root, 'push', '-q', 'origin', 'main');
+      await sh(root, 'clone', '-q', remote, clone);
+      sdkContext = new SdkContext(Language.PYTHON, new DirectoryPath(path.join(clone, 'sdk')));
+      const snapshotMissing = sinon.stub(SdkPreparePrompts.prototype, 'snapshotMissing');
+
+      expect((await execute()).getValue().kind).to.equal('record');
+      expect(snapshotMissing.firstCall.args[0].isEqual(base)).to.be.true;
+
+      await sh(root, 'push', '-q', 'origin', 'refs/apimatic/pristine/*:refs/apimatic/pristine/*');
+      await sh(clone, 'fetch', '-q', 'origin', '+refs/apimatic/pristine/*:refs/apimatic/pristine/*');
+
+      const destination = (await execute()).getValue();
+      expect(destination.kind).to.equal('merge');
+      expect(destination.kind === 'merge' && destination.base.isEqual(base)).to.be.true;
+    } finally {
+      fs.rmSync(remote, { recursive: true, force: true });
+      fs.rmSync(clone, { recursive: true, force: true });
+    }
   });
 
   it('merges against the recorded snapshot, without asking, when the record and its commit are there', async () => {

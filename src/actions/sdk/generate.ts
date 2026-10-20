@@ -1,3 +1,4 @@
+import { MergePlan } from '../../application/sdk-merge/merge-plan.js';
 import { SdkGenerationService } from '../../infrastructure/services/sdk-generation-service.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { ActionResult } from '../action-result.js';
@@ -33,7 +34,7 @@ export class GenerateAction {
     zipSdk: boolean,
     apiVersion?: string,
     packageSettingsDirectory?: DirectoryPath
-  ): Promise<ActionResult> => {
+  ): Promise<ActionResult<void, MergePlan>> => {
     if (!isAvailableLanguage(language)) {
       this.prompts.languageNotAvailable(language);
       return ActionResult.failed();

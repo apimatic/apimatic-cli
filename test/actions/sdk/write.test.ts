@@ -3,11 +3,13 @@ import os from 'os';
 import path from 'path';
 import { TextDecoder } from 'node:util';
 import { expect } from 'chai';
+import { execa } from 'execa';
 import { err } from 'neverthrow';
 import sinon from 'sinon';
 import { SdkWriteAction } from '../../../src/actions/sdk/write.js';
 import { GENERATED_MARKER, YOURS_MARKER } from '../../../src/application/sdk-merge/markers.js';
 import { GitService } from '../../../src/infrastructure/git-service.js';
+import { MergeService } from '../../../src/infrastructure/merge-service.js';
 import { PristineStoreService } from '../../../src/infrastructure/pristine-store-service.js';
 import { ZipService } from '../../../src/infrastructure/zip-service.js';
 import { SdkWritePrompts } from '../../../src/prompts/sdk/write.js';
@@ -208,6 +210,29 @@ describe('SdkWriteAction', () => {
       expect(read('models/book.py')).to.contain(`${GENERATED_MARKER}\n`);
       expect(read('README.md')).to.equal('# sdk v2');
       expect(record().conflictedPaths()).to.deep.equal(['models/book.py']);
+      expect(result.getError()?.conflictsByKind()).to.include({ bothChanged: 1, noLongerGenerated: 0 });
+      const cwd = repository.root().toString();
+      expect((await execa('git', ['status', '--porcelain'], { cwd })).stdout).to.contain(
+        'UU sdk/python/models/book.py'
+      );
+      const staged = (await execa('git', ['ls-files', '--stage', '--', 'sdk/python/models/book.py'], { cwd })).stdout;
+      expect(staged.split('\n').map((line) => line.split(/\s+/)[2])).to.deep.equal(['1', '2', '3']);
+    });
+
+    it('still reports the conflicts when they cannot be marked in the index, with a warning', async () => {
+      const { repository, base } = await recorded({ 'README.md': '# sdk', 'models/book.py': MODEL_V1 });
+      write(sdk(), { 'models/book.py': MODEL_V1_EDITED });
+      sinon.stub(MergeService.prototype, 'stageConflicts').resolves(err({ kind: 'gitFailed', reason: 'index locked' }));
+      const conflictsNotStaged = sinon.stub(SdkWritePrompts.prototype, 'conflictsNotStaged');
+      const conflicts = sinon.stub(SdkWritePrompts.prototype, 'conflicts');
+
+      const result = await execute({ kind: 'merge', repository, base }, { 'models/book.py': MODEL_V2 });
+
+      expect(result.isFailed()).to.be.true;
+      expect(result.getMessage()).to.equal('Resolve the conflicts and rerun');
+      expect(conflictsNotStaged.firstCall.args[0]).to.equal('index locked');
+      expect(conflicts.called).to.be.true;
+      expect(read('models/book.py')).to.contain(YOURS_MARKER);
     });
 
     it('leaves the directory alone when the pre-run state cannot be kept', async () => {

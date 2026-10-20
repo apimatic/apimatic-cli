@@ -37,6 +37,12 @@ export class SdkRepository {
     return SnapshotRef.previous(this.sdkPath());
   }
 
+  /** A path below the SDK directory, with `/` between segments, as git names it from the repository root. */
+  public rootRelative(relative: string): string {
+    const sdkPath = this.sdkPath();
+    return sdkPath === '' ? relative : `${sdkPath}/${relative}`;
+  }
+
   private sdkPath(): string {
     return posix(path.relative(this.rootDirectory.toString(), this.sdk.toString()));
   }

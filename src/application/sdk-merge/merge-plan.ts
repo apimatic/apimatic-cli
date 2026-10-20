@@ -67,6 +67,21 @@ export class MergePlan {
     return this.conflicts.map((conflict) => conflict.path);
   }
 
+  public conflictsByKind(): Record<ConflictKind, number> {
+    const counts: Record<ConflictKind, number> = {
+      bothChanged: 0,
+      bothAdded: 0,
+      deletedByYou: 0,
+      noLongerGenerated: 0,
+      binary: 0,
+      other: 0
+    };
+    for (const conflict of this.conflicts) {
+      counts[conflict.kind] += 1;
+    }
+    return counts;
+  }
+
   /** Whether the file at `path` is written with conflict markers in it. */
   public hasMarkers(path: string): boolean {
     return this.conflicts.some(

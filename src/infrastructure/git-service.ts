@@ -2,6 +2,7 @@ import { Buffer } from 'node:buffer';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execa, ExecaError } from 'execa';
+import { StageEntry } from '../application/sdk-merge/merge-tree-output.js';
 import { DirectoryPath } from '../types/file/directoryPath.js';
 import { FileName } from '../types/file/fileName.js';
 import { FilePath } from '../types/file/filePath.js';
@@ -239,6 +240,24 @@ export class GitService {
       }
     }
     return entries;
+  }
+
+  /**
+   * Puts the versions of each conflicted path into the repository's own index, as a merge
+   * would, so `git status` reports it as both modified and `git mergetool` can open it. Paths
+   * are from the repository root. A stage-0 entry is dropped first, since git would otherwise
+   * keep it beside the others.
+   */
+  public async stageConflicts(root: DirectoryPath, entries: readonly StageEntry[]): Promise<void> {
+    const removals = [...new Set(entries.map((entry) => entry.path))].map((path) => `0 ${'0'.repeat(40)} 0\t${path}`);
+    const stages = entries.map((entry) => `${entry.mode} ${entry.oid} ${entry.stage}\t${entry.path}`);
+    await this.run(
+      root,
+      ['update-index', '-z', '--index-info'],
+      {},
+      undefined,
+      `${[...removals, ...stages].join('\0')}\0`
+    );
   }
 
   public static emptyTree(): TreeId {
