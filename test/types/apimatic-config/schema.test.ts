@@ -123,10 +123,26 @@ describe('apimatic.schema.json', () => {
         "APIMatic's Ask AI service, in capitals",
         { ai: { copilot: { key: 'pk_test', apiUrl: 'HTTPS://ASK.APIMATIC.IO:8443' } } }
       ],
+      [
+        "APIMatic's Ask AI service, with a trailing slash",
+        { ai: { copilot: { key: 'pk_test', apiUrl: 'https://ask.apimatic.io/' } } }
+      ],
       ['an Ask AI service on this machine', { ai: { copilot: { key: 'pk_test', apiUrl: 'http://localhost:8787' } } }]
     ];
 
     const invalid: [string, object][] = [
+      [
+        'an Ask AI service address with a path',
+        { ai: { copilot: { key: 'pk_test', apiUrl: 'https://ask.apimatic.io/v1' } } }
+      ],
+      [
+        'an Ask AI service address with a query',
+        { ai: { copilot: { key: 'pk_test', apiUrl: 'https://ask.apimatic.io/?region=eu' } } }
+      ],
+      [
+        'an Ask AI service address with credentials',
+        { ai: { copilot: { key: 'pk_test', apiUrl: 'https://user@ask.apimatic.io' } } }
+      ],
       [
         'an Ask AI service APIMatic does not run',
         { ai: { copilot: { key: 'pk_test', apiUrl: 'https://ask.example.com' } } }

@@ -399,7 +399,7 @@ describe('PortalConfig', () => {
 
       it('offers the Ask AI chat only when the block sets one up', () => {
         expect(config({}).identity().copilot).to.be.null;
-        const copilot = { key: PUBLIC_KEY, apiUrl: 'https://ask.apimatic.io/v1' };
+        const copilot = { key: PUBLIC_KEY, apiUrl: 'https://ask.apimatic.io/' };
         expect(config({ ai: { copilot } }).identity().copilot).to.deep.equal({
           key: PUBLIC_KEY,
           apiUrl: 'https://ask.apimatic.io',

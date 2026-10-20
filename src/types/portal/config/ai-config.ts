@@ -1,5 +1,5 @@
 import { Result } from 'neverthrow';
-import { CopilotConfig, PortalCopilot } from './copilot-config.js';
+import { CopilotConfig, CopilotService, PortalCopilot } from './copilot-config.js';
 import { allOf, namespace, optional, optionalBoolean, Parsed, unknownKeys } from './fields.js';
 
 const KNOWN = ['pageActions', 'copilot'];
@@ -32,6 +32,11 @@ export class AiConfig {
   /** The Ask AI chat the portal offers, or null when it offers none. */
   public copilot(): PortalCopilot | null {
     return this.copilotSettings?.identity() ?? null;
+  }
+
+  /** The service the Ask AI chat is on, or null when the portal offers none. */
+  public copilotService(): CopilotService | null {
+    return this.copilotSettings?.service() ?? null;
   }
 
   public toJSON(): { pageActions: boolean; copilot?: ReturnType<CopilotConfig['toJSON']> } {

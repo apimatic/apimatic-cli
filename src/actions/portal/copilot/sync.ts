@@ -31,7 +31,7 @@ export class PortalCopilotSyncAction {
     }
     const { config } = settings.value;
 
-    const copilot = config.identity().copilot;
+    const copilot = config.copilotService();
     if (copilot === null) {
       this.prompts.copilotNotConfigured(project.sourceDirectory());
       return ActionResult.failed();
@@ -59,7 +59,7 @@ export class PortalCopilotSyncAction {
       bundle.pageCount()
     );
     if (receipt.isErr()) {
-      this.prompts.uploadFailed(receipt.error, copilot.apiUrl);
+      this.prompts.uploadFailed(receipt.error, copilot.address);
       return ActionResult.failed();
     }
     if (receipt.value.status === 'unchanged') {
@@ -75,7 +75,7 @@ export class PortalCopilotSyncAction {
       this.ingestService.awaitIndexing(copilot, receipt.value.versionId, shell, authKey)
     );
     if (indexed.isErr()) {
-      this.prompts.indexingFailed(indexed.error, copilot.apiUrl);
+      this.prompts.indexingFailed(indexed.error, copilot.address);
       return ActionResult.failed();
     }
     if (indexed.value.status === 'superseded') {

@@ -1,6 +1,6 @@
 import axios, { AxiosResponse } from 'axios';
 import { err, ok, Result } from 'neverthrow';
-import { PortalCopilot } from '../../types/portal/config/copilot-config.js';
+import { CopilotService } from '../../types/portal/config/copilot-config.js';
 import { CopilotBundle } from '../../types/portal/copilot/copilot-bundle.js';
 import { IndexedVersion, IndexingState, IngestReceipt, IngestStatus } from '../../types/portal/copilot/ingest.js';
 import { isJsonObject } from '../../utils/json-utils.js';
@@ -18,7 +18,7 @@ export const COPILOT_INGEST_TIMINGS = {
 export type CopilotIngestTimings = Partial<typeof COPILOT_INGEST_TIMINGS>;
 
 /** All the service needs of the portal's Ask AI settings: where it is, and which portal's chat it is. */
-export type CopilotTarget = Pick<PortalCopilot, 'key' | 'apiUrl'>;
+export type CopilotTarget = CopilotService;
 
 const STATES = new Set<IndexingState>(['queued', 'building', 'active', 'superseded', 'failed']);
 
@@ -101,7 +101,7 @@ export class CopilotIngestService {
 
   private axiosInstance(copilot: CopilotTarget, shell: string, token: string, timeout: number) {
     return axios.create({
-      baseURL: copilot.apiUrl,
+      baseURL: copilot.address.toString(),
       timeout,
       validateStatus: () => true,
       // A request that runs out of time then fails as ETIMEDOUT, apart from one that never got through.

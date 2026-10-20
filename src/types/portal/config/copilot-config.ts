@@ -1,5 +1,6 @@
 import { err, ok, Result } from 'neverthrow';
-import { allOf, isWebAddress, namespace, nonEmptyString, optional, Parsed, unknownKeys } from './fields.js';
+import { allOf, namespace, nonEmptyString, optional, Parsed, unknownKeys } from './fields.js';
+import { ServiceAddress } from './service-address.js';
 
 const KNOWN = ['key', 'apiUrl', 'suggestions'];
 const MAX_SUGGESTIONS = 3;
@@ -15,10 +16,16 @@ export interface PortalCopilot {
 
 type CopilotBlock = Omit<PortalCopilot, 'suggestions'> & { suggestions?: string[] };
 
+/** What `sync` needs of the Ask AI settings: which portal's chat it is, and the service it is on. */
+export interface CopilotService {
+  key: string;
+  address: ServiceAddress;
+}
+
 export class CopilotConfig {
   private constructor(
     private readonly key: string,
-    private readonly apiOrigin: string,
+    private readonly address: ServiceAddress,
     private readonly suggestions: string[]
   ) {}
 
@@ -29,51 +36,30 @@ export class CopilotConfig {
         // The key is not checked here: the Ask AI service validates it, and its design may change.
         Result.combineWithAllErrors([
           nonEmptyString(data.key, `${path}.key`),
-          serviceOrigin(data.apiUrl, `${path}.apiUrl`),
+          // Required while there is no hosted service; once there is, default to its address and keep this as an override.
+          ServiceAddress.parse(data.apiUrl, `${path}.apiUrl`),
           optional(data.suggestions, (present) => suggestionList(present, `${path}.suggestions`))
         ])
-      ).map(([key, apiOrigin, suggestions]) => new CopilotConfig(key, apiOrigin, suggestions ?? []))
+      ).map(([key, address, suggestions]) => new CopilotConfig(key, address, suggestions ?? []))
     );
   }
 
+  /** As the browser is told it. */
   public identity(): PortalCopilot {
-    return { key: this.key, apiUrl: this.apiOrigin, suggestions: this.suggestions };
+    return { key: this.key, apiUrl: this.address.toString(), suggestions: this.suggestions };
+  }
+
+  public service(): CopilotService {
+    return { key: this.key, address: this.address };
   }
 
   public toJSON(): CopilotBlock {
     return {
       key: this.key,
-      apiUrl: this.apiOrigin,
+      apiUrl: this.address.toString(),
       ...(this.suggestions.length > 0 ? { suggestions: this.suggestions } : {})
     };
   }
-}
-
-// Only names that never leave the machine: a `*.localhost` name is resolved through DNS on some systems, Windows' Node among them.
-const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
-const APIMATIC_DOMAIN = 'apimatic.io';
-
-function isLoopback(url: URL): boolean {
-  return LOOPBACK_HOSTS.has(url.hostname);
-}
-
-function isApimatic(url: URL): boolean {
-  return (
-    url.protocol === 'https:' && (url.hostname === APIMATIC_DOMAIN || url.hostname.endsWith(`.${APIMATIC_DOMAIN}`))
-  );
-}
-
-// Required while there is no hosted service; once there is, default to its address and keep this as an override.
-// `sync` sends the APIMatic login to this address, so it is APIMatic's own service, over HTTPS, or one on this
-// machine while developing it: no other service is offered, and none should be handed an APIMatic login.
-function serviceOrigin(value: unknown, path: string): Parsed<string> {
-  const url = typeof value === 'string' && isWebAddress(value) ? new URL(value) : null;
-  return url !== null && (isApimatic(url) || isLoopback(url))
-    ? ok(url.origin)
-    : err([
-        `'${path}' must be the address of APIMatic's Ask AI service, starting with 'https://' and ending in ` +
-          `'${APIMATIC_DOMAIN}', or of one on this machine, such as 'http://localhost:8787'.`
-      ]);
 }
 
 function suggestionList(value: unknown, path: string): Parsed<string[]> {

@@ -6,7 +6,7 @@ import { expect } from 'chai';
 import { gunzipSync } from 'node:zlib';
 import { err, ok } from 'neverthrow';
 import { PortalCopilotSyncAction } from '../../../../src/actions/portal/copilot/sync';
-import { CopilotIngestService } from '../../../../src/infrastructure/services/copilot-ingest-service';
+import { CopilotIngestService, CopilotTarget } from '../../../../src/infrastructure/services/copilot-ingest-service';
 import { ServiceError, ServiceErrorCode } from '../../../../src/infrastructure/service-error';
 import { PortalCopilotSyncPrompts } from '../../../../src/prompts/portal/copilot/sync';
 import { CommandMetadata } from '../../../../src/types/common/command-metadata';
@@ -29,6 +29,9 @@ const uploaded = (bundle: CopilotBundle) =>
 
 const COMMAND_METADATA: CommandMetadata = { commandName: 'portal:copilot:sync', shell: 'test' };
 const COPILOT = { key: 'pk_test', apiUrl: 'https://ask.apimatic.io' };
+
+/** The address of the service the portal's settings name. */
+const theService = sinon.match((address: unknown) => `${address as string}` === COPILOT.apiUrl, COPILOT.apiUrl);
 
 const indexed = (status: 'active' | 'superseded') => ({
   versionId: 'v-1',
@@ -111,8 +114,9 @@ describe('PortalCopilotSyncAction', () => {
     const result = await execute();
 
     expect(result.isSuccess()).to.be.true;
-    const [copilot, bundle, , authKey] = upload.firstCall.args as [unknown, CopilotBundle, unknown, string];
-    expect(copilot).to.deep.include(COPILOT);
+    const [copilot, bundle, , authKey] = upload.firstCall.args as [CopilotTarget, CopilotBundle, unknown, string];
+    expect(copilot.key).to.equal(COPILOT.key);
+    expect(`${copilot.address}`).to.equal(COPILOT.apiUrl);
     expect(authKey).to.equal('auth-key');
     expect(bundle.toJson()).to.equal(PUBLISHED.toJson());
     expect(uploaded(bundle)).to.deep.include({ basePath: '/docs/', siteUrl: 'https://example.com/docs' });
@@ -168,7 +172,7 @@ describe('PortalCopilotSyncAction', () => {
     const result = await execute();
 
     expect(result.isFailed()).to.be.true;
-    expect(prompts.uploadFailed.calledOnceWith(forbidden, COPILOT.apiUrl)).to.be.true;
+    expect(prompts.uploadFailed.calledOnceWith(forbidden, theService)).to.be.true;
   });
 
   it('fails when the service cannot be reached', async () => {
@@ -187,7 +191,7 @@ describe('PortalCopilotSyncAction', () => {
     const result = await execute();
 
     expect(result.isFailed()).to.be.true;
-    expect(prompts.indexingFailed.calledOnceWith(failed, COPILOT.apiUrl)).to.be.true;
+    expect(prompts.indexingFailed.calledOnceWith(failed, theService)).to.be.true;
   });
 
   it('refuses, without uploading, a service APIMatic does not run', async () => {

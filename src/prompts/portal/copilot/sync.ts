@@ -3,6 +3,7 @@ import { Result } from 'neverthrow';
 import { ServiceError, ServiceErrorCode } from '../../../infrastructure/service-error.js';
 import { APIMATIC_CONFIG_FILE_NAME } from '../../../types/apimatic-config/document.js';
 import { DirectoryPath } from '../../../types/file/directoryPath.js';
+import { ServiceAddress } from '../../../types/portal/config/service-address.js';
 import { FileName } from '../../../types/file/fileName.js';
 import { FilePath } from '../../../types/file/filePath.js';
 import { IndexedVersion, IngestReceipt } from '../../../types/portal/copilot/ingest.js';
@@ -62,28 +63,30 @@ export class PortalCopilotSyncPrompts {
     );
   }
 
-  public uploadFailed(error: ServiceError, apiUrl: string) {
+  public uploadFailed(error: ServiceError, service: ServiceAddress) {
     this.syncFailed(
       error,
-      apiUrl,
+      service,
       `${error.errorMessage} The service may have received the pages all the same; sync again, and it answers ` +
         `that nothing has changed if it did.`
     );
   }
 
-  public indexingFailed(error: ServiceError, apiUrl: string) {
+  public indexingFailed(error: ServiceError, service: ServiceAddress) {
     this.syncFailed(
       error,
-      apiUrl,
+      service,
       `${error.errorMessage} The service keeps indexing, and Ask AI answers from the previous pages until it ` +
         `is done; check the portal's Ask AI again in a few minutes.`
     );
   }
 
-  private syncFailed(error: ServiceError, apiUrl: string, timedOut: string) {
+  private syncFailed(error: ServiceError, service: ServiceAddress, timedOut: string) {
     switch (error.code) {
       case ServiceErrorCode.NetworkError:
-        log.error(`The Ask AI service at ${f.link(apiUrl)} could not be reached. Check the address and try again.`);
+        log.error(
+          `The Ask AI service at ${f.link(`${service}`)} could not be reached. Check the address and try again.`
+        );
         return;
       case ServiceErrorCode.Forbidden:
         log.error(

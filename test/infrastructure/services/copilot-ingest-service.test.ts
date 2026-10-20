@@ -6,9 +6,11 @@ import { expect } from 'chai';
 import { CopilotIngestService } from '../../../src/infrastructure/services/copilot-ingest-service';
 import { ServiceErrorCode } from '../../../src/infrastructure/service-error';
 import { CopilotBundle } from '../../../src/types/portal/copilot/copilot-bundle';
+import { ServiceAddress } from '../../../src/types/portal/config/service-address';
 
-const API_URL = 'http://copilot.test';
-const COPILOT = { key: 'pk_test', apiUrl: API_URL };
+const API_URL = 'http://localhost:8787';
+const at = (url: string) => ServiceAddress.parse(url, 'apiUrl')._unsafeUnwrap();
+const COPILOT = { key: 'pk_test', address: at(API_URL) };
 const VERSION_ID = 'v-1';
 
 const bundle = CopilotBundle.of(
@@ -89,7 +91,7 @@ describe('CopilotIngestService', () => {
     });
 
     it('reports a service that cannot be reached as a network error', async () => {
-      const unreachable = { ...COPILOT, apiUrl: `http://127.0.0.1:${await closedPort()}` };
+      const unreachable = { ...COPILOT, address: at(`http://127.0.0.1:${await closedPort()}`) };
 
       const result = await service.upload(unreachable, bundle, 'bash', 'auth-key');
 

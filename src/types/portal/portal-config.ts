@@ -2,7 +2,7 @@ import { err, ok, Result } from 'neverthrow';
 import { isJsonObject } from '../../utils/json-utils.js';
 import { UrlPath } from '../file/urlPath.js';
 import { AiConfig } from './config/ai-config.js';
-import { PortalCopilot } from './config/copilot-config.js';
+import { CopilotService, PortalCopilot } from './config/copilot-config.js';
 import { BrandConfig, ColorMode } from './config/brand-config.js';
 import { allOf, optional, Parsed, unknownKeys } from './config/fields.js';
 import { Link } from './config/link.js';
@@ -106,6 +106,11 @@ export class PortalConfig {
   /** Where the context plugin is hosted when it is not bundled into the portal, or null when it is. */
   public pluginUrl(): UrlPath | null {
     return this.pluginAddress;
+  }
+
+  /** The service the Ask AI chat is on, or null when the portal offers none. */
+  public copilotService(): CopilotService | null {
+    return this.ai.copilotService();
   }
 
   public brandSettings(): BrandConfig {
