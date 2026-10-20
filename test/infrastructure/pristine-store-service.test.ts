@@ -3,13 +3,14 @@ import os from 'os';
 import path from 'path';
 import { TextDecoder } from 'node:util';
 import { expect } from 'chai';
-import git from 'isomorphic-git';
+import { GitService } from '../../src/infrastructure/git-service.js';
 import { PristineStoreService } from '../../src/infrastructure/pristine-store-service.js';
 import { DirectoryPath } from '../../src/types/file/directoryPath.js';
 import { CommitId } from '../../src/types/sdk/commit-id.js';
 import { CodeGenerationVersion, Language, Stability } from '../../src/types/sdk/generate.js';
 import { GenerationRecord, SdkGeneration } from '../../src/types/sdk/generation-record.js';
 import { SdkRepository } from '../../src/types/sdk/sdk-repository.js';
+import { SnapshotRef } from '../../src/types/sdk/snapshot-ref.js';
 
 const TYPESCRIPT: SdkGeneration = {
   language: Language.TYPESCRIPT,
@@ -20,6 +21,7 @@ const TYPESCRIPT: SdkGeneration = {
 describe('PristineStoreService', () => {
   let root: string;
   let service: PristineStoreService;
+  const git = new GitService();
 
   const write = (directory: DirectoryPath, relative: string, contents: string) => {
     const target = path.join(directory.toString(), relative);
@@ -35,18 +37,17 @@ describe('PristineStoreService', () => {
     return directory;
   };
 
+  const record = async (repository: SdkRepository, files: Record<string, string>) => {
+    const tree = (await service.snapshotGenerated(repository, generated(files)))._unsafeUnwrap();
+    return service.recordPristine(repository, tree, TYPESCRIPT);
+  };
+
   const project = async (sdk = path.join('sdk', 'typescript')): Promise<SdkRepository> => {
     const projectDirectory = new DirectoryPath(path.join(root, 'project'));
     fs.mkdirSync(projectDirectory.join(sdk).toString(), { recursive: true });
-    await git.init({ fs, dir: projectDirectory.toString(), defaultBranch: 'main' });
+    await git.init(projectDirectory);
     return (await service.findRepository(projectDirectory.join(sdk)))!;
   };
-
-  const read = async (repository: SdkRepository, ref: string) =>
-    git.resolveRef({ fs, dir: repository.root().toString(), ref });
-
-  const commitOf = async (repository: SdkRepository, oid: string) =>
-    (await git.readCommit({ fs, dir: repository.root().toString(), oid })).commit;
 
   const text = (bytes: Uint8Array | undefined) => (bytes === undefined ? undefined : new TextDecoder().decode(bytes));
 
@@ -77,7 +78,7 @@ describe('PristineStoreService', () => {
   });
 
   describe('initRepository', () => {
-    it('makes the SDK directory its own repository, on main', async () => {
+    it('makes the SDK directory its own repository, on main, leaving its files alone', async () => {
       const sdk = new DirectoryPath(path.join(root, 'sdk', 'typescript'));
       write(sdk, 'README.md', '# sdk');
 
@@ -97,67 +98,62 @@ describe('PristineStoreService', () => {
       const repository = await project();
 
       const commit = (
-        await service.recordPristine(
-          repository,
-          generated({ 'README.md': '# v1', 'src/index.ts': 'export {};' }),
-          TYPESCRIPT
-        )
+        await record(repository, {
+          'README.md': '# v1',
+          'src/index.ts': 'export {};',
+          '.gitignore': 'dist/\n',
+          'dist/x.js': 'x'
+        })
       )._unsafeUnwrap();
 
-      expect(await read(repository, 'refs/apimatic/pristine/sdk/typescript')).to.equal(commit.toString());
-      const object = await commitOf(repository, commit.toString());
-      expect(object.parent).to.be.empty;
-      expect(object.message.trim()).to.equal('apimatic: pristine typescript v4 stable');
-      expect(object.author.name).to.equal('APIMatic CLI');
+      expect((await git.resolveRef(repository.root(), repository.pristineRef()))?.isEqual(commit)).to.be.true;
+      expect(await git.describe(repository.root(), commit)).to.deep.equal({
+        parents: [],
+        authorName: 'APIMatic CLI',
+        subject: 'apimatic: pristine typescript v4 stable'
+      });
       const files = (await service.readSnapshot(repository, commit))._unsafeUnwrap();
-      expect([...files.keys()]).to.have.members(['README.md', 'src/index.ts']);
+      expect([...files.keys()]).to.have.members(['README.md', 'src/index.ts', '.gitignore', 'dist/x.js']);
       expect(text(files.get('src/index.ts'))).to.equal('export {};');
     });
 
     it('chains the next snapshot onto the last and moves the ref', async () => {
       const repository = await project();
-      const first = (
-        await service.recordPristine(repository, generated({ 'README.md': '# v1' }), TYPESCRIPT)
-      )._unsafeUnwrap();
+      const first = (await record(repository, { 'README.md': '# v1' }))._unsafeUnwrap();
 
-      const second = (
-        await service.recordPristine(repository, generated({ 'README.md': '# v2' }), TYPESCRIPT)
-      )._unsafeUnwrap();
+      const second = (await record(repository, { 'README.md': '# v2' }))._unsafeUnwrap();
 
-      expect((await commitOf(repository, second.toString())).parent).to.deep.equal([first.toString()]);
+      expect((await git.describe(repository.root(), second)).parents).to.deep.equal([first]);
       expect((await service.pristineTip(repository))?.isEqual(second)).to.be.true;
       expect(text((await service.readSnapshot(repository, first))._unsafeUnwrap().get('README.md'))).to.equal('# v1');
     });
 
     it('refuses an SDK directory inside one that already has snapshots, and the reverse', async () => {
       const outer = await project();
-      (await service.recordPristine(outer, generated({ 'README.md': '# outer' }), TYPESCRIPT))._unsafeUnwrap();
+      (await record(outer, { 'README.md': '# outer' }))._unsafeUnwrap();
+      fs.mkdirSync(outer.sdkDirectory().join('typescript').toString());
       const inner = (await service.findRepository(outer.sdkDirectory().join('typescript')))!;
 
-      const refused = await service.recordPristine(inner, generated({ 'README.md': '# inner' }), TYPESCRIPT);
+      expect((await record(inner, { 'README.md': '# inner' }))._unsafeUnwrapErr().kind).to.equal('nestedSdkDirectory');
 
-      expect(refused._unsafeUnwrapErr().kind).to.equal('nestedSdkDirectory');
       const other = await project(path.join('other', 'typescript', 'nested'));
-      (await service.recordPristine(other, generated({ 'README.md': '# nested' }), TYPESCRIPT))._unsafeUnwrap();
+      (await record(other, { 'README.md': '# nested' }))._unsafeUnwrap();
       const parent = (await service.findRepository(
         new DirectoryPath(path.join(root, 'project', 'other', 'typescript'))
       ))!;
-      expect((await service.recordPristine(parent, generated({}), TYPESCRIPT))._unsafeUnwrapErr().kind).to.equal(
-        'nestedSdkDirectory'
-      );
+      expect((await record(parent, {}))._unsafeUnwrapErr().kind).to.equal('nestedSdkDirectory');
     });
 
     it('refuses any SDK directory below a repository whose root is one', async () => {
       const sdk = new DirectoryPath(path.join(root, 'sdk'));
       fs.mkdirSync(sdk.toString(), { recursive: true });
       const repository = (await service.initRepository(sdk))._unsafeUnwrap();
-      (await service.recordPristine(repository, generated({ 'README.md': '# root' }), TYPESCRIPT))._unsafeUnwrap();
-      expect(await read(repository, 'refs/apimatic/pristine')).to.be.a('string');
+      (await record(repository, { 'README.md': '# root' }))._unsafeUnwrap();
+      expect(await git.resolveRef(sdk, SnapshotRef.pristine(''))).to.not.be.undefined;
+      fs.mkdirSync(sdk.join('typescript').toString());
       const below = (await service.findRepository(sdk.join('typescript')))!;
 
-      expect((await service.recordPristine(below, generated({}), TYPESCRIPT))._unsafeUnwrapErr().kind).to.equal(
-        'nestedSdkDirectory'
-      );
+      expect((await record(below, {}))._unsafeUnwrapErr().kind).to.equal('nestedSdkDirectory');
     });
   });
 
@@ -168,18 +164,36 @@ describe('PristineStoreService', () => {
       write(sdk, path.join('.apimatic', 'generation.json'), '{}');
       const repository = (await service.initRepository(sdk))._unsafeUnwrap();
 
-      const first = (await service.savePrevious(repository))._unsafeUnwrap();
+      const first = (await service.savePrevious(repository, undefined))._unsafeUnwrap();
       write(sdk, 'README.md', '# edited again');
-      const second = (await service.savePrevious(repository))._unsafeUnwrap();
+      const second = (await service.savePrevious(repository, undefined))._unsafeUnwrap();
 
       const kept = (await service.readSnapshot(repository, second))._unsafeUnwrap();
       expect([...kept.keys()]).to.have.members(['README.md', '.apimatic/generation.json']);
       expect(text(kept.get('README.md'))).to.equal('# edited again');
-      expect(await read(repository, 'refs/apimatic/previous')).to.equal(second.toString());
-      expect((await commitOf(repository, second.toString())).parent).to.be.empty;
+      expect((await git.resolveRef(sdk, repository.previousRef()))?.isEqual(second)).to.be.true;
+      expect((await git.describe(sdk, second)).parents).to.be.empty;
       expect(text((await service.readSnapshot(repository, first))._unsafeUnwrap().get('README.md'))).to.equal(
         '# edited'
       );
+    });
+
+    it('includes a generated file the SDK’s own .gitignore matches, and leaves other ignored files out', async () => {
+      const repository = await project();
+      const base = (
+        await record(repository, { '.gitignore': 'dist/\n', 'dist/generated.js': 'generated' })
+      )._unsafeUnwrap();
+      const sdk = repository.sdkDirectory();
+      write(sdk, '.gitignore', 'dist/\n');
+      write(sdk, 'dist/generated.js', 'generated');
+      write(sdk, 'dist/built.js', 'built');
+
+      const previous = (await service.savePrevious(repository, base))._unsafeUnwrap();
+
+      expect([...(await service.readSnapshot(repository, previous))._unsafeUnwrap().keys()]).to.have.members([
+        '.gitignore',
+        'dist/generated.js'
+      ]);
     });
   });
 
@@ -198,21 +212,19 @@ describe('PristineStoreService', () => {
       const repository = await project();
       const sdk = repository.sdkDirectory();
       expect(await service.readRecord(sdk)).to.be.undefined;
-      const pristine = (
-        await service.recordPristine(repository, generated({ 'README.md': '# v1' }), TYPESCRIPT)
-      )._unsafeUnwrap();
-      const record = GenerationRecord.written(TYPESCRIPT, pristine, new Date('2026-10-20T10:00:00Z'), '2.3.0', [
+      const pristine = (await record(repository, { 'README.md': '# v1' }))._unsafeUnwrap();
+      const written = GenerationRecord.written(TYPESCRIPT, pristine, new Date('2026-10-20T10:00:00Z'), '2.3.0', [
         'src/index.ts'
       ]);
 
-      const file = await service.writeRecord(sdk, record);
+      const file = await service.writeRecord(sdk, written);
 
       expect(file.toString()).to.equal(path.join(sdk.toString(), '.apimatic', 'generation.json'));
       const read = (await service.readRecord(sdk))!;
       expect(read.pristineCommit().isEqual(pristine)).to.be.true;
       expect(read.conflictedPaths()).to.deep.equal(['src/index.ts']);
       expect(read.isFor(TYPESCRIPT)).to.be.true;
-      expect(read.toJson()).to.equal(record.toJson());
+      expect(read.toJson()).to.equal(written.toJson());
     });
 
     it('reads as absent when the file cannot be understood', async () => {
