@@ -20,10 +20,10 @@ export function relabelMarkers(content: Uint8Array): Uint8Array {
 }
 
 /** Whether `content` still carries the markers a conflicted run writes. */
-export function hasConflictMarkers(content: Uint8Array): boolean {
+export function hasConflictMarkers(content: Uint8Array | string): boolean {
   let text: string;
   try {
-    text = decoder.decode(content);
+    text = typeof content === 'string' ? content : decoder.decode(content);
   } catch {
     return false;
   }

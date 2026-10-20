@@ -1,4 +1,7 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import { err, ok, Result } from 'neverthrow';
+import { hasConflictMarkers } from '../application/sdk-merge/markers.js';
 import { DirectoryPath } from '../types/file/directoryPath.js';
 import { FileName } from '../types/file/fileName.js';
 import { FilePath } from '../types/file/filePath.js';
@@ -14,12 +17,37 @@ import { GitService } from './git-service.js';
 import { canonical } from './tmp-extensions.js';
 
 export type PristineStoreProblem = {
-  kind: 'nestedSdkDirectory' | 'snapshotMissing' | 'gitFailed';
+  kind: 'nestedSdkDirectory' | 'snapshotMissing' | 'gitFailed' | 'recordNotWritten';
   reason: string;
 };
 
+/** What the store knows about an SDK directory before a run, from the repository and the record. */
+export type SdkDirectoryState =
+  | { kind: 'noRepository' }
+  | { kind: 'noRecord'; repository: SdkRepository }
+  | { kind: 'otherGeneration'; repository: SdkRepository; recorded: SdkGeneration }
+  | { kind: 'snapshotMissing'; repository: SdkRepository; commit: CommitId }
+  | { kind: 'unresolved'; repository: SdkRepository; paths: string[] }
+  | { kind: 'ready'; repository: SdkRepository; base: CommitId };
+
 const RECORD_DIRECTORY = '.apimatic';
 const RECORD_FILE = 'generation.json';
+
+/**
+ * The directory spelt as git will spell it, and its nearest ancestor that exists, which is where
+ * git can be asked about it: the SDK directory of a first run is not there yet, and on Windows
+ * the one the caller holds may be an 8.3 alias where git answers with the long name.
+ */
+function realSpelling(directory: DirectoryPath): { real: DirectoryPath; existing: DirectoryPath } {
+  let existing = directory.toString();
+  const missing: string[] = [];
+  while (!fs.existsSync(existing)) {
+    missing.unshift(path.basename(existing));
+    existing = path.dirname(existing);
+  }
+  const existingReal = new DirectoryPath(canonical(existing));
+  return { real: existingReal.join(...missing), existing: existingReal };
+}
 
 /**
  * The snapshots behind custom code, kept as commits under hidden refs of the repository that
@@ -31,16 +59,43 @@ export class PristineStoreService {
   private readonly fileService = new FileService();
   private readonly git = new GitService();
 
-  // Git answers with the real path; the directory the caller holds may be an 8.3 alias on
-  // Windows, so both are spelt the real way before one is asked whether it contains the other.
+  /** Everything a run needs to know before it decides how to write; a nested SDK directory is the one refusal. */
+  public async inspect(
+    sdkDirectory: DirectoryPath,
+    generation: SdkGeneration
+  ): Promise<Result<SdkDirectoryState, PristineStoreProblem>> {
+    const repository = await this.findRepository(sdkDirectory);
+    if (repository === undefined) {
+      return ok({ kind: 'noRepository' });
+    }
+    const notNested = await this.verifyNotNested(repository);
+    if (notNested.isErr()) {
+      return err(notNested.error);
+    }
+    const record = await this.readRecord(sdkDirectory);
+    if (record === undefined) {
+      return ok({ kind: 'noRecord', repository });
+    }
+    if (!record.isFor(generation)) {
+      return ok({ kind: 'otherGeneration', repository, recorded: record.generatedAs() });
+    }
+    const base = record.pristineCommit();
+    if (!(await this.git.hasCommit(repository.root(), base))) {
+      return ok({ kind: 'snapshotMissing', repository, commit: base });
+    }
+    const paths = await this.unresolvedConflicts(sdkDirectory, record);
+    return ok(paths.length > 0 ? { kind: 'unresolved', repository, paths } : { kind: 'ready', repository, base });
+  }
+
   public async findRepository(sdkDirectory: DirectoryPath): Promise<SdkRepository | undefined> {
-    const real = new DirectoryPath(canonical(sdkDirectory.toString()));
-    const root = await this.git.topLevel(real);
+    const { real, existing } = realSpelling(sdkDirectory);
+    const root = await this.git.topLevel(existing);
     return root === undefined ? undefined : SdkRepository.create(new DirectoryPath(canonical(root.toString())), real);
   }
 
   public async initRepository(sdkDirectory: DirectoryPath): Promise<Result<SdkRepository, PristineStoreProblem>> {
     try {
+      await this.fileService.createDirectoryIfNotExists(sdkDirectory);
       await this.git.init(sdkDirectory);
       const repository = SdkRepository.create(sdkDirectory, sdkDirectory);
       return repository === undefined ? err(gitFailed('the repository could not be opened')) : ok(repository);
@@ -89,15 +144,12 @@ export class PristineStoreService {
     generated: TreeId,
     generation: SdkGeneration
   ): Promise<Result<CommitId, PristineStoreProblem>> {
+    const notNested = await this.verifyNotNested(repository);
+    if (notNested.isErr()) {
+      return err(notNested.error);
+    }
     const ref = repository.pristineRef();
     try {
-      const colliding = (await this.pristineRefsIn(repository)).find((existing) => existing.collidesWith(ref));
-      if (colliding !== undefined) {
-        return err({
-          kind: 'nestedSdkDirectory',
-          reason: `${ref} cannot be kept beside ${colliding}: one SDK directory sits inside another`
-        });
-      }
       const parent = await this.git.resolveRef(repository.root(), ref);
       const commit = await this.git.commitTree(
         repository.root(),
@@ -110,6 +162,22 @@ export class PristineStoreService {
     } catch (error) {
       return err(gitFailed(errorMessage(error)));
     }
+  }
+
+  /** The pristine snapshot first, then the record naming it, so the two never disagree. */
+  public async recordGeneration(
+    repository: SdkRepository,
+    generated: TreeId,
+    generation: SdkGeneration,
+    cliVersion: string,
+    conflicts: readonly string[]
+  ): Promise<Result<GenerationRecord, PristineStoreProblem>> {
+    const pristine = await this.recordPristine(repository, generated, generation);
+    if (pristine.isErr()) {
+      return err(pristine.error);
+    }
+    const record = GenerationRecord.written(generation, pristine.value, new Date(), cliVersion, conflicts);
+    return (await this.writeRecord(repository.sdkDirectory(), record)).map(() => record);
   }
 
   /** Keeps the SDK directory as it is on disk, replacing what the last run kept, so a merge can be undone. */
@@ -155,10 +223,48 @@ export class PristineStoreService {
     return GenerationRecord.parse(await this.fileService.getContents(file));
   }
 
-  public async writeRecord(sdkDirectory: DirectoryPath, record: GenerationRecord): Promise<FilePath> {
+  public async writeRecord(
+    sdkDirectory: DirectoryPath,
+    record: GenerationRecord
+  ): Promise<Result<FilePath, PristineStoreProblem>> {
     const file = this.recordFile(sdkDirectory);
-    await this.fileService.replaceContents(file, record.toJson());
-    return file;
+    try {
+      await this.fileService.replaceContents(file, record.toJson());
+      return ok(file);
+    } catch (error) {
+      return err({ kind: 'recordNotWritten', reason: errorMessage(error) });
+    }
+  }
+
+  // The ref name is the SDK directory's path, so one SDK directory inside another cannot have its own.
+  private async verifyNotNested(repository: SdkRepository): Promise<Result<void, PristineStoreProblem>> {
+    const ref = repository.pristineRef();
+    try {
+      const colliding = (await this.pristineRefsIn(repository)).find((existing) => existing.collidesWith(ref));
+      return colliding === undefined
+        ? ok(undefined)
+        : err({
+            kind: 'nestedSdkDirectory',
+            reason: `${ref} cannot be kept beside ${colliding}: one SDK directory sits inside another`
+          });
+    } catch (error) {
+      return err(gitFailed(errorMessage(error)));
+    }
+  }
+
+  // The files the record lists as conflicted that still hold the markers, so a run never merges over them.
+  private async unresolvedConflicts(sdkDirectory: DirectoryPath, record: GenerationRecord): Promise<string[]> {
+    const unresolved: string[] = [];
+    for (const relative of record.conflictedPaths()) {
+      const file = new FilePath(
+        sdkDirectory.join(path.posix.dirname(relative)),
+        new FileName(path.posix.basename(relative))
+      );
+      if ((await this.fileService.fileExists(file)) && hasConflictMarkers(await this.fileService.getContents(file))) {
+        unresolved.push(relative);
+      }
+    }
+    return unresolved;
   }
 
   private recordFile(sdkDirectory: DirectoryPath): FilePath {

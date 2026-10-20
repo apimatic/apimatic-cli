@@ -32,6 +32,20 @@ describe('SdkContext', () => {
       expect(fs.existsSync(inRoot('sdk', 'python', 'python.zip'))).to.be.true;
     });
 
+    it('replaces what the language directory holds, except its .git', async () => {
+      fs.mkdirSync(inRoot('generated'));
+      fs.writeFileSync(inRoot('generated', 'README.md'), '# sdk');
+      fs.mkdirSync(inRoot('sdk', 'python', '.git'), { recursive: true });
+      fs.writeFileSync(inRoot('sdk', 'python', '.git', 'HEAD'), 'ref: refs/heads/main');
+      fs.writeFileSync(inRoot('sdk', 'python', 'old.py'), 'old');
+
+      const saved = await context.save(new DirectoryPath(inRoot('generated')), false);
+
+      expect(saved._unsafeUnwrap().toString()).to.equal(inRoot('sdk', 'python'));
+      expect(fs.readdirSync(inRoot('sdk', 'python')).sort()).to.deep.equal(['.git', 'README.md']);
+      expect(fs.readFileSync(inRoot('sdk', 'python', '.git', 'HEAD'), 'utf-8')).to.equal('ref: refs/heads/main');
+    });
+
     it('reports an SDK it could not zip, naming its language directory, and leaves no archive behind', async () => {
       const saved = await context.save(new DirectoryPath(inRoot('missing')), true);
 

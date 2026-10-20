@@ -92,6 +92,10 @@ export class GenerationRecord {
     return this.pristine;
   }
 
+  public generatedAs(): SdkGeneration {
+    return this.generation;
+  }
+
   public conflictedPaths(): readonly string[] {
     return this.conflicts;
   }

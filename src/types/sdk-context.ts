@@ -9,6 +9,8 @@ import { ZipService } from '../infrastructure/zip-service.js';
 
 export type SdkSaveProblem = FileProblem & { sdkDirectory: DirectoryPath };
 
+const GIT_DIRECTORY = '.git';
+
 export class SdkContext {
   private readonly fileService = new FileService();
   private readonly zipService = new ZipService();
@@ -22,12 +24,18 @@ export class SdkContext {
     return new FilePath(this.sdkDirectory, new FileName(`${this.language}.zip`));
   }
 
+  /** The language directory the SDK is written into, and read back from on the next run. */
+  public directory(): DirectoryPath {
+    return this.sdkDirectory;
+  }
+
   public async exists() {
     return !(await this.fileService.directoryEmpty(this.sdkDirectory));
   }
 
+  /** Overwrites the directory; a `.git` in it is the developer's, or holds the snapshots, and stays. */
   public async save(tempSdkDirectory: DirectoryPath, zipSdk: boolean): Promise<Result<DirectoryPath, SdkSaveProblem>> {
-    await this.fileService.cleanDirectory(this.sdkDirectory);
+    await this.fileService.cleanDirectoryExcluding(this.sdkDirectory, [new FileName(GIT_DIRECTORY)]);
     if (!zipSdk) {
       await this.fileService.copyDirectoryContents(tempSdkDirectory, this.sdkDirectory);
       return ok(this.sdkDirectory);

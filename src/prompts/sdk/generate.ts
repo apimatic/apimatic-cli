@@ -1,4 +1,4 @@
-import { isCancel, confirm, log, select } from '@clack/prompts';
+import { isCancel, log, select } from '@clack/prompts';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { FileProblem } from '../../types/file/file-problem.js';
 import { format as f } from '../format.js';
@@ -7,7 +7,6 @@ import { withSpinner } from '../prompt.js';
 import { ServiceError } from '../../infrastructure/service-error.js';
 import { AVAILABLE_LANGUAGES, Language, languageLabel, UPCOMING_LANGUAGES } from '../../types/sdk/generate.js';
 import { VersionProblem } from '../../types/project-context.js';
-import { SdkSaveProblem } from '../../types/sdk-context.js';
 
 const names = (languages: readonly Language[]) => languages.map(languageLabel).join(', ');
 
@@ -23,19 +22,6 @@ export class SdkGeneratePrompts {
         `Available now: ${names(AVAILABLE_LANGUAGES)}\n` +
         `Coming soon: ${names(UPCOMING_LANGUAGES)}`
     );
-  }
-
-  public async overwriteSdk(directory: DirectoryPath): Promise<boolean> {
-    const overwrite = await confirm({
-      message: `The destination ${f.path(directory)} is not empty, do you want to overwrite?`,
-      initialValue: false
-    });
-
-    if (isCancel(overwrite)) {
-      return false;
-    }
-
-    return overwrite;
   }
 
   public sameSourceAndSdkDir(directory: DirectoryPath) {
@@ -54,11 +40,6 @@ export class SdkGeneratePrompts {
     log.error(message);
   }
 
-  public destinationDirNotEmpty() {
-    const message = `Please enter a different destination folder or remove the existing files and try again.`;
-    log.error(message);
-  }
-
   public generateSdk(fn: Promise<Result<NodeJS.ReadableStream, ServiceError>>) {
     return withSpinner('Generating SDK', 'SDK generated successfully.', 'SDK Generation failed.', fn);
   }
@@ -73,10 +54,6 @@ export class SdkGeneratePrompts {
 
   public sdkNotUnzipped(problem: FileProblem) {
     log.error(`${ServiceError.InvalidResponse.errorMessage}\n${problem.reason}`);
-  }
-
-  public sdkNotSaved(problem: SdkSaveProblem) {
-    log.error(`The SDK could not be saved to ${f.path(problem.sdkDirectory)}: ${problem.reason}`);
   }
 
   public noVersionToBuild(problem: VersionProblem, sourceDirectory: DirectoryPath) {
@@ -102,9 +79,5 @@ export class SdkGeneratePrompts {
     }
 
     return version;
-  }
-
-  public sdkGenerated(sdk: DirectoryPath) {
-    log.info(`The generated SDK can be found at ${f.relativePath(sdk)}.`);
   }
 }

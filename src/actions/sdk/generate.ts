@@ -5,8 +5,11 @@ import { withDirPath } from '../../infrastructure/tmp-extensions.js';
 import { SdkGeneratePrompts } from '../../prompts/sdk/generate.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { TempContext } from '../../types/temp-context.js';
-import { isAvailableLanguage, Language, Stability } from '../../types/sdk/generate.js';
+import { codegenVersionFor, isAvailableLanguage, Language, Stability } from '../../types/sdk/generate.js';
 import { ProjectContext } from '../../types/project-context.js';
+import { SdkGeneration } from '../../types/sdk/generation-record.js';
+import { SdkPrepareAction } from './prepare.js';
+import { SdkWriteAction } from './write.js';
 
 export class GenerateAction {
   private readonly prompts: SdkGeneratePrompts = new SdkGeneratePrompts();
@@ -64,9 +67,14 @@ export class GenerateAction {
     }
 
     const sdkContext = buildFrom.sdk(language, sdkDirectory);
-    if (!force && (await sdkContext.exists()) && !(await this.prompts.overwriteSdk(sdkDirectory))) {
-      this.prompts.destinationDirNotEmpty();
-      return ActionResult.cancelled();
+    const generation: SdkGeneration = {
+      language,
+      codegenVersion: codegenVersionFor(language, stability),
+      stability
+    };
+    const destination = await new SdkPrepareAction().execute(sdkContext, generation, force, zipSdk);
+    if (!destination.isSuccess()) {
+      return destination.discardValue();
     }
 
     return await withDirPath(async (tempDirectory) => {
@@ -100,14 +108,7 @@ export class GenerateAction {
         return ActionResult.failed();
       }
 
-      const saved = await sdkContext.save(tempSdk.value, zipSdk);
-      if (saved.isErr()) {
-        this.prompts.sdkNotSaved(saved.error);
-        return ActionResult.failed();
-      }
-
-      this.prompts.sdkGenerated(saved.value);
-      return ActionResult.success();
+      return await new SdkWriteAction().execute(destination.getValue(), sdkContext, tempSdk.value, generation);
     });
   };
 }
