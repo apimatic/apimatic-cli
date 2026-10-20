@@ -319,13 +319,12 @@ const stylesheetOf = (output: DirectoryPath) => {
     expect(filesNaming(fixture.join('content').toString(), fixture.toString())).to.deep.equal([]);
   });
 
-  // A portal without the chat ships none of its code, not even a chunk it never loads. That its stylesheet
-  // leaves out the chat's classes is held by the stylesheet's own tests: on Windows, a project built beside
-  // a source on another drive than the temp folder has Tailwind write classes nothing uses, the chat's among them.
-  it('ships none of the Ask AI chat', () => {
+  // A portal without the chat pays nothing for it, not even a chunk it never loads.
+  it('ships none of the Ask AI chat, neither its code nor its classes', () => {
     const chat = scriptsOf(portal.output()).filter((script) => script.text.includes(CHAT_CODE));
 
     expect(chat.map(({ name }) => name)).to.deep.equal([]);
+    expect(stylesheetOf(portal.output())).to.not.contain(CHAT_CLASS);
   });
 
   it('writes the sidebar tree to one cache file instead of into every page payload', () => {
