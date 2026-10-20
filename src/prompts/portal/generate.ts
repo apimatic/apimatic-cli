@@ -136,6 +136,14 @@ export class PortalGeneratePrompts {
     log.warn('The portal has no pages for Ask AI to answer from, so none were added to it.');
   }
 
+  // A fault of the build rather than of the docs, so the author is not sent looking through their pages.
+  public copilotPagesNotBuilt() {
+    log.warn(
+      'The build wrote no pages for Ask AI, so none were added to the portal. Generate the portal again, ' +
+        `and if they are still missing, contact ${f.var('support@apimatic.io')}.`
+    );
+  }
+
   public copilotBundleNotWritten(reason: string) {
     log.warn(
       `The pages for Ask AI could not be added to the portal (${reason}), so it is saved without them. ` +

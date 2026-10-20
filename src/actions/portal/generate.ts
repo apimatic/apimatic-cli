@@ -106,7 +106,11 @@ export class GenerateAction {
       return false;
     }
     const pages = taken.value;
-    if (pages === null || pages.length === 0) {
+    if (pages === null) {
+      this.prompts.copilotPagesNotBuilt();
+      return false;
+    }
+    if (pages.length === 0) {
       this.prompts.copilotPagesNotFound();
       return false;
     }

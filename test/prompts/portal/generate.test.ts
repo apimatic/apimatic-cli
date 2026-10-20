@@ -7,6 +7,33 @@ import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
 import { SiteAddress } from '../../../src/types/portal/config/site-address.js';
 
 describe('PortalGeneratePrompts', () => {
+  describe('when Ask AI gets no pages', () => {
+    const warned = (say: (prompts: PortalGeneratePrompts) => void) => {
+      const warn = sinon.stub(log, 'warn');
+      try {
+        say(new PortalGeneratePrompts());
+      } finally {
+        warn.restore();
+      }
+      return stripVTControlCharacters(String(warn.firstCall.args[0]));
+    };
+
+    it('tells a portal with no pages that it has none', () => {
+      expect(warned((prompts) => prompts.copilotPagesNotFound())).to.equal(
+        'The portal has no pages for Ask AI to answer from, so none were added to it.'
+      );
+    });
+
+    it('tells a build that wrote none to generate again, not to look through the docs', () => {
+      const message = warned((prompts) => prompts.copilotPagesNotBuilt());
+
+      expect(message).to.contain('The build wrote no pages for Ask AI');
+      expect(message).to.contain('Generate the portal again');
+      expect(message).to.contain('support@apimatic.io');
+      expect(message).to.not.contain('has no pages');
+    });
+  });
+
   describe('how Ask AI gets the pages', () => {
     const printed = (url: string | null) => {
       const site = url === null ? null : SiteAddress.parse(url, 'portal.site.url')._unsafeUnwrap();

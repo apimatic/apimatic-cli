@@ -301,18 +301,27 @@ describe('GenerateAction', () => {
     });
 
     it('still saves the portal when it has no pages', async () => {
-      for (const write of [() => writePages([]), () => undefined]) {
-        prompts.copilotPagesNotFound.resetHistory();
-        write();
+      writePages([]);
 
-        const result = await execute(COPILOT_FIXTURE, true);
+      const result = await execute(COPILOT_FIXTURE);
 
-        expect(result.isSuccess()).to.be.true;
-        expect(inPortal('index.html')).to.be.true;
-        expect(inPortal('__copilot')).to.be.false;
-        expect(prompts.copilotPagesNotFound.calledOnce).to.be.true;
-        expect(prompts.copilotUpdatesAfterDeploy.called).to.be.false;
-      }
+      expect(result.isSuccess()).to.be.true;
+      expect(inPortal('index.html')).to.be.true;
+      expect(inPortal('__copilot')).to.be.false;
+      expect(prompts.copilotPagesNotFound.calledOnce).to.be.true;
+      expect(prompts.copilotPagesNotBuilt.called).to.be.false;
+      expect(prompts.copilotUpdatesAfterDeploy.called).to.be.false;
+    });
+
+    it('still saves the portal when the build wrote no pages for Ask AI, naming it a fault of the build', async () => {
+      const result = await execute(COPILOT_FIXTURE);
+
+      expect(result.isSuccess()).to.be.true;
+      expect(inPortal('index.html')).to.be.true;
+      expect(inPortal('__copilot')).to.be.false;
+      expect(prompts.copilotPagesNotBuilt.calledOnce).to.be.true;
+      expect(prompts.copilotPagesNotFound.called).to.be.false;
+      expect(prompts.copilotUpdatesAfterDeploy.called).to.be.false;
     });
   });
 
