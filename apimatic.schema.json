@@ -188,8 +188,8 @@
                 },
                 "apiUrl": {
                   "type": "string",
-                  "description": "The Ask AI service's address, for example 'https://ask.example.com'. Plain 'http://' is only accepted for a service on this machine, such as 'http://localhost:8787'.",
-                  "pattern": "^([hH][tT][tT][pP][sS]://\\S+|[hH][tT][tT][pP]://(localhost|127\\.0\\.0\\.1|\\[::1\\])([:/]\\S*)?)$"
+                  "description": "The address of APIMatic's Ask AI service, such as 'https://ask.apimatic.io', or of one on this machine while developing it, such as 'http://localhost:8787'.",
+                  "pattern": "^([hH][tT][tT][pP][sS]://([^/?#@\\s]+\\.)?[aA][pP][iI][mM][aA][tT][iI][cC]\\.[iI][oO]|[hH][tT][tT][pP][sS]?://([lL][oO][cC][aA][lL][hH][oO][sS][tT]|127\\.0\\.0\\.1|\\[::1\\]))(:[0-9]+)?([/?#]\\S*)?$"
                 },
                 "suggestions": {
                   "type": "array",

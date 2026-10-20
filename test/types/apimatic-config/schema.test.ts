@@ -118,12 +118,31 @@ describe('apimatic.schema.json', () => {
       ['a link with two slashes in its query', { navigation: { links: [{ label: 'Next', url: '/start?next=//x' }] } }],
       ['a context plugin hosted elsewhere', { pluginUrl: 'https://plugins.acme.test/calc.zip?v=2' }],
       ['a plugin address with several query parameters', { pluginUrl: 'https://s3.test/calc.zip?a=1&b=2' }],
-      ['an Ask AI service over https', { ai: { copilot: { key: 'pk_test', apiUrl: 'https://ask.example.com' } } }],
+      ["APIMatic's Ask AI service", { ai: { copilot: { key: 'pk_test', apiUrl: 'https://ask.apimatic.io' } } }],
+      [
+        "APIMatic's Ask AI service, in capitals",
+        { ai: { copilot: { key: 'pk_test', apiUrl: 'HTTPS://ASK.APIMATIC.IO:8443' } } }
+      ],
       ['an Ask AI service on this machine', { ai: { copilot: { key: 'pk_test', apiUrl: 'http://localhost:8787' } } }]
     ];
 
     const invalid: [string, object][] = [
-      ['an Ask AI service over http', { ai: { copilot: { key: 'pk_test', apiUrl: 'http://ask.example.com' } } }],
+      [
+        'an Ask AI service APIMatic does not run',
+        { ai: { copilot: { key: 'pk_test', apiUrl: 'https://ask.example.com' } } }
+      ],
+      [
+        "APIMatic's Ask AI service over http",
+        { ai: { copilot: { key: 'pk_test', apiUrl: 'http://ask.apimatic.io' } } }
+      ],
+      [
+        'an Ask AI service on a host ending like APIMatic',
+        { ai: { copilot: { key: 'pk_test', apiUrl: 'https://ask.apimatic.io.example.com' } } }
+      ],
+      [
+        'an Ask AI service on this machine in name only',
+        { ai: { copilot: { key: 'pk_test', apiUrl: 'http://localhost:@evil.example/' } } }
+      ],
       // Resolved through DNS on some systems, so it may not be this machine.
       [
         'an Ask AI service over http on a .localhost name',

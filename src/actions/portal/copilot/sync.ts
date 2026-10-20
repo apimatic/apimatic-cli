@@ -3,7 +3,6 @@ import { CopilotIngestService } from '../../../infrastructure/services/copilot-i
 import { PortalCopilotSyncPrompts } from '../../../prompts/portal/copilot/sync.js';
 import { CommandMetadata } from '../../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../../types/file/directoryPath.js';
-import { receivesSavedLogin } from '../../../types/portal/config/copilot-config.js';
 import { PLACEHOLDER_SITE } from '../../../types/portal/config/site-config.js';
 import { GeneratedPortalContext } from '../../../types/portal/copilot/generated-portal-context.js';
 import { ProjectContext } from '../../../types/project-context.js';
@@ -37,7 +36,7 @@ export class PortalCopilotSyncAction {
       this.prompts.copilotNotConfigured(project.sourceDirectory());
       return ActionResult.failed();
     }
-    const authKey = await this.authKeyFor(copilot.apiUrl);
+    const authKey = await this.uploadKey();
     if (authKey === null) {
       return ActionResult.failed();
     }
@@ -87,16 +86,15 @@ export class PortalCopilotSyncAction {
     return ActionResult.success();
   };
 
-  /** The only place that decides which key the service receives: the passed one, else the saved login if it may have it. */
-  private async authKeyFor(apiUrl: string): Promise<string | null> {
-    // A blank `--auth-key` (say, from an unset variable) is no key, so it never lets the saved login through.
+  /**
+   * The only place that decides which key the service receives: the passed one, else the saved login. The
+   * service is APIMatic's own, or one on this machine, as the `portal` block allows no other.
+   */
+  private async uploadKey(): Promise<string | null> {
+    // A blank `--auth-key` (say, from an unset variable) is no key, so it falls back to the saved login.
     const passed = this.authKey?.trim() ?? '';
     if (passed !== '') {
       return passed;
-    }
-    if (!receivesSavedLogin(apiUrl)) {
-      this.prompts.savedLoginWithheld(apiUrl);
-      return null;
     }
     // `auth logout` blanks the stored key rather than deleting the file, so the key is checked, not the file.
     const saved = (await getAuthInfo(this.configDir.toString()))?.authKey;

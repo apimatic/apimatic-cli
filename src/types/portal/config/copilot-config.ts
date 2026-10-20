@@ -57,20 +57,23 @@ function isLoopback(url: URL): boolean {
   return LOOPBACK_HOSTS.has(url.hostname);
 }
 
-/** Whether sync may send the saved APIMatic login to the service: only APIMatic's own, or one on this machine. */
-export function receivesSavedLogin(apiUrl: string): boolean {
-  const url = new URL(apiUrl);
-  const { hostname } = url;
-  return isLoopback(url) || hostname === APIMATIC_DOMAIN || hostname.endsWith(`.${APIMATIC_DOMAIN}`);
+function isApimatic(url: URL): boolean {
+  return (
+    url.protocol === 'https:' && (url.hostname === APIMATIC_DOMAIN || url.hostname.endsWith(`.${APIMATIC_DOMAIN}`))
+  );
 }
 
 // Required while there is no hosted service; once there is, default to its address and keep this as an override.
-// Plain HTTP would expose the keys in transit, so it is only accepted for a service on this machine.
+// `sync` sends the APIMatic login to this address, so it is APIMatic's own service, over HTTPS, or one on this
+// machine while developing it: no other service is offered, and none should be handed an APIMatic login.
 function serviceOrigin(value: unknown, path: string): Parsed<string> {
   const url = typeof value === 'string' && isWebAddress(value) ? new URL(value) : null;
-  return url !== null && (url.protocol === 'https:' || isLoopback(url))
+  return url !== null && (isApimatic(url) || isLoopback(url))
     ? ok(url.origin)
-    : err([`'${path}' must be the Ask AI service's address, starting with 'https://' ('http://' only for localhost).`]);
+    : err([
+        `'${path}' must be the address of APIMatic's Ask AI service, starting with 'https://' and ending in ` +
+          `'${APIMATIC_DOMAIN}', or of one on this machine, such as 'http://localhost:8787'.`
+      ]);
 }
 
 function suggestionList(value: unknown, path: string): Parsed<string[]> {

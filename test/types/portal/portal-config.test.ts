@@ -1,7 +1,6 @@
 import { expect } from 'chai';
 import { DirectoryPath } from '../../../src/types/file/directoryPath';
 import { PortalConfig } from '../../../src/types/portal/portal-config';
-import { receivesSavedLogin } from '../../../src/types/portal/config/copilot-config';
 import { SuggestedSite } from '../../../src/types/portal/config/site-config';
 
 describe('PortalConfig', () => {
@@ -400,28 +399,28 @@ describe('PortalConfig', () => {
 
       it('offers the Ask AI chat only when the block sets one up', () => {
         expect(config({}).identity().copilot).to.be.null;
-        const copilot = { key: PUBLIC_KEY, apiUrl: 'https://ask.example.com/v1' };
+        const copilot = { key: PUBLIC_KEY, apiUrl: 'https://ask.apimatic.io/v1' };
         expect(config({ ai: { copilot } }).identity().copilot).to.deep.equal({
           key: PUBLIC_KEY,
-          apiUrl: 'https://ask.example.com',
+          apiUrl: 'https://ask.apimatic.io',
           suggestions: []
         });
         expect(config({ ai: { copilot } }).toJSON().ai.copilot).to.deep.equal({
           key: PUBLIC_KEY,
-          apiUrl: 'https://ask.example.com'
+          apiUrl: 'https://ask.apimatic.io'
         });
         expect(config({}).toJSON().ai).to.not.have.property('copilot');
       });
 
       it('offers up to three starter questions, and writes them back only when set', () => {
         const suggestions = [' How do I authenticate? ', 'How do I create an order?'];
-        const copilot = { key: PUBLIC_KEY, apiUrl: 'https://ask.example.com', suggestions };
+        const copilot = { key: PUBLIC_KEY, apiUrl: 'https://ask.apimatic.io', suggestions };
         expect(config({ ai: { copilot } }).identity().copilot?.suggestions).to.deep.equal([
           'How do I authenticate?',
           'How do I create an order?'
         ]);
         expect(config({ ai: { copilot } }).toJSON().ai.copilot?.suggestions).to.have.length(2);
-        const tooMany = { key: PUBLIC_KEY, apiUrl: 'https://ask.example.com', suggestions: ['a', 'b', 'c', 'd'] };
+        const tooMany = { key: PUBLIC_KEY, apiUrl: 'https://ask.apimatic.io', suggestions: ['a', 'b', 'c', 'd'] };
         expect(errorsOf({ ai: { copilot: tooMany } })).to.deep.equal([
           "'portal.ai.copilot.suggestions' must be a list of up to 3 questions, each a non-empty string of at most 120 characters."
         ]);
@@ -430,7 +429,7 @@ describe('PortalConfig', () => {
 
       // The service validates the key and owns its design, so any non-empty key is passed through.
       it('accepts any key, whatever its layout', () => {
-        const copilot = { key: ' v2-key_Zx9 ', apiUrl: 'https://ask.example.com' };
+        const copilot = { key: ' v2-key_Zx9 ', apiUrl: 'https://ask.apimatic.io' };
         expect(config({ ai: { copilot } }).identity().copilot?.key).to.equal('v2-key_Zx9');
       });
 
@@ -438,41 +437,39 @@ describe('PortalConfig', () => {
         expect(errorsOf({ ai: { copilot: { apiUrl: 'javascript:alert(1)', extra: true } } })).to.deep.equal([
           "'portal.ai.copilot.extra' is not a 'portal' setting.",
           "'portal.ai.copilot.key' must be a non-empty string.",
-          "'portal.ai.copilot.apiUrl' must be the Ask AI service's address, starting with 'https://' ('http://' only for localhost)."
+          "'portal.ai.copilot.apiUrl' must be the address of APIMatic's Ask AI service, starting with 'https://' and ending in 'apimatic.io', or of one on this machine, such as 'http://localhost:8787'."
         ]);
         expect(errorsOf({ ai: { copilot: 'yes' } })).to.deep.equal(["'portal.ai.copilot' must be a JSON object."]);
       });
 
-      // Plain HTTP would expose the keys in transit, except to a service on this machine.
-      it('accepts plain HTTP only for a service on this machine', () => {
+      // `sync` sends the APIMatic login there, so no service but APIMatic's, or one on this machine, is accepted.
+      it("accepts only APIMatic's own service, over HTTPS, or one on this machine", () => {
         const at = (apiUrl: string) => ({ ai: { copilot: { key: PUBLIC_KEY, apiUrl } } });
-        for (const local of ['http://localhost:8787', 'http://127.0.0.1:8787', 'http://[::1]:8787']) {
-          expect(config(at(local)).identity().copilot?.apiUrl, local).to.equal(new URL(local).origin);
-        }
-        // `*.localhost` is resolved through DNS on some systems, so it may not be this machine.
-        for (const remote of ['http://ask.example.com', 'http://localhost.example.com', 'http://ask.localhost']) {
-          expect(errorsOf(at(remote)), remote).to.have.length(1);
-        }
-      });
-    });
-
-    describe('receivesSavedLogin', () => {
-      it("trusts only APIMatic's own services and those on this machine with the saved login", () => {
-        for (const trusted of [
+        for (const accepted of [
           'https://ask.apimatic.io',
           'https://apimatic.io',
+          'https://ask.staging.apimatic.io:8443',
+          'HTTPS://ASK.APIMATIC.IO',
           'http://localhost:8787',
-          'http://[::1]'
+          'https://localhost:8787',
+          'http://127.0.0.1:8787',
+          'http://[::1]:8787'
         ]) {
-          expect(receivesSavedLogin(trusted), trusted).to.be.true;
+          expect(config(at(accepted)).identity().copilot?.apiUrl, accepted).to.equal(new URL(accepted).origin);
         }
-        for (const other of [
+        for (const refused of [
           'https://ask.example.com',
-          'https://apimatic.io.example.com',
+          // Plain HTTP would expose the keys in transit.
+          'http://ask.apimatic.io',
+          'https://ask.apimatic.io.example.com',
           'https://evilapimatic.io',
-          'https://ask.localhost'
+          'https://ask.apimatic.io@evil.example',
+          'http://localhost:@evil.example/',
+          'http://localhost.example.com',
+          // `*.localhost` is resolved through DNS on some systems, so it may not be this machine.
+          'http://ask.localhost'
         ]) {
-          expect(receivesSavedLogin(other), other).to.be.false;
+          expect(errorsOf(at(refused)), refused).to.have.length(1);
         }
       });
     });

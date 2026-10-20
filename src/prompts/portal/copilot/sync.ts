@@ -11,7 +11,7 @@ import { format as f } from '../../format.js';
 import { withSpinner } from '../../prompt.js';
 import { reportSourceProblem } from '../source.js';
 
-const COPILOT_EXAMPLE = '"ai": { "copilot": { "key": "pk_…", "apiUrl": "https://…" } }';
+const COPILOT_EXAMPLE = '"ai": { "copilot": { "key": "pk_…", "apiUrl": "https://ask.apimatic.io" } }';
 
 const pages = (count: number): string => `${count} ${count === 1 ? 'page' : 'pages'}`;
 
@@ -25,15 +25,6 @@ export class PortalCopilotSyncPrompts {
     const message =
       `The portal has no Ask AI chat to sync. Add ${f.var(COPILOT_EXAMPLE)} to the ${f.var('portal')} block of ` +
       `${f.path(config)}, then generate and deploy the portal again.`;
-    log.error(message);
-  }
-
-  public savedLoginWithheld(apiUrl: string) {
-    const message =
-      `The Ask AI service at ${f.link(
-        apiUrl
-      )} is not run by APIMatic, so your saved APIMatic login is not sent to it. ` +
-      `If you trust this service, pass your auth key with ${f.flag('auth-key', '{api-key}')}.`;
     log.error(message);
   }
 

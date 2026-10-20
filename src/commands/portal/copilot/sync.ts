@@ -13,9 +13,9 @@ export default class PortalCopilotSync extends Command {
 
   static readonly description = `Uploads the pages of a generated portal to the Ask AI service, so the portal's Ask AI chat answers from the docs as they are now. Run it after deploying a portal generated with 'apimatic portal generate'.
 
-The service is set by the 'ai.copilot' setting in the 'portal' block of 'src/apimatic.json'. The pages are swapped in at once, after all of them are indexed; until then Ask AI answers from the previous ones.
+The service is set by the 'ai.copilot' setting in the 'portal' block of 'src/apimatic.json': APIMatic's Ask AI service, or one on this machine. The pages are swapped in at once, after all of them are indexed; until then Ask AI answers from the previous ones.
 
-Your saved APIMatic login is sent only to an Ask AI service APIMatic runs, or to one on this machine. For any other service, pass your auth key with --auth-key.`;
+The upload is made with your saved APIMatic login, or with the auth key passed with --auth-key.`;
 
   static readonly cmdTxt = format.cmd('apimatic', 'portal', 'copilot', 'sync');
 

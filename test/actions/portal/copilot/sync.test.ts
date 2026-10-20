@@ -28,7 +28,7 @@ const uploaded = (bundle: CopilotBundle) =>
   };
 
 const COMMAND_METADATA: CommandMetadata = { commandName: 'portal:copilot:sync', shell: 'test' };
-const COPILOT = { key: 'pk_test', apiUrl: 'https://copilot.test' };
+const COPILOT = { key: 'pk_test', apiUrl: 'https://ask.apimatic.io' };
 
 const indexed = (status: 'active' | 'superseded') => ({
   versionId: 'v-1',
@@ -190,38 +190,30 @@ describe('PortalCopilotSyncAction', () => {
     expect(prompts.indexingFailed.calledOnceWith(failed, COPILOT.apiUrl)).to.be.true;
   });
 
-  it('keeps the saved login from a service APIMatic does not run, unless a key is passed', async () => {
-    const withheld = await execute(true, null);
-
-    expect(withheld.isFailed()).to.be.true;
-    expect(prompts.savedLoginWithheld.calledOnceWith(COPILOT.apiUrl)).to.be.true;
-    expect(upload.called).to.be.false;
-
-    expect((await execute()).isSuccess()).to.be.true;
-  });
-
-  it('treats a blank --auth-key as no key, so the saved login stays withheld', async () => {
+  it('refuses, without uploading, a service APIMatic does not run', async () => {
     writeSavedLogin('saved-key');
+    writeConfig({ copilot: { ...COPILOT, apiUrl: 'https://ask.example.com' } });
 
-    for (const blank of ['', '   ']) {
-      expect((await execute(true, blank)).isFailed(), JSON.stringify(blank)).to.be.true;
-    }
-    expect(prompts.savedLoginWithheld.callCount).to.equal(2);
+    const result = await execute(true, null);
+
+    expect(result.isFailed()).to.be.true;
+    expect(prompts.sourceProblem.calledOnce).to.be.true;
     expect(upload.called).to.be.false;
   });
 
-  it("uses the saved login with APIMatic's own service and one on this machine", async () => {
+  it('uses the passed key, else the saved login, a blank --auth-key counting as none', async () => {
     writeSavedLogin('saved-key');
 
     for (const apiUrl of ['https://ask.apimatic.io', 'http://localhost:8787']) {
       writeConfig({ copilot: { ...COPILOT, apiUrl } });
 
-      expect((await execute(true, null)).isSuccess(), apiUrl).to.be.true;
-      expect((await execute(true, '')).isSuccess(), apiUrl).to.be.true;
+      for (const passed of ['passed-key', null, '', '   ']) {
+        expect((await execute(true, passed)).isSuccess(), `${apiUrl} ${JSON.stringify(passed)}`).to.be.true;
+      }
     }
-    expect(upload.args.map((args) => args[3])).to.deep.equal(Array(4).fill('saved-key'));
-    expect(awaitIndexing.args.map((args) => args[3])).to.deep.equal(Array(4).fill('saved-key'));
-    expect(prompts.savedLoginWithheld.called).to.be.false;
+    const sent = ['passed-key', 'saved-key', 'saved-key', 'saved-key'];
+    expect(upload.args.map((args) => args[3])).to.deep.equal([...sent, ...sent]);
+    expect(awaitIndexing.args.map((args) => args[3])).to.deep.equal([...sent, ...sent]);
   });
 
   it('asks the user to log in, without uploading, when no key is passed or saved', async () => {
