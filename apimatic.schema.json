@@ -189,7 +189,7 @@
                 "apiUrl": {
                   "type": "string",
                   "description": "The address of APIMatic's Ask AI service, such as 'https://ask.apimatic.io', or of one on this machine while developing it, such as 'http://localhost:8787'. The address alone, without a path.",
-                  "pattern": "^([hH][tT][tT][pP][sS]://([^/?#@\\s]+\\.)?[aA][pP][iI][mM][aA][tT][iI][cC]\\.[iI][oO]|[hH][tT][tT][pP][sS]?://([lL][oO][cC][aA][lL][hH][oO][sS][tT]|127\\.0\\.0\\.1|\\[::1\\]))(:[0-9]+)?/?$"
+                  "pattern": "^([hH][tT][tT][pP][sS]://([A-Za-z0-9_-]+\\.)*[aA][pP][iI][mM][aA][tT][iI][cC]\\.[iI][oO]|[hH][tT][tT][pP][sS]?://([lL][oO][cC][aA][lL][hH][oO][sS][tT]|127\\.0\\.0\\.1|\\[::1\\]))(:(6553[0-5]|655[0-2][0-9]|65[0-4][0-9]{2}|6[0-4][0-9]{3}|[1-5][0-9]{4}|[1-9][0-9]{0,3}|0))?/?$"
                 },
                 "suggestions": {
                   "type": "array",

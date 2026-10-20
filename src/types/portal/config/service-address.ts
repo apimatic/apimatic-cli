@@ -6,11 +6,7 @@ const APIMATIC_DOMAIN = 'apimatic.io';
 // Only names that never leave the machine: a `*.localhost` name is resolved through DNS on some systems, Windows' Node among them.
 const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
 
-/**
- * Where the Ask AI service is: APIMatic's own, over HTTPS, or one on this machine while developing it. `sync`
- * sends the APIMatic login there, so no other service is accepted. It is an origin alone: the CLI and the chat
- * add the service's own paths, such as `/v1/chat`.
- */
+/** APIMatic's own Ask AI service, or one on this machine, since `sync` sends the APIMatic login there. */
 export class ServiceAddress {
   private constructor(private readonly origin: string) {}
 
@@ -23,11 +19,11 @@ export class ServiceAddress {
           `'${APIMATIC_DOMAIN}', or of one on this machine, such as 'http://localhost:8787'.`
       ]);
     }
-    // Checked as written too: the URL parser drops an empty query or fragment.
-    if (url.username !== '' || url.password !== '' || url.pathname !== '/' || /[?#]/.test(text)) {
+    // As written, so the schema can say the same: the URL parser would rewrite `127.1`, `%2e` or an empty port.
+    if (writtenOrigin(text) !== url.origin) {
       return err([
-        `'${path}' must be the service's address alone, without a path, query or credentials, ` +
-          `for example 'https://ask.apimatic.io'.`
+        `'${path}' must be the service's address alone, written in full, without a path, query or ` +
+          `credentials, for example 'https://ask.apimatic.io'.`
       ]);
     }
     return ok(new ServiceAddress(url.origin));
@@ -40,9 +36,17 @@ export class ServiceAddress {
 }
 
 function isApimatic(url: URL): boolean {
-  return (
-    url.protocol === 'https:' && (url.hostname === APIMATIC_DOMAIN || url.hostname.endsWith(`.${APIMATIC_DOMAIN}`))
-  );
+  const labels = url.hostname.split('.');
+  return url.protocol === 'https:' && labels.slice(-2).join('.') === APIMATIC_DOMAIN && !labels.includes('');
+}
+
+/** The text as an origin reads: in lower case, without one trailing slash or the scheme's default port. */
+function writtenOrigin(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/\/$/, '')
+    .replace(/^(https:\/\/[^/]+):443$/, '$1')
+    .replace(/^(http:\/\/[^/]+):80$/, '$1');
 }
 
 function isLoopback(url: URL): boolean {

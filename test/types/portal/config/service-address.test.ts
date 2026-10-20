@@ -11,8 +11,8 @@ describe('ServiceAddress', () => {
     "'portal.ai.copilot.apiUrl' must be the address of APIMatic's Ask AI service, starting with 'https://' and " +
     "ending in 'apimatic.io', or of one on this machine, such as 'http://localhost:8787'.";
   const NOT_ALONE =
-    "'portal.ai.copilot.apiUrl' must be the service's address alone, without a path, query or credentials, " +
-    "for example 'https://ask.apimatic.io'.";
+    "'portal.ai.copilot.apiUrl' must be the service's address alone, written in full, without a path, query or " +
+    "credentials, for example 'https://ask.apimatic.io'.";
 
   describe('parse', () => {
     it("reads APIMatic's own service, over HTTPS, or one on this machine, as its origin", () => {
@@ -25,7 +25,9 @@ describe('ServiceAddress', () => {
         ['http://localhost:8787', 'http://localhost:8787'],
         ['https://localhost:8787/', 'https://localhost:8787'],
         ['http://127.0.0.1:8787', 'http://127.0.0.1:8787'],
-        ['http://[::1]:8787', 'http://[::1]:8787']
+        ['http://[::1]:8787', 'http://[::1]:8787'],
+        ['https://ask.apimatic.io:443', 'https://ask.apimatic.io'],
+        ['http://localhost:80/', 'http://localhost']
       ];
       for (const [value, origin] of cases) {
         expect(address(value).toString(), value).to.equal(origin);
@@ -39,6 +41,9 @@ describe('ServiceAddress', () => {
         'http://ask.apimatic.io',
         'https://ask.apimatic.io.example.com',
         'https://evilapimatic.io',
+        'https://.apimatic.io',
+        'https://ask..apimatic.io',
+        'http://localhost:99999',
         'https://ask.apimatic.io@evil.example',
         'http://localhost:@evil.example/',
         'http://localhost.example.com',
@@ -62,7 +67,13 @@ describe('ServiceAddress', () => {
         'https://ask.apimatic.io#',
         'https://user@ask.apimatic.io',
         'https://user:secret@ask.apimatic.io',
-        'http://localhost:8787/api'
+        'http://localhost:8787/api',
+        // Addresses the URL parser would rewrite: refused, so what is accepted is what was written.
+        'http://127.1:8787',
+        'http://[0:0::1]:8787',
+        'https://ask%2eapimatic.io',
+        'https://ask.apimatic.io:',
+        'http://localhost:08787'
       ]) {
         expect(refusal(value), value).to.deep.equal([NOT_ALONE]);
       }

@@ -79,6 +79,39 @@ describe('apimatic.schema.json', () => {
     });
   });
 
+  // Each address through both, as an editor and `portal generate` would read it.
+  it('agrees with the parser on every Ask AI service address, accepted or not', () => {
+    for (const apiUrl of [
+      'https://ask.apimatic.io',
+      'HTTPS://ASK.APIMATIC.IO:8443',
+      'https://ask.staging.apimatic.io/',
+      'https://ask.apimatic.io:443',
+      'http://localhost:8787',
+      'https://localhost:65535',
+      'http://127.0.0.1:0',
+      'http://[::1]:8787',
+      'https://ask.example.com',
+      'http://ask.apimatic.io',
+      'https://ask.apimatic.io/v1',
+      'https://user@ask.apimatic.io',
+      'http://localhost:@evil.example/',
+      'http://localhost:99999',
+      'http://localhost:65536',
+      'http://localhost:08787',
+      'https://x.y:1.apimatic.io',
+      'https://.apimatic.io',
+      'https://ask..apimatic.io',
+      'http://127.1:8787',
+      'http://[0:0::1]:8787',
+      'https://ask%2eapimatic.io',
+      'https://ask.apimatic.io:',
+      'http://ask.localhost'
+    ]) {
+      const block = { ai: { copilot: { key: 'pk_test', apiUrl } } };
+      expect(schemaVerdict({ portal: block }).valid, apiUrl).to.equal(portalAccepts(block));
+    }
+  });
+
   describe('agrees with the parser on the portal block', () => {
     const valid: [string, object][] = [
       ['an empty block', {}],
