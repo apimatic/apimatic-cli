@@ -170,6 +170,34 @@ async function typeCheck(project: DirectoryPath) {
   );
 }
 
+/** Published files naming one of these build-machine directories, in any spelling. */
+function publishedFilesNaming(output: DirectoryPath, ...directories: string[]): string[] {
+  // Three spellings of each: a bundler normalises separators either way, and a Windows
+  // path embedded in a string literal has its backslashes escaped.
+  const secrets = directories.flatMap((absolute) => {
+    const native = absolute.replace(/\//g, '\\');
+    return [native, native.replace(/\\/g, '\\\\'), absolute.replace(/\\/g, '/')];
+  });
+
+  const walk = (directory: string): string[] =>
+    fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+      const child = path.join(directory, entry.name);
+      return entry.isDirectory() ? walk(child) : [child];
+    });
+
+  return (
+    walk(output.toString())
+      // Images and fonts cannot carry a path the build put there, and reading them as text
+      // only invites a false match.
+      .filter((file) => !/\.(png|jpe?g|gif|svg|ico|woff2?)$/i.test(file))
+      .filter((file) => {
+        const content = fs.readFileSync(file, 'utf8');
+        return secrets.some((secret) => content.includes(secret));
+      })
+      .map((file) => path.relative(output.toString(), file))
+  );
+}
+
 /** The browser's scripts, by name. */
 const scriptsOf = (output: DirectoryPath) =>
   fs
@@ -281,33 +309,7 @@ const stylesheetOf = (output: DirectoryPath) => {
     expect(offenders).to.deep.equal([]);
   });
 
-  /** Published files naming one of these build-machine directories, in any spelling. */
-  const filesNaming = (...directories: string[]) => {
-    // Three spellings of each: a bundler normalises separators either way, and a Windows
-    // path embedded in a string literal has its backslashes escaped.
-    const secrets = directories.flatMap((absolute) => {
-      const native = absolute.replace(/\//g, '\\');
-      return [native, native.replace(/\\/g, '\\\\'), absolute.replace(/\\/g, '/')];
-    });
-
-    const walk = (directory: string): string[] =>
-      fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
-        const child = path.join(directory, entry.name);
-        return entry.isDirectory() ? walk(child) : [child];
-      });
-
-    return (
-      walk(portal.output().toString())
-        // Images and fonts cannot carry a path the build put there, and reading them as text
-        // only invites a false match.
-        .filter((file) => !/\.(png|jpe?g|gif|svg|ico|woff2?)$/i.test(file))
-        .filter((file) => {
-          const content = fs.readFileSync(file, 'utf8');
-          return secrets.some((secret) => content.includes(secret));
-        })
-        .map((file) => path.relative(portal.output().toString(), file))
-    );
-  };
+  const filesNaming = (...directories: string[]) => publishedFilesNaming(portal.output(), ...directories);
 
   // The `.server` split exists so the build machine's filesystem stays out of what is
   // published: `portal.server.ts` holds the absolute path of every specification, and the
@@ -1058,10 +1060,21 @@ const stylesheetOf = (output: DirectoryPath) => {
     }
   });
 
-  it('tells the browser the public key and the service, and no more', () => {
+  it('tells the browser the public key, the service and the starter questions, and no more', () => {
     const scripts = scriptsOf(portal.output());
+    // The browser imports this file whole, so what it holds is what every visitor is told.
+    const { copilot } = JSON.parse(
+      fs.readFileSync(path.join(portal.project().toString(), 'portal.identity.json'), 'utf8')
+    ) as { copilot: unknown };
 
+    expect(copilot).to.deep.equal({
+      key: 'pk_test_e2e',
+      apiUrl: 'https://ask.apimatic.io',
+      suggestions: ['How do I list pets?']
+    });
     expect(scripts.some((script) => script.text.includes('pk_test_e2e'))).to.be.true;
     expect(scripts.some((script) => script.text.includes('https://ask.apimatic.io'))).to.be.true;
+    const fixture = new DirectoryPath(process.cwd()).join('test/resources/portal-inputs/copilot/src');
+    expect(publishedFilesNaming(portal.output(), portal.project().toString(), fixture.toString())).to.deep.equal([]);
   });
 });
