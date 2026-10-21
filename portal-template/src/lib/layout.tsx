@@ -2,6 +2,7 @@ import { Suspense, useMemo, useState, type ReactNode } from 'react';
 import type * as PageTree from 'fumadocs-core/page-tree';
 import { DocsLayout as NotebookLayout } from 'fumadocs-ui/layouts/notebook';
 import type { AIChatOptions } from 'fumadocs-ui/layouts/shared';
+import { WithoutChatOnError } from '@/components/without-chat-on-error';
 import { CopilotChat } from './copilot-entry';
 import type { PortalCopilot } from './portal-types';
 import { baseOptions } from './layout.shared';
@@ -37,9 +38,11 @@ function WithChat({ chat: Chat, copilot, tree, children }: ChatProps) {
         {children}
       </Notebook>
       {/* The prerender waits for the chunk, so each page carries the chat's button. */}
-      <Suspense fallback={null}>
-        <Chat copilot={copilot} open={open} onOpenChange={setOpen} panel={panel} />
-      </Suspense>
+      <WithoutChatOnError>
+        <Suspense fallback={null}>
+          <Chat copilot={copilot} open={open} onOpenChange={setOpen} panel={panel} />
+        </Suspense>
+      </WithoutChatOnError>
     </>
   );
 }
