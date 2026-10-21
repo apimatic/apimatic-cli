@@ -6,7 +6,7 @@ import { ConflictKind, MergePlan } from '../../../src/application/sdk-merge/merg
 import { SdkWritePrompts } from '../../../src/prompts/sdk/write.js';
 import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
 import { RelativeFilePath } from '../../../src/types/file/relativeFilePath.js';
-import { SdkRepository } from '../../../src/types/sdk/sdk-repository.js';
+import { SdkRepositoryContext } from '../../../src/types/sdk-repository-context.js';
 
 const rel = (value: string) => RelativeFilePath.fromGit(value);
 
@@ -32,7 +32,7 @@ const plan = (
 
 describe('SdkWritePrompts.sdkMerged', () => {
   const root = new DirectoryPath(process.cwd());
-  const sdk = SdkRepository.create(root, root.join('sdk', 'typescript'))!;
+  const sdk = SdkRepositoryContext.create(root, root.join('sdk', 'typescript'))!;
 
   afterEach(() => {
     sinon.restore();

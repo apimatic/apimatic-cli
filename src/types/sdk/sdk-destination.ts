@@ -1,5 +1,5 @@
 import { CommitId } from './commit-id.js';
-import { SdkRepository } from './sdk-repository.js';
+import { SdkRepositoryContext } from '../sdk-repository-context.js';
 
 /**
  * How a run will write the SDK directory, decided before anything is uploaded: replaced as
@@ -8,5 +8,5 @@ import { SdkRepository } from './sdk-repository.js';
  */
 export type SdkDestination =
   | { kind: 'overwrite'; zip: boolean }
-  | { kind: 'record'; repository: SdkRepository | undefined }
-  | { kind: 'merge'; repository: SdkRepository; base: CommitId };
+  | { kind: 'record'; repository: SdkRepositoryContext | undefined }
+  | { kind: 'merge'; repository: SdkRepositoryContext; base: CommitId };

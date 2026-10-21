@@ -1,5 +1,4 @@
 import { GitService } from '../../infrastructure/git-service.js';
-import { PristineStoreService } from '../../infrastructure/pristine-store-service.js';
 import { SdkPreparePrompts } from '../../prompts/sdk/prepare.js';
 import { SdkContext } from '../../types/sdk-context.js';
 import { SdkGeneration } from '../../types/sdk/generation-record.js';
@@ -13,7 +12,6 @@ import { ActionResult } from '../action-result.js';
 export class SdkPrepareAction {
   private readonly prompts = new SdkPreparePrompts();
   private readonly git = new GitService();
-  private readonly store = new PristineStoreService();
 
   public readonly execute = async (
     sdkContext: SdkContext,
@@ -51,8 +49,11 @@ export class SdkPrepareAction {
       return ActionResult.success<SdkDestination>({ kind: 'overwrite', zip: false });
     }
 
-    const sdk = sdkContext.directory();
-    const state = await this.store.inspect(sdk, generation);
+    const repository = await sdkContext.repository();
+    if (repository === undefined) {
+      return ActionResult.success<SdkDestination>({ kind: 'record', repository });
+    }
+    const state = await repository.inspect(generation);
     if (state.isErr()) {
       if (state.error.kind === 'nestedSdkDirectory') {
         this.prompts.nestedSdkDirectory(state.error.reason);
@@ -62,25 +63,19 @@ export class SdkPrepareAction {
       return ActionResult.failed();
     }
     switch (state.value.kind) {
-      case 'noRepository':
-        return ActionResult.success<SdkDestination>({ kind: 'record', repository: undefined });
       case 'noRecord':
-        return ActionResult.success<SdkDestination>({ kind: 'record', repository: state.value.repository });
+        return ActionResult.success<SdkDestination>({ kind: 'record', repository });
       case 'otherGeneration':
-        this.prompts.recordNotForThisGeneration(state.value.recorded, generation, sdk);
-        return ActionResult.success<SdkDestination>({ kind: 'record', repository: state.value.repository });
+        this.prompts.recordNotForThisGeneration(state.value.recorded, generation, sdkContext.directory());
+        return ActionResult.success<SdkDestination>({ kind: 'record', repository });
       case 'snapshotMissing':
-        this.prompts.snapshotMissing(state.value.commit, state.value.repository);
-        return ActionResult.success<SdkDestination>({ kind: 'record', repository: state.value.repository });
+        this.prompts.snapshotMissing(state.value.commit, repository);
+        return ActionResult.success<SdkDestination>({ kind: 'record', repository });
       case 'unresolved':
-        this.prompts.conflictsUnresolved(state.value.paths, state.value.repository);
+        this.prompts.conflictsUnresolved(state.value.paths, repository);
         return ActionResult.failed();
       case 'ready':
-        return ActionResult.success<SdkDestination>({
-          kind: 'merge',
-          repository: state.value.repository,
-          base: state.value.base
-        });
+        return ActionResult.success<SdkDestination>({ kind: 'merge', repository, base: state.value.base });
     }
   }
 }

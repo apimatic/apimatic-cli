@@ -6,7 +6,7 @@ import { Buffer } from 'node:buffer';
 import { expect } from 'chai';
 import { MergePlan } from '../../src/application/sdk-merge/merge-plan.js';
 import { GitService } from '../../src/infrastructure/git-service.js';
-import { PristineStoreService } from '../../src/infrastructure/pristine-store-service.js';
+import { SdkContext } from '../../src/types/sdk-context.js';
 import { DirectoryPath } from '../../src/types/file/directoryPath.js';
 import { CodeGenerationVersion, Language, Stability } from '../../src/types/sdk/generate.js';
 import { SdkGeneration } from '../../src/types/sdk/generation-record.js';
@@ -63,12 +63,10 @@ const counts = (plan: MergePlan) =>
 
 const rel = (value: string) => RelativeFilePath.fromGit(value);
 
-describe('PristineStoreService: the merge', () => {
+describe('SdkRepositoryContext: the merge', () => {
   let root: string;
   let counter = 0;
   const git = new GitService();
-  const store = new PristineStoreService();
-  const service = store;
 
   const write = (directory: DirectoryPath, files: Files) => {
     for (const [relative, contents] of Object.entries(files)) {
@@ -83,7 +81,7 @@ describe('PristineStoreService: the merge', () => {
     const sdk = project.join('sdk', 'typescript');
     fs.mkdirSync(sdk.toString(), { recursive: true });
     await git.init(project);
-    const repository = (await store.findRepository(sdk))!;
+    const repository = (await new SdkContext(Language.TYPESCRIPT, project.join('sdk')).repository())!;
     const baseDirectory = new DirectoryPath(path.join(root, `base-${counter}`));
     const generatedDirectory = new DirectoryPath(path.join(root, `generated-${counter}`));
     fs.mkdirSync(baseDirectory.toString());
@@ -92,17 +90,13 @@ describe('PristineStoreService: the merge', () => {
     write(sdk, disk);
     write(generatedDirectory, generated);
     const baseCommit = (
-      await store.recordPristine(
-        repository,
-        (await store.snapshotGenerated(repository, baseDirectory))._unsafeUnwrap(),
-        TYPESCRIPT
-      )
+      await repository.recordPristine((await repository.snapshotGenerated(baseDirectory))._unsafeUnwrap(), TYPESCRIPT)
     )._unsafeUnwrap();
-    const diskTree = (await store.snapshotDisk(repository, baseCommit))._unsafeUnwrap();
-    const generatedTree = (await store.snapshotGenerated(repository, generatedDirectory))._unsafeUnwrap();
+    const diskTree = (await repository.snapshotDisk(baseCommit))._unsafeUnwrap();
+    const generatedTree = (await repository.snapshotGenerated(generatedDirectory))._unsafeUnwrap();
 
-    const { plan } = (await service.merge(repository, baseCommit, diskTree, generatedTree))._unsafeUnwrap();
-    (await service.apply(repository, plan))._unsafeUnwrap();
+    const { plan } = (await repository.merge(baseCommit, diskTree, generatedTree))._unsafeUnwrap();
+    (await repository.apply(plan))._unsafeUnwrap();
 
     const at = (relative: string) => path.join(sdk.toString(), relative);
     const list = (directory: string): string[] =>
@@ -126,7 +120,7 @@ describe('PristineStoreService: the merge', () => {
   };
 
   beforeEach(() => {
-    root = fs.mkdtempSync(path.join(os.tmpdir(), 'pristine-store-merge-'));
+    root = fs.mkdtempSync(path.join(os.tmpdir(), 'sdk-repository-merge-'));
   });
 
   afterEach(() => {

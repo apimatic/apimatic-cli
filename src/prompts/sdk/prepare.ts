@@ -4,7 +4,7 @@ import { RelativeFilePath } from '../../types/file/relativeFilePath.js';
 import { CommitId } from '../../types/sdk/commit-id.js';
 import { describeGeneration, SdkGeneration } from '../../types/sdk/generation-record.js';
 import { GitVersion } from '../../types/sdk/git-version.js';
-import { SdkRepository } from '../../types/sdk/sdk-repository.js';
+import { SdkRepositoryContext } from '../../types/sdk-repository-context.js';
 import { SnapshotRef } from '../../types/sdk/snapshot-ref.js';
 import { format as f } from '../format.js';
 
@@ -52,7 +52,7 @@ export class SdkPreparePrompts {
     log.warn(message);
   }
 
-  public snapshotMissing(commit: CommitId, repository: SdkRepository) {
+  public snapshotMissing(commit: CommitId, repository: SdkRepositoryContext) {
     const refs = `'${SnapshotRef.pristineNamespace()}/*:${SnapshotRef.pristineNamespace()}/*'`;
     const message =
       `The snapshot this SDK was generated from, commit ${f.var(commit.toString())}, is not in the repository at ` +
@@ -63,7 +63,7 @@ export class SdkPreparePrompts {
     log.warn(message);
   }
 
-  public conflictsUnresolved(paths: readonly RelativeFilePath[], repository: SdkRepository) {
+  public conflictsUnresolved(paths: readonly RelativeFilePath[], repository: SdkRepositoryContext) {
     const one = paths.length === 1;
     const message =
       `${plural(paths.length, 'file')} still hold${one ? 's' : ''} conflict markers from the last run. ` +

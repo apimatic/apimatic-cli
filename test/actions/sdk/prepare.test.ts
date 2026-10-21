@@ -8,7 +8,6 @@ import { err } from 'neverthrow';
 import sinon from 'sinon';
 import { SdkPrepareAction } from '../../../src/actions/sdk/prepare.js';
 import { GitService } from '../../../src/infrastructure/git-service.js';
-import { PristineStoreService } from '../../../src/infrastructure/pristine-store-service.js';
 import { SdkPreparePrompts } from '../../../src/prompts/sdk/prepare.js';
 import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
 import { SdkContext } from '../../../src/types/sdk-context.js';
@@ -16,7 +15,7 @@ import { CommitId } from '../../../src/types/sdk/commit-id.js';
 import { CodeGenerationVersion, Language, Stability } from '../../../src/types/sdk/generate.js';
 import { GenerationRecord, SdkGeneration } from '../../../src/types/sdk/generation-record.js';
 import { GitVersion } from '../../../src/types/sdk/git-version.js';
-import { SdkRepository } from '../../../src/types/sdk/sdk-repository.js';
+import { SdkRepositoryContext } from '../../../src/types/sdk-repository-context.js';
 
 const STABLE: SdkGeneration = {
   language: Language.PYTHON,
@@ -31,7 +30,6 @@ describe('SdkPrepareAction', () => {
   let root: string;
   let sdkContext: SdkContext;
   const git = new GitService();
-  const store = new PristineStoreService();
 
   const execute = (options: { force?: boolean; zip?: boolean; generation?: SdkGeneration } = {}) =>
     new SdkPrepareAction().execute(
@@ -49,14 +47,14 @@ describe('SdkPrepareAction', () => {
   };
 
   /** A recorded generation of `files`, so the directory has a base; `conflicts` as the last run left them. */
-  const recorded = async (files: Record<string, string>, conflicts: string[] = []): Promise<SdkRepository> => {
+  const recorded = async (files: Record<string, string>, conflicts: string[] = []): Promise<SdkRepositoryContext> => {
     for (const [relative, contents] of Object.entries(files)) {
       write(relative, contents);
     }
     await git.init(new DirectoryPath(root));
-    const repository = (await store.findRepository(sdk()))!;
-    const tree = (await store.snapshotGenerated(repository, sdk()))._unsafeUnwrap();
-    (await store.recordGeneration(repository, tree, STABLE, '0.0.0', conflicts.map(rel)))._unsafeUnwrap();
+    const repository = (await sdkContext.repository())!;
+    const tree = (await repository.snapshotGenerated(sdk()))._unsafeUnwrap();
+    (await repository.recordGeneration(tree, STABLE, '0.0.0', conflicts.map(rel)))._unsafeUnwrap();
     return repository;
   };
 
@@ -130,8 +128,8 @@ describe('SdkPrepareAction', () => {
     const sh = (cwd: string, ...args: string[]) =>
       execa('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...args], { cwd });
     try {
-      await recorded({ 'README.md': '# sdk' });
-      const base = (await store.readRecord(sdk()))!.pristineCommit();
+      const repository = await recorded({ 'README.md': '# sdk' });
+      const base = (await repository.readRecord())!.pristineCommit();
       await sh(root, 'add', '.');
       await sh(root, 'commit', '-qm', 'sdk');
       await sh(root, 'init', '-q', '--bare', remote);
@@ -165,7 +163,7 @@ describe('SdkPrepareAction', () => {
 
     expect(destination.kind).to.equal('merge');
     expect(destination.kind === 'merge' && destination.repository.root().isEqual(repository.root())).to.be.true;
-    expect(destination.kind === 'merge' && destination.base.isEqual((await store.readRecord(sdk()))!.pristineCommit()))
+    expect(destination.kind === 'merge' && destination.base.isEqual((await repository.readRecord())!.pristineCommit()))
       .to.be.true;
     expect(overwriteSdk.called).to.be.false;
   });
@@ -189,7 +187,8 @@ describe('SdkPrepareAction', () => {
   });
 
   it('reports a directory git could not inspect', async () => {
-    sinon.stub(PristineStoreService.prototype, 'inspect').resolves(err({ kind: 'gitFailed', reason: 'git broke' }));
+    await git.init(new DirectoryPath(root));
+    sinon.stub(SdkRepositoryContext.prototype, 'inspect').resolves(err({ kind: 'gitFailed', reason: 'git broke' }));
     const notInspected = sinon.stub(SdkPreparePrompts.prototype, 'directoryNotInspected');
 
     expect((await execute()).isFailed()).to.be.true;

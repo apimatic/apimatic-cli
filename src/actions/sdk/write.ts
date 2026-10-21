@@ -1,15 +1,14 @@
 import { err, ok, Result } from 'neverthrow';
 import { MergePlan } from '../../application/sdk-merge/merge-plan.js';
 import { envInfo } from '../../infrastructure/env-info.js';
-import { PristineStoreProblem, PristineStoreService } from '../../infrastructure/pristine-store-service.js';
 import { SdkWritePrompts } from '../../prompts/sdk/write.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { RelativeFilePath } from '../../types/file/relativeFilePath.js';
 import { SdkContext } from '../../types/sdk-context.js';
+import { SdkRepositoryContext, SdkRepositoryProblem } from '../../types/sdk-repository-context.js';
 import { CommitId } from '../../types/sdk/commit-id.js';
 import { SdkGeneration } from '../../types/sdk/generation-record.js';
 import { SdkDestination } from '../../types/sdk/sdk-destination.js';
-import { SdkRepository } from '../../types/sdk/sdk-repository.js';
 import { TreeId } from '../../types/sdk/tree-id.js';
 import { ActionResult } from '../action-result.js';
 
@@ -18,7 +17,6 @@ const MERGE_NEEDS_RESOLVING = 'Resolve the conflicts and rerun';
 /** Writes a freshly generated SDK into its directory the way the destination was prepared for. */
 export class SdkWriteAction {
   private readonly prompts = new SdkWritePrompts();
-  private readonly store = new PristineStoreService();
 
   public readonly execute = async (
     destination: SdkDestination,
@@ -49,13 +47,13 @@ export class SdkWriteAction {
   // The repository is made once the generation has succeeded, so a failed one leaves none behind,
   // and before the write, which the generator's output cannot collide with.
   private async overwriteAndRecord(
-    enclosing: SdkRepository | undefined,
+    enclosing: SdkRepositoryContext | undefined,
     sdkContext: SdkContext,
     tempSdk: DirectoryPath,
     generation: SdkGeneration
   ): Promise<ActionResult> {
     const sdk = sdkContext.directory();
-    const repository = enclosing === undefined ? await this.store.initRepository(sdk) : ok(enclosing);
+    const repository = enclosing === undefined ? await sdkContext.initRepository() : ok(enclosing);
     if (repository.isErr()) {
       return this.customCodeFailed(repository.error);
     }
@@ -67,36 +65,36 @@ export class SdkWriteAction {
     if (enclosing === undefined) {
       this.prompts.repositoryInitialised(sdk);
     }
-    const generated = await this.store.snapshotGenerated(repository.value, tempSdk);
+    const generated = await repository.value.snapshotGenerated(tempSdk);
     await this.record(repository.value, generated, generation, []);
     this.prompts.sdkGenerated(sdk);
     return ActionResult.success();
   }
 
   private async merge(
-    repository: SdkRepository,
+    repository: SdkRepositoryContext,
     base: CommitId,
     tempSdk: DirectoryPath,
     generation: SdkGeneration
   ): Promise<ActionResult<void, MergePlan>> {
-    const generated = await this.store.snapshotGenerated(repository, tempSdk);
+    const generated = await repository.snapshotGenerated(tempSdk);
     if (generated.isErr()) {
       return this.customCodeFailed(generated.error);
     }
-    const previous = await this.store.savePrevious(repository, base);
+    const previous = await repository.savePrevious(base);
     if (previous.isErr()) {
       return this.customCodeFailed(previous.error);
     }
-    const disk = await this.store.snapshotDisk(repository, base);
+    const disk = await repository.snapshotDisk(base);
     if (disk.isErr()) {
       return this.customCodeFailed(disk.error);
     }
-    const merged = await this.store.merge(repository, base, disk.value, generated.value);
+    const merged = await repository.merge(base, disk.value, generated.value);
     if (merged.isErr()) {
       return this.customCodeFailed(merged.error);
     }
     const { plan } = merged.value;
-    const applied = await this.store.apply(repository, plan);
+    const applied = await repository.apply(plan);
     if (applied.isErr()) {
       return this.customCodeFailed(applied.error);
     }
@@ -105,7 +103,7 @@ export class SdkWriteAction {
     if (!plan.hasConflicts()) {
       return ActionResult.success();
     }
-    const staged = await this.store.stageConflicts(repository, merged.value);
+    const staged = await repository.stageConflicts(merged.value);
     if (staged.isErr()) {
       this.prompts.conflictsNotStaged(staged.error.reason);
     }
@@ -121,13 +119,13 @@ export class SdkWriteAction {
   // The SDK is already on disk when this runs, so a failure here is a warning: the next run
   // asks before replacing it, as it would any directory without a record.
   private async record(
-    repository: SdkRepository,
-    generated: Result<TreeId, PristineStoreProblem>,
+    repository: SdkRepositoryContext,
+    generated: Result<TreeId, SdkRepositoryProblem>,
     generation: SdkGeneration,
     conflicts: readonly RelativeFilePath[]
   ): Promise<void> {
     const recorded = await generated.match(
-      (tree) => this.store.recordGeneration(repository, tree, generation, envInfo.getCLIVersion(), conflicts),
+      (tree) => repository.recordGeneration(tree, generation, envInfo.getCLIVersion(), conflicts),
       async (problem) => err(problem)
     );
     if (recorded.isErr()) {

@@ -3,7 +3,7 @@ import { Conflict, ConflictKind, MergeFiles, MergePlan } from '../../application
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { RelativeFilePath } from '../../types/file/relativeFilePath.js';
 import { SdkSaveProblem } from '../../types/sdk-context.js';
-import { SdkRepository } from '../../types/sdk/sdk-repository.js';
+import { SdkRepositoryContext } from '../../types/sdk-repository-context.js';
 import { listedInProse } from '../../utils/string-utils.js';
 import { format as f } from '../format.js';
 import { noteWrapped } from '../prompt.js';
@@ -28,7 +28,7 @@ const YOUR_FILES: Readonly<Partial<Record<keyof MergeFiles, string>>> = {
 
 const plural = (count: number, noun: string) => `${count} ${noun}${count === 1 ? '' : 's'}`;
 
-const listed = (repository: SdkRepository, paths: readonly RelativeFilePath[]) =>
+const listed = (repository: SdkRepositoryContext, paths: readonly RelativeFilePath[]) =>
   paths.map((relative) => `  ${f.relativePath(relative.in(repository.sdkDirectory()))}`);
 
 export class SdkWritePrompts {
@@ -65,7 +65,7 @@ export class SdkWritePrompts {
     log.warn(message);
   }
 
-  public sdkMerged(repository: SdkRepository, plan: MergePlan) {
+  public sdkMerged(repository: SdkRepositoryContext, plan: MergePlan) {
     const generated = GENERATOR_FILES.filter((kind) => plan.files[kind].length > 0).map(
       (kind) => `${plural(plan.files[kind].length, 'file')} ${kind}`
     );
@@ -82,7 +82,7 @@ export class SdkWritePrompts {
     log.info(lines.join('\n'));
   }
 
-  public conflicts(conflicts: readonly Conflict[], repository: SdkRepository) {
+  public conflicts(conflicts: readonly Conflict[], repository: SdkRepositoryContext) {
     const lines = conflicts.map(
       (conflict) =>
         `${f.relativePath(conflict.path.in(repository.sdkDirectory()))}\n  ${

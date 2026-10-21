@@ -2,7 +2,6 @@ import { RelativeFilePath } from '../../../src/types/file/relativeFilePath.js';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { TextDecoder } from 'node:util';
 import { expect } from 'chai';
 import { execa } from 'execa';
 import { err } from 'neverthrow';
@@ -10,7 +9,6 @@ import sinon from 'sinon';
 import { SdkWriteAction } from '../../../src/actions/sdk/write.js';
 import { GENERATED_MARKER, YOURS_MARKER } from '../../../src/application/sdk-merge/markers.js';
 import { GitService } from '../../../src/infrastructure/git-service.js';
-import { PristineStoreService } from '../../../src/infrastructure/pristine-store-service.js';
 import { ZipService } from '../../../src/infrastructure/zip-service.js';
 import { SdkWritePrompts } from '../../../src/prompts/sdk/write.js';
 import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
@@ -19,7 +17,8 @@ import { CommitId } from '../../../src/types/sdk/commit-id.js';
 import { CodeGenerationVersion, Language, Stability } from '../../../src/types/sdk/generate.js';
 import { GenerationRecord, SdkGeneration } from '../../../src/types/sdk/generation-record.js';
 import { SdkDestination } from '../../../src/types/sdk/sdk-destination.js';
-import { SdkRepository } from '../../../src/types/sdk/sdk-repository.js';
+import { SdkRepositoryContext } from '../../../src/types/sdk-repository-context.js';
+import { snapshotFiles } from '../../helpers/snapshots.js';
 import { SnapshotRef } from '../../../src/types/sdk/snapshot-ref.js';
 
 const STABLE: SdkGeneration = {
@@ -51,7 +50,6 @@ describe('SdkWriteAction', () => {
   let sdkContext: SdkContext;
   let generations = 0;
   const git = new GitService();
-  const store = new PristineStoreService();
 
   const sdk = () => new DirectoryPath(path.join(root, 'sdk', 'python'));
   const at = (relative: string) => path.join(sdk().toString(), relative);
@@ -73,12 +71,12 @@ describe('SdkWriteAction', () => {
     new SdkWriteAction().execute(destination, sdkContext, generated(files), STABLE);
 
   /** A first generation of `files`, written and recorded into the project's repository. */
-  const recorded = async (files: Files): Promise<{ repository: SdkRepository; base: CommitId }> => {
+  const recorded = async (files: Files): Promise<{ repository: SdkRepositoryContext; base: CommitId }> => {
     write(sdk(), files);
     await git.init(new DirectoryPath(root));
-    const repository = (await store.findRepository(sdk()))!;
-    const tree = (await store.snapshotGenerated(repository, generated(files)))._unsafeUnwrap();
-    const written = (await store.recordGeneration(repository, tree, STABLE, '0.0.0', []))._unsafeUnwrap();
+    const repository = (await sdkContext.repository())!;
+    const tree = (await repository.snapshotGenerated(generated(files)))._unsafeUnwrap();
+    const written = (await repository.recordGeneration(tree, STABLE, '0.0.0', []))._unsafeUnwrap();
     return { repository, base: written.pristineCommit() };
   };
 
@@ -134,15 +132,15 @@ describe('SdkWriteAction', () => {
       const pristine = (await git.resolveRef(sdk(), SnapshotRef.pristine('')))!;
       expect(record().pristineCommit().isEqual(pristine)).to.be.true;
       expect(record().isFor(STABLE)).to.be.true;
-      const repository = (await store.findRepository(sdk()))!;
-      const files = (await store.readSnapshot(repository, pristine))._unsafeUnwrap();
+      const repository = (await sdkContext.repository())!;
+      const files = await snapshotFiles(repository.root(), pristine);
       expect([...files.keys()]).to.have.members(['README.md', 'a.py']);
     });
 
     it('records into the enclosing repository under the SDK directory’s ref, keeping what was there out of it', async () => {
       write(sdk(), { 'old.py': 'old' });
       await git.init(new DirectoryPath(root));
-      const repository = (await store.findRepository(sdk()))!;
+      const repository = (await sdkContext.repository())!;
       const repositoryInitialised = sinon.stub(SdkWritePrompts.prototype, 'repositoryInitialised');
 
       expect((await execute({ kind: 'record', repository }, { 'README.md': '# sdk' })).isSuccess()).to.be.true;
@@ -156,7 +154,7 @@ describe('SdkWriteAction', () => {
 
     it('still succeeds, with a warning, when the snapshot cannot be recorded', async () => {
       sinon
-        .stub(PristineStoreService.prototype, 'recordGeneration')
+        .stub(SdkRepositoryContext.prototype, 'recordGeneration')
         .resolves(err({ kind: 'gitFailed', reason: 'git broke' }));
       const snapshotNotRecorded = sinon.stub(SdkWritePrompts.prototype, 'snapshotNotRecorded');
 
@@ -198,8 +196,8 @@ describe('SdkWriteAction', () => {
       expect(record().hasConflicts()).to.be.false;
       expect((await git.describe(repository.root(), record().pristineCommit())).parents).to.deep.equal([base]);
       const previous = (await git.resolveRef(repository.root(), repository.previousRef()))!;
-      const kept = (await store.readSnapshot(repository, previous))._unsafeUnwrap();
-      expect(new TextDecoder().decode(kept.get('models/book.py'))).to.equal(DECORATED + MODEL_V1);
+      const kept = await snapshotFiles(repository.root(), previous);
+      expect(kept.get('models/book.py')).to.equal(DECORATED + MODEL_V1);
     });
 
     it('writes markers where you and the generator changed the same lines, lists the file and fails', async () => {
@@ -234,7 +232,7 @@ describe('SdkWriteAction', () => {
       const { repository, base } = await recorded({ 'README.md': '# sdk', 'models/book.py': MODEL_V1 });
       write(sdk(), { 'models/book.py': MODEL_V1_EDITED });
       sinon
-        .stub(PristineStoreService.prototype, 'stageConflicts')
+        .stub(SdkRepositoryContext.prototype, 'stageConflicts')
         .resolves(err({ kind: 'gitFailed', reason: 'index locked' }));
       const conflictsNotStaged = sinon.stub(SdkWritePrompts.prototype, 'conflictsNotStaged');
       const conflicts = sinon.stub(SdkWritePrompts.prototype, 'conflicts');
@@ -252,7 +250,7 @@ describe('SdkWriteAction', () => {
       const { repository, base } = await recorded({ 'README.md': '# sdk' });
       write(sdk(), { 'README.md': '# edited' });
       sinon
-        .stub(PristineStoreService.prototype, 'savePrevious')
+        .stub(SdkRepositoryContext.prototype, 'savePrevious')
         .resolves(err({ kind: 'gitFailed', reason: 'git broke' }));
       const customCodeFailed = sinon.stub(SdkWritePrompts.prototype, 'customCodeFailed');
 

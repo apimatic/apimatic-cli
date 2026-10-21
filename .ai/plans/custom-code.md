@@ -161,7 +161,7 @@ directory. `SdkPrepareAction` runs before the upload and returns an `SdkDestinat
 1. `--zip` takes today's path entirely: `overwrite`.
 2. `git --version`. Absent, or older than 2.38: warn that customizations will not persist;
    `overwrite`, writing no `.git` and no `.apimatic/`.
-3. `PristineStoreService.inspect` gathers the facts: the enclosing repository (from the
+3. `SdkContext.repository()` finds the enclosing repository (from the
    nearest existing ancestor, since a first run's directory is not there yet), the nesting
    check, the record, whether its commit is present, and which listed files still hold
    markers. A nested SDK directory is refused here.
@@ -275,16 +275,16 @@ The eleven Speakeasy runs from the lab notebook, plus three the lab did not cove
 | 14 | Fresh clone, regenerate | fails unless the hidden refs were pushed | merges if the team pushed and fetched the refs; otherwise a clear message with the commands and the overwrite question |
 
 Every row of section 5 and this table is a test over real repositories in
-`test/infrastructure/pristine-store-merge.test.ts`, `test/actions/sdk/prepare.test.ts` (row 14 with
+`test/types/sdk-repository-context-merge.test.ts`, `test/actions/sdk/prepare.test.ts` (row 14 with
 a bare remote) and `test/actions/sdk/write.test.ts`.
 
 ## 8. Phases, as delivered
 
 | Phase | Commit | What |
 |---|---|---|
-| 1 | `db3fe9f2`, reworked in `185e0663` | `GitService` (the system git through `execa`, every call with the 3.3 settings) and `PristineStoreService` with the value objects: repository, refs, commit and tree ids, git version, generation record. |
-| 2 | `185e0663` | The merge (since folded into `PristineStoreService`): the temporary commits, `merge-tree --write-tree -z`, the diffs; `src/application/sdk-merge/` keeps only what is pure: parsing merge-tree's output, the conflict kinds, marker relabelling, `MergePlan`. |
-| 3 | `4d5b9ccf` | `SdkPrepareAction`, `SdkDestination`, `SdkWriteAction`, their prompts, `PristineStoreService.inspect`; `GenerateAction` back to validation and generation; `SdkContext.save` keeps `.git`. |
+| 1 | `db3fe9f2`, reworked in `185e0663` | `GitService` (the system git through `execa`, every call with the 3.3 settings) and the pristine store (since the `SdkRepositoryContext`) with the value objects: refs, commit and tree ids, git version, generation record. |
+| 2 | `185e0663` | The merge (since moved onto `SdkRepositoryContext`): the temporary commits, `merge-tree --write-tree -z`, the diffs; `src/application/sdk-merge/` keeps only what is pure: parsing merge-tree's output, the conflict kinds, marker relabelling, `MergePlan`. |
+| 3 | `4d5b9ccf` | `SdkPrepareAction`, `SdkDestination`, `SdkWriteAction`, their prompts, the repository's `inspect`; `GenerateAction` back to validation and generation; `SdkContext.save` keeps `.git`. |
 | 4, 5 | `87453917` | The missing-snapshot message with the push and fetch commands; `stageConflicts` through `update-index --index-info`; `SdkMergeConflictedEvent`. |
 | 6 | this file | `CONTEXT.md` terms, the README section and requirement, the command description. |
 
@@ -295,11 +295,11 @@ PR into `dev`, squash-merged, title `feat(sdk): keep your edits when regeneratin
 | File | Role |
 |---|---|
 | `src/infrastructure/git-service.ts` | the system git behind every snapshot, the merge and the index staging |
-| `src/infrastructure/pristine-store-service.ts` | snapshots, the record, `inspect`, the merge, its application to disk, the staging |
+| `src/types/sdk-repository-context.ts` | the SDK directory with its repository: snapshots, the record, `inspect`, the merge, its application to disk, the staging |
 | `src/application/sdk-merge/*.ts` | pure: merge-tree output, conflict kinds, markers, `MergePlan` |
-| `src/types/sdk/{sdk-repository,snapshot-ref,commit-id,tree-id,git-version,generation-record,sdk-destination,snapshot-files}.ts` | value objects |
+| `src/types/sdk/{snapshot-ref,commit-id,tree-id,git-version,generation-record,sdk-destination}.ts`, `src/types/file/relativeFilePath.ts` | value objects |
 | `src/actions/sdk/{generate,prepare,write}.ts`, `src/prompts/sdk/{generate,prepare,write}.ts` | the run |
-| `src/types/sdk-context.ts` | `directory()`, save keeps `.git` |
+| `src/types/sdk-context.ts` | `directory()`, `repository()`, `initRepository()`, save keeps `.git` |
 | `src/types/events/sdk-merge-conflicted.ts`, `src/commands/sdk/generate.ts` | the conflict event |
 | `test/…` | mirrors each file above |
 
