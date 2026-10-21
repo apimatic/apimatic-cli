@@ -32,14 +32,13 @@ describe('GenerateAction (sdk)', () => {
   let sdkArchive: Buffer;
   let generateSdk: sinon.SinonStub;
 
-  const execute = (options: { zip?: boolean; force?: boolean } = {}) =>
+  const execute = (options: { force?: boolean } = {}) =>
     new GenerateAction(new DirectoryPath(root), COMMAND_METADATA, 'auth-key').execute(
       ProjectContext.in(new DirectoryPath(root)),
       sdkDirectory,
       Language.PYTHON,
       Stability.STABLE,
-      options.force ?? true,
-      options.zip ?? false
+      options.force ?? true
     );
 
   const sdk = () => sdkDirectory.join('python');
@@ -87,27 +86,6 @@ describe('GenerateAction (sdk)', () => {
     const problem = sdkNotUnzipped.firstCall.args[0];
     expect(problem.kind).to.equal('unzipFailed');
     expect(problem.reason).to.not.be.empty;
-  });
-
-  it('reports an SDK it could not save, naming its language directory', async () => {
-    const archive = sinon.stub(ZipService.prototype, 'archive').callThrough();
-    archive.onSecondCall().resolves(err('ENOSPC: no space left on device, write'));
-    const sdkNotSaved = sinon.stub(SdkWritePrompts.prototype, 'sdkNotSaved');
-    const sdkGenerated = sinon.stub(SdkWritePrompts.prototype, 'sdkGenerated');
-
-    expect((await execute({ zip: true })).isFailed()).to.be.true;
-    expect(sdkNotSaved.firstCall.args[0]).to.deep.equal({
-      kind: 'zipFailed',
-      reason: 'ENOSPC: no space left on device, write',
-      sdkDirectory: sdk()
-    });
-    expect(sdkGenerated.called).to.be.false;
-  });
-
-  it('writes a zip and nothing else with --zip', async () => {
-    expect((await execute({ zip: true })).isSuccess()).to.be.true;
-
-    expect(fs.readdirSync(sdk().toString())).to.deep.equal(['python.zip']);
   });
 
   it('stops before generating when the developer declines to overwrite', async () => {

@@ -31,13 +31,8 @@ describe('SdkPrepareAction', () => {
   let sdkContext: SdkContext;
   const git = new GitService();
 
-  const execute = (options: { force?: boolean; zip?: boolean; generation?: SdkGeneration } = {}) =>
-    new SdkPrepareAction().execute(
-      sdkContext,
-      options.generation ?? STABLE,
-      options.force ?? true,
-      options.zip ?? false
-    );
+  const execute = (options: { force?: boolean; generation?: SdkGeneration } = {}) =>
+    new SdkPrepareAction().execute(sdkContext, options.generation ?? STABLE, options.force ?? true);
 
   const sdk = () => new DirectoryPath(path.join(root, 'sdk', 'python'));
   const write = (relative: string, contents: string) => {
@@ -68,13 +63,6 @@ describe('SdkPrepareAction', () => {
     fs.rmSync(root, { recursive: true, force: true });
   });
 
-  it('writes a zip without consulting git', async () => {
-    const version = sinon.stub(GitService.prototype, 'version');
-
-    expect((await execute({ zip: true })).getValue()).to.deep.equal({ kind: 'overwrite', zip: true });
-    expect(version.called).to.be.false;
-  });
-
   for (const [found, output] of [
     ['no git', undefined],
     ['an older git', 'git version 2.30.2']
@@ -83,7 +71,7 @@ describe('SdkPrepareAction', () => {
       sinon.stub(GitService.prototype, 'version').resolves(output === undefined ? undefined : GitVersion.parse(output));
       const gitUnavailable = sinon.stub(SdkPreparePrompts.prototype, 'gitUnavailable');
 
-      expect((await execute()).getValue()).to.deep.equal({ kind: 'overwrite', zip: false });
+      expect((await execute()).getValue()).to.deep.equal({ kind: 'overwrite' });
       expect(gitUnavailable.firstCall.args[0]?.toString()).to.equal(output === undefined ? undefined : '2.30.2');
     });
   }

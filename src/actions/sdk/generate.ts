@@ -31,7 +31,6 @@ export class GenerateAction {
     language: Language,
     stability: Stability,
     force: boolean,
-    zipSdk: boolean,
     apiVersion?: string,
     packageSettingsDirectory?: DirectoryPath
   ): Promise<ActionResult<void, MergePlan>> => {
@@ -73,7 +72,7 @@ export class GenerateAction {
       codegenVersion: codegenVersionFor(language, stability),
       stability
     };
-    const destination = await new SdkPrepareAction().execute(sdkContext, generation, force, zipSdk);
+    const destination = await new SdkPrepareAction().execute(sdkContext, generation, force);
     if (!destination.isSuccess()) {
       return destination.discardValue();
     }

@@ -3,7 +3,6 @@ import { envInfo } from '../../infrastructure/env-info.js';
 import { MERGE_NEEDS_RESOLVING, SdkWritePrompts } from '../../prompts/sdk/write.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { RelativeFilePath } from '../../types/file/relativeFilePath.js';
-import { CommitId } from '../../types/git/commit-id.js';
 import { TreeId } from '../../types/git/tree-id.js';
 import { SdkContext } from '../../types/sdk-context.js';
 import { SdkRepositoryContext, SdkRepositoryProblem } from '../../types/sdk-repository-context.js';
@@ -24,91 +23,62 @@ export class SdkWriteAction {
   ): Promise<ActionResult<void, MergePlan>> => {
     switch (destination.kind) {
       case 'overwrite':
-        return this.overwrite(sdkContext, tempSdk, destination.zip);
-      case 'record':
-        return this.overwriteAndRecord(destination.repository, destination.remote, sdkContext, tempSdk, generation);
-      case 'merge':
-        return this.merge(destination.repository, destination.base, destination.remote, tempSdk, generation);
+        this.prompts.sdkGenerated(await sdkContext.save(tempSdk));
+        return ActionResult.success();
+      case 'record': {
+        // Initialised only now, once generation succeeded, so a failed run leaves no repository behind.
+        const sdk = sdkContext.directory();
+        const repository =
+          destination.repository === undefined ? await sdkContext.initRepository() : ok(destination.repository);
+        if (repository.isErr()) {
+          return this.customCodeFailed(repository.error);
+        }
+        await sdkContext.save(tempSdk);
+        if (destination.repository === undefined) {
+          this.prompts.repositoryInitialised(sdk);
+        }
+        const generated = await repository.value.snapshotGenerated(tempSdk);
+        await this.record(repository.value, generated, generation, [], destination.remote);
+        this.prompts.sdkGenerated(sdk);
+        return ActionResult.success();
+      }
+      case 'merge': {
+        const { repository, base, remote } = destination;
+        const generated = await repository.snapshotGenerated(tempSdk);
+        if (generated.isErr()) {
+          return this.customCodeFailed(generated.error);
+        }
+        const previous = await repository.savePrevious(base);
+        if (previous.isErr()) {
+          return this.customCodeFailed(previous.error);
+        }
+        const disk = await repository.snapshotDisk(base);
+        if (disk.isErr()) {
+          return this.customCodeFailed(disk.error);
+        }
+        const merged = await repository.merge(base, disk.value, generated.value);
+        if (merged.isErr()) {
+          return this.customCodeFailed(merged.error);
+        }
+        const { plan } = merged.value;
+        const applied = await repository.apply(plan);
+        if (applied.isErr()) {
+          return this.customCodeFailed(applied.error);
+        }
+        await this.record(repository, generated, generation, plan.conflictedPaths(), remote);
+        this.prompts.sdkMerged(repository.sdkDirectory(), plan);
+        if (!plan.hasConflicts()) {
+          return ActionResult.success();
+        }
+        const staged = await repository.stageConflicts(merged.value);
+        if (staged.isErr()) {
+          this.prompts.conflictsNotStaged(staged.error.reason);
+        }
+        this.prompts.conflicts(plan, repository.sdkDirectory());
+        return ActionResult.failed(MERGE_NEEDS_RESOLVING, plan);
+      }
     }
   };
-
-  private async overwrite(sdkContext: SdkContext, tempSdk: DirectoryPath, zipSdk: boolean): Promise<ActionResult> {
-    const saved = await sdkContext.save(tempSdk, zipSdk);
-    if (saved.isErr()) {
-      this.prompts.sdkNotSaved(saved.error);
-      return ActionResult.failed();
-    }
-    this.prompts.sdkGenerated(saved.value);
-    return ActionResult.success();
-  }
-
-  // Made only once generation succeeds, so a failed run leaves no repository; generated files never hold a .git.
-  private async overwriteAndRecord(
-    enclosing: SdkRepositoryContext | undefined,
-    remote: string | undefined,
-    sdkContext: SdkContext,
-    tempSdk: DirectoryPath,
-    generation: SdkGeneration
-  ): Promise<ActionResult> {
-    const sdk = sdkContext.directory();
-    const repository = enclosing === undefined ? await sdkContext.initRepository() : ok(enclosing);
-    if (repository.isErr()) {
-      return this.customCodeFailed(repository.error);
-    }
-    const saved = await sdkContext.save(tempSdk, false);
-    if (saved.isErr()) {
-      this.prompts.sdkNotSaved(saved.error);
-      return ActionResult.failed();
-    }
-    if (enclosing === undefined) {
-      this.prompts.repositoryInitialised(sdk);
-    }
-    const generated = await repository.value.snapshotGenerated(tempSdk);
-    await this.record(repository.value, generated, generation, [], remote);
-    this.prompts.sdkGenerated(sdk);
-    return ActionResult.success();
-  }
-
-  private async merge(
-    repository: SdkRepositoryContext,
-    base: CommitId,
-    remote: string | undefined,
-    tempSdk: DirectoryPath,
-    generation: SdkGeneration
-  ): Promise<ActionResult<void, MergePlan>> {
-    const generated = await repository.snapshotGenerated(tempSdk);
-    if (generated.isErr()) {
-      return this.customCodeFailed(generated.error);
-    }
-    const previous = await repository.savePrevious(base);
-    if (previous.isErr()) {
-      return this.customCodeFailed(previous.error);
-    }
-    const disk = await repository.snapshotDisk(base);
-    if (disk.isErr()) {
-      return this.customCodeFailed(disk.error);
-    }
-    const merged = await repository.merge(base, disk.value, generated.value);
-    if (merged.isErr()) {
-      return this.customCodeFailed(merged.error);
-    }
-    const { plan } = merged.value;
-    const applied = await repository.apply(plan);
-    if (applied.isErr()) {
-      return this.customCodeFailed(applied.error);
-    }
-    await this.record(repository, generated, generation, plan.conflictedPaths(), remote);
-    this.prompts.sdkMerged(repository.sdkDirectory(), plan);
-    if (!plan.hasConflicts()) {
-      return ActionResult.success();
-    }
-    const staged = await repository.stageConflicts(merged.value);
-    if (staged.isErr()) {
-      this.prompts.conflictsNotStaged(staged.error.reason);
-    }
-    this.prompts.conflicts(plan, repository.sdkDirectory());
-    return ActionResult.failed(MERGE_NEEDS_RESOLVING, plan);
-  }
 
   private customCodeFailed(problem: { reason: string }): ActionResult {
     this.prompts.customCodeFailed(problem.reason);

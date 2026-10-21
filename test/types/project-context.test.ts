@@ -244,7 +244,7 @@ describe('ProjectContext', () => {
       fs.mkdirSync(empty.toString());
 
       const version = (await project().versionToBuild(undefined, ask()))._unsafeUnwrap();
-      const saved = (await version.sdk(Language.TYPESCRIPT, version.sdkDirectory()).save(empty, false))._unsafeUnwrap();
+      const saved = await version.sdk(Language.TYPESCRIPT, version.sdkDirectory()).save(empty);
 
       expect(version.sdkDirectory().toString()).to.equal(inProject('sdk'));
       expect(saved.toString()).to.equal(inProject('sdk', 'v1', 'typescript'));
@@ -254,7 +254,7 @@ describe('ProjectContext', () => {
       const empty = new DirectoryPath(inProject('empty'));
       fs.mkdirSync(empty.toString());
 
-      const saved = (await project().sdk(Language.PYTHON, project().sdkDirectory()).save(empty, false))._unsafeUnwrap();
+      const saved = await project().sdk(Language.PYTHON, project().sdkDirectory()).save(empty);
 
       expect(saved.toString()).to.equal(inProject('sdk', 'python'));
     });

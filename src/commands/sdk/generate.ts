@@ -47,10 +47,6 @@ With git ${GitVersion.required()} or newer installed, your edits to the generate
     'api-version': Flags.string({
       description: 'Version of the API to use for SDK generation (if multiple versions exist)'
     }),
-    zip: Flags.boolean({
-      default: false,
-      description: 'Download the generated SDK as a .zip archive'
-    }),
     'codegen-version': Flags.string({
       description: 'Version of the code generator to use',
       options: Object.values(CodeGenerationVersion).map((v) => v.valueOf()),
@@ -68,9 +64,7 @@ With git ${GitVersion.required()} or newer installed, your edits to the generate
   static examples = [
     `${SdkGenerate.cmdTxt} ${format.flag('language', 'typescript')}`,
     `${SdkGenerate.cmdTxt} ${format.flag('language', 'csharp')} ${format.flag('input', './')}`,
-    `${SdkGenerate.cmdTxt} ${format.flag('language', 'python')} ${format.flag('destination', './sdk')} ${format.flag(
-      'zip'
-    )}`
+    `${SdkGenerate.cmdTxt} ${format.flag('language', 'python')} ${format.flag('destination', './sdk')}`
   ];
 
   async run() {
@@ -80,7 +74,6 @@ With git ${GitVersion.required()} or newer installed, your edits to the generate
         input,
         destination,
         force,
-        zip: zipSdk,
         stability,
         'auth-key': authKey,
         'api-version': apiVersion
@@ -102,7 +95,6 @@ With git ${GitVersion.required()} or newer installed, your edits to the generate
       language as Language,
       StabilityChoice.for(language as Language, stability).stabilityLevel(),
       force,
-      zipSdk,
       apiVersion
     );
     outro(result);

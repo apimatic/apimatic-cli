@@ -8,6 +8,6 @@ import { SdkRepositoryContext } from '../sdk-repository-context.js';
  * is where the snapshot is shared afterwards, none when the repository has no remote.
  */
 export type SdkDestination =
-  | { kind: 'overwrite'; zip: boolean }
+  | { kind: 'overwrite' }
   | { kind: 'record'; repository: SdkRepositoryContext | undefined; remote: string | undefined }
   | { kind: 'merge'; repository: SdkRepositoryContext; base: CommitId; remote: string | undefined };

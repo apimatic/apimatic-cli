@@ -1,7 +1,6 @@
 import { log } from '@clack/prompts';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { RelativeFilePath } from '../../types/file/relativeFilePath.js';
-import { SdkSaveProblem } from '../../types/sdk-context.js';
 import { ConflictKind, GENERATOR_FILES, MergePlan, YOUR_FILES } from '../../types/sdk/merge-plan.js';
 import { listedInProse } from '../../utils/string-utils.js';
 import { format as f } from '../format.js';
@@ -31,10 +30,6 @@ const listed = (sdk: DirectoryPath, paths: readonly RelativeFilePath[]) =>
   paths.map((relative) => `  ${f.relativePath(relative.in(sdk))}`);
 
 export class SdkWritePrompts {
-  public sdkNotSaved(problem: SdkSaveProblem) {
-    log.error(`The SDK could not be saved to ${f.path(problem.sdkDirectory)}: ${problem.reason}`);
-  }
-
   public sdkGenerated(sdk: DirectoryPath) {
     log.info(`The generated SDK can be found at ${f.relativePath(sdk)}.`);
   }

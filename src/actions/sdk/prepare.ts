@@ -13,10 +13,9 @@ export class SdkPrepareAction {
   public readonly execute = async (
     sdkContext: SdkContext,
     generation: SdkGeneration,
-    force: boolean,
-    zipSdk: boolean
+    force: boolean
   ): Promise<ActionResult<SdkDestination>> => {
-    const decided = await this.destination(sdkContext, generation, zipSdk);
+    const decided = await this.destination(sdkContext, generation);
     if (decided.isFailed()) {
       return decided;
     }
@@ -32,18 +31,11 @@ export class SdkPrepareAction {
     return decided;
   };
 
-  private async destination(
-    sdkContext: SdkContext,
-    generation: SdkGeneration,
-    zipSdk: boolean
-  ): Promise<ActionResult<SdkDestination>> {
-    if (zipSdk) {
-      return ActionResult.success<SdkDestination>({ kind: 'overwrite', zip: true });
-    }
+  private async destination(sdkContext: SdkContext, generation: SdkGeneration): Promise<ActionResult<SdkDestination>> {
     const version = await this.git.version();
     if (version === undefined || !version.isSupported()) {
       this.prompts.gitUnavailable(version);
-      return ActionResult.success<SdkDestination>({ kind: 'overwrite', zip: false });
+      return ActionResult.success<SdkDestination>({ kind: 'overwrite' });
     }
 
     const repository = await sdkContext.repository();

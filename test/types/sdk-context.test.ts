@@ -22,16 +22,6 @@ describe('SdkContext', () => {
   afterEach(() => fs.rmSync(root, { recursive: true, force: true }));
 
   describe('save', () => {
-    it('zips the SDK into its language directory', async () => {
-      fs.mkdirSync(inRoot('generated'));
-      fs.writeFileSync(inRoot('generated', 'README.md'), '# sdk');
-
-      const saved = await context.save(new DirectoryPath(inRoot('generated')), true);
-
-      expect(saved._unsafeUnwrap().toString()).to.equal(inRoot('sdk', 'python'));
-      expect(fs.existsSync(inRoot('sdk', 'python', 'python.zip'))).to.be.true;
-    });
-
     it('replaces what the language directory holds, except its .git', async () => {
       fs.mkdirSync(inRoot('generated'));
       fs.writeFileSync(inRoot('generated', 'README.md'), '# sdk');
@@ -39,21 +29,11 @@ describe('SdkContext', () => {
       fs.writeFileSync(inRoot('sdk', 'python', '.git', 'HEAD'), 'ref: refs/heads/main');
       fs.writeFileSync(inRoot('sdk', 'python', 'old.py'), 'old');
 
-      const saved = await context.save(new DirectoryPath(inRoot('generated')), false);
+      const saved = await context.save(new DirectoryPath(inRoot('generated')));
 
-      expect(saved._unsafeUnwrap().toString()).to.equal(inRoot('sdk', 'python'));
+      expect(saved.toString()).to.equal(inRoot('sdk', 'python'));
       expect(fs.readdirSync(inRoot('sdk', 'python')).sort()).to.deep.equal(['.git', 'README.md']);
       expect(fs.readFileSync(inRoot('sdk', 'python', '.git', 'HEAD'), 'utf-8')).to.equal('ref: refs/heads/main');
-    });
-
-    it('reports an SDK it could not zip, naming its language directory, and leaves no archive behind', async () => {
-      const saved = await context.save(new DirectoryPath(inRoot('missing')), true);
-
-      const problem = saved._unsafeUnwrapErr();
-      expect(problem.kind).to.equal('zipFailed');
-      expect(problem.reason).to.contain('ENOENT');
-      expect(problem.sdkDirectory.toString()).to.equal(inRoot('sdk', 'python'));
-      expect(fs.existsSync(inRoot('sdk', 'python', 'python.zip'))).to.be.false;
     });
   });
 

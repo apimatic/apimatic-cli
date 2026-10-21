@@ -56,7 +56,6 @@ export class SdkPublishAction {
         language,
         stability,
         force,
-        false,
         undefined,
         packageSettingsDirectory
       );

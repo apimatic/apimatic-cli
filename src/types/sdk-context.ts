@@ -13,8 +13,6 @@ import { FileProblem } from './file/file-problem.js';
 import { Language } from './sdk/generate.js';
 import { SdkRepositoryContext, SdkRepositoryProblem } from './sdk-repository-context.js';
 
-export type SdkSaveProblem = FileProblem & { sdkDirectory: DirectoryPath };
-
 const GIT_DIRECTORY = '.git';
 
 /**
@@ -39,12 +37,8 @@ export class SdkContext {
   private readonly git = new GitService();
   private readonly sdkDirectory: DirectoryPath;
 
-  constructor(private readonly language: Language, sdkDirectory: DirectoryPath, version?: string) {
+  constructor(language: Language, sdkDirectory: DirectoryPath, version?: string) {
     this.sdkDirectory = version ? sdkDirectory.join(version).join(language) : sdkDirectory.join(language);
-  }
-
-  private get zipPath(): FilePath {
-    return new FilePath(this.sdkDirectory, new FileName(`${this.language}.zip`));
   }
 
   /** The language directory the SDK is written into, and read back from on the next run. */
@@ -80,16 +74,10 @@ export class SdkContext {
   }
 
   /** Overwrites the directory; a `.git` in it is the developer's, or holds the snapshots, and stays. */
-  public async save(tempSdkDirectory: DirectoryPath, zipSdk: boolean): Promise<Result<DirectoryPath, SdkSaveProblem>> {
+  public async save(tempSdkDirectory: DirectoryPath): Promise<DirectoryPath> {
     await this.fileService.cleanDirectoryExcluding(this.sdkDirectory, [new FileName(GIT_DIRECTORY)]);
-    if (!zipSdk) {
-      await this.fileService.copyDirectoryContents(tempSdkDirectory, this.sdkDirectory);
-      return ok(this.sdkDirectory);
-    }
-    const archived = await this.zipService.archive(tempSdkDirectory, this.zipPath);
-    return archived
-      .map(() => this.sdkDirectory)
-      .mapErr((reason): SdkSaveProblem => ({ kind: 'zipFailed', reason, sdkDirectory: this.sdkDirectory }));
+    await this.fileService.copyDirectoryContents(tempSdkDirectory, this.sdkDirectory);
+    return this.sdkDirectory;
   }
 
   public async loadSdkInTempDirectory(

@@ -56,8 +56,6 @@ ref by hand, `git push <remote> refs/apimatic/pristine/<path>:refs/apimatic/pris
 fact. Two machines that regenerate independently are fine: their chains are
 joined on the next push, nothing is ever force-pushed.
 
-`--zip` is unchanged: no repository, no record, no merge.
-
 # Usage
 <!-- usage -->
 ```sh-session
@@ -449,7 +447,7 @@ Generate an SDK for your API
 ```
 USAGE
   $ apimatic sdk generate -l csharp|java|php|python|ruby|typescript|go [-d <value>] [--api-version <value>]
-    [--zip] [--codegen-version v4] [--stability stable|beta] [-i <value>] [-f] [-k <value>]
+    [--codegen-version v4] [--stability stable|beta] [-i <value>] [-f] [-k <value>]
 
 FLAGS
   -d, --destination=<value>       [default: <input>/sdk/<language> | <input>/sdk/<api-version>/<language>] path where
@@ -465,7 +463,6 @@ FLAGS
                                   <options: v4>
       --stability=<option>        Stability level of the generated SDK. Defaults to the level the language offers.
                                   <options: stable|beta>
-      --zip                       Download the generated SDK as a .zip archive
 
 DESCRIPTION
   Generate an SDK for your API
@@ -479,7 +476,7 @@ EXAMPLES
 
   apimatic sdk generate --language=csharp --input=./
 
-  apimatic sdk generate --language=python --destination=./sdk --zip
+  apimatic sdk generate --language=python --destination=./sdk
 ```
 
 _See code: [src/commands/sdk/generate.ts](https://github.com/apimatic/apimatic-cli/blob/v1.3.1/src/commands/sdk/generate.ts)_

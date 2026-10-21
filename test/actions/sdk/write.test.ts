@@ -8,7 +8,6 @@ import { err, ok } from 'neverthrow';
 import sinon from 'sinon';
 import { SdkWriteAction } from '../../../src/actions/sdk/write.js';
 import { GitService } from '../../../src/infrastructure/git-service.js';
-import { ZipService } from '../../../src/infrastructure/zip-service.js';
 import { SdkWritePrompts } from '../../../src/prompts/sdk/write.js';
 import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
 import { CommitId } from '../../../src/types/git/commit-id.js';
@@ -95,28 +94,10 @@ describe('SdkWriteAction', () => {
       write(sdk(), { 'old.py': 'old', '.git/HEAD': 'ref: refs/heads/main' });
       const sdkGenerated = sinon.stub(SdkWritePrompts.prototype, 'sdkGenerated');
 
-      expect((await execute({ kind: 'overwrite', zip: false }, { 'README.md': '# sdk' })).isSuccess()).to.be.true;
+      expect((await execute({ kind: 'overwrite' }, { 'README.md': '# sdk' })).isSuccess()).to.be.true;
 
       expect(fs.readdirSync(sdk().toString()).sort()).to.deep.equal(['.git', 'README.md']);
       expect(sdkGenerated.firstCall.args[0].isEqual(sdk())).to.be.true;
-    });
-
-    it('writes a zip', async () => {
-      expect((await execute({ kind: 'overwrite', zip: true }, { 'README.md': '# sdk' })).isSuccess()).to.be.true;
-
-      expect(fs.readdirSync(sdk().toString())).to.deep.equal(['python.zip']);
-    });
-
-    it('reports an SDK it could not save', async () => {
-      sinon.stub(ZipService.prototype, 'archive').resolves(err('ENOSPC: no space left on device, write'));
-      const sdkNotSaved = sinon.stub(SdkWritePrompts.prototype, 'sdkNotSaved');
-
-      expect((await execute({ kind: 'overwrite', zip: true }, { 'README.md': '# sdk' })).isFailed()).to.be.true;
-      expect(sdkNotSaved.firstCall.args[0]).to.deep.equal({
-        kind: 'zipFailed',
-        reason: 'ENOSPC: no space left on device, write',
-        sdkDirectory: sdk()
-      });
     });
   });
 
