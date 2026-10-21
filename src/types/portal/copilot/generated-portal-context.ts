@@ -91,7 +91,7 @@ export class GeneratedPortalContext {
         return ok(null);
       }
       // Archived from the built directory, so the bundle is at the same path inside.
-      return await this.zipService.readEntry(archive, `${COPILOT_DIRECTORY_NAME}/${BUNDLE_FILE_NAME}`);
+      return this.zipService.readEntry(archive, `${COPILOT_DIRECTORY_NAME}/${BUNDLE_FILE_NAME}`);
     } catch (error) {
       return err(errorMessage(error));
     }

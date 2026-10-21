@@ -30,7 +30,7 @@ export class ZipService {
   }
 
   /** One file of an archive, as text, without expanding the rest; null for an archive without it. */
-  public async readEntry(sourceFile: FilePath, entryPath: string): Promise<Result<string | null, string>> {
+  public readEntry(sourceFile: FilePath, entryPath: string): Result<string | null, string> {
     try {
       const entry = new AdmZip(sourceFile.toString()).getEntry(entryPath);
       return ok(entry === null ? null : entry.getData().toString('utf8'));

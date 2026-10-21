@@ -86,22 +86,20 @@ describe('ZipService', () => {
       write('index.html', '<html></html>');
       (await new ZipService().archive(source, archive))._unsafeUnwrap();
 
-      expect((await new ZipService().readEntry(archive, '__copilot/bundle.json'))._unsafeUnwrap()).to.equal(
-        '{"pages":[]}'
-      );
+      expect(new ZipService().readEntry(archive, '__copilot/bundle.json')._unsafeUnwrap()).to.equal('{"pages":[]}');
     });
 
     it('is null for a file the archive does not hold', async () => {
       write('index.html', '<html></html>');
       (await new ZipService().archive(source, archive))._unsafeUnwrap();
 
-      expect((await new ZipService().readEntry(archive, '__copilot/bundle.json'))._unsafeUnwrap()).to.be.null;
+      expect(new ZipService().readEntry(archive, '__copilot/bundle.json')._unsafeUnwrap()).to.be.null;
     });
 
-    it('reports a file that is not an archive', async () => {
+    it('reports a file that is not an archive', () => {
       fs.writeFileSync(archive.toString(), 'not a zip');
 
-      expect((await new ZipService().readEntry(archive, 'index.html'))._unsafeUnwrapErr()).to.not.be.empty;
+      expect(new ZipService().readEntry(archive, 'index.html')._unsafeUnwrapErr()).to.not.be.empty;
     });
   });
 
