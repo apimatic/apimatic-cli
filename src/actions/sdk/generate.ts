@@ -1,4 +1,3 @@
-import { MergePlan } from '../../application/sdk-merge/merge-plan.js';
 import { SdkGenerationService } from '../../infrastructure/services/sdk-generation-service.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { ActionResult } from '../action-result.js';
@@ -9,6 +8,7 @@ import { TempContext } from '../../types/temp-context.js';
 import { codegenVersionFor, isAvailableLanguage, Language, Stability } from '../../types/sdk/generate.js';
 import { ProjectContext } from '../../types/project-context.js';
 import { SdkGeneration } from '../../types/sdk/generation-record.js';
+import { MergePlan } from '../../types/sdk/merge-plan.js';
 import { SdkPrepareAction } from './prepare.js';
 import { SdkWriteAction } from './write.js';
 

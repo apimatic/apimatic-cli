@@ -6,6 +6,7 @@ import { TextDecoder } from 'node:util';
 import { expect } from 'chai';
 import { GitService } from '../../src/infrastructure/git-service.js';
 import { DirectoryPath } from '../../src/types/file/directoryPath.js';
+import { CommitId } from '../../src/types/sdk/commit-id.js';
 
 const text = (content: Uint8Array | undefined) =>
   content === undefined ? undefined : new TextDecoder().decode(content);
@@ -160,5 +161,56 @@ describe('GitService', () => {
       ['A', 'moved/a.txt']
     ]);
     expect(plain.find((change) => change.path.toString() === 'b.txt')?.blob).to.have.lengthOf(40);
+  });
+
+  describe('mergeTree', () => {
+    /** A commit in `repo` holding `files`, on `parents`. */
+    const commit = async (repo: DirectoryPath, name: string, files: Record<string, string>, parents: CommitId[]) => {
+      const work = new DirectoryPath(path.join(root, name));
+      for (const [relative, contents] of Object.entries(files)) {
+        write(work, relative, contents);
+      }
+      return git.commitTree(repo, await git.treeOf(repo, work, 'all'), parents, name);
+    };
+
+    it('reads the merged tree, the stages of each conflicted path and the messages', async () => {
+      const repo = await repository();
+      const base = await commit(repo, 'base', { 'same.txt': 'one\n', 'gone.txt': 'gone\n' }, []);
+      const ours = await commit(repo, 'ours', { 'same.txt': 'ours\n', 'gone.txt': 'kept\n' }, [base]);
+      const theirs = await commit(repo, 'theirs', { 'same.txt': 'theirs\n' }, [base]);
+
+      const merged = await git.mergeTree(repo, ours, theirs);
+
+      expect(merged.stages.map(({ stage, path: staged }) => [staged.toString(), stage])).to.have.deep.members([
+        ['same.txt', 1],
+        ['same.txt', 2],
+        ['same.txt', 3],
+        ['gone.txt', 1],
+        ['gone.txt', 2]
+      ]);
+      expect(merged.messages.map(({ paths, type }) => [paths.map(String), type])).to.have.deep.members([
+        [['same.txt'], 'Auto-merging'],
+        [['same.txt'], 'CONFLICT (contents)'],
+        [['gone.txt'], 'CONFLICT (modify/delete)']
+      ]);
+      expect(merged.messages.find(({ type }) => type === 'CONFLICT (modify/delete)')?.message).to.match(
+        /^CONFLICT \(modify\/delete\): gone\.txt deleted in .+ left in tree\.$/
+      );
+      expect((await filesOf(repo, merged.tree)).get('gone.txt')).to.equal('kept\n');
+    });
+
+    it('reads a clean merge as the merged tree and nothing else', async () => {
+      const repo = await repository();
+      const base = await commit(repo, 'base', { 'a.txt': 'a\n', 'b.txt': 'b\n' }, []);
+      const ours = await commit(repo, 'ours', { 'a.txt': 'A\n', 'b.txt': 'b\n' }, [base]);
+      const theirs = await commit(repo, 'theirs', { 'a.txt': 'a\n', 'b.txt': 'B\n' }, [base]);
+      const both = await commit(repo, 'both', { 'a.txt': 'A\n', 'b.txt': 'B\n' }, []);
+
+      const merged = await git.mergeTree(repo, ours, theirs);
+
+      expect(merged.tree.isEqual(await git.treeOfCommit(repo, both))).to.be.true;
+      expect(merged.stages).to.deep.equal([]);
+      expect(merged.messages).to.deep.equal([]);
+    });
   });
 });

@@ -1,9 +1,9 @@
 import { log } from '@clack/prompts';
-import { Conflict, ConflictKind, MergeFiles, MergePlan } from '../../application/sdk-merge/merge-plan.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { RelativeFilePath } from '../../types/file/relativeFilePath.js';
 import { SdkSaveProblem } from '../../types/sdk-context.js';
 import { SdkRepositoryContext } from '../../types/sdk-repository-context.js';
+import { Conflict, ConflictKind, MergeFiles, MergePlan } from '../../types/sdk/merge-plan.js';
 import { listedInProse } from '../../utils/string-utils.js';
 import { format as f } from '../format.js';
 import { noteWrapped } from '../prompt.js';

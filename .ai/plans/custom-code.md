@@ -283,7 +283,7 @@ a bare remote) and `test/actions/sdk/write.test.ts`.
 | Phase | Commit | What |
 |---|---|---|
 | 1 | `db3fe9f2`, reworked in `185e0663` | `GitService` (the system git through `execa`, every call with the 3.3 settings) and the pristine store (since the `SdkRepositoryContext`) with the value objects: refs, commit and tree ids, git version, generation record. |
-| 2 | `185e0663` | The merge (since moved onto `SdkRepositoryContext`): the temporary commits, `merge-tree --write-tree -z`, the diffs; `src/application/sdk-merge/` keeps only what is pure: parsing merge-tree's output, the conflict kinds, marker relabelling, `MergePlan`. |
+| 2 | `185e0663` | The merge (since moved onto `SdkRepositoryContext`): the temporary commits, `merge-tree --write-tree -z`, the diffs; `src/application/sdk-merge/` (since folded into `GitService` and `src/types/sdk/`) keeps only what is pure: parsing merge-tree's output, the conflict kinds, marker relabelling, `MergePlan`. |
 | 3 | `4d5b9ccf` | `SdkPrepareAction`, `SdkDestination`, `SdkWriteAction`, their prompts, the repository's `inspect`; `GenerateAction` back to validation and generation; `SdkContext.save` keeps `.git`. |
 | 4, 5 | `87453917` | The missing-snapshot message with the push and fetch commands; `stageConflicts` through `update-index --index-info`; `SdkMergeConflictedEvent`. |
 | 6 | this file | `CONTEXT.md` terms, the README section and requirement, the command description. |
@@ -294,9 +294,9 @@ PR into `dev`, squash-merged, title `feat(sdk): keep your edits when regeneratin
 
 | File | Role |
 |---|---|
-| `src/infrastructure/git-service.ts` | the system git behind every snapshot, the merge and the index staging |
+| `src/infrastructure/git-service.ts` | the system git behind every snapshot, the merge (its output read into stages and messages) and the index staging |
 | `src/types/sdk-repository-context.ts` | the SDK directory with its repository: snapshots, the record, `inspect`, the merge, its application to disk, the staging |
-| `src/application/sdk-merge/*.ts` | pure: merge-tree output, conflict kinds, markers, `MergePlan` |
+| `src/types/sdk/{merge-plan,conflict-markers}.ts` | pure: `MergePlan` built from git's merge and diffs, conflict kinds, markers |
 | `src/types/sdk/{snapshot-ref,commit-id,tree-id,git-version,generation-record,sdk-destination}.ts`, `src/types/file/relativeFilePath.ts` | value objects |
 | `src/actions/sdk/{generate,prepare,write}.ts`, `src/prompts/sdk/{generate,prepare,write}.ts` | the run |
 | `src/types/sdk-context.ts` | `directory()`, `repository()`, `initRepository()`, save keeps `.git` |

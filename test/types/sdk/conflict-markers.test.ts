@@ -1,6 +1,6 @@
 import { TextDecoder, TextEncoder } from 'node:util';
 import { expect } from 'chai';
-import { hasConflictMarkers, relabelMarkers } from '../../../src/application/sdk-merge/markers.js';
+import { hasConflictMarkers, relabelMarkers } from '../../../src/types/sdk/conflict-markers.js';
 
 const bytes = (text: string) => new TextEncoder().encode(text);
 const text = (content: Uint8Array) => new TextDecoder().decode(content);

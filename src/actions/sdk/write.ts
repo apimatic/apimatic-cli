@@ -1,5 +1,4 @@
 import { err, ok, Result } from 'neverthrow';
-import { MergePlan } from '../../application/sdk-merge/merge-plan.js';
 import { envInfo } from '../../infrastructure/env-info.js';
 import { SdkWritePrompts } from '../../prompts/sdk/write.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
@@ -8,6 +7,7 @@ import { SdkContext } from '../../types/sdk-context.js';
 import { SdkRepositoryContext, SdkRepositoryProblem } from '../../types/sdk-repository-context.js';
 import { CommitId } from '../../types/sdk/commit-id.js';
 import { SdkGeneration } from '../../types/sdk/generation-record.js';
+import { MergePlan } from '../../types/sdk/merge-plan.js';
 import { SdkDestination } from '../../types/sdk/sdk-destination.js';
 import { TreeId } from '../../types/sdk/tree-id.js';
 import { ActionResult } from '../action-result.js';

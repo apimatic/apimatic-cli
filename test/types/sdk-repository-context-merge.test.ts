@@ -4,12 +4,12 @@ import os from 'os';
 import path from 'path';
 import { Buffer } from 'node:buffer';
 import { expect } from 'chai';
-import { MergePlan } from '../../src/application/sdk-merge/merge-plan.js';
 import { GitService } from '../../src/infrastructure/git-service.js';
 import { SdkContext } from '../../src/types/sdk-context.js';
 import { DirectoryPath } from '../../src/types/file/directoryPath.js';
 import { CodeGenerationVersion, Language, Stability } from '../../src/types/sdk/generate.js';
 import { SdkGeneration } from '../../src/types/sdk/generation-record.js';
+import { MergePlan } from '../../src/types/sdk/merge-plan.js';
 
 const TYPESCRIPT: SdkGeneration = {
   language: Language.TYPESCRIPT,

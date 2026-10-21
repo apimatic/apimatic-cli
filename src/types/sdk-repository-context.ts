@@ -1,10 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { err, ok, Result } from 'neverthrow';
-import { hasConflictMarkers, relabelMarkers } from '../application/sdk-merge/markers.js';
-import { MergePlan } from '../application/sdk-merge/merge-plan.js';
-import { parseMergeTreeOutput, StageEntry } from '../application/sdk-merge/merge-tree-output.js';
-import { planMerge } from '../application/sdk-merge/sdk-merge.js';
 import { FileService } from '../infrastructure/file-service.js';
 import { GitService } from '../infrastructure/git-service.js';
 import { errorMessage } from '../utils/error-utils.js';
@@ -13,7 +9,9 @@ import { FileName } from './file/fileName.js';
 import { FilePath } from './file/filePath.js';
 import { RelativeFilePath } from './file/relativeFilePath.js';
 import { CommitId } from './sdk/commit-id.js';
+import { hasConflictMarkers, relabelMarkers } from './sdk/conflict-markers.js';
 import { describeGeneration, GenerationRecord, SdkGeneration } from './sdk/generation-record.js';
+import { MergePlan, StageEntry } from './sdk/merge-plan.js';
 import { SnapshotRef } from './sdk/snapshot-ref.js';
 import { TreeId } from './sdk/tree-id.js';
 
@@ -204,17 +202,15 @@ export class SdkRepositoryContext {
       const baseTree = await this.git.treeOfCommit(root, base);
       const yours = await this.git.commitTree(root, disk, [base], 'apimatic: your changes');
       const theirs = await this.git.commitTree(root, generated, [base], 'apimatic: generated');
-      const run = await this.git.mergeTree(root, yours, theirs);
-      const output = parseMergeTreeOutput(run.output);
-      const merged = TreeId.fromGit(output.tree);
-      const plan = planMerge({
-        merge: output,
+      const merge = await this.git.mergeTree(root, yours, theirs);
+      const plan = MergePlan.from({
+        merge,
         yours: await this.git.diffTrees(root, baseTree, disk, true),
         generated: await this.git.diffTrees(root, baseTree, generated, true),
-        applied: await this.git.diffTrees(root, disk, merged, false),
+        applied: await this.git.diffTrees(root, disk, merge.tree, false),
         basePaths: (await this.git.listTree(root, baseTree)).map((entry) => entry.path)
       });
-      return ok({ plan, merged, stages: output.stages });
+      return ok({ plan, merged: merge.tree, stages: merge.stages });
     } catch (error) {
       return err(gitFailed(errorMessage(error)));
     }

@@ -2,11 +2,11 @@ import { stripVTControlCharacters } from 'node:util';
 import { expect } from 'chai';
 import sinon from 'sinon';
 import { log } from '@clack/prompts';
-import { ConflictKind, MergePlan } from '../../../src/application/sdk-merge/merge-plan.js';
 import { SdkWritePrompts } from '../../../src/prompts/sdk/write.js';
 import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
 import { RelativeFilePath } from '../../../src/types/file/relativeFilePath.js';
 import { SdkRepositoryContext } from '../../../src/types/sdk-repository-context.js';
+import { ConflictKind, MergePlan } from '../../../src/types/sdk/merge-plan.js';
 
 const rel = (value: string) => RelativeFilePath.fromGit(value);
 

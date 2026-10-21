@@ -1,10 +1,9 @@
 import { RelativeFilePath } from '../../../src/types/file/relativeFilePath.js';
-import { MergePlan } from '../../../src/application/sdk-merge/merge-plan.js';
 import { expect } from 'chai';
-import { MergeInputs, planMerge } from '../../../src/application/sdk-merge/sdk-merge.js';
-import { MergeTreeOutput } from '../../../src/application/sdk-merge/merge-tree-output.js';
+import { MergeInputs, MergePlan, MergeTreeOutput } from '../../../src/types/sdk/merge-plan.js';
+import { TreeId } from '../../../src/types/sdk/tree-id.js';
 
-const TREE = 't'.repeat(40);
+const TREE = TreeId.fromGit('t'.repeat(40));
 const blob = (name: string) => name.padEnd(40, '0');
 
 const merge = (overrides: Partial<MergeTreeOutput> = {}): MergeTreeOutput => ({
@@ -28,9 +27,9 @@ const counts = (plan: MergePlan) =>
 
 const rel = (value: string) => RelativeFilePath.fromGit(value);
 
-describe('planMerge', () => {
+describe('MergePlan.from', () => {
   it('turns the diff from the disk to the merged tree into writes and deletions, counted by who changed what', () => {
-    const plan = planMerge(
+    const plan = MergePlan.from(
       inputs({
         basePaths: ['a.ts', 'b.ts', 'c.ts', 'd.ts', 'e.ts'].map(rel),
         yours: [
@@ -63,7 +62,7 @@ describe('planMerge', () => {
   });
 
   it('names each conflict by its kind, from the message and from which stages are present', () => {
-    const plan = planMerge(
+    const plan = MergePlan.from(
       inputs({
         merge: merge({
           stages: [
@@ -84,14 +83,26 @@ describe('planMerge', () => {
               type: 'CONFLICT (contents)',
               message: 'CONFLICT (add/add): Merge conflict in added.ts'
             },
-            { paths: ['logo.png'].map(rel), type: 'CONFLICT (binary)', message: 'warning: Cannot merge binary files: logo.png' },
+            {
+              paths: ['logo.png'].map(rel),
+              type: 'CONFLICT (binary)',
+              message: 'warning: Cannot merge binary files: logo.png'
+            },
             {
               paths: ['logo.png'].map(rel),
               type: 'CONFLICT (contents)',
               message: 'CONFLICT (content): Merge conflict in logo.png'
             },
-            { paths: ['deleted-by-you.ts'].map(rel), type: 'CONFLICT (modify/delete)', message: 'CONFLICT (modify/delete): …' },
-            { paths: ['dropped.ts'].map(rel), type: 'CONFLICT (modify/delete)', message: 'CONFLICT (modify/delete): …' },
+            {
+              paths: ['deleted-by-you.ts'].map(rel),
+              type: 'CONFLICT (modify/delete)',
+              message: 'CONFLICT (modify/delete): …'
+            },
+            {
+              paths: ['dropped.ts'].map(rel),
+              type: 'CONFLICT (modify/delete)',
+              message: 'CONFLICT (modify/delete): …'
+            },
             {
               paths: ['x.ts', 'y.ts'].map(rel),
               type: 'CONFLICT (rename/rename)',
@@ -121,7 +132,7 @@ describe('planMerge', () => {
   });
 
   it('reports the renames each side made', () => {
-    const plan = planMerge(
+    const plan = MergePlan.from(
       inputs({
         basePaths: ['a.ts', 'b.ts'].map(rel),
         yours: [{ status: 'R', from: rel('a.ts'), path: rel('moved/a.ts'), blob: blob('a') }],

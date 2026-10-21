@@ -1,31 +1,20 @@
 import { Buffer } from 'node:buffer';
 import fs from 'node:fs';
+import { TextDecoder } from 'node:util';
 import { execa, ExecaError } from 'execa';
-import { StageEntry } from '../application/sdk-merge/merge-tree-output.js';
 import { RelativeFilePath } from '../types/file/relativeFilePath.js';
 import { DirectoryPath } from '../types/file/directoryPath.js';
 import { FileName } from '../types/file/fileName.js';
 import { FilePath } from '../types/file/filePath.js';
 import { CommitId } from '../types/sdk/commit-id.js';
 import { GitVersion } from '../types/sdk/git-version.js';
+import { Change, MergeMessage, MergeTreeOutput, StageEntry } from '../types/sdk/merge-plan.js';
 import { SnapshotRef } from '../types/sdk/snapshot-ref.js';
 import { TreeId } from '../types/sdk/tree-id.js';
 import { errorMessage } from '../utils/error-utils.js';
 import { withDirPath } from './tmp-extensions.js';
 
 export type TreeEntry = { mode: string; type: 'blob' | 'tree' | 'commit'; oid: string; path: RelativeFilePath };
-
-/** One line of `diff-tree --raw`: how `path` differs between two trees, and the blob it holds in the second. */
-export type DiffEntry = {
-  status: 'A' | 'M' | 'D' | 'T' | 'R' | 'C';
-  path: RelativeFilePath;
-  /** The path in the first tree, for a rename or copy. */
-  from?: RelativeFilePath;
-  /** The blob in the second tree; absent for a deletion. */
-  blob?: string;
-};
-
-export type MergeTreeRun = { conflicted: boolean; output: Uint8Array };
 
 export type CommitDescription = { parents: CommitId[]; authorName: string; subject: string };
 
@@ -191,10 +180,11 @@ export class GitService {
   }
 
   /**
-   * `git merge-tree --write-tree` of two commits that share a parent: the merged tree and git's
-   * account of the conflicts, in its `-z` form, for the application layer to read.
+   * `git merge-tree --write-tree -z` of two commits that share a parent. It prints the merged
+   * tree's id, then one entry per stage of every conflicted path, then, after an empty entry, the
+   * messages git would have shown during a merge, each as a count, that many paths, a type and the text.
    */
-  public async mergeTree(root: DirectoryPath, ours: CommitId, theirs: CommitId): Promise<MergeTreeRun> {
+  public async mergeTree(root: DirectoryPath, ours: CommitId, theirs: CommitId): Promise<MergeTreeOutput> {
     return withDirPath(async (temporary) => {
       const result = await this.run(
         root,
@@ -205,7 +195,24 @@ export class GitService {
         'buffer',
         [0, 1]
       );
-      return { conflicted: result.exitCode === 1, output: new Uint8Array(result.stdout) };
+      const fields = new TextDecoder().decode(new Uint8Array(result.stdout)).split('\0');
+      const stages: StageEntry[] = [];
+      let index = 1;
+      for (; index < fields.length && fields[index] !== ''; index += 1) {
+        const [meta, path] = fields[index].split('\t');
+        const [mode, oid, stage] = meta.split(' ');
+        stages.push({ mode, oid, stage: Number(stage) as StageEntry['stage'], path: RelativeFilePath.fromGit(path) });
+      }
+      const messages: MergeMessage[] = [];
+      for (index += 1; index < fields.length && fields[index] !== ''; ) {
+        const count = Number(fields[index]);
+        const paths = fields.slice(index + 1, index + 1 + count).map((field) => RelativeFilePath.fromGit(field));
+        const type = fields[index + 1 + count];
+        const message = fields[index + 2 + count];
+        messages.push({ paths, type, message: message.trim() });
+        index += 3 + count;
+      }
+      return { tree: TreeId.fromGit(fields[0].trim()), stages, messages };
     });
   }
 
@@ -215,7 +222,7 @@ export class GitService {
     from: TreeId | CommitId,
     to: TreeId | CommitId,
     renames: boolean
-  ): Promise<DiffEntry[]> {
+  ): Promise<Change[]> {
     const { stdout } = await this.run(root, [
       'diff-tree',
       '-r',
@@ -226,10 +233,10 @@ export class GitService {
       to.toString()
     ]);
     const fields = stdout.split('\0');
-    const entries: DiffEntry[] = [];
+    const entries: Change[] = [];
     for (let index = 0; index < fields.length && fields[index] !== ''; ) {
       const [, , , dstBlob, statusWithScore] = fields[index].slice(1).split(' ');
-      const status = statusWithScore[0] as DiffEntry['status'];
+      const status = statusWithScore[0] as Change['status'];
       const first = fields[index + 1];
       if (status === 'R' || status === 'C') {
         entries.push({
