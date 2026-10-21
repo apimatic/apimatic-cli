@@ -70,13 +70,18 @@ export class SdkPrepareAction {
         this.prompts.recordNotForThisGeneration(state.value.recorded, generation, sdkContext.directory());
         return ActionResult.success<SdkDestination>({ kind: 'record', repository, remote });
       case 'snapshotMissing':
-        this.prompts.snapshotMissing(state.value.commit, repository, state.value.fetch);
+        this.prompts.snapshotMissing(
+          state.value.commit,
+          repository.root(),
+          repository.pristineRef(),
+          state.value.fetch
+        );
         return ActionResult.success<SdkDestination>({ kind: 'record', repository, remote });
       case 'unresolved':
         if (state.value.fetchedFrom !== undefined) {
           this.prompts.snapshotsFetched(state.value.fetchedFrom);
         }
-        this.prompts.conflictsUnresolved(state.value.paths, repository);
+        this.prompts.conflictsUnresolved(state.value.paths, repository.sdkDirectory());
         return ActionResult.failed();
       case 'ready':
         if (state.value.fetchedFrom !== undefined) {

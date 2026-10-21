@@ -220,7 +220,9 @@ describe('SdkWriteAction', () => {
       expect(result.isFailed()).to.be.true;
       expect(result.getExitCode()).to.equal(1);
       expect(result.getMessage()).to.equal('Resolve the conflicts and rerun');
-      expect(conflicts.firstCall.args[0]).to.deep.equal([{ path: rel('models/book.py'), kind: 'bothChanged' }]);
+      expect(conflicts.firstCall.args[0].conflicts).to.deep.equal([
+        { path: rel('models/book.py'), kind: 'bothChanged' }
+      ]);
       expect(read('models/book.py')).to.contain(`${YOURS_MARKER}\n    # Price in USD, VAT included.\n=======\n`);
       expect(read('models/book.py')).to.contain('    # Retail price in US dollars.\n');
       expect(read('models/book.py')).to.contain(`${GENERATED_MARKER}\n`);

@@ -5,7 +5,6 @@ import { log } from '@clack/prompts';
 import { SdkWritePrompts } from '../../../src/prompts/sdk/write.js';
 import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
 import { RelativeFilePath } from '../../../src/types/file/relativeFilePath.js';
-import { SdkRepositoryContext } from '../../../src/types/sdk-repository-context.js';
 import { ConflictKind, MergePlan } from '../../../src/types/sdk/merge-plan.js';
 
 const rel = (value: string) => RelativeFilePath.fromGit(value);
@@ -32,7 +31,7 @@ const plan = (
 
 describe('SdkWritePrompts.sdkMerged', () => {
   const root = new DirectoryPath(process.cwd());
-  const sdk = SdkRepositoryContext.create(root, root.join('sdk', 'typescript'))!;
+  const sdk = root.join('sdk', 'typescript');
 
   afterEach(() => {
     sinon.restore();

@@ -1,6 +1,6 @@
 import { RelativeFilePath } from '../../../src/types/file/relativeFilePath.js';
 import { expect } from 'chai';
-import { MergeInputs, MergePlan, MergeTreeOutput } from '../../../src/types/sdk/merge-plan.js';
+import { ConflictKind, MergeInputs, MergePlan, MergeTreeOutput } from '../../../src/types/sdk/merge-plan.js';
 import { TreeId } from '../../../src/types/sdk/tree-id.js';
 
 const TREE = TreeId.fromGit('t'.repeat(40));
@@ -129,6 +129,19 @@ describe('MergePlan.from', () => {
     expect(plan.hasMarkers(rel('same.ts'))).to.be.true;
     expect(plan.hasMarkers(rel('deleted-by-you.ts'))).to.be.false;
     expect(counts(plan)).to.deep.equal({ added: 0, updated: 0, merged: 0, removed: 0, kept: 0, unchanged: 0 });
+  });
+
+  it('tells the conflicts that leave markers in the file from those that leave it whole', () => {
+    const marks = (...kinds: ConflictKind[]) => {
+      const conflicts = kinds.map((kind, index) => ({ path: rel(`${index}.ts`), kind }));
+      const plan = new MergePlan([], [], conflicts, [], MergePlan.from(inputs({})).files);
+      return [plan.hasMarkedConflicts(), plan.hasUnmarkedConflicts()];
+    };
+
+    expect(marks('bothChanged', 'bothAdded')).to.deep.equal([true, false]);
+    expect(marks('deletedByYou', 'noLongerGenerated', 'binary', 'other')).to.deep.equal([false, true]);
+    expect(marks('bothChanged', 'binary')).to.deep.equal([true, true]);
+    expect(marks()).to.deep.equal([false, false]);
   });
 
   it('reports the renames each side made', () => {

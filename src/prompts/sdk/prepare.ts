@@ -4,7 +4,8 @@ import { RelativeFilePath } from '../../types/file/relativeFilePath.js';
 import { CommitId } from '../../types/sdk/commit-id.js';
 import { describeGeneration, SdkGeneration } from '../../types/sdk/generation-record.js';
 import { GitVersion } from '../../types/sdk/git-version.js';
-import { SdkRepositoryContext, SnapshotFetch } from '../../types/sdk-repository-context.js';
+import { SnapshotFetch } from '../../types/sdk-repository-context.js';
+import { SnapshotRef } from '../../types/sdk/snapshot-ref.js';
 import { format as f } from '../format.js';
 
 const plural = (count: number, noun: string) => `${count} ${noun}${count === 1 ? '' : 's'}`;
@@ -51,11 +52,10 @@ export class SdkPreparePrompts {
     log.warn(message);
   }
 
-  public snapshotMissing(commit: CommitId, repository: SdkRepositoryContext, fetch: SnapshotFetch) {
-    const ref = repository.pristineRef().toString();
+  public snapshotMissing(commit: CommitId, root: DirectoryPath, ref: SnapshotRef, fetch: SnapshotFetch) {
     const message =
       `The snapshot this SDK was generated from, commit ${f.var(commit.toString())}, is not in the repository at ` +
-      `${f.relativePath(repository.root())}, so your customizations cannot be merged. ${whereItWent(fetch)}\n` +
+      `${f.relativePath(root)}, so your customizations cannot be merged. ${whereItWent(fetch)}\n` +
       `${howToShare(fetch, ref)}\n` +
       `Otherwise the SDK will be replaced and a fresh snapshot recorded.`;
     log.warn(message);
@@ -65,12 +65,12 @@ export class SdkPreparePrompts {
     log.info(`Fetched the SDK's snapshots from ${f.var(remote)}.`);
   }
 
-  public conflictsUnresolved(paths: readonly RelativeFilePath[], repository: SdkRepositoryContext) {
+  public conflictsUnresolved(paths: readonly RelativeFilePath[], sdk: DirectoryPath) {
     const one = paths.length === 1;
     const message =
       `${plural(paths.length, 'file')} still hold${one ? 's' : ''} conflict markers from the last run. ` +
       `Resolve ${one ? 'it' : 'them'} and remove the markers, then rerun:\n` +
-      paths.map((path) => `  ${f.relativePath(path.in(repository.sdkDirectory()))}`).join('\n');
+      paths.map((path) => `  ${f.relativePath(path.in(sdk))}`).join('\n');
     log.error(message);
   }
 }
@@ -86,15 +86,15 @@ function whereItWent(fetch: SnapshotFetch): string {
   }
 }
 
-function howToShare(fetch: SnapshotFetch, ref: string): string {
+function howToShare(fetch: SnapshotFetch, ref: SnapshotRef): string {
   const remote = fetch.kind === 'noRemote' ? '<remote>' : fetch.remote;
   return (
     `Whoever generated it shares it by regenerating with a remote, or with ${f.cmd(
       'git',
       'push',
       remote,
-      `${ref}:${ref}`
+      ref.refspec()
     )}; ` +
-    `then rerun here${fetch.kind === 'noRemote' ? ` after ${f.cmd('git', 'fetch', remote, `+${ref}:${ref}`)}` : ''}.`
+    `then rerun here${fetch.kind === 'noRemote' ? ` after ${f.cmd('git', 'fetch', remote, ref.forcedRefspec())}` : ''}.`
   );
 }

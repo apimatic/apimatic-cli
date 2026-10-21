@@ -101,7 +101,7 @@ export class SdkWriteAction {
       return this.customCodeFailed(applied.error);
     }
     await this.record(repository, generated, generation, plan.conflictedPaths(), remote);
-    this.prompts.sdkMerged(repository, plan);
+    this.prompts.sdkMerged(repository.sdkDirectory(), plan);
     if (!plan.hasConflicts()) {
       return ActionResult.success();
     }
@@ -109,7 +109,7 @@ export class SdkWriteAction {
     if (staged.isErr()) {
       this.prompts.conflictsNotStaged(staged.error.reason);
     }
-    this.prompts.conflicts(plan.conflicts, repository);
+    this.prompts.conflicts(plan, repository.sdkDirectory(), repository.previousRef());
     return ActionResult.failed(MERGE_NEEDS_RESOLVING, plan);
   }
 
@@ -141,7 +141,7 @@ export class SdkWriteAction {
     }
     const shared = await repository.shareSnapshot(remote);
     if (shared.isErr()) {
-      this.prompts.snapshotNotShared(remote, shared.error.reason, repository);
+      this.prompts.snapshotNotShared(remote, shared.error.reason, repository.pristineRef());
     } else if (shared.value !== 'upToDate') {
       this.prompts.snapshotShared(remote, shared.value === 'joined');
     }

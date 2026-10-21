@@ -69,6 +69,12 @@ export type MergeFiles = {
   unchanged: readonly RelativeFilePath[];
 };
 
+/** The `MergeFiles` holding files you never edited, which only the generator changed. */
+export const GENERATOR_FILES = ['added', 'updated', 'removed'] as const;
+
+/** The `MergeFiles` holding files you edited. */
+export const YOUR_FILES = ['merged', 'kept'] as const;
+
 const CONFLICT_PREFIX = 'CONFLICT (';
 
 /** The stronger of two accounts of one path, when git reports it more than once. */
@@ -119,6 +125,11 @@ function conflictsOf(merge: MergeTreeOutput): Conflict[] {
   }
   return [...byPath.values()];
 }
+
+/** The conflicts whose file is written with markers in it. */
+const MARKED_KINDS: readonly ConflictKind[] = ['bothChanged', 'bothAdded'];
+
+const leavesMarkers = (conflict: Conflict): boolean => MARKED_KINDS.includes(conflict.kind);
 
 /** Each change under every path it names, so a rename is found by either name. */
 const changedPaths = (changes: readonly Change[]): Map<string, Change> =>
@@ -250,10 +261,18 @@ export class MergePlan {
     return counts;
   }
 
+  /** Whether any conflicted file is written with conflict markers in it. */
+  public hasMarkedConflicts(): boolean {
+    return this.conflicts.some(leavesMarkers);
+  }
+
+  /** Whether any conflicted file is left without markers, for you to keep or remove. */
+  public hasUnmarkedConflicts(): boolean {
+    return this.conflicts.some((conflict) => !leavesMarkers(conflict));
+  }
+
   /** Whether the file at `path` is written with conflict markers in it. */
   public hasMarkers(path: RelativeFilePath): boolean {
-    return this.conflicts.some(
-      (conflict) => conflict.path.isEqual(path) && (conflict.kind === 'bothChanged' || conflict.kind === 'bothAdded')
-    );
+    return this.conflicts.some((conflict) => conflict.path.isEqual(path) && leavesMarkers(conflict));
   }
 }

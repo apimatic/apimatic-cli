@@ -8,6 +8,15 @@ describe('SnapshotRef', () => {
     expect(SnapshotRef.pristine('').toString()).to.equal('refs/apimatic/pristine');
   });
 
+  it('maps itself onto itself for push and fetch, forced when the other side may have moved on', () => {
+    const ref = SnapshotRef.pristine('sdk/typescript');
+
+    expect(ref.refspec()).to.equal('refs/apimatic/pristine/sdk/typescript:refs/apimatic/pristine/sdk/typescript');
+    expect(ref.forcedRefspec()).to.equal(
+      '+refs/apimatic/pristine/sdk/typescript:refs/apimatic/pristine/sdk/typescript'
+    );
+  });
+
   it('collides only with a ref on its own path, in either direction', () => {
     const typescript = SnapshotRef.pristine('sdk/typescript');
 

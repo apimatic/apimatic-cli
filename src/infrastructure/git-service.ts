@@ -320,8 +320,8 @@ export class GitService {
 
   /** Sends `ref` to `remote` as a fast-forward; a ref that moved on at the remote is reported as rejected, never forced. */
   public async pushRef(root: DirectoryPath, remote: string, ref: SnapshotRef): Promise<PushResult> {
-    const result = await this.runRemote(root, ['push', '--porcelain', remote, `${ref}:${ref}`]);
-    const status = result.stdout.split('\n').find((line) => line.includes(`${ref}:${ref}`));
+    const result = await this.runRemote(root, ['push', '--porcelain', remote, ref.refspec()]);
+    const status = result.stdout.split('\n').find((line) => line.includes(ref.refspec()));
     if (status === undefined) {
       throw new GitError(`git push failed: ${result.stderr.trim() || `exit code ${result.exitCode}`}`);
     }

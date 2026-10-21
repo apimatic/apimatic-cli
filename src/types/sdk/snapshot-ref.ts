@@ -33,6 +33,16 @@ export class SnapshotRef {
     );
   }
 
+  /** This ref onto itself, as `git push` and `git fetch` take it to move the ref between repositories. */
+  public refspec(): string {
+    return `${this.name}:${this.name}`;
+  }
+
+  /** As `refspec`, but taking the other side's ref even where it moved on. */
+  public forcedRefspec(): string {
+    return `+${this.name}:${this.name}`;
+  }
+
   public isEqual(other: SnapshotRef): boolean {
     return this.name === other.name;
   }

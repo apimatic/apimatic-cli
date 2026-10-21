@@ -2,8 +2,8 @@ import { log } from '@clack/prompts';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { RelativeFilePath } from '../../types/file/relativeFilePath.js';
 import { SdkSaveProblem } from '../../types/sdk-context.js';
-import { SdkRepositoryContext } from '../../types/sdk-repository-context.js';
-import { Conflict, ConflictKind, MergeFiles, MergePlan } from '../../types/sdk/merge-plan.js';
+import { ConflictKind, GENERATOR_FILES, MergePlan, YOUR_FILES } from '../../types/sdk/merge-plan.js';
+import { SnapshotRef } from '../../types/sdk/snapshot-ref.js';
 import { listedInProse } from '../../utils/string-utils.js';
 import { format as f } from '../format.js';
 import { noteWrapped } from '../prompt.js';
@@ -17,19 +17,16 @@ const CONFLICT_LABELS: Record<ConflictKind, string> = {
   other: ''
 };
 
-const MARKED_KINDS: readonly ConflictKind[] = ['bothChanged', 'bothAdded'];
-
 /** The generator's own files are a count; the developer's are named. */
-const GENERATOR_FILES: readonly (keyof MergeFiles)[] = ['added', 'updated', 'removed'];
-const YOUR_FILES: Readonly<Partial<Record<keyof MergeFiles, string>>> = {
+const YOUR_FILE_HEADINGS: Record<(typeof YOUR_FILES)[number], string> = {
   merged: 'Merged with your changes:',
   kept: 'Kept as you edited:'
 };
 
 const plural = (count: number, noun: string) => `${count} ${noun}${count === 1 ? '' : 's'}`;
 
-const listed = (repository: SdkRepositoryContext, paths: readonly RelativeFilePath[]) =>
-  paths.map((relative) => `  ${f.relativePath(relative.in(repository.sdkDirectory()))}`);
+const listed = (sdk: DirectoryPath, paths: readonly RelativeFilePath[]) =>
+  paths.map((relative) => `  ${f.relativePath(relative.in(sdk))}`);
 
 export class SdkWritePrompts {
   public sdkNotSaved(problem: SdkSaveProblem) {
@@ -72,16 +69,15 @@ export class SdkWritePrompts {
     log.info(message);
   }
 
-  public snapshotNotShared(remote: string, reason: string, repository: SdkRepositoryContext) {
-    const ref = repository.pristineRef().toString();
+  public snapshotNotShared(remote: string, reason: string, ref: SnapshotRef) {
     const message =
       `The SDK's snapshot could not be pushed to ${f.var(remote)}: ${reason}\n` +
       `A clone will replace the SDK instead of merging until it is shared; ` +
-      `${f.cmd('git', 'push', remote, `${ref}:${ref}`)} does it by hand.`;
+      `${f.cmd('git', 'push', remote, ref.refspec())} does it by hand.`;
     log.warn(message);
   }
 
-  public sdkMerged(repository: SdkRepositoryContext, plan: MergePlan) {
+  public sdkMerged(sdk: DirectoryPath, plan: MergePlan) {
     const generated = GENERATOR_FILES.filter((kind) => plan.files[kind].length > 0).map(
       (kind) => `${plural(plan.files[kind].length, 'file')} ${kind}`
     );
@@ -89,24 +85,22 @@ export class SdkWritePrompts {
       generated.push(`${plural(plan.conflicts.length, 'file')} in conflict`);
     }
     const summary = listedInProse(generated) || 'nothing changed';
-    const lines = [`Regenerated the SDK at ${f.relativePath(repository.sdkDirectory())}: ${summary}.`];
-    for (const [kind, heading] of Object.entries(YOUR_FILES) as [keyof MergeFiles, string][]) {
+    const lines = [`Regenerated the SDK at ${f.relativePath(sdk)}: ${summary}.`];
+    for (const kind of YOUR_FILES) {
       if (plan.files[kind].length > 0) {
-        lines.push(heading, ...listed(repository, plan.files[kind]));
+        lines.push(YOUR_FILE_HEADINGS[kind], ...listed(sdk, plan.files[kind]));
       }
     }
     log.info(lines.join('\n'));
   }
 
-  public conflicts(conflicts: readonly Conflict[], repository: SdkRepositoryContext) {
+  public conflicts(plan: MergePlan, sdk: DirectoryPath, previous: SnapshotRef) {
+    const { conflicts } = plan;
     const lines = conflicts.map(
-      (conflict) =>
-        `${f.relativePath(conflict.path.in(repository.sdkDirectory()))}\n  ${
-          conflict.message ?? CONFLICT_LABELS[conflict.kind]
-        }`
+      (conflict) => `${f.relativePath(conflict.path.in(sdk))}\n  ${conflict.message ?? CONFLICT_LABELS[conflict.kind]}`
     );
-    const marked = conflicts.some((conflict) => MARKED_KINDS.includes(conflict.kind));
-    const unmarked = conflicts.some((conflict) => !MARKED_KINDS.includes(conflict.kind));
+    const marked = plan.hasMarkedConflicts();
+    const unmarked = plan.hasUnmarkedConflicts();
     const steps = [
       ...(marked
         ? [
@@ -122,7 +116,7 @@ export class SdkWritePrompts {
           ]
         : []),
       'Rerun the command; nothing needs committing first.',
-      `The directory as it was before this run is under ${f.var(repository.previousRef().toString())}.`
+      `The directory as it was before this run is under ${f.var(previous.toString())}.`
     ];
     noteWrapped(
       [...lines, '', ...steps.map((step, index) => `${index + 1}. ${step}`)].join('\n'),
