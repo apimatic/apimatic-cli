@@ -40,7 +40,13 @@ export default [
         before: 'readonly',
         beforeEach: 'readonly',
         after: 'readonly',
-        afterEach: 'readonly'
+        afterEach: 'readonly',
+        // The portal template's browser code is tested against Node's own fetch API.
+        fetch: 'readonly',
+        Headers: 'readonly',
+        Response: 'readonly',
+        RequestInfo: 'readonly',
+        RequestInit: 'readonly'
       }
     },
     rules: {

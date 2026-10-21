@@ -1,11 +1,69 @@
 import { stripVTControlCharacters } from 'node:util';
 import { expect } from 'chai';
 import sinon from 'sinon';
+import { log } from '@clack/prompts';
 import { PortalGeneratePrompts } from '../../../src/prompts/portal/generate.js';
 import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
 import { SiteAddress } from '../../../src/types/portal/config/site-address.js';
 
 describe('PortalGeneratePrompts', () => {
+  describe('when Ask AI gets no pages', () => {
+    const warned = (say: (prompts: PortalGeneratePrompts) => void) => {
+      const warn = sinon.stub(log, 'warn');
+      try {
+        say(new PortalGeneratePrompts());
+      } finally {
+        warn.restore();
+      }
+      return stripVTControlCharacters(String(warn.firstCall.args[0]));
+    };
+
+    it('tells a portal with no pages that it has none', () => {
+      expect(warned((prompts) => prompts.copilotPagesNotFound())).to.equal(
+        'The portal has no pages for Ask AI to answer from, so none were added to it.'
+      );
+    });
+
+    it('tells a build that wrote none to generate again, not to look through the docs', () => {
+      const message = warned((prompts) => prompts.copilotPagesNotBuilt());
+
+      expect(message).to.contain('The build wrote no pages for Ask AI');
+      expect(message).to.contain('Generate the portal again');
+      expect(message).to.contain('support@apimatic.io');
+      expect(message).to.not.contain('has no pages');
+    });
+  });
+
+  describe('how Ask AI gets the pages', () => {
+    const printed = (url: string | null) => {
+      const site = url === null ? null : SiteAddress.parse(url, 'portal.site.url')._unsafeUnwrap();
+      const info = sinon.stub(log, 'info');
+      try {
+        new PortalGeneratePrompts().copilotUpdatesAfterDeploy(site);
+      } finally {
+        info.restore();
+      }
+      return stripVTControlCharacters(String(info.firstCall.args[0]));
+    };
+
+    it('says the service picks them up from a portal with an address, with sync for one it cannot reach', () => {
+      const message = printed('https://example.com/docs');
+
+      expect(message).to.contain(
+        'picks up these pages by itself once the portal is deployed at https://example.com/docs'
+      );
+      expect(message).to.contain('cannot reach it there, run apimatic portal copilot sync after deploying');
+    });
+
+    it('sends a portal without an address to sync, since the service cannot find it', () => {
+      const message = printed(null);
+
+      expect(message).to.contain('Deploy the portal, then run apimatic portal copilot sync');
+      expect(message).to.contain('cannot find the portal by itself');
+      expect(message).to.not.contain('by itself once');
+    });
+  });
+
   describe('the next steps', () => {
     const portal = new DirectoryPath('portal');
 

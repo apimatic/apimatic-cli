@@ -23,6 +23,7 @@ import { PortalArtifacts } from '../../src/types/portal/portal-artifacts';
 import { PortalLanguages } from '../../src/types/portal/portal-languages';
 import { PortalSource } from '../../src/types/portal/portal-source';
 import { PortalStylesheet } from '../../src/types/portal/portal-stylesheet';
+import { PortalCopilotEntry } from '../../src/types/portal/portal-copilot-entry';
 import { Language } from '../../src/types/sdk/generate';
 
 const NO_ARTIFACTS = PortalArtifacts.none();
@@ -256,6 +257,22 @@ describe('PortalProjectService', () => {
       const styles = path.join(project.toString(), 'src/styles');
       expect(fs.readFileSync(path.join(styles, 'theme.css'), 'utf8')).to.equal(PortalStylesheet.of(config).toString());
       expect(fs.readFileSync(path.join(styles, 'app.css'), 'utf8')).to.contain("@import './theme.css';");
+    });
+
+    // `portal serve` rewrites it as the block changes, and the dev server reloads the layout with it.
+    it('writes the module the layout takes the Ask AI chat from, and rewrites it as the block changes', async () => {
+      const entry = () => fs.readFileSync(path.join(project.toString(), 'src/lib/copilot-entry.ts'), 'utf8');
+      const withoutChat = configFor({ site: { name: 'My API' } });
+      const withChat = configFor({
+        site: { name: 'My API' },
+        ai: { copilot: { key: 'pk_test', apiUrl: 'https://ask.apimatic.io' } }
+      });
+
+      (await service.prepare(project, sourceFor({ config: withoutChat }), NO_ARTIFACTS))._unsafeUnwrap();
+      expect(entry()).to.equal(PortalCopilotEntry.of(withoutChat).toString());
+
+      expect((await service.applyConfig(project, settingsFor(withChat)))._unsafeUnwrap()).to.be.true;
+      expect(entry()).to.equal(PortalCopilotEntry.of(withChat).toString());
     });
 
     it('leaves no identity placeholder in the module the browser receives', async () => {

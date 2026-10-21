@@ -17,7 +17,7 @@ import { staticImages } from './static-images.ts';
 export default defineConfig(async ({ command, isPreview }) => {
   const [paths, identity] = await Promise.all([readBuildPaths(), readPortalIdentity()]);
   // `vite dev` prerenders nothing, and listing the pages bundles every spec: one that fails would stop it starting.
-  const pages = command === 'serve' && !isPreview ? [] : await prerenderPages(paths, identity.siteUrl);
+  const pages = command === 'serve' && !isPreview ? [] : await prerenderPages(paths, identity);
   const publicDir: string | false = paths.staticDir ?? false;
   const portalProjectDirectory = fileURLToPath(new URL('.', import.meta.url));
 

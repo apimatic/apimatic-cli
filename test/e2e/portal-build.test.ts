@@ -12,6 +12,8 @@ import { DirectoryPath } from '../../src/types/file/directoryPath';
 import { FilePath } from '../../src/types/file/filePath';
 import { CodeSampleCatalog, CodeSampleCatalogs } from '../../src/types/portal/code-samples';
 import { PortalArtifacts } from '../../src/types/portal/portal-artifacts';
+import { BundlePage } from '../../src/types/portal/copilot/copilot-bundle';
+import { COPILOT_PAGES_FILE } from '../../src/types/portal/copilot/generated-portal-context';
 import { Language } from '../../src/types/sdk/generate';
 import { canonical } from '../../src/infrastructure/tmp-extensions';
 
@@ -160,12 +162,65 @@ async function typeCheck(project: DirectoryPath) {
   );
 }
 
+/** Published files naming one of these build-machine directories, in any spelling. */
+function publishedFilesNaming(output: DirectoryPath, ...directories: string[]): string[] {
+  // Three spellings of each: a bundler normalises separators either way, and a Windows
+  // path embedded in a string literal has its backslashes escaped.
+  const secrets = directories.flatMap((absolute) => {
+    const native = absolute.replace(/\//g, '\\');
+    return [native, native.replace(/\\/g, '\\\\'), absolute.replace(/\\/g, '/')];
+  });
+
+  const walk = (directory: string): string[] =>
+    fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+      const child = path.join(directory, entry.name);
+      return entry.isDirectory() ? walk(child) : [child];
+    });
+
+  return (
+    walk(output.toString())
+      // Images and fonts cannot carry a path the build put there, and reading them as text
+      // only invites a false match.
+      .filter((file) => !/\.(png|jpe?g|gif|svg|ico|woff2?)$/i.test(file))
+      .filter((file) => {
+        const content = fs.readFileSync(file, 'utf8');
+        return secrets.some((secret) => content.includes(secret));
+      })
+      .map((file) => path.relative(output.toString(), file))
+  );
+}
+
 /** The browser's scripts, by name. */
 const scriptsOf = (output: DirectoryPath) =>
   fs
     .readdirSync(path.join(output.toString(), 'assets'))
     .filter((name) => name.endsWith('.js'))
     .map((name) => ({ name, text: fs.readFileSync(path.join(output.toString(), 'assets', name), 'utf8') }));
+
+/** Code only the Ask AI chat carries: the address it opens a session at. */
+const CHAT_CODE = '/v1/sessions';
+
+/** A class only the Ask AI chat uses, on its source chips' numbers. */
+const CHAT_CLASS = '.text-\\[10\\.5px\\]';
+
+/**
+ * The scripts a page loads before anything asks for more: those its HTML names, and every one
+ * they import in turn. A chunk reached only through `import()` is left out.
+ */
+function scriptsLoadedBy(output: DirectoryPath, page: string): string[] {
+  const assets = path.join(output.toString(), 'assets');
+  const named = (text: string, pattern: RegExp) =>
+    [...text.matchAll(pattern)].map((match) => path.basename(match[1]!)).filter((name) => name.endsWith('.js'));
+  const loaded = new Set<string>();
+  const pending = named(page, /(?:src|href)="[^"]*\/assets\/([^"]+)"/g);
+  while (pending.length > 0) {
+    const name = pending.pop()!;
+    if (loaded.has(name) || !fs.existsSync(path.join(assets, name))) continue;
+    loaded.add(name);
+    pending.push(...named(fs.readFileSync(path.join(assets, name), 'utf8'), /(?:from|import)\s*["']\.\/([^"']+)["']/g));
+  }
+  return [...loaded];
+}
 
 const stylesheetOf = (output: DirectoryPath) => {
   const assets = path.join(output.toString(), 'assets');
@@ -249,33 +304,7 @@ const stylesheetOf = (output: DirectoryPath) => {
     expect(offenders).to.deep.equal([]);
   });
 
-  /** Published files naming one of these build-machine directories, in any spelling. */
-  const filesNaming = (...directories: string[]) => {
-    // Three spellings of each: a bundler normalises separators either way, and a Windows
-    // path embedded in a string literal has its backslashes escaped.
-    const secrets = directories.flatMap((absolute) => {
-      const native = absolute.replace(/\//g, '\\');
-      return [native, native.replace(/\\/g, '\\\\'), absolute.replace(/\\/g, '/')];
-    });
-
-    const walk = (directory: string): string[] =>
-      fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
-        const child = path.join(directory, entry.name);
-        return entry.isDirectory() ? walk(child) : [child];
-      });
-
-    return (
-      walk(portal.output().toString())
-        // Images and fonts cannot carry a path the build put there, and reading them as text
-        // only invites a false match.
-        .filter((file) => !/\.(png|jpe?g|gif|svg|ico|woff2?)$/i.test(file))
-        .filter((file) => {
-          const content = fs.readFileSync(file, 'utf8');
-          return secrets.some((secret) => content.includes(secret));
-        })
-        .map((file) => path.relative(portal.output().toString(), file))
-    );
-  };
+  const filesNaming = (...directories: string[]) => publishedFilesNaming(portal.output(), ...directories);
 
   // The `.server` split exists so the build machine's filesystem stays out of what is
   // published: `portal.server.ts` holds the absolute path of every specification, and the
@@ -288,6 +317,14 @@ const stylesheetOf = (output: DirectoryPath) => {
   // `base`, which is why the project reads a copy of the content by a relative name.
   it('publishes no absolute path from the build machine at all', () => {
     expect(filesNaming(fixture.join('content').toString(), fixture.toString())).to.deep.equal([]);
+  });
+
+  // A portal without the chat pays nothing for it, not even a chunk it never loads.
+  it('ships none of the Ask AI chat, neither its code nor its classes', () => {
+    const chat = scriptsOf(portal.output()).filter((script) => script.text.includes(CHAT_CODE));
+
+    expect(chat.map(({ name }) => name)).to.deep.equal([]);
+    expect(stylesheetOf(portal.output())).to.not.contain(CHAT_CLASS);
   });
 
   it('writes the sidebar tree to one cache file instead of into every page payload', () => {
@@ -497,6 +534,15 @@ const stylesheetOf = (output: DirectoryPath) => {
     expect(
       scripts.filter((script) => /contentDir|staticDir/.test(script.text)).map((script) => script.name)
     ).to.deep.equal([]);
+  });
+
+  it('loads no Ask AI chat code in a portal that offers no chat', () => {
+    const output = portal.output();
+    const loaded = scriptsLoadedBy(output, read('index.html'));
+
+    expect(loaded, 'the page names its scripts').to.not.be.empty;
+    expect(loaded.filter((name) => read('assets/' + name).includes(CHAT_CODE))).to.deep.equal([]);
+    expect(read('index.html')).to.not.contain('>Ask AI<');
   });
 
   it('bundles Geist and loads the neutral theme', () => {
@@ -981,5 +1027,87 @@ const stylesheetOf = (output: DirectoryPath) => {
   it('reads a schema kept in another file of the folder', () => {
     expect(read(`${LIST_ORDERS}/index.html`)).to.contain('grandTotalCents');
     expect(read(`${LIST_ORDERS}.md`)).to.contain('grandTotalCents');
+  });
+});
+
+(enabled ? describe : describe.skip)('portal build, with the Ask AI chat (end to end)', function () {
+  this.timeout(10 * 60 * 1000);
+
+  const portal = portalBuilt('copilot');
+  const { read } = portal;
+
+  /** The pages as the build wrote them for `generate`, read without taking them. */
+  const builtPages = () => JSON.parse(read(COPILOT_PAGES_FILE)) as BundlePage[];
+
+  // The chat wraps the whole layout, so a prerender that did not wait for its chunk would leave the button out.
+  it('prerenders each page with the chat button', () => {
+    expect(read('index.html')).to.contain('>Ask AI<');
+  });
+
+  it('keeps the chat in its own chunk, out of what a page loads before it asks for the chat', () => {
+    const output = portal.output();
+    const chat = scriptsOf(output).filter((script) => script.text.includes(CHAT_CODE));
+    const loaded = scriptsLoadedBy(output, read('index.html'));
+
+    expect(chat, 'a chunk carries the chat').to.not.be.empty;
+    expect(loaded.filter((name) => chat.some((script) => script.name === name))).to.deep.equal([]);
+  });
+
+  // The layout takes the chat from a module the CLI writes per portal: this is the one build that has the chat's.
+  it('type-checks with the chat', async () => {
+    const result = await typeCheck(portal.project());
+
+    expect(result.exitCode, result.all).to.equal(0);
+  });
+
+  it("styles the chat, its classes in the portal's stylesheet", () => {
+    expect(stylesheetOf(portal.output())).to.contain(CHAT_CLASS);
+  });
+
+  // `generate` bundles these for the service: every page the build renders, those the navigation leaves
+  // out and those whose names are not ASCII too, and no more.
+  it('writes every page Ask AI answers from, and no more', () => {
+    const pages = builtPages();
+    const twinOf = (page: string) => (page === '/' ? 'index.md' : `${decodeURIComponent(page.slice(1))}.md`);
+    const twins = fs
+      .readdirSync(portal.output().toString(), { recursive: true, encoding: 'utf8' })
+      .filter((file) => file.endsWith('.md'))
+      .map((file) => file.split(path.sep).join('/'));
+
+    expect(pages.map(({ path: page }) => twinOf(page).normalize()).sort()).to.deep.equal(
+      twins.map((twin) => twin.normalize()).sort()
+    );
+    expect(pages.find(({ title }) => title === 'Café')).to.deep.include({
+      description: 'A page whose name is not ASCII.'
+    });
+    expect(pages.map(({ title }) => title)).to.include('Unlisted');
+  });
+
+  // As `llms-full.txt` renders them: each operation's slice of the specification would repeat the schemas it shares.
+  it('renders each page without its specification', () => {
+    const operations = builtPages().filter(({ path: page }) => page.startsWith('/api/'));
+
+    expect(operations, 'the specification has operations').to.not.be.empty;
+    for (const { path: page, markdown } of operations) {
+      expect(markdown, page).to.contain(`(${page})`).and.not.contain('```yaml');
+    }
+  });
+
+  it('tells the browser the public key, the service and the starter questions, and no more', () => {
+    const scripts = scriptsOf(portal.output());
+    // The browser imports this file whole, so what it holds is what every visitor is told.
+    const { copilot } = JSON.parse(
+      fs.readFileSync(path.join(portal.project().toString(), 'portal.identity.json'), 'utf8')
+    ) as { copilot: unknown };
+
+    expect(copilot).to.deep.equal({
+      key: 'pk_test_e2e',
+      apiUrl: 'https://ask.apimatic.io',
+      suggestions: ['How do I list pets?']
+    });
+    expect(scripts.some((script) => script.text.includes('pk_test_e2e'))).to.be.true;
+    expect(scripts.some((script) => script.text.includes('https://ask.apimatic.io'))).to.be.true;
+    const fixture = new DirectoryPath(process.cwd()).join('test/resources/portal-inputs/copilot/src');
+    expect(publishedFilesNaming(portal.output(), portal.project().toString(), fixture.toString())).to.deep.equal([]);
   });
 });

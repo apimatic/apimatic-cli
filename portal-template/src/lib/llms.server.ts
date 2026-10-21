@@ -45,6 +45,27 @@ export async function renderFull(): Promise<string> {
   return pages.join('\n\n');
 }
 
+/** A page as Ask AI reads it: its portal-relative path, as the chat links it, and its Markdown. */
+export interface AssistantPage {
+  path: string;
+  title: string;
+  description: string | null;
+  markdown: string;
+}
+
+// Every page, those the navigation leaves out too, as `llms-full.txt` renders it: without the specifications.
+export async function renderAssistantPages(): Promise<AssistantPage[]> {
+  return await Promise.all(
+    source.getPages().map(async (page) => ({
+      path: page.url,
+      // The service names a page by its title in an answer's sources, so one without a title is named by its path.
+      title: page.data.title ?? page.url,
+      description: page.data.description ?? null,
+      markdown: await render(page, false)
+    }))
+  );
+}
+
 async function render(page: PortalPage, withSpecification: boolean): Promise<string> {
   return page.type === 'openapi' ? renderReference(page, withSpecification) : await renderContent(page);
 }

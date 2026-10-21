@@ -113,4 +113,43 @@ export class PortalGeneratePrompts {
     ].join('\n');
     noteWrapped(message, 'Next steps');
   }
+
+  /**
+   * The service fetches a deployed portal's pages from the portal's address, so only a portal with one
+   * updates Ask AI by itself; `sync` is the way for the rest.
+   */
+  public copilotUpdatesAfterDeploy(site: SiteAddress | null) {
+    if (site === null) {
+      log.info(
+        `Deploy the portal, then run ${syncCommand()} so Ask AI answers from these pages: without ` +
+          `${f.var('site.url')}, the Ask AI service cannot find the portal by itself.`
+      );
+      return;
+    }
+    log.info(
+      `Ask AI picks up these pages by itself once the portal is deployed at ${f.link(site.toString())}. ` +
+        `If the Ask AI service cannot reach it there, run ${syncCommand()} after deploying instead.`
+    );
+  }
+
+  public copilotPagesNotFound() {
+    log.warn('The portal has no pages for Ask AI to answer from, so none were added to it.');
+  }
+
+  // A fault of the build rather than of the docs, so the author is not sent looking through their pages.
+  public copilotPagesNotBuilt() {
+    log.warn(
+      'The build wrote no pages for Ask AI, so none were added to the portal. Generate the portal again, ' +
+        `and if they are still missing, contact ${f.var('support@apimatic.io')}.`
+    );
+  }
+
+  public copilotBundleNotWritten(reason: string) {
+    log.warn(
+      `The pages for Ask AI could not be added to the portal (${reason}), so it is saved without them. ` +
+        `Generate the portal again for Ask AI to answer from it.`
+    );
+  }
 }
+
+const syncCommand = () => f.cmdAlt('apimatic', 'portal', 'copilot', 'sync');

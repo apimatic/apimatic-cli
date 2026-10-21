@@ -33,4 +33,15 @@ export interface Portal {
   links: PortalLink[];
   /** Whether each page offers to open itself in an external AI assistant. */
   pageActions: boolean;
+  /** The Ask AI chat, or null when the portal offers none. */
+  copilot: PortalCopilot | null;
+}
+
+export interface PortalCopilot {
+  /** A public key, bound to this portal and to the origins allowed to use it. */
+  key: string;
+  /** The Ask AI service's origin. */
+  apiUrl: string;
+  /** Starter questions on a new chat; empty for the chat's own. */
+  suggestions: string[];
 }

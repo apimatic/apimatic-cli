@@ -1,21 +1,23 @@
 import { Result } from 'neverthrow';
-import { allOf, namespace, optionalBoolean, Parsed, unknownKeys } from './fields.js';
+import { CopilotConfig, CopilotService, PortalCopilot } from './copilot-config.js';
+import { allOf, namespace, optional, optionalBoolean, Parsed, unknownKeys } from './fields.js';
 
-const KNOWN = ['pageActions'];
+const KNOWN = ['pageActions', 'copilot'];
 
 export class AiConfig {
-  private constructor(private readonly pageActions: boolean) {}
+  private constructor(private readonly pageActions: boolean, private readonly copilotSettings: CopilotConfig | null) {}
 
-  public static readonly defaults = new AiConfig(true);
+  public static readonly defaults = new AiConfig(true, null);
 
   public static parse(value: unknown, path: string): Parsed<AiConfig> {
     return namespace(value, path).andThen((data) =>
       allOf(
         unknownKeys(data, KNOWN, path),
         Result.combineWithAllErrors([
-          optionalBoolean(data.pageActions, `${path}.pageActions`, AiConfig.defaults.pageActions)
+          optionalBoolean(data.pageActions, `${path}.pageActions`, AiConfig.defaults.pageActions),
+          optional(data.copilot, (present) => CopilotConfig.parse(present, `${path}.copilot`))
         ])
-      ).map(([pageActions]) => new AiConfig(pageActions))
+      ).map(([pageActions, copilot]) => new AiConfig(pageActions, copilot))
     );
   }
 
@@ -27,7 +29,20 @@ export class AiConfig {
     return this.pageActions;
   }
 
-  public toJSON(): { pageActions: boolean } {
-    return { pageActions: this.pageActions };
+  /** The Ask AI chat the portal offers, or null when it offers none. */
+  public copilot(): PortalCopilot | null {
+    return this.copilotSettings?.identity() ?? null;
+  }
+
+  /** The service the Ask AI chat is on, or null when the portal offers none. */
+  public copilotService(): CopilotService | null {
+    return this.copilotSettings?.service() ?? null;
+  }
+
+  public toJSON(): { pageActions: boolean; copilot?: ReturnType<CopilotConfig['toJSON']> } {
+    return {
+      pageActions: this.pageActions,
+      ...(this.copilotSettings === null ? {} : { copilot: this.copilotSettings.toJSON() })
+    };
   }
 }

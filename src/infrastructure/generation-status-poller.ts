@@ -21,25 +21,39 @@ export interface GenerationStatus {
 
 export type ValidationErrorFormatter = (errors: Record<string, string[]>) => string;
 
+/**
+ * Bounds a run whose status never settles. `label` opens the message.
+ * The budget is only read between polls, so `fetchStatus` must bound its own request —
+ * one that connects and never answers outlives any budget set here.
+ */
+export interface PollTimeout {
+  budgetMs: number;
+  label: string;
+}
+
 export interface GenerationPoll<T extends GenerationStatus> {
   pollIntervalMs: number;
   fetchStatus: () => Promise<Result<T, ServiceError>>;
-  /**
-   * Bounds a run whose status never reaches a terminal value. `label` opens the message.
-   * The budget is only read between polls, so `fetchStatus` must bound its own request —
-   * one that connects and never answers outlives any budget set here.
-   */
-  timeout: { budgetMs: number; label: string };
+  timeout: PollTimeout;
   /** Only when the endpoint needs custom validation wording. */
   formatValidationError?: ValidationErrorFormatter;
 }
 
-export async function pollUntilCompleted<T extends GenerationStatus>({
+export interface StatusPoll<S, T> {
+  pollIntervalMs: number;
+  fetchStatus: () => Promise<Result<S, ServiceError>>;
+  timeout: PollTimeout;
+  /** What a status ends the run with, or null while the run is still going. */
+  settle: (status: S) => Result<T, ServiceError> | null;
+}
+
+/** Polls until `settle` ends the run, or the timeout does. */
+export async function pollUntilSettled<S, T>({
   pollIntervalMs,
   fetchStatus,
   timeout,
-  formatValidationError = formatValidationErrors
-}: GenerationPoll<T>): Promise<Result<T, ServiceError>> {
+  settle
+}: StatusPoll<S, T>): Promise<Result<T, ServiceError>> {
   const deadline = Date.now() + timeout.budgetMs;
 
   for (;;) {
@@ -50,32 +64,53 @@ export async function pollUntilCompleted<T extends GenerationStatus>({
       return err(statusResult.error);
     }
 
-    const { status, errors } = statusResult.value;
-
-    if (status === Status.Completed) {
-      return ok(statusResult.value);
-    }
-    if (status === Status.Failed) {
-      return err(ServiceError.ServerError);
-    }
-    if (status === Status.ValidationError) {
-      const validationErrors = asMessages(errors);
-      return err(ServiceError.badRequest(formatValidationError(validationErrors), validationErrors));
-    }
-    if (status === Status.SubscriptionError) {
-      const message = Object.values(asMessages(errors)).flat()[0];
-      return err(ServiceError.forbidden('Access denied to resource.' + (message ? '\n' + bulleted([message]) : '')));
+    const settled = settle(statusResult.value);
+    if (settled !== null) {
+      return settled;
     }
 
-    // Every other status keeps the run alive rather than ending it: an endpoint reporting
-    // its own in-flight vocabulary is healthy, and the plugin orchestrator reports
-    // `Unknown` until it writes a custom status. The deadline is what stops a genuinely
-    // stuck run, and it is read after the status so a run that finished during the last
-    // wait still counts.
+    // The deadline is what stops a genuinely stuck run, and it is read after the status
+    // so a run that finished during the last wait still counts.
     if (Date.now() >= deadline) {
       return err(ServiceError.timeout(timedOutMessage(timeout.label, timeout.budgetMs)));
     }
   }
+}
+
+export async function pollUntilCompleted<T extends GenerationStatus>({
+  pollIntervalMs,
+  fetchStatus,
+  timeout,
+  formatValidationError = formatValidationErrors
+}: GenerationPoll<T>): Promise<Result<T, ServiceError>> {
+  return pollUntilSettled({
+    pollIntervalMs,
+    fetchStatus,
+    timeout,
+    settle: (current): Result<T, ServiceError> | null => {
+      const { status, errors } = current;
+
+      if (status === Status.Completed) {
+        return ok(current);
+      }
+      if (status === Status.Failed) {
+        return err(ServiceError.ServerError);
+      }
+      if (status === Status.ValidationError) {
+        const validationErrors = asMessages(errors);
+        return err(ServiceError.badRequest(formatValidationError(validationErrors), validationErrors));
+      }
+      if (status === Status.SubscriptionError) {
+        const message = Object.values(asMessages(errors)).flat()[0];
+        return err(ServiceError.forbidden('Access denied to resource.' + (message ? '\n' + bulleted([message]) : '')));
+      }
+
+      // Every other status keeps the run alive rather than ending it: an endpoint reporting
+      // its own in-flight vocabulary is healthy, and the plugin orchestrator reports
+      // `Unknown` until it writes a custom status.
+      return null;
+    }
+  });
 }
 
 /** Each message under a bullet of its own, any further line of it indented beneath. */
