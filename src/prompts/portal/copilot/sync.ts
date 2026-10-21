@@ -85,7 +85,7 @@ export class PortalCopilotSyncPrompts {
     switch (error.code) {
       case ServiceErrorCode.NetworkError:
         log.error(
-          `The Ask AI service at ${f.link(`${service}`)} could not be reached. Check the address and try again.`
+          `The Ask AI service at ${f.link(service.toString())} could not be reached. Check the address and try again.`
         );
         return;
       case ServiceErrorCode.Forbidden:
