@@ -127,7 +127,7 @@ export class PortalGeneratePrompts {
       return;
     }
     log.info(
-      `Ask AI picks up these pages by itself once the portal is deployed at ${f.link(`${site}`)}. ` +
+      `Ask AI picks up these pages by itself once the portal is deployed at ${f.link(site.toString())}. ` +
         `If the Ask AI service cannot reach it there, run ${syncCommand()} after deploying instead.`
     );
   }
