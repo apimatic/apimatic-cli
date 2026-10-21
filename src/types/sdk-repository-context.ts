@@ -20,13 +20,22 @@ export type SdkRepositoryProblem = {
   reason: string;
 };
 
+/** Why a recorded snapshot is still absent after the one place it could have come from was tried. */
+export type SnapshotFetch =
+  | { kind: 'noRemote' }
+  | { kind: 'absent'; remote: string }
+  | { kind: 'failed'; remote: string; reason: string };
+
 /** What the repository knows about its SDK directory before a run, from the record and the refs. */
 export type SdkRepositoryState =
   | { kind: 'noRecord' }
   | { kind: 'otherGeneration'; recorded: SdkGeneration }
-  | { kind: 'snapshotMissing'; commit: CommitId }
-  | { kind: 'unresolved'; paths: RelativeFilePath[] }
-  | { kind: 'ready'; base: CommitId };
+  | { kind: 'snapshotMissing'; commit: CommitId; fetch: SnapshotFetch }
+  | { kind: 'unresolved'; paths: RelativeFilePath[]; fetchedFrom?: string }
+  | { kind: 'ready'; base: CommitId; fetchedFrom?: string };
+
+/** What sharing a snapshot did at the remote. */
+export type SnapshotShare = 'pushed' | 'upToDate' | 'joined';
 
 /** The plan, the merged tree, and git's versions of every conflicted path, below the SDK directory. */
 export type MergeOutcome = { plan: MergePlan; merged: TreeId; stages: StageEntry[] };
@@ -77,8 +86,19 @@ export class SdkRepositoryContext {
     return relative.below(this.sdkPath());
   }
 
-  /** Everything a run needs to know before it decides how to write; a nested SDK directory is the one refusal. */
-  public async inspect(generation: SdkGeneration): Promise<Result<SdkRepositoryState, SdkRepositoryProblem>> {
+  /** The remote the SDK's snapshots are shared through: where the current branch pushes, else `origin`. */
+  public async remote(): Promise<string | undefined> {
+    return this.git.remoteOf(this.rootDirectory);
+  }
+
+  /**
+   * Everything a run needs to know before it decides how to write; a nested SDK directory is
+   * the one refusal. A recorded snapshot the repository lacks is fetched from `remote` first.
+   */
+  public async inspect(
+    generation: SdkGeneration,
+    remote: string | undefined
+  ): Promise<Result<SdkRepositoryState, SdkRepositoryProblem>> {
     const notNested = await this.verifyNotNested();
     if (notNested.isErr()) {
       return err(notNested.error);
@@ -91,11 +111,51 @@ export class SdkRepositoryContext {
       return ok({ kind: 'otherGeneration', recorded: record.generatedAs() });
     }
     const base = record.pristineCommit();
+    let fetchedFrom: string | undefined;
     if (!(await this.git.hasCommit(this.rootDirectory, base))) {
-      return ok({ kind: 'snapshotMissing', commit: base });
+      if (remote === undefined) {
+        return ok({ kind: 'snapshotMissing', commit: base, fetch: { kind: 'noRemote' } });
+      }
+      const fetched = await this.fetchSnapshots(remote);
+      if (fetched.isErr()) {
+        return ok({
+          kind: 'snapshotMissing',
+          commit: base,
+          fetch: { kind: 'failed', remote, reason: fetched.error.reason }
+        });
+      }
+      if (!(await this.git.hasCommit(this.rootDirectory, base))) {
+        return ok({ kind: 'snapshotMissing', commit: base, fetch: { kind: 'absent', remote } });
+      }
+      fetchedFrom = remote;
     }
     const paths = await this.unresolvedConflicts(record);
-    return ok(paths.length > 0 ? { kind: 'unresolved', paths } : { kind: 'ready', base });
+    return ok(paths.length > 0 ? { kind: 'unresolved', paths, fetchedFrom } : { kind: 'ready', base, fetchedFrom });
+  }
+
+  /**
+   * Sends the pristine chain to `remote`. A chain that moved on there (another machine
+   * generated too) is joined into this one, so every snapshot stays reachable and the push is
+   * a fast-forward; nothing is ever forced.
+   */
+  public async shareSnapshot(remote: string): Promise<Result<SnapshotShare, SdkRepositoryProblem>> {
+    try {
+      const first = await this.git.pushRef(this.rootDirectory, remote, this.pristineRef());
+      if (first !== 'rejected') {
+        return ok(first);
+      }
+      const absorbed = await this.fetchSnapshots(remote);
+      if (absorbed.isErr()) {
+        return err(absorbed.error);
+      }
+      const second = await this.git.pushRef(this.rootDirectory, remote, this.pristineRef());
+      if (second === 'rejected') {
+        return err(gitFailed(`${remote} refused the snapshot twice; try again`));
+      }
+      return ok(second === 'pushed' ? 'joined' : second);
+    } catch (error) {
+      return err(gitFailed(errorMessage(error)));
+    }
   }
 
   /** A freshly generated SDK as a tree: every file, whatever its own `.gitignore` says. */
@@ -242,6 +302,35 @@ export class SdkRepositoryContext {
         this.rootDirectory,
         outcome.stages.map((entry) => ({ ...entry, path: this.rootRelative(entry.path) }))
       );
+      return ok(undefined);
+    } catch (error) {
+      return err(gitFailed(errorMessage(error)));
+    }
+  }
+
+  // Brings the remote's chain in and makes the local ref reach it: moved onto it when the local
+  // one is behind, left alone when ahead, and joined with a two-parent commit when the two have
+  // diverged, so a later push is a fast-forward that keeps every machine's snapshots.
+  private async fetchSnapshots(remote: string): Promise<Result<void, SdkRepositoryProblem>> {
+    try {
+      const ref = this.pristineRef();
+      const remoteTip = await this.git.fetchRef(this.rootDirectory, remote, ref);
+      if (remoteTip === undefined) {
+        return ok(undefined);
+      }
+      const localTip = await this.git.resolveRef(this.rootDirectory, ref);
+      if (localTip === undefined || (await this.git.isAncestor(this.rootDirectory, localTip, remoteTip))) {
+        await this.git.updateRef(this.rootDirectory, ref, remoteTip);
+      } else if (!(await this.git.isAncestor(this.rootDirectory, remoteTip, localTip))) {
+        const tree = await this.git.treeOfCommit(this.rootDirectory, localTip);
+        const joined = await this.git.commitTree(
+          this.rootDirectory,
+          tree,
+          [localTip, remoteTip],
+          'apimatic: pristine chains joined'
+        );
+        await this.git.updateRef(this.rootDirectory, ref, joined);
+      }
       return ok(undefined);
     } catch (error) {
       return err(gitFailed(errorMessage(error)));

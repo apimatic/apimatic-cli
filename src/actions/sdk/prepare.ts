@@ -51,9 +51,10 @@ export class SdkPrepareAction {
 
     const repository = await sdkContext.repository();
     if (repository === undefined) {
-      return ActionResult.success<SdkDestination>({ kind: 'record', repository });
+      return ActionResult.success<SdkDestination>({ kind: 'record', repository, remote: undefined });
     }
-    const state = await repository.inspect(generation);
+    const remote = await repository.remote();
+    const state = await repository.inspect(generation, remote);
     if (state.isErr()) {
       if (state.error.kind === 'nestedSdkDirectory') {
         this.prompts.nestedSdkDirectory(state.error.reason);
@@ -64,18 +65,24 @@ export class SdkPrepareAction {
     }
     switch (state.value.kind) {
       case 'noRecord':
-        return ActionResult.success<SdkDestination>({ kind: 'record', repository });
+        return ActionResult.success<SdkDestination>({ kind: 'record', repository, remote });
       case 'otherGeneration':
         this.prompts.recordNotForThisGeneration(state.value.recorded, generation, sdkContext.directory());
-        return ActionResult.success<SdkDestination>({ kind: 'record', repository });
+        return ActionResult.success<SdkDestination>({ kind: 'record', repository, remote });
       case 'snapshotMissing':
-        this.prompts.snapshotMissing(state.value.commit, repository);
-        return ActionResult.success<SdkDestination>({ kind: 'record', repository });
+        this.prompts.snapshotMissing(state.value.commit, repository, state.value.fetch);
+        return ActionResult.success<SdkDestination>({ kind: 'record', repository, remote });
       case 'unresolved':
+        if (state.value.fetchedFrom !== undefined) {
+          this.prompts.snapshotsFetched(state.value.fetchedFrom);
+        }
         this.prompts.conflictsUnresolved(state.value.paths, repository);
         return ActionResult.failed();
       case 'ready':
-        return ActionResult.success<SdkDestination>({ kind: 'merge', repository, base: state.value.base });
+        if (state.value.fetchedFrom !== undefined) {
+          this.prompts.snapshotsFetched(state.value.fetchedFrom);
+        }
+        return ActionResult.success<SdkDestination>({ kind: 'merge', repository, base: state.value.base, remote });
     }
   }
 }

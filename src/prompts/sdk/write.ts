@@ -65,6 +65,22 @@ export class SdkWritePrompts {
     log.warn(message);
   }
 
+  public snapshotShared(remote: string, joined: boolean) {
+    const message = joined
+      ? `Pushed the SDK's snapshot to ${f.var(remote)}, joined with the one another machine pushed meanwhile.`
+      : `Pushed the SDK's snapshot to ${f.var(remote)}, so a clone can merge too.`;
+    log.info(message);
+  }
+
+  public snapshotNotShared(remote: string, reason: string, repository: SdkRepositoryContext) {
+    const ref = repository.pristineRef().toString();
+    const message =
+      `The SDK's snapshot could not be pushed to ${f.var(remote)}: ${reason}\n` +
+      `A clone will replace the SDK instead of merging until it is shared; ` +
+      `${f.cmd('git', 'push', remote, `${ref}:${ref}`)} does it by hand.`;
+    log.warn(message);
+  }
+
   public sdkMerged(repository: SdkRepositoryContext, plan: MergePlan) {
     const generated = GENERATOR_FILES.filter((kind) => plan.files[kind].length > 0).map(
       (kind) => `${plural(plan.files[kind].length, 'file')} ${kind}`

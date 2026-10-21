@@ -28,9 +28,9 @@ export class SdkWriteAction {
       case 'overwrite':
         return this.overwrite(sdkContext, tempSdk, destination.zip);
       case 'record':
-        return this.overwriteAndRecord(destination.repository, sdkContext, tempSdk, generation);
+        return this.overwriteAndRecord(destination.repository, destination.remote, sdkContext, tempSdk, generation);
       case 'merge':
-        return this.merge(destination.repository, destination.base, tempSdk, generation);
+        return this.merge(destination.repository, destination.base, destination.remote, tempSdk, generation);
     }
   };
 
@@ -48,6 +48,7 @@ export class SdkWriteAction {
   // and before the write, which the generator's output cannot collide with.
   private async overwriteAndRecord(
     enclosing: SdkRepositoryContext | undefined,
+    remote: string | undefined,
     sdkContext: SdkContext,
     tempSdk: DirectoryPath,
     generation: SdkGeneration
@@ -66,7 +67,7 @@ export class SdkWriteAction {
       this.prompts.repositoryInitialised(sdk);
     }
     const generated = await repository.value.snapshotGenerated(tempSdk);
-    await this.record(repository.value, generated, generation, []);
+    await this.record(repository.value, generated, generation, [], remote);
     this.prompts.sdkGenerated(sdk);
     return ActionResult.success();
   }
@@ -74,6 +75,7 @@ export class SdkWriteAction {
   private async merge(
     repository: SdkRepositoryContext,
     base: CommitId,
+    remote: string | undefined,
     tempSdk: DirectoryPath,
     generation: SdkGeneration
   ): Promise<ActionResult<void, MergePlan>> {
@@ -98,7 +100,7 @@ export class SdkWriteAction {
     if (applied.isErr()) {
       return this.customCodeFailed(applied.error);
     }
-    await this.record(repository, generated, generation, plan.conflictedPaths());
+    await this.record(repository, generated, generation, plan.conflictedPaths(), remote);
     this.prompts.sdkMerged(repository, plan);
     if (!plan.hasConflicts()) {
       return ActionResult.success();
@@ -117,12 +119,14 @@ export class SdkWriteAction {
   }
 
   // The SDK is already on disk when this runs, so a failure here is a warning: the next run
-  // asks before replacing it, as it would any directory without a record.
+  // asks before replacing it, as it would any directory without a record. Sharing the snapshot
+  // is a warning too: the developer can push the ref by hand, and teammates ask until then.
   private async record(
     repository: SdkRepositoryContext,
     generated: Result<TreeId, SdkRepositoryProblem>,
     generation: SdkGeneration,
-    conflicts: readonly RelativeFilePath[]
+    conflicts: readonly RelativeFilePath[],
+    remote: string | undefined
   ): Promise<void> {
     const recorded = await generated.match(
       (tree) => repository.recordGeneration(tree, generation, envInfo.getCLIVersion(), conflicts),
@@ -130,6 +134,16 @@ export class SdkWriteAction {
     );
     if (recorded.isErr()) {
       this.prompts.snapshotNotRecorded(recorded.error.reason);
+      return;
+    }
+    if (remote === undefined) {
+      return;
+    }
+    const shared = await repository.shareSnapshot(remote);
+    if (shared.isErr()) {
+      this.prompts.snapshotNotShared(remote, shared.error.reason, repository);
+    } else if (shared.value !== 'upToDate') {
+      this.prompts.snapshotShared(remote, shared.value === 'joined');
     }
   }
 }

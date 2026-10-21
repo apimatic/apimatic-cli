@@ -4,8 +4,7 @@ import { RelativeFilePath } from '../../types/file/relativeFilePath.js';
 import { CommitId } from '../../types/sdk/commit-id.js';
 import { describeGeneration, SdkGeneration } from '../../types/sdk/generation-record.js';
 import { GitVersion } from '../../types/sdk/git-version.js';
-import { SdkRepositoryContext } from '../../types/sdk-repository-context.js';
-import { SnapshotRef } from '../../types/sdk/snapshot-ref.js';
+import { SdkRepositoryContext, SnapshotFetch } from '../../types/sdk-repository-context.js';
 import { format as f } from '../format.js';
 
 const plural = (count: number, noun: string) => `${count} ${noun}${count === 1 ? '' : 's'}`;
@@ -52,15 +51,18 @@ export class SdkPreparePrompts {
     log.warn(message);
   }
 
-  public snapshotMissing(commit: CommitId, repository: SdkRepositoryContext) {
-    const refs = `'${SnapshotRef.pristineNamespace()}/*:${SnapshotRef.pristineNamespace()}/*'`;
+  public snapshotMissing(commit: CommitId, repository: SdkRepositoryContext, fetch: SnapshotFetch) {
+    const ref = repository.pristineRef().toString();
     const message =
       `The snapshot this SDK was generated from, commit ${f.var(commit.toString())}, is not in the repository at ` +
-      `${f.relativePath(repository.root())}, so your customizations cannot be merged.\n` +
-      `Whoever generated it can share it with ${f.cmd('git', 'push', 'origin', refs)}\n` +
-      `and you can fetch it with ${f.cmd('git', 'fetch', 'origin', `'+${refs.slice(1)}`)}, then rerun.\n` +
+      `${f.relativePath(repository.root())}, so your customizations cannot be merged. ${whereItWent(fetch)}\n` +
+      `${howToShare(fetch, ref)}\n` +
       `Otherwise the SDK will be replaced and a fresh snapshot recorded.`;
     log.warn(message);
+  }
+
+  public snapshotsFetched(remote: string) {
+    log.info(`Fetched the SDK's snapshots from ${f.var(remote)}.`);
   }
 
   public conflictsUnresolved(paths: readonly RelativeFilePath[], repository: SdkRepositoryContext) {
@@ -71,4 +73,28 @@ export class SdkPreparePrompts {
       paths.map((path) => `  ${f.relativePath(path.in(repository.sdkDirectory()))}`).join('\n');
     log.error(message);
   }
+}
+
+function whereItWent(fetch: SnapshotFetch): string {
+  switch (fetch.kind) {
+    case 'noRemote':
+      return 'The repository has no remote to fetch it from.';
+    case 'absent':
+      return `${f.var(fetch.remote)} does not have it either.`;
+    case 'failed':
+      return `It could not be fetched from ${f.var(fetch.remote)}: ${fetch.reason}`;
+  }
+}
+
+function howToShare(fetch: SnapshotFetch, ref: string): string {
+  const remote = fetch.kind === 'noRemote' ? '<remote>' : fetch.remote;
+  return (
+    `Whoever generated it shares it by regenerating with a remote, or with ${f.cmd(
+      'git',
+      'push',
+      remote,
+      `${ref}:${ref}`
+    )}; ` +
+    `then rerun here${fetch.kind === 'noRemote' ? ` after ${f.cmd('git', 'fetch', remote, `+${ref}:${ref}`)}` : ''}.`
+  );
 }

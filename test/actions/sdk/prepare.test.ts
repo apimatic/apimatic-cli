@@ -89,7 +89,7 @@ describe('SdkPrepareAction', () => {
   }
 
   it('records into a repository still to be made when nothing encloses the SDK directory', async () => {
-    expect((await execute()).getValue()).to.deep.equal({ kind: 'record', repository: undefined });
+    expect((await execute()).getValue()).to.deep.equal({ kind: 'record', repository: undefined, remote: undefined });
   });
 
   it('records into the enclosing repository when the directory has no record', async () => {
@@ -135,7 +135,7 @@ describe('SdkPrepareAction', () => {
       await sh(root, 'init', '-q', '--bare', remote);
       await sh(root, 'remote', 'add', 'origin', remote);
       await sh(root, 'push', '-q', 'origin', 'main');
-      await sh(root, 'clone', '-q', remote, clone);
+      await sh(root, 'clone', '-q', '--no-local', remote, clone);
       sdkContext = new SdkContext(Language.PYTHON, new DirectoryPath(path.join(clone, 'sdk')));
       const snapshotMissing = sinon.stub(SdkPreparePrompts.prototype, 'snapshotMissing');
 
@@ -217,6 +217,44 @@ describe('SdkPrepareAction', () => {
 
       expect((await execute({ force: true })).getValue().kind).to.equal('record');
       expect(overwriteSdk.called).to.be.false;
+    });
+  });
+
+  describe('sharing through the remote', () => {
+    const sh = (cwd: string, ...args: string[]) =>
+      execa('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...args], { cwd });
+
+    /** The developer's project pushed to a bare origin, its snapshot shared, and a clone of it. */
+    const shared = async (): Promise<{ clone: string; origin: string; base: CommitId }> => {
+      const origin = fs.mkdtempSync(path.join(os.tmpdir(), 'prepare-sdk-origin-'));
+      const clone = fs.mkdtempSync(path.join(os.tmpdir(), 'prepare-sdk-clone-'));
+      const repository = await recorded({ 'README.md': '# sdk' });
+      const base = (await repository.readRecord())!.pristineCommit();
+      await sh(root, 'add', '.');
+      await sh(root, 'commit', '-qm', 'sdk');
+      await sh(root, 'init', '-q', '--bare', origin);
+      await sh(root, 'remote', 'add', 'origin', origin);
+      await sh(root, 'push', '-q', 'origin', 'main');
+      (await repository.shareSnapshot('origin'))._unsafeUnwrap();
+      await sh(root, 'clone', '-q', '--no-local', origin, clone);
+      sdkContext = new SdkContext(Language.PYTHON, new DirectoryPath(path.join(clone, 'sdk')));
+      return { clone, origin, base };
+    };
+
+    it('merges in a clone by itself, fetching the snapshot the origin shared', async () => {
+      const { clone, origin, base } = await shared();
+      try {
+        const snapshotsFetched = sinon.stub(SdkPreparePrompts.prototype, 'snapshotsFetched');
+
+        const destination = (await execute()).getValue();
+
+        expect(destination.kind === 'merge' && destination.base.isEqual(base)).to.be.true;
+        expect(destination.kind === 'merge' && destination.remote).to.equal('origin');
+        expect(snapshotsFetched.firstCall.args[0]).to.equal('origin');
+      } finally {
+        fs.rmSync(clone, { recursive: true, force: true });
+        fs.rmSync(origin, { recursive: true, force: true });
+      }
     });
   });
 });

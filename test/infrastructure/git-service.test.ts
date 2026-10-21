@@ -4,9 +4,11 @@ import os from 'os';
 import path from 'path';
 import { TextDecoder } from 'node:util';
 import { expect } from 'chai';
+import { execa } from 'execa';
 import { GitService } from '../../src/infrastructure/git-service.js';
 import { DirectoryPath } from '../../src/types/file/directoryPath.js';
 import { CommitId } from '../../src/types/sdk/commit-id.js';
+import { SnapshotRef } from '../../src/types/sdk/snapshot-ref.js';
 
 const text = (content: Uint8Array | undefined) =>
   content === undefined ? undefined : new TextDecoder().decode(content);
@@ -144,7 +146,9 @@ describe('GitService', () => {
     const paired = await git.diffTrees(repo, from, to, true);
     const plain = await git.diffTrees(repo, from, to, false);
 
-    expect(paired.map(({ status, path: changed, from: origin }) => [status, changed.toString(), origin?.toString()])).to.deep.equal(
+    expect(
+      paired.map(({ status, path: changed, from: origin }) => [status, changed.toString(), origin?.toString()])
+    ).to.deep.equal(
       [
         ['M', 'b.txt', undefined],
         ['C', 'c.txt', undefined],
@@ -211,6 +215,101 @@ describe('GitService', () => {
       expect(merged.tree.isEqual(await git.treeOfCommit(repo, both))).to.be.true;
       expect(merged.stages).to.deep.equal([]);
       expect(merged.messages).to.deep.equal([]);
+    });
+  });
+
+  describe('remotes', () => {
+    const ref = SnapshotRef.pristine('sdk/typescript');
+
+    const bare = async (name = 'origin.git'): Promise<DirectoryPath> => {
+      const directory = new DirectoryPath(path.join(root, name));
+      await execa('git', ['init', '-q', '--bare', directory.toString()]);
+      return directory;
+    };
+
+    const withRemote = async (name: string, origin: DirectoryPath): Promise<DirectoryPath> => {
+      const repo = await repository(name);
+      await execa('git', ['remote', 'add', 'origin', origin.toString()], { cwd: repo.toString() });
+      return repo;
+    };
+
+    /** One more snapshot on `ref` in `repo`, holding `content`. */
+    const snapshot = async (repo: DirectoryPath, content: string) => {
+      const work = new DirectoryPath(path.join(root, `work-${content}`));
+      write(work, 'a.txt', content);
+      const tree = await git.treeOf(repo, work, 'all');
+      const parent = await git.resolveRef(repo, ref);
+      const commit = await git.commitTree(repo, tree, parent === undefined ? [] : [parent], 'snapshot');
+      await git.updateRef(repo, ref, commit);
+      return commit;
+    };
+
+    it('names the remote the current branch pushes to, else origin, else none', async () => {
+      const repo = await repository();
+      expect(await git.remoteOf(repo)).to.be.undefined;
+
+      await execa('git', ['remote', 'add', 'origin', (await bare()).toString()], { cwd: repo.toString() });
+      expect(await git.remoteOf(repo)).to.equal('origin');
+
+      await execa('git', ['remote', 'add', 'fork', (await bare('fork.git')).toString()], { cwd: repo.toString() });
+      await execa('git', ['config', 'branch.main.remote', 'fork'], { cwd: repo.toString() });
+      expect(await git.remoteOf(repo)).to.equal('fork');
+    });
+
+    it('pushes a ref as a fast-forward, reports one already there, and never forces one that moved on', async () => {
+      const origin = await bare();
+      const a = await withRemote('a', origin);
+      const b = await withRemote('b', origin);
+      const first = await snapshot(a, 'one');
+
+      expect(await git.pushRef(a, 'origin', ref)).to.equal('pushed');
+      expect(await git.pushRef(a, 'origin', ref)).to.equal('upToDate');
+      await snapshot(b, 'two');
+      expect(await git.pushRef(b, 'origin', ref)).to.equal('rejected');
+      expect((await git.resolveRef(origin, ref))?.isEqual(first)).to.be.true;
+    });
+
+    it('fetches a ref with its objects, and answers with nothing for a ref the remote lacks', async () => {
+      const origin = await bare();
+      const a = await withRemote('a', origin);
+      const b = await withRemote('b', origin);
+      const first = await snapshot(a, 'one');
+      await git.pushRef(a, 'origin', ref);
+
+      expect(await git.fetchRef(b, 'origin', SnapshotRef.pristine('elsewhere'))).to.be.undefined;
+      const tip = await git.fetchRef(b, 'origin', ref);
+
+      expect(tip?.isEqual(first)).to.be.true;
+      expect(await git.hasCommit(b, first)).to.be.true;
+    });
+
+    it('reports a push the remote refuses, in the remote’s own words', async () => {
+      const origin = await bare();
+      fs.writeFileSync(
+        path.join(origin.toString(), 'hooks', 'pre-receive'),
+        '#!/bin/sh\necho "snapshots are not accepted here"\nexit 1\n',
+        { mode: 0o755 }
+      );
+      const a = await withRemote('a', origin);
+      await snapshot(a, 'one');
+
+      let message = '';
+      try {
+        await git.pushRef(a, 'origin', ref);
+      } catch (error) {
+        message = (error as Error).message;
+      }
+
+      expect(message).to.contain('snapshots are not accepted here');
+    });
+
+    it('tells an ancestor from a stranger', async () => {
+      const repo = await repository();
+      const first = await snapshot(repo, 'one');
+      const second = await snapshot(repo, 'two');
+
+      expect(await git.isAncestor(repo, first, second)).to.be.true;
+      expect(await git.isAncestor(repo, second, first)).to.be.false;
     });
   });
 });

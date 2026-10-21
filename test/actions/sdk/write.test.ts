@@ -4,7 +4,7 @@ import os from 'os';
 import path from 'path';
 import { expect } from 'chai';
 import { execa } from 'execa';
-import { err } from 'neverthrow';
+import { err, ok } from 'neverthrow';
 import sinon from 'sinon';
 import { SdkWriteAction } from '../../../src/actions/sdk/write.js';
 import { GitService } from '../../../src/infrastructure/git-service.js';
@@ -124,7 +124,10 @@ describe('SdkWriteAction', () => {
     it('initialises a repository in the SDK directory, says so, and records the snapshot', async () => {
       const repositoryInitialised = sinon.stub(SdkWritePrompts.prototype, 'repositoryInitialised');
 
-      const result = await execute({ kind: 'record', repository: undefined }, { 'README.md': '# sdk', 'a.py': 'x' });
+      const result = await execute(
+        { kind: 'record', repository: undefined, remote: undefined },
+        { 'README.md': '# sdk', 'a.py': 'x' }
+      );
 
       expect(result.isSuccess()).to.be.true;
       expect(repositoryInitialised.firstCall.args[0].isEqual(sdk())).to.be.true;
@@ -143,7 +146,8 @@ describe('SdkWriteAction', () => {
       const repository = (await sdkContext.repository())!;
       const repositoryInitialised = sinon.stub(SdkWritePrompts.prototype, 'repositoryInitialised');
 
-      expect((await execute({ kind: 'record', repository }, { 'README.md': '# sdk' })).isSuccess()).to.be.true;
+      expect((await execute({ kind: 'record', repository, remote: undefined }, { 'README.md': '# sdk' })).isSuccess())
+        .to.be.true;
 
       expect(repositoryInitialised.called).to.be.false;
       expect(fs.existsSync(at('.git'))).to.be.false;
@@ -158,8 +162,11 @@ describe('SdkWriteAction', () => {
         .resolves(err({ kind: 'gitFailed', reason: 'git broke' }));
       const snapshotNotRecorded = sinon.stub(SdkWritePrompts.prototype, 'snapshotNotRecorded');
 
-      expect((await execute({ kind: 'record', repository: undefined }, { 'README.md': '# sdk' })).isSuccess()).to.be
-        .true;
+      expect(
+        (
+          await execute({ kind: 'record', repository: undefined, remote: undefined }, { 'README.md': '# sdk' })
+        ).isSuccess()
+      ).to.be.true;
 
       expect(read('README.md')).to.equal('# sdk');
       expect(snapshotNotRecorded.firstCall.args[0]).to.equal('git broke');
@@ -173,7 +180,7 @@ describe('SdkWriteAction', () => {
       const sdkMerged = sinon.stub(SdkWritePrompts.prototype, 'sdkMerged');
 
       const result = await execute(
-        { kind: 'merge', repository, base },
+        { kind: 'merge', repository, base, remote: undefined },
         { 'README.md': '# sdk v2', 'models/book.py': MODEL_V2, 'models/author.py': 'class Author: ...' }
       );
 
@@ -206,7 +213,7 @@ describe('SdkWriteAction', () => {
       const conflicts = sinon.stub(SdkWritePrompts.prototype, 'conflicts');
 
       const result = await execute(
-        { kind: 'merge', repository, base },
+        { kind: 'merge', repository, base, remote: undefined },
         { 'README.md': '# sdk v2', 'models/book.py': MODEL_V2 }
       );
 
@@ -237,7 +244,10 @@ describe('SdkWriteAction', () => {
       const conflictsNotStaged = sinon.stub(SdkWritePrompts.prototype, 'conflictsNotStaged');
       const conflicts = sinon.stub(SdkWritePrompts.prototype, 'conflicts');
 
-      const result = await execute({ kind: 'merge', repository, base }, { 'models/book.py': MODEL_V2 });
+      const result = await execute(
+        { kind: 'merge', repository, base, remote: undefined },
+        { 'models/book.py': MODEL_V2 }
+      );
 
       expect(result.isFailed()).to.be.true;
       expect(result.getMessage()).to.equal('Resolve the conflicts and rerun');
@@ -254,11 +264,73 @@ describe('SdkWriteAction', () => {
         .resolves(err({ kind: 'gitFailed', reason: 'git broke' }));
       const customCodeFailed = sinon.stub(SdkWritePrompts.prototype, 'customCodeFailed');
 
-      expect((await execute({ kind: 'merge', repository, base }, { 'README.md': '# sdk v2' })).isFailed()).to.be.true;
+      expect(
+        (await execute({ kind: 'merge', repository, base, remote: undefined }, { 'README.md': '# sdk v2' })).isFailed()
+      ).to.be.true;
 
       expect(read('README.md')).to.equal('# edited');
       expect(record().pristineCommit().isEqual(base)).to.be.true;
       expect(customCodeFailed.firstCall.args[0]).to.equal('git broke');
+    });
+  });
+
+  describe('sharing the snapshot', () => {
+    beforeEach(() => {
+      sinon.stub(SdkWritePrompts.prototype, 'repositoryInitialised');
+    });
+
+    it('pushes it to the remote the destination names, and says so', async () => {
+      const share = sinon.stub(SdkRepositoryContext.prototype, 'shareSnapshot').resolves(ok('pushed'));
+      const snapshotShared = sinon.stub(SdkWritePrompts.prototype, 'snapshotShared');
+
+      const result = await execute(
+        { kind: 'record', repository: undefined, remote: 'origin' },
+        { 'README.md': '# sdk' }
+      );
+
+      expect(result.isSuccess()).to.be.true;
+      expect(share.firstCall.args[0]).to.equal('origin');
+      expect(snapshotShared.firstCall.args).to.deep.equal(['origin', false]);
+    });
+
+    it('says nothing when the remote already had it', async () => {
+      sinon.stub(SdkRepositoryContext.prototype, 'shareSnapshot').resolves(ok('upToDate'));
+      const snapshotShared = sinon.stub(SdkWritePrompts.prototype, 'snapshotShared');
+
+      expect(
+        (
+          await execute({ kind: 'record', repository: undefined, remote: 'origin' }, { 'README.md': '# sdk' })
+        ).isSuccess()
+      ).to.be.true;
+
+      expect(snapshotShared.called).to.be.false;
+    });
+
+    it('warns, and still succeeds, when the push fails', async () => {
+      sinon
+        .stub(SdkRepositoryContext.prototype, 'shareSnapshot')
+        .resolves(err({ kind: 'gitFailed', reason: 'no access' }));
+      const snapshotNotShared = sinon.stub(SdkWritePrompts.prototype, 'snapshotNotShared');
+
+      const result = await execute(
+        { kind: 'record', repository: undefined, remote: 'origin' },
+        { 'README.md': '# sdk' }
+      );
+
+      expect(result.isSuccess()).to.be.true;
+      expect(snapshotNotShared.firstCall.args.slice(0, 2)).to.deep.equal(['origin', 'no access']);
+    });
+
+    it('leaves the remote alone when the destination names none', async () => {
+      const share = sinon.stub(SdkRepositoryContext.prototype, 'shareSnapshot');
+
+      expect(
+        (
+          await execute({ kind: 'record', repository: undefined, remote: undefined }, { 'README.md': '# sdk' })
+        ).isSuccess()
+      ).to.be.true;
+
+      expect(share.called).to.be.false;
     });
   });
 });

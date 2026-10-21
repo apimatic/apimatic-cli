@@ -18,6 +18,22 @@ export type TreeEntry = { mode: string; type: 'blob' | 'tree' | 'commit'; oid: s
 
 export type CommitDescription = { parents: CommitId[]; authorName: string; subject: string };
 
+/** What a push did: sent the ref, found it already there, or was refused because the remote's ref moved on. */
+export type PushResult = 'pushed' | 'upToDate' | 'rejected';
+
+/** A remote that does not answer within this is reported, not waited for. */
+const REMOTE_TIMEOUT_MS = 30_000;
+
+/** What the server itself said, which git relays as `remote:` lines; failing that, git's first line. */
+function remoteSaid(stderr: string): string {
+  const lines = stderr
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line !== '');
+  const remote = lines.filter((line) => line.startsWith('remote:')).map((line) => line.slice('remote:'.length).trim());
+  return (remote.length > 0 ? remote : lines.slice(0, 1)).join(' ');
+}
+
 /** What `git` reported when a command failed. */
 export class GitError extends Error {}
 
@@ -72,7 +88,10 @@ export class GitService {
       const forced =
         include === 'all' ? [] : include.filter((relative) => fs.existsSync(relative.in(directory).toString()));
       if (forced.length > 0) {
-        await inWorkTree(['add', '--force', '--pathspec-from-file=-', '--pathspec-file-nul'], forced.map(String).join('\0'));
+        await inWorkTree(
+          ['add', '--force', '--pathspec-from-file=-', '--pathspec-file-nul'],
+          forced.map(String).join('\0')
+        );
       }
       const { stdout } = await inWorkTree(['write-tree']);
       return TreeId.fromGit(stdout.trim());
@@ -261,7 +280,9 @@ export class GitService {
    * keep it beside the others.
    */
   public async stageConflicts(root: DirectoryPath, entries: readonly StageEntry[]): Promise<void> {
-    const removals = [...new Set(entries.map((entry) => entry.path.toString()))].map((path) => `0 ${'0'.repeat(40)} 0\t${path}`);
+    const removals = [...new Set(entries.map((entry) => entry.path.toString()))].map(
+      (path) => `0 ${'0'.repeat(40)} 0\t${path}`
+    );
     const stages = entries.map((entry) => `${entry.mode} ${entry.oid} ${entry.stage}\t${entry.path}`);
     await this.run(
       root,
@@ -272,8 +293,100 @@ export class GitService {
     );
   }
 
+  /** The remote the current branch is set to push to, else `origin` when there is one, else none. */
+  public async remoteOf(root: DirectoryPath): Promise<string | undefined> {
+    const branch = await this.tryRun(root, ['symbolic-ref', '--short', 'HEAD']);
+    const configured =
+      branch === undefined ? undefined : await this.tryRun(root, ['config', `branch.${branch}.remote`]);
+    if (configured !== undefined && configured !== '.') {
+      return configured;
+    }
+    const remotes = ((await this.tryRun(root, ['remote'])) ?? '').split('\n');
+    return remotes.includes('origin') ? 'origin' : undefined;
+  }
+
+  /** Brings `ref` and its objects over from `remote` and answers with its tip, or none when the remote has no such ref. */
+  public async fetchRef(root: DirectoryPath, remote: string, ref: SnapshotRef): Promise<CommitId | undefined> {
+    const result = await this.runRemote(root, ['fetch', '--quiet', '--no-tags', remote, ref.toString()]);
+    if (result.exitCode !== 0) {
+      if (/couldn't find remote ref|no such ref/i.test(result.stderr)) {
+        return undefined;
+      }
+      throw new GitError(`git fetch failed: ${result.stderr.trim() || `exit code ${result.exitCode}`}`);
+    }
+    const { stdout } = await this.run(root, ['rev-parse', '--verify', '--quiet', 'FETCH_HEAD']);
+    return CommitId.fromGit(stdout.trim());
+  }
+
+  /** Sends `ref` to `remote` as a fast-forward; a ref that moved on at the remote is reported as rejected, never forced. */
+  public async pushRef(root: DirectoryPath, remote: string, ref: SnapshotRef): Promise<PushResult> {
+    const result = await this.runRemote(root, ['push', '--porcelain', remote, `${ref}:${ref}`]);
+    const status = result.stdout.split('\n').find((line) => line.includes(`${ref}:${ref}`));
+    if (status === undefined) {
+      throw new GitError(`git push failed: ${result.stderr.trim() || `exit code ${result.exitCode}`}`);
+    }
+    if (status.startsWith('=')) {
+      return 'upToDate';
+    }
+    if (status.startsWith('!')) {
+      if (/fetch first|non-fast-forward/.test(status)) {
+        return 'rejected';
+      }
+      const summary = status.split('	').pop()?.trim() ?? '';
+      throw new GitError(
+        `git push failed: ${[summary, remoteSaid(result.stderr)].filter((part) => part !== '').join('; ')}`
+      );
+    }
+    return 'pushed';
+  }
+
+  public async isAncestor(root: DirectoryPath, ancestor: CommitId, descendant: CommitId): Promise<boolean> {
+    const result = await this.run(
+      root,
+      ['merge-base', '--is-ancestor', ancestor.toString(), descendant.toString()],
+      {},
+      undefined,
+      undefined,
+      'utf8',
+      [0, 1]
+    );
+    return result.exitCode === 0;
+  }
+
   public static emptyTree(): TreeId {
     return TreeId.fromGit(EMPTY_TREE);
+  }
+
+  private async tryRun(cwd: DirectoryPath, args: string[]): Promise<string | undefined> {
+    try {
+      return (await this.run(cwd, args)).stdout.trim();
+    } catch {
+      return undefined;
+    }
+  }
+
+  // A remote command may not ask anything: no terminal prompt, no credential helper dialogue,
+  // no ssh passphrase, and it is given up on after the timeout, so a missing credential or a
+  // dead remote becomes a reported failure rather than a stuck run.
+  private async runRemote(cwd: DirectoryPath, args: string[]) {
+    try {
+      return await execa('git', ['-c', 'credential.interactive=false', ...args], {
+        cwd: cwd.toString(),
+        env: {
+          GIT_TERMINAL_PROMPT: '0',
+          LC_ALL: 'C',
+          GIT_SSH_COMMAND: process.env.GIT_SSH_COMMAND ?? 'ssh -o BatchMode=yes'
+        },
+        timeout: REMOTE_TIMEOUT_MS,
+        reject: false
+      });
+    } catch (error) {
+      throw new GitError(
+        error instanceof ExecaError && error.timedOut
+          ? `the remote did not answer within ${REMOTE_TIMEOUT_MS / 1000} seconds`
+          : errorMessage(error)
+      );
+    }
   }
 
   private async gitDir(root: DirectoryPath): Promise<string> {

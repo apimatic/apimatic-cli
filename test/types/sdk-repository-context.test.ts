@@ -2,6 +2,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { expect } from 'chai';
+import { execa } from 'execa';
 import { GitService } from '../../src/infrastructure/git-service.js';
 import { DirectoryPath } from '../../src/types/file/directoryPath.js';
 import { RelativeFilePath } from '../../src/types/file/relativeFilePath.js';
@@ -264,7 +265,7 @@ describe('SdkRepositoryContext', () => {
     it('finds no record', async () => {
       const repository = await project();
 
-      expect((await repository.inspect(TYPESCRIPT))._unsafeUnwrap()).to.deep.equal({ kind: 'noRecord' });
+      expect((await repository.inspect(TYPESCRIPT, undefined))._unsafeUnwrap()).to.deep.equal({ kind: 'noRecord' });
     });
 
     it('finds a record for another generation', async () => {
@@ -275,7 +276,7 @@ describe('SdkRepositoryContext', () => {
         GenerationRecord.written({ ...TYPESCRIPT, stability: Stability.BETA }, pristine, new Date(), '2.3.0')
       );
 
-      const state = (await repository.inspect(TYPESCRIPT))._unsafeUnwrap();
+      const state = (await repository.inspect(TYPESCRIPT, undefined))._unsafeUnwrap();
 
       expect(state.kind).to.equal('otherGeneration');
       expect(state.kind === 'otherGeneration' && state.recorded.stability).to.equal(Stability.BETA);
@@ -286,7 +287,7 @@ describe('SdkRepositoryContext', () => {
       const missing = CommitId.create('f'.repeat(40))!;
       await writeRecord(repository, GenerationRecord.written(TYPESCRIPT, missing, new Date(), '2.3.0'));
 
-      const state = (await repository.inspect(TYPESCRIPT))._unsafeUnwrap();
+      const state = (await repository.inspect(TYPESCRIPT, undefined))._unsafeUnwrap();
 
       expect(state.kind).to.equal('snapshotMissing');
       expect(state.kind === 'snapshotMissing' && state.commit.isEqual(missing)).to.be.true;
@@ -309,7 +310,7 @@ describe('SdkRepositoryContext', () => {
       write(sdk, 'src/a.ts', MARKED);
       write(sdk, 'src/b.ts', 'resolved\n');
 
-      const state = (await repository.inspect(TYPESCRIPT))._unsafeUnwrap();
+      const state = (await repository.inspect(TYPESCRIPT, undefined))._unsafeUnwrap();
 
       expect(state).to.include({ kind: 'unresolved' });
       expect(state.kind === 'unresolved' && state.paths.map(String)).to.deep.equal(['src/a.ts']);
@@ -324,7 +325,7 @@ describe('SdkRepositoryContext', () => {
       );
       write(repository.sdkDirectory(), 'src/a.ts', 'resolved\n');
 
-      const state = (await repository.inspect(TYPESCRIPT))._unsafeUnwrap();
+      const state = (await repository.inspect(TYPESCRIPT, undefined))._unsafeUnwrap();
 
       expect(state.kind).to.equal('ready');
       expect(state.kind === 'ready' && state.base.isEqual(pristine)).to.be.true;
@@ -335,7 +336,112 @@ describe('SdkRepositoryContext', () => {
       (await record(outer, { 'README.md': '# outer' }))._unsafeUnwrap();
       const inner = (await contextFor(outer.sdkDirectory().join('typescript')).repository())!;
 
-      expect((await inner.inspect(TYPESCRIPT))._unsafeUnwrapErr().kind).to.equal('nestedSdkDirectory');
+      expect((await inner.inspect(TYPESCRIPT, undefined))._unsafeUnwrapErr().kind).to.equal('nestedSdkDirectory');
+    });
+  });
+
+  describe('sharing', () => {
+    const sh = (cwd: DirectoryPath | string, ...args: string[]) =>
+      execa('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...args], { cwd: cwd.toString() });
+
+    const withOrigin = async (): Promise<{ repository: SdkRepositoryContext; origin: DirectoryPath }> => {
+      const origin = new DirectoryPath(path.join(root, 'origin.git'));
+      await sh(root, 'init', '-q', '--bare', origin.toString());
+      const repository = await project();
+      await sh(repository.root(), 'remote', 'add', 'origin', origin.toString());
+      return { repository, origin };
+    };
+
+    /** A recorded generation, committed and pushed on `main`, as a developer leaves a project for a teammate. */
+    const published = async (repository: SdkRepositoryContext) => {
+      const tree = (await repository.snapshotGenerated(generated({ 'README.md': '# v1' })))._unsafeUnwrap();
+      const record = (await repository.recordGeneration(tree, TYPESCRIPT, '0.0.0', []))._unsafeUnwrap();
+      await sh(repository.root(), 'add', '.');
+      await sh(repository.root(), 'commit', '-qm', 'sdk');
+      await sh(repository.root(), 'push', '-q', 'origin', 'main');
+      return record.pristineCommit();
+    };
+
+    const cloneOf = async (origin: DirectoryPath, name: string): Promise<SdkRepositoryContext> => {
+      const clone = new DirectoryPath(path.join(root, name));
+      await sh(root, 'clone', '-q', '--no-local', origin.toString(), clone.toString());
+      return (await contextFor(clone.join('sdk', 'typescript')).repository())!;
+    };
+
+    it('pushes the chain, then finds it already there', async () => {
+      const { repository, origin } = await withOrigin();
+      const commit = (await record(repository, { 'README.md': '# v1' }))._unsafeUnwrap();
+
+      expect((await repository.shareSnapshot('origin'))._unsafeUnwrap()).to.equal('pushed');
+      expect((await repository.shareSnapshot('origin'))._unsafeUnwrap()).to.equal('upToDate');
+
+      expect((await git.resolveRef(origin, repository.pristineRef()))?.isEqual(commit)).to.be.true;
+    });
+
+    it('lets a clone merge against a snapshot it fetched, and says where from', async () => {
+      const { repository, origin } = await withOrigin();
+      const base = await published(repository);
+      const clone = await cloneOf(origin, 'clone');
+      const before = (await clone.inspect(TYPESCRIPT, 'origin'))._unsafeUnwrap();
+      expect(before).to.deep.include({ kind: 'snapshotMissing', fetch: { kind: 'absent', remote: 'origin' } });
+
+      (await repository.shareSnapshot('origin'))._unsafeUnwrap();
+      const after = (await clone.inspect(TYPESCRIPT, 'origin'))._unsafeUnwrap();
+
+      expect(after.kind === 'ready' && after.base.isEqual(base) && after.fetchedFrom).to.equal('origin');
+      expect((await git.resolveRef(clone.root(), clone.pristineRef()))?.isEqual(base)).to.be.true;
+    });
+
+    it('reports a remote it cannot reach, and no remote at all', async () => {
+      const { repository, origin } = await withOrigin();
+      await published(repository);
+      const clone = await cloneOf(origin, 'clone');
+      fs.rmSync(origin.toString(), { recursive: true, force: true });
+
+      const unreachable = (await clone.inspect(TYPESCRIPT, 'origin'))._unsafeUnwrap();
+      const none = (await clone.inspect(TYPESCRIPT, undefined))._unsafeUnwrap();
+
+      expect(unreachable.kind === 'snapshotMissing' && unreachable.fetch).to.include({
+        kind: 'failed',
+        remote: 'origin'
+      });
+      expect(none.kind === 'snapshotMissing' && none.fetch).to.deep.equal({ kind: 'noRemote' });
+    });
+
+    it('joins two chains that diverged, so both machines’ snapshots reach the remote', async () => {
+      const { repository: a, origin } = await withOrigin();
+      const first = (await record(a, { 'README.md': '# a' }))._unsafeUnwrap();
+      (await a.shareSnapshot('origin'))._unsafeUnwrap();
+      const bRoot = new DirectoryPath(path.join(root, 'b'));
+      fs.mkdirSync(bRoot.join('sdk', 'typescript').toString(), { recursive: true });
+      await git.init(bRoot);
+      await sh(bRoot, 'remote', 'add', 'origin', origin.toString());
+      const b = (await contextFor(bRoot.join('sdk', 'typescript')).repository())!;
+      const second = (await record(b, { 'README.md': '# b' }))._unsafeUnwrap();
+
+      expect((await b.shareSnapshot('origin'))._unsafeUnwrap()).to.equal('joined');
+
+      const tip = (await git.resolveRef(origin, b.pristineRef()))!;
+      expect((await git.describe(origin, tip)).parents.map(String)).to.have.members([
+        second.toString(),
+        first.toString()
+      ]);
+      expect((await git.describe(origin, tip)).subject).to.equal('apimatic: pristine chains joined');
+    });
+
+    it('reports a push the remote refuses, with its reason', async () => {
+      const { repository, origin } = await withOrigin();
+      fs.writeFileSync(
+        path.join(origin.toString(), 'hooks', 'pre-receive'),
+        '#!/bin/sh\necho "snapshots are not accepted here"\nexit 1\n',
+        { mode: 0o755 }
+      );
+      (await record(repository, { 'README.md': '# v1' }))._unsafeUnwrap();
+
+      const shared = await repository.shareSnapshot('origin');
+
+      expect(shared._unsafeUnwrapErr().reason).to.contain('snapshots are not accepted here');
+      expect(shared._unsafeUnwrapErr().reason).to.not.contain('failed to push some refs');
     });
   });
 });
