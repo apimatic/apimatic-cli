@@ -7,7 +7,7 @@ import { expect } from 'chai';
 import { execa } from 'execa';
 import { GitService } from '../../src/infrastructure/git-service.js';
 import { DirectoryPath } from '../../src/types/file/directoryPath.js';
-import { CommitId } from '../../src/types/sdk/commit-id.js';
+import { CommitId } from '../../src/types/git/commit-id.js';
 import { SnapshotRef } from '../../src/types/sdk/snapshot-ref.js';
 
 const text = (content: Uint8Array | undefined) =>

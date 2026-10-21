@@ -10,11 +10,11 @@ import { SdkPrepareAction } from '../../../src/actions/sdk/prepare.js';
 import { GitService } from '../../../src/infrastructure/git-service.js';
 import { SdkPreparePrompts } from '../../../src/prompts/sdk/prepare.js';
 import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
+import { CommitId } from '../../../src/types/git/commit-id.js';
+import { GitVersion } from '../../../src/types/git/git-version.js';
 import { SdkContext } from '../../../src/types/sdk-context.js';
-import { CommitId } from '../../../src/types/sdk/commit-id.js';
 import { CodeGenerationVersion, Language, Stability } from '../../../src/types/sdk/generate.js';
 import { GenerationRecord, SdkGeneration } from '../../../src/types/sdk/generation-record.js';
-import { GitVersion } from '../../../src/types/sdk/git-version.js';
 import { SdkRepositoryContext } from '../../../src/types/sdk-repository-context.js';
 
 const STABLE: SdkGeneration = {

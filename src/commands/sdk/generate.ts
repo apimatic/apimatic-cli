@@ -10,7 +10,7 @@ import {
   Stability,
   UPCOMING_LANGUAGES
 } from '../../types/sdk/generate.js';
-import { GitVersion } from '../../types/sdk/git-version.js';
+import { GitVersion } from '../../types/git/git-version.js';
 import { StabilityChoice } from '../../types/sdk/stability-choice.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { ProjectContext } from '../../types/project-context.js';

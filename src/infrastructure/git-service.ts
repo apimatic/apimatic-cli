@@ -6,11 +6,11 @@ import { RelativeFilePath } from '../types/file/relativeFilePath.js';
 import { DirectoryPath } from '../types/file/directoryPath.js';
 import { FileName } from '../types/file/fileName.js';
 import { FilePath } from '../types/file/filePath.js';
-import { CommitId } from '../types/sdk/commit-id.js';
-import { GitVersion } from '../types/sdk/git-version.js';
-import { Change, MergeMessage, MergeTreeOutput, StageEntry } from '../types/sdk/merge-plan.js';
+import { CommitId } from '../types/git/commit-id.js';
+import { GitVersion } from '../types/git/git-version.js';
+import { Change, MergeMessage, MergeTreeOutput, StageEntry } from '../types/git/merge-tree.js';
+import { TreeId } from '../types/git/tree-id.js';
 import { SnapshotRef } from '../types/sdk/snapshot-ref.js';
-import { TreeId } from '../types/sdk/tree-id.js';
 import { errorMessage } from '../utils/error-utils.js';
 import { withDirPath } from './tmp-extensions.js';
 

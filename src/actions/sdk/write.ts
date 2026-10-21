@@ -3,13 +3,13 @@ import { envInfo } from '../../infrastructure/env-info.js';
 import { SdkWritePrompts } from '../../prompts/sdk/write.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { RelativeFilePath } from '../../types/file/relativeFilePath.js';
+import { CommitId } from '../../types/git/commit-id.js';
+import { TreeId } from '../../types/git/tree-id.js';
 import { SdkContext } from '../../types/sdk-context.js';
 import { SdkRepositoryContext, SdkRepositoryProblem } from '../../types/sdk-repository-context.js';
-import { CommitId } from '../../types/sdk/commit-id.js';
 import { SdkGeneration } from '../../types/sdk/generation-record.js';
 import { MergePlan } from '../../types/sdk/merge-plan.js';
 import { SdkDestination } from '../../types/sdk/sdk-destination.js';
-import { TreeId } from '../../types/sdk/tree-id.js';
 import { ActionResult } from '../action-result.js';
 
 const MERGE_NEEDS_RESOLVING = 'Resolve the conflicts and rerun';

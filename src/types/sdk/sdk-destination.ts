@@ -1,4 +1,4 @@
-import { CommitId } from './commit-id.js';
+import { CommitId } from '../git/commit-id.js';
 import { SdkRepositoryContext } from '../sdk-repository-context.js';
 
 /**

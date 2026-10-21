@@ -1,6 +1,6 @@
 import { RelativeFilePath } from '../../../src/types/file/relativeFilePath.js';
 import { expect } from 'chai';
-import { CommitId } from '../../../src/types/sdk/commit-id.js';
+import { CommitId } from '../../../src/types/git/commit-id.js';
 import { CodeGenerationVersion, Language, Stability } from '../../../src/types/sdk/generate.js';
 import { GenerationRecord } from '../../../src/types/sdk/generation-record.js';
 

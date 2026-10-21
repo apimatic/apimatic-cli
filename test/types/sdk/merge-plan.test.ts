@@ -1,7 +1,8 @@
 import { RelativeFilePath } from '../../../src/types/file/relativeFilePath.js';
 import { expect } from 'chai';
-import { ConflictKind, MergeInputs, MergePlan, MergeTreeOutput } from '../../../src/types/sdk/merge-plan.js';
-import { TreeId } from '../../../src/types/sdk/tree-id.js';
+import { MergeTreeOutput } from '../../../src/types/git/merge-tree.js';
+import { TreeId } from '../../../src/types/git/tree-id.js';
+import { ConflictKind, MergeInputs, MergePlan } from '../../../src/types/sdk/merge-plan.js';
 
 const TREE = TreeId.fromGit('t'.repeat(40));
 const blob = (name: string) => name.padEnd(40, '0');

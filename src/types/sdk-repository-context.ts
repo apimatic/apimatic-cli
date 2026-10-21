@@ -8,12 +8,13 @@ import { DirectoryPath, posix } from './file/directoryPath.js';
 import { FileName } from './file/fileName.js';
 import { FilePath } from './file/filePath.js';
 import { RelativeFilePath } from './file/relativeFilePath.js';
-import { CommitId } from './sdk/commit-id.js';
+import { CommitId } from './git/commit-id.js';
+import { StageEntry } from './git/merge-tree.js';
+import { TreeId } from './git/tree-id.js';
 import { hasConflictMarkers, relabelMarkers } from './sdk/conflict-markers.js';
 import { describeGeneration, GenerationRecord, SdkGeneration } from './sdk/generation-record.js';
-import { MergePlan, StageEntry } from './sdk/merge-plan.js';
+import { MergePlan } from './sdk/merge-plan.js';
 import { SnapshotRef } from './sdk/snapshot-ref.js';
-import { TreeId } from './sdk/tree-id.js';
 
 export type SdkRepositoryProblem = {
   kind: 'nestedSdkDirectory' | 'gitFailed' | 'recordNotWritten';

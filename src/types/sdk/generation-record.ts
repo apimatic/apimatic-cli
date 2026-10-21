@@ -1,5 +1,5 @@
 import { RelativeFilePath } from '../file/relativeFilePath.js';
-import { CommitId } from './commit-id.js';
+import { CommitId } from '../git/commit-id.js';
 import { CodeGenerationVersion, Language, Stability } from './generate.js';
 
 /** What was generated: a snapshot is a base only for the same generator output. */

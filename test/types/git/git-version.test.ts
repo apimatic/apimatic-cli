@@ -1,5 +1,5 @@
 import { expect } from 'chai';
-import { GitVersion } from '../../../src/types/sdk/git-version.js';
+import { GitVersion } from '../../../src/types/git/git-version.js';
 
 describe('GitVersion', () => {
   it('reads what git prints, on any platform', () => {

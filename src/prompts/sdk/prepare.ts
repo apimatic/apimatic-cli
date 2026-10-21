@@ -1,9 +1,9 @@
 import { isCancel, confirm, log } from '@clack/prompts';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { RelativeFilePath } from '../../types/file/relativeFilePath.js';
-import { CommitId } from '../../types/sdk/commit-id.js';
+import { CommitId } from '../../types/git/commit-id.js';
+import { GitVersion } from '../../types/git/git-version.js';
 import { describeGeneration, SdkGeneration } from '../../types/sdk/generation-record.js';
-import { GitVersion } from '../../types/sdk/git-version.js';
 import { SnapshotFetch } from '../../types/sdk-repository-context.js';
 import { SnapshotRef } from '../../types/sdk/snapshot-ref.js';
 import { format as f } from '../format.js';
