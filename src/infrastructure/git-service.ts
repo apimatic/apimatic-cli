@@ -312,7 +312,7 @@ export class GitService {
       if (/couldn't find remote ref|no such ref/i.test(result.stderr)) {
         return undefined;
       }
-      throw new GitError(`git fetch failed: ${result.stderr.trim() || `exit code ${result.exitCode}`}`);
+      throw new GitError(remoteSaid(result.stderr) || `exit code ${result.exitCode}`);
     }
     const { stdout } = await this.run(root, ['rev-parse', '--verify', '--quiet', 'FETCH_HEAD']);
     return CommitId.fromGit(stdout.trim());
@@ -323,7 +323,7 @@ export class GitService {
     const result = await this.runRemote(root, ['push', '--porcelain', remote, ref.refspec()]);
     const status = result.stdout.split('\n').find((line) => line.includes(ref.refspec()));
     if (status === undefined) {
-      throw new GitError(`git push failed: ${result.stderr.trim() || `exit code ${result.exitCode}`}`);
+      throw new GitError(remoteSaid(result.stderr) || `exit code ${result.exitCode}`);
     }
     if (status.startsWith('=')) {
       return 'upToDate';
@@ -333,9 +333,7 @@ export class GitService {
         return 'rejected';
       }
       const summary = status.split('	').pop()?.trim() ?? '';
-      throw new GitError(
-        `git push failed: ${[summary, remoteSaid(result.stderr)].filter((part) => part !== '').join('; ')}`
-      );
+      throw new GitError(remoteSaid(result.stderr) || summary || `exit code ${result.exitCode}`);
     }
     return 'pushed';
   }
@@ -414,26 +412,29 @@ export class GitService {
       ['gc.auto', '0'],
       ...(attributesIn === undefined ? [] : [['core.attributesFile', await this.attributesFile(attributesIn)]])
     ].flatMap(([key, value]) => ['-c', `${key}=${value}`]);
+    let result;
     try {
-      const result = await execa('git', [...settings, ...args], {
+      result = await execa('git', [...settings, ...args], {
         cwd: cwd.toString(),
         env: { ...env, GIT_TERMINAL_PROMPT: '0', LC_ALL: 'C' },
         input,
         encoding: encoding as 'utf8',
         reject: false
       });
-      if (!acceptedExitCodes.includes(result.exitCode ?? -1)) {
-        throw new GitError(`git ${args[0]} failed: ${String(result.stderr).trim() || `exit code ${result.exitCode}`}`);
-      }
-      return result as unknown as { stdout: Buffer & string; stderr: string; exitCode: number };
     } catch (error) {
-      if (error instanceof GitError) {
-        throw error;
-      }
       throw new GitError(
         error instanceof ExecaError ? `git ${args[0]} failed: ${error.shortMessage}` : errorMessage(error)
       );
     }
+    if (!acceptedExitCodes.includes(result.exitCode ?? -1)) {
+      // With no exit code git never ran (or was killed), so execa's own message says why.
+      const reason =
+        result.exitCode === undefined
+          ? result.shortMessage
+          : String(result.stderr).trim() || `exit code ${result.exitCode}`;
+      throw new GitError(`git ${args[0]} failed: ${reason}`);
+    }
+    return result as unknown as { stdout: Buffer & string; stderr: string; exitCode: number };
   }
 
   // Trees are stored with line endings normalised, so a CRLF file and its LF twin compare equal

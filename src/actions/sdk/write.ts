@@ -106,7 +106,7 @@ export class SdkWriteAction {
     if (staged.isErr()) {
       this.prompts.conflictsNotStaged(staged.error.reason);
     }
-    this.prompts.conflicts(plan, repository.sdkDirectory(), repository.previousRef());
+    this.prompts.conflicts(plan, repository.sdkDirectory());
     return ActionResult.failed(MERGE_NEEDS_RESOLVING, plan);
   }
 
@@ -136,9 +136,9 @@ export class SdkWriteAction {
     }
     const shared = await repository.shareSnapshot(remote);
     if (shared.isErr()) {
-      this.prompts.snapshotNotShared(remote, shared.error.reason, repository.pristineRef());
+      this.prompts.snapshotNotShared(remote, shared.error.reason);
     } else if (shared.value !== 'upToDate') {
-      this.prompts.snapshotShared(remote, shared.value === 'joined');
+      this.prompts.snapshotShared(remote);
     }
   }
 }

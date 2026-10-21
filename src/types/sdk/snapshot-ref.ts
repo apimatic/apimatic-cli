@@ -26,6 +26,12 @@ export class SnapshotRef {
     return PRISTINE;
   }
 
+  /** The SDK directory's path below the repository root, which the ref is named after; '' for the root itself. */
+  public sdkPath(): string {
+    const namespace = this.name.startsWith(PREVIOUS) ? PREVIOUS : PRISTINE;
+    return this.name.slice(namespace.length + 1);
+  }
+
   /** Git stores refs as files in directories, so a ref cannot sit on another ref's path. */
   public collidesWith(other: SnapshotRef): boolean {
     return (

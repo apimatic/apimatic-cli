@@ -16,10 +16,13 @@ import { describeGeneration, GenerationRecord, SdkGeneration } from './sdk/gener
 import { MergePlan } from './sdk/merge-plan.js';
 import { SnapshotRef } from './sdk/snapshot-ref.js';
 
-export type SdkRepositoryProblem = {
-  kind: 'nestedSdkDirectory' | 'gitFailed' | 'recordNotWritten';
-  reason: string;
-};
+export type SdkRepositoryProblem = { kind: 'gitFailed' | 'recordNotWritten'; reason: string };
+
+/**
+ * Two SDK directories, one inside the other: refs are files, so only one of them can have
+ * snapshots. `encloses` says the other one is the outer directory.
+ */
+export type NestedSdkDirectory = { kind: 'nestedSdkDirectory'; other: DirectoryPath; encloses: boolean };
 
 /** Why a recorded snapshot is still absent after the one place it could have come from was tried. */
 export type SnapshotFetch =
@@ -31,12 +34,12 @@ export type SnapshotFetch =
 export type SdkRepositoryState =
   | { kind: 'noRecord' }
   | { kind: 'otherGeneration'; recorded: SdkGeneration }
-  | { kind: 'snapshotMissing'; commit: CommitId; fetch: SnapshotFetch }
-  | { kind: 'unresolved'; paths: RelativeFilePath[]; fetchedFrom?: string }
-  | { kind: 'ready'; base: CommitId; fetchedFrom?: string };
+  | { kind: 'snapshotMissing'; fetch: SnapshotFetch }
+  | { kind: 'unresolved'; paths: RelativeFilePath[] }
+  | { kind: 'ready'; base: CommitId };
 
 /** What sharing a snapshot did at the remote. */
-export type SnapshotShare = 'pushed' | 'upToDate' | 'joined';
+export type SnapshotShare = 'pushed' | 'upToDate';
 
 /** The plan, the merged tree, and git's versions of every conflicted path, below the SDK directory. */
 export type MergeOutcome = { plan: MergePlan; merged: TreeId; stages: StageEntry[] };
@@ -99,7 +102,7 @@ export class SdkRepositoryContext {
   public async inspect(
     generation: SdkGeneration,
     remote: string | undefined
-  ): Promise<Result<SdkRepositoryState, SdkRepositoryProblem>> {
+  ): Promise<Result<SdkRepositoryState, SdkRepositoryProblem | NestedSdkDirectory>> {
     const notNested = await this.verifyNotNested();
     if (notNested.isErr()) {
       return err(notNested.error);
@@ -112,26 +115,20 @@ export class SdkRepositoryContext {
       return ok({ kind: 'otherGeneration', recorded: record.generatedAs() });
     }
     const base = record.pristineCommit();
-    let fetchedFrom: string | undefined;
     if (!(await this.git.hasCommit(this.rootDirectory, base))) {
       if (remote === undefined) {
-        return ok({ kind: 'snapshotMissing', commit: base, fetch: { kind: 'noRemote' } });
+        return ok({ kind: 'snapshotMissing', fetch: { kind: 'noRemote' } });
       }
       const fetched = await this.fetchSnapshots(remote);
       if (fetched.isErr()) {
-        return ok({
-          kind: 'snapshotMissing',
-          commit: base,
-          fetch: { kind: 'failed', remote, reason: fetched.error.reason }
-        });
+        return ok({ kind: 'snapshotMissing', fetch: { kind: 'failed', remote, reason: fetched.error.reason } });
       }
       if (!(await this.git.hasCommit(this.rootDirectory, base))) {
-        return ok({ kind: 'snapshotMissing', commit: base, fetch: { kind: 'absent', remote } });
+        return ok({ kind: 'snapshotMissing', fetch: { kind: 'absent', remote } });
       }
-      fetchedFrom = remote;
     }
     const paths = await this.unresolvedConflicts(record);
-    return ok(paths.length > 0 ? { kind: 'unresolved', paths, fetchedFrom } : { kind: 'ready', base, fetchedFrom });
+    return ok(paths.length > 0 ? { kind: 'unresolved', paths } : { kind: 'ready', base });
   }
 
   /**
@@ -153,7 +150,7 @@ export class SdkRepositoryContext {
       if (second === 'rejected') {
         return err(gitFailed(`${remote} refused the snapshot twice; try again`));
       }
-      return ok(second === 'pushed' ? 'joined' : second);
+      return ok(second);
     } catch (error) {
       return err(gitFailed(errorMessage(error)));
     }
@@ -187,10 +184,6 @@ export class SdkRepositoryContext {
     generated: TreeId,
     generation: SdkGeneration
   ): Promise<Result<CommitId, SdkRepositoryProblem>> {
-    const notNested = await this.verifyNotNested();
-    if (notNested.isErr()) {
-      return err(notNested.error);
-    }
     const ref = this.pristineRef();
     try {
       const parent = await this.git.resolveRef(this.rootDirectory, ref);
@@ -339,16 +332,15 @@ export class SdkRepositoryContext {
   }
 
   // The ref name is the SDK directory's path, so one SDK directory inside another cannot have its own.
-  private async verifyNotNested(): Promise<Result<void, SdkRepositoryProblem>> {
+  private async verifyNotNested(): Promise<Result<void, SdkRepositoryProblem | NestedSdkDirectory>> {
     const ref = this.pristineRef();
     try {
       const colliding = (await this.pristineRefsIn()).find((existing) => existing.collidesWith(ref));
-      return colliding === undefined
-        ? ok(undefined)
-        : err({
-            kind: 'nestedSdkDirectory',
-            reason: `${ref} cannot be kept beside ${colliding}: one SDK directory sits inside another`
-          });
+      if (colliding === undefined) {
+        return ok(undefined);
+      }
+      const other = this.rootDirectory.join(colliding.sdkPath());
+      return err({ kind: 'nestedSdkDirectory', other, encloses: other.contains(this.sdk) });
     } catch (error) {
       return err(gitFailed(errorMessage(error)));
     }

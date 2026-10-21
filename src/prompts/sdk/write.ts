@@ -3,7 +3,6 @@ import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { RelativeFilePath } from '../../types/file/relativeFilePath.js';
 import { SdkSaveProblem } from '../../types/sdk-context.js';
 import { ConflictKind, GENERATOR_FILES, MergePlan, YOUR_FILES } from '../../types/sdk/merge-plan.js';
-import { SnapshotRef } from '../../types/sdk/snapshot-ref.js';
 import { listedInProse } from '../../utils/string-utils.js';
 import { format as f } from '../format.js';
 import { noteWrapped } from '../prompt.js';
@@ -65,18 +64,14 @@ export class SdkWritePrompts {
     log.warn(message);
   }
 
-  public snapshotShared(remote: string, joined: boolean) {
-    const message = joined
-      ? `Pushed the SDK's snapshot to ${f.var(remote)}, joined with the one another machine pushed meanwhile.`
-      : `Pushed the SDK's snapshot to ${f.var(remote)}, so a clone can merge too.`;
-    log.info(message);
+  public snapshotShared(remote: string) {
+    log.info(`Pushed the SDK's snapshot to ${f.var(remote)}.`);
   }
 
-  public snapshotNotShared(remote: string, reason: string, ref: SnapshotRef) {
+  public snapshotNotShared(remote: string, reason: string) {
     const message =
-      `The SDK's snapshot could not be pushed to ${f.var(remote)}: ${reason}\n` +
-      `A clone will replace the SDK instead of merging until it is shared; ` +
-      `${f.cmd('git', 'push', remote, ref.refspec())} does it by hand.`;
+      `Could not push the SDK's snapshot to ${f.var(remote)}: ${reason}\n` +
+      `Clones will replace the SDK instead of merging.`;
     log.warn(message);
   }
 
@@ -97,7 +92,7 @@ export class SdkWritePrompts {
     log.info(lines.join('\n'));
   }
 
-  public conflicts(plan: MergePlan, sdk: DirectoryPath, previous: SnapshotRef) {
+  public conflicts(plan: MergePlan, sdk: DirectoryPath) {
     const { conflicts } = plan;
     const lines = conflicts.map(
       (conflict) => `${f.relativePath(conflict.path.in(sdk))}\n  ${conflict.message ?? CONFLICT_LABELS[conflict.kind]}`
@@ -105,12 +100,7 @@ export class SdkWritePrompts {
     const marked = plan.hasMarkedConflicts();
     const unmarked = plan.hasUnmarkedConflicts();
     const steps = [
-      ...(marked
-        ? [
-            `Open each marked file, keep what is right, and remove the markers; ${f.cmd('git', 'status')} lists ` +
-              `them as both modified and ${f.cmd('git', 'mergetool')} opens them.`
-          ]
-        : []),
+      ...(marked ? ['Open each marked file, keep what is right, and remove the markers.'] : []),
       ...(unmarked
         ? [
             `For each ${
@@ -118,8 +108,7 @@ export class SdkWritePrompts {
             }file, decide whether it stays or goes: delete it again, or keep it as your own.`
           ]
         : []),
-      'Rerun the command; nothing needs committing first.',
-      `The directory as it was before this run is under ${f.var(previous.toString())}.`
+      'Rerun the command; nothing needs committing first.'
     ];
     noteWrapped(
       [...lines, '', ...steps.map((step, index) => `${index + 1}. ${step}`)].join('\n'),

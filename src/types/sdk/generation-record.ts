@@ -140,3 +140,10 @@ export class GenerationRecord {
 export function describeGeneration(generation: SdkGeneration): string {
   return `${generation.language} ${generation.codegenVersion} ${generation.stability}`;
 }
+
+/** Each as "stable typescript", with the codegen version added only when that is what sets them apart. */
+export function describeApart(recorded: SdkGeneration, requested: SdkGeneration): [string, string] {
+  const brief = (generation: SdkGeneration) => `${generation.stability} ${generation.language}`;
+  const full = (generation: SdkGeneration) => `${brief(generation)} (codegen ${generation.codegenVersion})`;
+  return brief(recorded) === brief(requested) ? [full(recorded), full(requested)] : [brief(recorded), brief(requested)];
+}

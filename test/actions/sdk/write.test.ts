@@ -292,7 +292,7 @@ describe('SdkWriteAction', () => {
 
       expect(result.isSuccess()).to.be.true;
       expect(share.firstCall.args[0]).to.equal('origin');
-      expect(snapshotShared.firstCall.args).to.deep.equal(['origin', false]);
+      expect(snapshotShared.firstCall.args).to.deep.equal(['origin']);
     });
 
     it('says nothing when the remote already had it', async () => {
@@ -320,7 +320,7 @@ describe('SdkWriteAction', () => {
       );
 
       expect(result.isSuccess()).to.be.true;
-      expect(snapshotNotShared.firstCall.args.slice(0, 2)).to.deep.equal(['origin', 'no access']);
+      expect(snapshotNotShared.firstCall.args).to.deep.equal(['origin', 'no access']);
     });
 
     it('leaves the remote alone when the destination names none', async () => {

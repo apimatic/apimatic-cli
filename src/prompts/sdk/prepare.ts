@@ -1,11 +1,9 @@
 import { isCancel, confirm, log } from '@clack/prompts';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { RelativeFilePath } from '../../types/file/relativeFilePath.js';
-import { CommitId } from '../../types/git/commit-id.js';
 import { GitVersion } from '../../types/git/git-version.js';
-import { describeGeneration, SdkGeneration } from '../../types/sdk/generation-record.js';
-import { SnapshotFetch } from '../../types/sdk-repository-context.js';
-import { SnapshotRef } from '../../types/sdk/snapshot-ref.js';
+import { describeApart, SdkGeneration } from '../../types/sdk/generation-record.js';
+import { NestedSdkDirectory, SnapshotFetch } from '../../types/sdk-repository-context.js';
 import { format as f } from '../format.js';
 
 const plural = (count: number, noun: string) => `${count} ${noun}${count === 1 ? '' : 's'}`;
@@ -37,8 +35,11 @@ export class SdkPreparePrompts {
     log.warn(`${reason}, so your customizations to the generated SDK will not persist across regenerations.`);
   }
 
-  public nestedSdkDirectory(reason: string) {
-    log.error(`The SDK cannot be generated here: ${reason}.`);
+  public nestedSdkDirectory(sdk: DirectoryPath, nested: NestedSdkDirectory) {
+    const where = nested.encloses
+      ? `it sits inside the SDK at ${f.relativePath(nested.other)}`
+      : `the SDK at ${f.relativePath(nested.other)} sits inside it`;
+    log.error(`The SDK cannot be generated at ${f.relativePath(sdk)}: ${where}.`);
   }
 
   public directoryNotInspected(reason: string) {
@@ -46,23 +47,15 @@ export class SdkPreparePrompts {
   }
 
   public recordNotForThisGeneration(recorded: SdkGeneration, requested: SdkGeneration, sdk: DirectoryPath) {
-    const message =
-      `${f.relativePath(sdk)} was last generated as ${describeGeneration(recorded)}; ` +
-      `a ${describeGeneration(requested)} SDK cannot be merged into it and will replace it.`;
-    log.warn(message);
+    const [was, now] = describeApart(recorded, requested);
+    log.warn(`${f.relativePath(sdk)} holds a ${was} SDK; a ${now} SDK cannot be merged into it.`);
   }
 
-  public snapshotMissing(commit: CommitId, root: DirectoryPath, ref: SnapshotRef, fetch: SnapshotFetch) {
+  public snapshotMissing(fetch: SnapshotFetch) {
     const message =
-      `The snapshot this SDK was generated from, commit ${f.var(commit.toString())}, is not in the repository at ` +
-      `${f.relativePath(root)}, so your customizations cannot be merged. ${whereItWent(fetch)}\n` +
-      `${howToShare(fetch, ref)}\n` +
-      `Otherwise the SDK will be replaced and a fresh snapshot recorded.`;
+      `The snapshot this SDK was generated from is not available ${whereItWasLookedFor(fetch)}, ` +
+      `so the new SDK cannot be merged into it.`;
     log.warn(message);
-  }
-
-  public snapshotsFetched(remote: string) {
-    log.info(`Fetched the SDK's snapshots from ${f.var(remote)}.`);
   }
 
   public conflictsUnresolved(paths: readonly RelativeFilePath[], sdk: DirectoryPath) {
@@ -75,26 +68,13 @@ export class SdkPreparePrompts {
   }
 }
 
-function whereItWent(fetch: SnapshotFetch): string {
+function whereItWasLookedFor(fetch: SnapshotFetch): string {
   switch (fetch.kind) {
     case 'noRemote':
-      return 'The repository has no remote to fetch it from.';
+      return 'here, and there is no remote to fetch it from';
     case 'absent':
-      return `${f.var(fetch.remote)} does not have it either.`;
+      return `here or on ${f.var(fetch.remote)}`;
     case 'failed':
-      return `It could not be fetched from ${f.var(fetch.remote)}: ${fetch.reason}`;
+      return `here, and could not be fetched from ${f.var(fetch.remote)} (${fetch.reason})`;
   }
-}
-
-function howToShare(fetch: SnapshotFetch, ref: SnapshotRef): string {
-  const remote = fetch.kind === 'noRemote' ? '<remote>' : fetch.remote;
-  return (
-    `Whoever generated it shares it by regenerating with a remote, or with ${f.cmd(
-      'git',
-      'push',
-      remote,
-      ref.refspec()
-    )}; ` +
-    `then rerun here${fetch.kind === 'noRemote' ? ` after ${f.cmd('git', 'fetch', remote, ref.forcedRefspec())}` : ''}.`
-  );
 }

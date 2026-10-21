@@ -112,14 +112,14 @@ describe('SdkPrepareAction', () => {
     expect(notForThis.firstCall.args[1]).to.deep.equal(BETA);
   });
 
-  it('records over an SDK whose snapshot the repository does not hold, naming the commit', async () => {
+  it('records over an SDK whose snapshot the repository does not hold, after saying so', async () => {
     await recorded({ 'README.md': '# sdk' });
     const missing = CommitId.create('f'.repeat(40))!;
     write('.apimatic/generation.json', GenerationRecord.written(STABLE, missing, new Date(), '0.0.0').toJson());
     const snapshotMissing = sinon.stub(SdkPreparePrompts.prototype, 'snapshotMissing');
 
     expect((await execute()).getValue().kind).to.equal('record');
-    expect(snapshotMissing.firstCall.args[0].isEqual(missing)).to.be.true;
+    expect(snapshotMissing.firstCall.args[0]).to.deep.equal({ kind: 'noRemote' });
   });
 
   it('merges in a clone only once the pristine refs were fetched by hand, and says how', async () => {
@@ -140,7 +140,7 @@ describe('SdkPrepareAction', () => {
       const snapshotMissing = sinon.stub(SdkPreparePrompts.prototype, 'snapshotMissing');
 
       expect((await execute()).getValue().kind).to.equal('record');
-      expect(snapshotMissing.firstCall.args[0].isEqual(base)).to.be.true;
+      expect(snapshotMissing.firstCall.args[0]).to.deep.equal({ kind: 'absent', remote: 'origin' });
 
       await sh(root, 'push', '-q', 'origin', 'refs/apimatic/pristine/*:refs/apimatic/pristine/*');
       await sh(clone, 'fetch', '-q', 'origin', '+refs/apimatic/pristine/*:refs/apimatic/pristine/*');
@@ -183,7 +183,9 @@ describe('SdkPrepareAction', () => {
     const nestedSdkDirectory = sinon.stub(SdkPreparePrompts.prototype, 'nestedSdkDirectory');
 
     expect((await execute()).isFailed()).to.be.true;
-    expect(nestedSdkDirectory.firstCall.args[0]).to.contain('refs/apimatic/pristine/sdk/python/python');
+    expect(nestedSdkDirectory.firstCall.args[0].isEqual(sdk().join('python'))).to.be.true;
+    expect(nestedSdkDirectory.firstCall.args[1].other.isEqual(sdk())).to.be.true;
+    expect(nestedSdkDirectory.firstCall.args[1].encloses).to.be.true;
   });
 
   it('reports a directory git could not inspect', async () => {
@@ -210,6 +212,15 @@ describe('SdkPrepareAction', () => {
       sinon.stub(SdkPreparePrompts.prototype, 'overwriteSdk').resolves(true);
 
       expect((await execute({ force: false })).getValue().kind).to.equal('record');
+    });
+
+    it('follows the warning about another generation, and no cancels there too', async () => {
+      await recorded({ 'README.md': '# sdk' });
+      const notForThis = sinon.stub(SdkPreparePrompts.prototype, 'recordNotForThisGeneration');
+      const overwriteSdk = sinon.stub(SdkPreparePrompts.prototype, 'overwriteSdk').resolves(false);
+
+      expect((await execute({ generation: BETA, force: false })).isCancelled()).to.be.true;
+      expect(notForThis.calledBefore(overwriteSdk)).to.be.true;
     });
 
     it('is skipped by --force', async () => {
@@ -244,13 +255,10 @@ describe('SdkPrepareAction', () => {
     it('merges in a clone by itself, fetching the snapshot the origin shared', async () => {
       const { clone, origin, base } = await shared();
       try {
-        const snapshotsFetched = sinon.stub(SdkPreparePrompts.prototype, 'snapshotsFetched');
-
         const destination = (await execute()).getValue();
 
         expect(destination.kind === 'merge' && destination.base.isEqual(base)).to.be.true;
         expect(destination.kind === 'merge' && destination.remote).to.equal('origin');
-        expect(snapshotsFetched.firstCall.args[0]).to.equal('origin');
       } finally {
         fs.rmSync(clone, { recursive: true, force: true });
         fs.rmSync(origin, { recursive: true, force: true });

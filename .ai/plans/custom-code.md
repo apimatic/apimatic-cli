@@ -83,9 +83,10 @@ the ref has no suffix.
 
 The commit named in the generation record on disk, never the ref's tip. The tip only says
 where the chain continues. If the named commit is absent locally, the CLI fetches the ref from
-the remote (3.2) and looks again; if it is still absent, it says which commit is missing, why
-(no remote, the remote lacks it, or the fetch failed and how), how to push it by hand, and
-offers to overwrite instead, which records a fresh snapshot.
+the remote (3.2) and looks again; if it is still absent, it says so and why (no remote, the
+remote lacks it, or the fetch failed and how), and offers to overwrite instead, which records a
+fresh snapshot. The commit id and the ref are not shown: nothing in the message is for the
+developer to act on beyond the question that follows.
 
 ### 3.2 Sharing through the remote
 
@@ -103,9 +104,9 @@ reachable and the push is a fast-forward.
 Every remote command runs without prompts (`GIT_TERMINAL_PROMPT=0`,
 `credential.interactive=false`, ssh `BatchMode=yes` unless `GIT_SSH_COMMAND` is set) and with
 a 30-second timeout, so a missing credential, a refused push (no rights, a ruleset on
-`refs/apimatic/*`, a hook) or a dead remote becomes a warning with git's reason and the
-manual `git push <remote> <ref>:<ref>`, never a stuck or failed run. The SDK is written and
-recorded either way; only the sharing is missing until someone pushes.
+`refs/apimatic/*`, a hook) or a dead remote becomes a warning in the server's own words,
+never a stuck or failed run. The SDK is written and recorded either way; only the sharing is
+missing until someone pushes (the manual command is in the README, not in the message).
 
 Fallback by hand, when the CLI could not: `git push <remote> refs/apimatic/pristine/<path>:refs/apimatic/pristine/<path>`
 on the generating machine, and `git fetch <remote> +refs/apimatic/pristine/<path>:refs/apimatic/pristine/<path>`
