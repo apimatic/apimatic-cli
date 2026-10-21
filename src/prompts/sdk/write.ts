@@ -8,6 +8,9 @@ import { listedInProse } from '../../utils/string-utils.js';
 import { format as f } from '../format.js';
 import { noteWrapped } from '../prompt.js';
 
+/** The closing line of a run that left conflicts. */
+export const MERGE_NEEDS_RESOLVING = 'Resolve the conflicts and rerun';
+
 const CONFLICT_LABELS: Record<ConflictKind, string> = {
   bothChanged: 'changed by you and by the generator; markers in the file',
   bothAdded: 'added by you and by the generator; markers in the file',

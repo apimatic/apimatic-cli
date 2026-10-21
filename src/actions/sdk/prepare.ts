@@ -5,10 +5,7 @@ import { SdkGeneration } from '../../types/sdk/generation-record.js';
 import { SdkDestination } from '../../types/sdk/sdk-destination.js';
 import { ActionResult } from '../action-result.js';
 
-/**
- * Decides how the SDK directory will be written, before anything is uploaded: a run that will be
- * refused, or that the developer does not want, stops here.
- */
+/** Decides how the SDK will be written before anything is uploaded, so a refused or declined run stops here. */
 export class SdkPrepareAction {
   private readonly prompts = new SdkPreparePrompts();
   private readonly git = new GitService();

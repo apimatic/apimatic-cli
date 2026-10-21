@@ -1,6 +1,6 @@
 import { err, ok, Result } from 'neverthrow';
 import { envInfo } from '../../infrastructure/env-info.js';
-import { SdkWritePrompts } from '../../prompts/sdk/write.js';
+import { MERGE_NEEDS_RESOLVING, SdkWritePrompts } from '../../prompts/sdk/write.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { RelativeFilePath } from '../../types/file/relativeFilePath.js';
 import { CommitId } from '../../types/git/commit-id.js';
@@ -11,8 +11,6 @@ import { SdkGeneration } from '../../types/sdk/generation-record.js';
 import { MergePlan } from '../../types/sdk/merge-plan.js';
 import { SdkDestination } from '../../types/sdk/sdk-destination.js';
 import { ActionResult } from '../action-result.js';
-
-const MERGE_NEEDS_RESOLVING = 'Resolve the conflicts and rerun';
 
 /** Writes a freshly generated SDK into its directory the way the destination was prepared for. */
 export class SdkWriteAction {
@@ -44,8 +42,7 @@ export class SdkWriteAction {
     return ActionResult.success();
   }
 
-  // The repository is made once the generation has succeeded, so a failed one leaves none behind,
-  // and before the write, which the generator's output cannot collide with.
+  // Made only once generation succeeds, so a failed run leaves no repository; generated files never hold a .git.
   private async overwriteAndRecord(
     enclosing: SdkRepositoryContext | undefined,
     remote: string | undefined,
@@ -118,9 +115,7 @@ export class SdkWriteAction {
     return ActionResult.failed();
   }
 
-  // The SDK is already on disk when this runs, so a failure here is a warning: the next run
-  // asks before replacing it, as it would any directory without a record. Sharing the snapshot
-  // is a warning too: the developer can push the ref by hand, and teammates ask until then.
+  // Only warns: the SDK is already on disk, and a run without its snapshot asks before replacing it.
   private async record(
     repository: SdkRepositoryContext,
     generated: Result<TreeId, SdkRepositoryProblem>,
