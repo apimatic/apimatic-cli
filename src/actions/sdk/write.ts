@@ -1,7 +1,6 @@
 import { err, ok, Result } from 'neverthrow';
 import { MergePlan } from '../../application/sdk-merge/merge-plan.js';
 import { envInfo } from '../../infrastructure/env-info.js';
-import { MergeService } from '../../infrastructure/merge-service.js';
 import { PristineStoreProblem, PristineStoreService } from '../../infrastructure/pristine-store-service.js';
 import { SdkWritePrompts } from '../../prompts/sdk/write.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
@@ -20,7 +19,6 @@ const MERGE_NEEDS_RESOLVING = 'Resolve the conflicts and rerun';
 export class SdkWriteAction {
   private readonly prompts = new SdkWritePrompts();
   private readonly store = new PristineStoreService();
-  private readonly mergeService = new MergeService();
 
   public readonly execute = async (
     destination: SdkDestination,
@@ -93,12 +91,12 @@ export class SdkWriteAction {
     if (disk.isErr()) {
       return this.customCodeFailed(disk.error);
     }
-    const merged = await this.mergeService.merge(repository, base, disk.value, generated.value);
+    const merged = await this.store.merge(repository, base, disk.value, generated.value);
     if (merged.isErr()) {
       return this.customCodeFailed(merged.error);
     }
     const { plan } = merged.value;
-    const applied = await this.mergeService.apply(repository, plan);
+    const applied = await this.store.apply(repository, plan);
     if (applied.isErr()) {
       return this.customCodeFailed(applied.error);
     }
@@ -107,7 +105,7 @@ export class SdkWriteAction {
     if (!plan.hasConflicts()) {
       return ActionResult.success();
     }
-    const staged = await this.mergeService.stageConflicts(repository, merged.value);
+    const staged = await this.store.stageConflicts(repository, merged.value);
     if (staged.isErr()) {
       this.prompts.conflictsNotStaged(staged.error.reason);
     }

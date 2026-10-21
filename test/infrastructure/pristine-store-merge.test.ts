@@ -6,7 +6,6 @@ import { Buffer } from 'node:buffer';
 import { expect } from 'chai';
 import { MergePlan } from '../../src/application/sdk-merge/merge-plan.js';
 import { GitService } from '../../src/infrastructure/git-service.js';
-import { MergeService } from '../../src/infrastructure/merge-service.js';
 import { PristineStoreService } from '../../src/infrastructure/pristine-store-service.js';
 import { DirectoryPath } from '../../src/types/file/directoryPath.js';
 import { CodeGenerationVersion, Language, Stability } from '../../src/types/sdk/generate.js';
@@ -64,12 +63,12 @@ const counts = (plan: MergePlan) =>
 
 const rel = (value: string) => RelativeFilePath.fromGit(value);
 
-describe('MergeService', () => {
+describe('PristineStoreService: the merge', () => {
   let root: string;
   let counter = 0;
   const git = new GitService();
   const store = new PristineStoreService();
-  const service = new MergeService();
+  const service = store;
 
   const write = (directory: DirectoryPath, files: Files) => {
     for (const [relative, contents] of Object.entries(files)) {
@@ -127,7 +126,7 @@ describe('MergeService', () => {
   };
 
   beforeEach(() => {
-    root = fs.mkdtempSync(path.join(os.tmpdir(), 'merge-service-'));
+    root = fs.mkdtempSync(path.join(os.tmpdir(), 'pristine-store-merge-'));
   });
 
   afterEach(() => {
@@ -288,7 +287,9 @@ describe('MergeService', () => {
 
       expect(read('models/catalog/book.ts')).to.equal(MODEL_V2 + HELPER);
       expect(exists('models/book.ts')).to.be.false;
-      expect(plan.renames).to.deep.equal([{ from: rel('models/book.ts'), to: rel('models/catalog/book.ts'), by: 'you' }]);
+      expect(plan.renames).to.deep.equal([
+        { from: rel('models/book.ts'), to: rel('models/catalog/book.ts'), by: 'you' }
+      ]);
       expect(plan.hasConflicts()).to.be.false;
     });
 
@@ -301,7 +302,9 @@ describe('MergeService', () => {
 
       expect(read('models/book-model.ts')).to.equal(MODEL_V2 + HELPER);
       expect(exists('models/book.ts')).to.be.false;
-      expect(plan.renames).to.deep.equal([{ from: rel('models/book.ts'), to: rel('models/book-model.ts'), by: 'generator' }]);
+      expect(plan.renames).to.deep.equal([
+        { from: rel('models/book.ts'), to: rel('models/book-model.ts'), by: 'generator' }
+      ]);
       expect(plan.hasConflicts()).to.be.false;
     });
   });

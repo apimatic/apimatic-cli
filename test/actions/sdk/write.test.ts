@@ -10,7 +10,6 @@ import sinon from 'sinon';
 import { SdkWriteAction } from '../../../src/actions/sdk/write.js';
 import { GENERATED_MARKER, YOURS_MARKER } from '../../../src/application/sdk-merge/markers.js';
 import { GitService } from '../../../src/infrastructure/git-service.js';
-import { MergeService } from '../../../src/infrastructure/merge-service.js';
 import { PristineStoreService } from '../../../src/infrastructure/pristine-store-service.js';
 import { ZipService } from '../../../src/infrastructure/zip-service.js';
 import { SdkWritePrompts } from '../../../src/prompts/sdk/write.js';
@@ -234,7 +233,9 @@ describe('SdkWriteAction', () => {
     it('still reports the conflicts when they cannot be marked in the index, with a warning', async () => {
       const { repository, base } = await recorded({ 'README.md': '# sdk', 'models/book.py': MODEL_V1 });
       write(sdk(), { 'models/book.py': MODEL_V1_EDITED });
-      sinon.stub(MergeService.prototype, 'stageConflicts').resolves(err({ kind: 'gitFailed', reason: 'index locked' }));
+      sinon
+        .stub(PristineStoreService.prototype, 'stageConflicts')
+        .resolves(err({ kind: 'gitFailed', reason: 'index locked' }));
       const conflictsNotStaged = sinon.stub(SdkWritePrompts.prototype, 'conflictsNotStaged');
       const conflicts = sinon.stub(SdkWritePrompts.prototype, 'conflicts');
 

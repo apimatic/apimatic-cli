@@ -275,7 +275,7 @@ The eleven Speakeasy runs from the lab notebook, plus three the lab did not cove
 | 14 | Fresh clone, regenerate | fails unless the hidden refs were pushed | merges if the team pushed and fetched the refs; otherwise a clear message with the commands and the overwrite question |
 
 Every row of section 5 and this table is a test over real repositories in
-`test/infrastructure/merge-service.test.ts`, `test/actions/sdk/prepare.test.ts` (row 14 with
+`test/infrastructure/pristine-store-merge.test.ts`, `test/actions/sdk/prepare.test.ts` (row 14 with
 a bare remote) and `test/actions/sdk/write.test.ts`.
 
 ## 8. Phases, as delivered
@@ -283,7 +283,7 @@ a bare remote) and `test/actions/sdk/write.test.ts`.
 | Phase | Commit | What |
 |---|---|---|
 | 1 | `db3fe9f2`, reworked in `185e0663` | `GitService` (the system git through `execa`, every call with the 3.3 settings) and `PristineStoreService` with the value objects: repository, refs, commit and tree ids, git version, generation record. |
-| 2 | `185e0663` | `MergeService`: the temporary commits, `merge-tree --write-tree -z`, the diffs; `src/application/sdk-merge/` keeps only what is pure: parsing merge-tree's output, the conflict kinds, marker relabelling, `MergePlan`. |
+| 2 | `185e0663` | The merge (since folded into `PristineStoreService`): the temporary commits, `merge-tree --write-tree -z`, the diffs; `src/application/sdk-merge/` keeps only what is pure: parsing merge-tree's output, the conflict kinds, marker relabelling, `MergePlan`. |
 | 3 | `4d5b9ccf` | `SdkPrepareAction`, `SdkDestination`, `SdkWriteAction`, their prompts, `PristineStoreService.inspect`; `GenerateAction` back to validation and generation; `SdkContext.save` keeps `.git`. |
 | 4, 5 | `87453917` | The missing-snapshot message with the push and fetch commands; `stageConflicts` through `update-index --index-info`; `SdkMergeConflictedEvent`. |
 | 6 | this file | `CONTEXT.md` terms, the README section and requirement, the command description. |
@@ -295,8 +295,7 @@ PR into `dev`, squash-merged, title `feat(sdk): keep your edits when regeneratin
 | File | Role |
 |---|---|
 | `src/infrastructure/git-service.ts` | the system git behind every snapshot, the merge and the index staging |
-| `src/infrastructure/pristine-store-service.ts` | snapshots, the record, `inspect` |
-| `src/infrastructure/merge-service.ts` | the merge, its application to disk, the staging |
+| `src/infrastructure/pristine-store-service.ts` | snapshots, the record, `inspect`, the merge, its application to disk, the staging |
 | `src/application/sdk-merge/*.ts` | pure: merge-tree output, conflict kinds, markers, `MergePlan` |
 | `src/types/sdk/{sdk-repository,snapshot-ref,commit-id,tree-id,git-version,generation-record,sdk-destination,snapshot-files}.ts` | value objects |
 | `src/actions/sdk/{generate,prepare,write}.ts`, `src/prompts/sdk/{generate,prepare,write}.ts` | the run |

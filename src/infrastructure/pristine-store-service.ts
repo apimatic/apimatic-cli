@@ -1,7 +1,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { err, ok, Result } from 'neverthrow';
-import { hasConflictMarkers } from '../application/sdk-merge/markers.js';
+import { hasConflictMarkers, relabelMarkers } from '../application/sdk-merge/markers.js';
+import { MergePlan } from '../application/sdk-merge/merge-plan.js';
+import { parseMergeTreeOutput, StageEntry } from '../application/sdk-merge/merge-tree-output.js';
+import { planMerge } from '../application/sdk-merge/sdk-merge.js';
 import { DirectoryPath } from '../types/file/directoryPath.js';
 import { FileName } from '../types/file/fileName.js';
 import { FilePath } from '../types/file/filePath.js';
@@ -31,6 +34,9 @@ export type SdkDirectoryState =
   | { kind: 'unresolved'; repository: SdkRepository; paths: RelativeFilePath[] }
   | { kind: 'ready'; repository: SdkRepository; base: CommitId };
 
+/** The plan, the merged tree, and git's versions of every conflicted path, below the SDK directory. */
+export type MergeOutcome = { plan: MergePlan; merged: TreeId; stages: StageEntry[] };
+
 const RECORD_DIRECTORY = '.apimatic';
 const RECORD_FILE = 'generation.json';
 
@@ -53,8 +59,9 @@ function realSpelling(directory: DirectoryPath): { real: DirectoryPath; existing
 /**
  * The snapshots behind custom code, kept as commits under hidden refs of the repository that
  * encloses an SDK directory: the pristine chain (one commit per generation, the base of the
- * next merge) and the previous state (the directory before the last run wrote to it). The
- * repository is never pushed, fetched, or checked out from here.
+ * next merge) and the previous state (the directory before the last run wrote to it), and
+ * the merge of a regeneration over the directory against that base. The repository is never
+ * pushed, fetched, or checked out from here.
  */
 export class PristineStoreService {
   private readonly fileService = new FileService();
@@ -237,6 +244,74 @@ export class PristineStoreService {
       return ok(file);
     } catch (error) {
       return err({ kind: 'recordNotWritten', reason: errorMessage(error) });
+    }
+  }
+
+  /**
+   * The three-way merge, done by git: the disk and the fresh generation are committed on the
+   * pristine base as temporary commits, `merge-tree` merges them, and the plan says which
+   * paths differ between the disk and the result.
+   */
+  public async merge(
+    repository: SdkRepository,
+    base: CommitId,
+    disk: TreeId,
+    generated: TreeId
+  ): Promise<Result<MergeOutcome, PristineStoreProblem>> {
+    const root = repository.root();
+    try {
+      const baseTree = await this.git.treeOfCommit(root, base);
+      const yours = await this.git.commitTree(root, disk, [base], 'apimatic: your changes');
+      const theirs = await this.git.commitTree(root, generated, [base], 'apimatic: generated');
+      const run = await this.git.mergeTree(root, yours, theirs);
+      const output = parseMergeTreeOutput(run.output);
+      const merged = TreeId.fromGit(output.tree);
+      const plan = planMerge({
+        merge: output,
+        yours: await this.git.diffTrees(root, baseTree, disk, true),
+        generated: await this.git.diffTrees(root, baseTree, generated, true),
+        applied: await this.git.diffTrees(root, disk, merged, false),
+        basePaths: (await this.git.listTree(root, baseTree)).map((entry) => entry.path)
+      });
+      return ok({ plan, merged, stages: output.stages });
+    } catch (error) {
+      return err(gitFailed(errorMessage(error)));
+    }
+  }
+
+  /** Writes and removes what the plan says, in the SDK directory, with the CLI's labels on any markers. */
+  public async apply(repository: SdkRepository, plan: MergePlan): Promise<Result<void, PristineStoreProblem>> {
+    const sdk = repository.sdkDirectory();
+    try {
+      const blobs = await this.git.readBlobs(repository.root(), [...new Set(plan.writes.map((write) => write.blob))]);
+      for (const write of plan.writes) {
+        const content = blobs.get(write.blob)!;
+        const target = write.path.in(sdk).toString();
+        await fs.promises.mkdir(path.dirname(target), { recursive: true });
+        await fs.promises.writeFile(target, plan.hasMarkers(write.path) ? relabelMarkers(content) : content);
+      }
+      for (const relative of plan.deletes) {
+        await fs.promises.rm(relative.in(sdk).toString(), { force: true });
+      }
+      return ok(undefined);
+    } catch (error) {
+      return err(gitFailed(errorMessage(error)));
+    }
+  }
+
+  /** Marks the conflicted paths in the repository's index the way a merge would, so git's own tools take over. */
+  public async stageConflicts(
+    repository: SdkRepository,
+    outcome: MergeOutcome
+  ): Promise<Result<void, PristineStoreProblem>> {
+    try {
+      await this.git.stageConflicts(
+        repository.root(),
+        outcome.stages.map((entry) => ({ ...entry, path: repository.rootRelative(entry.path) }))
+      );
+      return ok(undefined);
+    } catch (error) {
+      return err(gitFailed(errorMessage(error)));
     }
   }
 
