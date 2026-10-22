@@ -70,7 +70,7 @@ describe('placeCodeSamples', () => {
   it('drops the samples an operation carries when the build has no samples file', async () => {
     const written = { paths: { '/pets': { get: { ...operation('List'), [EXTENSION]: [typescript('own')] } } } };
 
-    expect(placed(written, await readCodeSamples(null)).paths['/pets'].get).to.not.have.property(EXTENSION);
+    expect(placed(written, await readCodeSamples(null, 'pets')).paths['/pets'].get).to.not.have.property(EXTENSION);
   });
 
   it('gives two paths that share one operation object their own samples', () => {
@@ -112,11 +112,11 @@ describe('placeCodeSamples', () => {
         components: { pathItems: { Owners: { get: operation('List owners') } } }
       });
       const samplesFile = write('code-samples.json', {
-        '/pets': { GET: [typescript('pets')] },
-        '/owners': { GET: [typescript('owners')] }
+        paths: { '/pets': { GET: [typescript('pets')] }, '/owners': { GET: [typescript('owners')] } },
+        specs: {}
       });
 
-      const samples = await readCodeSamples(samplesFile);
+      const samples = await readCodeSamples(samplesFile, 'api');
       const server = createOpenAPI({
         input: { api: async () => placeCodeSamples(await bundleSpec(file), samples) }
       });
@@ -124,6 +124,44 @@ describe('placeCodeSamples', () => {
 
       expect(document.paths['/pets'].get[EXTENSION]).to.deep.equal([typescript('pets')]);
       expect(document.paths['/owners'].get[EXTENSION]).to.deep.equal([typescript('owners')]);
+    });
+  });
+});
+
+describe('readCodeSamples', () => {
+  let root: string;
+
+  /** The samples file the CLI writes: `orders` filed apart, every other section reading `paths`. */
+  const samplesFile = () => {
+    const file = path.join(root, 'code-samples.json');
+    fs.writeFileSync(
+      file,
+      JSON.stringify({
+        paths: { '/status': { GET: [typescript('shared')] } },
+        specs: { orders: { '/status': { GET: [typescript('orders')] } } }
+      })
+    );
+    return file;
+  };
+
+  beforeEach(() => {
+    root = fs.mkdtempSync(path.join(os.tmpdir(), 'code-samples-read-'));
+  });
+
+  afterEach(() => {
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  it("gives a section filed apart its own samples, and any other section's the rest", async () => {
+    const file = samplesFile();
+
+    expect(await readCodeSamples(file, 'orders')).to.deep.equal({ '/status': { GET: [typescript('orders')] } });
+    expect(await readCodeSamples(file, 'inventory')).to.deep.equal({ '/status': { GET: [typescript('shared')] } });
+  });
+
+  it("gives a section named after one of an object's own members the rest", async () => {
+    expect(await readCodeSamples(samplesFile(), 'constructor')).to.deep.equal({
+      '/status': { GET: [typescript('shared')] }
     });
   });
 });
