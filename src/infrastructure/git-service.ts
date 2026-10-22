@@ -96,6 +96,21 @@ export class GitService {
     });
   }
 
+  /**
+   * Makes `directory` hold exactly `tree`: its files written, files it does not hold removed,
+   * `.git` and ignored files left alone. A temporary index stands in for the repository's own.
+   */
+  public async checkoutTree(root: DirectoryPath, directory: DirectoryPath, tree: TreeId): Promise<void> {
+    const gitDir = await this.gitDir(root);
+    await withDirPath(async (temporary) => {
+      const env = { GIT_INDEX_FILE: new FilePath(temporary, new FileName('index')).toString() };
+      const inWorkTree = (args: string[]) =>
+        this.run(directory, ['--git-dir', gitDir, '--work-tree', directory.toString(), ...args], env, temporary);
+      await inWorkTree(['add', '--all', '--', '.']);
+      await inWorkTree(['read-tree', '--reset', '-u', tree.toString()]);
+    });
+  }
+
   public async commitTree(
     root: DirectoryPath,
     tree: TreeId,
@@ -201,11 +216,24 @@ export class GitService {
    * tree's id, then one entry per stage of every conflicted path, then, after an empty entry, the
    * messages git would have shown during a merge, each as a count, that many paths, a type and the text.
    */
-  public async mergeTree(root: DirectoryPath, ours: CommitId, theirs: CommitId): Promise<MergeTreeOutput> {
+  /** `favour: 'theirs'` settles every content conflict for `theirs`, hunk by hunk, as `git merge -X theirs` would. */
+  public async mergeTree(
+    root: DirectoryPath,
+    ours: CommitId,
+    theirs: CommitId,
+    favour?: 'theirs'
+  ): Promise<MergeTreeOutput> {
     return withDirPath(async (temporary) => {
       const result = await this.run(
         root,
-        ['merge-tree', '--write-tree', '-z', ours.toString(), theirs.toString()],
+        [
+          'merge-tree',
+          '--write-tree',
+          '-z',
+          ...(favour === 'theirs' ? ['--strategy-option=theirs'] : []),
+          ours.toString(),
+          theirs.toString()
+        ],
         {},
         temporary,
         undefined,
@@ -325,6 +353,30 @@ export class GitService {
   /** `core.hooksPath` when the hooks live elsewhere than `.git/hooks`, as husky and its kin set it. */
   public async hooksPathConfigured(root: DirectoryPath): Promise<string | undefined> {
     return this.tryRun(root, ['config', '--get', 'core.hooksPath']);
+  }
+
+  /**
+   * Takes `paths` out of the unmerged state once the CLI settled them: each index entry goes back
+   * to what HEAD holds, or is forgotten where there is no HEAD yet, so `git status` stops saying
+   * "both modified"; the files on disk are not touched.
+   */
+  public async unstage(root: DirectoryPath, paths: readonly RelativeFilePath[]): Promise<void> {
+    if (paths.length === 0) {
+      return;
+    }
+    const list = paths.map(String).join('\0');
+    const reset = await this.run(
+      root,
+      ['reset', '-q', '--pathspec-from-file=-', '--pathspec-file-nul'],
+      {},
+      undefined,
+      list,
+      'utf8',
+      [0, 128]
+    );
+    if (reset.exitCode !== 0) {
+      await this.run(root, ['update-index', '--force-remove', '-z', '--stdin'], {}, undefined, list);
+    }
   }
 
   public async isAncestor(root: DirectoryPath, ancestor: CommitId, descendant: CommitId): Promise<boolean> {

@@ -7,8 +7,9 @@ import { TreeId } from '../../types/git/tree-id.js';
 import { SdkContext } from '../../types/sdk-context.js';
 import { SdkRepositoryContext, SdkRepositoryProblem } from '../../types/sdk-repository-context.js';
 import { SdkGeneration } from '../../types/sdk/generation-record.js';
-import { MergePlan } from '../../types/sdk/merge-plan.js';
+import { ConflictOutcome } from '../../types/sdk/merge-plan.js';
 import { SdkDestination } from '../../types/sdk/sdk-destination.js';
+import { terminal } from '../../utils/terminal-utils.js';
 import { ActionResult } from '../action-result.js';
 
 /** Writes a freshly generated SDK into its directory the way the destination was prepared for. */
@@ -19,8 +20,9 @@ export class SdkWriteAction {
     destination: SdkDestination,
     sdkContext: SdkContext,
     tempSdk: DirectoryPath,
-    generation: SdkGeneration
-  ): Promise<ActionResult<void, MergePlan>> => {
+    generation: SdkGeneration,
+    force: boolean
+  ): Promise<ActionResult<ConflictOutcome | void, ConflictOutcome>> => {
     switch (destination.kind) {
       case 'overwrite':
         this.prompts.sdkGenerated(await sdkContext.save(tempSdk));
@@ -44,13 +46,10 @@ export class SdkWriteAction {
       }
       case 'merge': {
         const { repository, base } = destination;
+        const sdk = repository.sdkDirectory();
         const generated = await repository.snapshotGenerated(tempSdk);
         if (generated.isErr()) {
           return this.customCodeFailed(generated.error);
-        }
-        const previous = await repository.savePrevious(base);
-        if (previous.isErr()) {
-          return this.customCodeFailed(previous.error);
         }
         const disk = await repository.snapshotDisk(base);
         if (disk.isErr()) {
@@ -60,22 +59,49 @@ export class SdkWriteAction {
         if (merged.isErr()) {
           return this.customCodeFailed(merged.error);
         }
-        const { plan } = merged.value;
+        // Conflicts are settled before anything is written: a run that cannot ask leaves markers.
+        let { plan } = merged.value;
+        let outcome: ConflictOutcome | undefined;
+        if (plan.hasConflicts()) {
+          const choice = force || !terminal.isInteractive() ? 'resolve' : await this.prompts.conflictChoice(plan, sdk);
+          if (choice === undefined || choice === 'keep') {
+            this.prompts.sdkKept(sdk);
+            return ActionResult.cancelled();
+          }
+          outcome = { plan, choice };
+          if (choice === 'generated') {
+            // Hunk by hunk where the sides overlap; a file one side deleted is settled whole.
+            this.prompts.resolvedForGenerator(plan.conflictedPaths(), sdk);
+            const favoured = await repository.merge(base, disk.value, generated.value, 'generated');
+            if (favoured.isErr()) {
+              return this.customCodeFailed(favoured.error);
+            }
+            plan = favoured.value.plan.takingGenerated();
+          }
+        }
+        const previous = await repository.savePrevious(base);
+        if (previous.isErr()) {
+          return this.customCodeFailed(previous.error);
+        }
         const applied = await repository.apply(plan);
         if (applied.isErr()) {
           return this.customCodeFailed(applied.error);
         }
         await this.record(repository, generated, generation, plan.conflictedPaths());
-        this.prompts.sdkMerged(repository.sdkDirectory(), plan);
+        this.prompts.sdkMerged(sdk, plan);
         if (!plan.hasConflicts()) {
-          return ActionResult.success();
+          return ActionResult.success(outcome);
         }
         const staged = await repository.stageConflicts(merged.value);
         if (staged.isErr()) {
           this.prompts.conflictsNotStaged(staged.error.reason);
         }
-        this.prompts.conflicts(plan, repository.sdkDirectory());
-        return ActionResult.failed(MERGE_NEEDS_RESOLVING, plan);
+        if (force || !terminal.isInteractive()) {
+          this.prompts.conflicts(plan, sdk);
+        } else {
+          this.prompts.conflictSteps(plan);
+        }
+        return ActionResult.failed(MERGE_NEEDS_RESOLVING, outcome);
       }
     }
   };

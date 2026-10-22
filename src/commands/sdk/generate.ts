@@ -16,6 +16,7 @@ import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { ProjectContext } from '../../types/project-context.js';
 import { format, intro, outro } from '../../prompts/format.js';
 import { TelemetryService } from '../../infrastructure/services/telemetry-service.js';
+import { ConflictOutcome } from '../../types/sdk/merge-plan.js';
 import { SdkMergeConflictedEvent } from '../../types/events/sdk-merge-conflicted.js';
 import { listedInProse } from '../../utils/string-utils.js';
 
@@ -69,15 +70,7 @@ With git ${GitVersion.required()} or newer installed, your edits to the generate
 
   async run() {
     const {
-      flags: {
-        language,
-        input,
-        destination,
-        force,
-        stability,
-        'auth-key': authKey,
-        'api-version': apiVersion
-      }
+      flags: { language, input, destination, force, stability, 'auth-key': authKey, 'api-version': apiVersion }
     } = await this.parse(SdkGenerate);
 
     const project = ProjectContext.at(input);
@@ -99,24 +92,25 @@ With git ${GitVersion.required()} or newer installed, your edits to the generate
     );
     outro(result);
 
+    const conflicted = async (outcome: ConflictOutcome | void) => {
+      if (!outcome) {
+        return;
+      }
+      await new TelemetryService(this.getConfigDir()).trackEvent(
+        new SdkMergeConflictedEvent(outcome.plan.conflictsByKind(), SdkGenerate.id, {
+          language,
+          ...(force && { force }),
+          ...(stability && { stability }),
+          ...(apiVersion && { 'api-version': apiVersion }),
+          choice: outcome.choice
+        }),
+        commandMetadata.shell
+      );
+    };
     await result.mapAll(
-      () => {},
-      async () => {
-        const conflicts = result.getError();
-        if (conflicts === undefined) {
-          return;
-        }
-        await new TelemetryService(this.getConfigDir()).trackEvent(
-          new SdkMergeConflictedEvent(conflicts.conflictsByKind(), SdkGenerate.id, {
-            language,
-            ...(force && { force }),
-            ...(stability && { stability }),
-            ...(apiVersion && { 'api-version': apiVersion })
-          }),
-          commandMetadata.shell
-        );
-      },
-      () => {}
+      () => conflicted(result.getValue()),
+      () => conflicted(result.getError()),
+      async () => {}
     );
   }
 

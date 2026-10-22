@@ -1,8 +1,8 @@
-import { log } from '@clack/prompts';
+import { isCancel, log, select } from '@clack/prompts';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { RelativeFilePath } from '../../types/file/relativeFilePath.js';
 import { ShareHookInstall } from '../../types/sdk-repository-context.js';
-import { ConflictKind, GENERATOR_FILES, MergePlan, YOUR_FILES } from '../../types/sdk/merge-plan.js';
+import { ConflictChoice, ConflictKind, GENERATOR_FILES, MergePlan, YOUR_FILES } from '../../types/sdk/merge-plan.js';
 import { SHARE_HOOK_CALL } from '../../types/sdk/share-hook.js';
 import { listedInProse } from '../../utils/string-utils.js';
 import { format as f } from '../format.js';
@@ -23,7 +23,7 @@ const CONFLICT_LABELS: Record<ConflictKind, string> = {
 /** The generator's own files are a count; the developer's are named. */
 const YOUR_FILE_HEADINGS: Record<(typeof YOUR_FILES)[number], string> = {
   merged: 'Merged with your changes:',
-  kept: 'Kept as you edited:'
+  kept: 'Kept as yours:'
 };
 
 const plural = (count: number, noun: string) => `${count} ${noun}${count === 1 ? '' : 's'}`;
@@ -99,11 +99,58 @@ export class SdkWritePrompts {
     log.info(lines.join('\n'));
   }
 
+  /** The conflicted files and the question, before anything is written; none when the developer backs out. */
+  public async conflictChoice(plan: MergePlan, sdk: DirectoryPath): Promise<ConflictChoice | undefined> {
+    const one = plan.conflicts.length === 1;
+    noteWrapped(this.conflictLines(plan, sdk).join('\n'), this.attentionTitle(plan));
+    const choice = await select<ConflictChoice>({
+      message: 'What should happen?',
+      options: [
+        {
+          value: 'resolve',
+          label: `I'll resolve ${one ? 'it' : 'them'} myself`,
+          hint: 'markers go into the file; rerun once they are gone'
+        },
+        {
+          value: 'generated',
+          label: `Use the generator's changes where they conflict`,
+          hint: `your other edits ${one ? 'in this file stay' : 'in these files stay'}`
+        },
+        { value: 'keep', label: 'Keep the SDK as it is', hint: 'nothing is written' }
+      ]
+    });
+    return isCancel(choice) ? undefined : choice;
+  }
+
+  public sdkKept(sdk: DirectoryPath) {
+    log.info(`Nothing was written; ${f.relativePath(sdk)} is as it was.`);
+  }
+
+  public resolvedForGenerator(paths: readonly RelativeFilePath[], sdk: DirectoryPath) {
+    log.info(["Resolved for the generator's side:", ...listed(sdk, paths)].join('\n'));
+  }
+
+  /** The conflicted files with what to do about them, for a run that could not ask. */
   public conflicts(plan: MergePlan, sdk: DirectoryPath) {
-    const { conflicts } = plan;
-    const lines = conflicts.map(
+    noteWrapped([...this.conflictLines(plan, sdk), '', ...this.steps(plan)].join('\n'), this.attentionTitle(plan));
+  }
+
+  /** What to do about the conflicts the developer chose to resolve, listed just before. */
+  public conflictSteps(plan: MergePlan) {
+    noteWrapped(this.steps(plan).join('\n'), 'Next steps');
+  }
+
+  private attentionTitle(plan: MergePlan): string {
+    return `${plural(plan.conflicts.length, 'file')} need${plan.conflicts.length === 1 ? 's' : ''} your attention`;
+  }
+
+  private conflictLines(plan: MergePlan, sdk: DirectoryPath): string[] {
+    return plan.conflicts.map(
       (conflict) => `${f.relativePath(conflict.path.in(sdk))}\n  ${conflict.message ?? CONFLICT_LABELS[conflict.kind]}`
     );
+  }
+
+  private steps(plan: MergePlan): string[] {
     const marked = plan.hasMarkedConflicts();
     const unmarked = plan.hasUnmarkedConflicts();
     const steps = [
@@ -115,11 +162,9 @@ export class SdkWritePrompts {
             }file, decide whether it stays or goes: delete it again, or keep it as your own.`
           ]
         : []),
-      'Rerun the command; nothing needs committing first.'
+      'Rerun the command; nothing needs committing first.',
+      ...(marked ? ['To undo this run instead, rerun and choose "Undo the last generation".'] : [])
     ];
-    noteWrapped(
-      [...lines, '', ...steps.map((step, index) => `${index + 1}. ${step}`)].join('\n'),
-      `${plural(conflicts.length, 'file')} need${conflicts.length === 1 ? 's' : ''} your attention`
-    );
+    return steps.map((step, index) => `${index + 1}. ${step}`);
   }
 }

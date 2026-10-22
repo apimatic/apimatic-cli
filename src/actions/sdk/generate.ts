@@ -8,7 +8,7 @@ import { TempContext } from '../../types/temp-context.js';
 import { codegenVersionFor, isAvailableLanguage, Language, Stability } from '../../types/sdk/generate.js';
 import { ProjectContext } from '../../types/project-context.js';
 import { SdkGeneration } from '../../types/sdk/generation-record.js';
-import { MergePlan } from '../../types/sdk/merge-plan.js';
+import { ConflictOutcome } from '../../types/sdk/merge-plan.js';
 import { SdkPrepareAction } from './prepare.js';
 import { SdkWriteAction } from './write.js';
 
@@ -33,7 +33,7 @@ export class GenerateAction {
     force: boolean,
     apiVersion?: string,
     packageSettingsDirectory?: DirectoryPath
-  ): Promise<ActionResult<void, MergePlan>> => {
+  ): Promise<ActionResult<ConflictOutcome | void, ConflictOutcome>> => {
     if (!isAvailableLanguage(language)) {
       this.prompts.languageNotAvailable(language);
       return ActionResult.failed();
@@ -108,7 +108,7 @@ export class GenerateAction {
         return ActionResult.failed();
       }
 
-      return await new SdkWriteAction().execute(destination.getValue(), sdkContext, tempSdk.value, generation);
+      return await new SdkWriteAction().execute(destination.getValue(), sdkContext, tempSdk.value, generation, force);
     });
   };
 }

@@ -19,6 +19,29 @@ export function relabelMarkers(content: Uint8Array): Uint8Array {
   return relabelled === text ? content : encoder.encode(relabelled);
 }
 
+/**
+ * The file with every marker block settled for the generator's side: your side of each block
+ * goes, the generator's stays, and every line outside the markers, including what you already
+ * resolved by hand, is left as it is.
+ */
+export function resolveMarkersForGenerated(content: string): string {
+  const resolved: string[] = [];
+  let inside: 'none' | 'yours' | 'generated' = 'none';
+  for (const line of content.split('\n')) {
+    const bare = line.endsWith('\r') ? line.slice(0, -1) : line;
+    if (inside === 'none' && bare === YOURS_MARKER) {
+      inside = 'yours';
+    } else if (inside === 'yours' && bare === '=======') {
+      inside = 'generated';
+    } else if (inside === 'generated' && bare === GENERATED_MARKER) {
+      inside = 'none';
+    } else if (inside !== 'yours') {
+      resolved.push(line);
+    }
+  }
+  return resolved.join('\n');
+}
+
 /** Whether `content` still carries the markers a conflicted run writes. */
 export function hasConflictMarkers(content: Uint8Array | string): boolean {
   let text: string;

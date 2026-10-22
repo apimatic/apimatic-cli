@@ -1,8 +1,9 @@
-import { isCancel, confirm, log } from '@clack/prompts';
+import { isCancel, confirm, log, select } from '@clack/prompts';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { RelativeFilePath } from '../../types/file/relativeFilePath.js';
 import { GitVersion } from '../../types/git/git-version.js';
 import { describeApart, SdkGeneration } from '../../types/sdk/generation-record.js';
+import { UnresolvedChoice } from '../../types/sdk/merge-plan.js';
 import { NestedSdkDirectory, SnapshotFetch } from '../../types/sdk-repository-context.js';
 import { format as f } from '../format.js';
 
@@ -65,6 +66,57 @@ export class SdkPreparePrompts {
       `Resolve ${one ? 'it' : 'them'} and remove the markers, then rerun:\n` +
       paths.map((path) => `  ${f.relativePath(path.in(sdk))}`).join('\n');
     log.error(message);
+  }
+
+  /** The files still marked and the question, before anything is generated; none when the developer backs out. */
+  public async unresolvedChoice(
+    paths: readonly RelativeFilePath[],
+    sdk: DirectoryPath
+  ): Promise<UnresolvedChoice | undefined> {
+    const one = paths.length === 1;
+    log.warn(
+      `${plural(paths.length, 'file')} still hold${one ? 's' : ''} conflict markers from the last run:\n` +
+        paths.map((path) => `  ${f.relativePath(path.in(sdk))}`).join('\n')
+    );
+    const choice = await select<UnresolvedChoice>({
+      message: 'What should happen?',
+      options: [
+        {
+          value: 'resolve',
+          label: `I'll finish resolving ${one ? 'it' : 'them'}`,
+          hint: 'nothing is done now; rerun once the markers are gone'
+        },
+        {
+          value: 'generated',
+          label: `Use the generator's changes in the file${one ? '' : 's'} still marked`,
+          hint: 'what you already resolved stays'
+        },
+        {
+          value: 'undo',
+          label: 'Undo the last generation',
+          hint: 'the SDK goes back to before it ran, then this run merges afresh'
+        }
+      ]
+    });
+    return isCancel(choice) ? undefined : choice;
+  }
+
+  public resolveLater() {
+    log.info('Nothing was done. Rerun once the markers are gone.');
+  }
+
+  public resolvedForGenerator(paths: readonly RelativeFilePath[], sdk: DirectoryPath) {
+    log.info(
+      ["Resolved for the generator's side:", ...paths.map((path) => `  ${f.relativePath(path.in(sdk))}`)].join('\n')
+    );
+  }
+
+  public previousRestored(sdk: DirectoryPath) {
+    log.info(`Undid the last generation: ${f.relativePath(sdk)} is as it was before it ran.`);
+  }
+
+  public conflictsNotSettled(reason: string) {
+    log.error(`The conflicts could not be settled: ${reason}`);
   }
 }
 

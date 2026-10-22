@@ -19,6 +19,7 @@ import { CodeGenerationVersion, Language, Stability } from '../../../src/types/s
 import { GenerationRecord, SdkGeneration } from '../../../src/types/sdk/generation-record.js';
 import { SdkDestination } from '../../../src/types/sdk/sdk-destination.js';
 import { SdkRepositoryContext } from '../../../src/types/sdk-repository-context.js';
+import { terminal } from '../../../src/utils/terminal-utils.js';
 import { snapshotFiles } from '../../helpers/snapshots.js';
 import { SnapshotRef } from '../../../src/types/sdk/snapshot-ref.js';
 
@@ -68,8 +69,8 @@ describe('SdkWriteAction', () => {
     return directory;
   };
   const record = () => GenerationRecord.parse(read('.apimatic/generation.json'))!;
-  const execute = (destination: SdkDestination, files: Files) =>
-    new SdkWriteAction().execute(destination, sdkContext, generated(files), STABLE);
+  const execute = (destination: SdkDestination, files: Files, force = true) =>
+    new SdkWriteAction().execute(destination, sdkContext, generated(files), STABLE, force);
 
   /** A first generation of `files`, written and recorded into the project's repository. */
   const recorded = async (files: Files): Promise<{ repository: SdkRepositoryContext; base: CommitId }> => {
@@ -173,7 +174,7 @@ describe('SdkWriteAction', () => {
         added: ['models/author.py'],
         merged: ['models/book.py'],
         removed: [],
-        kept: []
+        kept: ['notes.txt']
       });
       expect(record().pristineCommit().isEqual(base)).to.be.false;
       expect(record().hasConflicts()).to.be.false;
@@ -204,7 +205,8 @@ describe('SdkWriteAction', () => {
       expect(read('models/book.py')).to.contain(`${GENERATED_MARKER}\n`);
       expect(read('README.md')).to.equal('# sdk v2');
       expect(record().conflictedPaths().map(String)).to.deep.equal(['models/book.py']);
-      expect(result.getError()?.conflictsByKind()).to.include({ bothChanged: 1, noLongerGenerated: 0 });
+      expect(result.getError()?.plan.conflictsByKind()).to.include({ bothChanged: 1, noLongerGenerated: 0 });
+      expect(result.getError()?.choice).to.equal('resolve');
       const cwd = repository.root().toString();
       expect((await execa('git', ['status', '--porcelain'], { cwd })).stdout).to.contain(
         'UU sdk/python/models/book.py'
@@ -244,6 +246,88 @@ describe('SdkWriteAction', () => {
       expect(read('README.md')).to.equal('# edited');
       expect(record().pristineCommit().isEqual(base)).to.be.true;
       expect(customCodeFailed.firstCall.args[0]).to.equal('git broke');
+    });
+  });
+
+  describe('the question when the merge conflicts', () => {
+    /** An edited model the generator also changed, so the merge conflicts on it, plus a clean change elsewhere. */
+    const conflicting = async () => {
+      const { repository, base } = await recorded({ 'README.md': '# sdk', 'models/book.py': MODEL_V1 });
+      write(sdk(), { 'models/book.py': DECORATED + MODEL_V1_EDITED, 'notes.txt': 'mine' });
+      sinon.stub(terminal, 'isInteractive').returns(true);
+      sinon.stub(SdkWritePrompts.prototype, 'sdkMerged');
+      return { repository, base, next: { 'README.md': '# sdk v2', 'models/book.py': MODEL_V2 } };
+    };
+
+    it('settles the overlapping hunks for the generator on request, keeping your other edits in the same file', async () => {
+      const { repository, base, next } = await conflicting();
+      sinon.stub(SdkWritePrompts.prototype, 'conflictChoice').resolves('generated');
+      const resolvedForGenerator = sinon.stub(SdkWritePrompts.prototype, 'resolvedForGenerator');
+
+      const result = await execute({ kind: 'merge', repository, base }, next, false);
+
+      expect(result.isSuccess()).to.be.true;
+      expect(result.getValue()?.choice).to.equal('generated');
+      expect(result.getValue()?.plan.conflictedPaths().map(String)).to.deep.equal(['models/book.py']);
+      expect(read('models/book.py')).to.equal(DECORATED + MODEL_V2);
+      expect(read('README.md')).to.equal('# sdk v2');
+      expect(read('notes.txt')).to.equal('mine');
+      expect(resolvedForGenerator.firstCall.args[0].map(String)).to.deep.equal(['models/book.py']);
+      expect(record().hasConflicts()).to.be.false;
+      const previous = (await git.resolveRef(repository.root(), repository.previousRef()))!;
+      expect((await snapshotFiles(repository.root(), previous)).get('models/book.py')).to.equal(
+        DECORATED + MODEL_V1_EDITED
+      );
+    });
+
+    it('writes nothing at all when the developer keeps the SDK as it is, or backs out of the question', async () => {
+      for (const answer of ['keep', undefined] as const) {
+        const { repository, base, next } = await conflicting();
+        sinon.stub(SdkWritePrompts.prototype, 'conflictChoice').resolves(answer);
+        const sdkKept = sinon.stub(SdkWritePrompts.prototype, 'sdkKept');
+
+        const result = await execute({ kind: 'merge', repository, base }, next, false);
+
+        expect(result.isCancelled(), String(answer)).to.be.true;
+        expect(read('models/book.py')).to.equal(DECORATED + MODEL_V1_EDITED);
+        expect(read('README.md')).to.equal('# sdk');
+        expect(record().pristineCommit().isEqual(base)).to.be.true;
+        expect(await git.resolveRef(repository.root(), repository.previousRef())).to.be.undefined;
+        expect(sdkKept.calledOnce).to.be.true;
+        sinon.restore();
+        fs.rmSync(root, { recursive: true, force: true });
+        root = fs.mkdtempSync(path.join(os.tmpdir(), 'sdk-write-'));
+        sdkContext = new SdkContext(Language.PYTHON, new DirectoryPath(path.join(root, 'sdk')));
+      }
+    });
+
+    it('leaves markers when the developer will resolve, with the steps but not the list again', async () => {
+      const { repository, base, next } = await conflicting();
+      sinon.stub(SdkWritePrompts.prototype, 'conflictChoice').resolves('resolve');
+      const conflictSteps = sinon.stub(SdkWritePrompts.prototype, 'conflictSteps');
+      const conflicts = sinon.stub(SdkWritePrompts.prototype, 'conflicts');
+
+      const result = await execute({ kind: 'merge', repository, base }, next, false);
+
+      expect(result.isFailed()).to.be.true;
+      expect(result.getError()?.choice).to.equal('resolve');
+      expect(read('models/book.py')).to.contain(YOURS_MARKER);
+      expect(conflictSteps.calledOnce).to.be.true;
+      expect(conflicts.called).to.be.false;
+    });
+
+    it('does not ask without a terminal, or with --force: markers, the list and the steps', async () => {
+      const { repository, base, next } = await conflicting();
+      (terminal.isInteractive as sinon.SinonStub).returns(false);
+      const conflictChoice = sinon.stub(SdkWritePrompts.prototype, 'conflictChoice');
+      const conflicts = sinon.stub(SdkWritePrompts.prototype, 'conflicts');
+
+      const result = await execute({ kind: 'merge', repository, base }, next, false);
+
+      expect(result.isFailed()).to.be.true;
+      expect(conflictChoice.called).to.be.false;
+      expect(conflicts.calledOnce).to.be.true;
+      expect(read('models/book.py')).to.contain(YOURS_MARKER);
     });
   });
 

@@ -55,7 +55,7 @@ describe('SdkWritePrompts.sdkMerged', () => {
         "Regenerated the SDK at './sdk/typescript': 1 file added and 2 files updated.",
         'Merged with your changes:',
         "  './sdk/typescript/src/models/book.ts'",
-        'Kept as you edited:',
+        'Kept as yours:',
         "  './sdk/typescript/src/resources/books.ts'",
         "  './sdk/typescript/docs/pricing.md'"
       ].join('\n')
@@ -70,7 +70,7 @@ describe('SdkWritePrompts.sdkMerged', () => {
     expect(stripVTControlCharacters(info.firstCall.args[0])).to.equal(
       [
         "Regenerated the SDK at './sdk/typescript': nothing changed.",
-        'Kept as you edited:',
+        'Kept as yours:',
         "  './sdk/typescript/src/models/book.ts'"
       ].join('\n')
     );

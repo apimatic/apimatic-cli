@@ -11,7 +11,7 @@ import { RelativeFilePath } from './file/relativeFilePath.js';
 import { CommitId } from './git/commit-id.js';
 import { StageEntry } from './git/merge-tree.js';
 import { TreeId } from './git/tree-id.js';
-import { hasConflictMarkers, relabelMarkers } from './sdk/conflict-markers.js';
+import { hasConflictMarkers, relabelMarkers, resolveMarkersForGenerated } from './sdk/conflict-markers.js';
 import { describeGeneration, GenerationRecord, SdkGeneration } from './sdk/generation-record.js';
 import { MergePlan } from './sdk/merge-plan.js';
 import { SHARE_HOOK_SCRIPT, SHARE_HOOK_SCRIPT_NAME, ShareHook } from './sdk/share-hook.js';
@@ -201,6 +201,48 @@ export class SdkRepositoryContext {
     await fs.promises.chmod(file.toString(), 0o755);
   }
 
+  /** Puts the SDK directory back as it was before the last run, record included, and settles its conflicts in the index. */
+  public async restorePrevious(): Promise<Result<void, SdkRepositoryProblem>> {
+    try {
+      const previous = await this.git.resolveRef(this.rootDirectory, this.previousRef());
+      if (previous === undefined) {
+        return err(gitFailed('there is no earlier state of the SDK directory to go back to'));
+      }
+      const conflicts = (await this.readRecord())?.conflictedPaths() ?? [];
+      const tree = await this.git.treeOfCommit(this.rootDirectory, previous);
+      await this.git.checkoutTree(this.rootDirectory, this.sdk, tree);
+      await this.git.unstage(
+        this.rootDirectory,
+        conflicts.map((path) => this.rootRelative(path))
+      );
+      return ok(undefined);
+    } catch (error) {
+      return err(gitFailed(errorMessage(error)));
+    }
+  }
+
+  /**
+   * Settles the markers still in `paths` for the generator's side, keeping everything around
+   * them (including what was already resolved by hand), and takes the files out of the
+   * unmerged state in the index.
+   */
+  public async resolveForGenerator(paths: readonly RelativeFilePath[]): Promise<Result<void, SdkRepositoryProblem>> {
+    try {
+      for (const path of paths) {
+        const file = path.in(this.sdk).toString();
+        const content = await fs.promises.readFile(file, 'utf8');
+        await fs.promises.writeFile(file, resolveMarkersForGenerated(content), 'utf8');
+      }
+      await this.git.unstage(
+        this.rootDirectory,
+        paths.map((path) => this.rootRelative(path))
+      );
+      return ok(undefined);
+    } catch (error) {
+      return err(gitFailed(errorMessage(error)));
+    }
+  }
+
   /** A freshly generated SDK as a tree: every file, whatever its own `.gitignore` says. */
   public async snapshotGenerated(generated: DirectoryPath): Promise<Result<TreeId, SdkRepositoryProblem>> {
     try {
@@ -294,17 +336,21 @@ export class SdkRepositoryContext {
   public async merge(
     base: CommitId,
     disk: TreeId,
-    generated: TreeId
+    generated: TreeId,
+    favour?: 'generated'
   ): Promise<Result<MergeOutcome, SdkRepositoryProblem>> {
     const root = this.rootDirectory;
     try {
       const baseTree = await this.git.treeOfCommit(root, base);
       const yours = await this.git.commitTree(root, disk, [base], 'apimatic: your changes');
       const theirs = await this.git.commitTree(root, generated, [base], 'apimatic: generated');
-      const merge = await this.git.mergeTree(root, yours, theirs);
+      const merge = await this.git.mergeTree(root, yours, theirs, favour === 'generated' ? 'theirs' : undefined);
+      const yourChanges = (await this.git.diffTrees(root, baseTree, disk, true)).filter(
+        (change) => !change.path.toString().startsWith(`${RECORD_DIRECTORY}/`)
+      );
       const plan = MergePlan.from({
         merge,
-        yours: await this.git.diffTrees(root, baseTree, disk, true),
+        yours: yourChanges,
         generated: await this.git.diffTrees(root, baseTree, generated, true),
         applied: await this.git.diffTrees(root, disk, merge.tree, false),
         basePaths: (await this.git.listTree(root, baseTree)).map((entry) => entry.path)

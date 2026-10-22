@@ -364,7 +364,7 @@ describe('SdkRepositoryContext: the merge', () => {
       ]);
       expect(read('src/models/book.ts')).to.equal(MODEL_V2 + HELPER);
       expect(plan.conflicts).to.deep.equal([{ path: rel('docs/models/book.md'), kind: 'deletedByYou' }]);
-      expect(counts(plan)).to.deep.equal({ added: 1, updated: 0, merged: 1, removed: 0, kept: 0, unchanged: 1 });
+      expect(counts(plan)).to.deep.equal({ added: 1, updated: 0, merged: 1, removed: 0, kept: 1, unchanged: 1 });
     });
 
     it('keeps an edited file the v3 spec drops, and removes nothing else it did not produce', async () => {
