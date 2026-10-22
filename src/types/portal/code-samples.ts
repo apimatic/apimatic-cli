@@ -1,9 +1,10 @@
 import { DirectoryPath } from '../file/directoryPath.js';
+import { FilePath } from '../file/filePath.js';
 import { Language, languageLabel } from '../sdk/generate.js';
 import { isJsonObject } from '../../utils/json-utils.js';
 import { Endpoint } from './endpoint.js';
 import { PortalSpec } from './portal-source.js';
-import { shared } from './shared.js';
+import { Shared, shared } from './shared.js';
 
 type Sources = Record<string, string>;
 
@@ -27,11 +28,26 @@ export interface EndpointSample {
   sample: CodeSample;
 }
 
+/** An operation more than one spec declares, which one code sample per method and path cannot serve. */
+export type SharedEndpoint = Shared<Endpoint>;
+
+/**
+ * Samples no operation takes: those filed under `spec` that it does not declare, or, for the
+ * samples not filed by spec (`null`), those no spec declares.
+ */
+export interface UnplacedSamples {
+  spec: FilePath | null;
+  endpoints: Endpoint[];
+}
+
 /** One language's samples, as one `/portal-artifacts` run delivers them. */
 export class CodeSampleCatalog {
   private constructor(
     private readonly paths: EndpointSample[],
-    /** By the spec's main file relative to `spec/`, as the platform records it; none when the operations come from one spec. */
+    /**
+     * By the spec's main file relative to `spec/`, as the platform records it; none when the
+     * operations come from one spec.
+     */
     private readonly specs: ReadonlyMap<string, EndpointSample[]>
   ) {}
 
@@ -67,12 +83,6 @@ export class CodeSampleCatalogs {
   public placedOn(specs: PortalSpec[], specDirectory: DirectoryPath): PlacedCodeSamples {
     return new PlacedCodeSamples(this.catalogs, specs, specDirectory);
   }
-
-  public unplacedIn(documented: Endpoint[]): string[] {
-    const names = new Set(documented.map(String));
-    const endpoints = this.catalogs.flatMap((catalog) => catalog.samples().map(({ endpoint }) => String(endpoint)));
-    return [...new Set(endpoints)].filter((endpoint) => !names.has(endpoint));
-  }
 }
 
 /**
@@ -81,33 +91,57 @@ export class CodeSampleCatalogs {
  * sample per method and path cannot serve.
  */
 export class PlacedCodeSamples {
-  private readonly sharedEndpoints: Set<string>;
+  private readonly shared: SharedEndpoint[];
 
   constructor(
     private readonly catalogs: CodeSampleCatalog[],
     private readonly specs: PortalSpec[],
     private readonly specDirectory: DirectoryPath
   ) {
-    const claims = specs.flatMap(({ file, endpoints }) => endpoints.map((key) => ({ key, file })));
-    this.sharedEndpoints = new Set(shared(claims).map(({ key }) => String(key)));
+    this.shared = shared(specs.flatMap(({ file, endpoints }) => endpoints.map((key) => ({ key, file }))));
+  }
+
+  /** The operations shown with no SDK sample because more than one spec declares them. */
+  public sharedEndpoints(): SharedEndpoint[] {
+    return this.catalogs.some((catalog) => !catalog.isFiledBySpec()) ? this.shared : [];
+  }
+
+  public unplaced(): UnplacedSamples[] {
+    const declared = this.specs.flatMap(({ endpoints }) => endpoints);
+    return [
+      ...this.specs.map((spec) => ({ spec: spec.file, endpoints: undeclared(this.ownSamples(spec), spec.endpoints) })),
+      { spec: null, endpoints: undeclared(this.unfiledSamples(), declared) }
+    ].filter(({ endpoints }) => endpoints.length > 0);
   }
 
   public toJson(): CodeSamplesFile {
-    const unfiled = this.catalogs
-      .filter((catalog) => !catalog.isFiledBySpec())
-      .flatMap((catalog) => catalog.samples())
-      .filter(({ endpoint }) => !this.sharedEndpoints.has(String(endpoint)));
+    const sharedKeys = new Set(this.shared.map(({ key }) => String(key)));
     return {
-      paths: byEndpoint(unfiled),
+      paths: byEndpoint(this.unfiledSamples().filter(({ endpoint }) => !sharedKeys.has(String(endpoint)))),
       specs: Object.fromEntries(
-        this.specs.flatMap(({ slug, file }): [string, CodeSamplesByEndpoint][] => {
-          const specFile = file.relativeTo(this.specDirectory);
-          const own = this.catalogs.flatMap((catalog) => catalog.samplesOf(specFile));
-          return own.length === 0 ? [] : [[slug, byEndpoint(own)]];
+        this.specs.flatMap((spec): [string, CodeSamplesByEndpoint][] => {
+          const own = this.ownSamples(spec);
+          return own.length === 0 ? [] : [[spec.slug, byEndpoint(own)]];
         })
       )
     };
   }
+
+  private ownSamples({ file }: PortalSpec): EndpointSample[] {
+    const specFile = file.relativeTo(this.specDirectory);
+    return this.catalogs.flatMap((catalog) => catalog.samplesOf(specFile));
+  }
+
+  private unfiledSamples(): EndpointSample[] {
+    return this.catalogs.filter((catalog) => !catalog.isFiledBySpec()).flatMap((catalog) => catalog.samples());
+  }
+}
+
+/** The endpoints of `samples` that `declared` leaves out, each once. */
+function undeclared(samples: EndpointSample[], declared: Endpoint[]): Endpoint[] {
+  const names = new Set(declared.map(String));
+  const left = samples.map(({ endpoint }) => endpoint).filter((endpoint) => !names.has(String(endpoint)));
+  return left.filter((endpoint, index) => index === left.findIndex((other) => other.isEqual(endpoint)));
 }
 
 /** Languages in the order given, each endpoint's samples together. */

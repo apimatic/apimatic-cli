@@ -64,7 +64,6 @@ describe('PortalProjectService', () => {
     specDirectory: new DirectoryPath(root).join('spec'),
     unmergedSpecs: [],
     leftOutSpecs: [],
-    sharedEndpoints: [],
     contentDirectory: null,
     staticDirectory: null,
     shadowedFiles: [],

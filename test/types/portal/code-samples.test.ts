@@ -47,20 +47,84 @@ describe('CodeSampleCatalog', () => {
   });
 });
 
-describe('CodeSampleCatalogs', () => {
-  it('names the samples no document has an operation for', () => {
-    const codeSampleCatalogs = new CodeSampleCatalogs([
-      catalog(Language.TYPESCRIPT, {
-        paths: { '/pets': { GET: { Example: 'a' } }, '/owners': { GET: { Example: 'b' } } }
-      }),
-      catalog(Language.CSHARP, { paths: { '/owners': { GET: { Example: 'c' } } } })
-    ]);
-
-    expect(codeSampleCatalogs.unplacedIn([new Endpoint('get', '/pets')])).to.deep.equal(['GET /owners']);
-  });
-});
-
 describe('PlacedCodeSamples', () => {
+  const placedOn = (catalogs: CodeSampleCatalog[], specs: PortalSpec[]) =>
+    new CodeSampleCatalogs(catalogs).placedOn(specs, SPEC_DIRECTORY);
+
+  /** Each spec named by its path from `spec/`, or null for the samples not filed by spec. */
+  const named = (file: FilePath | null) => (file === null ? null : file.relativeTo(SPEC_DIRECTORY));
+
+  describe('the operations shown with no SDK sample', () => {
+    const alpha = spec('alpha', 'alpha/openapi.json', ['GET /status', 'GET /alpha']);
+    const beta = spec('beta', 'beta/openapi.json', ['GET /status', 'POST /status', 'GET /beta']);
+    const unfiled = catalog(Language.TYPESCRIPT, { paths: { '/status': { GET: { Example: 'status' } } } });
+
+    it('names each operation more than one spec declares, with the specs that do', () => {
+      const shared = placedOn([unfiled], [alpha, beta]).sharedEndpoints();
+
+      expect(shared.map(({ key, files }) => [`${key}`, files.map(named)])).to.deep.equal([
+        ['GET /status', ['alpha/openapi.json', 'beta/openapi.json']]
+      ]);
+    });
+
+    it('names none when no two specs declare the same operation', () => {
+      const gamma = spec('gamma', 'gamma/openapi.json', ['GET /gamma']);
+
+      expect(placedOn([unfiled], [alpha, gamma]).sharedEndpoints()).to.be.empty;
+    });
+
+    it('names none when the samples are filed by spec, each spec showing its own', () => {
+      const filed = catalog(Language.TYPESCRIPT, {
+        paths: { '/status': { GET: { Example: 'alpha status' } } },
+        specs: {
+          'alpha/openapi.json': { paths: { '/status': { GET: { Example: 'alpha status' } } } },
+          'beta/openapi.json': { paths: { '/status': { GET: { Example: 'beta status' } } } }
+        }
+      });
+
+      expect(placedOn([filed], [alpha, beta]).sharedEndpoints()).to.be.empty;
+    });
+  });
+
+  describe('the samples no operation takes', () => {
+    it('names, of the samples not filed by spec, those no spec declares, once across languages', () => {
+      const unplaced = placedOn(
+        [
+          catalog(Language.TYPESCRIPT, {
+            paths: { '/pets': { GET: { Example: 'a' } }, '/owners': { GET: { Example: 'b' } } }
+          }),
+          catalog(Language.CSHARP, { paths: { '/owners': { GET: { Example: 'c' } } } })
+        ],
+        [spec('pets', 'openapi.json', ['GET /pets'])]
+      ).unplaced();
+
+      expect(unplaced.map(({ spec, endpoints }) => [named(spec), endpoints.map(String)])).to.deep.equal([
+        [null, ['GET /owners']]
+      ]);
+    });
+
+    it('names, of the samples filed under a spec, those it does not declare, and checks nothing else', () => {
+      const unplaced = placedOn(
+        [
+          catalog(Language.TYPESCRIPT, {
+            paths: { '/orders': { GET: { Example: 'orders' } }, '/refunds': { POST: { Example: 'refund' } } },
+            specs: {
+              'orders/openapi.yaml': {
+                paths: { '/orders': { GET: { Example: 'orders' } }, '/refunds': { POST: { Example: 'refund' } } }
+              },
+              'gamma/openapi.json': { paths: { '/gamma': { GET: { Example: 'gamma' } } } }
+            }
+          })
+        ],
+        [spec('orders', 'orders/openapi.yaml', ['GET /orders'])]
+      ).unplaced();
+
+      expect(unplaced.map(({ spec, endpoints }) => [named(spec), endpoints.map(String)])).to.deep.equal([
+        ['orders/openapi.yaml', ['POST /refunds']]
+      ]);
+    });
+  });
+
   describe('samples not filed by spec', () => {
     const calculator = spec('calculator', 'openapi.json', ['GET /pets', 'POST /pets']);
 
