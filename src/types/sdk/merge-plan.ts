@@ -36,9 +36,6 @@ export type ConflictChoice = 'resolve' | 'generated' | 'keep';
 /** What the developer chose when the last run's markers are still in the files, asked before generating. */
 export type UnresolvedChoice = 'resolve' | 'generated' | 'undo';
 
-/** How a run that conflicted ended: markers left for the developer, or the generator's version taken. */
-export type ConflictOutcome = { plan: MergePlan; choice: 'resolve' | 'generated' };
-
 export type Conflict = { path: RelativeFilePath; kind: ConflictKind; message?: string };
 
 export type Rename = { from: RelativeFilePath; to: RelativeFilePath; by: 'generator' | 'you' };
@@ -264,21 +261,6 @@ export class MergePlan {
 
   public conflictedPaths(): RelativeFilePath[] {
     return this.conflicts.map((conflict) => conflict.path);
-  }
-
-  public conflictsByKind(): Record<ConflictKind, number> {
-    const counts: Record<ConflictKind, number> = {
-      bothChanged: 0,
-      bothAdded: 0,
-      deletedByYou: 0,
-      noLongerGenerated: 0,
-      binary: 0,
-      other: 0
-    };
-    for (const conflict of this.conflicts) {
-      counts[conflict.kind] += 1;
-    }
-    return counts;
   }
 
   /** Whether any conflicted file is written with conflict markers in it. */

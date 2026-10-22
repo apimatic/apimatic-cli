@@ -52,6 +52,9 @@ export type ShareHookInstall =
 /** The plan, the merged tree, and git's versions of every conflicted path, below the SDK directory. */
 export type MergeOutcome = { plan: MergePlan; merged: TreeId; stages: StageEntry[] };
 
+/** A fresh generation merged over the directory as it is: the snapshot it will be recorded as, and the merge. */
+export type Regeneration = { generated: TreeId; merge: MergeOutcome };
+
 const RECORD_DIRECTORY = '.apimatic';
 const RECORD_FILE = 'generation.json';
 
@@ -359,6 +362,35 @@ export class SdkRepositoryContext {
     } catch (error) {
       return err(gitFailed(errorMessage(error)));
     }
+  }
+
+  /**
+   * The generation in `generated` merged over the directory against `base`, in one step: both
+   * trees are snapshotted, then merged, favouring the generator's side where asked.
+   */
+  public async regenerate(
+    base: CommitId,
+    generated: DirectoryPath,
+    favour?: 'generated'
+  ): Promise<Result<Regeneration, SdkRepositoryProblem>> {
+    const generatedTree = await this.snapshotGenerated(generated);
+    if (generatedTree.isErr()) {
+      return err(generatedTree.error);
+    }
+    const disk = await this.snapshotDisk(base);
+    if (disk.isErr()) {
+      return err(disk.error);
+    }
+    return (await this.merge(base, disk.value, generatedTree.value, favour)).map((merge) => ({
+      generated: generatedTree.value,
+      merge
+    }));
+  }
+
+  /** Applies the plan once the directory as it is has been kept under the previous ref, so the run can be undone. */
+  public async write(base: CommitId, plan: MergePlan): Promise<Result<void, SdkRepositoryProblem>> {
+    const previous = await this.savePrevious(base);
+    return previous.isErr() ? err(previous.error) : this.apply(plan);
   }
 
   /** Writes and removes what the plan says, in the SDK directory, with the CLI's labels on any markers. */

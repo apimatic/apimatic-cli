@@ -11,8 +11,6 @@ import { GitService } from '../../../src/infrastructure/git-service.js';
 import { SdkGenerationService } from '../../../src/infrastructure/services/sdk-generation-service.js';
 import { ZipService } from '../../../src/infrastructure/zip-service.js';
 import { SdkGeneratePrompts } from '../../../src/prompts/sdk/generate.js';
-import { SdkPreparePrompts } from '../../../src/prompts/sdk/prepare.js';
-import { SdkWritePrompts } from '../../../src/prompts/sdk/write.js';
 import { CommandMetadata } from '../../../src/types/common/command-metadata.js';
 import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
 import { FileName } from '../../../src/types/file/fileName.js';
@@ -91,8 +89,8 @@ describe('GenerateAction (sdk)', () => {
   it('stops before generating when the developer declines to overwrite', async () => {
     fs.mkdirSync(sdk().toString(), { recursive: true });
     fs.writeFileSync(at('README.md'), '# mine');
-    sinon.stub(SdkPreparePrompts.prototype, 'overwriteSdk').resolves(false);
-    sinon.stub(SdkPreparePrompts.prototype, 'destinationDirNotEmpty');
+    sinon.stub(SdkGeneratePrompts.prototype, 'overwriteSdk').resolves(false);
+    sinon.stub(SdkGeneratePrompts.prototype, 'destinationDirNotEmpty');
 
     expect((await execute({ force: false })).isCancelled()).to.be.true;
 
@@ -101,7 +99,7 @@ describe('GenerateAction (sdk)', () => {
   });
 
   it('expands the generated SDK into its language directory and records it for the next run', async () => {
-    sinon.stub(SdkWritePrompts.prototype, 'repositoryInitialised');
+    sinon.stub(SdkGeneratePrompts.prototype, 'repositoryInitialised');
 
     expect((await execute()).isSuccess()).to.be.true;
 
@@ -113,7 +111,7 @@ describe('GenerateAction (sdk)', () => {
 
   it('writes the SDK as it always has when git is not there', async () => {
     sinon.stub(GitService.prototype, 'version').resolves(undefined);
-    sinon.stub(SdkPreparePrompts.prototype, 'gitUnavailable');
+    sinon.stub(SdkGeneratePrompts.prototype, 'gitUnavailable');
 
     expect((await execute()).isSuccess()).to.be.true;
 

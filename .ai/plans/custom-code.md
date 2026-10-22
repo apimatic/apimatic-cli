@@ -63,6 +63,10 @@ portal downloads that include custom code (section 11), and any push by the CLI 
 | `--force` | Keeps its meaning: never ask. With a base it changes nothing, since nothing is asked. | CI runs already pass it. |
 | Undo | The SDK directory as it was before the run is kept under `refs/apimatic/previous/…`, overwritten each run. | A merge that goes wrong on uncommitted edits would otherwise be unrecoverable. |
 | Conflicts in git's index | The conflicted paths are put into the repository's index at stages 1, 2 and 3. | `git status` says "both modified" and `git mergetool` opens them, as after a merge git ran itself. |
+| One action | `GenerateAction` is the whole run: no `SdkPrepareAction`, no `SdkWriteAction` (decided 2026-10-22). | Each phase had one caller and could not run alone, and passing `SdkDestination` between actions through `ActionResult.getValue()` put data on a result that is meant to carry only an outcome. |
+| Functional core, imperative shell | `execute` is the script of the run, read top to bottom, and the only place that speaks: every question and message is a `this.prompts.*` call in it, and the action has no other method. The prompts word the data they are handed and decide nothing, not even which of their own messages fits. The I/O is on the contexts (`SdkContext.destination`, `SdkRepositoryContext.regenerate` and `write`); the decisions are pure functions in `src/types/sdk/`: `destinationFor`, `replacesDirectory`, `resolving`, `favouringGenerator`, `MergePlan.takingGenerated` (decided 2026-10-22). | The reader of `execute` sees what is asked and said, and when, without a hop; what a repository state or a conflict choice means is testable without git or a terminal; the contexts stay silent, so they can be composed. |
+| Telemetry | None for now. `SdkMergeConflictedEvent`, `ConflictOutcome` and the result's payload are gone; `execute` returns a plain `ActionResult` (decided 2026-10-22). | An `ActionResult` carries no data. Conflict counts can come back later through a callback the command hands the action, as `sdk publish` does with `onPublishSdkError`. |
+| Two contexts | `SdkContext` is the directory of this run; `SdkRepositoryContext` is that directory once git says a repository encloses it, and holds everything that needs the root. They stay two classes (decided 2026-10-22). | A first run's directory may not exist and may have no repository, so `repository()` can answer "none". One class would make every snapshot method begin by asking for a root that may not be there, or hold a mutable "opened" state; the second class makes "a repository was found" a fact the type carries, checked once. |
 
 ## 3. What is saved, and where
 
@@ -182,8 +186,9 @@ flowchart TD
   K -- yes --> T([Failed: list of conflicts and what to do])
 ```
 
-The run is three actions. `GenerateAction` validates as before and generates into a temp
-directory. `SdkPrepareAction` runs before the upload and returns an `SdkDestination`:
+The run is one action, `GenerateAction.execute`, read top to bottom; every question and
+message is in it (section 10). It validates as before, then `SdkContext.destination` says
+how the SDK will be written, before the upload:
 
 1. `git --version`. Absent, or older than 2.38: warn that customizations will not persist;
    `overwrite`, writing no `.git` and no `.apimatic/`.
@@ -196,18 +201,20 @@ directory. `SdkPrepareAction` runs before the upload and returns an `SdkDestinat
 4. The overwrite question is asked for `overwrite` and `record` when the directory holds
    files, never for `merge`, and never with `--force`.
 
-After the download, `SdkWriteAction` writes it the way the destination says:
+It asks the overwrite question, uploads, polls and downloads into a temp directory as
+before, and puts the SDK in place the way the destination says:
 
 - `overwrite`: today's save into the directory; a `.git` in it stays.
 - `record`: `git init -b main` in the SDK directory when nothing encloses it (after the
   generation succeeded, so a failed one leaves no repository behind), the save, then the
   pristine commit and the record. A failure to record is a warning: the SDK is on disk, and
   the next run asks before replacing it.
-- `merge`: the generated tree, the previous ref, the disk tree, `merge-tree`, the writes and
-  deletions (only paths whose content differs between the disk and the merged tree; the
-  directory is never emptied), the pristine commit and the record, the summary. With
-  conflicts: the stages into the index, the conflict block, and a failed result carrying the
-  plan, which the command turns into a telemetry event of counts by kind.
+- `merge`: `SdkRepositoryContext.regenerate` (the generated tree, the disk tree,
+  `merge-tree`) into a `Regeneration`; its conflicts settled into a `Settlement` (6.1);
+  `SdkRepositoryContext.write` (the previous ref, then the writes and deletions: only paths
+  whose content differs between the disk and the merged tree; the directory is never emptied);
+  the pristine commit and the record; the summary. With conflicts: the stages into the index,
+  the conflict block, and a failed result.
 
 ## 5. The merge, file by file
 
@@ -279,8 +286,8 @@ after any merge.
 
 Conflicts are settled before anything is written. The plan is computed first (generated
 tree, disk tree, `merge-tree`); when it has conflicts, a terminal is attached and `--force`
-is absent, `SdkWriteAction` lists the conflicted files with their kind and asks
-(`SdkWritePrompts.conflictChoice`, a `select`):
+is absent, the action lists the conflicted files with their kind and asks
+(`SdkGeneratePrompts.conflictChoice`, a `select`):
 
 - **I'll resolve them myself**: the run goes on as above, markers, exit 1, and the steps
   (ending with "to undo this run instead, rerun and choose Undo the last generation"). The
@@ -288,15 +295,17 @@ is absent, `SdkWriteAction` lists the conflicted files with their kind and asks
 - **Use the generator's changes where they conflict**: the merge is run again with
   `--strategy-option=theirs`, so every overlapping hunk goes the generator's way and your other
   edits in the same file survive; a file one side deleted is settled whole by
-  `MergePlan.takingGenerated()` (the generator's version back, or the file removed). The run
-  names the files, records a clean snapshot and succeeds.
+  `MergePlan.takingGenerated()` (the generator's version back, or the file removed). The two
+  merges become one `Settlement` (`favouringGenerator`), which remembers the files the first
+  left in conflict so the run can name them once they are written; it records a clean
+  snapshot and succeeds.
 - **Keep the SDK as it is**, or backing out of the question: nothing written, nothing
   recorded, no previous ref saved; the result is cancelled. The previous ref is saved only
   after the decision, so this answer leaves no trace.
 
 The next run, while a listed file still holds markers, asks before generating
-(`SdkPrepareAction`, `SdkPreparePrompts.unresolvedChoice`); `--force` and a run without a
-terminal get the refusal as before:
+(`SdkGeneratePrompts.unresolvedChoice`); `--force` and a run without a terminal get the
+refusal as before:
 
 - **I'll finish resolving them**, or backing out: nothing done, exit 1.
 - **Use the generator's changes in the files still marked**:
@@ -312,9 +321,7 @@ After either, the directory is inspected again, once; a file still marked after 
 reported, never asked about twice. The run then generates and merges from the settled or
 restored state, so an undo with an unchanged spec lands back at the first question.
 
-The command fires `SdkMergeConflictedEvent` with the conflict counts and the choice
-(`resolve` from the failed result, `generated` from the success value, through
-`ConflictOutcome`); a kept SDK fires nothing. Whether a question can be asked is
+Nothing is reported to telemetry (section 2). Whether a question can be asked is
 `terminal.isInteractive()` (`process.stdin.isTTY`, `src/utils/terminal-utils.ts`), stubbed
 in tests.
 
@@ -345,8 +352,9 @@ The eleven Speakeasy runs from the lab notebook, plus three the lab did not cove
 | 14 | Fresh clone, regenerate | fails unless the hidden refs were pushed | merges by itself: the generating run pushed the ref, the clone fetches it; a clear message with the commands and the overwrite question only when the push had failed |
 
 Every row of section 5 and this table is a test over real repositories in
-`test/types/sdk-repository-context-merge.test.ts`, `test/actions/sdk/prepare.test.ts` (row 14 with
-a bare remote) and `test/actions/sdk/write.test.ts`.
+`test/types/sdk-repository-context-merge.test.ts`, `test/actions/sdk/generate-destination.test.ts`
+(row 14 with a bare remote) and `test/actions/sdk/generate-write.test.ts`, both driving
+`GenerateAction` with a stubbed generation service (`test/helpers/sdk-generation.ts`).
 
 ## 8. Phases, as delivered
 
@@ -360,6 +368,8 @@ a bare remote) and `test/actions/sdk/write.test.ts`.
 | 7 | 8217ac56 | Sharing through the remote: `GitService.remoteOf`, `fetchRef`, `pushRef`, `isAncestor`; `SdkRepositoryContext.remote`, `shareSnapshot`, the fetch inside `inspect`, chains joined on divergence; the prompts; lab cases for a clone, a refused push, a remote attached after generating, and two diverged machines. |
 | 8 | 7c181dfa | Sharing through a `pre-push` hook instead of a push in the CLI: the `apimatic-pre-push` script and the calling block (`ShareHook`), `GitService.hooksDirectory` and `hooksPathConfigured`, `SdkRepositoryContext.installShareHook`, the one-step note; `pushRef` and `shareSnapshot` removed; lab cases for `core.hooksPath` and an existing hook. |
 | 9 | 07c03c13 | The conflict questions (6.1): `MergePlan.takingGenerated`, `ConflictChoice`/`UnresolvedChoice`/`ConflictOutcome`, `SdkRepositoryContext.restorePrevious` and `resolveForGenerator`, `GitService.checkoutTree`, `terminal.isInteractive`, the two `select` prompts and their follow-ups, the choice on the telemetry event; the README's custom-code section removed. |
+| 10 | this file | Review follow-up: `SdkPrepareAction` and `SdkWriteAction` folded into `GenerateAction.execute`, their prompts into `SdkGeneratePrompts`; `SdkMergeConflictedEvent`, `ConflictOutcome`, `MergePlan.conflictsByKind` and the result payload removed; the two action tests now drive `GenerateAction` through `test/helpers/sdk-generation.ts`. |
+| 11 | this file | Functional core, imperative shell: `SdkDestination` carrying its reason, `destinationFor` (`unresolved` included), `replacesDirectory`; `Regeneration` and `Settlement` (`resolving`, `favouringGenerator`); `SdkContext.destination`, `SdkRepositoryContext.regenerate` and `write`; `execute` the one place that speaks, with no other method on the action and no logic in the prompts. |
 
 PR into `dev`, squash-merged, title `feat(sdk): keep your edits when regenerating an SDK`.
 
@@ -368,13 +378,14 @@ PR into `dev`, squash-merged, title `feat(sdk): keep your edits when regeneratin
 | File | Role |
 |---|---|
 | `src/infrastructure/git-service.ts` | the system git behind every snapshot, the merge (its output read into stages and messages) and the index staging |
-| `src/types/sdk-repository-context.ts` | the SDK directory with its repository: snapshots, the record, `inspect`, the merge, its application to disk, the staging |
+| `src/types/sdk-repository-context.ts` | the SDK directory with its repository: snapshots, the record, `inspect`, `regenerate` (the merge as a `Regeneration`), `write` (the previous ref, then the plan to disk), the staging |
 | `src/types/sdk/{merge-plan,conflict-markers}.ts` | pure: `MergePlan` built from git's merge and diffs, `takingGenerated`, conflict kinds, the choices, markers and their generator-side resolution |
-| `src/types/sdk/{snapshot-ref,generation-record,sdk-destination,share-hook}.ts`, `src/types/git/{commit-id,tree-id,git-version,merge-tree}.ts`, `src/types/file/relativeFilePath.ts` | value objects, the hook script and block, git's output as types |
-| `src/actions/sdk/{generate,prepare,write}.ts`, `src/prompts/sdk/{generate,prepare,write}.ts` | the run, its questions and its wording |
-| `src/types/sdk-context.ts` | `directory()`, `repository()`, `initRepository()`, save keeps `.git` |
+| `src/types/sdk/{sdk-destination,settlement}.ts` | the functional core of the run: how it writes and why, what a settled merge is — data and pure functions, no I/O |
+| `src/types/sdk/{snapshot-ref,generation-record,share-hook}.ts`, `src/types/git/{commit-id,tree-id,git-version,merge-tree}.ts`, `src/types/file/relativeFilePath.ts` | value objects, the hook script and block, git's output as types |
+| `src/actions/sdk/generate.ts`, `src/prompts/sdk/generate.ts` | the run, its questions and its wording |
+| `src/types/sdk-context.ts` | `directory()`, `destination(generation)` (what git and the repository say, as an `SdkDestination` or `unresolved`), `repository()`, `initRepository()`, save keeps `.git` |
 | `src/utils/terminal-utils.ts` | whether a question can be asked at all |
-| `src/types/events/sdk-merge-conflicted.ts`, `src/commands/sdk/generate.ts` | the conflict event, with the choice |
+| `src/commands/sdk/generate.ts` | flags, the git requirement in the description, intro/outro |
 | `test/…` | mirrors each file above |
 
 ## 10. Architecture
@@ -386,29 +397,26 @@ not the developer's flow (that is section 4.2).
 ```mermaid
 flowchart TB
   subgraph CMD["Command — src/commands/sdk/generate.ts"]
-    C["SdkGenerate.run()<br/>flags → GenerateAction.execute<br/>result → SdkMergeConflictedEvent(counts, choice) via TelemetryService"]
+    C["SdkGenerate.run()<br/>flags → GenerateAction.execute → outro(result)"]
   end
   subgraph ACT["Actions — src/actions/sdk/"]
-    G["GenerateAction.execute(project, sdkDir, language, stability, force, apiVersion?, packageSettings?)<br/>validate · SdkContext + SdkGeneration · prepare → upload/poll/download → write"]
-    P["SdkPrepareAction.execute(sdkContext, generation, force) → SdkDestination<br/>git version · repository · inspect (fetch when the base is missing)<br/>unresolved → unresolvedChoice: resolve | resolveForGenerator | restorePrevious, inspect again once<br/>overwrite question unless merge or --force"]
-    W["SdkWriteAction.execute(destination, sdkContext, tempSdk, generation, force)<br/>overwrite → save · record → initRepository?, save, snapshotGenerated, record<br/>merge → snapshotGenerated, snapshotDisk, merge → plan<br/>conflicts → conflictChoice: resolve | merge again -X theirs | keep (cancel)<br/>savePrevious, apply, record, sdkMerged; markers → stageConflicts, steps, failed(outcome)<br/>record() = recordGeneration + installShareHook (quiet) + notes"]
+    G["GenerateAction.execute(project, sdkDir, language, stability, force, apiVersion?, packageSettings?) → ActionResult<br/>the only method; every prompt is called here<br/>validate · SdkContext.destination; unresolved → unresolvedChoice, resolveForGenerator | restorePrevious, destination again once<br/>gitUnavailable | recordNotForThisGeneration | snapshotMissing · overwriteSdk unless --force or !replacesDirectory<br/>withDirPath: zip → generateSdk → save → unzip<br/>overwrite → save, sdkGenerated · record → initRepository?, save, snapshotGenerated, recordGeneration, installShareHook, sdkGenerated<br/>merge → regenerate → resolving | conflictChoice: regenerate favouring generated → favouringGenerator | keep (sdkKept)<br/>write → recordGeneration, installShareHook → resolvedForGenerator?, sdkMerged; markers → stageConflicts, conflicts | conflictSteps"]
   end
   subgraph PR["Prompts — src/prompts/sdk/ (wording only)"]
-    PP["SdkPreparePrompts<br/>gitUnavailable · overwriteSdk · recordNotForThisGeneration · snapshotMissing · nestedSdkDirectory<br/>conflictsUnresolved · unresolvedChoice · resolveLater · resolvedForGenerator · previousRestored · conflictsNotSettled"]
-    WP["SdkWritePrompts<br/>sdkGenerated · repositoryInitialised · sdkMerged · conflictChoice · sdkKept · resolvedForGenerator<br/>conflicts · conflictSteps · conflictsNotStaged · snapshotNotRecorded · customCodeFailed<br/>shareHookNeedsOneStep · shareHookNotInstalled"]
+    GP["SdkGeneratePrompts (wording only, no branching)<br/>gitUnavailable · overwriteSdk · recordNotForThisGeneration · snapshotMissing · nestedSdkDirectory<br/>conflictsUnresolved · unresolvedChoice · resolveLater · resolvedForGenerator · previousRestored · conflictsNotSettled<br/>sdkGenerated · repositoryInitialised · sdkMerged · conflictChoice · sdkKept<br/>conflicts · conflictSteps · conflictsNotStaged · snapshotNotRecorded · customCodeFailed<br/>shareHookNeedsOneStep · shareHookNotInstalled"]
   end
   subgraph TY["Types — src/types/"]
-    SC["SdkContext<br/>directory · exists · repository() · initRepository · save · loadSdkInTempDirectory"]
-    RC["SdkRepositoryContext (sdk-repository-context.ts)<br/>remote · inspect → SdkRepositoryState · snapshotGenerated · snapshotDisk · savePrevious<br/>merge → MergeOutcome · apply · stageConflicts · recordPristine/recordGeneration · readRecord<br/>installShareHook → ShareHookInstall · restorePrevious · resolveForGenerator"]
-    MP["MergePlan (sdk/merge-plan.ts)<br/>from(inputs) · writes/deletes/conflicts/renames/files · takingGenerated()<br/>ConflictKind · ConflictChoice · UnresolvedChoice · ConflictOutcome"]
+    SC["SdkContext<br/>directory · exists · destination(generation) → SdkDestination | Unresolved · repository() · initRepository · save · loadSdkInTempDirectory"]
+    RC["SdkRepositoryContext (sdk-repository-context.ts)<br/>remote · inspect → SdkRepositoryState · regenerate → Regeneration{generated, merge} · write(base, plan)<br/>snapshotGenerated · snapshotDisk · savePrevious · merge → MergeOutcome · apply · stageConflicts<br/>recordPristine/recordGeneration · readRecord · installShareHook → ShareHookInstall · restorePrevious · resolveForGenerator"]
+    MP["MergePlan (sdk/merge-plan.ts)<br/>from(inputs) · writes/deletes/conflicts/renames/files · takingGenerated()<br/>ConflictKind · ConflictChoice · UnresolvedChoice"]
     CMK["conflict-markers.ts<br/>relabelMarkers · hasConflictMarkers · resolveMarkersForGenerated"]
     GR["GenerationRecord (sdk/generation-record.ts)<br/>generation.json: language, codegen, stability, pristine commit, conflicts · describeApart"]
     SR["SnapshotRef (sdk/snapshot-ref.ts)<br/>refs/apimatic/pristine|previous/‹path› · refspec · sdkPath · collidesWith"]
     SH["ShareHook (sdk/share-hook.ts)<br/>SHARE_HOOK_SCRIPT · SHARE_HOOK_CALL · SHARE_HOOK_BLOCK · installInto · calls"]
-    SD["SdkDestination (sdk/sdk-destination.ts)<br/>overwrite | record{repository?} | merge{repository, base}"]
+    SD["SdkDestination (sdk/sdk-destination.ts)<br/>overwrite{found} | record{repository?, because} | merge{repository, base} · Unresolved{repository, paths}<br/>destinationFor(repository, SdkRepositoryState) · replacesDirectory"]
+    ST["Settlement (sdk/settlement.ts)<br/>{regeneration, plan, settledForGenerator}<br/>resolving(regeneration) · favouringGenerator(original, favoured)"]
     GT["git/ · CommitId · TreeId · GitVersion · merge-tree (Change, StageEntry, MergeTreeOutput)"]
     RF["file/ · RelativeFilePath · FilePath · DirectoryPath"]
-    EV["events/sdk-merge-conflicted.ts · SdkMergeConflictedEvent"]
   end
   subgraph INF["Infrastructure — src/infrastructure/"]
     GS["GitService (git-service.ts)<br/>version · init · treeOf · commitTree · updateRef · resolveRef · hasCommit · describe<br/>mergeTree · diffTrees · listTree · readBlobs · stageConflicts (update-index) · checkoutTree (read-tree)<br/>remoteOf · fetchRef (no prompts, 30 s) · hooksDirectory · hooksPathConfigured"]
@@ -419,21 +427,16 @@ flowchart TB
     HK[".git/hooks/apimatic-pre-push (sh) called from .git/hooks/pre-push or .husky/pre-push<br/>push refs/apimatic/pristine/* · on rejection fetch into refs/apimatic/remotes/‹remote›/pristine/*, join, push again"]
     RM[(remote<br/>refs/apimatic/pristine/‹path›)]
   end
-  C --> G --> P
-  G --> W
-  P --> PP
-  W --> WP
-  P --> SC
-  W --> SC
+  C --> G
+  G --> GP
+  G --> SC
   SC --> RC
-  P --> RC
-  W --> RC
-  P --> SD
-  W --> SD
-  P --> TU
-  W --> TU
-  C --> EV
-  W --> MP
+  G --> RC
+  G --> SD
+  G --> ST
+  SC --> SD
+  ST --> MP
+  G --> TU
   RC --> GS
   RC --> FS
   RC --> MP
@@ -454,10 +457,10 @@ What each layer owns:
 
 | Layer | Holds | Never does |
 |---|---|---|
-| Command | flags, the one telemetry event, intro/outro | git, files, questions |
-| Actions | the order of steps, every decision between them (ask or not, which destination, what to do with a choice) | wording, git commands, file I/O |
+| Command | flags, intro/outro | git, files, questions, telemetry (none for now) |
+| Actions | the imperative shell: one `execute` with the order of the steps and every question and message between them | wording, git commands, file I/O, data on the `ActionResult`, deciding what a state means, speaking from anywhere but `execute` |
 | Prompts | words and `select`/`confirm` for data they are handed | decide anything, know git refs |
-| Types | the SDK directory with its repository (`SdkRepositoryContext`), the plan, the record, refs, the hook text, destinations | print, call the API |
+| Types | the functional core: what a state means (`destinationFor`), how a settled merge is written (`Settlement`); the SDK directory with its repository (`SdkRepositoryContext`), the plan, the record, refs, the hook text | print, call the API, ask |
 | Infrastructure | `git` and the file system | know what a snapshot or a conflict means |
 | Outside | the hook script in the developer's `.git/hooks`, the remote's refs | need the CLI to run |
 

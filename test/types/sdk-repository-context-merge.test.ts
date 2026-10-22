@@ -92,11 +92,12 @@ describe('SdkRepositoryContext: the merge', () => {
     const baseCommit = (
       await repository.recordPristine((await repository.snapshotGenerated(baseDirectory))._unsafeUnwrap(), TYPESCRIPT)
     )._unsafeUnwrap();
-    const diskTree = (await repository.snapshotDisk(baseCommit))._unsafeUnwrap();
-    const generatedTree = (await repository.snapshotGenerated(generatedDirectory))._unsafeUnwrap();
-
-    const { plan } = (await repository.merge(baseCommit, diskTree, generatedTree))._unsafeUnwrap();
-    (await repository.apply(plan))._unsafeUnwrap();
+    const regeneration = (await repository.regenerate(baseCommit, generatedDirectory))._unsafeUnwrap();
+    expect(regeneration.generated.isEqual((await repository.snapshotGenerated(generatedDirectory))._unsafeUnwrap())).to
+      .be.true;
+    const { plan } = regeneration.merge;
+    (await repository.write(baseCommit, plan))._unsafeUnwrap();
+    expect(await git.resolveRef(project, repository.previousRef())).to.not.be.undefined;
 
     const at = (relative: string) => path.join(sdk.toString(), relative);
     const list = (directory: string): string[] =>

@@ -11,7 +11,9 @@ import { FilePath } from './file/filePath.js';
 import { FileName } from './file/fileName.js';
 import { FileProblem } from './file/file-problem.js';
 import { Language } from './sdk/generate.js';
-import { SdkRepositoryContext, SdkRepositoryProblem } from './sdk-repository-context.js';
+import { SdkGeneration } from './sdk/generation-record.js';
+import { destinationFor, SdkDestination, Unresolved } from './sdk/sdk-destination.js';
+import { NestedSdkDirectory, SdkRepositoryContext, SdkRepositoryProblem } from './sdk-repository-context.js';
 
 const GIT_DIRECTORY = '.git';
 
@@ -48,6 +50,25 @@ export class SdkContext {
 
   public async exists() {
     return !(await this.fileService.directoryEmpty(this.sdkDirectory));
+  }
+
+  /**
+   * How a run will write the directory, from what git and the enclosing repository say about
+   * it; `unresolved` when the last run's markers are still in the files. Nothing is asked here.
+   */
+  public async destination(
+    generation: SdkGeneration
+  ): Promise<Result<SdkDestination | Unresolved, NestedSdkDirectory | SdkRepositoryProblem>> {
+    const version = await this.git.version();
+    if (version === undefined || !version.isSupported()) {
+      return ok({ kind: 'overwrite', found: version });
+    }
+    const repository = await this.repository();
+    if (repository === undefined) {
+      return ok({ kind: 'record', repository, because: { kind: 'noRepository' } });
+    }
+    const state = await repository.inspect(generation, await repository.remote());
+    return state.map((found) => destinationFor(repository, found));
   }
 
   /** The repository enclosing the SDK directory, which need not exist yet, or none when nothing does. */

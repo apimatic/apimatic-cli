@@ -1,4 +1,3 @@
-import { RelativeFilePath } from '../../../src/types/file/relativeFilePath.js';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -6,23 +5,27 @@ import { expect } from 'chai';
 import { execa } from 'execa';
 import { err, ok } from 'neverthrow';
 import sinon from 'sinon';
-import { SdkWriteAction } from '../../../src/actions/sdk/write.js';
+import { GenerateAction } from '../../../src/actions/sdk/generate.js';
 import { GitService } from '../../../src/infrastructure/git-service.js';
-import { SdkWritePrompts } from '../../../src/prompts/sdk/write.js';
+import { SdkGeneratePrompts } from '../../../src/prompts/sdk/generate.js';
+import { CommandMetadata } from '../../../src/types/common/command-metadata.js';
 import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
 import { FileName } from '../../../src/types/file/fileName.js';
 import { FilePath } from '../../../src/types/file/filePath.js';
+import { RelativeFilePath } from '../../../src/types/file/relativeFilePath.js';
 import { CommitId } from '../../../src/types/git/commit-id.js';
+import { ProjectContext } from '../../../src/types/project-context.js';
 import { SdkContext } from '../../../src/types/sdk-context.js';
 import { GENERATED_MARKER, YOURS_MARKER } from '../../../src/types/sdk/conflict-markers.js';
 import { CodeGenerationVersion, Language, Stability } from '../../../src/types/sdk/generate.js';
 import { GenerationRecord, SdkGeneration } from '../../../src/types/sdk/generation-record.js';
-import { SdkDestination } from '../../../src/types/sdk/sdk-destination.js';
+import { SnapshotRef } from '../../../src/types/sdk/snapshot-ref.js';
 import { SdkRepositoryContext } from '../../../src/types/sdk-repository-context.js';
 import { terminal } from '../../../src/utils/terminal-utils.js';
+import { Files, stubSdkGeneration, writeFiles } from '../../helpers/sdk-generation.js';
 import { snapshotFiles } from '../../helpers/snapshots.js';
-import { SnapshotRef } from '../../../src/types/sdk/snapshot-ref.js';
 
+const COMMAND_METADATA: CommandMetadata = { commandName: 'sdk generate', shell: 'test' };
 const STABLE: SdkGeneration = {
   language: Language.PYTHON,
   codegenVersion: CodeGenerationVersion.V4,
@@ -43,49 +46,47 @@ const MODEL_V2 = MODEL_V1.replace('# Price in USD.', '# Retail price in US dolla
 const DECORATED = 'from dataclasses import dataclass\n\n\n@dataclass\n';
 const MODEL_V1_EDITED = MODEL_V1.replace('# Price in USD.', '# Price in USD, VAT included.');
 
-type Files = Record<string, string>;
-
 const rel = (value: string) => RelativeFilePath.fromGit(value);
 
-describe('SdkWriteAction', () => {
+/** How the downloaded SDK lands in its directory: replaced, recorded, or merged over the developer's edits. */
+describe('GenerateAction (sdk) — writing the SDK', () => {
   let root: string;
-  let sdkContext: SdkContext;
-  let generations = 0;
+  let generates: (files: Files) => Promise<void>;
   const git = new GitService();
 
   const sdk = () => new DirectoryPath(path.join(root, 'sdk', 'python'));
+  const sdkContext = () => new SdkContext(Language.PYTHON, new DirectoryPath(path.join(root, 'sdk')));
   const at = (relative: string) => path.join(sdk().toString(), relative);
   const read = (relative: string) => fs.readFileSync(at(relative), 'utf-8');
-  const write = (directory: DirectoryPath, files: Files) => {
-    for (const [relative, contents] of Object.entries(files)) {
-      const target = path.join(directory.toString(), relative);
-      fs.mkdirSync(path.dirname(target), { recursive: true });
-      fs.writeFileSync(target, contents);
-    }
-  };
-  const generated = (files: Files): DirectoryPath => {
-    const directory = new DirectoryPath(path.join(root, `generated-${generations++}`));
-    write(directory, files);
-    return directory;
-  };
   const record = () => GenerationRecord.parse(read('.apimatic/generation.json'))!;
-  const execute = (destination: SdkDestination, files: Files, force = true) =>
-    new SdkWriteAction().execute(destination, sdkContext, generated(files), STABLE, force);
+
+  const execute = async (files: Files, force = true) => {
+    await generates(files);
+    return new GenerateAction(new DirectoryPath(root), COMMAND_METADATA, 'auth-key').execute(
+      ProjectContext.in(new DirectoryPath(root)),
+      new DirectoryPath(path.join(root, 'sdk')),
+      Language.PYTHON,
+      Stability.STABLE,
+      force
+    );
+  };
 
   /** A first generation of `files`, written and recorded into the project's repository. */
   const recorded = async (files: Files): Promise<{ repository: SdkRepositoryContext; base: CommitId }> => {
-    write(sdk(), files);
+    writeFiles(sdk().toString(), files);
     await git.init(new DirectoryPath(root));
-    const repository = (await sdkContext.repository())!;
-    const tree = (await repository.snapshotGenerated(generated(files)))._unsafeUnwrap();
+    const repository = (await sdkContext().repository())!;
+    const tree = (await repository.snapshotGenerated(sdk()))._unsafeUnwrap();
     const written = (await repository.recordGeneration(tree, STABLE, '0.0.0', []))._unsafeUnwrap();
     return { repository, base: written.pristineCommit() };
   };
 
-  beforeEach(() => {
+  const fresh = () => {
     root = fs.mkdtempSync(path.join(os.tmpdir(), 'sdk-write-'));
-    sdkContext = new SdkContext(Language.PYTHON, new DirectoryPath(path.join(root, 'sdk')));
-  });
+    ({ generates } = stubSdkGeneration(root));
+  };
+
+  beforeEach(fresh);
 
   afterEach(() => {
     sinon.restore();
@@ -94,10 +95,12 @@ describe('SdkWriteAction', () => {
 
   describe('overwrite', () => {
     it('replaces the directory with the generated files, keeping a .git and writing no record', async () => {
-      write(sdk(), { 'old.py': 'old', '.git/HEAD': 'ref: refs/heads/main' });
-      const sdkGenerated = sinon.stub(SdkWritePrompts.prototype, 'sdkGenerated');
+      sinon.stub(GitService.prototype, 'version').resolves(undefined);
+      sinon.stub(SdkGeneratePrompts.prototype, 'gitUnavailable');
+      writeFiles(sdk().toString(), { 'old.py': 'old', '.git/HEAD': 'ref: refs/heads/main' });
+      const sdkGenerated = sinon.stub(SdkGeneratePrompts.prototype, 'sdkGenerated');
 
-      expect((await execute({ kind: 'overwrite' }, { 'README.md': '# sdk' })).isSuccess()).to.be.true;
+      expect((await execute({ 'README.md': '# sdk' })).isSuccess()).to.be.true;
 
       expect(fs.readdirSync(sdk().toString()).sort()).to.deep.equal(['.git', 'README.md']);
       expect(sdkGenerated.firstCall.args[0].isEqual(sdk())).to.be.true;
@@ -106,9 +109,9 @@ describe('SdkWriteAction', () => {
 
   describe('record', () => {
     it('initialises a repository in the SDK directory, says so, and records the snapshot', async () => {
-      const repositoryInitialised = sinon.stub(SdkWritePrompts.prototype, 'repositoryInitialised');
+      const repositoryInitialised = sinon.stub(SdkGeneratePrompts.prototype, 'repositoryInitialised');
 
-      const result = await execute({ kind: 'record', repository: undefined }, { 'README.md': '# sdk', 'a.py': 'x' });
+      const result = await execute({ 'README.md': '# sdk', 'a.py': 'x' });
 
       expect(result.isSuccess()).to.be.true;
       expect(repositoryInitialised.firstCall.args[0].isEqual(sdk())).to.be.true;
@@ -116,18 +119,17 @@ describe('SdkWriteAction', () => {
       const pristine = (await git.resolveRef(sdk(), SnapshotRef.pristine('')))!;
       expect(record().pristineCommit().isEqual(pristine)).to.be.true;
       expect(record().isFor(STABLE)).to.be.true;
-      const repository = (await sdkContext.repository())!;
+      const repository = (await sdkContext().repository())!;
       const files = await snapshotFiles(repository.root(), pristine);
       expect([...files.keys()]).to.have.members(['README.md', 'a.py']);
     });
 
     it('records into the enclosing repository under the SDK directory’s ref, keeping what was there out of it', async () => {
-      write(sdk(), { 'old.py': 'old' });
+      writeFiles(sdk().toString(), { 'old.py': 'old' });
       await git.init(new DirectoryPath(root));
-      const repository = (await sdkContext.repository())!;
-      const repositoryInitialised = sinon.stub(SdkWritePrompts.prototype, 'repositoryInitialised');
+      const repositoryInitialised = sinon.stub(SdkGeneratePrompts.prototype, 'repositoryInitialised');
 
-      expect((await execute({ kind: 'record', repository }, { 'README.md': '# sdk' })).isSuccess()).to.be.true;
+      expect((await execute({ 'README.md': '# sdk' })).isSuccess()).to.be.true;
 
       expect(repositoryInitialised.called).to.be.false;
       expect(fs.existsSync(at('.git'))).to.be.false;
@@ -137,13 +139,13 @@ describe('SdkWriteAction', () => {
     });
 
     it('still succeeds, with a warning, when the snapshot cannot be recorded', async () => {
+      sinon.stub(SdkGeneratePrompts.prototype, 'repositoryInitialised');
       sinon
         .stub(SdkRepositoryContext.prototype, 'recordGeneration')
         .resolves(err({ kind: 'gitFailed', reason: 'git broke' }));
-      const snapshotNotRecorded = sinon.stub(SdkWritePrompts.prototype, 'snapshotNotRecorded');
+      const snapshotNotRecorded = sinon.stub(SdkGeneratePrompts.prototype, 'snapshotNotRecorded');
 
-      expect((await execute({ kind: 'record', repository: undefined }, { 'README.md': '# sdk' })).isSuccess()).to.be
-        .true;
+      expect((await execute({ 'README.md': '# sdk' })).isSuccess()).to.be.true;
 
       expect(read('README.md')).to.equal('# sdk');
       expect(snapshotNotRecorded.firstCall.args[0]).to.equal('git broke');
@@ -153,13 +155,14 @@ describe('SdkWriteAction', () => {
   describe('merge', () => {
     it('merges the generator’s changes into your edited files, adds new files and keeps your own', async () => {
       const { repository, base } = await recorded({ 'README.md': '# sdk', 'models/book.py': MODEL_V1 });
-      write(sdk(), { 'models/book.py': DECORATED + MODEL_V1, 'notes.txt': 'mine' });
-      const sdkMerged = sinon.stub(SdkWritePrompts.prototype, 'sdkMerged');
+      writeFiles(sdk().toString(), { 'models/book.py': DECORATED + MODEL_V1, 'notes.txt': 'mine' });
+      const sdkMerged = sinon.stub(SdkGeneratePrompts.prototype, 'sdkMerged');
 
-      const result = await execute(
-        { kind: 'merge', repository, base },
-        { 'README.md': '# sdk v2', 'models/book.py': MODEL_V2, 'models/author.py': 'class Author: ...' }
-      );
+      const result = await execute({
+        'README.md': '# sdk v2',
+        'models/book.py': MODEL_V2,
+        'models/author.py': 'class Author: ...'
+      });
 
       expect(result.isSuccess()).to.be.true;
       expect(read('models/book.py')).to.equal(DECORATED + MODEL_V2);
@@ -185,14 +188,12 @@ describe('SdkWriteAction', () => {
     });
 
     it('writes markers where you and the generator changed the same lines, lists the file and fails', async () => {
-      const { repository, base } = await recorded({ 'README.md': '# sdk', 'models/book.py': MODEL_V1 });
-      write(sdk(), { 'models/book.py': MODEL_V1_EDITED });
-      const conflicts = sinon.stub(SdkWritePrompts.prototype, 'conflicts');
+      const { repository } = await recorded({ 'README.md': '# sdk', 'models/book.py': MODEL_V1 });
+      writeFiles(sdk().toString(), { 'models/book.py': MODEL_V1_EDITED });
+      sinon.stub(SdkGeneratePrompts.prototype, 'sdkMerged');
+      const conflicts = sinon.stub(SdkGeneratePrompts.prototype, 'conflicts');
 
-      const result = await execute(
-        { kind: 'merge', repository, base },
-        { 'README.md': '# sdk v2', 'models/book.py': MODEL_V2 }
-      );
+      const result = await execute({ 'README.md': '# sdk v2', 'models/book.py': MODEL_V2 });
 
       expect(result.isFailed()).to.be.true;
       expect(result.getExitCode()).to.equal(1);
@@ -205,8 +206,6 @@ describe('SdkWriteAction', () => {
       expect(read('models/book.py')).to.contain(`${GENERATED_MARKER}\n`);
       expect(read('README.md')).to.equal('# sdk v2');
       expect(record().conflictedPaths().map(String)).to.deep.equal(['models/book.py']);
-      expect(result.getError()?.plan.conflictsByKind()).to.include({ bothChanged: 1, noLongerGenerated: 0 });
-      expect(result.getError()?.choice).to.equal('resolve');
       const cwd = repository.root().toString();
       expect((await execa('git', ['status', '--porcelain'], { cwd })).stdout).to.contain(
         'UU sdk/python/models/book.py'
@@ -216,15 +215,16 @@ describe('SdkWriteAction', () => {
     });
 
     it('still reports the conflicts when they cannot be marked in the index, with a warning', async () => {
-      const { repository, base } = await recorded({ 'README.md': '# sdk', 'models/book.py': MODEL_V1 });
-      write(sdk(), { 'models/book.py': MODEL_V1_EDITED });
+      await recorded({ 'README.md': '# sdk', 'models/book.py': MODEL_V1 });
+      writeFiles(sdk().toString(), { 'models/book.py': MODEL_V1_EDITED });
       sinon
         .stub(SdkRepositoryContext.prototype, 'stageConflicts')
         .resolves(err({ kind: 'gitFailed', reason: 'index locked' }));
-      const conflictsNotStaged = sinon.stub(SdkWritePrompts.prototype, 'conflictsNotStaged');
-      const conflicts = sinon.stub(SdkWritePrompts.prototype, 'conflicts');
+      sinon.stub(SdkGeneratePrompts.prototype, 'sdkMerged');
+      const conflictsNotStaged = sinon.stub(SdkGeneratePrompts.prototype, 'conflictsNotStaged');
+      const conflicts = sinon.stub(SdkGeneratePrompts.prototype, 'conflicts');
 
-      const result = await execute({ kind: 'merge', repository, base }, { 'models/book.py': MODEL_V2 });
+      const result = await execute({ 'models/book.py': MODEL_V2 });
 
       expect(result.isFailed()).to.be.true;
       expect(result.getMessage()).to.equal('Resolve the conflicts and rerun');
@@ -234,14 +234,14 @@ describe('SdkWriteAction', () => {
     });
 
     it('leaves the directory alone when the pre-run state cannot be kept', async () => {
-      const { repository, base } = await recorded({ 'README.md': '# sdk' });
-      write(sdk(), { 'README.md': '# edited' });
+      const { base } = await recorded({ 'README.md': '# sdk' });
+      writeFiles(sdk().toString(), { 'README.md': '# edited' });
       sinon
         .stub(SdkRepositoryContext.prototype, 'savePrevious')
         .resolves(err({ kind: 'gitFailed', reason: 'git broke' }));
-      const customCodeFailed = sinon.stub(SdkWritePrompts.prototype, 'customCodeFailed');
+      const customCodeFailed = sinon.stub(SdkGeneratePrompts.prototype, 'customCodeFailed');
 
-      expect((await execute({ kind: 'merge', repository, base }, { 'README.md': '# sdk v2' })).isFailed()).to.be.true;
+      expect((await execute({ 'README.md': '# sdk v2' })).isFailed()).to.be.true;
 
       expect(read('README.md')).to.equal('# edited');
       expect(record().pristineCommit().isEqual(base)).to.be.true;
@@ -250,25 +250,25 @@ describe('SdkWriteAction', () => {
   });
 
   describe('the question when the merge conflicts', () => {
+    const NEXT: Files = { 'README.md': '# sdk v2', 'models/book.py': MODEL_V2 };
+
     /** An edited model the generator also changed, so the merge conflicts on it, plus a clean change elsewhere. */
     const conflicting = async () => {
       const { repository, base } = await recorded({ 'README.md': '# sdk', 'models/book.py': MODEL_V1 });
-      write(sdk(), { 'models/book.py': DECORATED + MODEL_V1_EDITED, 'notes.txt': 'mine' });
+      writeFiles(sdk().toString(), { 'models/book.py': DECORATED + MODEL_V1_EDITED, 'notes.txt': 'mine' });
       sinon.stub(terminal, 'isInteractive').returns(true);
-      sinon.stub(SdkWritePrompts.prototype, 'sdkMerged');
-      return { repository, base, next: { 'README.md': '# sdk v2', 'models/book.py': MODEL_V2 } };
+      sinon.stub(SdkGeneratePrompts.prototype, 'sdkMerged');
+      return { repository, base };
     };
 
     it('settles the overlapping hunks for the generator on request, keeping your other edits in the same file', async () => {
-      const { repository, base, next } = await conflicting();
-      sinon.stub(SdkWritePrompts.prototype, 'conflictChoice').resolves('generated');
-      const resolvedForGenerator = sinon.stub(SdkWritePrompts.prototype, 'resolvedForGenerator');
+      const { repository } = await conflicting();
+      sinon.stub(SdkGeneratePrompts.prototype, 'conflictChoice').resolves('generated');
+      const resolvedForGenerator = sinon.stub(SdkGeneratePrompts.prototype, 'resolvedForGenerator');
 
-      const result = await execute({ kind: 'merge', repository, base }, next, false);
+      const result = await execute(NEXT, false);
 
       expect(result.isSuccess()).to.be.true;
-      expect(result.getValue()?.choice).to.equal('generated');
-      expect(result.getValue()?.plan.conflictedPaths().map(String)).to.deep.equal(['models/book.py']);
       expect(read('models/book.py')).to.equal(DECORATED + MODEL_V2);
       expect(read('README.md')).to.equal('# sdk v2');
       expect(read('notes.txt')).to.equal('mine');
@@ -282,11 +282,11 @@ describe('SdkWriteAction', () => {
 
     it('writes nothing at all when the developer keeps the SDK as it is, or backs out of the question', async () => {
       for (const answer of ['keep', undefined] as const) {
-        const { repository, base, next } = await conflicting();
-        sinon.stub(SdkWritePrompts.prototype, 'conflictChoice').resolves(answer);
-        const sdkKept = sinon.stub(SdkWritePrompts.prototype, 'sdkKept');
+        const { repository, base } = await conflicting();
+        sinon.stub(SdkGeneratePrompts.prototype, 'conflictChoice').resolves(answer);
+        const sdkKept = sinon.stub(SdkGeneratePrompts.prototype, 'sdkKept');
 
-        const result = await execute({ kind: 'merge', repository, base }, next, false);
+        const result = await execute(NEXT, false);
 
         expect(result.isCancelled(), String(answer)).to.be.true;
         expect(read('models/book.py')).to.equal(DECORATED + MODEL_V1_EDITED);
@@ -296,33 +296,31 @@ describe('SdkWriteAction', () => {
         expect(sdkKept.calledOnce).to.be.true;
         sinon.restore();
         fs.rmSync(root, { recursive: true, force: true });
-        root = fs.mkdtempSync(path.join(os.tmpdir(), 'sdk-write-'));
-        sdkContext = new SdkContext(Language.PYTHON, new DirectoryPath(path.join(root, 'sdk')));
+        fresh();
       }
     });
 
     it('leaves markers when the developer will resolve, with the steps but not the list again', async () => {
-      const { repository, base, next } = await conflicting();
-      sinon.stub(SdkWritePrompts.prototype, 'conflictChoice').resolves('resolve');
-      const conflictSteps = sinon.stub(SdkWritePrompts.prototype, 'conflictSteps');
-      const conflicts = sinon.stub(SdkWritePrompts.prototype, 'conflicts');
+      await conflicting();
+      sinon.stub(SdkGeneratePrompts.prototype, 'conflictChoice').resolves('resolve');
+      const conflictSteps = sinon.stub(SdkGeneratePrompts.prototype, 'conflictSteps');
+      const conflicts = sinon.stub(SdkGeneratePrompts.prototype, 'conflicts');
 
-      const result = await execute({ kind: 'merge', repository, base }, next, false);
+      const result = await execute(NEXT, false);
 
       expect(result.isFailed()).to.be.true;
-      expect(result.getError()?.choice).to.equal('resolve');
       expect(read('models/book.py')).to.contain(YOURS_MARKER);
       expect(conflictSteps.calledOnce).to.be.true;
       expect(conflicts.called).to.be.false;
     });
 
     it('does not ask without a terminal, or with --force: markers, the list and the steps', async () => {
-      const { repository, base, next } = await conflicting();
+      await conflicting();
       (terminal.isInteractive as sinon.SinonStub).returns(false);
-      const conflictChoice = sinon.stub(SdkWritePrompts.prototype, 'conflictChoice');
-      const conflicts = sinon.stub(SdkWritePrompts.prototype, 'conflicts');
+      const conflictChoice = sinon.stub(SdkGeneratePrompts.prototype, 'conflictChoice');
+      const conflicts = sinon.stub(SdkGeneratePrompts.prototype, 'conflicts');
 
-      const result = await execute({ kind: 'merge', repository, base }, next, false);
+      const result = await execute(NEXT, false);
 
       expect(result.isFailed()).to.be.true;
       expect(conflictChoice.called).to.be.false;
@@ -333,18 +331,18 @@ describe('SdkWriteAction', () => {
 
   describe('the hook that shares snapshots', () => {
     beforeEach(() => {
-      sinon.stub(SdkWritePrompts.prototype, 'repositoryInitialised');
+      sinon.stub(SdkGeneratePrompts.prototype, 'repositoryInitialised');
     });
 
-    const recordOne = () => execute({ kind: 'record', repository: undefined }, { 'README.md': '# sdk' });
+    const recordOne = () => execute({ 'README.md': '# sdk' });
 
     it('is installed after recording, without a word', async () => {
       const file = new FilePath(new DirectoryPath(root), new FileName('pre-push'));
       const install = sinon
         .stub(SdkRepositoryContext.prototype, 'installShareHook')
         .resolves(ok({ kind: 'installed', file }));
-      const shareHookNeedsOneStep = sinon.stub(SdkWritePrompts.prototype, 'shareHookNeedsOneStep');
-      const shareHookNotInstalled = sinon.stub(SdkWritePrompts.prototype, 'shareHookNotInstalled');
+      const shareHookNeedsOneStep = sinon.stub(SdkGeneratePrompts.prototype, 'shareHookNeedsOneStep');
+      const shareHookNotInstalled = sinon.stub(SdkGeneratePrompts.prototype, 'shareHookNotInstalled');
 
       expect((await recordOne()).isSuccess()).to.be.true;
 
@@ -358,7 +356,7 @@ describe('SdkWriteAction', () => {
       const script = new FilePath(new DirectoryPath(root), new FileName('apimatic-pre-push'));
       const needed = { kind: 'elsewhere' as const, file, hooksPath: '.husky/_', script };
       sinon.stub(SdkRepositoryContext.prototype, 'installShareHook').resolves(ok(needed));
-      const shareHookNeedsOneStep = sinon.stub(SdkWritePrompts.prototype, 'shareHookNeedsOneStep');
+      const shareHookNeedsOneStep = sinon.stub(SdkGeneratePrompts.prototype, 'shareHookNeedsOneStep');
 
       expect((await recordOne()).isSuccess()).to.be.true;
 
@@ -369,7 +367,7 @@ describe('SdkWriteAction', () => {
       sinon
         .stub(SdkRepositoryContext.prototype, 'installShareHook')
         .resolves(err({ kind: 'hookNotWritten', reason: 'EACCES: permission denied' }));
-      const shareHookNotInstalled = sinon.stub(SdkWritePrompts.prototype, 'shareHookNotInstalled');
+      const shareHookNotInstalled = sinon.stub(SdkGeneratePrompts.prototype, 'shareHookNotInstalled');
 
       expect((await recordOne()).isSuccess()).to.be.true;
 
