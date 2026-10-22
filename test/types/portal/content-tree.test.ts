@@ -99,6 +99,35 @@ describe('ContentTree', () => {
     expect(problems[0]).to.deep.equal({ kind: 'missingImages', images: [image] });
   });
 
+  it('refuses every page that is not valid MDX at once, and none of those that are', async () => {
+    const cards = inContent('guides', 'cards.mdx');
+    const steps = inContent('guides', 'steps.mdx');
+    const pages = await parsed(
+      [inContent('index.md'), '---\ntitle: Home\n---\n'],
+      [cards, '---\ntitle: Cards\n---\n\n<Cards>\n  <Card title="a" />\n'],
+      [steps, '---\ntitle: Steps\n---\n\n<Steps>\n</Step>\n'],
+      [inContent('guides', 'tabs.mdx'), '---\ntitle: Tabs\n---\n\n<Tabs>\n  <Tab>One</Tab>\n</Tabs>\n']
+    );
+    const navigationFiles = handed([inContent('nav.json'), '{}'], [inContent('guides', 'nav.json'), '{}']);
+
+    const problems = tree.check({ pages, navigationFiles, missingImages: [] }, [], GENERATED)._unsafeUnwrapErr();
+
+    expect(problems).to.deep.equal([
+      {
+        kind: 'invalidMdx',
+        pages: [
+          { page: cards, line: 5, column: 1, reason: 'Expected a closing tag for `<Cards>`' },
+          {
+            page: steps,
+            line: 6,
+            column: 1,
+            reason: 'Unexpected closing tag `</Step>`, expected corresponding closing tag for `<Steps>` on line 5'
+          }
+        ]
+      }
+    ]);
+  });
+
   it('names the tabs from what it is handed', () => {
     const navigationFiles = handed(
       [inContent('nav.json'), JSON.stringify({ title: 'Guides', tabs: ['guides'], pages: ['index'] })],

@@ -6,6 +6,7 @@ import { ContentNotices, NoTabsListed } from '../../types/portal/content-notices
 import { API_REFERENCE_TOKEN, NAVIGATION_FILE_NAME, TabEntry } from '../../types/portal/portal-navigation.js';
 import {
   ContentProblem,
+  InvalidPage,
   MissingFile,
   MissingImage,
   PortalSourceProblem,
@@ -327,7 +328,25 @@ function reportContentProblem(problem: ContentProblem, sourceDirectory: Director
       reportMissingImages(problem.images, sourceDirectory);
       return;
     }
+    case 'invalidMdx': {
+      reportInvalidPages(problem.pages, sourceDirectory);
+      return;
+    }
   }
+}
+
+function reportInvalidPages(pages: InvalidPage[], sourceDirectory: DirectoryPath): void {
+  const lines = pages.map(
+    ({ page, line, column, reason }) =>
+      `  • ${relative(page, sourceDirectory)}, line ${line}, column ${column}: ${reason}`
+  );
+  log.error(
+    pages.length === 1
+      ? `A page in ${f.path(sourceDirectory)} is not valid MDX:`
+      : `Pages in ${f.path(sourceDirectory)} are not valid MDX:`
+  );
+  log.message(lines.join('\n'));
+  log.message('MDX stops at the first mistake in a page, so a page can have more after the one shown.');
 }
 
 function reportMissingImages(images: MissingImage[], sourceDirectory: DirectoryPath): void {

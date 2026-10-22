@@ -113,7 +113,7 @@ describe('parsePage', () => {
       expect((await images('---\ntitle: Home\n---\n\n![a](/a.png)\n')).map(({ line }) => line)).to.deep.equal([5]);
     });
 
-    // The front matter check reports the first; the build reports the second.
+    // The front matter check reports the first; the syntax error, the second.
     it('finds nothing in a page that does not parse, rather than throwing', async () => {
       expect(await images('---\ntitle: [unclosed\n---\n![a](/a.png)\n')).to.deep.equal([]);
       expect(await images('<Callout>\n\n![a](/a.png)\n', 'page.mdx')).to.deep.equal([]);
@@ -148,5 +148,51 @@ describe('parsePage', () => {
 
       expect(found.map(({ path, line }) => [path, line])).to.deep.equal([['a.png', 3]]);
     });
+  });
+
+  // A preview leaves such a page an error screen, and the build fails over it naming its temporary copy.
+  describe('the first mistake in an .mdx page', () => {
+    const syntaxError = async (body: string, name = 'page.mdx') =>
+      (await page(`---\ntitle: Cards\n---\n\n${body}`, name)).syntaxError;
+
+    it('places a tag left open at the tag, which MDX finds only at the end of the page', async () => {
+      expect(await syntaxError('## One\n\n<Cards>\n  <Card title="a" />\n\n## Two\n')).to.deep.equal({
+        line: 7,
+        column: 1,
+        reason: 'Expected a closing tag for `<Cards>`'
+      });
+    });
+
+    it('places a closing tag that does not match at the closing tag, naming the line of the one it should close', async () => {
+      expect(await syntaxError('<Cards>\n  Text\n</Card>\n')).to.deep.equal({
+        line: 7,
+        column: 1,
+        reason: 'Unexpected closing tag `</Card>`, expected corresponding closing tag for `<Cards>` on line 5'
+      });
+    });
+
+    it("gives what is wrong with an expression in acorn's words, and not its name", async () => {
+      expect(await syntaxError('Then {oops(}.\n')).to.deep.equal({
+        line: 5,
+        column: 12,
+        reason: 'Could not parse expression: Unexpected token'
+      });
+    });
+
+    it('names an HTML comment as MDX does, with what to write instead', async () => {
+      const found = await syntaxError('<!-- note -->\n');
+
+      expect(found).to.include({ line: 5, column: 2 });
+      expect(found?.reason).to.contain('use `{/* text */}`');
+    });
+
+    for (const [description, body, name] of [
+      ['a valid page', '<Cards>\n  <Card title="a" />\n</Cards>\n\n{/* a comment */}\n', 'page.mdx'],
+      ['a .md page, which is not read as MDX', '<Cards>\n\n<!-- note -->\n\nIf a <5.\n', 'page.md']
+    ]) {
+      it(`finds none in ${description}`, async () => {
+        expect(await syntaxError(body, name)).to.be.null;
+      });
+    }
   });
 });
