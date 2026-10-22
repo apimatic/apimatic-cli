@@ -77,7 +77,7 @@ describe('SdkPrepareAction', () => {
   }
 
   it('records into a repository still to be made when nothing encloses the SDK directory', async () => {
-    expect((await execute()).getValue()).to.deep.equal({ kind: 'record', repository: undefined, remote: undefined });
+    expect((await execute()).getValue()).to.deep.equal({ kind: 'record', repository: undefined });
   });
 
   it('records into the enclosing repository when the directory has no record', async () => {
@@ -234,7 +234,7 @@ describe('SdkPrepareAction', () => {
       await sh(root, 'init', '-q', '--bare', origin);
       await sh(root, 'remote', 'add', 'origin', origin);
       await sh(root, 'push', '-q', 'origin', 'main');
-      (await repository.shareSnapshot('origin'))._unsafeUnwrap();
+      await sh(root, 'push', '-q', 'origin', repository.pristineRef().refspec());
       await sh(root, 'clone', '-q', '--no-local', origin, clone);
       sdkContext = new SdkContext(Language.PYTHON, new DirectoryPath(path.join(clone, 'sdk')));
       return { clone, origin, base };
@@ -246,7 +246,6 @@ describe('SdkPrepareAction', () => {
         const destination = (await execute()).getValue();
 
         expect(destination.kind === 'merge' && destination.base.isEqual(base)).to.be.true;
-        expect(destination.kind === 'merge' && destination.remote).to.equal('origin');
       } finally {
         fs.rmSync(clone, { recursive: true, force: true });
         fs.rmSync(origin, { recursive: true, force: true });

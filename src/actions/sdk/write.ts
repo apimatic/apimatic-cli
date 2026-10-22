@@ -38,12 +38,12 @@ export class SdkWriteAction {
           this.prompts.repositoryInitialised(sdk);
         }
         const generated = await repository.value.snapshotGenerated(tempSdk);
-        await this.record(repository.value, generated, generation, [], destination.remote);
+        await this.record(repository.value, generated, generation, []);
         this.prompts.sdkGenerated(sdk);
         return ActionResult.success();
       }
       case 'merge': {
-        const { repository, base, remote } = destination;
+        const { repository, base } = destination;
         const generated = await repository.snapshotGenerated(tempSdk);
         if (generated.isErr()) {
           return this.customCodeFailed(generated.error);
@@ -65,7 +65,7 @@ export class SdkWriteAction {
         if (applied.isErr()) {
           return this.customCodeFailed(applied.error);
         }
-        await this.record(repository, generated, generation, plan.conflictedPaths(), remote);
+        await this.record(repository, generated, generation, plan.conflictedPaths());
         this.prompts.sdkMerged(repository.sdkDirectory(), plan);
         if (!plan.hasConflicts()) {
           return ActionResult.success();
@@ -86,12 +86,13 @@ export class SdkWriteAction {
   }
 
   // Only warns: the SDK is already on disk, and a run without its snapshot asks before replacing it.
+  // The hook that shares snapshots on push is (re)installed after every record, quietly: it is part of
+  // keeping customizations, not something the run announces. A deleted one comes back.
   private async record(
     repository: SdkRepositoryContext,
     generated: Result<TreeId, SdkRepositoryProblem>,
     generation: SdkGeneration,
-    conflicts: readonly RelativeFilePath[],
-    remote: string | undefined
+    conflicts: readonly RelativeFilePath[]
   ): Promise<void> {
     const recorded = await generated.match(
       (tree) => repository.recordGeneration(tree, generation, envInfo.getCLIVersion(), conflicts),
@@ -101,14 +102,11 @@ export class SdkWriteAction {
       this.prompts.snapshotNotRecorded(recorded.error.reason);
       return;
     }
-    if (remote === undefined) {
-      return;
-    }
-    const shared = await repository.shareSnapshot(remote);
-    if (shared.isErr()) {
-      this.prompts.snapshotNotShared(remote, shared.error.reason);
-    } else if (shared.value !== 'upToDate') {
-      this.prompts.snapshotShared(remote);
+    const hook = await repository.installShareHook();
+    if (hook.isErr()) {
+      this.prompts.shareHookNotInstalled(hook.error.reason);
+    } else if (hook.value.kind !== 'installed') {
+      this.prompts.shareHookNeedsOneStep(hook.value);
     }
   }
 }

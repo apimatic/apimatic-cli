@@ -10,6 +10,8 @@ import { SdkWriteAction } from '../../../src/actions/sdk/write.js';
 import { GitService } from '../../../src/infrastructure/git-service.js';
 import { SdkWritePrompts } from '../../../src/prompts/sdk/write.js';
 import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
+import { FileName } from '../../../src/types/file/fileName.js';
+import { FilePath } from '../../../src/types/file/filePath.js';
 import { CommitId } from '../../../src/types/git/commit-id.js';
 import { SdkContext } from '../../../src/types/sdk-context.js';
 import { GENERATED_MARKER, YOURS_MARKER } from '../../../src/types/sdk/conflict-markers.js';
@@ -105,10 +107,7 @@ describe('SdkWriteAction', () => {
     it('initialises a repository in the SDK directory, says so, and records the snapshot', async () => {
       const repositoryInitialised = sinon.stub(SdkWritePrompts.prototype, 'repositoryInitialised');
 
-      const result = await execute(
-        { kind: 'record', repository: undefined, remote: undefined },
-        { 'README.md': '# sdk', 'a.py': 'x' }
-      );
+      const result = await execute({ kind: 'record', repository: undefined }, { 'README.md': '# sdk', 'a.py': 'x' });
 
       expect(result.isSuccess()).to.be.true;
       expect(repositoryInitialised.firstCall.args[0].isEqual(sdk())).to.be.true;
@@ -127,8 +126,7 @@ describe('SdkWriteAction', () => {
       const repository = (await sdkContext.repository())!;
       const repositoryInitialised = sinon.stub(SdkWritePrompts.prototype, 'repositoryInitialised');
 
-      expect((await execute({ kind: 'record', repository, remote: undefined }, { 'README.md': '# sdk' })).isSuccess())
-        .to.be.true;
+      expect((await execute({ kind: 'record', repository }, { 'README.md': '# sdk' })).isSuccess()).to.be.true;
 
       expect(repositoryInitialised.called).to.be.false;
       expect(fs.existsSync(at('.git'))).to.be.false;
@@ -143,11 +141,8 @@ describe('SdkWriteAction', () => {
         .resolves(err({ kind: 'gitFailed', reason: 'git broke' }));
       const snapshotNotRecorded = sinon.stub(SdkWritePrompts.prototype, 'snapshotNotRecorded');
 
-      expect(
-        (
-          await execute({ kind: 'record', repository: undefined, remote: undefined }, { 'README.md': '# sdk' })
-        ).isSuccess()
-      ).to.be.true;
+      expect((await execute({ kind: 'record', repository: undefined }, { 'README.md': '# sdk' })).isSuccess()).to.be
+        .true;
 
       expect(read('README.md')).to.equal('# sdk');
       expect(snapshotNotRecorded.firstCall.args[0]).to.equal('git broke');
@@ -161,7 +156,7 @@ describe('SdkWriteAction', () => {
       const sdkMerged = sinon.stub(SdkWritePrompts.prototype, 'sdkMerged');
 
       const result = await execute(
-        { kind: 'merge', repository, base, remote: undefined },
+        { kind: 'merge', repository, base },
         { 'README.md': '# sdk v2', 'models/book.py': MODEL_V2, 'models/author.py': 'class Author: ...' }
       );
 
@@ -194,7 +189,7 @@ describe('SdkWriteAction', () => {
       const conflicts = sinon.stub(SdkWritePrompts.prototype, 'conflicts');
 
       const result = await execute(
-        { kind: 'merge', repository, base, remote: undefined },
+        { kind: 'merge', repository, base },
         { 'README.md': '# sdk v2', 'models/book.py': MODEL_V2 }
       );
 
@@ -227,10 +222,7 @@ describe('SdkWriteAction', () => {
       const conflictsNotStaged = sinon.stub(SdkWritePrompts.prototype, 'conflictsNotStaged');
       const conflicts = sinon.stub(SdkWritePrompts.prototype, 'conflicts');
 
-      const result = await execute(
-        { kind: 'merge', repository, base, remote: undefined },
-        { 'models/book.py': MODEL_V2 }
-      );
+      const result = await execute({ kind: 'merge', repository, base }, { 'models/book.py': MODEL_V2 });
 
       expect(result.isFailed()).to.be.true;
       expect(result.getMessage()).to.equal('Resolve the conflicts and rerun');
@@ -247,9 +239,7 @@ describe('SdkWriteAction', () => {
         .resolves(err({ kind: 'gitFailed', reason: 'git broke' }));
       const customCodeFailed = sinon.stub(SdkWritePrompts.prototype, 'customCodeFailed');
 
-      expect(
-        (await execute({ kind: 'merge', repository, base, remote: undefined }, { 'README.md': '# sdk v2' })).isFailed()
-      ).to.be.true;
+      expect((await execute({ kind: 'merge', repository, base }, { 'README.md': '# sdk v2' })).isFailed()).to.be.true;
 
       expect(read('README.md')).to.equal('# edited');
       expect(record().pristineCommit().isEqual(base)).to.be.true;
@@ -257,63 +247,49 @@ describe('SdkWriteAction', () => {
     });
   });
 
-  describe('sharing the snapshot', () => {
+  describe('the hook that shares snapshots', () => {
     beforeEach(() => {
       sinon.stub(SdkWritePrompts.prototype, 'repositoryInitialised');
     });
 
-    it('pushes it to the remote the destination names, and says so', async () => {
-      const share = sinon.stub(SdkRepositoryContext.prototype, 'shareSnapshot').resolves(ok('pushed'));
-      const snapshotShared = sinon.stub(SdkWritePrompts.prototype, 'snapshotShared');
+    const recordOne = () => execute({ kind: 'record', repository: undefined }, { 'README.md': '# sdk' });
 
-      const result = await execute(
-        { kind: 'record', repository: undefined, remote: 'origin' },
-        { 'README.md': '# sdk' }
-      );
+    it('is installed after recording, without a word', async () => {
+      const file = new FilePath(new DirectoryPath(root), new FileName('pre-push'));
+      const install = sinon
+        .stub(SdkRepositoryContext.prototype, 'installShareHook')
+        .resolves(ok({ kind: 'installed', file }));
+      const shareHookNeedsOneStep = sinon.stub(SdkWritePrompts.prototype, 'shareHookNeedsOneStep');
+      const shareHookNotInstalled = sinon.stub(SdkWritePrompts.prototype, 'shareHookNotInstalled');
 
-      expect(result.isSuccess()).to.be.true;
-      expect(share.firstCall.args[0]).to.equal('origin');
-      expect(snapshotShared.firstCall.args).to.deep.equal(['origin']);
+      expect((await recordOne()).isSuccess()).to.be.true;
+
+      expect(install.calledOnce).to.be.true;
+      expect(shareHookNeedsOneStep.called).to.be.false;
+      expect(shareHookNotInstalled.called).to.be.false;
     });
 
-    it('says nothing when the remote already had it', async () => {
-      sinon.stub(SdkRepositoryContext.prototype, 'shareSnapshot').resolves(ok('upToDate'));
-      const snapshotShared = sinon.stub(SdkWritePrompts.prototype, 'snapshotShared');
+    it('shows the one step when git runs hooks from elsewhere, and still succeeds', async () => {
+      const file = new FilePath(new DirectoryPath(root), new FileName('pre-push'));
+      const script = new FilePath(new DirectoryPath(root), new FileName('apimatic-pre-push'));
+      const needed = { kind: 'elsewhere' as const, file, hooksPath: '.husky/_', script };
+      sinon.stub(SdkRepositoryContext.prototype, 'installShareHook').resolves(ok(needed));
+      const shareHookNeedsOneStep = sinon.stub(SdkWritePrompts.prototype, 'shareHookNeedsOneStep');
 
-      expect(
-        (
-          await execute({ kind: 'record', repository: undefined, remote: 'origin' }, { 'README.md': '# sdk' })
-        ).isSuccess()
-      ).to.be.true;
+      expect((await recordOne()).isSuccess()).to.be.true;
 
-      expect(snapshotShared.called).to.be.false;
+      expect(shareHookNeedsOneStep.firstCall.args[0]).to.equal(needed);
     });
 
-    it('warns, and still succeeds, when the push fails', async () => {
+    it('warns when the hook cannot be written, and still succeeds', async () => {
       sinon
-        .stub(SdkRepositoryContext.prototype, 'shareSnapshot')
-        .resolves(err({ kind: 'gitFailed', reason: 'no access' }));
-      const snapshotNotShared = sinon.stub(SdkWritePrompts.prototype, 'snapshotNotShared');
+        .stub(SdkRepositoryContext.prototype, 'installShareHook')
+        .resolves(err({ kind: 'hookNotWritten', reason: 'EACCES: permission denied' }));
+      const shareHookNotInstalled = sinon.stub(SdkWritePrompts.prototype, 'shareHookNotInstalled');
 
-      const result = await execute(
-        { kind: 'record', repository: undefined, remote: 'origin' },
-        { 'README.md': '# sdk' }
-      );
+      expect((await recordOne()).isSuccess()).to.be.true;
 
-      expect(result.isSuccess()).to.be.true;
-      expect(snapshotNotShared.firstCall.args).to.deep.equal(['origin', 'no access']);
-    });
-
-    it('leaves the remote alone when the destination names none', async () => {
-      const share = sinon.stub(SdkRepositoryContext.prototype, 'shareSnapshot');
-
-      expect(
-        (
-          await execute({ kind: 'record', repository: undefined, remote: undefined }, { 'README.md': '# sdk' })
-        ).isSuccess()
-      ).to.be.true;
-
-      expect(share.called).to.be.false;
+      expect(shareHookNotInstalled.firstCall.args[0]).to.equal('EACCES: permission denied');
     });
   });
 });

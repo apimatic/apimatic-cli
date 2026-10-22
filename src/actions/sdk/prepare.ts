@@ -40,10 +40,9 @@ export class SdkPrepareAction {
 
     const repository = await sdkContext.repository();
     if (repository === undefined) {
-      return ActionResult.success<SdkDestination>({ kind: 'record', repository, remote: undefined });
+      return ActionResult.success<SdkDestination>({ kind: 'record', repository });
     }
-    const remote = await repository.remote();
-    const state = await repository.inspect(generation, remote);
+    const state = await repository.inspect(generation, await repository.remote());
     if (state.isErr()) {
       if (state.error.kind === 'nestedSdkDirectory') {
         this.prompts.nestedSdkDirectory(sdkContext.directory(), state.error);
@@ -54,18 +53,18 @@ export class SdkPrepareAction {
     }
     switch (state.value.kind) {
       case 'noRecord':
-        return ActionResult.success<SdkDestination>({ kind: 'record', repository, remote });
+        return ActionResult.success<SdkDestination>({ kind: 'record', repository });
       case 'otherGeneration':
         this.prompts.recordNotForThisGeneration(state.value.recorded, generation, sdkContext.directory());
-        return ActionResult.success<SdkDestination>({ kind: 'record', repository, remote });
+        return ActionResult.success<SdkDestination>({ kind: 'record', repository });
       case 'snapshotMissing':
         this.prompts.snapshotMissing(state.value.fetch);
-        return ActionResult.success<SdkDestination>({ kind: 'record', repository, remote });
+        return ActionResult.success<SdkDestination>({ kind: 'record', repository });
       case 'unresolved':
         this.prompts.conflictsUnresolved(state.value.paths, repository.sdkDirectory());
         return ActionResult.failed();
       case 'ready':
-        return ActionResult.success<SdkDestination>({ kind: 'merge', repository, base: state.value.base, remote });
+        return ActionResult.success<SdkDestination>({ kind: 'merge', repository, base: state.value.base });
     }
   }
 }

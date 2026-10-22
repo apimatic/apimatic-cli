@@ -256,25 +256,12 @@ describe('GitService', () => {
       expect(await git.remoteOf(repo)).to.equal('fork');
     });
 
-    it('pushes a ref as a fast-forward, reports one already there, and never forces one that moved on', async () => {
-      const origin = await bare();
-      const a = await withRemote('a', origin);
-      const b = await withRemote('b', origin);
-      const first = await snapshot(a, 'one');
-
-      expect(await git.pushRef(a, 'origin', ref)).to.equal('pushed');
-      expect(await git.pushRef(a, 'origin', ref)).to.equal('upToDate');
-      await snapshot(b, 'two');
-      expect(await git.pushRef(b, 'origin', ref)).to.equal('rejected');
-      expect((await git.resolveRef(origin, ref))?.isEqual(first)).to.be.true;
-    });
-
     it('fetches a ref with its objects, and answers with nothing for a ref the remote lacks', async () => {
       const origin = await bare();
       const a = await withRemote('a', origin);
       const b = await withRemote('b', origin);
       const first = await snapshot(a, 'one');
-      await git.pushRef(a, 'origin', ref);
+      await execa('git', ['push', '-q', 'origin', ref.refspec()], { cwd: a.toString() });
 
       expect(await git.fetchRef(b, 'origin', SnapshotRef.pristine('elsewhere'))).to.be.undefined;
       const tip = await git.fetchRef(b, 'origin', ref);
@@ -283,24 +270,16 @@ describe('GitService', () => {
       expect(await git.hasCommit(b, first)).to.be.true;
     });
 
-    it('reports a push the remote refuses, in the remote’s own words', async () => {
-      const origin = await bare();
-      fs.writeFileSync(
-        path.join(origin.toString(), 'hooks', 'pre-receive'),
-        '#!/bin/sh\necho "snapshots are not accepted here"\nexit 1\n',
-        { mode: 0o755 }
-      );
-      const a = await withRemote('a', origin);
-      await snapshot(a, 'one');
+    it('names git’s own hooks directory, and whether core.hooksPath moved the hooks elsewhere', async () => {
+      const repo = await repository();
 
-      let message = '';
-      try {
-        await git.pushRef(a, 'origin', ref);
-      } catch (error) {
-        message = (error as Error).message;
-      }
+      expect((await git.hooksDirectory(repo)).toString()).to.equal(path.join(repo.toString(), '.git', 'hooks'));
+      expect(await git.hooksPathConfigured(repo)).to.be.undefined;
 
-      expect(message).to.contain('snapshots are not accepted here');
+      await execa('git', ['config', 'core.hooksPath', '.husky'], { cwd: repo.toString() });
+
+      expect(await git.hooksPathConfigured(repo)).to.equal('.husky');
+      expect((await git.hooksDirectory(repo)).toString()).to.equal(path.join(repo.toString(), '.git', 'hooks'));
     });
 
     it('tells an ancestor from a stranger', async () => {

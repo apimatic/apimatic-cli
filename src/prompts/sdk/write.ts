@@ -1,7 +1,9 @@
 import { log } from '@clack/prompts';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { RelativeFilePath } from '../../types/file/relativeFilePath.js';
+import { ShareHookInstall } from '../../types/sdk-repository-context.js';
 import { ConflictKind, GENERATOR_FILES, MergePlan, YOUR_FILES } from '../../types/sdk/merge-plan.js';
+import { SHARE_HOOK_CALL } from '../../types/sdk/share-hook.js';
 import { listedInProse } from '../../utils/string-utils.js';
 import { format as f } from '../format.js';
 import { noteWrapped } from '../prompt.js';
@@ -59,15 +61,25 @@ export class SdkWritePrompts {
     log.warn(message);
   }
 
-  public snapshotShared(remote: string) {
-    log.info(`Pushed the SDK's snapshot to ${f.var(remote)}.`);
+  public shareHookNeedsOneStep(needed: Extract<ShareHookInstall, { kind: 'elsewhere' | 'notShell' }>) {
+    const because =
+      needed.kind === 'elsewhere'
+        ? `git runs hooks from ${f.var(needed.hooksPath)}, so the hook the CLI keeps at ` +
+          `${f.relativePath(needed.script)} is not run on push.`
+        : `${f.relativePath(needed.file)} is not a shell script, so the CLI left it alone and the hook it keeps at ` +
+          `${f.relativePath(needed.script)} is not run on push.`;
+    const steps = [
+      `Add this line to ${f.relativePath(needed.file)}:\n   ${SHARE_HOOK_CALL}`,
+      ...(needed.kind === 'elsewhere' ? ['Commit it; every clone shares from then on.'] : [])
+    ];
+    noteWrapped(
+      [because, '', ...steps.map((step, index) => `${index + 1}. ${step}`)].join('\n'),
+      'Sharing SDK snapshots needs one step'
+    );
   }
 
-  public snapshotNotShared(remote: string, reason: string) {
-    const message =
-      `Could not push the SDK's snapshot to ${f.var(remote)}: ${reason}\n` +
-      `Clones will replace the SDK instead of merging.`;
-    log.warn(message);
+  public shareHookNotInstalled(reason: string) {
+    log.warn(`The pre-push hook that shares the SDK's snapshots could not be written: ${reason}`);
   }
 
   public sdkMerged(sdk: DirectoryPath, plan: MergePlan) {

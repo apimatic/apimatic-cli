@@ -14,9 +14,10 @@ import { TreeId } from './git/tree-id.js';
 import { hasConflictMarkers, relabelMarkers } from './sdk/conflict-markers.js';
 import { describeGeneration, GenerationRecord, SdkGeneration } from './sdk/generation-record.js';
 import { MergePlan } from './sdk/merge-plan.js';
+import { SHARE_HOOK_SCRIPT, SHARE_HOOK_SCRIPT_NAME, ShareHook } from './sdk/share-hook.js';
 import { SnapshotRef } from './sdk/snapshot-ref.js';
 
-export type SdkRepositoryProblem = { kind: 'gitFailed' | 'recordNotWritten'; reason: string };
+export type SdkRepositoryProblem = { kind: 'gitFailed' | 'recordNotWritten' | 'hookNotWritten'; reason: string };
 
 /**
  * Two SDK directories, one inside the other: refs are files, so only one of them can have
@@ -38,8 +39,15 @@ export type SdkRepositoryState =
   | { kind: 'unresolved'; paths: RelativeFilePath[] }
   | { kind: 'ready'; base: CommitId };
 
-/** What sharing a snapshot did at the remote. */
-export type SnapshotShare = 'pushed' | 'upToDate';
+/**
+ * The pre-push hook that shares snapshots runs the script, or the one line the developer has to
+ * add to `file` so that it does: because git runs hooks from `hooksPath`, or because the hook
+ * there is not a shell script the CLI can add to.
+ */
+export type ShareHookInstall =
+  | { kind: 'installed'; file: FilePath }
+  | { kind: 'elsewhere'; file: FilePath; hooksPath: string; script: FilePath }
+  | { kind: 'notShell'; file: FilePath; shebang: string; script: FilePath };
 
 /** The plan, the merged tree, and git's versions of every conflicted path, below the SDK directory. */
 export type MergeOutcome = { plan: MergePlan; merged: TreeId; stages: StageEntry[] };
@@ -132,28 +140,65 @@ export class SdkRepositoryContext {
   }
 
   /**
-   * Sends the pristine chain to `remote`. A chain that moved on there (another machine
-   * generated too) is joined into this one, so every snapshot stays reachable and the push is
-   * a fast-forward; nothing is ever forced.
+   * Puts the block that shares snapshots into the repository's `pre-push` hook, where git runs
+   * hooks from. The script itself always goes into git's own hooks directory, so that the one
+   * line a hook elsewhere needs is the same everywhere. Idempotent: files are rewritten only
+   * when their content differs, and a hook that already runs the script is left alone.
    */
-  public async shareSnapshot(remote: string): Promise<Result<SnapshotShare, SdkRepositoryProblem>> {
+  public async installShareHook(): Promise<Result<ShareHookInstall, SdkRepositoryProblem>> {
     try {
-      const first = await this.git.pushRef(this.rootDirectory, remote, this.pristineRef());
-      if (first !== 'rejected') {
-        return ok(first);
+      const hooks = await this.git.hooksDirectory(this.rootDirectory);
+      const script = new FilePath(hooks, new FileName(SHARE_HOOK_SCRIPT_NAME));
+      await this.writeExecutable(script, SHARE_HOOK_SCRIPT);
+      const hooksPath = await this.git.hooksPathConfigured(this.rootDirectory);
+      if (hooksPath !== undefined) {
+        const file = this.hookRunFrom(hooksPath);
+        return ok(
+          ShareHook.calls(await this.read(file))
+            ? { kind: 'installed', file }
+            : { kind: 'elsewhere', file, hooksPath, script }
+        );
       }
-      const absorbed = await this.fetchSnapshots(remote);
-      if (absorbed.isErr()) {
-        return err(absorbed.error);
+      const file = new FilePath(hooks, new FileName('pre-push'));
+      const existing = await this.read(file);
+      const hook = ShareHook.installInto(existing);
+      switch (hook.kind) {
+        case 'present':
+          return ok({ kind: 'installed', file });
+        case 'notShell':
+          return ok(
+            ShareHook.calls(existing)
+              ? { kind: 'installed', file }
+              : { kind: 'notShell', file, shebang: hook.shebang, script }
+          );
+        case 'installed':
+          await this.writeExecutable(file, hook.content);
+          return ok({ kind: 'installed', file });
       }
-      const second = await this.git.pushRef(this.rootDirectory, remote, this.pristineRef());
-      if (second === 'rejected') {
-        return err(gitFailed(`${remote} refused the snapshot twice; try again`));
-      }
-      return ok(second);
     } catch (error) {
-      return err(gitFailed(errorMessage(error)));
+      return err({ kind: 'hookNotWritten', reason: errorMessage(error) });
     }
+  }
+
+  // The script a hooks directory elsewhere runs: husky v9's `.husky/_` runs `.husky/pre-push`; any other
+  // `core.hooksPath` runs its own `pre-push`.
+  private hookRunFrom(hooksPath: string): FilePath {
+    const directory = this.rootDirectory.resolve(hooksPath);
+    const scripts = path.basename(directory.toString()) === '_' ? directory.join('..') : directory;
+    return new FilePath(scripts, new FileName('pre-push'));
+  }
+
+  private async read(file: FilePath): Promise<string | undefined> {
+    return (await this.fileService.fileExists(file)) ? fs.promises.readFile(file.toString(), 'utf8') : undefined;
+  }
+
+  private async writeExecutable(file: FilePath, content: string): Promise<void> {
+    if ((await this.read(file)) === content) {
+      return;
+    }
+    await fs.promises.mkdir(file.directory().toString(), { recursive: true });
+    await fs.promises.writeFile(file.toString(), content, 'utf8');
+    await fs.promises.chmod(file.toString(), 0o755);
   }
 
   /** A freshly generated SDK as a tree: every file, whatever its own `.gitignore` says. */

@@ -11,6 +11,7 @@ import { SdkContext } from '../../src/types/sdk-context.js';
 import { SdkRepositoryContext } from '../../src/types/sdk-repository-context.js';
 import { CodeGenerationVersion, Language, Stability } from '../../src/types/sdk/generate.js';
 import { GenerationRecord, SdkGeneration } from '../../src/types/sdk/generation-record.js';
+import { SHARE_HOOK_BLOCK, SHARE_HOOK_CALL, SHARE_HOOK_SCRIPT } from '../../src/types/sdk/share-hook.js';
 import { SnapshotRef } from '../../src/types/sdk/snapshot-ref.js';
 import { snapshotFiles } from '../helpers/snapshots.js';
 
@@ -379,24 +380,14 @@ describe('SdkRepositoryContext', () => {
       return (await contextFor(clone.join('sdk', 'typescript')).repository())!;
     };
 
-    it('pushes the chain, then finds it already there', async () => {
-      const { repository, origin } = await withOrigin();
-      const commit = (await record(repository, { 'README.md': '# v1' }))._unsafeUnwrap();
-
-      expect((await repository.shareSnapshot('origin'))._unsafeUnwrap()).to.equal('pushed');
-      expect((await repository.shareSnapshot('origin'))._unsafeUnwrap()).to.equal('upToDate');
-
-      expect((await git.resolveRef(origin, repository.pristineRef()))?.isEqual(commit)).to.be.true;
-    });
-
-    it('lets a clone merge against a snapshot it fetched, and says where from', async () => {
+    it('lets a clone merge against a snapshot it fetched', async () => {
       const { repository, origin } = await withOrigin();
       const base = await published(repository);
       const clone = await cloneOf(origin, 'clone');
       const before = (await clone.inspect(TYPESCRIPT, 'origin'))._unsafeUnwrap();
       expect(before).to.deep.include({ kind: 'snapshotMissing', fetch: { kind: 'absent', remote: 'origin' } });
 
-      (await repository.shareSnapshot('origin'))._unsafeUnwrap();
+      await sh(repository.root(), 'push', '-q', 'origin', repository.pristineRef().refspec());
       const after = (await clone.inspect(TYPESCRIPT, 'origin'))._unsafeUnwrap();
 
       expect(after.kind === 'ready' && after.base.isEqual(base)).to.be.true;
@@ -419,40 +410,216 @@ describe('SdkRepositoryContext', () => {
       expect(none.kind === 'snapshotMissing' && none.fetch).to.deep.equal({ kind: 'noRemote' });
     });
 
-    it('joins two chains that diverged, so both machines’ snapshots reach the remote', async () => {
+    it('joins its own chain with the remote’s while fetching a snapshot it lacks', async () => {
       const { repository: a, origin } = await withOrigin();
       const first = (await record(a, { 'README.md': '# a' }))._unsafeUnwrap();
-      (await a.shareSnapshot('origin'))._unsafeUnwrap();
+      await sh(a.root(), 'push', '-q', 'origin', a.pristineRef().refspec());
       const bRoot = new DirectoryPath(path.join(root, 'b'));
       fs.mkdirSync(bRoot.join('sdk', 'typescript').toString(), { recursive: true });
       await git.init(bRoot);
       await sh(bRoot, 'remote', 'add', 'origin', origin.toString());
       const b = (await contextFor(bRoot.join('sdk', 'typescript')).repository())!;
       const second = (await record(b, { 'README.md': '# b' }))._unsafeUnwrap();
+      await writeRecord(b, GenerationRecord.written(TYPESCRIPT, first, new Date(), '0.0.0'));
 
-      expect((await b.shareSnapshot('origin'))._unsafeUnwrap()).to.equal('pushed');
+      const state = (await b.inspect(TYPESCRIPT, 'origin'))._unsafeUnwrap();
 
-      const tip = (await git.resolveRef(origin, b.pristineRef()))!;
-      expect((await git.describe(origin, tip)).parents.map(String)).to.have.members([
+      expect(state.kind === 'ready' && state.base.isEqual(first)).to.be.true;
+      const tip = (await git.resolveRef(bRoot, b.pristineRef()))!;
+      expect((await git.describe(bRoot, tip)).parents.map(String)).to.have.members([
         second.toString(),
         first.toString()
       ]);
-      expect((await git.describe(origin, tip)).subject).to.equal('apimatic: pristine chains joined');
+    });
+  });
+
+  describe('the hook that shares snapshots', () => {
+    const sh = (cwd: DirectoryPath | string, ...args: string[]) =>
+      execa('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...args], { cwd: cwd.toString() });
+
+    const hookFile = (repository: SdkRepositoryContext, name = 'pre-push') =>
+      path.join(repository.root().toString(), '.git', 'hooks', name);
+
+    /** A project with a bare origin, one recorded snapshot, the hook installed, and `main` committed. */
+    const ready = async (name = 'project') => {
+      const origin = new DirectoryPath(path.join(root, `${name}-origin.git`));
+      await sh(root, 'init', '-q', '--bare', origin.toString());
+      const projectDirectory = new DirectoryPath(path.join(root, name));
+      fs.mkdirSync(projectDirectory.join('sdk', 'typescript').toString(), { recursive: true });
+      await git.init(projectDirectory);
+      await sh(projectDirectory, 'remote', 'add', 'origin', origin.toString());
+      const repository = (await contextFor(projectDirectory.join('sdk', 'typescript')).repository())!;
+      const commit = (await record(repository, { 'README.md': `# ${name}` }))._unsafeUnwrap();
+      (await repository.installShareHook())._unsafeUnwrap();
+      write(projectDirectory, 'README.md', `# ${name}`);
+      await sh(projectDirectory, 'add', '.');
+      await sh(projectDirectory, 'commit', '-qm', 'sdk');
+      return { repository, origin, commit };
+    };
+
+    it('writes the script and a hook that calls it into .git/hooks, once', async () => {
+      const repository = await project();
+
+      const first = (await repository.installShareHook())._unsafeUnwrap();
+      const second = (await repository.installShareHook())._unsafeUnwrap();
+
+      expect(first.kind === 'installed' && first.file.toString()).to.equal(hookFile(repository));
+      expect(second).to.deep.equal(first);
+      expect(fs.readFileSync(hookFile(repository, 'apimatic-pre-push'), 'utf8')).to.equal(SHARE_HOOK_SCRIPT);
+      const hook = fs.readFileSync(hookFile(repository), 'utf8');
+      expect(hook.split(SHARE_HOOK_BLOCK)).to.have.length(2);
+      if (process.platform !== 'win32') {
+        expect(fs.statSync(hookFile(repository)).mode & 0o111).to.not.equal(0);
+        expect(fs.statSync(hookFile(repository, 'apimatic-pre-push')).mode & 0o111).to.not.equal(0);
+      }
     });
 
-    it('reports a push the remote refuses, with its reason', async () => {
-      const { repository, origin } = await withOrigin();
+    it('names the one line to add where git runs hooks from elsewhere, husky’s layout included', async () => {
+      const repository = await project();
+      const script = hookFile(repository, 'apimatic-pre-push');
+      await sh(repository.root(), 'config', 'core.hooksPath', '.githooks');
+
+      const plain = (await repository.installShareHook())._unsafeUnwrap();
+
+      expect(plain.kind === 'elsewhere' && plain.hooksPath).to.equal('.githooks');
+      expect(plain.kind === 'elsewhere' && plain.file.toString()).to.equal(
+        path.join(repository.root().toString(), '.githooks', 'pre-push')
+      );
+      expect(plain.kind === 'elsewhere' && plain.script.toString()).to.equal(script);
+      expect(fs.existsSync(script)).to.be.true;
+      expect(fs.existsSync(hookFile(repository))).to.be.false;
+
+      await sh(repository.root(), 'config', 'core.hooksPath', '.husky/_');
+      const husky = (await repository.installShareHook())._unsafeUnwrap();
+
+      expect(husky.kind === 'elsewhere' && husky.file.toString()).to.equal(
+        path.join(repository.root().toString(), '.husky', 'pre-push')
+      );
+    });
+
+    it('is quiet once the hook elsewhere runs the script', async () => {
+      const repository = await project();
+      await sh(repository.root(), 'config', 'core.hooksPath', '.husky/_');
+      write(repository.root(), path.join('.husky', 'pre-push'), `npm test\n${SHARE_HOOK_CALL}\n`);
+
+      const result = (await repository.installShareHook())._unsafeUnwrap();
+
+      expect(result.kind).to.equal('installed');
+      expect(result.kind === 'installed' && result.file.toString()).to.equal(
+        path.join(repository.root().toString(), '.husky', 'pre-push')
+      );
+    });
+
+    it('leaves a hook in another language alone, naming it, unless it runs the script already', async () => {
+      const repository = await project();
+      fs.mkdirSync(path.dirname(hookFile(repository)), { recursive: true });
+      fs.writeFileSync(hookFile(repository), '#!/usr/bin/env node\nconsole.log("hi");\n');
+
+      const result = (await repository.installShareHook())._unsafeUnwrap();
+
+      expect(result.kind === 'notShell' && result.shebang).to.equal('#!/usr/bin/env node');
+      expect(fs.readFileSync(hookFile(repository), 'utf8')).to.not.contain(SHARE_HOOK_BLOCK);
+
+      fs.writeFileSync(
+        hookFile(repository),
+        '#!/usr/bin/env node\nrequire("child_process").execSync("sh .git/hooks/apimatic-pre-push");\n'
+      );
+      expect((await repository.installShareHook())._unsafeUnwrap().kind).to.equal('installed');
+    });
+
+    it('shares the chain when the developer pushes a branch, and is quiet about it', async () => {
+      const { repository, origin, commit } = await ready();
+
+      const pushed = await sh(repository.root(), 'push', '-q', 'origin', 'main');
+
+      expect(pushed.stderr).to.not.contain('apimatic');
+      expect((await git.resolveRef(origin, repository.pristineRef()))?.isEqual(commit)).to.be.true;
+    });
+
+    it('shares through husky’s hook too, once it has the line', async () => {
+      const { repository, origin, commit } = await ready();
+      fs.rmSync(hookFile(repository));
+      await sh(repository.root(), 'config', 'core.hooksPath', '.husky/_');
+      write(repository.root(), path.join('.husky', '_', 'pre-push'), '#!/bin/sh\n. "$(dirname "$0")/../pre-push"\n');
+      fs.chmodSync(path.join(repository.root().toString(), '.husky', '_', 'pre-push'), 0o755);
+      write(repository.root(), path.join('.husky', 'pre-push'), `set -e\n${SHARE_HOOK_CALL}\necho "husky ran" >&2\n`);
+
+      const pushed = await sh(repository.root(), 'push', '-q', 'origin', 'main');
+
+      expect(pushed.stderr).to.contain('husky ran');
+      expect(pushed.stderr).to.not.contain('apimatic');
+      expect((await git.resolveRef(origin, repository.pristineRef()))?.isEqual(commit)).to.be.true;
+    });
+
+    it('does not fail a push from a clone that never ran the CLI', async () => {
+      const { repository, origin } = await ready();
+      const clone = new DirectoryPath(path.join(root, 'clone'));
+      await sh(root, 'clone', '-q', '--no-local', origin.toString(), clone.toString());
+      await sh(clone, 'config', 'core.hooksPath', '.husky/_');
+      write(clone, path.join('.husky', '_', 'pre-push'), '#!/bin/sh\n. "$(dirname "$0")/../pre-push"\n');
+      fs.chmodSync(clone.join('.husky', '_', 'pre-push').toString(), 0o755);
+      write(clone, path.join('.husky', 'pre-push'), `set -e\n${SHARE_HOOK_CALL}\n`);
+      write(clone, 'more.txt', 'more');
+      await sh(clone, 'add', '.');
+      await sh(clone, 'commit', '-qm', 'more');
+
+      const pushed = await sh(clone, 'push', '-q', 'origin', 'HEAD:refs/heads/more');
+
+      expect(pushed.exitCode).to.equal(0);
+      expect(repository).to.not.be.undefined;
+    });
+
+    it('joins a chain another machine pushed meanwhile, at push time', async () => {
+      const a = await ready('a');
+      await sh(a.repository.root(), 'push', '-q', 'origin', 'main');
+      const bRoot = new DirectoryPath(path.join(root, 'b'));
+      fs.mkdirSync(bRoot.join('sdk', 'typescript').toString(), { recursive: true });
+      await git.init(bRoot);
+      await sh(bRoot, 'remote', 'add', 'origin', a.origin.toString());
+      const b = (await contextFor(bRoot.join('sdk', 'typescript')).repository())!;
+      const second = (await record(b, { 'README.md': '# b' }))._unsafeUnwrap();
+      (await b.installShareHook())._unsafeUnwrap();
+      write(bRoot, 'README.md', '# b');
+      await sh(bRoot, 'add', '.');
+      await sh(bRoot, 'commit', '-qm', 'b');
+
+      const pushed = await sh(bRoot, 'push', '-q', 'origin', 'HEAD:refs/heads/b');
+
+      expect(pushed.stderr).to.not.contain('apimatic');
+      const tip = (await git.resolveRef(a.origin, b.pristineRef()))!;
+      expect((await git.describe(a.origin, tip)).subject).to.equal('apimatic: pristine chains joined');
+      expect((await git.describe(a.origin, tip)).parents.map(String)).to.have.members([
+        second.toString(),
+        a.commit.toString()
+      ]);
+    });
+
+    it('warns in the server’s words when the remote refuses the ref, and the branch still lands', async () => {
+      const { repository, origin } = await ready();
       fs.writeFileSync(
         path.join(origin.toString(), 'hooks', 'pre-receive'),
-        '#!/bin/sh\necho "snapshots are not accepted here"\nexit 1\n',
+        '#!/bin/sh\nwhile read old new ref; do case "$ref" in refs/apimatic/*) echo "snapshots are not accepted here"; exit 1;; esac; done; exit 0\n',
         { mode: 0o755 }
       );
-      (await record(repository, { 'README.md': '# v1' }))._unsafeUnwrap();
 
-      const shared = await repository.shareSnapshot('origin');
+      const pushed = await sh(repository.root(), 'push', '-q', 'origin', 'main');
 
-      expect(shared._unsafeUnwrapErr().reason).to.contain('snapshots are not accepted here');
-      expect(shared._unsafeUnwrapErr().reason).to.not.contain('failed to push some refs');
+      expect(pushed.stderr).to.contain(
+        'apimatic: the SDK snapshots could not be pushed to origin: snapshots are not accepted here'
+      );
+      expect(await git.resolveRef(origin, repository.pristineRef())).to.be.undefined;
+      expect((await sh(origin, 'rev-parse', '--verify', 'refs/heads/main')).exitCode).to.equal(0);
+    });
+
+    it('runs ahead of a hook that was already there, which still runs', async () => {
+      const { repository, origin, commit } = await ready();
+      fs.writeFileSync(hookFile(repository), '#!/bin/sh\necho "existing hook ran" >&2\nexit 0\n');
+      (await repository.installShareHook())._unsafeUnwrap();
+
+      const pushed = await sh(repository.root(), 'push', '-q', 'origin', 'main');
+
+      expect(pushed.stderr.match(/existing hook ran/g)).to.have.length(1);
+      expect((await git.resolveRef(origin, repository.pristineRef()))?.isEqual(commit)).to.be.true;
     });
   });
 });

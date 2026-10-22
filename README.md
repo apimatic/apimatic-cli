@@ -34,10 +34,8 @@ files, new files are added, and files the generator stopped producing are remove
 
 This needs git 2.38 or newer. On the first run, if no git repository encloses the SDK directory, the CLI runs
 `git init` in it and says so. Each run records the SDK exactly as generated as a commit under a hidden ref,
-`refs/apimatic/pristine/<path>`, names that commit in `<sdk>/.apimatic/generation.json`, which is committed
-with the SDK, and pushes the ref to the remote your branch pushes to (or `origin`), saying so when it did. A push
-that fails, for lack of access, a credential or a network, is a warning, not a failed run; your customizations are
-still kept locally. No branch is created, and no commit is needed before regenerating.
+`refs/apimatic/pristine/<path>`, and names that commit in `<sdk>/.apimatic/generation.json`, which is committed
+with the SDK. No branch is created, and no commit is needed before regenerating.
 The SDK directory as it was before the last run is kept under `refs/apimatic/previous/<path>`; to undo a run:
 
 ```sh-session
@@ -49,12 +47,27 @@ When you and the generator changed the same lines, the file gets git-style confl
 shows them as both modified. Keep what is right, remove the markers, and rerun; until then the command refuses
 to run. Every other file is already updated.
 
-A clone or a CI job has the record but not the hidden ref, so the CLI fetches the ref from the remote before it
-merges. If the remote does not have it either, because the push from the generating machine failed, the CLI says
-so, then asks before replacing the SDK (or replaces it with `--force`) and records a fresh snapshot. Pushing the
-ref by hand, `git push <remote> refs/apimatic/pristine/<path>:refs/apimatic/pristine/<path>`, shares it after the
-fact. Two machines that regenerate independently are fine: their chains are
-joined on the next push, nothing is ever force-pushed.
+### Sharing with your team
+
+The snapshot reaches the remote when you push. The first recorded run writes a small script,
+`.git/hooks/apimatic-pre-push`, and a `pre-push` hook that calls it (added to one that is already there). From
+then on every `git push` also pushes `refs/apimatic/pristine/*` to the remote you are pushing to, quietly; when
+another machine pushed its own snapshots first the two chains are joined, and when the server refuses the ref
+the hook prints one line and your push still goes through. The CLI itself never pushes. A clone or a CI job has
+the record but not the ref, so the CLI fetches it from the remote before it merges; if it is not there either,
+the CLI says so and asks before replacing the SDK (or replaces it with `--force`), then records a fresh
+snapshot.
+
+When git runs hooks from somewhere else (`core.hooksPath`, as husky sets it) or the existing `pre-push` is not
+a shell script, the run shows the one step left: add this line to the hook that does run, and commit it, so
+every clone shares from then on. It does nothing on a machine where the CLI never ran, and never fails a push.
+
+```sh
+f="$(git rev-parse --git-common-dir)/hooks/apimatic-pre-push"; [ -f "$f" ] && sh "$f" "$@" || true
+```
+
+To stop sharing, delete the block between `# >>> apimatic snapshots` and `# <<< apimatic snapshots` from the
+hook, or that line.
 
 # Usage
 <!-- usage -->

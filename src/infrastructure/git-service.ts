@@ -1,5 +1,6 @@
 import { Buffer } from 'node:buffer';
 import fs from 'node:fs';
+import path from 'node:path';
 import { TextDecoder } from 'node:util';
 import { execa, ExecaError } from 'execa';
 import { RelativeFilePath } from '../types/file/relativeFilePath.js';
@@ -17,9 +18,6 @@ import { withDirPath } from './tmp-extensions.js';
 export type TreeEntry = { mode: string; type: 'blob' | 'tree' | 'commit'; oid: string; path: RelativeFilePath };
 
 export type CommitDescription = { parents: CommitId[]; authorName: string; subject: string };
-
-/** What a push did: sent the ref, found it already there, or was refused because the remote's ref moved on. */
-export type PushResult = 'pushed' | 'upToDate' | 'rejected';
 
 /** A remote that does not answer within this is reported, not waited for. */
 const REMOTE_TIMEOUT_MS = 30_000;
@@ -318,24 +316,15 @@ export class GitService {
     return CommitId.fromGit(stdout.trim());
   }
 
-  /** Sends `ref` to `remote` as a fast-forward; a ref that moved on at the remote is reported as rejected, never forced. */
-  public async pushRef(root: DirectoryPath, remote: string, ref: SnapshotRef): Promise<PushResult> {
-    const result = await this.runRemote(root, ['push', '--porcelain', remote, ref.refspec()]);
-    const status = result.stdout.split('\n').find((line) => line.includes(ref.refspec()));
-    if (status === undefined) {
-      throw new GitError(remoteSaid(result.stderr) || `exit code ${result.exitCode}`);
-    }
-    if (status.startsWith('=')) {
-      return 'upToDate';
-    }
-    if (status.startsWith('!')) {
-      if (/fetch first|non-fast-forward/.test(status)) {
-        return 'rejected';
-      }
-      const summary = status.split('	').pop()?.trim() ?? '';
-      throw new GitError(remoteSaid(result.stderr) || summary || `exit code ${result.exitCode}`);
-    }
-    return 'pushed';
+  /** Git's own hooks directory, `.git/hooks` (shared by every worktree), whatever `core.hooksPath` says. */
+  public async hooksDirectory(root: DirectoryPath): Promise<DirectoryPath> {
+    const { stdout } = await this.run(root, ['rev-parse', '--git-common-dir']);
+    return new DirectoryPath(path.resolve(root.toString(), stdout.trim(), 'hooks'));
+  }
+
+  /** `core.hooksPath` when the hooks live elsewhere than `.git/hooks`, as husky and its kin set it. */
+  public async hooksPathConfigured(root: DirectoryPath): Promise<string | undefined> {
+    return this.tryRun(root, ['config', '--get', 'core.hooksPath']);
   }
 
   public async isAncestor(root: DirectoryPath, ancestor: CommitId, descendant: CommitId): Promise<boolean> {
