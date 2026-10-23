@@ -18,23 +18,25 @@ export const SHARE_HOOK_CALL =
   `f="$(git rev-parse --git-common-dir)/hooks/${SHARE_HOOK_SCRIPT_NAME}"; ` + '[ -f "$f" ] && sh "$f" "$@" || true';
 
 /**
- * The script: pushes `refs/apimatic/pristine/*` to the remote being pushed to. It pushes first;
- * when the remote's chain moved on it fetches that chain into
- * `refs/apimatic/remotes/<remote>/pristine/*`, joins the two with a two-parent commit, and
+ * The script: pushes `refs/apimatic/pristine` and every ref below it to the remote being pushed
+ * to; an SDK at the repository root has the ref itself, so it is matched as a ref and not only as
+ * a directory. It pushes first; when the remote's chain moved on it fetches that chain into the
+ * same names below `refs/apimatic/remotes/<remote>/`, joins the two with a two-parent commit, and
  * pushes again. It never prompts, never fails the developer's push, and warns in one line.
  */
 export const SHARE_HOOK_SCRIPT = [
   DEFAULT_SHEBANG,
-  '# Shares the SDK snapshots (refs/apimatic/pristine/*) with the remote on every push, so a',
-  '# clone can merge its customizations. Written by the APIMatic CLI; the pre-push hook calls it.',
+  '# Shares the SDK snapshots (refs/apimatic/pristine and every ref below it) with the remote on',
+  '# every push, so a clone can merge its customizations. Written by the APIMatic CLI; the pre-push',
+  '# hook calls it.',
   'remote="$1"',
-  "refs=$(git for-each-ref --format='%(refname)' refs/apimatic/pristine/)",
+  "refs=$(git for-each-ref --format='%(refname)' refs/apimatic/pristine)",
   '[ -z "$refs" ] && exit 0',
   'specs=""',
   'for ref in $refs; do specs="$specs $ref:$ref"; done',
   'GIT_TERMINAL_PROMPT=0 git push --quiet --no-verify "$remote" $specs >/dev/null 2>&1 && exit 0',
   'GIT_TERMINAL_PROMPT=0 git fetch --quiet --no-tags "$remote" \\',
-  '  "+refs/apimatic/pristine/*:refs/apimatic/remotes/$remote/pristine/*" >/dev/null 2>&1 || true',
+  '  "+refs/apimatic/pristine*:refs/apimatic/remotes/$remote/pristine*" >/dev/null 2>&1 || true',
   'for ref in $refs; do',
   '  tracking="refs/apimatic/remotes/$remote/$(printf \'%s\' "$ref" | sed \'s|^refs/apimatic/||\')"',
   '  git rev-parse -q --verify "$tracking^{commit}" >/dev/null 2>&1 || continue',

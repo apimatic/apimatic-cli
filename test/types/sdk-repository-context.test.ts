@@ -517,15 +517,24 @@ describe('SdkRepositoryContext', () => {
     const hookFile = (repository: SdkRepositoryContext, name = 'pre-push') =>
       path.join(repository.root().toString(), '.git', 'hooks', name);
 
-    /** A project with a bare origin, one recorded snapshot, the hook installed, and `main` committed. */
-    const ready = async (name = 'project') => {
-      const origin = new DirectoryPath(path.join(root, `${name}-origin.git`));
-      await sh(root, 'init', '-q', '--bare', '--initial-branch=main', origin.toString());
+    /**
+     * A project with a bare origin, one recorded snapshot, the hook installed, and `main` committed.
+     * `sdk` is the SDK directory below the project, empty for the project's root; `origin` is one
+     * another project already pushes to.
+     */
+    const ready = async (
+      name = 'project',
+      { sdk = ['sdk', 'typescript'], origin: shared }: { sdk?: string[]; origin?: DirectoryPath } = {}
+    ) => {
+      const origin = shared ?? new DirectoryPath(path.join(root, `${name}-origin.git`));
+      if (shared === undefined) {
+        await sh(root, 'init', '-q', '--bare', '--initial-branch=main', origin.toString());
+      }
       const projectDirectory = new DirectoryPath(path.join(root, name));
-      fs.mkdirSync(projectDirectory.join('sdk', 'typescript').toString(), { recursive: true });
+      fs.mkdirSync(projectDirectory.join(...sdk).toString(), { recursive: true });
       await git.init(projectDirectory);
       await sh(projectDirectory, 'remote', 'add', 'origin', origin.toString());
-      const repository = (await contextFor(projectDirectory.join('sdk', 'typescript')).repository())!;
+      const repository = (await contextFor(projectDirectory.join(...sdk)).repository())!;
       const commit = (await record(repository, { 'README.md': `# ${name}` }))._unsafeUnwrap();
       (await repository.installShareHook())._unsafeUnwrap();
       write(projectDirectory, 'README.md', `# ${name}`);
@@ -613,6 +622,15 @@ describe('SdkRepositoryContext', () => {
       expect((await git.resolveRef(origin, repository.pristineRef()))?.isEqual(commit)).to.be.true;
     });
 
+    it('shares the chain of an SDK at the repository root, whose ref has no directory of its own', async () => {
+      const { repository, origin, commit } = await ready('typescript', { sdk: [] });
+
+      await sh(repository.root(), 'push', '-q', 'origin', 'main');
+
+      expect(repository.pristineRef().toString()).to.equal('refs/apimatic/pristine');
+      expect((await git.resolveRef(origin, repository.pristineRef()))?.isEqual(commit)).to.be.true;
+    });
+
     it('shares through husky’s hook too, once it has the line', async () => {
       const { repository, origin, commit } = await ready();
       fs.rmSync(hookFile(repository));
@@ -649,24 +667,29 @@ describe('SdkRepositoryContext', () => {
     it('joins a chain another machine pushed meanwhile, at push time', async () => {
       const a = await ready('a');
       await sh(a.repository.root(), 'push', '-q', 'origin', 'main');
-      const bRoot = new DirectoryPath(path.join(root, 'b'));
-      fs.mkdirSync(bRoot.join('sdk', 'typescript').toString(), { recursive: true });
-      await git.init(bRoot);
-      await sh(bRoot, 'remote', 'add', 'origin', a.origin.toString());
-      const b = (await contextFor(bRoot.join('sdk', 'typescript')).repository())!;
-      const second = (await record(b, { 'README.md': '# b' }))._unsafeUnwrap();
-      (await b.installShareHook())._unsafeUnwrap();
-      write(bRoot, 'README.md', '# b');
-      await sh(bRoot, 'add', '.');
-      await sh(bRoot, 'commit', '-qm', 'b');
+      const b = await ready('b', { origin: a.origin });
 
-      const pushed = await sh(bRoot, 'push', '-q', 'origin', 'HEAD:refs/heads/b');
+      const pushed = await sh(b.repository.root(), 'push', '-q', 'origin', 'HEAD:refs/heads/b');
 
       expect(pushed.stderr).to.not.contain('apimatic');
-      const tip = (await git.resolveRef(a.origin, b.pristineRef()))!;
+      const tip = (await git.resolveRef(a.origin, b.repository.pristineRef()))!;
       expect((await git.describe(a.origin, tip)).subject).to.equal('apimatic: pristine chains joined');
       expect((await git.describe(a.origin, tip)).parents.map(String)).to.have.members([
-        second.toString(),
+        b.commit.toString(),
+        a.commit.toString()
+      ]);
+    });
+
+    it('joins the chain of an SDK at the repository root too', async () => {
+      const a = await ready('a', { sdk: [] });
+      await sh(a.repository.root(), 'push', '-q', 'origin', 'main');
+      const b = await ready('b', { sdk: [], origin: a.origin });
+
+      await sh(b.repository.root(), 'push', '-q', 'origin', 'HEAD:refs/heads/b');
+
+      const tip = (await git.resolveRef(a.origin, b.repository.pristineRef()))!;
+      expect((await git.describe(a.origin, tip)).parents.map(String)).to.have.members([
+        b.commit.toString(),
         a.commit.toString()
       ]);
     });

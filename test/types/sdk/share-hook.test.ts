@@ -16,7 +16,8 @@ describe('ShareHook', () => {
 
   it('keeps the script apart from the hook, which only calls it through git', () => {
     expect(SHARE_HOOK_SCRIPT.startsWith('#!/bin/sh\n')).to.be.true;
-    expect(SHARE_HOOK_SCRIPT).to.contain('refs/apimatic/pristine/');
+    expect(SHARE_HOOK_SCRIPT).to.contain('refs/apimatic/pristine');
+    expect(SHARE_HOOK_SCRIPT).to.not.contain('pristine/');
     expect(SHARE_HOOK_SCRIPT).to.not.contain('\r');
     expect(SHARE_HOOK_CALL).to.contain(`git rev-parse --git-common-dir)/hooks/${SHARE_HOOK_SCRIPT_NAME}`);
     expect(SHARE_HOOK_CALL.endsWith('|| true')).to.be.true;

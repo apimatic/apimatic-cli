@@ -108,9 +108,11 @@ there (a clone that never ran the CLI) and never fails the push:
 `f="$(git rev-parse --git-common-dir)/hooks/apimatic-pre-push"; [ -f "$f" ] && sh "$f" "$@" || true`.
 That is what makes the other cases a one-step note rather than a warning with nothing to do.
 
-The script, for the remote git passes as `$1`: push every `refs/apimatic/pristine/*` with
-`--no-verify` (so the push inside the hook does not re-enter the hook) and `GIT_TERMINAL_PROMPT=0`;
-when that is rejected, fetch the remote's chains into `refs/apimatic/remotes/<remote>/pristine/*`,
+The script, for the remote git passes as `$1`: push `refs/apimatic/pristine` and every ref below
+it (an SDK at the repository root has the ref itself, so `refs/apimatic/pristine/*` alone would
+miss it) with `--no-verify` (so the push inside the hook does not re-enter the hook) and
+`GIT_TERMINAL_PROMPT=0`; when that is rejected, fetch the remote's chains with
+`+refs/apimatic/pristine*:refs/apimatic/remotes/<remote>/pristine*` (the `*` may match nothing),
 fast-forward or join each local chain with a two-parent commit (`apimatic: pristine chains
 joined`), and push again. A second failure prints one line in the server's words; the script
 always exits 0, and runs in its own `sh`, so a hook's `set -e` cannot be tripped by it. The
@@ -430,7 +432,7 @@ flowchart TB
     TU["utils/terminal-utils.ts · terminal.isInteractive"]
   end
   subgraph OUT["Outside the CLI (dashed)"]
-    HK[".git/hooks/apimatic-pre-push (sh) called from .git/hooks/pre-push or .husky/pre-push<br/>push refs/apimatic/pristine/* · on rejection fetch into refs/apimatic/remotes/‹remote›/pristine/*, join, push again"]
+    HK[".git/hooks/apimatic-pre-push (sh) called from .git/hooks/pre-push or .husky/pre-push<br/>push refs/apimatic/pristine and the refs below it · on rejection fetch into refs/apimatic/remotes/‹remote›/pristine…, join, push again"]
     RM[(remote<br/>refs/apimatic/pristine/‹path›)]
   end
   C --> G
