@@ -83,6 +83,11 @@ export class DirectoryPath {
     return this.contains(other) && !this.isEqual(other);
   }
 
+  /** On a Windows network share, named `\\server\share\…`; `\\?\` and `\\.\` start a local path. */
+  public isOnNetworkShare(): boolean {
+    return /^\\\\[^\\?.]/.test(this.directoryPath);
+  }
+
   public leafName() {
     return path.basename(this.directoryPath);
   }

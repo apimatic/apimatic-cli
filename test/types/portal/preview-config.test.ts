@@ -41,5 +41,13 @@ describe('PreviewConfig', () => {
       expect(preview.show(named('Pets'), false)).to.equal(true);
       expect(preview.show(named('Pets'), false)).to.equal(false);
     });
+
+    it('takes a refusal as fixed by a save that also wrote something, and not again after it', () => {
+      const preview = new PreviewConfig(named('Pets'), false);
+      preview.refuse();
+
+      expect(preview.show(named('Cats'), true)).to.equal(true);
+      expect(preview.show(named('Cats'), false)).to.equal(false);
+    });
   });
 });
