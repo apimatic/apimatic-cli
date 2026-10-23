@@ -16,7 +16,7 @@ import { apiBaseDir } from './shared';
  */
 export async function openApiSection(slug: string, file: string, codeSamplesFile: string | null) {
   const load = async () =>
-    placeCodeSamples(withoutInternalOperations(await bundleSpec(file)), await readCodeSamples(codeSamplesFile));
+    placeCodeSamples(withoutInternalOperations(await bundleSpec(file)), await readCodeSamples(codeSamplesFile, slug));
   const specName = path.basename(file);
   const baseDir = `${apiBaseDir}/${slug}`;
   const unsafe = new Set<string>();
