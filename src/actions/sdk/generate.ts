@@ -17,7 +17,8 @@ import { SdkContext } from '../../types/sdk-context.js';
 import { Regeneration, SdkRepositoryContext, SdkRepositoryProblem } from '../../types/sdk-repository-context.js';
 import { SdkGeneration } from '../../types/sdk/generation-record.js';
 import { replacesDirectory } from '../../types/sdk/sdk-destination.js';
-import { favouringGenerator, resolving, Settlement } from '../../types/sdk/settlement.js';
+import { ConflictSide } from '../../types/sdk/merge-plan.js';
+import { favouring, resolving, Settlement } from '../../types/sdk/settlement.js';
 import { terminal } from '../../utils/terminal-utils.js';
 
 export class GenerateAction {
@@ -85,8 +86,7 @@ export class GenerateAction {
         unresolvedChoice: this.prompts.unresolvedChoice,
         resolveLater: this.prompts.resolveLater,
         conflictsNotSettled: this.prompts.conflictsNotSettled,
-        resolvedForGenerator: this.prompts.resolvedForGenerator,
-        previousRestored: this.prompts.previousRestored
+        conflictsResolved: this.prompts.conflictsResolved
       });
       if (settled.isErr()) {
         return settled.error;
@@ -185,13 +185,13 @@ export class GenerateAction {
         regenerated.value,
         sdk,
         canAsk,
-        () => repository.regenerate(base, tempSdk.value, 'generated'),
+        (side) => repository.regenerate(base, tempSdk.value, side),
         this.prompts.conflictChoice
       );
       if (settled.isErr()) {
         const { error } = settled;
-        if (error === 'kept') {
-          this.prompts.sdkKept(sdk);
+        if (error === 'cancelled') {
+          this.prompts.runCancelled(sdk);
           return ActionResult.cancelled();
         }
         this.prompts.customCodeFailed(error.reason);
@@ -208,7 +208,7 @@ export class GenerateAction {
         shareHookNotInstalled: this.prompts.shareHookNotInstalled
       });
       return closeMerge(repository, settled.value, canAsk, {
-        resolvedForGenerator: this.prompts.resolvedForGenerator,
+        conflictsResolved: this.prompts.conflictsResolved,
         sdkMerged: this.prompts.sdkMerged,
         conflictsNotStaged: this.prompts.conflictsNotStaged,
         conflicts: this.prompts.conflicts,
@@ -221,10 +221,7 @@ export class GenerateAction {
 async function settleUnresolvedConflicts(
   repository: SdkRepositoryContext,
   paths: readonly RelativeFilePath[],
-  said: Pick<
-    SdkGeneratePrompts,
-    'unresolvedChoice' | 'resolveLater' | 'conflictsNotSettled' | 'resolvedForGenerator' | 'previousRestored'
-  >
+  said: Pick<SdkGeneratePrompts, 'unresolvedChoice' | 'resolveLater' | 'conflictsNotSettled' | 'conflictsResolved'>
 ): Promise<Result<void, ActionResult>> {
   const sdk = repository.sdkDirectory();
   const choice = await said.unresolvedChoice(paths, sdk);
@@ -232,17 +229,12 @@ async function settleUnresolvedConflicts(
     said.resolveLater();
     return err(ActionResult.failed());
   }
-  const settled =
-    choice === 'generated' ? await repository.resolveForGenerator(paths) : await repository.restorePrevious(paths);
+  const settled = await repository.settleUnresolved(choice, paths);
   if (settled.isErr()) {
     said.conflictsNotSettled(settled.error.reason);
     return err(ActionResult.failed());
   }
-  if (choice === 'generated') {
-    said.resolvedForGenerator(paths, sdk);
-  } else {
-    said.previousRestored(sdk);
-  }
+  said.conflictsResolved(choice, paths, sdk);
   return ok(undefined);
 }
 
@@ -250,21 +242,21 @@ async function settleConflicts(
   regeneration: Regeneration,
   sdk: DirectoryPath,
   canAsk: boolean,
-  again: () => Promise<Result<Regeneration, SdkRepositoryProblem>>,
+  again: (side: ConflictSide) => Promise<Result<Regeneration, SdkRepositoryProblem>>,
   ask: SdkGeneratePrompts['conflictChoice']
-): Promise<Result<Settlement, 'kept' | SdkRepositoryProblem>> {
+): Promise<Result<Settlement, 'cancelled' | SdkRepositoryProblem>> {
   const { plan } = regeneration.merge;
   if (!plan.hasConflicts()) {
     return ok(resolving(regeneration));
   }
   const choice = canAsk ? await ask(plan, sdk) : 'resolve';
-  if (choice === undefined || choice === 'keep') {
-    return err('kept');
+  if (choice === undefined || choice === 'cancel') {
+    return err('cancelled');
   }
   if (choice === 'resolve') {
     return ok(resolving(regeneration));
   }
-  return (await again()).map((favoured) => favouringGenerator(regeneration, favoured));
+  return (await again(choice)).map((favoured) => favouring(choice, regeneration, favoured));
 }
 
 async function recordSnapshot(
@@ -294,13 +286,13 @@ async function closeMerge(
   canAsk: boolean,
   said: Pick<
     SdkGeneratePrompts,
-    'resolvedForGenerator' | 'sdkMerged' | 'conflictsNotStaged' | 'conflicts' | 'conflictSteps'
+    'conflictsResolved' | 'sdkMerged' | 'conflictsNotStaged' | 'conflicts' | 'conflictSteps'
   >
 ): Promise<ActionResult> {
   const sdk = repository.sdkDirectory();
-  const { plan } = settlement;
-  if (settlement.settledForGenerator.length > 0) {
-    said.resolvedForGenerator(settlement.settledForGenerator, sdk);
+  const { plan, settled } = settlement;
+  if (settled !== undefined) {
+    said.conflictsResolved(settled.side, settled.paths, sdk);
   }
   said.sdkMerged(sdk, plan);
   if (!plan.hasConflicts()) {

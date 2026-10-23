@@ -13,6 +13,7 @@ import { describeApart, SdkGeneration } from '../../types/sdk/generation-record.
 import {
   ConflictChoice,
   ConflictKind,
+  ConflictSide,
   GENERATOR_FILES,
   MergePlan,
   UnresolvedChoice,
@@ -32,6 +33,11 @@ const CONFLICT_LABELS: Record<ConflictKind, string> = {
   noLongerGenerated: 'no longer generated; your edited file stays',
   binary: 'binary file changed by you and by the generator; yours stays',
   other: ''
+};
+
+const RESOLVED_HEADINGS: Record<ConflictSide, string> = {
+  generated: "Resolved using the generator's changes:",
+  yours: 'Resolved using your changes:'
 };
 
 /** The generator's own files are a count; the developer's are named. */
@@ -193,17 +199,17 @@ export class SdkGeneratePrompts {
         {
           value: 'resolve',
           label: `I'll finish resolving ${one ? 'it' : 'them'}`,
-          hint: `nothing is done now; rerun once ${one ? 'it is' : 'they are'} resolved and staged`
+          hint: `nothing is done now; resolve and stage ${one ? 'it' : 'them'}, then rerun`
         },
         {
           value: 'generated',
-          label: `Use the generator's changes in the file${one ? '' : 's'} still marked`,
-          hint: 'what you already resolved stays; any file without markers is kept as it is'
+          label: 'Resolve remaining conflicts using generator changes',
+          hint: "where markers remain, the generator's lines win; what you already resolved stays"
         },
         {
-          value: 'undo',
-          label: 'Undo the last generation',
-          hint: 'the SDK goes back to before it ran, then this run merges afresh'
+          value: 'yours',
+          label: 'Resolve remaining conflicts using my changes',
+          hint: 'where markers remain, your lines win; what you already resolved stays'
         }
       ]
     });
@@ -214,12 +220,8 @@ export class SdkGeneratePrompts {
     log.info('Nothing was done. Rerun once the files are resolved and staged.');
   }
 
-  public resolvedForGenerator(paths: readonly RelativeFilePath[], sdk: DirectoryPath) {
-    log.info(["Resolved for the generator's side:", ...listed(sdk, paths)].join('\n'));
-  }
-
-  public previousRestored(sdk: DirectoryPath) {
-    log.info(`Undid the last generation: ${f.relativePath(sdk)} is as it was before it ran.`);
+  public conflictsResolved(side: ConflictSide, paths: readonly RelativeFilePath[], sdk: DirectoryPath) {
+    log.info([RESOLVED_HEADINGS[side], ...listed(sdk, paths)].join('\n'));
   }
 
   public conflictsNotSettled(reason: string) {
@@ -303,20 +305,25 @@ export class SdkGeneratePrompts {
         {
           value: 'resolve',
           label: `I'll resolve ${one ? 'it' : 'them'} myself`,
-          hint: 'markers go into the file; rerun once they are gone'
+          hint: `markers go into the file${one ? '' : 's'}; resolve and stage ${one ? 'it' : 'them'}, then rerun`
         },
         {
           value: 'generated',
-          label: `Use the generator's changes where they conflict`,
-          hint: `your other edits ${one ? 'in this file stay' : 'in these files stay'}`
+          label: 'Resolve using generator changes',
+          hint: "where you both changed the same lines, the generator's lines win; your other edits stay"
         },
-        { value: 'keep', label: 'Keep the SDK as it is', hint: 'nothing is written' }
+        {
+          value: 'yours',
+          label: 'Resolve using my changes',
+          hint: "where you both changed the same lines, your lines win; the generator's other changes still apply"
+        },
+        { value: 'cancel', label: 'Cancel this run', hint: 'nothing is written; the SDK stays as it is' }
       ]
     });
     return isCancel(choice) ? undefined : choice;
   }
 
-  public sdkKept(sdk: DirectoryPath) {
+  public runCancelled(sdk: DirectoryPath) {
     log.info(`Nothing was written; ${f.relativePath(sdk)} is as it was.`);
   }
 
@@ -365,7 +372,7 @@ function steps(plan: MergePlan): string[] {
         ]
       : []),
     'Rerun the command; nothing needs committing first.',
-    ...(marked ? ['To undo this run instead, rerun and choose "Undo the last generation".'] : [])
+    'Or rerun and let the CLI resolve what is left, using either side.'
   ];
   return steps.map((step, index) => `${index + 1}. ${step}`);
 }

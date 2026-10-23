@@ -11,9 +11,10 @@ import { RelativeFilePath } from './file/relativeFilePath.js';
 import { CommitId } from './git/commit-id.js';
 import { StageEntry } from './git/merge-tree.js';
 import { TreeId } from './git/tree-id.js';
-import { relabelMarkers, resolveMarkersForGenerated } from './sdk/conflict-markers.js';
+import { relabelMarkers } from './sdk/conflict-markers.js';
 import { describeGeneration, GenerationRecord, SdkGeneration } from './sdk/generation-record.js';
-import { MergePlan } from './sdk/merge-plan.js';
+import { ConflictSide, MergePlan } from './sdk/merge-plan.js';
+import { settledContent } from './sdk/unresolved-file.js';
 import { SHARE_HOOK_SCRIPT, SHARE_HOOK_SCRIPT_NAME, ShareHook } from './sdk/share-hook.js';
 import { SnapshotRef } from './sdk/snapshot-ref.js';
 
@@ -54,6 +55,9 @@ export type MergeOutcome = { plan: MergePlan; merged: TreeId; stages: StageEntry
 
 /** A fresh generation merged over the directory as it is: the snapshot it will be recorded as, and the merge. */
 export type Regeneration = { generated: TreeId; merge: MergeOutcome };
+
+/** The merge's two commits are yours (`ours`) and the generator's (`theirs`). */
+const GIT_SIDES: Record<ConflictSide, 'ours' | 'theirs'> = { yours: 'ours', generated: 'theirs' };
 
 const RECORD_DIRECTORY = '.apimatic';
 const RECORD_FILE = 'generation.json';
@@ -204,41 +208,39 @@ export class SdkRepositoryContext {
     await fs.promises.chmod(file.toString(), 0o700);
   }
 
-  /** Puts the SDK directory back as it was before the last run, record included, and takes `unresolved` out of the unmerged state. */
-  public async restorePrevious(unresolved: readonly RelativeFilePath[]): Promise<Result<void, SdkRepositoryProblem>> {
-    try {
-      const previous = await this.git.resolveRef(this.rootDirectory, this.previousRef());
-      if (previous === undefined) {
-        return err(gitFailed('there is no earlier state of the SDK directory to go back to'));
-      }
-      const tree = await this.git.treeOfCommit(this.rootDirectory, previous);
-      await this.git.checkoutTree(this.rootDirectory, this.sdk, tree);
-      await this.git.unstage(
-        this.rootDirectory,
-        unresolved.map((path) => this.rootRelative(path))
-      );
-      return ok(undefined);
-    } catch (error) {
-      return err(gitFailed(errorMessage(error)));
-    }
-  }
-
   /**
-   * Settles the markers still in `paths` for the generator's side, keeping everything around
-   * them (including what was already resolved by hand) and every file without markers as it
-   * is, and takes the files out of the unmerged state in the index.
+   * Settles what is left of the conflicts in `paths` for `side`, from the two sides git kept in
+   * the index and the files as they are now (`settledContent`), and takes the files out of the
+   * unmerged state, so `git status` stops listing them as both modified.
    */
-  public async resolveForGenerator(paths: readonly RelativeFilePath[]): Promise<Result<void, SdkRepositoryProblem>> {
+  public async settleUnresolved(
+    side: ConflictSide,
+    paths: readonly RelativeFilePath[]
+  ): Promise<Result<void, SdkRepositoryProblem>> {
+    const root = this.rootDirectory;
     try {
+      const stages = await this.git.unmergedStages(root, this.sdkPathspec());
+      const blobs = await this.git.readBlobs(root, [...new Set(stages.map((entry) => entry.oid))]);
       for (const path of paths) {
+        const key = this.rootRelative(path).toString();
+        const stage = (number: StageEntry['stage']) => {
+          const entry = stages.find((candidate) => candidate.stage === number && candidate.path.toString() === key);
+          return entry === undefined ? undefined : blobs.get(entry.oid);
+        };
         const file = path.in(this.sdk);
-        if (await this.fileService.fileExists(file)) {
-          const content = await fs.promises.readFile(file.toString(), 'utf8');
-          await fs.promises.writeFile(file.toString(), resolveMarkersForGenerated(content), 'utf8');
+        const disk = (await this.fileService.fileExists(file))
+          ? new Uint8Array(await fs.promises.readFile(file.toString()))
+          : undefined;
+        const settled = settledContent(side, { disk, yours: stage(2), generated: stage(3) });
+        if (settled === undefined) {
+          await fs.promises.rm(file.toString(), { force: true });
+        } else if (settled !== disk) {
+          await fs.promises.mkdir(file.directory().toString(), { recursive: true });
+          await fs.promises.writeFile(file.toString(), settled);
         }
       }
       await this.git.unstage(
-        this.rootDirectory,
+        root,
         paths.map((path) => this.rootRelative(path))
       );
       return ok(undefined);
@@ -340,14 +342,14 @@ export class SdkRepositoryContext {
     base: CommitId,
     disk: TreeId,
     generated: TreeId,
-    favour?: 'generated'
+    favour?: ConflictSide
   ): Promise<Result<MergeOutcome, SdkRepositoryProblem>> {
     const root = this.rootDirectory;
     try {
       const baseTree = await this.git.treeOfCommit(root, base);
       const yours = await this.git.commitTree(root, disk, [base], 'apimatic: your changes');
       const theirs = await this.git.commitTree(root, generated, [base], 'apimatic: generated');
-      const merge = await this.git.mergeTree(root, yours, theirs, favour === 'generated' ? 'theirs' : undefined);
+      const merge = await this.git.mergeTree(root, yours, theirs, favour && GIT_SIDES[favour]);
       const yourChanges = (await this.git.diffTrees(root, baseTree, disk, true)).filter(
         (change) => !change.path.toString().startsWith(`${RECORD_DIRECTORY}/`)
       );
@@ -366,12 +368,12 @@ export class SdkRepositoryContext {
 
   /**
    * The generation in `generated` merged over the directory against `base`, in one step: both
-   * trees are snapshotted, then merged, favouring the generator's side where asked.
+   * trees are snapshotted, then merged, favouring one side where asked.
    */
   public async regenerate(
     base: CommitId,
     generated: DirectoryPath,
-    favour?: 'generated'
+    favour?: ConflictSide
   ): Promise<Result<Regeneration, SdkRepositoryProblem>> {
     const generatedTree = await this.snapshotGenerated(generated);
     if (generatedTree.isErr()) {
@@ -387,7 +389,11 @@ export class SdkRepositoryContext {
     }));
   }
 
-  /** Applies the plan once the directory as it is has been kept under the previous ref, so the run can be undone. */
+  /**
+   * Applies the plan once the directory as it is has been kept under the previous ref. The CLI
+   * offers no way back through it; it is there for a developer to restore by hand, for instance
+   * after a run that could not ask left markers.
+   */
   public async write(base: CommitId, plan: MergePlan): Promise<Result<void, SdkRepositoryProblem>> {
     const previous = await this.savePrevious(base);
     return previous.isErr() ? err(previous.error) : this.apply(plan);
@@ -483,8 +489,15 @@ export class SdkRepositoryContext {
   // never merges over a conflict the developer has not marked resolved the way git expects.
   private async unresolvedConflicts(): Promise<RelativeFilePath[]> {
     const prefix = this.sdkPath();
-    const unmerged = await this.git.unmergedPaths(this.rootDirectory, prefix === '' ? '.' : prefix);
-    return unmerged.flatMap((path) => path.inside(prefix) ?? []);
+    const stages = await this.git.unmergedStages(this.rootDirectory, this.sdkPathspec());
+    const paths = new Map(stages.map((entry) => [entry.path.toString(), entry.path]));
+    return [...paths.values()].flatMap((path) => path.inside(prefix) ?? []);
+  }
+
+  // The SDK directory as a pathspec from the repository root, which names the root itself `.`.
+  private sdkPathspec(): string {
+    const prefix = this.sdkPath();
+    return prefix === '' ? '.' : prefix;
   }
 
   private recordFile(): FilePath {

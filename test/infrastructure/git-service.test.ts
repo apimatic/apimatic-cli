@@ -204,6 +204,21 @@ describe('GitService', () => {
       expect((await filesOf(repo, merged.tree)).get('gone.txt')).to.equal('kept\n');
     });
 
+    it('settles each overlapping hunk for the side it favours, and merges the rest as usual', async () => {
+      const repo = await repository();
+      const base = await commit(repo, 'base', { 'a.txt': 'a\nb\nc\nd\ne\nf\ng\n' }, []);
+      const ours = await commit(repo, 'ours', { 'a.txt': 'A\nb\nc\nd\ne\nf\ng ours\n' }, [base]);
+      const theirs = await commit(repo, 'theirs', { 'a.txt': 'a\nb\nc\nD\ne\nf\ng theirs\n' }, [base]);
+
+      const forOurs = await git.mergeTree(repo, ours, theirs, 'ours');
+      const forTheirs = await git.mergeTree(repo, ours, theirs, 'theirs');
+
+      expect(forOurs.stages).to.deep.equal([]);
+      expect((await filesOf(repo, forOurs.tree)).get('a.txt')).to.equal('A\nb\nc\nD\ne\nf\ng ours\n');
+      expect(forTheirs.stages).to.deep.equal([]);
+      expect((await filesOf(repo, forTheirs.tree)).get('a.txt')).to.equal('A\nb\nc\nD\ne\nf\ng theirs\n');
+    });
+
     it('reads a clean merge as the merged tree and nothing else', async () => {
       const repo = await repository();
       const base = await commit(repo, 'base', { 'a.txt': 'a\n', 'b.txt': 'b\n' }, []);
@@ -219,8 +234,8 @@ describe('GitService', () => {
     });
   });
 
-  describe('unmergedPaths', () => {
-    it('names each unmerged path below the directory once, from the root, and none outside it', async () => {
+  describe('unmergedStages', () => {
+    it('lists the sides git kept for each unmerged path below the directory, from the root, and none outside it', async () => {
       const repo = await repository();
       const oid = (
         await execa('git', ['hash-object', '-w', '--stdin'], { cwd: repo.toString(), input: 'x' })
@@ -236,13 +251,18 @@ describe('GitService', () => {
         input: entries.join('\0') + '\0'
       });
 
-      expect((await git.unmergedPaths(repo, 'sdk/ts')).map(String)).to.deep.equal(['sdk/ts/a.ts', 'sdk/ts/b.ts']);
-      expect((await git.unmergedPaths(repo, '.')).map(String)).to.deep.equal([
-        'sdk/py/a.py',
-        'sdk/ts/a.ts',
-        'sdk/ts/b.ts'
+      const listed = async (directory: string) =>
+        (await git.unmergedStages(repo, directory)).map((entry) => `${entry.path}:${entry.stage}:${entry.oid === oid}`);
+
+      expect(await listed('sdk/ts')).to.deep.equal([
+        'sdk/ts/a.ts:1:true',
+        'sdk/ts/a.ts:3:true',
+        'sdk/ts/b.ts:1:true',
+        'sdk/ts/b.ts:2:true',
+        'sdk/ts/b.ts:3:true'
       ]);
-      expect(await git.unmergedPaths(repo, 'docs')).to.deep.equal([]);
+      expect(await listed('.')).to.include.members(['sdk/py/a.py:1:true', 'sdk/py/a.py:2:true']);
+      expect(await git.unmergedStages(repo, 'docs')).to.deep.equal([]);
     });
   });
 

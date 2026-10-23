@@ -30,13 +30,19 @@ export type ConflictKind =
 /** A file to write, as the blob the merged tree holds for it. */
 export type FileWrite = { path: RelativeFilePath; blob: string };
 
-/** What the developer chose when a regeneration conflicted, asked before anything is written. */
-export type ConflictChoice = 'resolve' | 'generated' | 'keep';
+/** Whose lines win where you and the generator changed the same ones. */
+export type ConflictSide = 'generated' | 'yours';
 
-/** What the developer chose when the last run's markers are still in the files, asked before generating. */
-export type UnresolvedChoice = 'resolve' | 'generated' | 'undo';
+/** What the developer chose when a regeneration conflicted, asked before anything is written. */
+export type ConflictChoice = 'resolve' | ConflictSide | 'cancel';
+
+/** What the developer chose when the last run's conflicts are still unresolved, asked before generating. */
+export type UnresolvedChoice = 'resolve' | ConflictSide;
 
 export type Conflict = { path: RelativeFilePath; kind: ConflictKind; message?: string };
+
+/** What each side holds for a conflicted path: the generator's blob, none where it no longer produces the file, and whether you deleted it. */
+export type ConflictSides = { generated: string | undefined; youDeleted: boolean };
 
 export type Rename = { from: RelativeFilePath; to: RelativeFilePath; by: 'generator' | 'you' };
 
@@ -50,7 +56,7 @@ export type MergeFiles = {
   merged: readonly RelativeFilePath[];
   /** Unedited files the generator stopped producing. */
   removed: readonly RelativeFilePath[];
-  /** Files you edited or added that the generator left alone. */
+  /** Files you edited or added that the generator left alone, and conflicted files settled for your side. */
   kept: readonly RelativeFilePath[];
   /** Files neither side changed. */
   unchanged: readonly RelativeFilePath[];
@@ -141,8 +147,8 @@ export class MergePlan {
   public readonly conflicts: readonly Conflict[];
   public readonly renames: readonly Rename[];
   public readonly files: MergeFiles;
-  /** For each conflicted path, the generator's blob, or none where the generator no longer produces the file. */
-  private readonly generatedSides: ReadonlyMap<string, string | undefined>;
+  /** For each conflicted path, what each side holds for it. */
+  private readonly sides: ReadonlyMap<string, ConflictSides>;
 
   constructor(
     writes: readonly FileWrite[],
@@ -150,14 +156,14 @@ export class MergePlan {
     conflicts: readonly Conflict[],
     renames: readonly Rename[],
     files: MergeFiles,
-    generatedSides: ReadonlyMap<string, string | undefined> = new Map()
+    sides: ReadonlyMap<string, ConflictSides> = new Map()
   ) {
     this.writes = writes;
     this.deletes = deletes;
     this.conflicts = conflicts;
     this.renames = renames;
     this.files = files;
-    this.generatedSides = generatedSides;
+    this.sides = sides;
   }
 
   /**
@@ -226,33 +232,43 @@ export class MergePlan {
         .map((change) => ({ from: change.from!, to: change.path, by: 'you' as const }))
     ];
 
-    const generatedSides = new Map(
-      conflicts.map((conflict) => [conflict.path.toString(), generated.get(conflict.path.toString())?.blob])
+    const sides = new Map(
+      conflicts.map((conflict): [string, ConflictSides] => {
+        const key = conflict.path.toString();
+        return [key, { generated: generated.get(key)?.blob, youDeleted: yours.get(key)?.status === 'D' }];
+      })
     );
-    return new MergePlan(writes, deletes, conflicts, renames, files, generatedSides);
+    return new MergePlan(writes, deletes, conflicts, renames, files, sides);
   }
 
   /**
-   * The same plan with every conflict settled the generator's way: its file written over yours,
-   * or removed where it no longer produces one. Every other path keeps what the merge decided.
+   * The same plan with every conflict settled whole for `side`. The generator's: its file
+   * written over yours, or removed where it no longer produces one. Yours: the file left as it
+   * is on disk, which is your side, deleted where you deleted it. Every other path keeps what
+   * the merge decided.
    */
-  public takingGenerated(): MergePlan {
+  public taking(side: ConflictSide): MergePlan {
     const conflicted = new Set(this.conflicts.map((conflict) => conflict.path.toString()));
     const writes = this.writes.filter((write) => !conflicted.has(write.path.toString()));
     const deletes = this.deletes.filter((path) => !conflicted.has(path.toString()));
     const updated = [...this.files.updated];
     const removed = [...this.files.removed];
+    const kept = [...this.files.kept];
     for (const { path } of this.conflicts) {
-      const blob = this.generatedSides.get(path.toString());
-      if (blob === undefined) {
+      const sides = this.sides.get(path.toString());
+      if (side === 'yours') {
+        if (!sides?.youDeleted) {
+          kept.push(path);
+        }
+      } else if (sides?.generated === undefined) {
         deletes.push(path);
         removed.push(path);
       } else {
-        writes.push({ path, blob });
+        writes.push({ path, blob: sides.generated });
         updated.push(path);
       }
     }
-    return new MergePlan(writes, deletes, [], this.renames, { ...this.files, updated, removed });
+    return new MergePlan(writes, deletes, [], this.renames, { ...this.files, updated, removed, kept });
   }
 
   public hasConflicts(): boolean {

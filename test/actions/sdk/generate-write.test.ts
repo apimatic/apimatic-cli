@@ -263,7 +263,7 @@ describe('GenerateAction (sdk) — writing the SDK', () => {
     it('settles the overlapping hunks for the generator on request, keeping your other edits in the same file', async () => {
       const { repository } = await conflicting();
       sinon.stub(SdkGeneratePrompts.prototype, 'conflictChoice').resolves('generated');
-      const resolvedForGenerator = sinon.stub(SdkGeneratePrompts.prototype, 'resolvedForGenerator');
+      const conflictsResolved = sinon.stub(SdkGeneratePrompts.prototype, 'conflictsResolved');
 
       const result = await execute(NEXT, false);
 
@@ -271,18 +271,34 @@ describe('GenerateAction (sdk) — writing the SDK', () => {
       expect(read('models/book.py')).to.equal(DECORATED + MODEL_V2);
       expect(read('README.md')).to.equal('# sdk v2');
       expect(read('notes.txt')).to.equal('mine');
-      expect(resolvedForGenerator.firstCall.args[0].map(String)).to.deep.equal(['models/book.py']);
+      expect(conflictsResolved.firstCall.args[0]).to.equal('generated');
+      expect(conflictsResolved.firstCall.args[1].map(String)).to.deep.equal(['models/book.py']);
       const previous = (await git.resolveRef(repository.root(), repository.previousRef()))!;
       expect((await snapshotFiles(repository.root(), previous)).get('models/book.py')).to.equal(
         DECORATED + MODEL_V1_EDITED
       );
     });
 
-    it('writes nothing at all when the developer keeps the SDK as it is, or backs out of the question', async () => {
-      for (const answer of ['keep', undefined] as const) {
+    it('settles the overlapping hunks for you on request, with the generator’s other changes in the same file', async () => {
+      await conflicting();
+      sinon.stub(SdkGeneratePrompts.prototype, 'conflictChoice').resolves('yours');
+      const conflictsResolved = sinon.stub(SdkGeneratePrompts.prototype, 'conflictsResolved');
+
+      const result = await execute(NEXT, false);
+
+      expect(result.isSuccess()).to.be.true;
+      expect(read('models/book.py')).to.equal(DECORATED + MODEL_V1_EDITED + '    isbn: str\n');
+      expect(read('README.md')).to.equal('# sdk v2');
+      expect(read('notes.txt')).to.equal('mine');
+      expect(conflictsResolved.firstCall.args[0]).to.equal('yours');
+      expect(conflictsResolved.firstCall.args[1].map(String)).to.deep.equal(['models/book.py']);
+    });
+
+    it('writes nothing at all when the developer cancels the run, or backs out of the question', async () => {
+      for (const answer of ['cancel', undefined] as const) {
         const { repository, base } = await conflicting();
         sinon.stub(SdkGeneratePrompts.prototype, 'conflictChoice').resolves(answer);
-        const sdkKept = sinon.stub(SdkGeneratePrompts.prototype, 'sdkKept');
+        const runCancelled = sinon.stub(SdkGeneratePrompts.prototype, 'runCancelled');
 
         const result = await execute(NEXT, false);
 
@@ -291,7 +307,7 @@ describe('GenerateAction (sdk) — writing the SDK', () => {
         expect(read('README.md')).to.equal('# sdk');
         expect(record().pristineCommit().isEqual(base)).to.be.true;
         expect(await git.resolveRef(repository.root(), repository.previousRef())).to.be.undefined;
-        expect(sdkKept.calledOnce).to.be.true;
+        expect(runCancelled.calledOnce).to.be.true;
         sinon.restore();
         fs.rmSync(root, { recursive: true, force: true });
         fresh();

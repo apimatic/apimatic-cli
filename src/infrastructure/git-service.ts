@@ -96,21 +96,6 @@ export class GitService {
     });
   }
 
-  /**
-   * Makes `directory` hold exactly `tree`: its files written, files it does not hold removed,
-   * `.git` and ignored files left alone. A temporary index stands in for the repository's own.
-   */
-  public async checkoutTree(root: DirectoryPath, directory: DirectoryPath, tree: TreeId): Promise<void> {
-    const gitDir = await this.gitDir(root);
-    await withDirPath(async (temporary) => {
-      const env = { GIT_INDEX_FILE: new FilePath(temporary, new FileName('index')).toString() };
-      const inWorkTree = (args: string[]) =>
-        this.run(directory, ['--git-dir', gitDir, '--work-tree', directory.toString(), ...args], env, temporary);
-      await inWorkTree(['add', '--all', '--', '.']);
-      await inWorkTree(['read-tree', '--reset', '-u', tree.toString()]);
-    });
-  }
-
   public async commitTree(
     root: DirectoryPath,
     tree: TreeId,
@@ -216,12 +201,12 @@ export class GitService {
    * tree's id, then one entry per stage of every conflicted path, then, after an empty entry, the
    * messages git would have shown during a merge, each as a count, that many paths, a type and the text.
    */
-  /** `favour: 'theirs'` settles every content conflict for `theirs`, hunk by hunk, as `git merge -X theirs` would. */
+  /** `favour` settles every content conflict for that side, hunk by hunk, as `git merge -X ours|theirs` would. */
   public async mergeTree(
     root: DirectoryPath,
     ours: CommitId,
     theirs: CommitId,
-    favour?: 'theirs'
+    favour?: 'ours' | 'theirs'
   ): Promise<MergeTreeOutput> {
     return withDirPath(async (temporary) => {
       const result = await this.run(
@@ -230,7 +215,7 @@ export class GitService {
           'merge-tree',
           '--write-tree',
           '-z',
-          ...(favour === 'theirs' ? ['--strategy-option=theirs'] : []),
+          ...(favour === undefined ? [] : [`--strategy-option=${favour}`]),
           ours.toString(),
           theirs.toString()
         ],
@@ -320,20 +305,25 @@ export class GitService {
   }
 
   /**
-   * The paths below `directory` (from the repository root, `.` for the root itself) that the
-   * index holds in the unmerged state, as git names them from the root: what a merge left
-   * for the developer and `git add` has not yet marked resolved.
+   * The index entries below `directory` (from the repository root, `.` for the root itself)
+   * that git holds in the unmerged state, paths as git names them from the root: what a merge
+   * left for the developer and `git add` has not yet marked resolved, one entry per side kept.
    */
-  public async unmergedPaths(root: DirectoryPath, directory: string): Promise<RelativeFilePath[]> {
+  public async unmergedStages(root: DirectoryPath, directory: string): Promise<StageEntry[]> {
     const { stdout } = await this.run(root, ['ls-files', '-u', '-z', '--', directory]);
-    const paths = new Map<string, RelativeFilePath>();
-    for (const entry of stdout.split('\0')) {
-      if (entry !== '') {
-        const filePath = entry.slice(entry.indexOf('\t') + 1);
-        paths.set(filePath, RelativeFilePath.fromGit(filePath));
-      }
-    }
-    return [...paths.values()];
+    return stdout
+      .split('\0')
+      .filter((entry) => entry !== '')
+      .map((entry) => {
+        const tab = entry.indexOf('\t');
+        const [mode, oid, stage] = entry.slice(0, tab).split(' ');
+        return {
+          mode,
+          oid,
+          stage: Number(stage) as StageEntry['stage'],
+          path: RelativeFilePath.fromGit(entry.slice(tab + 1))
+        };
+      });
   }
 
   /** The remote the current branch is set to push to, else `origin` when there is one, else none. */

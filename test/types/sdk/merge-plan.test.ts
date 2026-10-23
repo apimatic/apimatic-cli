@@ -148,8 +148,9 @@ describe('MergePlan.from', () => {
     expect(plan.writes).to.deep.equal([]);
   });
 
-  it('settles every conflict the generator’s way when asked to, leaving the rest of the plan alone', () => {
-    const plan = MergePlan.from(
+  /** One conflict of each kind, next to a clean change to `other.ts`. */
+  const conflicted = () =>
+    MergePlan.from(
       inputs({
         basePaths: ['same.ts', 'dropped.ts', 'deleted-by-you.ts', 'logo.png', 'other.ts'].map(rel),
         yours: [
@@ -207,7 +208,10 @@ describe('MergePlan.from', () => {
       })
     );
 
-    const settled = plan.takingGenerated();
+  it('settles every conflict the generator’s way when asked to, leaving the rest of the plan alone', () => {
+    const plan = conflicted();
+
+    const settled = plan.taking('generated');
 
     expect(settled.hasConflicts()).to.be.false;
     expect(settled.writes).to.have.deep.members([
@@ -227,6 +231,19 @@ describe('MergePlan.from', () => {
     ]);
     expect(settled.files.removed.map(String)).to.deep.equal(['dropped.ts']);
     expect(plan.hasConflicts()).to.be.true;
+  });
+
+  it('settles every conflict your way when asked to: each file left as it is on disk, which is your side', () => {
+    const plan = conflicted();
+
+    const settled = plan.taking('yours');
+
+    expect(settled.hasConflicts()).to.be.false;
+    expect(settled.writes).to.deep.equal([{ path: rel('other.ts'), blob: blob('og') }]);
+    expect(settled.deletes).to.deep.equal([]);
+    expect(settled.files.kept.map(String)).to.have.members(['same.ts', 'added.ts', 'logo.png', 'dropped.ts']);
+    expect(settled.files.updated.map(String)).to.deep.equal(['other.ts']);
+    expect(settled.files.removed).to.deep.equal([]);
   });
 
   it('tells the conflicts that leave markers in the file from those that leave it whole', () => {
