@@ -17,7 +17,7 @@ export interface CodeSample {
 /** Each endpoint's samples, keyed by path and then by upper-case method. */
 export type CodeSamplesByEndpoint = Record<string, Record<string, CodeSample[]>>;
 
-/** What the portal template reads: each spec's own samples by its slug, and the samples of the others in `paths`. */
+/** `code-samples.json`, which the template reads as `CodeSamplesFile`; a test holds the two to one shape. */
 export interface CodeSamplesFile {
   paths: CodeSamplesByEndpoint;
   specs: Record<string, CodeSamplesByEndpoint>;
@@ -87,8 +87,7 @@ export class CodeSampleCatalogs {
 
 /**
  * The samples of one run, placed on the specs the portal documents: those filed by spec on their
- * spec alone, and the others on every spec, but for an operation two specs declare, which one
- * sample per method and path cannot serve.
+ * spec alone, and the others on every spec but for the shared endpoints.
  */
 export class PlacedCodeSamples {
   private readonly shared: SharedEndpoint[];
