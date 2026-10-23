@@ -10,7 +10,6 @@ import { DirectoryPath } from './file/directoryPath.js';
 import { FilePath } from './file/filePath.js';
 import { FileName } from './file/fileName.js';
 import { FileProblem } from './file/file-problem.js';
-import { Language } from './sdk/generate.js';
 import { SdkGeneration } from './sdk/generation-record.js';
 import { destinationFor, SdkDestination, Unresolved } from './sdk/sdk-destination.js';
 import { NestedSdkDirectory, SdkRepositoryContext, SdkRepositoryProblem } from './sdk-repository-context.js';
@@ -37,13 +36,10 @@ export class SdkContext {
   private readonly fileService = new FileService();
   private readonly zipService = new ZipService();
   private readonly git = new GitService();
-  private readonly sdkDirectory: DirectoryPath;
 
-  constructor(language: Language, sdkDirectory: DirectoryPath, version?: string) {
-    this.sdkDirectory = version ? sdkDirectory.join(version).join(language) : sdkDirectory.join(language);
-  }
+  constructor(private readonly sdkDirectory: DirectoryPath) {}
 
-  /** The language directory the SDK is written into, and read back from on the next run. */
+  /** The directory the SDK is written into, and read back from on the next run. */
   public directory(): DirectoryPath {
     return this.sdkDirectory;
   }

@@ -33,15 +33,6 @@ export class SdkPublishInteractiveAction {
     }
     const project = ProjectContext.in(workingDirectory);
 
-    const sdkDirectory = await this.prompts.inputSdkDirectory(
-      project.sdkDirectory(),
-      SdkPublishInteractiveAction.sdkDirectoryValidator(project)
-    );
-    if (!sdkDirectory) {
-      await this.prompts.noSdkDirectoryProvided();
-      return ActionResult.cancelled();
-    }
-
     const publishingProfilesResponse = await this.prompts.getPublishingProfiles(
       this.publishingApiService.getPublishingProfiles(this.configDir, this.commandMetadata.shell)
     );
@@ -83,6 +74,15 @@ export class SdkPublishInteractiveAction {
     const language = await this.prompts.selectLanguage(publishingProfile, offered);
     if (!language) {
       this.prompts.noLanguageSelected();
+      return ActionResult.cancelled();
+    }
+
+    const sdkDirectory = await this.prompts.inputSdkDirectory(
+      project.sdkDirectory(language),
+      SdkPublishInteractiveAction.sdkDirectoryValidator(project)
+    );
+    if (!sdkDirectory) {
+      await this.prompts.noSdkDirectoryProvided();
       return ActionResult.cancelled();
     }
 
@@ -161,8 +161,8 @@ export class SdkPublishInteractiveAction {
   public static sdkDirectoryValidator(project: ProjectContext): (value: string | undefined) => string | undefined {
     return (value) => {
       if (!value) return;
-      if (project.isSourceDirectory(DirectoryPath.fromUserInput(value)))
-        return 'SDK directory must be different from the src directory.';
+      if (project.isSourceWithin(DirectoryPath.fromUserInput(value)))
+        return 'The SDK directory must not be or contain the src directory.';
     };
   }
 }

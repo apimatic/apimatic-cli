@@ -20,8 +20,12 @@ What changes for the developer:
   the merge. Without it `sdk generate` behaves exactly as before, writes no `.git` and no
   `.apimatic/`, and warns: "git was not found, so your customizations to the generated SDK
   will not persist across regenerations".
-- **First run**: as before, a spec and a language; the SDK lands in `<project>/sdk/<language>`.
+- **First run**: as before, a spec and a language; the SDK lands in `<project>/sdk/<language>`,
+  or in the `--destination` itself when one is named, with no language directory added below it.
   If no git repository encloses that directory, the CLI runs `git init` in it and says so.
+- **A clone**: `--destination` naming a clone of an SDK repository regenerates over the clone,
+  and merges when the clone holds a generation record. A destination holding the project's
+  `src` is refused, since the SDK directory is emptied before a write that does not merge.
 - **Regenerate in place**: the same command. Generator changes are merged into edited files,
   new files are added, files the generator stopped producing are removed when unedited.
 - **Conflicts are explicit**: overlapping changes get git-style markers, the run exits 1 and
@@ -33,8 +37,8 @@ What changes for the developer:
   snapshot is missing, gets the "overwrite?" question as before; the run then records a
   snapshot so the next one merges.
 
-Terms, also in `CONTEXT.md`: the **SDK directory** is the `<language>` directory the CLI
-writes into, input and output of every later run; the **repository** is the nearest git
+Terms, also in `CONTEXT.md`: the **SDK directory** is the directory the CLI writes into (the
+`--destination` as named, else `sdk/[<api-version>/]<language>`), input and output of every later run; the **repository** is the nearest git
 repository enclosing it; a **pristine snapshot** is one generation's output exactly as the
 server returned it, stored as a commit under a hidden ref; the **generation record** is
 `<sdk>/.apimatic/generation.json`, naming the snapshot the directory was last written from;
@@ -416,7 +420,7 @@ flowchart TB
     C["SdkGenerate.run()<br/>flags → GenerateAction.execute → outro(result)"]
   end
   subgraph ACT["Actions — src/actions/sdk/"]
-    G["GenerateAction.execute(project, sdkDir, language, stability, force, apiVersion?, packageSettings?) → ActionResult<br/>the only method; every prompt is called here<br/>validate · SdkContext.destination; unresolved → unresolvedChoice, settleUnresolved(side), conflictsResolved, destination again once<br/>gitUnavailable | recordNotForThisGeneration | snapshotMissing · overwriteSdk unless --force or !replacesDirectory<br/>withDirPath: zip → generateSdk → save → unzip<br/>overwrite → save, sdkGenerated · record → initRepository?, save, snapshotGenerated, recordGeneration, installShareHook, sdkGenerated<br/>merge → regenerate → resolving | conflictChoice: regenerate favouring a side → favouring(side) | cancel (runCancelled)<br/>write → recordGeneration, installShareHook → conflictsResolved?, sdkMerged; markers → stageConflicts, conflicts | conflictSteps"]
+    G["GenerateAction.execute(project, sdkDir?, language, stability, force, apiVersion?, packageSettings?) → ActionResult<br/>the only method; every prompt is called here<br/>validate · SdkContext.destination; unresolved → unresolvedChoice, settleUnresolved(side), conflictsResolved, destination again once<br/>gitUnavailable | recordNotForThisGeneration | snapshotMissing · overwriteSdk unless --force or !replacesDirectory<br/>withDirPath: zip → generateSdk → save → unzip<br/>overwrite → save, sdkGenerated · record → initRepository?, save, snapshotGenerated, recordGeneration, installShareHook, sdkGenerated<br/>merge → regenerate → resolving | conflictChoice: regenerate favouring a side → favouring(side) | cancel (runCancelled)<br/>write → recordGeneration, installShareHook → conflictsResolved?, sdkMerged; markers → stageConflicts, conflicts | conflictSteps"]
   end
   subgraph PR["Prompts — src/prompts/sdk/ (wording only)"]
     GP["SdkGeneratePrompts (wording only, no branching)<br/>gitUnavailable · overwriteSdk · recordNotForThisGeneration · snapshotMissing · nestedSdkDirectory<br/>conflictsUnresolved · unresolvedChoice · resolveLater · conflictsResolved · conflictsNotSettled<br/>sdkGenerated · repositoryInitialised · sdkMerged · conflictChoice · runCancelled<br/>conflicts · conflictSteps · conflictsNotStaged · snapshotNotRecorded · customCodeFailed<br/>shareHookNeedsOneStep · shareHookNotInstalled"]

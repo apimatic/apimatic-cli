@@ -39,7 +39,7 @@ describe('GenerateAction (sdk) — the destination', () => {
   const git = new GitService();
 
   const sdk = () => new DirectoryPath(path.join(project, 'sdk', 'python'));
-  const sdkContext = () => new SdkContext(Language.PYTHON, new DirectoryPath(path.join(project, 'sdk')));
+  const sdkContext = () => new SdkContext(sdk());
   const at = (relative: string) => path.join(sdk().toString(), relative);
   const read = (relative: string) => fs.readFileSync(at(relative), 'utf8');
   const write = (relative: string, contents: string) => writeFiles(sdk().toString(), { [relative]: contents });
@@ -55,7 +55,7 @@ describe('GenerateAction (sdk) — the destination', () => {
     await generates(options.files ?? GENERATED);
     return new GenerateAction(new DirectoryPath(project), COMMAND_METADATA, 'auth-key').execute(
       ProjectContext.in(new DirectoryPath(project)),
-      options.destination ?? new DirectoryPath(path.join(project, 'sdk')),
+      options.destination,
       Language.PYTHON,
       options.stability ?? Stability.STABLE,
       options.force ?? true
@@ -279,7 +279,7 @@ describe('GenerateAction (sdk) — the destination', () => {
     await recorded({ 'README.md': '# sdk' });
     const nestedSdkDirectory = sinon.stub(SdkGeneratePrompts.prototype, 'nestedSdkDirectory');
 
-    expect((await execute({ destination: sdk() })).isFailed()).to.be.true;
+    expect((await execute({ destination: sdk().join('python') })).isFailed()).to.be.true;
 
     expect(nestedSdkDirectory.firstCall.args[0].isEqual(sdk().join('python'))).to.be.true;
     expect(nestedSdkDirectory.firstCall.args[1].other.isEqual(sdk())).to.be.true;
@@ -368,6 +368,39 @@ describe('GenerateAction (sdk) — the destination', () => {
         expect((await execute()).isSuccess()).to.be.true;
 
         expect(await mergedAgainst((await sdkContext().repository())!, base)).to.be.true;
+      } finally {
+        fs.rmSync(clone, { recursive: true, force: true });
+        fs.rmSync(origin, { recursive: true, force: true });
+      }
+    });
+
+    it('merges over a clone of an SDK repository named as the destination, not into a language directory in it', async () => {
+      const origin = fs.mkdtempSync(path.join(os.tmpdir(), 'sdk-destination-origin-'));
+      const clone = canonical(fs.mkdtempSync(path.join(os.tmpdir(), 'sdk-destination-clone-')));
+      const published = path.join(root, 'published-sdk');
+      try {
+        writeFiles(published, GENERATED);
+        await git.init(new DirectoryPath(published));
+        const repository = (await new SdkContext(new DirectoryPath(published)).repository())!;
+        const tree = (await repository.snapshotGenerated(new DirectoryPath(published)))._unsafeUnwrap();
+        const base = (await repository.recordGeneration(tree, STABLE, '0.0.0'))._unsafeUnwrap().pristineCommit();
+        await sh(published, 'add', '.');
+        await sh(published, 'commit', '-qm', 'sdk');
+        await sh(published, 'init', '-q', '--bare', '--initial-branch=main', origin);
+        await sh(published, 'remote', 'add', 'origin', origin);
+        await sh(published, 'push', '-q', 'origin', 'main');
+        await sh(published, 'push', '-q', 'origin', repository.pristineRef().refspec());
+        await sh(published, 'clone', '-q', '--no-local', origin, clone);
+        writeFiles(clone, { 'README.md': '# edited' });
+
+        expect((await execute({ destination: new DirectoryPath(clone) })).isSuccess()).to.be.true;
+
+        expect(fs.readFileSync(path.join(clone, 'README.md'), 'utf8')).to.equal('# edited');
+        expect(fs.existsSync(path.join(clone, 'python'))).to.be.false;
+        const recorded = GenerationRecord.parse(
+          fs.readFileSync(path.join(clone, '.apimatic/generation.json'), 'utf8')
+        )!;
+        expect(recorded.pristineCommit().isEqual(base)).to.be.true;
       } finally {
         fs.rmSync(clone, { recursive: true, force: true });
         fs.rmSync(origin, { recursive: true, force: true });

@@ -36,7 +36,7 @@ export class GenerateAction {
 
   public readonly execute = async (
     project: ProjectContext,
-    sdkDirectory: DirectoryPath,
+    sdkDirectory: DirectoryPath | undefined,
     language: Language,
     stability: Stability,
     force: boolean,
@@ -48,8 +48,9 @@ export class GenerateAction {
       return ActionResult.failed();
     }
     const sourceDirectory = project.sourceDirectory();
-    if (project.isSourceDirectory(sdkDirectory)) {
-      this.prompts.sameSourceAndSdkDir(sourceDirectory);
+    // The SDK directory is emptied before the SDK is written, so one holding the source would delete it.
+    if (sdkDirectory !== undefined && project.isSourceWithin(sdkDirectory)) {
+      this.prompts.destinationContainsSource(sourceDirectory, sdkDirectory);
       return ActionResult.failed();
     }
     if (!(await project.sourceExists())) {

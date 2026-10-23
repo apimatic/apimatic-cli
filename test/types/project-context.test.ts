@@ -37,13 +37,15 @@ describe('ProjectContext', () => {
     });
 
     it('writes each output beside the source directory', () => {
-      expect(project().sdkDirectory().toString()).to.equal(inProject('sdk'));
+      expect(project().sdkDirectory(Language.PYTHON).toString()).to.equal(inProject('sdk', 'python'));
       expect(project().portalDirectory().toString()).to.equal(inProject('portal'));
       expect(project().pluginDirectory().toString()).to.equal(inProject('plugin'));
     });
 
     it('writes where the destination flag says instead, when it says anywhere', () => {
-      expect(project().sdkDirectory('elsewhere').toString()).to.equal(path.resolve('elsewhere'));
+      expect(project().sdk(Language.PYTHON, new DirectoryPath('elsewhere')).directory().toString()).to.equal(
+        path.resolve('elsewhere')
+      );
       expect(project().portalDirectory('').toString()).to.equal(inProject('portal'));
     });
 
@@ -244,9 +246,8 @@ describe('ProjectContext', () => {
       fs.mkdirSync(empty.toString());
 
       const version = (await project().versionToBuild(undefined, ask()))._unsafeUnwrap();
-      const saved = await version.sdk(Language.TYPESCRIPT, version.sdkDirectory()).save(empty);
+      const saved = await version.sdk(Language.TYPESCRIPT).save(empty);
 
-      expect(version.sdkDirectory().toString()).to.equal(inProject('sdk'));
       expect(saved.toString()).to.equal(inProject('sdk', 'v1', 'typescript'));
     });
 
@@ -254,9 +255,19 @@ describe('ProjectContext', () => {
       const empty = new DirectoryPath(inProject('empty'));
       fs.mkdirSync(empty.toString());
 
-      const saved = await project().sdk(Language.PYTHON, project().sdkDirectory()).save(empty);
+      const saved = await project().sdk(Language.PYTHON).save(empty);
 
       expect(saved.toString()).to.equal(inProject('sdk', 'python'));
+    });
+
+    it('writes into a named destination itself, adding neither the version nor the language', async () => {
+      versionedBuild();
+      fs.mkdirSync(inProject('src', 'versioned_docs', 'v1'), { recursive: true });
+      const clone = new DirectoryPath(inProject('my-sdk'));
+
+      const version = (await project().versionToBuild(undefined, ask()))._unsafeUnwrap();
+
+      expect(version.sdk(Language.TYPESCRIPT, clone).directory().isEqual(clone)).to.be.true;
     });
   });
 

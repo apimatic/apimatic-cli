@@ -26,27 +26,25 @@ const COMMAND_METADATA: CommandMetadata = { commandName: 'sdk generate', shell: 
 
 describe('GenerateAction (sdk)', () => {
   let root: string;
-  let sdkDirectory: DirectoryPath;
   let sdkArchive: Buffer;
   let generateSdk: sinon.SinonStub;
 
-  const execute = (options: { force?: boolean } = {}) =>
+  const execute = (options: { force?: boolean; destination?: DirectoryPath } = {}) =>
     new GenerateAction(new DirectoryPath(root), COMMAND_METADATA, 'auth-key').execute(
       ProjectContext.in(new DirectoryPath(root)),
-      sdkDirectory,
+      options.destination,
       Language.PYTHON,
       Stability.STABLE,
       options.force ?? true
     );
 
-  const sdk = () => sdkDirectory.join('python');
+  const sdk = () => new DirectoryPath(path.join(root, 'sdk', 'python'));
   const at = (relative: string) => path.join(sdk().toString(), relative);
 
   beforeEach(async () => {
     root = fs.mkdtempSync(path.join(os.tmpdir(), 'sdk-generate-'));
     fs.mkdirSync(path.join(root, 'src', 'spec'), { recursive: true });
     fs.writeFileSync(path.join(root, 'src', 'spec', 'openapi.json'), '{}');
-    sdkDirectory = new DirectoryPath(path.join(root, 'sdk'));
 
     const generated = path.join(root, 'generated');
     fs.mkdirSync(generated);
@@ -117,4 +115,29 @@ describe('GenerateAction (sdk)', () => {
 
     expect(fs.readdirSync(sdk().toString())).to.deep.equal(['README.md']);
   });
+
+  it('writes into the destination itself, with no language directory below it', async () => {
+    sinon.stub(SdkGeneratePrompts.prototype, 'repositoryInitialised');
+    const destination = new DirectoryPath(path.join(root, 'my-python-sdk'));
+
+    expect((await execute({ destination })).isSuccess()).to.be.true;
+
+    expect(fs.readFileSync(path.join(destination.toString(), 'README.md'), 'utf-8')).to.equal('# sdk');
+    expect(fs.existsSync(path.join(destination.toString(), 'python'))).to.be.false;
+  });
+
+  for (const [named, destination] of [
+    ['the project', () => new DirectoryPath(root)],
+    ['the source directory', () => new DirectoryPath(path.join(root, 'src'))]
+  ] as const) {
+    it(`refuses ${named} as the destination, since writing the SDK would delete the source`, async () => {
+      const destinationContainsSource = sinon.stub(SdkGeneratePrompts.prototype, 'destinationContainsSource');
+
+      expect((await execute({ destination: destination() })).isFailed()).to.be.true;
+
+      expect(destinationContainsSource.calledOnce).to.be.true;
+      expect(generateSdk.called).to.be.false;
+      expect(fs.existsSync(path.join(root, 'src', 'spec', 'openapi.json'))).to.be.true;
+    });
+  }
 });

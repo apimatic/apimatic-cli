@@ -47,8 +47,7 @@ describe('SdkRepositoryContext', () => {
     return repository.recordPristine(tree, TYPESCRIPT);
   };
 
-  /** The context for an SDK directory whose language directory is `sdk`'s last segment, below `parent`. */
-  const contextFor = (sdk: DirectoryPath) => new SdkContext(path.basename(sdk.toString()) as Language, sdk.join('..'));
+  const contextFor = (sdk: DirectoryPath) => new SdkContext(sdk);
 
   const project = async (sdk = path.join('sdk', 'typescript')): Promise<SdkRepositoryContext> => {
     const projectDirectory = new DirectoryPath(path.join(root, 'project'));

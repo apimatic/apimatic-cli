@@ -55,7 +55,7 @@ describe('GenerateAction (sdk) — writing the SDK', () => {
   const git = new GitService();
 
   const sdk = () => new DirectoryPath(path.join(root, 'sdk', 'python'));
-  const sdkContext = () => new SdkContext(Language.PYTHON, new DirectoryPath(path.join(root, 'sdk')));
+  const sdkContext = () => new SdkContext(sdk());
   const at = (relative: string) => path.join(sdk().toString(), relative);
   const read = (relative: string) => fs.readFileSync(at(relative), 'utf-8');
   const record = () => GenerationRecord.parse(read('.apimatic/generation.json'))!;
@@ -64,7 +64,7 @@ describe('GenerateAction (sdk) — writing the SDK', () => {
     await generates(files);
     return new GenerateAction(new DirectoryPath(root), COMMAND_METADATA, 'auth-key').execute(
       ProjectContext.in(new DirectoryPath(root)),
-      new DirectoryPath(path.join(root, 'sdk')),
+      undefined,
       Language.PYTHON,
       Stability.STABLE,
       force

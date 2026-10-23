@@ -68,9 +68,11 @@ export class SdkGeneratePrompts {
     );
   }
 
-  public sameSourceAndSdkDir(directory: DirectoryPath) {
+  public destinationContainsSource(sourceDirectory: DirectoryPath, sdkDirectory: DirectoryPath) {
     const message =
-      `The ${f.var('src')} and ${f.var('sdk')} directories must be different. ` + `Current value: ${f.path(directory)}`;
+      `The destination ${f.path(sdkDirectory)} contains your source directory ` +
+      `${f.path(sourceDirectory)}, and everything in the destination is replaced by the ` +
+      `generated SDK. Choose a destination outside it, such as ${f.flag('destination', './sdk')}.`;
     log.error(message);
   }
 

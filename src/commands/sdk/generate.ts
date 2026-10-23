@@ -40,7 +40,7 @@ With git ${GitVersion.required()} or newer installed, your edits to the generate
     destination: Flags.string({
       char: 'd',
       description:
-        '[default: <input>/sdk/<language> | <input>/sdk/<api-version>/<language>] path where the SDK will be generated'
+        '[default: <input>/sdk/<language> | <input>/sdk/<api-version>/<language>] directory the SDK is generated into'
     }),
     'api-version': Flags.string({
       description: 'Version of the API to use for SDK generation (if multiple versions exist)'
@@ -62,7 +62,7 @@ With git ${GitVersion.required()} or newer installed, your edits to the generate
   static examples = [
     `${SdkGenerate.cmdTxt} ${format.flag('language', 'typescript')}`,
     `${SdkGenerate.cmdTxt} ${format.flag('language', 'csharp')} ${format.flag('input', './')}`,
-    `${SdkGenerate.cmdTxt} ${format.flag('language', 'python')} ${format.flag('destination', './sdk')}`
+    `${SdkGenerate.cmdTxt} ${format.flag('language', 'python')} ${format.flag('destination', './my-python-sdk')}`
   ];
 
   async run() {
@@ -81,7 +81,7 @@ With git ${GitVersion.required()} or newer installed, your edits to the generate
     const action = new GenerateAction(this.getConfigDir(), commandMetadata, authKey);
     const result = await action.execute(
       project,
-      project.sdkDirectory(destination),
+      destination ? new DirectoryPath(destination) : undefined,
       language as Language,
       StabilityChoice.for(language as Language, stability).stabilityLevel(),
       force,

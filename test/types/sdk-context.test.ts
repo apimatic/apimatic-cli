@@ -6,7 +6,6 @@ import { DirectoryPath } from '../../src/types/file/directoryPath.js';
 import { FileName } from '../../src/types/file/fileName.js';
 import { FilePath } from '../../src/types/file/filePath.js';
 import { SdkContext } from '../../src/types/sdk-context.js';
-import { Language } from '../../src/types/sdk/generate.js';
 
 describe('SdkContext', () => {
   let root: string;
@@ -16,13 +15,13 @@ describe('SdkContext', () => {
 
   beforeEach(() => {
     root = fs.mkdtempSync(path.join(os.tmpdir(), 'sdk-context-'));
-    context = new SdkContext(Language.PYTHON, new DirectoryPath(inRoot('sdk')));
+    context = new SdkContext(new DirectoryPath(inRoot('sdk', 'python')));
   });
 
   afterEach(() => fs.rmSync(root, { recursive: true, force: true }));
 
   describe('save', () => {
-    it('replaces what the language directory holds, except its .git', async () => {
+    it('replaces what the SDK directory holds, except its .git', async () => {
       fs.mkdirSync(inRoot('generated'));
       fs.writeFileSync(inRoot('generated', 'README.md'), '# sdk');
       fs.mkdirSync(inRoot('sdk', 'python', '.git'), { recursive: true });

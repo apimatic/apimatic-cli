@@ -37,7 +37,7 @@ describe('SdkPublishAction', () => {
   const execute = () =>
     new SdkPublishAction(new DirectoryPath(root), COMMAND_METADATA).execute(
       ProjectContext.in(new DirectoryPath(root)),
-      new DirectoryPath(path.join(root, 'sdk')),
+      new DirectoryPath(path.join(root, 'sdk', 'python')),
       Language.PYTHON,
       [PublishType.PackagePublishing],
       true,
@@ -83,5 +83,20 @@ describe('SdkPublishAction', () => {
     expect(publishSdkPackage.called).to.be.false;
     expect(sdkNotZipped.firstCall.args[1]).to.equal(problem);
     expect(onPublishSdkError.called).to.be.false;
+  });
+
+  it('zips the directory it generated the SDK into, for a versioned build too', async () => {
+    fs.writeFileSync(path.join(root, 'src', 'APIMATIC-BUILD.json'), JSON.stringify({ generateVersionedPortal: {} }));
+    fs.mkdirSync(path.join(root, 'src', 'versioned_docs', 'v1', 'spec'), { recursive: true });
+    fs.writeFileSync(path.join(root, 'src', 'versioned_docs', 'v1', 'spec', 'openapi.json'), '{}');
+    const zip = sinon.stub(TempContext.prototype, 'zip').callThrough();
+    zip.onSecondCall().resolves(err({ kind: 'zipFailed', reason: 'stopped here' }));
+    const sdkNotZipped = sinon.stub(SdkPublishPrompts.prototype, 'sdkNotZipped');
+
+    expect((await execute()).isFailed()).to.be.true;
+
+    const zipped = sdkNotZipped.firstCall.args[0].toString();
+    expect(zipped).to.equal(path.join(root, 'sdk', 'python'));
+    expect(fs.readFileSync(path.join(zipped, 'README.md'), 'utf-8')).to.equal('# sdk');
   });
 });
