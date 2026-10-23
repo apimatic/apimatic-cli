@@ -2,6 +2,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { expect } from 'chai';
+import { canonical } from '../../../src/infrastructure/tmp-extensions.js';
 import { execa } from 'execa';
 import { err } from 'neverthrow';
 import sinon from 'sinon';
@@ -75,7 +76,7 @@ describe('GenerateAction (sdk) — the destination', () => {
   };
 
   beforeEach(() => {
-    root = fs.mkdtempSync(path.join(os.tmpdir(), 'sdk-destination-'));
+    root = canonical(fs.mkdtempSync(path.join(os.tmpdir(), 'sdk-destination-')));
     project = root;
     ({ generates, generateSdk } = stubSdkGeneration(root));
     sinon.stub(SdkGeneratePrompts.prototype, 'sdkGenerated');
@@ -153,7 +154,7 @@ describe('GenerateAction (sdk) — the destination', () => {
       const base = (await repository.readRecord())!.pristineCommit();
       await sh(root, 'add', '.');
       await sh(root, 'commit', '-qm', 'sdk');
-      await sh(root, 'init', '-q', '--bare', remote);
+      await sh(root, 'init', '-q', '--bare', '--initial-branch=main', remote);
       await sh(root, 'remote', 'add', 'origin', remote);
       await sh(root, 'push', '-q', 'origin', 'main');
       await sh(root, 'clone', '-q', '--no-local', remote, clone);
@@ -346,7 +347,7 @@ describe('GenerateAction (sdk) — the destination', () => {
       const base = (await repository.readRecord())!.pristineCommit();
       await sh(root, 'add', '.');
       await sh(root, 'commit', '-qm', 'sdk');
-      await sh(root, 'init', '-q', '--bare', origin);
+      await sh(root, 'init', '-q', '--bare', '--initial-branch=main', origin);
       await sh(root, 'remote', 'add', 'origin', origin);
       await sh(root, 'push', '-q', 'origin', 'main');
       await sh(root, 'push', '-q', 'origin', repository.pristineRef().refspec());

@@ -4,6 +4,7 @@ import os from 'os';
 import path from 'path';
 import { TextDecoder } from 'node:util';
 import { expect } from 'chai';
+import { canonical } from '../../src/infrastructure/tmp-extensions.js';
 import { execa } from 'execa';
 import { GitService } from '../../src/infrastructure/git-service.js';
 import { DirectoryPath } from '../../src/types/file/directoryPath.js';
@@ -42,7 +43,7 @@ describe('GitService', () => {
   };
 
   beforeEach(() => {
-    root = fs.mkdtempSync(path.join(os.tmpdir(), 'git-service-'));
+    root = canonical(fs.mkdtempSync(path.join(os.tmpdir(), 'git-service-')));
     git = new GitService();
   });
 
@@ -223,7 +224,7 @@ describe('GitService', () => {
 
     const bare = async (name = 'origin.git'): Promise<DirectoryPath> => {
       const directory = new DirectoryPath(path.join(root, name));
-      await execa('git', ['init', '-q', '--bare', directory.toString()]);
+      await execa('git', ['init', '-q', '--bare', '--initial-branch=main', directory.toString()]);
       return directory;
     };
 

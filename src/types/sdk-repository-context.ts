@@ -201,7 +201,7 @@ export class SdkRepositoryContext {
     }
     await fs.promises.mkdir(file.directory().toString(), { recursive: true });
     await fs.promises.writeFile(file.toString(), content, 'utf8');
-    await fs.promises.chmod(file.toString(), 0o755);
+    await fs.promises.chmod(file.toString(), 0o700);
   }
 
   /** Puts the SDK directory back as it was before the last run, record included, and settles its conflicts in the index. */

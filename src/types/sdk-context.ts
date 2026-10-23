@@ -60,7 +60,7 @@ export class SdkContext {
     generation: SdkGeneration
   ): Promise<Result<SdkDestination | Unresolved, NestedSdkDirectory | SdkRepositoryProblem>> {
     const version = await this.git.version();
-    if (version === undefined || !version.isSupported()) {
+    if (!version?.isSupported()) {
       return ok({ kind: 'overwrite', found: version });
     }
     const repository = await this.repository();

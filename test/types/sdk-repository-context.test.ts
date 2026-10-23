@@ -2,6 +2,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { expect } from 'chai';
+import { canonical } from '../../src/infrastructure/tmp-extensions.js';
 import { execa } from 'execa';
 import { GitService } from '../../src/infrastructure/git-service.js';
 import { DirectoryPath } from '../../src/types/file/directoryPath.js';
@@ -60,7 +61,7 @@ describe('SdkRepositoryContext', () => {
     write(repository.sdkDirectory(), path.join('.apimatic', 'generation.json'), record.toJson());
 
   beforeEach(() => {
-    root = fs.mkdtempSync(path.join(os.tmpdir(), 'sdk-repository-'));
+    root = canonical(fs.mkdtempSync(path.join(os.tmpdir(), 'sdk-repository-')));
   });
 
   afterEach(() => {
@@ -293,7 +294,9 @@ describe('SdkRepositoryContext', () => {
 
       (await repository.resolveForGenerator([rel('a.ts')]))._unsafeUnwrap();
 
-      expect(fs.readFileSync(repository.sdkDirectory().join('a.ts').toString(), 'utf8')).to.equal('top\ntheirs\nbottom\n');
+      expect(fs.readFileSync(repository.sdkDirectory().join('a.ts').toString(), 'utf8')).to.equal(
+        'top\ntheirs\nbottom\n'
+      );
       expect(fs.readFileSync(repository.sdkDirectory().join('b.ts').toString(), 'utf8')).to.equal('still ' + markers);
       expect(await unmergedPaths(repository)).to.deep.equal([]);
     });
@@ -428,7 +431,7 @@ describe('SdkRepositoryContext', () => {
 
     const withOrigin = async (): Promise<{ repository: SdkRepositoryContext; origin: DirectoryPath }> => {
       const origin = new DirectoryPath(path.join(root, 'origin.git'));
-      await sh(root, 'init', '-q', '--bare', origin.toString());
+      await sh(root, 'init', '-q', '--bare', '--initial-branch=main', origin.toString());
       const repository = await project();
       await sh(repository.root(), 'remote', 'add', 'origin', origin.toString());
       return { repository, origin };
@@ -513,7 +516,7 @@ describe('SdkRepositoryContext', () => {
     /** A project with a bare origin, one recorded snapshot, the hook installed, and `main` committed. */
     const ready = async (name = 'project') => {
       const origin = new DirectoryPath(path.join(root, `${name}-origin.git`));
-      await sh(root, 'init', '-q', '--bare', origin.toString());
+      await sh(root, 'init', '-q', '--bare', '--initial-branch=main', origin.toString());
       const projectDirectory = new DirectoryPath(path.join(root, name));
       fs.mkdirSync(projectDirectory.join('sdk', 'typescript').toString(), { recursive: true });
       await git.init(projectDirectory);

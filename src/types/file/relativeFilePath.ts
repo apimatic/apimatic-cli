@@ -19,7 +19,8 @@ export class RelativeFilePath {
     const segments = value.split('/');
     const wellFormed =
       !value.includes('\\') &&
-      !path.isAbsolute(value) &&
+      !path.win32.isAbsolute(value) &&
+      !path.posix.isAbsolute(value) &&
       segments.every((segment) => segment !== '' && segment !== '.' && segment !== '..');
     return wellFormed ? new RelativeFilePath(value) : undefined;
   }

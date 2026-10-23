@@ -41,7 +41,7 @@ export function stubSdkGeneration(root: string): {
         const archive = new FilePath(new DirectoryPath(scratch), new FileName('sdk.zip'));
         (await new ZipService().archive(new DirectoryPath(path.join(scratch, 'sdk')), archive))._unsafeUnwrap();
         const bytes = fs.readFileSync(archive.toString());
-        generateSdk.callsFake(async () => ok(Readable.from([bytes])));
+        generateSdk.callsFake(() => Promise.resolve(ok(Readable.from([bytes]))));
       } finally {
         fs.rmSync(scratch, { recursive: true, force: true });
       }
