@@ -5,10 +5,10 @@ import { PortalAuthorizationFailure } from '../../infrastructure/services/portal
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { FileName } from '../../types/file/fileName.js';
 import { FilePath } from '../../types/file/filePath.js';
+import { SharedEndpoint, UnplacedSamples } from '../../types/portal/code-samples.js';
 import { ContentNotices } from '../../types/portal/content-notices.js';
 import { MissingArtifacts } from '../../types/portal/generated-pages.js';
 import { PortalArtifacts } from '../../types/portal/portal-artifacts.js';
-import { SharedEndpoint, UnplacedSamples } from '../../types/portal/code-samples.js';
 import { PortalSourceProblem } from '../../types/portal/portal-source.js';
 import { format as f } from '../format.js';
 import { describeMissingArtifacts, generateArtifacts } from './artifacts.js';

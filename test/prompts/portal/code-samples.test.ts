@@ -70,15 +70,15 @@ describe('the code samples prompts', () => {
     it('names the spec of the samples filed by spec, and spec/ for the others', () => {
       reportUnplacedSamples(
         [
-          { spec: files[0], endpoints: [new Endpoint('get', '/refunds'), new Endpoint('post', '/refunds')] },
-          { spec: null, endpoints: [new Endpoint('get', '/owners')] }
+          { where: files[0], endpoints: [new Endpoint('get', '/refunds'), new Endpoint('post', '/refunds')] },
+          { where: source.join('spec'), endpoints: [new Endpoint('get', '/owners')] }
         ],
         source
       );
 
       expect(lines).to.deep.equal([
         "No operation in 'spec/alpha/openapi.json' takes the code samples for GET /refunds, POST /refunds.",
-        "No operation in 'spec' takes the code samples for GET /owners."
+        "No operation in './spec' takes the code samples for GET /owners."
       ]);
     });
   });

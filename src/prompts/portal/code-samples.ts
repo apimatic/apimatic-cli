@@ -2,7 +2,7 @@ import { log } from '@clack/prompts';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { SharedEndpoint, UnplacedSamples } from '../../types/portal/code-samples.js';
 import { format as f } from '../format.js';
-import { relative, sharedLines } from './source.js';
+import { sharedLines } from './source.js';
 
 export function reportSharedEndpoints(shared: SharedEndpoint[], sourceDirectory: DirectoryPath): void {
   if (shared.length === 0) {
@@ -17,8 +17,9 @@ export function reportSharedEndpoints(shared: SharedEndpoint[], sourceDirectory:
 }
 
 export function reportUnplacedSamples(unplaced: UnplacedSamples[], sourceDirectory: DirectoryPath): void {
-  for (const { spec, endpoints } of unplaced) {
-    const where = spec === null ? f.var('spec') : relative(spec, sourceDirectory);
-    log.warn(`No operation in ${where} takes the code samples for ${endpoints.join(', ')}.`);
+  for (const { where, endpoints } of unplaced) {
+    log.warn(
+      `No operation in ${f.var(where.relativeTo(sourceDirectory))} takes the code samples for ${endpoints.join(', ')}.`
+    );
   }
 }

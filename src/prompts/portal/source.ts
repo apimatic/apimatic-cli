@@ -51,8 +51,7 @@ export const contentPath = (sourceDirectory: DirectoryPath): string =>
 export const staticPath = (sourceDirectory: DirectoryPath): string =>
   f.path(sourceDirectory.join(STATIC_DIRECTORY_NAME));
 
-export const relative = (file: FilePath, sourceDirectory: DirectoryPath): string =>
-  f.var(file.relativeTo(sourceDirectory));
+const relative = (file: FilePath, sourceDirectory: DirectoryPath): string => f.var(file.relativeTo(sourceDirectory));
 
 const listed = (files: FilePath[], sourceDirectory: DirectoryPath): string =>
   listedInProse(files.map((file) => relative(file, sourceDirectory)));

@@ -2,12 +2,18 @@ import path from 'path';
 import { expect } from 'chai';
 import { DirectoryPath } from '../../../src/types/file/directoryPath';
 import { FilePath } from '../../../src/types/file/filePath';
-import { CodeSampleCatalog, CodeSampleCatalogs, CodeSamplesFile } from '../../../src/types/portal/code-samples';
+import {
+  CodeSampleCatalog,
+  CodeSampleCatalogs,
+  CodeSamplesFile,
+  UnplacedSamples
+} from '../../../src/types/portal/code-samples';
 import { Endpoint } from '../../../src/types/portal/endpoint';
 import { PortalSpec } from '../../../src/types/portal/portal-source';
 import { Language } from '../../../src/types/sdk/generate';
 
-const SPEC_DIRECTORY = new DirectoryPath(path.resolve('portal', 'src', 'spec'));
+const SOURCE_DIRECTORY = new DirectoryPath(path.resolve('portal', 'src'));
+const SPEC_DIRECTORY = SOURCE_DIRECTORY.join('spec');
 
 const catalog = (language: Language, json: object): CodeSampleCatalog => {
   const parsed = CodeSampleCatalog.fromJson(language, { webhooks: {}, ...json });
@@ -51,8 +57,10 @@ describe('PlacedCodeSamples', () => {
   const placedOn = (catalogs: CodeSampleCatalog[], specs: PortalSpec[]) =>
     new CodeSampleCatalogs(catalogs).placedOn(specs, SPEC_DIRECTORY);
 
-  /** Each spec named by its path from `spec/`, or null for the samples not filed by spec. */
-  const named = (file: FilePath | null) => (file === null ? null : file.relativeTo(SPEC_DIRECTORY));
+  const named = (file: FilePath) => file.relativeTo(SPEC_DIRECTORY);
+  /** Each place named as a warning names it, from the source directory. */
+  const unplacedIn = (unplaced: UnplacedSamples[]) =>
+    unplaced.map(({ where, endpoints }) => [where.relativeTo(SOURCE_DIRECTORY), endpoints.map(String)]);
 
   describe('the operations shown with no SDK sample', () => {
     const alpha = spec('alpha', 'alpha/openapi.json', ['GET /status', 'GET /alpha']);
@@ -98,9 +106,7 @@ describe('PlacedCodeSamples', () => {
         [spec('pets', 'openapi.json', ['GET /pets'])]
       ).unplaced();
 
-      expect(unplaced.map(({ spec, endpoints }) => [named(spec), endpoints.map(String)])).to.deep.equal([
-        [null, ['GET /owners']]
-      ]);
+      expect(unplacedIn(unplaced)).to.deep.equal([['./spec', ['GET /owners']]]);
     });
 
     it('names, of the samples filed under a spec, those it does not declare, and checks nothing else', () => {
@@ -119,9 +125,7 @@ describe('PlacedCodeSamples', () => {
         [spec('orders', 'orders/openapi.yaml', ['GET /orders'])]
       ).unplaced();
 
-      expect(unplaced.map(({ spec, endpoints }) => [named(spec), endpoints.map(String)])).to.deep.equal([
-        ['orders/openapi.yaml', ['POST /refunds']]
-      ]);
+      expect(unplacedIn(unplaced)).to.deep.equal([['spec/orders/openapi.yaml', ['POST /refunds']]]);
     });
   });
 

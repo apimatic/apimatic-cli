@@ -31,12 +31,9 @@ export interface EndpointSample {
 /** An operation more than one spec declares, which one code sample per method and path cannot serve. */
 export type SharedEndpoint = Shared<Endpoint>;
 
-/**
- * Samples no operation takes: those filed under `spec` that it does not declare, or, for the
- * samples not filed by spec (`null`), those no spec declares.
- */
+/** Samples no operation in `where` takes: a spec, for its own samples, or `spec/`, for the rest. */
 export interface UnplacedSamples {
-  spec: FilePath | null;
+  where: FilePath | DirectoryPath;
   endpoints: Endpoint[];
 }
 
@@ -44,10 +41,7 @@ export interface UnplacedSamples {
 export class CodeSampleCatalog {
   private constructor(
     private readonly paths: EndpointSample[],
-    /**
-     * By the spec's main file relative to `spec/`, as the platform records it; none when the
-     * operations come from one spec.
-     */
+    /** By each spec's main file from `spec/`, as the platform keys it; empty when the operations come from one. */
     private readonly specs: ReadonlyMap<string, EndpointSample[]>
   ) {}
 
@@ -64,8 +58,9 @@ export class CodeSampleCatalog {
     return this.specs.size > 0;
   }
 
-  public samples(): EndpointSample[] {
-    return this.paths;
+  // Filed by spec, every operation in `paths` is in a spec's samples too.
+  public unfiledSamples(): EndpointSample[] {
+    return this.isFiledBySpec() ? [] : this.paths;
   }
 
   public samplesOf(specFile: string): EndpointSample[] {
@@ -85,10 +80,7 @@ export class CodeSampleCatalogs {
   }
 }
 
-/**
- * The samples of one run, placed on the specs the portal documents: those filed by spec on their
- * spec alone, and the others on every spec but for the shared endpoints.
- */
+/** One run's samples on the specs: filed ones on their spec alone, others on every spec but for shared endpoints. */
 export class PlacedCodeSamples {
   private readonly shared: SharedEndpoint[];
 
@@ -108,8 +100,8 @@ export class PlacedCodeSamples {
   public unplaced(): UnplacedSamples[] {
     const declared = this.specs.flatMap(({ endpoints }) => endpoints);
     return [
-      ...this.specs.map((spec) => ({ spec: spec.file, endpoints: undeclared(this.ownSamples(spec), spec.endpoints) })),
-      { spec: null, endpoints: undeclared(this.unfiledSamples(), declared) }
+      ...this.specs.map((spec) => ({ where: spec.file, endpoints: undeclared(this.ownSamples(spec), spec.endpoints) })),
+      { where: this.specDirectory, endpoints: undeclared(this.unfiledSamples(), declared) }
     ].filter(({ endpoints }) => endpoints.length > 0);
   }
 
@@ -132,15 +124,15 @@ export class PlacedCodeSamples {
   }
 
   private unfiledSamples(): EndpointSample[] {
-    return this.catalogs.filter((catalog) => !catalog.isFiledBySpec()).flatMap((catalog) => catalog.samples());
+    return this.catalogs.flatMap((catalog) => catalog.unfiledSamples());
   }
 }
 
 /** The endpoints of `samples` that `declared` leaves out, each once. */
 function undeclared(samples: EndpointSample[], declared: Endpoint[]): Endpoint[] {
   const names = new Set(declared.map(String));
-  const left = samples.map(({ endpoint }) => endpoint).filter((endpoint) => !names.has(String(endpoint)));
-  return left.filter((endpoint, index) => index === left.findIndex((other) => other.isEqual(endpoint)));
+  const sampled = new Map(samples.map(({ endpoint }) => [String(endpoint), endpoint]));
+  return [...sampled.values()].filter((endpoint) => !names.has(String(endpoint)));
 }
 
 /** Languages in the order given, each endpoint's samples together. */
