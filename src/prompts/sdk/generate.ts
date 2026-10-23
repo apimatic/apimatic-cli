@@ -47,6 +47,7 @@ const plural = (count: number, noun: string) => `${count} ${noun}${count === 1 ?
 const listed = (sdk: DirectoryPath, paths: readonly RelativeFilePath[]) =>
   paths.map((relative) => `  ${f.relativePath(relative.in(sdk))}`);
 
+/** No method uses `this`, so each can be handed to a step as it is, the way `selectVersion` is. */
 export class SdkGeneratePrompts {
   /**
    * Named rather than listed as flag values: a user whose language is on its way back reads
@@ -295,7 +296,7 @@ export class SdkGeneratePrompts {
   /** The conflicted files and the question, before anything is written; none when the developer backs out. */
   public async conflictChoice(plan: MergePlan, sdk: DirectoryPath): Promise<ConflictChoice | undefined> {
     const one = plan.conflicts.length === 1;
-    noteWrapped(this.conflictLines(plan, sdk).join('\n'), this.attentionTitle(plan));
+    noteWrapped(conflictLines(plan, sdk).join('\n'), attentionTitle(plan));
     const choice = await select<ConflictChoice>({
       message: 'What should happen?',
       options: [
@@ -321,40 +322,12 @@ export class SdkGeneratePrompts {
 
   /** The conflicted files with what to do about them, for a run that could not ask. */
   public conflicts(plan: MergePlan, sdk: DirectoryPath) {
-    noteWrapped([...this.conflictLines(plan, sdk), '', ...this.steps(plan)].join('\n'), this.attentionTitle(plan));
+    noteWrapped([...conflictLines(plan, sdk), '', ...steps(plan)].join('\n'), attentionTitle(plan));
   }
 
   /** What to do about the conflicts the developer chose to resolve, listed just before. */
   public conflictSteps(plan: MergePlan) {
-    noteWrapped(this.steps(plan).join('\n'), 'Next steps');
-  }
-
-  private attentionTitle(plan: MergePlan): string {
-    return `${plural(plan.conflicts.length, 'file')} need${plan.conflicts.length === 1 ? 's' : ''} your attention`;
-  }
-
-  private conflictLines(plan: MergePlan, sdk: DirectoryPath): string[] {
-    return plan.conflicts.map(
-      (conflict) => `${f.relativePath(conflict.path.in(sdk))}\n  ${conflict.message ?? CONFLICT_LABELS[conflict.kind]}`
-    );
-  }
-
-  private steps(plan: MergePlan): string[] {
-    const marked = plan.hasMarkedConflicts();
-    const unmarked = plan.hasUnmarkedConflicts();
-    const steps = [
-      ...(marked ? ['Open each marked file, keep what is right, remove the markers, and stage it.'] : []),
-      ...(unmarked
-        ? [
-            `For each ${
-              marked ? 'other ' : ''
-            }file, decide whether it stays or goes: delete it again, or keep it as your own, and stage that.`
-          ]
-        : []),
-      'Rerun the command; nothing needs committing first.',
-      ...(marked ? ['To undo this run instead, rerun and choose "Undo the last generation".'] : [])
-    ];
-    return steps.map((step, index) => `${index + 1}. ${step}`);
+    noteWrapped(steps(plan).join('\n'), 'Next steps');
   }
 }
 
@@ -367,4 +340,32 @@ function whereItWasLookedFor(fetch: SnapshotFetch): string {
     case 'failed':
       return `here, and could not be fetched from ${f.var(fetch.remote)} (${fetch.reason})`;
   }
+}
+
+function attentionTitle(plan: MergePlan): string {
+  return `${plural(plan.conflicts.length, 'file')} need${plan.conflicts.length === 1 ? 's' : ''} your attention`;
+}
+
+function conflictLines(plan: MergePlan, sdk: DirectoryPath): string[] {
+  return plan.conflicts.map(
+    (conflict) => `${f.relativePath(conflict.path.in(sdk))}\n  ${conflict.message ?? CONFLICT_LABELS[conflict.kind]}`
+  );
+}
+
+function steps(plan: MergePlan): string[] {
+  const marked = plan.hasMarkedConflicts();
+  const unmarked = plan.hasUnmarkedConflicts();
+  const steps = [
+    ...(marked ? ['Open each marked file, keep what is right, remove the markers, and stage it.'] : []),
+    ...(unmarked
+      ? [
+          `For each ${
+            marked ? 'other ' : ''
+          }file, decide whether it stays or goes: delete it again, or keep it as your own, and stage that.`
+        ]
+      : []),
+    'Rerun the command; nothing needs committing first.',
+    ...(marked ? ['To undo this run instead, rerun and choose "Undo the last generation".'] : [])
+  ];
+  return steps.map((step, index) => `${index + 1}. ${step}`);
 }
