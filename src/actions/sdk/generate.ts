@@ -9,19 +9,17 @@ import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { TempContext } from '../../types/temp-context.js';
 import { codegenVersionFor, isAvailableLanguage, Language, Stability } from '../../types/sdk/generate.js';
 import { ProjectContext } from '../../types/project-context.js';
+import { FilePath } from '../../types/file/filePath.js';
 import { RelativeFilePath } from '../../types/file/relativeFilePath.js';
 import { TreeId } from '../../types/git/tree-id.js';
+import { ServiceError } from '../../infrastructure/service-error.js';
+import { SdkContext } from '../../types/sdk-context.js';
 import { Regeneration, SdkRepositoryContext, SdkRepositoryProblem } from '../../types/sdk-repository-context.js';
 import { SdkGeneration } from '../../types/sdk/generation-record.js';
 import { replacesDirectory } from '../../types/sdk/sdk-destination.js';
 import { favouringGenerator, resolving, Settlement } from '../../types/sdk/settlement.js';
 import { terminal } from '../../utils/terminal-utils.js';
 
-/**
- * One run of `sdk generate`, read top to bottom. Every prompt is named here: called, or handed
- * to one of the steps below the class, which take the prompts they may use as arguments and
- * have no other way to speak. What a state means lives in `src/types/sdk/`; the I/O in the contexts.
- */
 export class GenerateAction {
   private readonly prompts: SdkGeneratePrompts = new SdkGeneratePrompts();
   private readonly sdkGenerationService: SdkGenerationService = new SdkGenerationService();
@@ -75,13 +73,7 @@ export class GenerateAction {
     const sdk = sdkContext.directory();
     const generation: SdkGeneration = { language, codegenVersion: codegenVersionFor(language, stability), stability };
     const canAsk = !force && terminal.isInteractive();
-    const { unresolvedChoice, resolveLater, conflictsNotSettled, resolvedForGenerator, previousRestored } =
-      this.prompts;
-    const { snapshotNotRecorded, shareHookNeedsOneStep, shareHookNotInstalled } = this.prompts;
-    const { sdkMerged, conflictsNotStaged, conflicts, conflictSteps } = this.prompts;
 
-    // Decided before anything is uploaded, so a refused or declined run stops here. Conflicts the
-    // last run left unresolved in git's index are settled first, and the directory looked at again, once.
     let looked = await sdkContext.destination(generation);
     if (looked.isOk() && looked.value.kind === 'unresolved') {
       const { repository, paths } = looked.value;
@@ -89,12 +81,12 @@ export class GenerateAction {
         this.prompts.conflictsUnresolved(paths, repository.sdkDirectory());
         return ActionResult.failed();
       }
-      const settled = await settleMarkers(repository, paths, {
-        unresolvedChoice,
-        resolveLater,
-        conflictsNotSettled,
-        resolvedForGenerator,
-        previousRestored
+      const settled = await settleUnresolvedConflicts(repository, paths, {
+        unresolvedChoice: this.prompts.unresolvedChoice,
+        resolveLater: this.prompts.resolveLater,
+        conflictsNotSettled: this.prompts.conflictsNotSettled,
+        resolvedForGenerator: this.prompts.resolvedForGenerator,
+        previousRestored: this.prompts.previousRestored
       });
       if (settled.isErr()) {
         return settled.error;
@@ -132,30 +124,29 @@ export class GenerateAction {
     }
 
     return await withDirPath(async (tempDirectory) => {
-      const srcDirZip = await buildFrom.srcDirZip(tempDirectory, packageSettingsDirectory);
-      if (srcDirZip.isErr()) {
-        this.prompts.srcDirNotZipped(sourceDirectory, srcDirZip.error);
-        return ActionResult.failed();
-      }
-      const response = await this.prompts.generateSdk(
-        this.sdkGenerationService.generateSdk(
-          srcDirZip.value,
-          language,
-          stability,
-          this.configDir,
-          this.commandMetadata,
-          this.authKey
-        )
+      const tempSdk = await download(
+        buildFrom,
+        sdkContext,
+        tempDirectory,
+        packageSettingsDirectory,
+        (srcDirZip) =>
+          this.sdkGenerationService.generateSdk(
+            srcDirZip,
+            language,
+            stability,
+            this.configDir,
+            this.commandMetadata,
+            this.authKey
+          ),
+        this.prompts.generateSdk,
+        {
+          srcDirNotZipped: this.prompts.srcDirNotZipped,
+          sdkGenerationServiceError: this.prompts.sdkGenerationServiceError,
+          sdkNotUnzipped: this.prompts.sdkNotUnzipped
+        }
       );
-      if (response.isErr()) {
-        this.prompts.sdkGenerationServiceError(response.error);
-        return ActionResult.failed();
-      }
-      const archive = await new TempContext(tempDirectory).save(response.value);
-      const tempSdk = await sdkContext.loadSdkInTempDirectory(tempDirectory, archive);
       if (tempSdk.isErr()) {
-        this.prompts.sdkNotUnzipped(tempSdk.error);
-        return ActionResult.failed();
+        return tempSdk.error;
       }
 
       if (destination.kind === 'overwrite') {
@@ -164,7 +155,6 @@ export class GenerateAction {
       }
 
       if (destination.kind === 'record') {
-        // Initialised only now, once generation succeeded, so a failed run leaves no repository behind.
         const opened =
           destination.repository === undefined ? await sdkContext.initRepository() : ok(destination.repository);
         if (opened.isErr()) {
@@ -177,9 +167,9 @@ export class GenerateAction {
           this.prompts.repositoryInitialised(sdk);
         }
         await recordSnapshot(repository, await repository.snapshotGenerated(tempSdk.value), generation, {
-          snapshotNotRecorded,
-          shareHookNeedsOneStep,
-          shareHookNotInstalled
+          snapshotNotRecorded: this.prompts.snapshotNotRecorded,
+          shareHookNeedsOneStep: this.prompts.shareHookNeedsOneStep,
+          shareHookNotInstalled: this.prompts.shareHookNotInstalled
         });
         this.prompts.sdkGenerated(sdk);
         return ActionResult.success();
@@ -213,28 +203,22 @@ export class GenerateAction {
         return ActionResult.failed();
       }
       await recordSnapshot(repository, ok(settled.value.regeneration.generated), generation, {
-        snapshotNotRecorded,
-        shareHookNeedsOneStep,
-        shareHookNotInstalled
+        snapshotNotRecorded: this.prompts.snapshotNotRecorded,
+        shareHookNeedsOneStep: this.prompts.shareHookNeedsOneStep,
+        shareHookNotInstalled: this.prompts.shareHookNotInstalled
       });
       return closeMerge(repository, settled.value, canAsk, {
-        resolvedForGenerator,
-        sdkMerged,
-        conflictsNotStaged,
-        conflicts,
-        conflictSteps
+        resolvedForGenerator: this.prompts.resolvedForGenerator,
+        sdkMerged: this.prompts.sdkMerged,
+        conflictsNotStaged: this.prompts.conflictsNotStaged,
+        conflicts: this.prompts.conflicts,
+        conflictSteps: this.prompts.conflictSteps
       });
     });
   };
 }
 
-/**
- * The steps below take the prompts they may use as arguments, each the exact method `execute`
- * names, and have no `this`, so there is no other way for them to speak.
- */
-
-/** The last run's markers are still in the files: the developer settles them, or the run stops. */
-async function settleMarkers(
+async function settleUnresolvedConflicts(
   repository: SdkRepositoryContext,
   paths: readonly RelativeFilePath[],
   said: Pick<
@@ -262,7 +246,6 @@ async function settleMarkers(
   return ok(undefined);
 }
 
-/** Conflicts are settled before anything is written; a run that cannot ask leaves markers. */
 async function settleConflicts(
   regeneration: Regeneration,
   sdk: DirectoryPath,
@@ -284,10 +267,6 @@ async function settleConflicts(
   return (await again()).map((favoured) => favouringGenerator(regeneration, favoured));
 }
 
-/**
- * The snapshot and the record, then the hook that shares snapshots on push, (re)installed quietly.
- * Neither failure stops the run: the SDK is on disk, and a run without its snapshot asks before replacing it.
- */
 async function recordSnapshot(
   repository: SdkRepositoryContext,
   generated: Result<TreeId, SdkRepositoryProblem>,
@@ -309,7 +288,6 @@ async function recordSnapshot(
   }
 }
 
-/** The summary; markers left for the developer go into git's index and stop the run with the steps. */
 async function closeMerge(
   repository: SdkRepositoryContext,
   settlement: Settlement,
@@ -338,4 +316,32 @@ async function closeMerge(
     said.conflicts(plan, sdk);
   }
   return ActionResult.failed(MERGE_NEEDS_RESOLVING);
+}
+
+async function download(
+  buildFrom: ProjectContext,
+  sdkContext: SdkContext,
+  tempDirectory: DirectoryPath,
+  packageSettingsDirectory: DirectoryPath | undefined,
+  generate: (srcDirZip: FilePath) => Promise<Result<NodeJS.ReadableStream, ServiceError>>,
+  shown: SdkGeneratePrompts['generateSdk'],
+  said: Pick<SdkGeneratePrompts, 'srcDirNotZipped' | 'sdkGenerationServiceError' | 'sdkNotUnzipped'>
+): Promise<Result<DirectoryPath, ActionResult>> {
+  const srcDirZip = await buildFrom.srcDirZip(tempDirectory, packageSettingsDirectory);
+  if (srcDirZip.isErr()) {
+    said.srcDirNotZipped(buildFrom.sourceDirectory(), srcDirZip.error);
+    return err(ActionResult.failed());
+  }
+  const response = await shown(generate(srcDirZip.value));
+  if (response.isErr()) {
+    said.sdkGenerationServiceError(response.error);
+    return err(ActionResult.failed());
+  }
+  const archive = await new TempContext(tempDirectory).save(response.value);
+  const tempSdk = await sdkContext.loadSdkInTempDirectory(tempDirectory, archive);
+  if (tempSdk.isErr()) {
+    said.sdkNotUnzipped(tempSdk.error);
+    return err(ActionResult.failed());
+  }
+  return ok(tempSdk.value);
 }
