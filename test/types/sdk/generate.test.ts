@@ -1,9 +1,12 @@
 import { expect } from 'chai';
 import {
   AVAILABLE_LANGUAGES,
+  CodeGenerationVersion,
+  codegenVersionFor,
   isAvailableLanguage,
   Language,
   LANGUAGE_CHOICES,
+  Stability,
   UPCOMING_LANGUAGES
 } from '../../../src/types/sdk/generate';
 
@@ -31,5 +34,15 @@ describe('the languages a generator renders', () => {
     expect(isAvailableLanguage('typescript')).to.be.true;
     expect(isAvailableLanguage('java')).to.be.false;
     expect(isAvailableLanguage('cobol')).to.be.false;
+  });
+});
+
+describe('the generator behind a language and level', () => {
+  it('is the one the table offers for that level', () => {
+    expect(codegenVersionFor(Language.PYTHON, Stability.BETA)).to.equal(CodeGenerationVersion.V4);
+  });
+
+  it('falls back to the generator the language does have, as the default level does', () => {
+    expect(codegenVersionFor(Language.JAVA, Stability.STABLE)).to.equal(CodeGenerationVersion.V4);
   });
 });

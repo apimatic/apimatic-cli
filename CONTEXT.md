@@ -55,3 +55,21 @@ _Avoid_: Example name, variant
 **Unplaced sample**:
 A code sample whose endpoint no spec in the source directory declares.
 _Avoid_: Orphan sample, missing operation
+
+### SDK regeneration
+
+**SDK directory**:
+The directory `sdk generate` writes an SDK into, and reads back on every later run: the `--destination` itself when one is named, else `<input>/sdk/<language>`, or `<input>/sdk/<api-version>/<language>`.
+_Avoid_: Destination, output directory, language directory
+
+**Pristine snapshot**:
+One generation's output exactly as the server returned it, stored as a commit under the hidden ref `refs/apimatic/pristine/<path>` of the repository enclosing the SDK directory, never on a branch; the base of the next merge.
+_Avoid_: Generated snapshot, baseline, original
+
+**Generation record**:
+`<sdk>/.apimatic/generation.json`, committed with the SDK, naming the pristine snapshot the directory was last written from. Written with `.apimatic/.gitattributes` beside it, so git merges it as binary and GitHub collapses it in pull requests.
+_Avoid_: Lock file, manifest, metadata file
+
+**Custom code**:
+Whatever differs between the SDK directory on disk and its pristine snapshot: the developer's edits, additions, deletions and moves, kept by merging the next generation over them.
+_Avoid_: Customizations (in code), user changes, overrides

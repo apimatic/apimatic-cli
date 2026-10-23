@@ -71,8 +71,9 @@ export class ProjectContext {
     return directory.contains(this.source);
   }
 
-  public sdkDirectory(destination?: string): DirectoryPath {
-    return this.outputDirectory(OUTPUT_DIRECTORY_NAMES.sdk, destination);
+  public sdkDirectory(language: Language): DirectoryPath {
+    const sdks = this.projectDirectory.join(OUTPUT_DIRECTORY_NAMES.sdk);
+    return this.version ? sdks.join(this.version, language) : sdks.join(language);
   }
 
   public portalDirectory(destination?: string): DirectoryPath {
@@ -155,8 +156,8 @@ export class ProjectContext {
     return version === undefined ? err('versionNotFound') : ok(this.reading(version));
   }
 
-  public sdk(language: Language, sdkDirectory: DirectoryPath): SdkContext {
-    return new SdkContext(language, sdkDirectory, this.version);
+  public sdk(language: Language, destination?: DirectoryPath): SdkContext {
+    return new SdkContext(destination ?? this.sdkDirectory(language));
   }
 
   public portalSource(): PortalSourceContext {

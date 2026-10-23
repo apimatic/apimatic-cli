@@ -68,6 +68,10 @@ export class CodegenOption {
     return this.stability;
   }
 
+  public codegenVersion(): CodeGenerationVersion {
+    return this.version;
+  }
+
   public toString(): string {
     return `${this.version.toUpperCase()} (${this.stability})`;
   }
@@ -116,6 +120,17 @@ export function stabilityLevelsFor(language: Language): readonly Stability[] {
 /** What a flow that never asks sends: the first level a language offers. */
 export function defaultStability(language: Language): Stability {
   return stabilityLevelsFor(language)[0] ?? Stability.STABLE;
+}
+
+/**
+ * The generator that produces `language` at `stability`, which a snapshot records so it is only
+ * ever a base for the same output. A level the language does not offer falls back to the
+ * generator it does have, as `defaultStability` does for the level.
+ */
+export function codegenVersionFor(language: Language, stability: Stability): CodeGenerationVersion {
+  const options = codegenOptionsFor(language);
+  const option = options.find((candidate) => candidate.stabilityLevel() === stability) ?? options[0];
+  return option?.codegenVersion() ?? CodeGenerationVersion.V4;
 }
 
 /**

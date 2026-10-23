@@ -25,7 +25,7 @@ export class SdkPublishNonInteractiveAction {
 
   public readonly execute = async (
     project: ProjectContext,
-    sdkDirectory: DirectoryPath,
+    sdkDirectory: DirectoryPath | undefined,
     language: Language,
     publishTypes: PublishType[],
     force: boolean,
@@ -35,8 +35,8 @@ export class SdkPublishNonInteractiveAction {
     profileId?: string,
     version?: string
   ): Promise<ActionResult> => {
-    if (project.isSourceDirectory(sdkDirectory)) {
-      this.prompts.directoryCannotBeSame(sdkDirectory);
+    if (sdkDirectory !== undefined && project.isSourceWithin(sdkDirectory)) {
+      this.prompts.destinationContainsSource(project.sourceDirectory(), sdkDirectory);
       return ActionResult.failed();
     }
 
@@ -113,12 +113,12 @@ export class SdkPublishNonInteractiveAction {
       // Named only when the user chose it, so a run that took the default reads as the doc does.
       stability: stability.chosenLevel()
     });
-    const outputDir = dryRun
-      ? await this.fileService.getAvailableDirectoryPath(getDownloadsDirectory('apimatic-sdk'))
-      : sdkDirectory;
+    const generateInto = dryRun
+      ? (await this.fileService.getAvailableDirectoryPath(getDownloadsDirectory('apimatic-sdk'))).join(language)
+      : (sdkDirectory ?? project.sdkDirectory(language));
     const publishResult = await new SdkPublishAction(this.configDir, this.commandMetadata).execute(
       project,
-      outputDir,
+      generateInto,
       language,
       publishTypes,
       force,

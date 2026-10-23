@@ -27,7 +27,7 @@ export class SdkPublishAction {
 
   public readonly execute = async (
     project: ProjectContext,
-    outputDirectory: DirectoryPath,
+    sdkDirectory: DirectoryPath,
     language: Language,
     publishType: PublishType[],
     force: boolean,
@@ -52,11 +52,10 @@ export class SdkPublishAction {
       const sdkGenerateAction = new GenerateAction(this.configDir, this.commandMetadata);
       const sdkGenerationResult = await sdkGenerateAction.execute(
         project,
-        outputDirectory,
+        sdkDirectory,
         language,
         stability,
         force,
-        false,
         undefined,
         packageSettingsDirectory
       );
@@ -67,19 +66,17 @@ export class SdkPublishAction {
         return ActionResult.cancelled();
       }
 
-      const sdkLanguageDirectory = outputDirectory.join(language);
-
       if (dryRun) {
         this.prompts.dryRunNotice(publishingSummary);
-        const readmeFilePath = new FilePath(sdkLanguageDirectory, new FileName('README.md'));
-        await this.launcherService.openDirectoryInEditorOrFileExplorer(sdkLanguageDirectory, readmeFilePath);
+        const readmeFilePath = new FilePath(sdkDirectory, new FileName('README.md'));
+        await this.launcherService.openDirectoryInEditorOrFileExplorer(sdkDirectory, readmeFilePath);
         return ActionResult.success();
       }
 
       const tempContext = new TempContext(tempDirectory);
-      const sdkFile = await tempContext.zip(sdkLanguageDirectory);
+      const sdkFile = await tempContext.zip(sdkDirectory);
       if (sdkFile.isErr()) {
-        this.prompts.sdkNotZipped(sdkLanguageDirectory, sdkFile.error);
+        this.prompts.sdkNotZipped(sdkDirectory, sdkFile.error);
         return ActionResult.failed();
       }
 

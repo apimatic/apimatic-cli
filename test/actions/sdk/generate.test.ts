@@ -7,6 +7,7 @@ import { expect } from 'chai';
 import { err, ok } from 'neverthrow';
 import sinon from 'sinon';
 import { GenerateAction } from '../../../src/actions/sdk/generate.js';
+import { GitService } from '../../../src/infrastructure/git-service.js';
 import { SdkGenerationService } from '../../../src/infrastructure/services/sdk-generation-service.js';
 import { ZipService } from '../../../src/infrastructure/zip-service.js';
 import { SdkGeneratePrompts } from '../../../src/prompts/sdk/generate.js';
@@ -17,31 +18,33 @@ import { FilePath } from '../../../src/types/file/filePath.js';
 import { FileProblem } from '../../../src/types/file/file-problem.js';
 import { ProjectContext } from '../../../src/types/project-context.js';
 import { Language, Stability } from '../../../src/types/sdk/generate.js';
+import { GenerationRecord } from '../../../src/types/sdk/generation-record.js';
+import { SnapshotRef } from '../../../src/types/sdk/snapshot-ref.js';
 import { TempContext } from '../../../src/types/temp-context.js';
 
 const COMMAND_METADATA: CommandMetadata = { commandName: 'sdk generate', shell: 'test' };
 
 describe('GenerateAction (sdk)', () => {
   let root: string;
-  let sdkDirectory: DirectoryPath;
   let sdkArchive: Buffer;
   let generateSdk: sinon.SinonStub;
 
-  const execute = (zipSdk = false) =>
+  const execute = (options: { force?: boolean; destination?: DirectoryPath } = {}) =>
     new GenerateAction(new DirectoryPath(root), COMMAND_METADATA, 'auth-key').execute(
       ProjectContext.in(new DirectoryPath(root)),
-      sdkDirectory,
+      options.destination,
       Language.PYTHON,
       Stability.STABLE,
-      true,
-      zipSdk
+      options.force ?? true
     );
+
+  const sdk = () => new DirectoryPath(path.join(root, 'sdk', 'python'));
+  const at = (relative: string) => path.join(sdk().toString(), relative);
 
   beforeEach(async () => {
     root = fs.mkdtempSync(path.join(os.tmpdir(), 'sdk-generate-'));
     fs.mkdirSync(path.join(root, 'src', 'spec'), { recursive: true });
     fs.writeFileSync(path.join(root, 'src', 'spec', 'openapi.json'), '{}');
-    sdkDirectory = new DirectoryPath(path.join(root, 'sdk'));
 
     const generated = path.join(root, 'generated');
     fs.mkdirSync(generated);
@@ -59,12 +62,6 @@ describe('GenerateAction (sdk)', () => {
   afterEach(() => {
     sinon.restore();
     fs.rmSync(root, { recursive: true, force: true });
-  });
-
-  it('expands the generated SDK into its language directory', async () => {
-    expect((await execute()).isSuccess()).to.be.true;
-
-    expect(fs.readFileSync(path.join(sdkDirectory.toString(), 'python', 'README.md'), 'utf-8')).to.equal('# sdk');
   });
 
   it('reports a source directory it could not zip, without generating', async () => {
@@ -87,18 +84,60 @@ describe('GenerateAction (sdk)', () => {
     expect(problem.reason).to.not.be.empty;
   });
 
-  it('reports an SDK it could not save, naming its language directory', async () => {
-    const archive = sinon.stub(ZipService.prototype, 'archive').callThrough();
-    archive.onSecondCall().resolves(err('ENOSPC: no space left on device, write'));
-    const sdkNotSaved = sinon.stub(SdkGeneratePrompts.prototype, 'sdkNotSaved');
-    const sdkGenerated = sinon.stub(SdkGeneratePrompts.prototype, 'sdkGenerated');
+  it('stops before generating when the developer declines to overwrite', async () => {
+    fs.mkdirSync(sdk().toString(), { recursive: true });
+    fs.writeFileSync(at('README.md'), '# mine');
+    sinon.stub(SdkGeneratePrompts.prototype, 'overwriteSdk').resolves(false);
+    sinon.stub(SdkGeneratePrompts.prototype, 'destinationDirNotEmpty');
 
-    expect((await execute(true)).isFailed()).to.be.true;
-    expect(sdkNotSaved.firstCall.args[0]).to.deep.equal({
-      kind: 'zipFailed',
-      reason: 'ENOSPC: no space left on device, write',
-      sdkDirectory: sdkDirectory.join('python')
-    });
-    expect(sdkGenerated.called).to.be.false;
+    expect((await execute({ force: false })).isCancelled()).to.be.true;
+
+    expect(generateSdk.called).to.be.false;
+    expect(fs.readFileSync(at('README.md'), 'utf-8')).to.equal('# mine');
   });
+
+  it('expands the generated SDK into its language directory and records it for the next run', async () => {
+    sinon.stub(SdkGeneratePrompts.prototype, 'repositoryInitialised');
+
+    expect((await execute()).isSuccess()).to.be.true;
+
+    expect(fs.readFileSync(at('README.md'), 'utf-8')).to.equal('# sdk');
+    const record = GenerationRecord.parse(fs.readFileSync(at('.apimatic/generation.json'), 'utf-8'))!;
+    const pristine = await new GitService().resolveRef(sdk(), SnapshotRef.pristine(''));
+    expect(record.pristineCommit().isEqual(pristine!)).to.be.true;
+  });
+
+  it('writes the SDK as it always has when git is not there', async () => {
+    sinon.stub(GitService.prototype, 'version').resolves(undefined);
+    sinon.stub(SdkGeneratePrompts.prototype, 'gitUnavailable');
+
+    expect((await execute()).isSuccess()).to.be.true;
+
+    expect(fs.readdirSync(sdk().toString())).to.deep.equal(['README.md']);
+  });
+
+  it('writes into the destination itself, with no language directory below it', async () => {
+    sinon.stub(SdkGeneratePrompts.prototype, 'repositoryInitialised');
+    const destination = new DirectoryPath(path.join(root, 'my-python-sdk'));
+
+    expect((await execute({ destination })).isSuccess()).to.be.true;
+
+    expect(fs.readFileSync(path.join(destination.toString(), 'README.md'), 'utf-8')).to.equal('# sdk');
+    expect(fs.existsSync(path.join(destination.toString(), 'python'))).to.be.false;
+  });
+
+  for (const [named, destination] of [
+    ['the project', () => new DirectoryPath(root)],
+    ['the source directory', () => new DirectoryPath(path.join(root, 'src'))]
+  ] as const) {
+    it(`refuses ${named} as the destination, since writing the SDK would delete the source`, async () => {
+      const destinationContainsSource = sinon.stub(SdkGeneratePrompts.prototype, 'destinationContainsSource');
+
+      expect((await execute({ destination: destination() })).isFailed()).to.be.true;
+
+      expect(destinationContainsSource.calledOnce).to.be.true;
+      expect(generateSdk.called).to.be.false;
+      expect(fs.existsSync(path.join(root, 'src', 'spec', 'openapi.json'))).to.be.true;
+    });
+  }
 });

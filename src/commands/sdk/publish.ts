@@ -28,7 +28,7 @@ export default class SdkPublish extends Command {
       char: 'v',
       description: 'Semantic version of the SDK to publish (e.g. 1.0.0).'
     }),
-    ...FlagsProvider.destination('sdk', 'sdk'),
+    ...FlagsProvider.destination('sdk/<language>', 'sdk'),
     language: Flags.string({
       char: 'l',
       description: 'Language of the SDK to generate and publish.',
@@ -134,7 +134,7 @@ export default class SdkPublish extends Command {
         )
       : await new SdkPublishNonInteractiveAction(configDir, commandMetadata).execute(
           project,
-          project.sdkDirectory(destination),
+          destination ? new DirectoryPath(destination) : undefined,
           language as Language,
           publishTypes,
           force,

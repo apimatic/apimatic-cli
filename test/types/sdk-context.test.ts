@@ -6,7 +6,6 @@ import { DirectoryPath } from '../../src/types/file/directoryPath.js';
 import { FileName } from '../../src/types/file/fileName.js';
 import { FilePath } from '../../src/types/file/filePath.js';
 import { SdkContext } from '../../src/types/sdk-context.js';
-import { Language } from '../../src/types/sdk/generate.js';
 
 describe('SdkContext', () => {
   let root: string;
@@ -16,30 +15,24 @@ describe('SdkContext', () => {
 
   beforeEach(() => {
     root = fs.mkdtempSync(path.join(os.tmpdir(), 'sdk-context-'));
-    context = new SdkContext(Language.PYTHON, new DirectoryPath(inRoot('sdk')));
+    context = new SdkContext(new DirectoryPath(inRoot('sdk', 'python')));
   });
 
   afterEach(() => fs.rmSync(root, { recursive: true, force: true }));
 
   describe('save', () => {
-    it('zips the SDK into its language directory', async () => {
+    it('replaces what the SDK directory holds, except its .git', async () => {
       fs.mkdirSync(inRoot('generated'));
       fs.writeFileSync(inRoot('generated', 'README.md'), '# sdk');
+      fs.mkdirSync(inRoot('sdk', 'python', '.git'), { recursive: true });
+      fs.writeFileSync(inRoot('sdk', 'python', '.git', 'HEAD'), 'ref: refs/heads/main');
+      fs.writeFileSync(inRoot('sdk', 'python', 'old.py'), 'old');
 
-      const saved = await context.save(new DirectoryPath(inRoot('generated')), true);
+      const saved = await context.save(new DirectoryPath(inRoot('generated')));
 
-      expect(saved._unsafeUnwrap().toString()).to.equal(inRoot('sdk', 'python'));
-      expect(fs.existsSync(inRoot('sdk', 'python', 'python.zip'))).to.be.true;
-    });
-
-    it('reports an SDK it could not zip, naming its language directory, and leaves no archive behind', async () => {
-      const saved = await context.save(new DirectoryPath(inRoot('missing')), true);
-
-      const problem = saved._unsafeUnwrapErr();
-      expect(problem.kind).to.equal('zipFailed');
-      expect(problem.reason).to.contain('ENOENT');
-      expect(problem.sdkDirectory.toString()).to.equal(inRoot('sdk', 'python'));
-      expect(fs.existsSync(inRoot('sdk', 'python', 'python.zip'))).to.be.false;
+      expect(saved.toString()).to.equal(inRoot('sdk', 'python'));
+      expect(fs.readdirSync(inRoot('sdk', 'python')).sort()).to.deep.equal(['.git', 'README.md']);
+      expect(fs.readFileSync(inRoot('sdk', 'python', '.git', 'HEAD'), 'utf-8')).to.equal('ref: refs/heads/main');
     });
   });
 

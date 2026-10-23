@@ -10,6 +10,7 @@ import {
   Stability,
   UPCOMING_LANGUAGES
 } from '../../types/sdk/generate.js';
+import { GitVersion } from '../../types/git/git-version.js';
 import { StabilityChoice } from '../../types/sdk/stability-choice.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { ProjectContext } from '../../types/project-context.js';
@@ -22,7 +23,8 @@ export default class SdkGenerate extends Command {
   static readonly summary = 'Generate an SDK for your API';
 
   static readonly description = `Generate a Software Development Kit (SDK) from an API specification.
-${inProse(AVAILABLE_LANGUAGES)} are available; ${inProse(UPCOMING_LANGUAGES)} are coming soon.`;
+${inProse(AVAILABLE_LANGUAGES)} are available; ${inProse(UPCOMING_LANGUAGES)} are coming soon.
+With git ${GitVersion.required()} or newer installed, your edits to the generated SDK are kept when you regenerate it.`;
 
   static readonly cmdTxt = format.cmd('apimatic', 'sdk', 'generate');
 
@@ -38,14 +40,10 @@ ${inProse(AVAILABLE_LANGUAGES)} are available; ${inProse(UPCOMING_LANGUAGES)} ar
     destination: Flags.string({
       char: 'd',
       description:
-        '[default: <input>/sdk/<language> | <input>/sdk/<api-version>/<language>] path where the SDK will be generated'
+        '[default: <input>/sdk/<language> | <input>/sdk/<api-version>/<language>] directory the SDK is generated into'
     }),
     'api-version': Flags.string({
       description: 'Version of the API to use for SDK generation (if multiple versions exist)'
-    }),
-    zip: Flags.boolean({
-      default: false,
-      description: 'Download the generated SDK as a .zip archive'
     }),
     'codegen-version': Flags.string({
       description: 'Version of the code generator to use',
@@ -64,23 +62,12 @@ ${inProse(AVAILABLE_LANGUAGES)} are available; ${inProse(UPCOMING_LANGUAGES)} ar
   static examples = [
     `${SdkGenerate.cmdTxt} ${format.flag('language', 'typescript')}`,
     `${SdkGenerate.cmdTxt} ${format.flag('language', 'csharp')} ${format.flag('input', './')}`,
-    `${SdkGenerate.cmdTxt} ${format.flag('language', 'python')} ${format.flag('destination', './sdk')} ${format.flag(
-      'zip'
-    )}`
+    `${SdkGenerate.cmdTxt} ${format.flag('language', 'python')} ${format.flag('destination', './my-python-sdk')}`
   ];
 
   async run() {
     const {
-      flags: {
-        language,
-        input,
-        destination,
-        force,
-        zip: zipSdk,
-        stability,
-        'auth-key': authKey,
-        'api-version': apiVersion
-      }
+      flags: { language, input, destination, force, stability, 'auth-key': authKey, 'api-version': apiVersion }
     } = await this.parse(SdkGenerate);
 
     const project = ProjectContext.at(input);
@@ -94,11 +81,10 @@ ${inProse(AVAILABLE_LANGUAGES)} are available; ${inProse(UPCOMING_LANGUAGES)} ar
     const action = new GenerateAction(this.getConfigDir(), commandMetadata, authKey);
     const result = await action.execute(
       project,
-      project.sdkDirectory(destination),
+      destination ? new DirectoryPath(destination) : undefined,
       language as Language,
       StabilityChoice.for(language as Language, stability).stabilityLevel(),
       force,
-      zipSdk,
       apiVersion
     );
     outro(result);

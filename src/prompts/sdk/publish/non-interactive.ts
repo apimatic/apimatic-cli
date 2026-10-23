@@ -12,10 +12,11 @@ import { SDK_PUBLISHING_OVERVIEW_URL } from '../../publishing/links.js';
 import { APIMATIC_CONFIG_FILE_NAME } from '../../../types/apimatic-config/document.js';
 
 export class SdkPublishNonInteractivePrompts {
-  public directoryCannotBeSame(directory: DirectoryPath) {
-    const message = `The ${f.var('src')} and ${f.var('sdk')} directories must be different. Current value: ${f.path(
-      directory
-    )}`;
+  public destinationContainsSource(sourceDirectory: DirectoryPath, sdkDirectory: DirectoryPath) {
+    const message =
+      `The destination ${f.path(sdkDirectory)} contains your source directory ` +
+      `${f.path(sourceDirectory)}, and everything in the destination is replaced by the ` +
+      `generated SDK. Choose a destination outside it, such as ${f.flag('destination', './sdk')}.`;
     log.error(message);
   }
 
