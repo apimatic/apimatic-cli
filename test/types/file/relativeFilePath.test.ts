@@ -31,6 +31,15 @@ describe('RelativeFilePath', () => {
     expect(file.below('')).to.equal(file);
   });
 
+  it('is seen from inside a prefix it is under, and not from one it is not', () => {
+    const file = RelativeFilePath.fromGit('sdk/typescript/src/models/book.ts');
+
+    expect(file.inside('sdk/typescript')?.toString()).to.equal('src/models/book.ts');
+    expect(file.inside('sdk/types')).to.be.undefined;
+    expect(file.inside('docs')).to.be.undefined;
+    expect(file.inside('')).to.equal(file);
+  });
+
   it('compares by value', () => {
     const a = RelativeFilePath.fromGit('a.ts');
 

@@ -11,7 +11,7 @@ import { RelativeFilePath } from './file/relativeFilePath.js';
 import { CommitId } from './git/commit-id.js';
 import { StageEntry } from './git/merge-tree.js';
 import { TreeId } from './git/tree-id.js';
-import { hasConflictMarkers, relabelMarkers, resolveMarkersForGenerated } from './sdk/conflict-markers.js';
+import { relabelMarkers, resolveMarkersForGenerated } from './sdk/conflict-markers.js';
 import { describeGeneration, GenerationRecord, SdkGeneration } from './sdk/generation-record.js';
 import { MergePlan } from './sdk/merge-plan.js';
 import { SHARE_HOOK_SCRIPT, SHARE_HOOK_SCRIPT_NAME, ShareHook } from './sdk/share-hook.js';
@@ -138,7 +138,7 @@ export class SdkRepositoryContext {
         return ok({ kind: 'snapshotMissing', fetch: { kind: 'absent', remote } });
       }
     }
-    const paths = await this.unresolvedConflicts(record);
+    const paths = await this.unresolvedConflicts();
     return ok(paths.length > 0 ? { kind: 'unresolved', paths } : { kind: 'ready', base });
   }
 
@@ -204,19 +204,18 @@ export class SdkRepositoryContext {
     await fs.promises.chmod(file.toString(), 0o700);
   }
 
-  /** Puts the SDK directory back as it was before the last run, record included, and settles its conflicts in the index. */
-  public async restorePrevious(): Promise<Result<void, SdkRepositoryProblem>> {
+  /** Puts the SDK directory back as it was before the last run, record included, and takes `unresolved` out of the unmerged state. */
+  public async restorePrevious(unresolved: readonly RelativeFilePath[]): Promise<Result<void, SdkRepositoryProblem>> {
     try {
       const previous = await this.git.resolveRef(this.rootDirectory, this.previousRef());
       if (previous === undefined) {
         return err(gitFailed('there is no earlier state of the SDK directory to go back to'));
       }
-      const conflicts = (await this.readRecord())?.conflictedPaths() ?? [];
       const tree = await this.git.treeOfCommit(this.rootDirectory, previous);
       await this.git.checkoutTree(this.rootDirectory, this.sdk, tree);
       await this.git.unstage(
         this.rootDirectory,
-        conflicts.map((path) => this.rootRelative(path))
+        unresolved.map((path) => this.rootRelative(path))
       );
       return ok(undefined);
     } catch (error) {
@@ -226,15 +225,17 @@ export class SdkRepositoryContext {
 
   /**
    * Settles the markers still in `paths` for the generator's side, keeping everything around
-   * them (including what was already resolved by hand), and takes the files out of the
-   * unmerged state in the index.
+   * them (including what was already resolved by hand) and every file without markers as it
+   * is, and takes the files out of the unmerged state in the index.
    */
   public async resolveForGenerator(paths: readonly RelativeFilePath[]): Promise<Result<void, SdkRepositoryProblem>> {
     try {
       for (const path of paths) {
-        const file = path.in(this.sdk).toString();
-        const content = await fs.promises.readFile(file, 'utf8');
-        await fs.promises.writeFile(file, resolveMarkersForGenerated(content), 'utf8');
+        const file = path.in(this.sdk);
+        if (await this.fileService.fileExists(file)) {
+          const content = await fs.promises.readFile(file.toString(), 'utf8');
+          await fs.promises.writeFile(file.toString(), resolveMarkersForGenerated(content), 'utf8');
+        }
       }
       await this.git.unstage(
         this.rootDirectory,
@@ -297,14 +298,13 @@ export class SdkRepositoryContext {
   public async recordGeneration(
     generated: TreeId,
     generation: SdkGeneration,
-    cliVersion: string,
-    conflicts: readonly RelativeFilePath[]
+    cliVersion: string
   ): Promise<Result<GenerationRecord, SdkRepositoryProblem>> {
     const pristine = await this.recordPristine(generated, generation);
     if (pristine.isErr()) {
       return err(pristine.error);
     }
-    const record = GenerationRecord.written(generation, pristine.value, new Date(), cliVersion, conflicts);
+    const record = GenerationRecord.written(generation, pristine.value, new Date(), cliVersion);
     return (await this.writeRecord(record)).map(() => record);
   }
 
@@ -479,16 +479,12 @@ export class SdkRepositoryContext {
     }
   }
 
-  // The files the record lists as conflicted that still hold the markers, so a run never merges over them.
-  private async unresolvedConflicts(record: GenerationRecord): Promise<RelativeFilePath[]> {
-    const unresolved: RelativeFilePath[] = [];
-    for (const relative of record.conflictedPaths()) {
-      const file = relative.in(this.sdk);
-      if ((await this.fileService.fileExists(file)) && hasConflictMarkers(await this.fileService.getContents(file))) {
-        unresolved.push(relative);
-      }
-    }
-    return unresolved;
+  // The files git still holds as unmerged below the SDK directory, by path below it, so a run
+  // never merges over a conflict the developer has not marked resolved the way git expects.
+  private async unresolvedConflicts(): Promise<RelativeFilePath[]> {
+    const prefix = this.sdkPath();
+    const unmerged = await this.git.unmergedPaths(this.rootDirectory, prefix === '' ? '.' : prefix);
+    return unmerged.flatMap((path) => path.inside(prefix) ?? []);
   }
 
   private recordFile(): FilePath {

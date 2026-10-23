@@ -219,6 +219,33 @@ describe('GitService', () => {
     });
   });
 
+  describe('unmergedPaths', () => {
+    it('names each unmerged path below the directory once, from the root, and none outside it', async () => {
+      const repo = await repository();
+      const oid = (
+        await execa('git', ['hash-object', '-w', '--stdin'], { cwd: repo.toString(), input: 'x' })
+      ).stdout.trim();
+      const entries = [
+        ...[1, 2, 3].map((stage) => `100644 ${oid} ${stage}\tsdk/ts/b.ts`),
+        ...[1, 3].map((stage) => `100644 ${oid} ${stage}\tsdk/ts/a.ts`),
+        ...[1, 2].map((stage) => `100644 ${oid} ${stage}\tsdk/py/a.py`),
+        `100644 ${oid} 0\tsdk/ts/clean.ts`
+      ];
+      await execa('git', ['update-index', '-z', '--index-info'], {
+        cwd: repo.toString(),
+        input: entries.join('\0') + '\0'
+      });
+
+      expect((await git.unmergedPaths(repo, 'sdk/ts')).map(String)).to.deep.equal(['sdk/ts/a.ts', 'sdk/ts/b.ts']);
+      expect((await git.unmergedPaths(repo, '.')).map(String)).to.deep.equal([
+        'sdk/py/a.py',
+        'sdk/ts/a.ts',
+        'sdk/ts/b.ts'
+      ]);
+      expect(await git.unmergedPaths(repo, 'docs')).to.deep.equal([]);
+    });
+  });
+
   describe('remotes', () => {
     const ref = SnapshotRef.pristine('sdk/typescript');
 

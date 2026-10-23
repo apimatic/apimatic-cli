@@ -41,14 +41,3 @@ export function resolveMarkersForGenerated(content: string): string {
   }
   return resolved.join('\n');
 }
-
-/** Whether `content` still carries the markers a conflicted run writes. */
-export function hasConflictMarkers(content: Uint8Array | string): boolean {
-  let text: string;
-  try {
-    text = typeof content === 'string' ? content : decoder.decode(content);
-  } catch {
-    return false;
-  }
-  return text.split(/\r?\n/).some((line) => line === YOURS_MARKER || line === GENERATED_MARKER);
-}

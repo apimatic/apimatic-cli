@@ -319,6 +319,23 @@ export class GitService {
     );
   }
 
+  /**
+   * The paths below `directory` (from the repository root, `.` for the root itself) that the
+   * index holds in the unmerged state, as git names them from the root: what a merge left
+   * for the developer and `git add` has not yet marked resolved.
+   */
+  public async unmergedPaths(root: DirectoryPath, directory: string): Promise<RelativeFilePath[]> {
+    const { stdout } = await this.run(root, ['ls-files', '-u', '-z', '--', directory]);
+    const paths = new Map<string, RelativeFilePath>();
+    for (const entry of stdout.split('\0')) {
+      if (entry !== '') {
+        const filePath = entry.slice(entry.indexOf('\t') + 1);
+        paths.set(filePath, RelativeFilePath.fromGit(filePath));
+      }
+    }
+    return [...paths.values()];
+  }
+
   /** The remote the current branch is set to push to, else `origin` when there is one, else none. */
   public async remoteOf(root: DirectoryPath): Promise<string | undefined> {
     const branch = await this.tryRun(root, ['symbolic-ref', '--short', 'HEAD']);

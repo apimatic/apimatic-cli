@@ -1,4 +1,3 @@
-import { RelativeFilePath } from '../file/relativeFilePath.js';
 import { CommitId } from '../git/commit-id.js';
 import { CodeGenerationVersion, Language, Stability } from './generate.js';
 
@@ -14,44 +13,33 @@ const SCHEMA_VERSION = 1;
 const isOneOf = <T extends string>(values: readonly T[], value: unknown): value is T =>
   typeof value === 'string' && (values as readonly string[]).includes(value);
 
-const isStringArray = (value: unknown): value is string[] =>
-  Array.isArray(value) && value.every((item) => typeof item === 'string');
-
 /**
  * What `.apimatic/generation.json` records: the pristine snapshot an SDK directory was last
- * written from, and the files a run left with conflict markers. Committed with the SDK, so a
- * branch or a clone merges against the base it was generated from.
+ * written from. Committed with the SDK, so a branch or a clone merges against the base it
+ * was generated from. The conflicts a run leaves are git's unmerged index entries, not the
+ * record's, since only the index says when the developer has resolved them.
  */
 export class GenerationRecord {
   private readonly generation: SdkGeneration;
   private readonly pristine: CommitId;
   private readonly generatedAt: Date;
   private readonly cliVersion: string;
-  private readonly conflicts: readonly RelativeFilePath[];
 
-  private constructor(
-    generation: SdkGeneration,
-    pristine: CommitId,
-    generatedAt: Date,
-    cliVersion: string,
-    conflicts: readonly RelativeFilePath[]
-  ) {
+  private constructor(generation: SdkGeneration, pristine: CommitId, generatedAt: Date, cliVersion: string) {
     this.generation = generation;
     this.pristine = pristine;
     this.generatedAt = generatedAt;
     this.cliVersion = cliVersion;
-    this.conflicts = conflicts;
   }
 
-  /** Written by a run that just recorded `pristine`; `conflicts` are paths below the SDK directory with `/` between segments. */
+  /** Written by a run that just recorded `pristine`. */
   public static written(
     generation: SdkGeneration,
     pristine: CommitId,
     generatedAt: Date,
-    cliVersion: string,
-    conflicts: readonly RelativeFilePath[] = []
+    cliVersion: string
   ): GenerationRecord {
-    return new GenerationRecord(generation, pristine, generatedAt, cliVersion, conflicts);
+    return new GenerationRecord(generation, pristine, generatedAt, cliVersion);
   }
 
   public static parse(json: string): GenerationRecord | undefined {
@@ -75,21 +63,15 @@ export class GenerationRecord {
       pristine === undefined ||
       generatedAt === undefined ||
       Number.isNaN(generatedAt.getTime()) ||
-      typeof record.cliVersion !== 'string' ||
-      !isStringArray(record.conflicts)
+      typeof record.cliVersion !== 'string'
     ) {
-      return undefined;
-    }
-    const conflicts = record.conflicts.map((value) => RelativeFilePath.create(value));
-    if (!conflicts.every((path): path is RelativeFilePath => path !== undefined)) {
       return undefined;
     }
     return new GenerationRecord(
       { language: record.language, codegenVersion: record.codegenVersion, stability: record.stability },
       pristine,
       generatedAt,
-      record.cliVersion,
-      conflicts
+      record.cliVersion
     );
   }
 
@@ -99,14 +81,6 @@ export class GenerationRecord {
 
   public generatedAs(): SdkGeneration {
     return this.generation;
-  }
-
-  public conflictedPaths(): readonly RelativeFilePath[] {
-    return this.conflicts;
-  }
-
-  public hasConflicts(): boolean {
-    return this.conflicts.length > 0;
   }
 
   /** Whether `generation` would produce the same kind of output the recorded snapshot holds. */
@@ -127,8 +101,7 @@ export class GenerationRecord {
         stability: this.generation.stability,
         pristine: this.pristine.toString(),
         generatedAt: this.generatedAt.toISOString(),
-        cliVersion: this.cliVersion,
-        conflicts: this.conflicts.map((path) => path.toString())
+        cliVersion: this.cliVersion
       },
       null,
       2

@@ -170,20 +170,20 @@ export class SdkGeneratePrompts {
   public conflictsUnresolved(paths: readonly RelativeFilePath[], sdk: DirectoryPath) {
     const one = paths.length === 1;
     const message =
-      `${plural(paths.length, 'file')} still hold${one ? 's' : ''} conflict markers from the last run. ` +
-      `Resolve ${one ? 'it' : 'them'} and remove the markers, then rerun:\n` +
+      `${plural(paths.length, 'file')} from the last run ${one ? 'is' : 'are'} still unresolved. ` +
+      `Resolve and stage ${one ? 'it' : 'them'}, then rerun:\n` +
       listed(sdk, paths).join('\n');
     log.error(message);
   }
 
-  /** The files still marked and the question, before anything is generated; none when the developer backs out. */
+  /** The files still unresolved and the question, before anything is generated; none when the developer backs out. */
   public async unresolvedChoice(
     paths: readonly RelativeFilePath[],
     sdk: DirectoryPath
   ): Promise<UnresolvedChoice | undefined> {
     const one = paths.length === 1;
     log.warn(
-      `${plural(paths.length, 'file')} still hold${one ? 's' : ''} conflict markers from the last run:\n` +
+      `${plural(paths.length, 'file')} from the last run ${one ? 'is' : 'are'} still unresolved:\n` +
         listed(sdk, paths).join('\n')
     );
     const choice = await select<UnresolvedChoice>({
@@ -192,12 +192,12 @@ export class SdkGeneratePrompts {
         {
           value: 'resolve',
           label: `I'll finish resolving ${one ? 'it' : 'them'}`,
-          hint: 'nothing is done now; rerun once the markers are gone'
+          hint: `nothing is done now; rerun once ${one ? 'it is' : 'they are'} resolved and staged`
         },
         {
           value: 'generated',
           label: `Use the generator's changes in the file${one ? '' : 's'} still marked`,
-          hint: 'what you already resolved stays'
+          hint: 'what you already resolved stays; any file without markers is kept as it is'
         },
         {
           value: 'undo',
@@ -210,7 +210,7 @@ export class SdkGeneratePrompts {
   }
 
   public resolveLater() {
-    log.info('Nothing was done. Rerun once the markers are gone.');
+    log.info('Nothing was done. Rerun once the files are resolved and staged.');
   }
 
   public resolvedForGenerator(paths: readonly RelativeFilePath[], sdk: DirectoryPath) {
@@ -250,7 +250,7 @@ export class SdkGeneratePrompts {
   public conflictsNotStaged(reason: string) {
     const message =
       `The conflicted files could not be marked in git's index: ${reason}\n` +
-      `The markers in the files are still there; only ${f.cmd('git', 'status')} will not list them as both modified.`;
+      `The markers are in the files, but the next run will not know about them: resolve them before rerunning.`;
     log.warn(message);
   }
 
@@ -343,12 +343,12 @@ export class SdkGeneratePrompts {
     const marked = plan.hasMarkedConflicts();
     const unmarked = plan.hasUnmarkedConflicts();
     const steps = [
-      ...(marked ? ['Open each marked file, keep what is right, and remove the markers.'] : []),
+      ...(marked ? ['Open each marked file, keep what is right, remove the markers, and stage it.'] : []),
       ...(unmarked
         ? [
             `For each ${
               marked ? 'other ' : ''
-            }file, decide whether it stays or goes: delete it again, or keep it as your own.`
+            }file, decide whether it stays or goes: delete it again, or keep it as your own, and stage that.`
           ]
         : []),
       'Rerun the command; nothing needs committing first.',

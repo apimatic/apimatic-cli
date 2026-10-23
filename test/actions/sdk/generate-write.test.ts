@@ -77,7 +77,7 @@ describe('GenerateAction (sdk) — writing the SDK', () => {
     await git.init(new DirectoryPath(root));
     const repository = (await sdkContext().repository())!;
     const tree = (await repository.snapshotGenerated(sdk()))._unsafeUnwrap();
-    const written = (await repository.recordGeneration(tree, STABLE, '0.0.0', []))._unsafeUnwrap();
+    const written = (await repository.recordGeneration(tree, STABLE, '0.0.0'))._unsafeUnwrap();
     return { repository, base: written.pristineCommit() };
   };
 
@@ -180,7 +180,6 @@ describe('GenerateAction (sdk) — writing the SDK', () => {
         kept: ['notes.txt']
       });
       expect(record().pristineCommit().isEqual(base)).to.be.false;
-      expect(record().hasConflicts()).to.be.false;
       expect((await git.describe(repository.root(), record().pristineCommit())).parents).to.deep.equal([base]);
       const previous = (await git.resolveRef(repository.root(), repository.previousRef()))!;
       const kept = await snapshotFiles(repository.root(), previous);
@@ -205,7 +204,7 @@ describe('GenerateAction (sdk) — writing the SDK', () => {
       expect(read('models/book.py')).to.contain('    # Retail price in US dollars.\n');
       expect(read('models/book.py')).to.contain(`${GENERATED_MARKER}\n`);
       expect(read('README.md')).to.equal('# sdk v2');
-      expect(record().conflictedPaths().map(String)).to.deep.equal(['models/book.py']);
+      expect(record().toJson()).to.not.contain('conflicts');
       const cwd = repository.root().toString();
       expect((await execa('git', ['status', '--porcelain'], { cwd })).stdout).to.contain(
         'UU sdk/python/models/book.py'
@@ -273,7 +272,6 @@ describe('GenerateAction (sdk) — writing the SDK', () => {
       expect(read('README.md')).to.equal('# sdk v2');
       expect(read('notes.txt')).to.equal('mine');
       expect(resolvedForGenerator.firstCall.args[0].map(String)).to.deep.equal(['models/book.py']);
-      expect(record().hasConflicts()).to.be.false;
       const previous = (await git.resolveRef(repository.root(), repository.previousRef()))!;
       expect((await snapshotFiles(repository.root(), previous)).get('models/book.py')).to.equal(
         DECORATED + MODEL_V1_EDITED

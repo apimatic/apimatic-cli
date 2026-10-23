@@ -79,7 +79,7 @@ the ref has no suffix.
 |---|---|---|---|
 | `refs/apimatic/pristine/<path>` | A chain of commits, one per generation. Each tree is that generation's output exactly as unzipped: no `.git`, no `.apimatic/`, no developer files. | After every successful write, with plumbing: the generated directory is added to a temporary index (`GIT_INDEX_FILE`, `--work-tree`), then `write-tree`, `commit-tree` and `update-ref`. Author "APIMatic CLI <developer@apimatic.io>", message `apimatic: pristine typescript v4 stable`. | Pushed to the remote after every recorded run; fetched by a run whose record names a commit the repository lacks (3.2). |
 | `refs/apimatic/previous/<path>` | One commit, no parent: the SDK directory as it was on disk the moment before the last run wrote to it (`.git` excluded). Its tree is rooted at the SDK directory, not at the repository root. | Before the merge writes anything. Overwritten each run. | No. Local safety net: `git --work-tree=sdk/typescript restore --source=refs/apimatic/previous/sdk/typescript --worktree -- .` puts the files back, record included (verified in the lab, case 15); files the run added stay and `git status` lists them. |
-| `<sdk>/.apimatic/generation.json` | `schemaVersion`, `language`, `codegenVersion`, `stability`, `pristine` (the commit the directory was written from), `generatedAt`, `cliVersion`, and `conflicts` (paths left with markers, empty on a clean run). | After the pristine commit exists, so the two never disagree. | Yes: an ordinary tracked file, committed with the SDK. It is what makes a branch, a worktree or a clone merge against the right base. |
+| `<sdk>/.apimatic/generation.json` | `schemaVersion`, `language`, `codegenVersion`, `stability`, `pristine` (the commit the directory was written from), `generatedAt`, `cliVersion`. The files a run leaves in conflict are not in it: they are git's unmerged index entries, the only state that says when the developer has resolved them. | After the pristine commit exists, so the two never disagree. | Yes: an ordinary tracked file, committed with the SDK. It is what makes a branch, a worktree or a clone merge against the right base. |
 
 ### 3.1 Which snapshot is the base
 
@@ -268,19 +268,23 @@ the file is written:
 The other kinds carry no markers: a file no longer generated stays as yours; a file you
 deleted comes back in its new version; a binary keeps yours. All are listed by kind in a
 block after the summary, "N files need your attention", with the steps: open each file, keep
-what is right, remove the markers (`git status` lists them as both modified, `git mergetool`
-opens them); rerun, nothing needs committing first; the pre-run state is under
-`refs/apimatic/previous/…`.
+what is right, remove the markers and stage the file (`git status` lists them as both
+modified, `git mergetool` opens them, `git add` marks them resolved); rerun, nothing needs
+committing first; the pre-run state is under `refs/apimatic/previous/…`.
 
 The result is failed, so the exit code is 1 and scripts and CI notice; the outro says the
 conflicts need resolving, not that generation failed. Nothing is lost: every other file is
-already updated, the pristine snapshot is recorded, the record lists the conflicted paths.
+already updated, the pristine snapshot is recorded, the index holds the conflicted paths.
 
-The next run: while any listed file still holds the marker lines, the run stops before
-generating and names them (or asks, 6.1). Once resolved, no commit is needed. With the spec
-unchanged the rerun changes nothing, because new equals base. With a changed spec it merges
-onto your resolution. Git's index keeps the three stages until `git add` resolves them, as
-after any merge.
+The next run: while git still holds any file below the SDK directory as unmerged
+(`GitService.unmergedPaths`, `ls-files -u`), the run stops before generating and names them
+(or asks, 6.1). That is git's own convention: the three stages stay in the index until
+`git add` (or a mergetool, or an IDE's accept button) marks the file resolved, and `git commit`
+refuses until then. The CLI reads nothing else: not the marker text, which a developer may
+legitimately write and which an unstaged resolution still lacks, and not a list in the record,
+which would carry a local, transient state in a committed file. Once resolved and staged, no
+commit is needed. With the spec unchanged the rerun changes nothing, because new equals base.
+With a changed spec it merges onto your resolution.
 
 ### 6.1 The questions
 
@@ -303,7 +307,7 @@ is absent, the action lists the conflicted files with their kind and asks
   recorded, no previous ref saved; the result is cancelled. The previous ref is saved only
   after the decision, so this answer leaves no trace.
 
-The next run, while a listed file still holds markers, asks before generating
+The next run, while git holds any of the SDK's files as unmerged, asks before generating
 (`SdkGeneratePrompts.unresolvedChoice`); `--force` and a run without a terminal get the
 refusal as before:
 
@@ -311,13 +315,14 @@ refusal as before:
 - **Use the generator's changes in the files still marked**:
   `SdkRepositoryContext.resolveForGenerator` settles each marker block in place for the
   generator's side, keeping every line around it (what you already resolved in that file
-  included), and takes the file out of the unmerged state; no network needed.
+  included), leaves an unmerged file without markers as it is on disk, and takes every one
+  of them out of the unmerged state; no network needed.
 - **Undo the last generation**: `SdkRepositoryContext.restorePrevious` puts the whole SDK
   directory back as `refs/apimatic/previous/<path>` holds it, record included, through
   `GitService.checkoutTree` (a temporary index, `read-tree --reset -u`): files the run added
   go, `.git` and ignored files are untouched.
 
-After either, the directory is inspected again, once; a file still marked after that is
+After either, the directory is inspected again, once; a file still unmerged after that is
 reported, never asked about twice. The run then generates and merges from the settled or
 restored state, so an undo with an unchanged spec lands back at the first question.
 
@@ -369,6 +374,7 @@ Every row of section 5 and this table is a test over real repositories in
 | 8 | 7c181dfa | Sharing through a `pre-push` hook instead of a push in the CLI: the `apimatic-pre-push` script and the calling block (`ShareHook`), `GitService.hooksDirectory` and `hooksPathConfigured`, `SdkRepositoryContext.installShareHook`, the one-step note; `pushRef` and `shareSnapshot` removed; lab cases for `core.hooksPath` and an existing hook. |
 | 9 | 07c03c13 | The conflict questions (6.1): `MergePlan.takingGenerated`, `ConflictChoice`/`UnresolvedChoice`/`ConflictOutcome`, `SdkRepositoryContext.restorePrevious` and `resolveForGenerator`, `GitService.checkoutTree`, `terminal.isInteractive`, the two `select` prompts and their follow-ups, the choice on the telemetry event; the README's custom-code section removed. |
 | 10 | this file | Review follow-up: `SdkPrepareAction` and `SdkWriteAction` folded into `GenerateAction.execute`, their prompts into `SdkGeneratePrompts`; `SdkMergeConflictedEvent`, `ConflictOutcome`, `MergePlan.conflictsByKind` and the result payload removed; the two action tests now drive `GenerateAction` through `test/helpers/sdk-generation.ts`. |
+| 12 | this file | Review follow-up: the conflicts a run leaves are found from git's unmerged index entries (`GitService.unmergedPaths`, `ls-files -u` below the SDK directory), as git itself finds them, instead of a conflict list in the record plus a scan for marker text; `GenerationRecord` drops `conflicts` (older records still parse), `hasConflictMarkers` goes, `restorePrevious` takes the paths to settle, the second-run messages say "unresolved" and the first-run steps say to stage each file. |
 | 11 | this file | Functional core, imperative shell: `SdkDestination` carrying its reason, `destinationFor` (`unresolved` included), `replacesDirectory`; `Regeneration` and `Settlement` (`resolving`, `favouringGenerator`); `SdkContext.destination`, `SdkRepositoryContext.regenerate` and `write`; `execute` the one place that speaks, with no other method on the action and no logic in the prompts. |
 
 PR into `dev`, squash-merged, title `feat(sdk): keep your edits when regenerating an SDK`.
@@ -409,8 +415,8 @@ flowchart TB
     SC["SdkContext<br/>directory · exists · destination(generation) → SdkDestination | Unresolved · repository() · initRepository · save · loadSdkInTempDirectory"]
     RC["SdkRepositoryContext (sdk-repository-context.ts)<br/>remote · inspect → SdkRepositoryState · regenerate → Regeneration{generated, merge} · write(base, plan)<br/>snapshotGenerated · snapshotDisk · savePrevious · merge → MergeOutcome · apply · stageConflicts<br/>recordPristine/recordGeneration · readRecord · installShareHook → ShareHookInstall · restorePrevious · resolveForGenerator"]
     MP["MergePlan (sdk/merge-plan.ts)<br/>from(inputs) · writes/deletes/conflicts/renames/files · takingGenerated()<br/>ConflictKind · ConflictChoice · UnresolvedChoice"]
-    CMK["conflict-markers.ts<br/>relabelMarkers · hasConflictMarkers · resolveMarkersForGenerated"]
-    GR["GenerationRecord (sdk/generation-record.ts)<br/>generation.json: language, codegen, stability, pristine commit, conflicts · describeApart"]
+    CMK["conflict-markers.ts<br/>relabelMarkers · resolveMarkersForGenerated"]
+    GR["GenerationRecord (sdk/generation-record.ts)<br/>generation.json: language, codegen, stability, pristine commit · describeApart"]
     SR["SnapshotRef (sdk/snapshot-ref.ts)<br/>refs/apimatic/pristine|previous/‹path› · refspec · sdkPath · collidesWith"]
     SH["ShareHook (sdk/share-hook.ts)<br/>SHARE_HOOK_SCRIPT · SHARE_HOOK_CALL · SHARE_HOOK_BLOCK · installInto · calls"]
     SD["SdkDestination (sdk/sdk-destination.ts)<br/>overwrite{found} | record{repository?, because} | merge{repository, base} · Unresolved{repository, paths}<br/>destinationFor(repository, SdkRepositoryState) · replacesDirectory"]
@@ -419,7 +425,7 @@ flowchart TB
     RF["file/ · RelativeFilePath · FilePath · DirectoryPath"]
   end
   subgraph INF["Infrastructure — src/infrastructure/"]
-    GS["GitService (git-service.ts)<br/>version · init · treeOf · commitTree · updateRef · resolveRef · hasCommit · describe<br/>mergeTree · diffTrees · listTree · readBlobs · stageConflicts (update-index) · checkoutTree (read-tree)<br/>remoteOf · fetchRef (no prompts, 30 s) · hooksDirectory · hooksPathConfigured"]
+    GS["GitService (git-service.ts)<br/>version · init · treeOf · commitTree · updateRef · resolveRef · hasCommit · describe<br/>mergeTree · diffTrees · listTree · readBlobs · stageConflicts (update-index) · unmergedPaths (ls-files -u) · unstage · checkoutTree (read-tree)<br/>remoteOf · fetchRef (no prompts, 30 s) · hooksDirectory · hooksPathConfigured"]
     FS["FileService"]
     TU["utils/terminal-utils.ts · terminal.isInteractive"]
   end
@@ -475,8 +481,12 @@ What each layer owns:
   pattern to avoid; this one falls under its exception (a layout context answering with a
   derived directory for a prompt that names it and a service that works on it). The
   alternative is a method handing back the store's findings, so no caller holds the path.
-- **The marker check** covers the files the record lists, not every tracked file. Reading
-  the whole SDK before every run seemed a high price for a case the record already covers.
+- **Unresolved conflicts are git's unmerged entries**, decided 2026-10-23 on review: the
+  CLI asks the index (`ls-files -u` below the SDK directory) and nothing else, so a file
+  counts as resolved exactly when `git add` has marked it so, as after any merge. A
+  developer who discards the index (`git reset`, `git stash`) with markers still in the
+  files has told git the files are resolved; the next merge then sees the marker lines as
+  their edit and flags them again, so nothing is lost silently.
 - **Packages must exclude `.apimatic/`.** No change needed, checked 2026-10-20: all three v4
   manifests are whitelists (`package.json` `files`, the `.csproj`'s explicit `Pack="true"`
   items, `[tool.poetry]` `packages`), and `npm pack`, `dotnet pack` and `python -m build` on

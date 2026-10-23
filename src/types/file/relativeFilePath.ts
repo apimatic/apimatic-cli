@@ -43,6 +43,14 @@ export class RelativeFilePath {
     return prefix === '' ? this : new RelativeFilePath(`${prefix}/${this.value}`);
   }
 
+  /** The same file seen from inside `prefix`, undoing `below`; none when the file is not under it. */
+  public inside(prefix: string): RelativeFilePath | undefined {
+    if (prefix === '') {
+      return this;
+    }
+    return this.value.startsWith(`${prefix}/`) ? new RelativeFilePath(this.value.slice(prefix.length + 1)) : undefined;
+  }
+
   public name(): FileName {
     return new FileName(path.posix.basename(this.value));
   }

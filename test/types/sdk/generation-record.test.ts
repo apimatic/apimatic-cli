@@ -1,4 +1,3 @@
-import { RelativeFilePath } from '../../../src/types/file/relativeFilePath.js';
 import { expect } from 'chai';
 import { CommitId } from '../../../src/types/git/commit-id.js';
 import { CodeGenerationVersion, Language, Stability } from '../../../src/types/sdk/generate.js';
@@ -15,11 +14,8 @@ const json = (overrides: Record<string, unknown> = {}) =>
     pristine: SHA,
     generatedAt: '2026-10-20T10:00:00.000Z',
     cliVersion: '2.3.0',
-    conflicts: [],
     ...overrides
   });
-
-const rel = (value: string) => RelativeFilePath.fromGit(value);
 
 describe('GenerationRecord', () => {
   it('round-trips through its file form', () => {
@@ -27,14 +23,12 @@ describe('GenerationRecord', () => {
       { language: Language.PYTHON, codegenVersion: CodeGenerationVersion.V4, stability: Stability.BETA },
       CommitId.create(SHA)!,
       new Date('2026-10-20T10:00:00Z'),
-      '2.3.0',
-      [rel('src/models/book.py')]
+      '2.3.0'
     );
 
     const parsed = GenerationRecord.parse(record.toJson())!;
 
     expect(parsed.toJson()).to.equal(record.toJson());
-    expect(parsed.hasConflicts()).to.be.true;
     expect(
       parsed.isFor({ language: Language.PYTHON, codegenVersion: CodeGenerationVersion.V4, stability: Stability.BETA })
     ).to.be.true;
@@ -55,8 +49,7 @@ describe('GenerationRecord', () => {
         '  "stability": "stable",',
         `  "pristine": "${SHA}",`,
         '  "generatedAt": "2026-10-20T10:00:00.000Z",',
-        '  "cliVersion": "2.3.0",',
-        '  "conflicts": []',
+        '  "cliVersion": "2.3.0"',
         '}',
         ''
       ].join('\n')
@@ -71,7 +64,19 @@ describe('GenerationRecord', () => {
     expect(GenerationRecord.parse(json({ stability: 'alpha' }))).to.be.undefined;
     expect(GenerationRecord.parse(json({ pristine: 'HEAD' }))).to.be.undefined;
     expect(GenerationRecord.parse(json({ generatedAt: 'yesterday' }))).to.be.undefined;
-    expect(GenerationRecord.parse(json({ conflicts: 'src/index.ts' }))).to.be.undefined;
     expect(GenerationRecord.parse(json({ cliVersion: 2 }))).to.be.undefined;
+  });
+
+  it('reads a record an earlier CLI wrote with a conflict list, and drops the list', () => {
+    const record = GenerationRecord.parse(json({ conflicts: ['src/index.ts'] }))!;
+
+    expect(
+      record.isFor({
+        language: Language.TYPESCRIPT,
+        codegenVersion: CodeGenerationVersion.V4,
+        stability: Stability.STABLE
+      })
+    ).to.be.true;
+    expect(record.toJson()).to.not.contain('conflicts');
   });
 });

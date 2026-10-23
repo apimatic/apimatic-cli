@@ -72,8 +72,8 @@ export class GenerateAction {
     const generation: SdkGeneration = { language, codegenVersion: codegenVersionFor(language, stability), stability };
     const canAsk = !force && terminal.isInteractive();
 
-    // Decided before anything is uploaded, so a refused or declined run stops here. Markers left
-    // by the last run are settled first, and the directory looked at again, once.
+    // Decided before anything is uploaded, so a refused or declined run stops here. Conflicts the
+    // last run left unresolved in git's index are settled first, and the directory looked at again, once.
     let looked = await sdkContext.destination(generation);
     if (looked.isOk() && looked.value.kind === 'unresolved') {
       const { repository, paths } = looked.value;
@@ -87,7 +87,7 @@ export class GenerateAction {
         return ActionResult.failed();
       }
       const settled =
-        choice === 'generated' ? await repository.resolveForGenerator(paths) : await repository.restorePrevious();
+        choice === 'generated' ? await repository.resolveForGenerator(paths) : await repository.restorePrevious(paths);
       if (settled.isErr()) {
         this.prompts.conflictsNotSettled(settled.error.reason);
         return ActionResult.failed();
@@ -176,7 +176,7 @@ export class GenerateAction {
         }
         const generated = await repository.snapshotGenerated(tempSdk.value);
         const recorded = await generated.asyncAndThen(
-          (tree) => new ResultAsync(repository.recordGeneration(tree, generation, envInfo.getCLIVersion(), []))
+          (tree) => new ResultAsync(repository.recordGeneration(tree, generation, envInfo.getCLIVersion()))
         );
         if (recorded.isErr()) {
           this.prompts.snapshotNotRecorded(recorded.error.reason);
@@ -223,8 +223,7 @@ export class GenerateAction {
       const recorded = await repository.recordGeneration(
         settlement.regeneration.generated,
         generation,
-        envInfo.getCLIVersion(),
-        settlement.plan.conflictedPaths()
+        envInfo.getCLIVersion()
       );
       if (recorded.isErr()) {
         this.prompts.snapshotNotRecorded(recorded.error.reason);
