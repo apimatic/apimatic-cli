@@ -11,7 +11,7 @@ import { CommitId } from '../../src/types/git/commit-id.js';
 import { SdkContext } from '../../src/types/sdk-context.js';
 import { SdkRepositoryContext } from '../../src/types/sdk-repository-context.js';
 import { CodeGenerationVersion, Language, Stability } from '../../src/types/sdk/generate.js';
-import { GenerationRecord, SdkGeneration } from '../../src/types/sdk/generation-record.js';
+import { GenerationRecord, RECORD_ATTRIBUTES, SdkGeneration } from '../../src/types/sdk/generation-record.js';
 import { SHARE_HOOK_BLOCK, SHARE_HOOK_CALL, SHARE_HOOK_SCRIPT } from '../../src/types/sdk/share-hook.js';
 import { SnapshotRef } from '../../src/types/sdk/snapshot-ref.js';
 import { snapshotFiles } from '../helpers/snapshots.js';
@@ -355,6 +355,66 @@ describe('SdkRepositoryContext', () => {
       write(repository.sdkDirectory(), path.join('.apimatic', 'generation.json'), '{"schemaVersion": 2}');
 
       expect(await repository.readRecord()).to.be.undefined;
+    });
+
+    it('is written with attributes that merge it as binary and mark it generated', async () => {
+      const repository = await project();
+      const tree = (await repository.snapshotGenerated(generated({ 'README.md': '# v1' })))._unsafeUnwrap();
+
+      (await repository.recordGeneration(tree, TYPESCRIPT, '2.3.0'))._unsafeUnwrap();
+
+      const attributes = path.join(repository.sdkDirectory().toString(), '.apimatic', '.gitattributes');
+      expect(fs.readFileSync(attributes, 'utf8')).to.equal(RECORD_ATTRIBUTES);
+      const checked = await execa(
+        'git',
+        ['check-attr', 'merge', 'linguist-generated', '--', 'sdk/typescript/.apimatic/generation.json'],
+        {
+          cwd: repository.root().toString()
+        }
+      );
+      expect(checked.stdout.split('\n')).to.deep.equal([
+        'sdk/typescript/.apimatic/generation.json: merge: binary',
+        'sdk/typescript/.apimatic/generation.json: linguist-generated: true'
+      ]);
+    });
+
+    it('stays yours, whole and without markers, when a pull meets a teammate’s record', async () => {
+      const sh = (cwd: string, ...args: string[]) =>
+        execa('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', '-c', 'core.autocrlf=false', ...args], {
+          cwd,
+          reject: false
+        });
+      const regenerate = async (sdk: string, files: Record<string, string>, message: string) => {
+        const repository = (await contextFor(new DirectoryPath(sdk)).repository())!;
+        const tree = (await repository.snapshotGenerated(generated(files)))._unsafeUnwrap();
+        const recorded = (await repository.recordGeneration(tree, TYPESCRIPT, '2.3.0'))._unsafeUnwrap();
+        await sh(repository.root().toString(), 'add', '-A');
+        await sh(repository.root().toString(), 'commit', '-qm', message);
+        return recorded;
+      };
+      const mine = (await project()).root().toString();
+      const origin = path.join(root, 'origin.git');
+      const teammate = path.join(root, 'teammate');
+      await regenerate(path.join(mine, 'sdk', 'typescript'), { 'README.md': '# v1' }, 'v1');
+      await sh(root, 'init', '-q', '--bare', '--initial-branch=main', origin);
+      await sh(mine, 'remote', 'add', 'origin', origin);
+      await sh(mine, 'push', '-q', 'origin', 'main');
+      await sh(root, 'clone', '-q', origin, teammate);
+      await regenerate(path.join(teammate, 'sdk', 'typescript'), { 'README.md': '# v2 for them' }, 'theirs');
+      await sh(teammate, 'push', '-q', 'origin', 'main');
+      const yours = await regenerate(path.join(mine, 'sdk', 'typescript'), { 'README.md': '# v2 for me' }, 'mine');
+
+      const pulled = await sh(mine, '-c', 'pull.rebase=false', 'pull', '-q', 'origin', 'main');
+
+      const record = fs.readFileSync(path.join(mine, 'sdk', 'typescript', '.apimatic', 'generation.json'), 'utf8');
+      expect(pulled.exitCode).to.not.equal(0);
+      expect(record).to.equal(yours.toJson());
+      expect(record).to.not.contain('<<<<<<<');
+      expect((await sh(mine, 'status', '--porcelain', '--', 'sdk/typescript/.apimatic')).stdout).to.equal(
+        'UU sdk/typescript/.apimatic/generation.json'
+      );
+      await sh(mine, 'add', '--', 'sdk/typescript/.apimatic/generation.json');
+      expect((await sh(mine, 'commit', '-q', '--no-edit')).exitCode).to.equal(0);
     });
   });
 

@@ -12,7 +12,7 @@ import { CommitId } from './git/commit-id.js';
 import { StageEntry } from './git/merge-tree.js';
 import { TreeId } from './git/tree-id.js';
 import { relabelMarkers } from './sdk/conflict-markers.js';
-import { describeGeneration, GenerationRecord, SdkGeneration } from './sdk/generation-record.js';
+import { describeGeneration, GenerationRecord, RECORD_ATTRIBUTES, SdkGeneration } from './sdk/generation-record.js';
 import { ConflictSide, MergePlan } from './sdk/merge-plan.js';
 import { settledContent } from './sdk/unresolved-file.js';
 import { SHARE_HOOK_SCRIPT, SHARE_HOOK_SCRIPT_NAME, ShareHook } from './sdk/share-hook.js';
@@ -61,6 +61,7 @@ const GIT_SIDES: Record<ConflictSide, 'ours' | 'theirs'> = { yours: 'ours', gene
 
 const RECORD_DIRECTORY = '.apimatic';
 const RECORD_FILE = 'generation.json';
+const RECORD_ATTRIBUTES_FILE = '.gitattributes';
 
 /**
  * An SDK directory together with the git repository that encloses it, where its snapshots live
@@ -478,7 +479,11 @@ export class SdkRepositoryContext {
   private async writeRecord(record: GenerationRecord): Promise<Result<FilePath, SdkRepositoryProblem>> {
     const file = this.recordFile();
     try {
-      await this.fileService.replaceContents(file, record.toJson());
+      await this.fileService.replaceContentsIfChanged(
+        new FilePath(this.sdk.join(RECORD_DIRECTORY), new FileName(RECORD_ATTRIBUTES_FILE)),
+        RECORD_ATTRIBUTES
+      );
+      await this.fileService.replaceContentsIfChanged(file, record.toJson());
       return ok(file);
     } catch (error) {
       return err({ kind: 'recordNotWritten', reason: errorMessage(error) });

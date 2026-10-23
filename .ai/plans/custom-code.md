@@ -83,7 +83,7 @@ the ref has no suffix.
 |---|---|---|---|
 | `refs/apimatic/pristine/<path>` | A chain of commits, one per generation. Each tree is that generation's output exactly as unzipped: no `.git`, no `.apimatic/`, no developer files. | After every successful write, with plumbing: the generated directory is added to a temporary index (`GIT_INDEX_FILE`, `--work-tree`), then `write-tree`, `commit-tree` and `update-ref`. Author "APIMatic CLI <developer@apimatic.io>", message `apimatic: pristine typescript v4 stable`. | Pushed to the remote after every recorded run; fetched by a run whose record names a commit the repository lacks (3.2). |
 | `refs/apimatic/previous/<path>` | One commit, no parent: the SDK directory as it was on disk the moment before the last run wrote to it (`.git` excluded). Its tree is rooted at the SDK directory, not at the repository root. | Before the merge writes anything. Overwritten each run. | No. Local safety net: `git --work-tree=sdk/typescript restore --source=refs/apimatic/previous/sdk/typescript --worktree -- .` puts the files back, record included (verified in the lab, case 15); files the run added stay and `git status` lists them. |
-| `<sdk>/.apimatic/generation.json` | `schemaVersion`, `language`, `codegenVersion`, `stability`, `pristine` (the commit the directory was written from), `generatedAt`, `cliVersion`. The files a run leaves in conflict are not in it: they are git's unmerged index entries, the only state that says when the developer has resolved them. | After the pristine commit exists, so the two never disagree. | Yes: an ordinary tracked file, committed with the SDK. It is what makes a branch, a worktree or a clone merge against the right base. |
+| `<sdk>/.apimatic/generation.json` | `schemaVersion`, `language`, `codegenVersion`, `stability`, `pristine` (the commit the directory was written from), `generatedAt`, `cliVersion`. The files a run leaves in conflict are not in it: they are git's unmerged index entries, the only state that says when the developer has resolved them. | After the pristine commit exists, so the two never disagree; `.apimatic/.gitattributes` (`generation.json merge=binary linguist-generated=true`) first, each only when its content changed. | Yes: an ordinary tracked file, committed with the SDK. It is what makes a branch, a worktree or a clone merge against the right base. The attributes keep a pull where two clones both regenerated from writing markers into it (section 11). |
 
 ### 3.1 Which snapshot is the base
 
@@ -390,6 +390,7 @@ Every row of section 5 and this table is a test over real repositories in
 | 11 | this file | Functional core, imperative shell: `SdkDestination` carrying its reason, `destinationFor` (`unresolved` included), `replacesDirectory`; `Regeneration` and `Settlement` (`resolving`, `favouringGenerator`); `SdkContext.destination`, `SdkRepositoryContext.regenerate` and `write`; `execute` the one place that speaks, with no other method on the action and no logic in the prompts. |
 | 12 | this file | Review follow-up: the conflicts a run leaves are found from git's unmerged index entries (`GitService.unmergedPaths`, `ls-files -u` below the SDK directory), as git itself finds them, instead of a conflict list in the record plus a scan for marker text; `GenerationRecord` drops `conflicts` (older records still parse), `hasConflictMarkers` goes, `restorePrevious` takes the paths to settle, the second-run messages say "unresolved" and the first-run steps say to stage each file. |
 | 13 | this file | Review follow-up: "Resolve using my changes" on both questions (`-X ours`, `MergePlan.taking(side)`, `favouring(side, …)`, `resolveMarkers(content, side)`), the first question's third answer renamed "Cancel this run", and the second question's undo removed with `restorePrevious`, `previousRestored` and `GitService.checkoutTree`; the second run settles files without markers from the index's stages (`GitService.unmergedStages`, `settledContent`), so a customized file the generator dropped is removed for the generator's side. |
+| 14 | this file | Review follow-up: `.apimatic/.gitattributes` written beside the record (`RECORD_ATTRIBUTES`), so a pull where two clones both regenerated leaves the puller's record whole instead of writing markers into it; a test pulls between two real clones. |
 
 PR into `dev`, squash-merged, title `feat(sdk): keep your edits when regenerating an SDK`.
 
@@ -495,6 +496,16 @@ What each layer owns:
   pattern to avoid; this one falls under its exception (a layout context answering with a
   derived directory for a prompt that names it and a service that works on it). The
   alternative is a method handing back the store's findings, so no caller holds the path.
+- **The record merges as binary.** Decided 2026-10-23 after testing with two clones: both
+  regenerated, so both changed `generatedAt`, and the second pull hit a text conflict in the
+  record. `.apimatic/.gitattributes` sets `merge=binary`: git writes no markers, leaves the
+  puller's record in place as valid JSON and lists it as both modified, so `git add` accepts
+  it; either record names a snapshot a run can merge from. Under `git pull --rebase` the
+  record left in place is the upstream one, equally valid. Weighed and set aside: `merge=union`
+  (no conflict, but invalid JSON), a custom "keep ours" driver (silent, but it needs a
+  `git config` line in every clone, and a clone without it falls back to markers), and
+  dropping the fields that change on every run (kept by decision). `linguist-generated`
+  collapses the record in GitHub's pull request diffs.
 - **Unresolved conflicts are git's unmerged entries**, decided 2026-10-23 on review: the
   CLI asks the index (`ls-files -u` below the SDK directory) and nothing else, so a file
   counts as resolved exactly when `git add` has marked it so, as after any merge. A

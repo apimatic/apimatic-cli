@@ -109,6 +109,9 @@ export class GenerationRecord {
   }
 }
 
+export const RECORD_ATTRIBUTES =
+  '# Written by the APIMatic CLI.\ngeneration.json merge=binary linguist-generated=true\n';
+
 /** How a snapshot's commit message names its generation. */
 export function describeGeneration(generation: SdkGeneration): string {
   return `${generation.language} ${generation.codegenVersion} ${generation.stability}`;

@@ -67,7 +67,7 @@ One generation's output exactly as the server returned it, stored as a commit un
 _Avoid_: Generated snapshot, baseline, original
 
 **Generation record**:
-`<sdk>/.apimatic/generation.json`, committed with the SDK, naming the pristine snapshot the directory was last written from and the files a run left with conflict markers.
+`<sdk>/.apimatic/generation.json`, committed with the SDK, naming the pristine snapshot the directory was last written from. Written with `.apimatic/.gitattributes` beside it, so git merges it as binary and GitHub collapses it in pull requests.
 _Avoid_: Lock file, manifest, metadata file
 
 **Custom code**:
