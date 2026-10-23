@@ -1,5 +1,6 @@
-import { getAuthInfo } from '../../../client-utils/auth-manager.js';
+import { resolveAuthKey } from '../../../client-utils/auth-manager.js';
 import { CopilotIngestService } from '../../../infrastructure/services/copilot-ingest-service.js';
+import { PortalAuthorizationService } from '../../../infrastructure/services/portal-authorization-service.js';
 import { PortalCopilotSyncPrompts } from '../../../prompts/portal/copilot/sync.js';
 import { CommandMetadata } from '../../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../../types/file/directoryPath.js';
@@ -11,6 +12,7 @@ import { ActionResult } from '../../action-result.js';
 export class PortalCopilotSyncAction {
   private readonly prompts = new PortalCopilotSyncPrompts();
   private readonly ingestService = new CopilotIngestService();
+  private readonly authorizationService = new PortalAuthorizationService();
 
   constructor(
     private readonly configDir: DirectoryPath,
@@ -36,8 +38,17 @@ export class PortalCopilotSyncAction {
       this.prompts.copilotNotConfigured(project.sourceDirectory());
       return ActionResult.failed();
     }
-    const authKey = await this.uploadKey();
+    const authKey = await resolveAuthKey(this.configDir, this.authKey);
     if (authKey === null) {
+      this.prompts.notLoggedIn();
+      return ActionResult.failed();
+    }
+    const { shell } = this.commandMetadata;
+    const entitled = await this.prompts.checkSubscription(
+      this.authorizationService.authorizeAskAi(this.configDir, shell, authKey)
+    );
+    if (entitled.isErr()) {
+      this.prompts.authorizationFailed(entitled.error);
       return ActionResult.failed();
     }
 
@@ -53,7 +64,6 @@ export class PortalCopilotSyncAction {
       return ActionResult.failed();
     }
 
-    const { shell } = this.commandMetadata;
     const receipt = await this.prompts.upload(
       this.ingestService.upload(copilot, bundle, shell, authKey),
       bundle.pageCount()
@@ -85,23 +95,4 @@ export class PortalCopilotSyncAction {
     }
     return ActionResult.success();
   };
-
-  /**
-   * The only place that decides which key the service receives: the passed one, else the saved login. The
-   * service is APIMatic's own, or one on this machine, as the `portal` block allows no other.
-   */
-  private async uploadKey(): Promise<string | null> {
-    // A blank `--auth-key` (say, from an unset variable) is no key, so it falls back to the saved login.
-    const passed = this.authKey?.trim() ?? '';
-    if (passed !== '') {
-      return passed;
-    }
-    // `auth logout` blanks the stored key rather than deleting the file, so the key is checked, not the file.
-    const saved = (await getAuthInfo(this.configDir.toString()))?.authKey;
-    if (!saved) {
-      this.prompts.notLoggedIn();
-      return null;
-    }
-    return saved;
-  }
 }

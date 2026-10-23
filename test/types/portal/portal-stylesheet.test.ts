@@ -56,7 +56,7 @@ describe('PortalStylesheet', () => {
   // colour meant for light mode would win in dark mode as well.
   // The chat's classes would otherwise come with every portal's stylesheet, chat or not.
   it("imports the Ask AI chat's preset only for a portal that offers the chat, before any rule", () => {
-    const copilot = { key: 'pk_test', apiUrl: 'https://ask.apimatic.io' };
+    const copilot = { key: 'pk_test' };
 
     expect(stylesheetFor({})).to.not.contain(CHAT_PRESET);
     const css = stylesheetFor({ ai: { copilot }, brand: { colors: { primary: '#1d4ed8' } } });
@@ -110,7 +110,7 @@ describe('PortalStylesheet', () => {
 
       expect(await chatSources({})).to.be.empty;
       expect(
-        await chatSources({ ai: { copilot: { key: 'pk_test', apiUrl: 'https://ask.apimatic.io' } } })
+        await chatSources({ ai: { copilot: { key: 'pk_test' } } })
       ).to.have.length(1);
     });
 

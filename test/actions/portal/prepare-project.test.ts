@@ -8,6 +8,7 @@ import { DirectoryPath } from '../../../src/types/file/directoryPath';
 import { CommandMetadata } from '../../../src/types/common/command-metadata';
 import { ProjectContext } from '../../../src/types/project-context';
 import { stubPreparePortalProject } from './prepare-project-stubs';
+import { entitlementsWith } from '../../helpers/account';
 
 const COMMAND_METADATA: CommandMetadata = { commandName: 'portal generate', shell: 'test' };
 
@@ -20,7 +21,7 @@ describe('PreparePortalProjectAction', () => {
   it('stops before signing in when the source is on a network share', async function () {
     if (process.platform !== 'win32') this.skip();
     const shared = stubPreparePortalProject();
-    const authorize = sinon.stub(PortalAuthorizationService.prototype, 'authorize').resolves(ok(undefined));
+    const authorize = sinon.stub(PortalAuthorizationService.prototype, 'authorize').resolves(ok(entitlementsWith('portalGeneration')));
     const onPrepared = sinon.stub();
     const share = new DirectoryPath('\\\\server\\share\\api');
 

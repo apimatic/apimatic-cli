@@ -28,7 +28,7 @@ $ npm install -g @apimatic/cli
 $ apimatic COMMAND
 running command...
 $ apimatic (--version)
-@apimatic/cli/1.3.1 win32-x64 node-v24.19.0
+@apimatic/cli/1.5.0 win32-x64 node-v24.14.0
 $ apimatic --help [COMMAND]
 USAGE
   $ apimatic COMMAND
@@ -47,6 +47,8 @@ USAGE
 * [`apimatic help [COMMAND]`](#apimatic-help-command)
 * [`apimatic plugin generate`](#apimatic-plugin-generate)
 * [`apimatic plugin publish`](#apimatic-plugin-publish)
+* [`apimatic portal copilot disable`](#apimatic-portal-copilot-disable)
+* [`apimatic portal copilot enable`](#apimatic-portal-copilot-enable)
 * [`apimatic portal copilot sync`](#apimatic-portal-copilot-sync)
 * [`apimatic portal generate`](#apimatic-portal-generate)
 * [`apimatic portal serve`](#apimatic-portal-serve)
@@ -87,7 +89,7 @@ EXAMPLES
   apimatic api transform --format=raml --url="https://petstore.swagger.io/v2/swagger.json" --destination=./
 ```
 
-_See code: [src/commands/api/transform.ts](https://github.com/apimatic/apimatic-cli/blob/v1.3.1/src/commands/api/transform.ts)_
+_See code: [src/commands/api/transform.ts](https://github.com/apimatic/apimatic-cli/blob/v1.5.0/src/commands/api/transform.ts)_
 
 ## `apimatic api validate`
 
@@ -120,7 +122,7 @@ EXAMPLES
   apimatic api validate --url="https://petstore.swagger.io/v2/swagger.json"
 ```
 
-_See code: [src/commands/api/validate.ts](https://github.com/apimatic/apimatic-cli/blob/v1.3.1/src/commands/api/validate.ts)_
+_See code: [src/commands/api/validate.ts](https://github.com/apimatic/apimatic-cli/blob/v1.5.0/src/commands/api/validate.ts)_
 
 ## `apimatic auth login`
 
@@ -144,7 +146,7 @@ EXAMPLES
   apimatic auth login --auth-key={api-key}
 ```
 
-_See code: [src/commands/auth/login.ts](https://github.com/apimatic/apimatic-cli/blob/v1.3.1/src/commands/auth/login.ts)_
+_See code: [src/commands/auth/login.ts](https://github.com/apimatic/apimatic-cli/blob/v1.5.0/src/commands/auth/login.ts)_
 
 ## `apimatic auth logout`
 
@@ -163,7 +165,7 @@ EXAMPLES
   apimatic auth logout
 ```
 
-_See code: [src/commands/auth/logout.ts](https://github.com/apimatic/apimatic-cli/blob/v1.3.1/src/commands/auth/logout.ts)_
+_See code: [src/commands/auth/logout.ts](https://github.com/apimatic/apimatic-cli/blob/v1.5.0/src/commands/auth/logout.ts)_
 
 ## `apimatic auth status`
 
@@ -180,7 +182,7 @@ EXAMPLES
   apimatic auth status
 ```
 
-_See code: [src/commands/auth/status.ts](https://github.com/apimatic/apimatic-cli/blob/v1.3.1/src/commands/auth/status.ts)_
+_See code: [src/commands/auth/status.ts](https://github.com/apimatic/apimatic-cli/blob/v1.5.0/src/commands/auth/status.ts)_
 
 ## `apimatic autocomplete [SHELL]`
 
@@ -252,8 +254,8 @@ DESCRIPTION
   Generate a context plugin for your SDKs.
 
   Generate a context plugin that teaches an AI coding assistant how to use your SDKs. Requires an input directory
-  containing a `src` directory with your API specification — `apimatic.json` is created if it is not there. It asks
-  for the plugin's name on the first run, and for its languages only when `apimatic.json` records none (`sdk publish`
+  containing a `src` directory with your API specification — `apimatic.json` is created if it is not there. It asks for
+  the plugin's name on the first run, and for its languages only when `apimatic.json` records none (`sdk publish`
   records them). Later runs read both from `apimatic.json` without asking.
 
 EXAMPLES
@@ -262,7 +264,7 @@ EXAMPLES
   apimatic plugin generate --input="./" --destination="./plugin"
 ```
 
-_See code: [src/commands/plugin/generate.ts](https://github.com/apimatic/apimatic-cli/blob/v1.3.1/src/commands/plugin/generate.ts)_
+_See code: [src/commands/plugin/generate.ts](https://github.com/apimatic/apimatic-cli/blob/v1.5.0/src/commands/plugin/generate.ts)_
 
 ## `apimatic plugin publish`
 
@@ -289,7 +291,78 @@ EXAMPLES
   apimatic plugin publish --input="./" --destination="./plugin"
 ```
 
-_See code: [src/commands/plugin/publish.ts](https://github.com/apimatic/apimatic-cli/blob/v1.3.1/src/commands/plugin/publish.ts)_
+_See code: [src/commands/plugin/publish.ts](https://github.com/apimatic/apimatic-cli/blob/v1.5.0/src/commands/plugin/publish.ts)_
+
+## `apimatic portal copilot disable`
+
+Turn off the portal's Ask AI chat and revoke its key.
+
+```
+USAGE
+  $ apimatic portal copilot disable [-i <value>] [-k <value>]
+
+FLAGS
+  -i, --input=<value>     [default: ./] path to the parent directory containing the 'src' directory, which includes API
+                          specifications and configuration files.
+  -k, --auth-key=<value>  override current authentication state with an authentication key.
+
+DESCRIPTION
+  Turn off the portal's Ask AI chat and revoke its key.
+
+  Revokes the portal's Ask AI key with the Ask AI service and removes it from the 'portal' block of 'src/apimatic.json'.
+  Generate and deploy the portal again afterwards, so it no longer shows the chat.
+
+  The key is revoked with your saved APIMatic login, or with the auth key passed with --auth-key.
+
+EXAMPLES
+  apimatic portal copilot disable
+```
+
+_See code: [src/commands/portal/copilot/disable.ts](https://github.com/apimatic/apimatic-cli/blob/v1.5.0/src/commands/portal/copilot/disable.ts)_
+
+## `apimatic portal copilot enable`
+
+Set up an Ask AI chat for the portal, answered from its own pages.
+
+```
+USAGE
+  $ apimatic portal copilot enable [--dev] [--rotate] [--origin <value>...] [-i <value>] [-k <value>]
+
+FLAGS
+  -i, --input=<value>      [default: ./] path to the parent directory containing the 'src' directory, which includes API
+                           specifications and configuration files.
+  -k, --auth-key=<value>   override current authentication state with an authentication key.
+      --dev                use a development key, which also works on this machine and answers a limited number of
+                           questions a day.
+      --origin=<value>...  [default: ] a site besides the portal's 'site.url' allowed to use the key, such as
+                           'https://staging.example.com'.
+      --rotate             replace the portal's key with a new one, and revoke the old one.
+
+DESCRIPTION
+  Set up an Ask AI chat for the portal, answered from its own pages.
+
+  Gives the portal an Ask AI key, registers it with the Ask AI service, and saves it to the 'portal' block of
+  'src/apimatic.json'. The next 'apimatic portal generate' builds the portal with its Ask AI chat.
+
+  The key works only on the sites allowed to use it: the portal's 'site.url', and any passed with --origin. Run this
+  command again after changing them, and the service is told. With --dev, the key also works on this machine, for
+  previewing the chat with 'apimatic portal serve', and answers a limited number of questions a day.
+
+  The portal is registered with APIMatic's Ask AI service, or with the one the APIMATIC_COPILOT_URL environment variable
+  names. It is registered with your saved APIMatic login, or with the auth key passed with --auth-key, and needs a
+  subscription that includes Ask AI.
+
+EXAMPLES
+  apimatic portal copilot enable
+
+  apimatic portal copilot enable --dev
+
+  apimatic portal copilot enable --origin=https://staging.example.com
+
+  apimatic portal copilot enable --rotate
+```
+
+_See code: [src/commands/portal/copilot/enable.ts](https://github.com/apimatic/apimatic-cli/blob/v1.5.0/src/commands/portal/copilot/enable.ts)_
 
 ## `apimatic portal copilot sync`
 
@@ -316,11 +389,12 @@ DESCRIPTION
   portal generated with 'apimatic portal generate' when it cannot: for a portal without 'site.url', or one the service
   cannot reach, such as one on a private network.
 
-  The service is set by the 'ai.copilot' setting in the 'portal' block of 'src/apimatic.json': APIMatic's Ask AI
-  service, or one on this machine. The pages are swapped in at once, after all of them are indexed; until then Ask AI
-  answers from the previous ones.
+  The portal's chat is the one 'apimatic portal copilot enable' set up in the 'portal' block of 'src/apimatic.json'. The
+  pages go to APIMatic's Ask AI service, or to the one the APIMATIC_COPILOT_URL environment variable names. They are
+  swapped in at once, after all of them are indexed; until then Ask AI answers from the previous ones.
 
-  The upload is made with your saved APIMatic login, or with the auth key passed with --auth-key.
+  The upload is made with your saved APIMatic login, or with the auth key passed with --auth-key, and needs a
+  subscription that includes Ask AI.
 
 EXAMPLES
   apimatic portal copilot sync
@@ -330,7 +404,7 @@ EXAMPLES
   apimatic portal copilot sync --no-wait
 ```
 
-_See code: [src/commands/portal/copilot/sync.ts](https://github.com/apimatic/apimatic-cli/blob/v1.3.1/src/commands/portal/copilot/sync.ts)_
+_See code: [src/commands/portal/copilot/sync.ts](https://github.com/apimatic/apimatic-cli/blob/v1.5.0/src/commands/portal/copilot/sync.ts)_
 
 ## `apimatic portal generate`
 
@@ -370,7 +444,7 @@ EXAMPLES
   apimatic portal generate --zip
 ```
 
-_See code: [src/commands/portal/generate.ts](https://github.com/apimatic/apimatic-cli/blob/v1.3.1/src/commands/portal/generate.ts)_
+_See code: [src/commands/portal/generate.ts](https://github.com/apimatic/apimatic-cli/blob/v1.5.0/src/commands/portal/generate.ts)_
 
 ## `apimatic portal serve`
 
@@ -406,7 +480,7 @@ EXAMPLES
   apimatic portal serve --input=./ --port=23513 --open
 ```
 
-_See code: [src/commands/portal/serve.ts](https://github.com/apimatic/apimatic-cli/blob/v1.3.1/src/commands/portal/serve.ts)_
+_See code: [src/commands/portal/serve.ts](https://github.com/apimatic/apimatic-cli/blob/v1.5.0/src/commands/portal/serve.ts)_
 
 ## `apimatic publishing profile list`
 
@@ -425,7 +499,7 @@ EXAMPLES
   apimatic publishing profile list
 ```
 
-_See code: [src/commands/publishing/profile/list.ts](https://github.com/apimatic/apimatic-cli/blob/v1.3.1/src/commands/publishing/profile/list.ts)_
+_See code: [src/commands/publishing/profile/list.ts](https://github.com/apimatic/apimatic-cli/blob/v1.5.0/src/commands/publishing/profile/list.ts)_
 
 ## `apimatic quickstart`
 
@@ -445,7 +519,7 @@ EXAMPLES
   apimatic quickstart
 ```
 
-_See code: [src/commands/quickstart.ts](https://github.com/apimatic/apimatic-cli/blob/v1.3.1/src/commands/quickstart.ts)_
+_See code: [src/commands/quickstart.ts](https://github.com/apimatic/apimatic-cli/blob/v1.5.0/src/commands/quickstart.ts)_
 
 ## `apimatic sdk generate`
 
@@ -486,7 +560,7 @@ EXAMPLES
   apimatic sdk generate --language=python --destination=./sdk --zip
 ```
 
-_See code: [src/commands/sdk/generate.ts](https://github.com/apimatic/apimatic-cli/blob/v1.3.1/src/commands/sdk/generate.ts)_
+_See code: [src/commands/sdk/generate.ts](https://github.com/apimatic/apimatic-cli/blob/v1.5.0/src/commands/sdk/generate.ts)_
 
 ## `apimatic sdk publish`
 
@@ -533,5 +607,5 @@ EXAMPLES
   apimatic sdk publish --profile-id=c3d4e5f6a1b2c3d4e5f6a1b2 --language=python --version=1.0.0 --publish-type=package --dry-run
 ```
 
-_See code: [src/commands/sdk/publish.ts](https://github.com/apimatic/apimatic-cli/blob/v1.3.1/src/commands/sdk/publish.ts)_
+_See code: [src/commands/sdk/publish.ts](https://github.com/apimatic/apimatic-cli/blob/v1.5.0/src/commands/sdk/publish.ts)_
 <!-- commandsstop -->

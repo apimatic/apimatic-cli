@@ -2,7 +2,7 @@ import { err, ok, Result } from 'neverthrow';
 import { allOf, namespace, nonEmptyString, optional, Parsed, unknownKeys } from './fields.js';
 import { ServiceAddress } from './service-address.js';
 
-const KNOWN = ['key', 'apiUrl', 'suggestions'];
+const KNOWN = ['key', 'suggestions'];
 const MAX_SUGGESTIONS = 3;
 const MAX_SUGGESTION_LENGTH = 120;
 
@@ -14,7 +14,7 @@ export interface PortalCopilot {
   suggestions: string[];
 }
 
-type CopilotBlock = Omit<PortalCopilot, 'suggestions'> & { suggestions?: string[] };
+type CopilotBlock = Pick<PortalCopilot, 'key'> & { suggestions?: string[] };
 
 /** What `sync` needs of the Ask AI settings: which portal's chat it is, and the service it is on. */
 export interface CopilotService {
@@ -29,6 +29,7 @@ export class CopilotConfig {
     private readonly suggestions: string[]
   ) {}
 
+  /** The block names the portal's key; the service is the one this run of the CLI uses. */
   public static parse(value: unknown, path: string): Parsed<CopilotConfig> {
     return namespace(value, path).andThen((data) =>
       allOf(
@@ -36,8 +37,7 @@ export class CopilotConfig {
         // The key is not checked here: the Ask AI service validates it, and its design may change.
         Result.combineWithAllErrors([
           nonEmptyString(data.key, `${path}.key`),
-          // Required while there is no hosted service; once there is, default to its address and keep this as an override.
-          ServiceAddress.parse(data.apiUrl, `${path}.apiUrl`),
+          ServiceAddress.current(),
           optional(data.suggestions, (present) => suggestionList(present, `${path}.suggestions`))
         ])
       ).map(([key, address, suggestions]) => new CopilotConfig(key, address, suggestions ?? []))
@@ -56,7 +56,6 @@ export class CopilotConfig {
   public toJSON(): CopilotBlock {
     return {
       key: this.key,
-      apiUrl: this.address.toString(),
       ...(this.suggestions.length > 0 ? { suggestions: this.suggestions } : {})
     };
   }

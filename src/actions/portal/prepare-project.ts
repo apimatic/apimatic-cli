@@ -68,6 +68,10 @@ export class PreparePortalProjectAction {
       this.prompts.sourceProblem(source.error, sourceDirectory);
       return ActionResult.failed();
     }
+    if (source.value.config.copilotService() !== null && !authorization.value.includes('askAi')) {
+      this.prompts.askAiNotEntitled(sourceDirectory);
+      return ActionResult.failed();
+    }
     this.prompts.filesShadowedByStatic(source.value.shadowedFiles);
     this.prompts.contentNotices(source.value.contentNotices, sourceDirectory);
     this.prompts.unmergedSpecs(source.value.unmergedSpecs, sourceDirectory);

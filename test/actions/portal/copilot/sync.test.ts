@@ -18,6 +18,8 @@ import { CopilotBundle } from '../../../../src/types/portal/copilot/copilot-bund
 import { ProjectContext } from '../../../../src/types/project-context';
 import { SiteAddress } from '../../../../src/types/portal/config/site-address';
 import { GeneratedPortalContext } from '../../../../src/types/portal/copilot/generated-portal-context';
+import { PortalAuthorizationService } from '../../../../src/infrastructure/services/portal-authorization-service';
+import { entitlementsWith } from '../../../helpers/account';
 
 /** The bundle as the service receives it. */
 const uploaded = (bundle: CopilotBundle) =>
@@ -28,10 +30,11 @@ const uploaded = (bundle: CopilotBundle) =>
   };
 
 const COMMAND_METADATA: CommandMetadata = { commandName: 'portal:copilot:sync', shell: 'test' };
-const COPILOT = { key: 'pk_test', apiUrl: 'https://ask.apimatic.io' };
+const COPILOT = { key: 'pk_test' };
+const SERVICE_URL = 'https://ask.apimatic.io';
 
-/** The address of the service the portal's settings name. */
-const theService = sinon.match((address: unknown) => `${address as string}` === COPILOT.apiUrl, COPILOT.apiUrl);
+/** The address of the service this run uses. */
+const theService = sinon.match((address: unknown) => `${address as string}` === SERVICE_URL, SERVICE_URL);
 
 const indexed = (status: 'active' | 'superseded') => ({
   versionId: 'v-1',
@@ -48,6 +51,7 @@ describe('PortalCopilotSyncAction', () => {
   let prompts: sinon.SinonStubbedInstance<PortalCopilotSyncPrompts>;
   let upload: sinon.SinonStub;
   let awaitIndexing: sinon.SinonStub;
+  let authorizeAskAi: sinon.SinonStub;
 
   const write = (relative: string, contents: string) => {
     const file = path.join(root, relative);
@@ -94,6 +98,10 @@ describe('PortalCopilotSyncAction', () => {
     // The spinners would render to stdout; pass the underlying promise straight through.
     prompts.upload.callsFake((fn) => fn);
     prompts.awaitIndexing.callsFake((fn) => fn);
+    prompts.checkSubscription.callsFake((fn) => fn);
+    authorizeAskAi = sinon
+      .stub(PortalAuthorizationService.prototype, 'authorizeAskAi')
+      .resolves(ok(entitlementsWith('askAi')));
     upload = sinon
       .stub(CopilotIngestService.prototype, 'upload')
       .resolves(ok({ versionId: 'v-1', status: 'queued', pageCount: 2 }));
@@ -103,6 +111,7 @@ describe('PortalCopilotSyncAction', () => {
   });
 
   afterEach(() => {
+    delete process.env.APIMATIC_COPILOT_URL;
     sinon.restore();
     fs.rmSync(root, { recursive: true, force: true });
   });
@@ -116,7 +125,7 @@ describe('PortalCopilotSyncAction', () => {
     expect(result.isSuccess()).to.be.true;
     const [copilot, bundle, , authKey] = upload.firstCall.args as [CopilotTarget, CopilotBundle, unknown, string];
     expect(copilot.key).to.equal(COPILOT.key);
-    expect(`${copilot.address}`).to.equal(COPILOT.apiUrl);
+    expect(`${copilot.address}`).to.equal(SERVICE_URL);
     expect(authKey).to.equal('auth-key');
     expect(bundle.toJson()).to.equal(PUBLISHED.toJson());
     expect(uploaded(bundle)).to.deep.include({ basePath: '/docs/', siteUrl: 'https://example.com/docs' });
@@ -194,7 +203,7 @@ describe('PortalCopilotSyncAction', () => {
     expect(prompts.indexingFailed.calledOnceWith(failed, theService)).to.be.true;
   });
 
-  it('refuses, without uploading, a service APIMatic does not run', async () => {
+  it('refuses, without uploading, a service address written in apimatic.json', async () => {
     writeSavedLogin('saved-key');
     writeConfig({ copilot: { ...COPILOT, apiUrl: 'https://ask.example.com' } });
 
@@ -205,23 +214,48 @@ describe('PortalCopilotSyncAction', () => {
     expect(upload.called).to.be.false;
   });
 
+  it('syncs with the service APIMATIC_COPILOT_URL names', async () => {
+    process.env.APIMATIC_COPILOT_URL = 'http://localhost:8787';
+
+    expect((await execute()).isSuccess()).to.be.true;
+    expect(`${(upload.firstCall.args[0] as CopilotTarget).address}`).to.equal('http://localhost:8787');
+  });
+
+  it('refuses, without uploading, an APIMATIC_COPILOT_URL it cannot use', async () => {
+    process.env.APIMATIC_COPILOT_URL = 'http://ask.example.com';
+
+    const result = await execute();
+
+    expect(result.isFailed()).to.be.true;
+    expect(prompts.sourceProblem.calledOnce).to.be.true;
+    expect(upload.called).to.be.false;
+  });
+
   it('uses the passed key, else the saved login, a blank --auth-key counting as none', async () => {
     writeSavedLogin('saved-key');
 
-    for (const apiUrl of ['https://ask.apimatic.io', 'http://localhost:8787']) {
-      writeConfig({ copilot: { ...COPILOT, apiUrl } });
-
-      for (const passed of ['passed-key', null, '', '   ']) {
-        expect((await execute(true, passed)).isSuccess(), `${apiUrl} ${JSON.stringify(passed)}`).to.be.true;
-      }
+    for (const passed of ['passed-key', null, '', '   ']) {
+      expect((await execute(true, passed)).isSuccess(), JSON.stringify(passed)).to.be.true;
     }
     const sent = ['passed-key', 'saved-key', 'saved-key', 'saved-key'];
-    expect(upload.args.map((args) => args[3])).to.deep.equal([...sent, ...sent]);
-    expect(awaitIndexing.args.map((args) => args[3])).to.deep.equal([...sent, ...sent]);
+    expect(authorizeAskAi.args.map((args) => args[2])).to.deep.equal(sent);
+    expect(upload.args.map((args) => args[3])).to.deep.equal(sent);
+    expect(awaitIndexing.args.map((args) => args[3])).to.deep.equal(sent);
+  });
+
+  it('fails without uploading when the subscription does not include Ask AI', async () => {
+    const refused = { kind: 'notEntitled' as const, feature: 'askAi' as const };
+    authorizeAskAi.resolves(err(refused));
+
+    const result = await execute();
+
+    expect(result.isFailed()).to.be.true;
+    expect(prompts.authorizationFailed.calledOnceWith(refused)).to.be.true;
+    expect(upload.called).to.be.false;
   });
 
   it('asks the user to log in, without uploading, when no key is passed or saved', async () => {
-    writeConfig({ copilot: { ...COPILOT, apiUrl: 'https://ask.apimatic.io' } });
+    writeConfig({ copilot: COPILOT });
     // `auth logout` leaves the file with a blank key.
     writeSavedLogin('');
 
@@ -229,6 +263,7 @@ describe('PortalCopilotSyncAction', () => {
 
     expect(result.isFailed()).to.be.true;
     expect(prompts.notLoggedIn.calledOnce).to.be.true;
+    expect(authorizeAskAi.called).to.be.false;
     expect(upload.called).to.be.false;
   });
 

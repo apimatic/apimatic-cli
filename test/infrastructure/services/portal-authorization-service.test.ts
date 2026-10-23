@@ -7,20 +7,12 @@ import { PortalAuthorizationService } from '../../../src/infrastructure/services
 import { DirectoryPath } from '../../../src/types/file/directoryPath';
 import { ServiceErrorCode } from '../../../src/infrastructure/service-error';
 import { envInfo } from '../../../src/infrastructure/env-info';
+import { profileWith } from '../../helpers/account';
 
 const BASE_URL = 'http://portal-authorization.test';
 
-const profile = (isOnPremGenerationAllowed: boolean) => ({
-  Id: 'id',
-  Email: 'user@example.com',
-  FullName: 'User',
-  SecurityStamp: '',
-  tenantId: 'tenant',
-  allowedLanguages: 0,
-  isPackagePublishingAllowed: true,
-  isOnPremGenerationAllowed,
-  ApiCopilotKeys: []
-});
+const profile = (isOnPremGenerationAllowed: boolean) =>
+  isOnPremGenerationAllowed ? profileWith('portalGeneration') : profileWith();
 
 describe('PortalAuthorizationService', () => {
   const service = new PortalAuthorizationService();
@@ -92,7 +84,7 @@ describe('PortalAuthorizationService', () => {
     storeKey('stored-key');
     nock(BASE_URL).get('/account/profile').reply(200, profile(false));
 
-    expect((await authorize())._unsafeUnwrapErr()).to.deep.equal({ kind: 'notEntitled' });
+    expect((await authorize())._unsafeUnwrapErr()).to.deep.equal({ kind: 'notEntitled', feature: 'portalGeneration' });
   });
 
   it('treats a rejected key as unauthenticated', async () => {
@@ -129,5 +121,46 @@ describe('PortalAuthorizationService', () => {
     nock(BASE_URL).get('/account/profile').replyWithError('socket hang up');
 
     expect((await authorize())._unsafeUnwrapErr().kind).to.equal('unverifiable');
+  });
+
+  it('answers with whether the subscription also includes Ask AI', async () => {
+    storeKey('stored-key');
+    nock(BASE_URL).get('/account/profile').reply(200, profileWith('portalGeneration', 'askAi'));
+
+    expect((await authorize())._unsafeUnwrap().includes('askAi')).to.be.true;
+  });
+
+  describe('authorizeAskAi', () => {
+    const authorizeAskAi = () => service.authorizeAskAi(configDir, 'bash', null);
+
+    it('allows an account whose subscription includes Ask AI, without portal generation', async () => {
+      storeKey('stored-key');
+      nock(BASE_URL).get('/account/profile').reply(200, profileWith('askAi'));
+
+      expect((await authorizeAskAi()).isOk()).to.be.true;
+    });
+
+    it('refuses an account whose subscription does not include Ask AI', async () => {
+      storeKey('stored-key');
+      nock(BASE_URL).get('/account/profile').reply(200, profileWith('portalGeneration'));
+
+      expect((await authorizeAskAi())._unsafeUnwrapErr()).to.deep.equal({ kind: 'notEntitled', feature: 'askAi' });
+    });
+
+    it('refuses a platform that does not report Ask AI at all', async () => {
+      storeKey('stored-key');
+      const older: Record<string, unknown> = { ...profileWith('portalGeneration', 'askAi') };
+      delete older.isApiCopilotAllowed;
+      nock(BASE_URL).get('/account/profile').reply(200, older);
+
+      expect((await authorizeAskAi())._unsafeUnwrapErr()).to.deep.equal({ kind: 'notEntitled', feature: 'askAi' });
+    });
+
+    it('fails closed when the subscription cannot be verified', async () => {
+      storeKey('stored-key');
+      nock(BASE_URL).get('/account/profile').reply(503);
+
+      expect((await authorizeAskAi())._unsafeUnwrapErr().kind).to.equal('unverifiable');
+    });
   });
 });

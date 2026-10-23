@@ -2,26 +2,27 @@ import { expect } from 'chai';
 import { ServiceAddress } from '../../../../src/types/portal/config/service-address';
 
 describe('ServiceAddress', () => {
-  const SETTING = 'portal.ai.copilot.apiUrl';
+  const SETTING = 'APIMATIC_COPILOT_URL';
 
   const address = (value: unknown) => ServiceAddress.parse(value, SETTING)._unsafeUnwrap();
   const refusal = (value: unknown) => ServiceAddress.parse(value, SETTING)._unsafeUnwrapErr();
 
-  const NOT_APIMATIC =
-    "'portal.ai.copilot.apiUrl' must be the address of APIMatic's Ask AI service, starting with 'https://' and " +
-    "ending in 'apimatic.io', or of one on this machine, such as 'http://localhost:8787'.";
+  const NOT_SECURE =
+    "'APIMATIC_COPILOT_URL' must be the address of an Ask AI service, starting with 'https://', or of one on " +
+    "this machine, such as 'http://localhost:8787'.";
   const NOT_ALONE =
-    "'portal.ai.copilot.apiUrl' must be the service's address alone, written in full, without a path, query or " +
+    "'APIMATIC_COPILOT_URL' must be the service's address alone, written in full, without a path, query or " +
     "credentials, for example 'https://ask.apimatic.io'.";
 
   describe('parse', () => {
-    it("reads APIMatic's own service, over HTTPS, or one on this machine, as its origin", () => {
+    it('reads a service over HTTPS, or one on this machine, as its origin', () => {
       const cases: [string, string][] = [
         ['https://ask.apimatic.io', 'https://ask.apimatic.io'],
         ['https://ask.apimatic.io/', 'https://ask.apimatic.io'],
-        ['https://apimatic.io', 'https://apimatic.io'],
         ['https://ask.staging.apimatic.io:8443', 'https://ask.staging.apimatic.io:8443'],
         ['HTTPS://ASK.APIMATIC.IO', 'https://ask.apimatic.io'],
+        // A development deployment may sit on its host's own domain.
+        ['https://ask-dev.example.azurecontainerapps.io', 'https://ask-dev.example.azurecontainerapps.io'],
         ['http://localhost:8787', 'http://localhost:8787'],
         ['https://localhost:8787/', 'https://localhost:8787'],
         ['http://127.0.0.1:8787', 'http://127.0.0.1:8787'],
@@ -34,17 +35,12 @@ describe('ServiceAddress', () => {
       }
     });
 
-    // `sync` sends the APIMatic login there, so no service but APIMatic's, or one on this machine, is accepted.
-    it('refuses any other service, or APIMatic over plain HTTP', () => {
+    // The APIMatic login is sent there, so it never travels in the clear off this machine.
+    it('refuses plain HTTP off this machine, and anything not a web address', () => {
       for (const value of [
-        'https://ask.example.com',
         'http://ask.apimatic.io',
-        'https://ask.apimatic.io.example.com',
-        'https://evilapimatic.io',
-        'https://.apimatic.io',
-        'https://ask..apimatic.io',
+        'http://ask.example.com',
         'http://localhost:99999',
-        'https://ask.apimatic.io@evil.example',
         'http://localhost:@evil.example/',
         'http://localhost.example.com',
         // `*.localhost` is resolved through DNS on some systems, so it may not be this machine.
@@ -53,7 +49,7 @@ describe('ServiceAddress', () => {
         '',
         7
       ]) {
-        expect(refusal(value), String(value)).to.deep.equal([NOT_APIMATIC]);
+        expect(refusal(value), String(value)).to.deep.equal([NOT_SECURE]);
       }
     });
 
@@ -67,6 +63,7 @@ describe('ServiceAddress', () => {
         'https://ask.apimatic.io#',
         'https://user@ask.apimatic.io',
         'https://user:secret@ask.apimatic.io',
+        'https://ask.apimatic.io@evil.example',
         'http://localhost:8787/api',
         // Addresses the URL parser would rewrite: refused, so what is accepted is what was written.
         'http://127.1:8787',
@@ -77,6 +74,25 @@ describe('ServiceAddress', () => {
       ]) {
         expect(refusal(value), value).to.deep.equal([NOT_ALONE]);
       }
+    });
+  });
+
+  describe('current', () => {
+    afterEach(() => {
+      delete process.env.APIMATIC_COPILOT_URL;
+    });
+
+    it("is APIMatic's own service unless APIMATIC_COPILOT_URL names another", () => {
+      expect(ServiceAddress.current()._unsafeUnwrap().toString()).to.equal('https://ask.apimatic.io');
+      process.env.APIMATIC_COPILOT_URL = '  ';
+      expect(ServiceAddress.current()._unsafeUnwrap().toString()).to.equal('https://ask.apimatic.io');
+      process.env.APIMATIC_COPILOT_URL = 'http://localhost:8787';
+      expect(ServiceAddress.current()._unsafeUnwrap().toString()).to.equal('http://localhost:8787');
+    });
+
+    it('reports an address it cannot use, naming the variable', () => {
+      process.env.APIMATIC_COPILOT_URL = 'http://ask.example.com';
+      expect(ServiceAddress.current()._unsafeUnwrapErr()).to.deep.equal([NOT_SECURE]);
     });
   });
 });

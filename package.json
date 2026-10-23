@@ -181,7 +181,7 @@
                 "description": "Build and serve an API Documentation portal for your APIs."
             },
             "portal:copilot": {
-                "description": "Keep your portal's Ask AI chat in sync with its pages."
+                "description": "Set up your portal's Ask AI chat and keep it in sync with its pages."
             },
             "sdk": {
                 "description": "Generate and publish SDKs for your APIs in multiple languages."

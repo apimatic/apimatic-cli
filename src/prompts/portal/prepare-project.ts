@@ -2,6 +2,7 @@ import { log } from '@clack/prompts';
 import { Result } from 'neverthrow';
 import { ServiceError } from '../../infrastructure/service-error.js';
 import { PortalAuthorizationFailure } from '../../infrastructure/services/portal-authorization-service.js';
+import { APIMATIC_CONFIG_FILE_NAME } from '../../types/apimatic-config/document.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { FileName } from '../../types/file/fileName.js';
 import { FilePath } from '../../types/file/filePath.js';
@@ -37,6 +38,15 @@ export class PreparePortalProjectPrompts {
 
   public authorizationFailed(failure: PortalAuthorizationFailure) {
     reportAuthorizationFailure(failure);
+  }
+
+  public askAiNotEntitled(sourceDirectory: DirectoryPath) {
+    reportAuthorizationFailure({ kind: 'notEntitled', feature: 'askAi' });
+    const config = new FilePath(sourceDirectory, new FileName(APIMATIC_CONFIG_FILE_NAME));
+    log.message(
+      `To build the portal without its Ask AI chat, remove ${f.var('ai.copilot')} from the ${f.var('portal')} ` +
+        `block of ${f.path(config)}.`
+    );
   }
 
   public generateArtifacts(fn: Promise<Result<PortalArtifacts, ServiceError>>) {

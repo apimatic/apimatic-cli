@@ -22,6 +22,7 @@ import { Language } from '../../../src/types/sdk/generate';
 import { PortalSourceContext } from '../../../src/types/portal-source-context';
 import { ProjectContext } from '../../../src/types/project-context';
 import { completeArtifacts, stubPreparePortalProject } from './prepare-project-stubs';
+import { entitlementsWith } from '../../helpers/account';
 
 const COMMAND_METADATA: CommandMetadata = { commandName: 'portal serve', shell: 'test' };
 const FIXTURE = new DirectoryPath(process.cwd()).join('test/resources/portal-inputs/default');
@@ -98,7 +99,7 @@ describe('PortalServeAction', () => {
     getServerPort = sinon.stub(NetworkService.prototype, 'getServerPort').resolves(PORT);
     openUrlInBrowser = sinon.stub(LauncherService.prototype, 'openUrlInBrowser').resolves();
 
-    authorize = sinon.stub(PortalAuthorizationService.prototype, 'authorize').resolves(ok(undefined));
+    authorize = sinon.stub(PortalAuthorizationService.prototype, 'authorize').resolves(ok(entitlementsWith('portalGeneration')));
     // Never a real watch: most tests serve the shared fixture, which nothing may edit.
     watch = sinon
       .stub(FileWatchService.prototype, 'watch')
@@ -128,12 +129,12 @@ describe('PortalServeAction', () => {
   });
 
   it('fails when the account may not build a portal, without starting the preview', async () => {
-    authorize.resolves(err({ kind: 'notEntitled' as const }));
+    authorize.resolves(err({ kind: 'notEntitled' as const, feature: 'portalGeneration' as const }));
 
     const result = await execute();
 
     expect(result.isFailed()).to.be.true;
-    expect(shared.prompts.authorizationFailed.calledOnceWith({ kind: 'notEntitled' })).to.be.true;
+    expect(shared.prompts.authorizationFailed.calledOnceWith({ kind: 'notEntitled', feature: 'portalGeneration' })).to.be.true;
     expect(getServerPort.called).to.be.false;
     expect(start.called).to.be.false;
   });

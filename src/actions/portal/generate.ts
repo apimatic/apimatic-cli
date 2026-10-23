@@ -6,7 +6,9 @@ import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { PortalContext } from '../../types/portal-context.js';
 import { SiteAddress } from '../../types/portal/config/site-address.js';
+import { CopilotService } from '../../types/portal/config/copilot-config.js';
 import { CopilotBundle } from '../../types/portal/copilot/copilot-bundle.js';
+import { CopilotKey } from '../../types/portal/copilot/copilot-key.js';
 import { GeneratedPortalContext } from '../../types/portal/copilot/generated-portal-context.js';
 import { ProjectContext } from '../../types/project-context.js';
 import { ActionResult } from '../action-result.js';
@@ -48,7 +50,7 @@ export class GenerateAction {
       confirm: () => this.confirmOverwrite(portalContext, portalDirectory, force),
       onPrepared: (portalProject, source) =>
         this.build(portalProject, source.config.siteAddress(), portalContext, portalDirectory, zipPortal, {
-          copilot: source.config.identity().copilot !== null
+          copilot: source.config.copilotService()
         })
     });
   };
@@ -71,7 +73,7 @@ export class GenerateAction {
     portalContext: PortalContext,
     portalDirectory: DirectoryPath,
     zipPortal: boolean,
-    { copilot }: { copilot: boolean }
+    { copilot }: { copilot: CopilotService | null }
   ): Promise<ActionResult> {
     const build = await this.prompts.buildPortal(this.buildService.build(portalProject));
 
@@ -83,7 +85,7 @@ export class GenerateAction {
     }
 
     // Added before saving, so a zipped portal carries the bundle too.
-    const copilotPublished = copilot && (await this.publishCopilotBundle(build.value.output, site));
+    const copilotPublished = copilot !== null && (await this.publishCopilotBundle(build.value.output, site));
 
     const saved = await this.prompts.savePortal(portalContext.save(build.value.output, zipPortal));
     if (saved.isErr()) {
@@ -93,6 +95,7 @@ export class GenerateAction {
     this.prompts.portalGenerated(portalDirectory);
     this.prompts.nextSteps(portalDirectory, zipPortal, site);
     if (copilotPublished) this.prompts.copilotUpdatesAfterDeploy(site);
+    if (copilot !== null && CopilotKey.parse(copilot.key)?.kind() === 'dev') this.prompts.copilotDevelopmentKey();
 
     return ActionResult.success();
   }

@@ -132,6 +132,14 @@ export class PortalGeneratePrompts {
     );
   }
 
+  public copilotDevelopmentKey() {
+    log.warn(
+      `The portal's Ask AI key is a development key: on its site the chat answers only a limited number of ` +
+        `questions a day. Run ${f.cmdAlt('apimatic', 'portal', 'copilot', 'enable')} ${f.flag('rotate')} for a ` +
+        `key to deploy with, then generate the portal again.`
+    );
+  }
+
   public copilotPagesNotFound() {
     log.warn('The portal has no pages for Ask AI to answer from, so none were added to it.');
   }

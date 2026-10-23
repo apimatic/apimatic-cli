@@ -13,7 +13,7 @@ describe('PortalCopilotEntry', () => {
   const CHAT_IMPORT = "import('@/components/copilot')";
 
   it('imports the Ask AI chat, lazily, for a portal that offers it', () => {
-    const entry = entryFor({ ai: { copilot: { key: 'pk_test', apiUrl: 'https://ask.apimatic.io' } } });
+    const entry = entryFor({ ai: { copilot: { key: 'pk_test' } } });
 
     expect(entry).to.contain(`const chat = ${CHAT_IMPORT};`);
     expect(entry).to.contain('export const CopilotChat = lazy(() => chat);');

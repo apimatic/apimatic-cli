@@ -11,8 +11,10 @@ import { PortalSourceProblem } from '../../../types/portal/portal-source.js';
 import { format as f } from '../../format.js';
 import { withSpinner } from '../../prompt.js';
 import { reportSourceProblem } from '../source.js';
-
-const COPILOT_EXAMPLE = '"ai": { "copilot": { "key": "pk_…", "apiUrl": "https://ask.apimatic.io" } }';
+import { PortalAuthorizationFailure } from '../../../infrastructure/services/portal-authorization-service.js';
+import { AccountEntitlements } from '../../../types/api/account-entitlements.js';
+import { reportAuthorizationFailure } from '../authorization.js';
+import { checkAskAiSubscription } from './shared.js';
 
 const pages = (count: number): string => `${count} ${count === 1 ? 'page' : 'pages'}`;
 
@@ -24,13 +26,22 @@ export class PortalCopilotSyncPrompts {
   public copilotNotConfigured(sourceDirectory: DirectoryPath) {
     const config = new FilePath(sourceDirectory, new FileName(APIMATIC_CONFIG_FILE_NAME));
     const message =
-      `The portal has no Ask AI chat to sync. Add ${f.var(COPILOT_EXAMPLE)} to the ${f.var('portal')} block of ` +
-      `${f.path(config)}, then generate and deploy the portal again.`;
+      `The portal has no Ask AI chat to sync: ${f.path(config)} sets no ${f.var('portal.ai.copilot')}. ` +
+      `Run ${f.cmdAlt('apimatic', 'portal', 'copilot', 'enable')} to set one up, then generate and deploy ` +
+      `the portal again.`;
     log.error(message);
   }
 
   public notLoggedIn() {
     log.error(ServiceError.unauthorizedWithHint(null).errorMessage);
+  }
+
+  public checkSubscription(fn: Promise<Result<AccountEntitlements, PortalAuthorizationFailure>>) {
+    return checkAskAiSubscription(fn);
+  }
+
+  public authorizationFailed(failure: PortalAuthorizationFailure) {
+    reportAuthorizationFailure(failure, 'sync Ask AI');
   }
 
   public portalNotGenerated(portalDirectory: DirectoryPath) {

@@ -428,6 +428,34 @@ export class PortalSourceContext {
     }
   }
 
+  /**
+   * Sets the portal's Ask AI key in `portal.ai.copilot`, keeping the block's other settings, or
+   * with null removes the block. The `portal` block must already be an object, as a parsed one is.
+   */
+  public async writeCopilotKey(key: string | null): Promise<Result<FilePath, PortalScaffoldProblem>> {
+    try {
+      const written = await this.mergeConfig((document) => {
+        const portal = document.portal();
+        if (!isJsonObject(portal)) {
+          return document;
+        }
+        const { copilot, ...ai } = isJsonObject(portal.ai) ? portal.ai : {};
+        if (key === null) {
+          const rest = { ...portal };
+          delete rest.ai;
+          return document.with('portal', Object.keys(ai).length === 0 ? rest : { ...portal, ai });
+        }
+        return document.with('portal', {
+          ...portal,
+          ai: { ...ai, copilot: { ...(isJsonObject(copilot) ? copilot : {}), key } }
+        });
+      });
+      return written.map(() => this.configFile);
+    } catch (error) {
+      return err({ kind: 'sourceUnwritable', reason: errorMessage(error) });
+    }
+  }
+
   private async mergeConfig(
     apply: (document: ApimaticConfigDocument) => ApimaticConfigDocument
   ): Promise<Result<ApimaticConfigDocument, PortalScaffoldProblem>> {
