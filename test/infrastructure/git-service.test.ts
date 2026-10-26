@@ -266,6 +266,64 @@ describe('GitService', () => {
     });
   });
 
+  describe('graft', () => {
+    const treeOfFiles = async (repo: DirectoryPath, name: string, files: Record<string, string>) => {
+      const work = new DirectoryPath(path.join(root, name));
+      for (const [relative, content] of Object.entries(files)) {
+        write(work, relative, content);
+      }
+      return git.treeOf(repo, work, 'all');
+    };
+
+    it('replaces one directory of a tree, leaves the rest alone, and adds the extra entries', async () => {
+      const repo = await repository();
+      const whole = await treeOfFiles(repo, 'whole', {
+        'README.md': 'top',
+        'sdk/py/a.py': 'old',
+        'sdk/py/b.py': 'old'
+      });
+      const sdk = await treeOfFiles(repo, 'sdk', { 'a.py': 'new', 'c.py': 'new' });
+      const oid = await git.writeBlob(repo, 'record');
+      const extra = { mode: '100644', type: 'blob' as const, oid, path: rel('sdk/py/.apimatic/generation.json') };
+
+      const grafted = await git.graft(repo, whole, 'sdk/py', sdk, [extra]);
+
+      expect(await filesOf(repo, grafted)).to.deep.equal(
+        new Map([
+          ['README.md', 'top'],
+          ['sdk/py/.apimatic/generation.json', 'record'],
+          ['sdk/py/a.py', 'new'],
+          ['sdk/py/c.py', 'new']
+        ])
+      );
+    });
+
+    it('reads one directory, or one file, out of a commit, and nothing where there is none', async () => {
+      const repo = await repository();
+      const whole = await treeOfFiles(repo, 'whole', { 'README.md': 'top', 'sdk/py/a.py': 'old' });
+      const commit = await git.commitTree(repo, whole, [], 'whole');
+
+      const sdk = (await git.subtreeAt(repo, commit, 'sdk/py'))!;
+
+      expect(await filesOf(repo, sdk)).to.deep.equal(new Map([['a.py', 'old']]));
+      expect((await git.subtreeAt(repo, commit, ''))?.isEqual(whole)).to.be.true;
+      expect(await git.subtreeAt(repo, commit, 'docs')).to.be.undefined;
+      expect(await git.readFile(repo, commit, rel('sdk/py/a.py'))).to.equal('old');
+      expect(await git.readFile(repo, commit, rel('sdk/py/b.py'))).to.be.undefined;
+    });
+
+    it('is the subtree itself for the root, and fills an empty tree', async () => {
+      const repo = await repository();
+      const whole = await treeOfFiles(repo, 'whole', { 'README.md': 'top', 'a.py': 'old' });
+      const sdk = await treeOfFiles(repo, 'sdk', { 'a.py': 'new' });
+
+      expect((await git.graft(repo, whole, '', sdk, [])).isEqual(sdk)).to.be.true;
+      expect(await filesOf(repo, await git.graft(repo, GitService.emptyTree(), 'sdk/py', sdk, []))).to.deep.equal(
+        new Map([['sdk/py/a.py', 'new']])
+      );
+    });
+  });
+
   describe('remotes', () => {
     const ref = SnapshotRef.pristine('sdk/typescript');
 
@@ -328,6 +386,48 @@ describe('GitService', () => {
 
       expect(await git.hooksPathConfigured(repo)).to.equal('.husky');
       expect((await git.hooksDirectory(repo)).toString()).to.equal(path.join(repo.toString(), '.git', 'hooks'));
+    });
+
+    it('creates a branch at a commit, refuses one that exists, and names the checked-out commit', async () => {
+      const repo = await repository();
+      expect(await git.headCommit(repo)).to.be.undefined;
+      const first = await snapshot(repo, 'one');
+      const second = await snapshot(repo, 'two');
+
+      await git.createBranch(repo, 'apimatic/yours/1', first);
+      await execa('git', ['switch', '-q', 'apimatic/yours/1'], { cwd: repo.toString() });
+
+      expect((await git.headCommit(repo))?.isEqual(first)).to.be.true;
+      let refused: unknown;
+      try {
+        await git.createBranch(repo, 'apimatic/yours/1', second);
+      } catch (error) {
+        refused = error;
+      }
+      expect(refused).to.be.instanceOf(Error);
+      expect((await git.headCommit(repo))?.isEqual(first)).to.be.true;
+    });
+
+    it('pushes the given refspecs and nothing else, and reports a remote that refuses', async () => {
+      const origin = await bare();
+      const repo = await withRemote('a', origin);
+      const first = await snapshot(repo, 'one');
+      await git.createBranch(repo, 'apimatic/yours/1', first);
+
+      await git.push(repo, 'origin', ['refs/heads/apimatic/yours/1:refs/heads/apimatic/yours/1', ref.refspec()]);
+
+      const { stdout } = await execa('git', ['for-each-ref', '--format=%(refname)'], { cwd: origin.toString() });
+      expect(stdout.split('\n').sort()).to.deep.equal([
+        'refs/apimatic/pristine/sdk/typescript',
+        'refs/heads/apimatic/yours/1'
+      ]);
+      let refused: unknown;
+      try {
+        await git.push(repo, 'nowhere', ['refs/heads/apimatic/yours/1:refs/heads/apimatic/yours/1']);
+      } catch (error) {
+        refused = error;
+      }
+      expect(refused).to.be.instanceOf(Error);
     });
 
     it('tells an ancestor from a stranger', async () => {

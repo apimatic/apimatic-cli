@@ -9,9 +9,10 @@ import { AVAILABLE_LANGUAGES, Language, languageLabel, UPCOMING_LANGUAGES } from
 import { VersionProblem } from '../../types/project-context.js';
 import { RelativeFilePath } from '../../types/file/relativeFilePath.js';
 import { GitVersion } from '../../types/git/git-version.js';
-import { describeApart, SdkGeneration } from '../../types/sdk/generation-record.js';
+import { describeApart, PendingPullRequest, SdkGeneration } from '../../types/sdk/generation-record.js';
 import {
   ConflictChoice,
+  PullRequestChoice,
   ConflictKind,
   ConflictSide,
   GENERATOR_FILES,
@@ -20,11 +21,17 @@ import {
   YOUR_FILES
 } from '../../types/sdk/merge-plan.js';
 import { SHARE_HOOK_CALL } from '../../types/sdk/share-hook.js';
-import { NestedSdkDirectory, ShareHookInstall, SnapshotFetch } from '../../types/sdk-repository-context.js';
+import {
+  NestedSdkDirectory,
+  PublishedConflict,
+  ShareHookInstall,
+  SnapshotFetch
+} from '../../types/sdk-repository-context.js';
 import { listedInProse } from '../../utils/string-utils.js';
 
 /** The closing line of a run that left conflicts. */
 export const MERGE_NEEDS_RESOLVING = 'Resolve the conflicts and rerun';
+export const CONFLICT_IN_PULL_REQUEST = 'Resolve the conflicts in a pull request';
 
 const CONFLICT_LABELS: Record<ConflictKind, string> = {
   bothChanged: 'changed by you and by the generator; markers in the file',
@@ -222,6 +229,50 @@ export class SdkGeneratePrompts {
     log.info('Nothing was done. Rerun once the files are resolved and staged.');
   }
 
+  public pullRequestPending(pending: PendingPullRequest, outcome: 'open' | 'gone', link: string | undefined) {
+    const branches = `${f.var(pending.yours)} and ${f.var(pending.generated)}`;
+    if (outcome === 'gone') {
+      log.warn(`The last run's conflicts were pushed as ${branches}, but the first branch is no longer there.`);
+      return;
+    }
+    const where = link === undefined ? `between ${branches}` : `at ${link}`;
+    log.warn(`The last run's conflicts are in a pull request that is not merged yet, ${where}.`);
+  }
+
+  public async pullRequestChoice(outcome: 'open' | 'gone'): Promise<PullRequestChoice | undefined> {
+    const wait = {
+      value: 'wait' as const,
+      label: "I'll merge it first",
+      hint: 'nothing is done now; merge the pull request, then rerun'
+    };
+    const forget = {
+      value: 'forget' as const,
+      label: 'Forget it and regenerate',
+      hint: 'this run merges over the files as they are, and may conflict again'
+    };
+    const choice = await select<PullRequestChoice>({
+      message: 'What should happen?',
+      options: outcome === 'gone' ? [forget] : [wait, forget]
+    });
+    return isCancel(choice) ? undefined : choice;
+  }
+
+  public pullRequestWaiting() {
+    log.info('Nothing was done. Rerun once the pull request is merged.');
+  }
+
+  public pullRequestForgotten(sdk: DirectoryPath) {
+    log.info(`The pull request is forgotten; ${f.relativePath(sdk)} is regenerated as it is.`);
+  }
+
+  public pullRequestTaken(sdk: DirectoryPath, pending: PendingPullRequest) {
+    log.info(`The pull request was merged: ${f.relativePath(sdk)} now holds what ${f.var(pending.yours)} resolved.`);
+  }
+
+  public pullRequestFailed(reason: string) {
+    log.error(`The last run's pull request could not be taken up: ${reason}`);
+  }
+
   public conflictsResolved(side: ConflictSide, paths: readonly RelativeFilePath[], sdk: DirectoryPath) {
     log.info([RESOLVED_HEADINGS[side], ...listed(sdk, paths)].join('\n'));
   }
@@ -319,10 +370,40 @@ export class SdkGeneratePrompts {
           label: 'Resolve using my changes',
           hint: "where you both changed the same lines, your lines win; the generator's other changes still apply"
         },
+        {
+          value: 'pullRequest',
+          label: `Open a pull request and resolve ${one ? 'it' : 'them'} there`,
+          hint: "nothing is written here; your files and the generator's output are pushed as two branches on your current commit"
+        },
         { value: 'cancel', label: 'Cancel this run', hint: 'nothing is written; the SDK stays as it is' }
       ]
     });
     return isCancel(choice) ? undefined : choice;
+  }
+
+  public conflictsPublished(sdk: DirectoryPath, published: PublishedConflict) {
+    const { branches, remote, link } = published;
+    const pushed =
+      remote === undefined
+        ? 'Two branches were created; there is no remote to push them to:'
+        : `Two branches were pushed to ${f.var(remote)}:`;
+    const next =
+      link === undefined
+        ? ['Open a pull request from the second into the first and resolve the conflicts there.']
+        : ['Open a pull request between them and resolve the conflicts there:', `  ${link}`];
+    const lines = [
+      `Only the record remembers the pull request; ${f.relativePath(sdk)} is otherwise as it was.`,
+      pushed,
+      `  ${f.var(branches.yours)}  your files`,
+      `  ${f.var(branches.generated)}  the generator's output`,
+      ...next,
+      `Merge the pull request: the next run takes the result into ${f.relativePath(sdk)} and continues from there.`
+    ];
+    noteWrapped(lines.join('\n'), 'Conflicts published');
+  }
+
+  public conflictsNotPublished(reason: string) {
+    log.error(`The conflict branches could not be published: ${reason}`);
   }
 
   public runCancelled(sdk: DirectoryPath) {

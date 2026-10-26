@@ -10,6 +10,8 @@ export type SdkGeneration = {
 
 const SCHEMA_VERSION = 1;
 
+export type PendingPullRequest = { yours: string; generated: string; remote: string | undefined };
+
 const isOneOf = <T extends string>(values: readonly T[], value: unknown): value is T =>
   typeof value === 'string' && (values as readonly string[]).includes(value);
 
@@ -24,12 +26,20 @@ export class GenerationRecord {
   private readonly pristine: CommitId;
   private readonly generatedAt: Date;
   private readonly cliVersion: string;
+  private readonly pullRequest: PendingPullRequest | undefined;
 
-  private constructor(generation: SdkGeneration, pristine: CommitId, generatedAt: Date, cliVersion: string) {
+  private constructor(
+    generation: SdkGeneration,
+    pristine: CommitId,
+    generatedAt: Date,
+    cliVersion: string,
+    pullRequest?: PendingPullRequest
+  ) {
     this.generation = generation;
     this.pristine = pristine;
     this.generatedAt = generatedAt;
     this.cliVersion = cliVersion;
+    this.pullRequest = pullRequest;
   }
 
   /** Written by a run that just recorded `pristine`. */
@@ -55,6 +65,7 @@ export class GenerationRecord {
     const record = parsed as Record<string, unknown>;
     const pristine = typeof record.pristine === 'string' ? CommitId.create(record.pristine) : undefined;
     const generatedAt = typeof record.generatedAt === 'string' ? new Date(record.generatedAt) : undefined;
+    const pullRequest = record.pullRequest === undefined ? null : parsePullRequest(record.pullRequest);
     if (
       record.schemaVersion !== SCHEMA_VERSION ||
       !isOneOf(Object.values(Language), record.language) ||
@@ -63,7 +74,8 @@ export class GenerationRecord {
       pristine === undefined ||
       generatedAt === undefined ||
       Number.isNaN(generatedAt.getTime()) ||
-      typeof record.cliVersion !== 'string'
+      typeof record.cliVersion !== 'string' ||
+      pullRequest === undefined
     ) {
       return undefined;
     }
@@ -71,8 +83,21 @@ export class GenerationRecord {
       { language: record.language, codegenVersion: record.codegenVersion, stability: record.stability },
       pristine,
       generatedAt,
-      record.cliVersion
+      record.cliVersion,
+      pullRequest ?? undefined
     );
+  }
+
+  public pendingPullRequest(): PendingPullRequest | undefined {
+    return this.pullRequest;
+  }
+
+  public awaiting(pullRequest: PendingPullRequest): GenerationRecord {
+    return new GenerationRecord(this.generation, this.pristine, this.generatedAt, this.cliVersion, pullRequest);
+  }
+
+  public forgetting(): GenerationRecord {
+    return new GenerationRecord(this.generation, this.pristine, this.generatedAt, this.cliVersion);
   }
 
   public pristineCommit(): CommitId {
@@ -101,12 +126,28 @@ export class GenerationRecord {
         stability: this.generation.stability,
         pristine: this.pristine.toString(),
         generatedAt: this.generatedAt.toISOString(),
-        cliVersion: this.cliVersion
+        cliVersion: this.cliVersion,
+        ...(this.pullRequest === undefined ? {} : { pullRequest: this.pullRequest })
       },
       null,
       2
     )}\n`;
   }
+}
+
+function parsePullRequest(value: unknown): PendingPullRequest | undefined {
+  if (typeof value !== 'object' || value === null) {
+    return undefined;
+  }
+  const { yours, generated, remote } = value as Record<string, unknown>;
+  if (
+    typeof yours !== 'string' ||
+    typeof generated !== 'string' ||
+    (remote !== undefined && typeof remote !== 'string')
+  ) {
+    return undefined;
+  }
+  return { yours, generated, remote };
 }
 
 export const RECORD_ATTRIBUTES =

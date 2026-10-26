@@ -11,6 +11,7 @@ import {
   UPCOMING_LANGUAGES
 } from '../../types/sdk/generate.js';
 import { GitVersion } from '../../types/git/git-version.js';
+import { CONFLICT_POLICY_FLAGS } from '../../types/sdk/merge-plan.js';
 import { StabilityChoice } from '../../types/sdk/stability-choice.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { ProjectContext } from '../../types/project-context.js';
@@ -54,6 +55,11 @@ With git ${GitVersion.required()} or newer installed, your edits to the generate
       description: 'Stability level of the generated SDK. Defaults to the level the language offers.',
       options: Object.values(Stability).map((s) => s.valueOf())
     }),
+    'on-conflict': Flags.string({
+      description:
+        'What happens when your edits and the regenerated SDK conflict, instead of asking: leave markers in the files, take one side, or push both sides as branches to resolve in a pull request',
+      options: Object.keys(CONFLICT_POLICY_FLAGS)
+    }),
     ...FlagsProvider.input,
     ...FlagsProvider.force,
     ...FlagsProvider.authKey
@@ -67,7 +73,16 @@ With git ${GitVersion.required()} or newer installed, your edits to the generate
 
   async run() {
     const {
-      flags: { language, input, destination, force, stability, 'auth-key': authKey, 'api-version': apiVersion }
+      flags: {
+        language,
+        input,
+        destination,
+        force,
+        stability,
+        'auth-key': authKey,
+        'api-version': apiVersion,
+        'on-conflict': onConflict
+      }
     } = await this.parse(SdkGenerate);
 
     const project = ProjectContext.at(input);
@@ -85,7 +100,9 @@ With git ${GitVersion.required()} or newer installed, your edits to the generate
       language as Language,
       StabilityChoice.for(language as Language, stability).stabilityLevel(),
       force,
-      apiVersion
+      apiVersion,
+      undefined,
+      onConflict === undefined ? undefined : CONFLICT_POLICY_FLAGS[onConflict]
     );
     outro(result);
   }

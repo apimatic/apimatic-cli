@@ -1,10 +1,13 @@
 import { RelativeFilePath } from '../file/relativeFilePath.js';
 import { CommitId } from '../git/commit-id.js';
 import { GitVersion } from '../git/git-version.js';
+import { PendingPullRequest } from './generation-record.js';
 import { SdkRepositoryContext, SdkRepositoryState } from '../sdk-repository-context.js';
 
 /** Why a run records a fresh snapshot instead of merging: there is no base, or not one for this generation. */
-export type RecordReason = { kind: 'noRepository' } | Exclude<SdkRepositoryState, { kind: 'ready' | 'unresolved' }>;
+export type RecordReason =
+  | { kind: 'noRepository' }
+  | Exclude<SdkRepositoryState, { kind: 'ready' | 'unresolved' | 'pendingPullRequest' }>;
 
 /**
  * How a run will write the SDK directory, decided before anything is uploaded, with the reason
@@ -20,15 +23,24 @@ export type SdkDestination =
 /** The last run's markers are still in the files; nothing is decided until the developer settles them. */
 export type Unresolved = { kind: 'unresolved'; repository: SdkRepositoryContext; paths: readonly RelativeFilePath[] };
 
+export type AwaitingPullRequest = {
+  kind: 'pendingPullRequest';
+  repository: SdkRepositoryContext;
+  pending: PendingPullRequest;
+  base: CommitId;
+};
+
 export function destinationFor(
   repository: SdkRepositoryContext,
   state: SdkRepositoryState
-): SdkDestination | Unresolved {
+): SdkDestination | Unresolved | AwaitingPullRequest {
   switch (state.kind) {
     case 'ready':
       return { kind: 'merge', repository, base: state.base };
     case 'unresolved':
       return { kind: 'unresolved', repository, paths: state.paths };
+    case 'pendingPullRequest':
+      return { kind: 'pendingPullRequest', repository, pending: state.pending, base: state.base };
     case 'noRecord':
     case 'otherGeneration':
     case 'snapshotMissing':

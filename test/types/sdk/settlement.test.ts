@@ -1,5 +1,6 @@
 import { expect } from 'chai';
 import { RelativeFilePath } from '../../../src/types/file/relativeFilePath.js';
+import { CommitId } from '../../../src/types/git/commit-id.js';
 import { TreeId } from '../../../src/types/git/tree-id.js';
 import { Conflict, ConflictSides, MergeFiles, MergePlan } from '../../../src/types/sdk/merge-plan.js';
 import { favouring, resolving } from '../../../src/types/sdk/settlement.js';
@@ -17,7 +18,12 @@ const regeneration = (conflicts: Conflict[]): Regeneration => {
   const plan = new MergePlan([], [], conflicts, [], NO_FILES, sides);
   return {
     generated: TreeId.fromGit('a'.repeat(40)),
-    merge: { plan, merged: TreeId.fromGit('b'.repeat(40)), stages: [] }
+    merge: {
+      plan,
+      merged: TreeId.fromGit('b'.repeat(40)),
+      stages: [],
+      sides: { yours: CommitId.fromGit('c'.repeat(40)), theirs: CommitId.fromGit('d'.repeat(40)) }
+    }
   };
 };
 

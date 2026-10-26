@@ -15,7 +15,7 @@ describe('SdkDestination', () => {
     const destination = destinationFor(repository, { kind: 'ready', base });
 
     expect(destination).to.deep.equal({ kind: 'merge', repository, base });
-    expect(destination.kind !== 'unresolved' && replacesDirectory(destination)).to.be.false;
+    expect(destination.kind === 'merge' && replacesDirectory(destination)).to.be.false;
   });
 
   it('records a fresh snapshot otherwise, carrying why, which the overwrite question follows', () => {
@@ -30,8 +30,19 @@ describe('SdkDestination', () => {
 
     expect(destinations).to.deep.equal(states.map((because) => ({ kind: 'record', repository, because })));
     expect(
-      destinations.map((destination) => destination.kind !== 'unresolved' && replacesDirectory(destination))
+      destinations.map((destination) => destination.kind === 'record' && replacesDirectory(destination))
     ).to.deep.equal([true, true, true]);
+  });
+
+  it('decides nothing while the last run’s pull request is pending, carrying it and the base', () => {
+    const pending = { yours: 'apimatic/conflict/1', generated: 'apimatic/generated/1', remote: 'origin' };
+
+    expect(destinationFor(repository, { kind: 'pendingPullRequest', pending, base })).to.deep.equal({
+      kind: 'pendingPullRequest',
+      repository,
+      pending,
+      base
+    });
   });
 
   it('decides nothing while the last run’s markers are still in the files, naming them for the question', () => {
