@@ -1,7 +1,6 @@
 export interface BuildConfigData {
   generateVersionedPortal?: object;
   versionsPath?: string;
-  [key: string]: unknown;
 }
 
 // Immutable wrapper around the parsed APIMATIC-BUILD.json. Since version 2 the portal is
@@ -11,16 +10,7 @@ export class BuildConfig {
   private constructor(private readonly data: BuildConfigData) {}
 
   public static parse(json: string): BuildConfig {
-    return BuildConfig.from(JSON.parse(json) as BuildConfigData);
-  }
-
-  public static from(data: BuildConfigData): BuildConfig {
-    return new BuildConfig(data);
-  }
-
-  // Called implicitly by JSON.stringify when the config is written back to disk.
-  public toJSON(): BuildConfigData {
-    return this.data;
+    return new BuildConfig(JSON.parse(json) as BuildConfigData);
   }
 
   public isVersioned(): boolean {

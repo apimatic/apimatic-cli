@@ -12,7 +12,8 @@ import {
   ReservedAddressPage,
   SharedAddress,
   SharedEndpoint,
-  SpecConversion
+  SpecConversion,
+  UnreadableSpecReason
 } from '../../types/portal/portal-source.js';
 import { Shared } from '../../types/portal/shared.js';
 import { MERGE_SETTINGS } from '../../types/portal/spec-metadata.js';
@@ -40,7 +41,10 @@ const mergeTheFolders = (): string =>
 const addingToMergeOrder = (folders: string): string =>
   `adding ${folders} to ${f.var(MERGE_SETTINGS.order)} when the file lists folders`;
 
-export const specPath = (sourceDirectory: DirectoryPath): string => f.path(sourceDirectory.join(SPEC_DIRECTORY_NAME));
+export const specDirectoryOf = (sourceDirectory: DirectoryPath): DirectoryPath =>
+  sourceDirectory.join(SPEC_DIRECTORY_NAME);
+
+export const specPath = (sourceDirectory: DirectoryPath): string => f.path(specDirectoryOf(sourceDirectory));
 
 export const contentPath = (sourceDirectory: DirectoryPath): string =>
   f.path(sourceDirectory.join(CONTENT_DIRECTORY_NAME));
@@ -95,6 +99,24 @@ function reportSpecConversion({ file, format, converted, others }: SpecConversio
   );
 }
 
+function unreadableBecause(reason: UnreadableSpecReason): string {
+  switch (reason.kind) {
+    case 'empty':
+      return 'it is empty';
+    case 'noValue':
+      return 'it holds no value';
+    case 'noKey':
+      return 'it is not JSON, and the portal reads YAML only when it holds a key';
+    case 'gone':
+      return 'it is no longer there';
+    case 'folder':
+      return 'it is a folder';
+    case 'invalid':
+    case 'unopened':
+      return reason.message;
+  }
+}
+
 const folderNames = (folders: DirectoryPath[], sourceDirectory: DirectoryPath): string =>
   listedInProse(folders.map((folder) => f.var(folder.relativeTo(sourceDirectory))));
 
@@ -141,7 +163,39 @@ export function reportSourceProblem(problem: PortalSourceProblem, sourceDirector
       return;
     }
     case 'unreadableSpec': {
-      log.error(`${relative(problem.file, sourceDirectory)} could not be read as JSON or YAML.`);
+      const file = relative(problem.file, sourceDirectory);
+      const why = unreadableBecause(problem.reason);
+      log.error(
+        problem.referencedBy === null
+          ? `${file} could not be read: ${why}.`
+          : `${file}, which ${relative(problem.referencedBy, sourceDirectory)} refers to, could not be read: ${why}.`
+      );
+      return;
+    }
+    case 'missingSpecReference': {
+      const { file, foundAs } = problem.missing;
+      const referencedBy = relative(problem.referencedBy, sourceDirectory);
+      const refersTo = `${referencedBy} refers to ${relative(file, sourceDirectory)}`;
+      if (foundAs !== null) {
+        log.error(`${refersTo}, but the file is ${spelt(foundAs, sourceDirectory)}.`);
+        return;
+      }
+      log.error(`${refersTo}, but there is no such file.`);
+      log.message(`A ${f.var('$ref')} names a file from the folder of the file it is written in.`);
+      return;
+    }
+    case 'unresolvableSpecReference': {
+      const { file, ref } = problem.reference;
+      const writtenIn = relative(file, sourceDirectory);
+      log.error(
+        ref === ''
+          ? `${writtenIn} has an empty ${f.var('$ref')}.`
+          : `${writtenIn} has the ${f.var('$ref')} ${f.var(ref)}, which the portal cannot resolve.`
+      );
+      log.message(
+        `A ${f.var('$ref')} names a part of the file it is in as ${f.var('#/components/schemas/Pet')}, ` +
+          `and a part of another as ${f.var('./pets.yaml#/Pet')}.`
+      );
       return;
     }
     case 'unreadableMetadata': {

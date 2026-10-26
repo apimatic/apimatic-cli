@@ -116,6 +116,7 @@ describe('FileService', () => {
     });
 
     afterEach(() => {
+      sinon.restore();
       fs.rmSync(root.toString(), { recursive: true, force: true });
     });
 
@@ -150,6 +151,28 @@ describe('FileService', () => {
       expect((await fileService.directorySpelledOnDisk(root, images))?.isEqual(images)).to.be.true;
       expect((await fileService.directorySpelledOnDisk(root, root))?.isEqual(root)).to.be.true;
       expect(await fileService.directorySpelledOnDisk(root, root.join('static', 'logos'))).to.be.null;
+    });
+
+    it('answers null for a directory that is not below the root', async () => {
+      expect(await fileService.directorySpelledOnDisk(root.join('static'), root)).to.be.null;
+    });
+
+    it('answers for several files, reading each folder once', async () => {
+      fs.writeFileSync(path.join(root.toString(), 'static', 'images', 'icon.png'), '');
+      const readdir = sinon.spy(fsExtra, 'readdir');
+
+      const found = await fileService.spellingsOnDisk(root, [
+        fileAt('static', 'images', 'Logo.png'),
+        fileAt('static', 'images', 'icon.png'),
+        fileAt('static', 'images', 'banner.png')
+      ]);
+
+      expect(found.map((file) => file?.relativeTo(root) ?? null)).to.deep.equal([
+        'static/images/logo.png',
+        'static/images/icon.png',
+        null
+      ]);
+      expect(readdir.callCount).to.equal(3);
     });
   });
 

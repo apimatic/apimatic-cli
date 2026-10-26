@@ -9,7 +9,6 @@ import { FilePath } from '../types/file/filePath.js';
 import { DirectoryPath } from '../types/file/directoryPath.js';
 import { Directory, DirectoryItem } from '../types/file/directory.js';
 import { FileName } from '../types/file/fileName.js';
-import { sleep } from './timer-extensions.js';
 import { errorMessage } from '../utils/error-utils.js';
 
 /** `stat` follows a link, so a link to nothing fails as though the entry were not there. */
@@ -17,6 +16,14 @@ function isDanglingLink(error: unknown): boolean {
   const code = (error as NodeJS.ErrnoException | null)?.code;
   return code === 'ENOENT' || code === 'ENOTDIR';
 }
+
+interface DirectoryEntries {
+  fileNames: FileName[];
+  subDirectories: DirectoryPath[];
+}
+
+/** Each folder's entries by its path, read once for the files of one call. */
+type Listings = Map<string, Promise<DirectoryEntries>>;
 
 function spelling<T>(name: string, entries: T[], nameOf: (entry: T) => string): T | undefined {
   return (
@@ -29,15 +36,6 @@ export class FileService {
   public async fileExists(file: FilePath): Promise<boolean> {
     try {
       const stat = await fsExtra.stat(file.toString());
-      return stat.isFile();
-    } catch {
-      return false;
-    }
-  }
-
-  public fileExistsSync(file: FilePath): boolean {
-    try {
-      const stat = fsExtra.statSync(file.toString());
       return stat.isFile();
     } catch {
       return false;
@@ -165,21 +163,43 @@ export class FileService {
 
   // By code point first: Windows and macOS open `logo.png` for `Logo.PNG`, where a web server would not.
   public async spelledOnDisk(root: DirectoryPath, file: FilePath): Promise<FilePath | null> {
-    const directory = await this.directorySpelledOnDisk(root, file.directory());
-    if (directory === null) {
-      return null;
-    }
-    const { fileNames } = await this.listEntries(directory);
-    const match = spelling(file.name().toString(), fileNames, (candidate) => candidate.toString());
-    return match === undefined ? null : new FilePath(directory, match);
+    const [found] = await this.spellingsOnDisk(root, [file]);
+    return found;
   }
 
-  /** `directory`, at or below `root`, as each folder below `root` is spelt on disk; null when one is not there. */
+  /** As `spelledOnDisk` for each of `files`, listing each folder once: a split specification runs to thousands. */
+  public async spellingsOnDisk(root: DirectoryPath, files: FilePath[]): Promise<(FilePath | null)[]> {
+    const listings: Listings = new Map();
+    return await Promise.all(
+      files.map(async (file) => {
+        const directory = await this.spelledDirectory(root, file.directory(), listings);
+        if (directory === null) {
+          return null;
+        }
+        const { fileNames } = await this.listOnce(directory, listings);
+        const match = spelling(file.name().toString(), fileNames, (candidate) => candidate.toString());
+        return match === undefined ? null : new FilePath(directory, match);
+      })
+    );
+  }
+
+  /** `directory` as each folder below `root` is spelt on disk; null when one is not there, or it is not below `root`. */
   public async directorySpelledOnDisk(root: DirectoryPath, directory: DirectoryPath): Promise<DirectoryPath | null> {
+    return await this.spelledDirectory(root, directory, new Map());
+  }
+
+  private async spelledDirectory(
+    root: DirectoryPath,
+    directory: DirectoryPath,
+    listings: Listings
+  ): Promise<DirectoryPath | null> {
+    if (!root.contains(directory)) {
+      return null;
+    }
     const relative = path.relative(root.toString(), directory.toString());
     let found = root;
     for (const name of relative === '' ? [] : relative.split(path.sep)) {
-      const { subDirectories } = await this.listEntries(found);
+      const { subDirectories } = await this.listOnce(found, listings);
       const match = spelling(name, subDirectories, (subDirectory) => path.basename(subDirectory.toString()));
       if (match === undefined) {
         return null;
@@ -189,10 +209,16 @@ export class FileService {
     return found;
   }
 
+  private listOnce(dir: DirectoryPath, listings: Listings): Promise<DirectoryEntries> {
+    const listing = listings.get(dir.toString()) ?? this.listEntries(dir);
+    listings.set(dir.toString(), listing);
+    return listing;
+  }
+
   // The direct children of `dir`, split into files and directories; both empty when it cannot
   // be read. A symlink counts as what it points at: skipping it silently drops an entry the
   // user did put there.
-  private async listEntries(dir: DirectoryPath): Promise<{ fileNames: FileName[]; subDirectories: DirectoryPath[] }> {
+  private async listEntries(dir: DirectoryPath): Promise<DirectoryEntries> {
     const fileNames: FileName[] = [];
     const subDirectories: DirectoryPath[] = [];
     try {
@@ -231,36 +257,6 @@ export class FileService {
     );
   }
 
-  public async copyDirectoryExcluding(
-    source: DirectoryPath,
-    destination: DirectoryPath,
-    excludeNames: FileName[]
-  ): Promise<void> {
-    await this.createDirectoryIfNotExists(destination);
-
-    const entries = await fsExtra.readdir(source.toString());
-
-    await Promise.all(
-      entries
-        .filter((entry) => !excludeNames.find((exclude) => exclude.toString() === entry))
-        .map(async (entry) => {
-          const sourcePath = path.join(source.toString(), entry);
-          const destPath = path.join(destination.toString(), entry);
-          const stat = await fsExtra.stat(sourcePath);
-
-          if (stat.isDirectory()) {
-            return this.copyDirectoryExcluding(
-              new DirectoryPath(sourcePath),
-              new DirectoryPath(destPath),
-              excludeNames
-            );
-          }
-
-          return fsExtra.copyFile(sourcePath, destPath);
-        })
-    );
-  }
-
   public async deleteFile(filePath: FilePath): Promise<void> {
     const exists = await this.fileExists(filePath);
     if (exists) {
@@ -272,25 +268,6 @@ export class FileService {
     const exists = await this.directoryExists(dirPath);
     if (exists) {
       await fsExtra.remove(dirPath.toString());
-    }
-  }
-
-  public async pollDeleteDirectory(dirPath: DirectoryPath, onDeleteFailurePersists: () => void): Promise<void> {
-    const timeoutMs = 5 * 60 * 1000;
-    const deadline = Date.now() + timeoutMs;
-    const deleteFailurePersistsMaxDelay = Date.now() + 5 * 1000;
-    let actionPerformed = false;
-    while (
-      Date.now() < deadline &&
-      (await this.deleteDirectory(dirPath)
-        .then(() => false)
-        .catch(() => true))
-    ) {
-      if (!actionPerformed && Date.now() > deleteFailurePersistsMaxDelay) {
-        onDeleteFailurePersists();
-        actionPerformed = true;
-      }
-      await sleep(500);
     }
   }
 
@@ -358,10 +335,6 @@ export class FileService {
     }
     await fsExtra.copy(source.toString(), destination.toString(), { preserveTimestamps: true });
     return true;
-  }
-
-  public async copyToDir(source: FilePath, destination: DirectoryPath) {
-    await fsExtra.copyFile(source.toString(), source.replaceDirectory(destination).toString());
   }
 
   public async isZipFile(filePath: FilePath): Promise<boolean> {
