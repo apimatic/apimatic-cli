@@ -11,7 +11,7 @@ import { FilePath } from './file/filePath.js';
 import { FileName } from './file/fileName.js';
 import { FileProblem } from './file/file-problem.js';
 import { SdkGeneration } from './sdk/generation-record.js';
-import { destinationFor, SdkDestination, Unresolved } from './sdk/sdk-destination.js';
+import { AwaitingPullRequest, destinationFor, SdkDestination, Unresolved } from './sdk/sdk-destination.js';
 import { NestedSdkDirectory, SdkRepositoryContext, SdkRepositoryProblem } from './sdk-repository-context.js';
 
 const GIT_DIRECTORY = '.git';
@@ -54,7 +54,7 @@ export class SdkContext {
    */
   public async destination(
     generation: SdkGeneration
-  ): Promise<Result<SdkDestination | Unresolved, NestedSdkDirectory | SdkRepositoryProblem>> {
+  ): Promise<Result<SdkDestination | Unresolved | AwaitingPullRequest, NestedSdkDirectory | SdkRepositoryProblem>> {
     const version = await this.git.version();
     if (!version?.isSupported()) {
       return ok({ kind: 'overwrite', found: version });

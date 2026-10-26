@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { err, ok, Result } from 'neverthrow';
 import { FileService } from '../infrastructure/file-service.js';
-import { GitService } from '../infrastructure/git-service.js';
+import { GitService, TreeEntry } from '../infrastructure/git-service.js';
 import { errorMessage } from '../utils/error-utils.js';
 import { DirectoryPath, posix } from './file/directoryPath.js';
 import { FileName } from './file/fileName.js';
@@ -12,8 +12,15 @@ import { CommitId } from './git/commit-id.js';
 import { StageEntry } from './git/merge-tree.js';
 import { TreeId } from './git/tree-id.js';
 import { relabelMarkers } from './sdk/conflict-markers.js';
-import { describeGeneration, GenerationRecord, RECORD_ATTRIBUTES, SdkGeneration } from './sdk/generation-record.js';
-import { ConflictSide, MergePlan } from './sdk/merge-plan.js';
+import {
+  describeGeneration,
+  GenerationRecord,
+  PendingPullRequest,
+  RECORD_ATTRIBUTES,
+  SdkGeneration
+} from './sdk/generation-record.js';
+import { ConflictSide, FileWrite, MergePlan } from './sdk/merge-plan.js';
+import { compareUrl, conflictBranches, ConflictBranches } from './sdk/pull-request-link.js';
 import { settledContent } from './sdk/unresolved-file.js';
 import { SHARE_HOOK_SCRIPT, SHARE_HOOK_SCRIPT_NAME, ShareHook } from './sdk/share-hook.js';
 import { SnapshotRef } from './sdk/snapshot-ref.js';
@@ -38,7 +45,10 @@ export type SdkRepositoryState =
   | { kind: 'otherGeneration'; recorded: SdkGeneration }
   | { kind: 'snapshotMissing'; fetch: SnapshotFetch }
   | { kind: 'unresolved'; paths: RelativeFilePath[] }
+  | { kind: 'pendingPullRequest'; pending: PendingPullRequest; base: CommitId }
   | { kind: 'ready'; base: CommitId };
+
+export type PullRequestOutcome = { kind: 'merged'; tip: CommitId } | { kind: 'open' } | { kind: 'gone' };
 
 /**
  * The pre-push hook that shares snapshots runs the script, or the one line the developer has to
@@ -50,8 +60,12 @@ export type ShareHookInstall =
   | { kind: 'elsewhere'; file: FilePath; hooksPath: string; script: FilePath }
   | { kind: 'notShell'; file: FilePath; shebang: string; script: FilePath };
 
+export type MergeSides = { yours: CommitId; theirs: CommitId };
+
 /** The plan, the merged tree, and git's versions of every conflicted path, below the SDK directory. */
-export type MergeOutcome = { plan: MergePlan; merged: TreeId; stages: StageEntry[] };
+export type MergeOutcome = { plan: MergePlan; merged: TreeId; stages: StageEntry[]; sides: MergeSides };
+
+export type PublishedConflict = { branches: ConflictBranches; remote: string | undefined; link: string | undefined };
 
 /** A fresh generation merged over the directory as it is: the snapshot it will be recorded as, and the merge. */
 export type Regeneration = { generated: TreeId; merge: MergeOutcome };
@@ -67,8 +81,8 @@ const RECORD_ATTRIBUTES_FILE = '.gitattributes';
  * An SDK directory together with the git repository that encloses it, where its snapshots live
  * as commits under hidden refs: the pristine chain (one commit per generation, the base of the
  * next merge) and the previous state (the directory before the last run wrote to it). It merges
- * a regeneration over the directory against that base. The repository is never pushed, fetched,
- * or checked out from here.
+ * a regeneration over the directory against that base. Nothing here checks out or moves a branch
+ * the developer has; a conflict published for a pull request pushes new branches of its own.
  */
 export class SdkRepositoryContext {
   private readonly fileService = new FileService();
@@ -142,6 +156,10 @@ export class SdkRepositoryContext {
       if (!(await this.git.hasCommit(this.rootDirectory, base))) {
         return ok({ kind: 'snapshotMissing', fetch: { kind: 'absent', remote } });
       }
+    }
+    const pending = record.pendingPullRequest();
+    if (pending !== undefined) {
+      return ok({ kind: 'pendingPullRequest', pending, base });
     }
     const paths = await this.unresolvedConflicts();
     return ok(paths.length > 0 ? { kind: 'unresolved', paths } : { kind: 'ready', base });
@@ -361,7 +379,7 @@ export class SdkRepositoryContext {
         applied: await this.git.diffTrees(root, disk, merge.tree, false),
         basePaths: (await this.git.listTree(root, baseTree)).map((entry) => entry.path)
       });
-      return ok({ plan, merged: merge.tree, stages: merge.stages });
+      return ok({ plan, merged: merge.tree, stages: merge.stages, sides: { yours, theirs } });
     } catch (error) {
       return err(gitFailed(errorMessage(error)));
     }
@@ -402,21 +420,174 @@ export class SdkRepositoryContext {
 
   /** Writes and removes what the plan says, in the SDK directory, with the CLI's labels on any markers. */
   public async apply(plan: MergePlan): Promise<Result<void, SdkRepositoryProblem>> {
+    return this.writeFiles(plan.writes, plan.deletes, (relative) => plan.hasMarkers(relative));
+  }
+
+  private async writeFiles(
+    writes: readonly FileWrite[],
+    deletes: readonly RelativeFilePath[],
+    hasMarkers: (relative: RelativeFilePath) => boolean
+  ): Promise<Result<void, SdkRepositoryProblem>> {
     try {
-      const blobs = await this.git.readBlobs(this.rootDirectory, [...new Set(plan.writes.map((write) => write.blob))]);
-      for (const write of plan.writes) {
+      const blobs = await this.git.readBlobs(this.rootDirectory, [...new Set(writes.map((write) => write.blob))]);
+      for (const write of writes) {
         const content = blobs.get(write.blob)!;
         const target = write.path.in(this.sdk).toString();
         await fs.promises.mkdir(path.dirname(target), { recursive: true });
-        await fs.promises.writeFile(target, plan.hasMarkers(write.path) ? relabelMarkers(content) : content);
+        await fs.promises.writeFile(target, hasMarkers(write.path) ? relabelMarkers(content) : content);
       }
-      for (const relative of plan.deletes) {
+      for (const relative of deletes) {
         await fs.promises.rm(relative.in(this.sdk).toString(), { force: true });
       }
       return ok(undefined);
     } catch (error) {
       return err(gitFailed(errorMessage(error)));
     }
+  }
+
+  public async checkPullRequest(
+    pending: PendingPullRequest,
+    base: CommitId
+  ): Promise<Result<PullRequestOutcome, SdkRepositoryProblem>> {
+    const root = this.rootDirectory;
+    const ref = `refs/heads/${pending.yours}`;
+    try {
+      const tip =
+        pending.remote === undefined
+          ? await this.git.resolveRef(root, ref)
+          : await this.git.fetchRef(root, pending.remote, ref);
+      if (tip === undefined) {
+        return ok({ kind: 'gone' });
+      }
+      const json = await this.git.readFile(root, tip, this.rootRelative(this.recordPath()));
+      const record = json === undefined ? undefined : GenerationRecord.parse(json);
+      if (record === undefined || record.pristineCommit().isEqual(base)) {
+        return ok({ kind: 'open' });
+      }
+      return ok({ kind: 'merged', tip });
+    } catch (error) {
+      return err(gitFailed(errorMessage(error)));
+    }
+  }
+
+  public async takePullRequest(base: CommitId, tip: CommitId): Promise<Result<void, SdkRepositoryProblem>> {
+    const root = this.rootDirectory;
+    const previous = await this.savePrevious(base);
+    if (previous.isErr()) {
+      return err(previous.error);
+    }
+    try {
+      const merged = await this.git.subtreeAt(root, tip, this.sdkPath());
+      if (merged === undefined) {
+        return err(gitFailed(`${tip} holds no ${this.sdkPathspec()} directory`));
+      }
+      const disk = await this.git.treeOfCommit(root, previous.value);
+      const changes = await this.git.diffTrees(root, disk, merged, false);
+      const writes = changes.flatMap((change) =>
+        change.blob === undefined ? [] : [{ path: change.path, blob: change.blob }]
+      );
+      const deletes = changes.filter((change) => change.status === 'D').map((change) => change.path);
+      return this.writeFiles(writes, deletes, () => false);
+    } catch (error) {
+      return err(gitFailed(errorMessage(error)));
+    }
+  }
+
+  public async forgetPullRequest(): Promise<Result<void, SdkRepositoryProblem>> {
+    const record = await this.readRecord();
+    return record === undefined ? ok(undefined) : (await this.writeRecord(record.forgetting())).map(() => undefined);
+  }
+
+  public async pullRequestLink(pending: PendingPullRequest): Promise<string | undefined> {
+    if (pending.remote === undefined) {
+      return undefined;
+    }
+    const url = await this.git.remoteUrl(this.rootDirectory, pending.remote);
+    return url === undefined ? undefined : compareUrl(url, pending);
+  }
+
+  public async publishConflict(
+    base: CommitId,
+    regeneration: Regeneration,
+    generation: SdkGeneration,
+    cliVersion: string,
+    remote: string | undefined
+  ): Promise<Result<PublishedConflict, SdkRepositoryProblem>> {
+    const root = this.rootDirectory;
+    if (remote !== undefined) {
+      await this.fetchSnapshots(remote);
+    }
+    const pristine = await this.recordPristine(regeneration.generated, generation);
+    if (pristine.isErr()) {
+      return err(pristine.error);
+    }
+    const branches = conflictBranches(new Date());
+    try {
+      const head = await this.git.headCommit(root);
+      const checkedOut = head === undefined ? GitService.emptyTree() : await this.git.treeOfCommit(root, head);
+      const sdkPath = this.sdkPath();
+      const graft = (subtree: TreeId, extras: readonly TreeEntry[]) =>
+        this.git.graft(root, checkedOut, sdkPath, subtree, extras);
+      const disk = await this.git.treeOfCommit(root, regeneration.merge.sides.yours);
+      const record = GenerationRecord.written(generation, pristine.value, new Date(), cliVersion);
+      const baseTree = await graft(await this.git.treeOfCommit(root, base), await this.recordEntriesIn(disk));
+      const yoursTree = await graft(disk, []);
+      const generatedTree = await graft(regeneration.generated, [
+        await this.recordEntry(RECORD_FILE, record.toJson()),
+        await this.recordEntry(RECORD_ATTRIBUTES_FILE, RECORD_ATTRIBUTES)
+      ]);
+      const described = describeGeneration(generation);
+      const baseCommit = await this.git.commitTree(
+        root,
+        baseTree,
+        head === undefined ? [] : [head],
+        `apimatic: base of ${described}`
+      );
+      const yours = await this.git.commitTree(root, yoursTree, [baseCommit], 'apimatic: your changes');
+      const generated = await this.git.commitTree(
+        root,
+        generatedTree,
+        [baseCommit],
+        `apimatic: generated ${described}`
+      );
+      await this.git.createBranch(root, branches.yours, yours);
+      await this.git.createBranch(root, branches.generated, generated);
+      if (remote !== undefined) {
+        await this.git.push(root, remote, [
+          branchRefspec(branches.yours),
+          branchRefspec(branches.generated),
+          this.pristineRef().refspec()
+        ]);
+      }
+    } catch (error) {
+      return err(gitFailed(errorMessage(error)));
+    }
+    const pending = { ...branches, remote };
+    const remembered = await this.rememberPullRequest(pending);
+    if (remembered.isErr()) {
+      return err(remembered.error);
+    }
+    return ok({ branches, remote, link: await this.pullRequestLink(pending) });
+  }
+
+  private async rememberPullRequest(pending: PendingPullRequest): Promise<Result<void, SdkRepositoryProblem>> {
+    const record = await this.readRecord();
+    if (record === undefined) {
+      return err({ kind: 'recordNotWritten', reason: `${this.recordFile()} is missing` });
+    }
+    return (await this.writeRecord(record.awaiting(pending))).map(() => undefined);
+  }
+
+  private async recordEntriesIn(tree: TreeId): Promise<TreeEntry[]> {
+    return (await this.git.listTree(this.rootDirectory, tree))
+      .filter((entry) => entry.path.toString().startsWith(`${RECORD_DIRECTORY}/`))
+      .map((entry) => ({ ...entry, path: this.rootRelative(entry.path) }));
+  }
+
+  private async recordEntry(name: string, content: string): Promise<TreeEntry> {
+    const oid = await this.git.writeBlob(this.rootDirectory, content);
+    const path = this.rootRelative(RelativeFilePath.fromGit(`${RECORD_DIRECTORY}/${name}`));
+    return { mode: '100644', type: 'blob', oid, path };
   }
 
   /** Marks the conflicted paths in the repository's index the way a merge would, so git's own tools take over. */
@@ -509,6 +680,10 @@ export class SdkRepositoryContext {
     return new FilePath(this.sdk.join(RECORD_DIRECTORY), new FileName(RECORD_FILE));
   }
 
+  private recordPath(): RelativeFilePath {
+    return RelativeFilePath.fromGit(`${RECORD_DIRECTORY}/${RECORD_FILE}`);
+  }
+
   private async pristineRefsIn(): Promise<SnapshotRef[]> {
     const namespace = SnapshotRef.pristineNamespace();
     return (await this.git.listRefs(this.rootDirectory, namespace)).map((name) =>
@@ -522,3 +697,5 @@ export class SdkRepositoryContext {
 }
 
 const gitFailed = (reason: string): SdkRepositoryProblem => ({ kind: 'gitFailed', reason });
+
+const branchRefspec = (branch: string) => `refs/heads/${branch}:refs/heads/${branch}`;

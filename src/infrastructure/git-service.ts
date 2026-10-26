@@ -37,11 +37,12 @@ export class GitError extends Error {}
 
 const AUTHOR = { name: 'APIMatic CLI', email: 'developer@apimatic.io' } as const;
 const EMPTY_TREE = '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
+const ZERO_ID = '0'.repeat(40);
 
 /**
  * The system git, driven through its plumbing. Every call carries the same `-c` settings so a
  * developer's own configuration cannot change a tree, a merge or its markers, and no command
- * here touches the working tree, the index or a branch of the repository it runs in.
+ * here touches the working tree, the index or a checked-out branch of the repository it runs in.
  */
 export class GitService {
   public async version(): Promise<GitVersion | undefined> {
@@ -120,7 +121,49 @@ export class GitService {
     await this.run(root, ['update-ref', ref.toString(), commit.toString()]);
   }
 
-  public async resolveRef(root: DirectoryPath, ref: SnapshotRef): Promise<CommitId | undefined> {
+  public async createBranch(root: DirectoryPath, branch: string, commit: CommitId): Promise<void> {
+    await this.run(root, ['update-ref', `refs/heads/${branch}`, commit.toString(), ZERO_ID]);
+  }
+
+  public async headCommit(root: DirectoryPath): Promise<CommitId | undefined> {
+    const head = await this.tryRun(root, ['rev-parse', '--verify', '--quiet', 'HEAD^{commit}']);
+    return head === undefined || head === '' ? undefined : CommitId.fromGit(head);
+  }
+
+  public async writeBlob(root: DirectoryPath, content: string): Promise<string> {
+    const { stdout } = await this.run(root, ['hash-object', '-w', '--stdin'], {}, undefined, content);
+    return stdout.trim();
+  }
+
+  public async graft(
+    root: DirectoryPath,
+    tree: TreeId,
+    prefix: string,
+    subtree: TreeId,
+    extras: readonly TreeEntry[]
+  ): Promise<TreeId> {
+    return withDirPath(async (temporary) => {
+      const env = { GIT_INDEX_FILE: new FilePath(temporary, new FileName('index')).toString() };
+      const inIndex = (args: string[], input?: string) => this.run(root, args, env, undefined, input);
+      if (prefix === '') {
+        await inIndex(['read-tree', subtree.toString()]);
+      } else {
+        await inIndex(['read-tree', tree.toString()]);
+        const { stdout } = await inIndex(['ls-files', '-z', '--', prefix]);
+        if (stdout !== '') {
+          await inIndex(['update-index', '--force-remove', '-z', '--stdin'], stdout);
+        }
+        await inIndex(['read-tree', `--prefix=${prefix}/`, subtree.toString()]);
+      }
+      for (const extra of extras) {
+        await inIndex(['update-index', '--add', '--cacheinfo', `${extra.mode},${extra.oid},${extra.path}`]);
+      }
+      const { stdout } = await inIndex(['write-tree']);
+      return TreeId.fromGit(stdout.trim());
+    });
+  }
+
+  public async resolveRef(root: DirectoryPath, ref: SnapshotRef | string): Promise<CommitId | undefined> {
     try {
       const { stdout } = await this.run(root, ['rev-parse', '--verify', '--quiet', `${ref}^{commit}`]);
       return CommitId.fromGit(stdout.trim());
@@ -152,6 +195,15 @@ export class GitService {
       authorName,
       subject
     };
+  }
+
+  public async subtreeAt(root: DirectoryPath, commit: CommitId, prefix: string): Promise<TreeId | undefined> {
+    const tree = await this.tryRun(root, ['rev-parse', '--verify', '--quiet', `${commit}:${prefix}`]);
+    return tree === undefined || tree === '' ? undefined : TreeId.fromGit(tree);
+  }
+
+  public async readFile(root: DirectoryPath, commit: CommitId, path: RelativeFilePath): Promise<string | undefined> {
+    return this.tryRun(root, ['cat-file', '-p', `${commit}:${path}`]);
   }
 
   public async treeOfCommit(root: DirectoryPath, commit: CommitId): Promise<TreeId> {
@@ -339,7 +391,7 @@ export class GitService {
   }
 
   /** Brings `ref` and its objects over from `remote` and answers with its tip, or none when the remote has no such ref. */
-  public async fetchRef(root: DirectoryPath, remote: string, ref: SnapshotRef): Promise<CommitId | undefined> {
+  public async fetchRef(root: DirectoryPath, remote: string, ref: SnapshotRef | string): Promise<CommitId | undefined> {
     const result = await this.runRemote(root, ['fetch', '--quiet', '--no-tags', remote, ref.toString()]);
     if (result.exitCode !== 0) {
       if (/couldn't find remote ref|no such ref/i.test(result.stderr)) {
@@ -409,6 +461,17 @@ export class GitService {
     } catch {
       return undefined;
     }
+  }
+
+  public async push(root: DirectoryPath, remote: string, refspecs: readonly string[]): Promise<void> {
+    const result = await this.runRemote(root, ['push', '--quiet', '--no-verify', remote, ...refspecs]);
+    if (result.exitCode !== 0) {
+      throw new GitError(remoteSaid(result.stderr) || `exit code ${result.exitCode}`);
+    }
+  }
+
+  public async remoteUrl(root: DirectoryPath, remote: string): Promise<string | undefined> {
+    return this.tryRun(root, ['remote', 'get-url', remote]);
   }
 
   // A remote command may not ask anything: no terminal prompt, no credential helper dialogue,

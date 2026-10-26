@@ -34,10 +34,21 @@ export type FileWrite = { path: RelativeFilePath; blob: string };
 export type ConflictSide = 'generated' | 'yours';
 
 /** What the developer chose when a regeneration conflicted, asked before anything is written. */
-export type ConflictChoice = 'resolve' | ConflictSide | 'cancel';
+export type ConflictChoice = 'resolve' | ConflictSide | 'pullRequest' | 'cancel';
+
+export type ConflictPolicy = Exclude<ConflictChoice, 'cancel'>;
+
+export const CONFLICT_POLICY_FLAGS: Record<string, ConflictPolicy> = {
+  resolve: 'resolve',
+  generated: 'generated',
+  yours: 'yours',
+  'pull-request': 'pullRequest'
+};
 
 /** What the developer chose when the last run's conflicts are still unresolved, asked before generating. */
 export type UnresolvedChoice = 'resolve' | ConflictSide;
+
+export type PullRequestChoice = 'wait' | 'forget';
 
 export type Conflict = { path: RelativeFilePath; kind: ConflictKind; message?: string };
 

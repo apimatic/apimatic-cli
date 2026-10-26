@@ -56,6 +56,21 @@ describe('GenerationRecord', () => {
     );
   });
 
+  it('remembers a pending pull request, with or without a remote, until told to forget it', () => {
+    const written = GenerationRecord.parse(json())!;
+    const pending = { yours: 'apimatic/conflict/1', generated: 'apimatic/generated/1', remote: 'origin' };
+
+    const awaiting = GenerationRecord.parse(written.awaiting(pending).toJson())!;
+    const local = GenerationRecord.parse(written.awaiting({ ...pending, remote: undefined }).toJson())!;
+
+    expect(written.pendingPullRequest()).to.be.undefined;
+    expect(awaiting.pendingPullRequest()).to.deep.equal(pending);
+    expect(local.pendingPullRequest()).to.deep.equal({ ...pending, remote: undefined });
+    expect(awaiting.toJson()).to.contain('"pullRequest": {');
+    expect(awaiting.forgetting().toJson()).to.equal(written.toJson());
+    expect(awaiting.pristineCommit().isEqual(written.pristineCommit())).to.be.true;
+  });
+
   it('refuses what it cannot read', () => {
     expect(GenerationRecord.parse('not json')).to.be.undefined;
     expect(GenerationRecord.parse('[]')).to.be.undefined;
@@ -65,6 +80,9 @@ describe('GenerationRecord', () => {
     expect(GenerationRecord.parse(json({ pristine: 'HEAD' }))).to.be.undefined;
     expect(GenerationRecord.parse(json({ generatedAt: 'yesterday' }))).to.be.undefined;
     expect(GenerationRecord.parse(json({ cliVersion: 2 }))).to.be.undefined;
+    expect(GenerationRecord.parse(json({ pullRequest: 'apimatic/conflict/1' }))).to.be.undefined;
+    expect(GenerationRecord.parse(json({ pullRequest: { yours: 'a' } }))).to.be.undefined;
+    expect(GenerationRecord.parse(json({ pullRequest: { yours: 'a', generated: 'b', remote: 1 } }))).to.be.undefined;
   });
 
   it('reads a record an earlier CLI wrote with a conflict list, and drops the list', () => {

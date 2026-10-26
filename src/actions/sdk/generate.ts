@@ -4,20 +4,21 @@ import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { ActionResult } from '../action-result.js';
 import { withDirPath } from '../../infrastructure/tmp-extensions.js';
 import { envInfo } from '../../infrastructure/env-info.js';
-import { MERGE_NEEDS_RESOLVING, SdkGeneratePrompts } from '../../prompts/sdk/generate.js';
+import { CONFLICT_IN_PULL_REQUEST, MERGE_NEEDS_RESOLVING, SdkGeneratePrompts } from '../../prompts/sdk/generate.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { TempContext } from '../../types/temp-context.js';
 import { codegenVersionFor, isAvailableLanguage, Language, Stability } from '../../types/sdk/generate.js';
 import { ProjectContext } from '../../types/project-context.js';
 import { FilePath } from '../../types/file/filePath.js';
 import { RelativeFilePath } from '../../types/file/relativeFilePath.js';
+import { CommitId } from '../../types/git/commit-id.js';
 import { TreeId } from '../../types/git/tree-id.js';
 import { ServiceError } from '../../infrastructure/service-error.js';
 import { SdkContext } from '../../types/sdk-context.js';
 import { Regeneration, SdkRepositoryContext, SdkRepositoryProblem } from '../../types/sdk-repository-context.js';
-import { SdkGeneration } from '../../types/sdk/generation-record.js';
+import { PendingPullRequest, SdkGeneration } from '../../types/sdk/generation-record.js';
 import { replacesDirectory } from '../../types/sdk/sdk-destination.js';
-import { ConflictSide } from '../../types/sdk/merge-plan.js';
+import { ConflictPolicy, ConflictSide } from '../../types/sdk/merge-plan.js';
 import { favouring, resolving, Settlement } from '../../types/sdk/settlement.js';
 import { terminal } from '../../utils/terminal-utils.js';
 
@@ -41,7 +42,8 @@ export class GenerateAction {
     stability: Stability,
     force: boolean,
     apiVersion?: string,
-    packageSettingsDirectory?: DirectoryPath
+    packageSettingsDirectory?: DirectoryPath,
+    onConflict?: ConflictPolicy
   ): Promise<ActionResult> => {
     if (!isAvailableLanguage(language)) {
       this.prompts.languageNotAvailable(language);
@@ -77,6 +79,21 @@ export class GenerateAction {
     const canAsk = !force && terminal.isInteractive();
 
     let looked = await sdkContext.destination(generation);
+    if (looked.isOk() && looked.value.kind === 'pendingPullRequest') {
+      const { repository, pending, base } = looked.value;
+      const settled = await settlePullRequest(repository, pending, base, canAsk, force, {
+        pullRequestPending: this.prompts.pullRequestPending,
+        pullRequestChoice: this.prompts.pullRequestChoice,
+        pullRequestWaiting: this.prompts.pullRequestWaiting,
+        pullRequestForgotten: this.prompts.pullRequestForgotten,
+        pullRequestTaken: this.prompts.pullRequestTaken,
+        pullRequestFailed: this.prompts.pullRequestFailed
+      });
+      if (settled.isErr()) {
+        return settled.error;
+      }
+      looked = await sdkContext.destination(generation);
+    }
     if (looked.isOk() && looked.value.kind === 'unresolved') {
       const { repository, paths } = looked.value;
       if (!canAsk) {
@@ -104,6 +121,10 @@ export class GenerateAction {
     }
     if (looked.value.kind === 'unresolved') {
       this.prompts.conflictsUnresolved(looked.value.paths, looked.value.repository.sdkDirectory());
+      return ActionResult.failed();
+    }
+    if (looked.value.kind === 'pendingPullRequest') {
+      this.prompts.pullRequestFailed('the record still names a pull request');
       return ActionResult.failed();
     }
     const destination = looked.value;
@@ -187,13 +208,20 @@ export class GenerateAction {
         sdk,
         canAsk,
         (side) => repository.regenerate(base, tempSdk.value, side),
-        this.prompts.conflictChoice
+        this.prompts.conflictChoice,
+        onConflict
       );
       if (settled.isErr()) {
         const { error } = settled;
         if (error === 'cancelled') {
           this.prompts.runCancelled(sdk);
           return ActionResult.cancelled();
+        }
+        if (error === 'pullRequest') {
+          return publishConflict(repository, base, regenerated.value, generation, {
+            conflictsPublished: this.prompts.conflictsPublished,
+            conflictsNotPublished: this.prompts.conflictsNotPublished
+          });
         }
         this.prompts.customCodeFailed(error.reason);
         return ActionResult.failed();
@@ -217,6 +245,55 @@ export class GenerateAction {
       });
     });
   };
+}
+
+async function settlePullRequest(
+  repository: SdkRepositoryContext,
+  pending: PendingPullRequest,
+  base: CommitId,
+  canAsk: boolean,
+  force: boolean,
+  said: Pick<
+    SdkGeneratePrompts,
+    | 'pullRequestPending'
+    | 'pullRequestChoice'
+    | 'pullRequestWaiting'
+    | 'pullRequestForgotten'
+    | 'pullRequestTaken'
+    | 'pullRequestFailed'
+  >
+): Promise<Result<void, ActionResult>> {
+  const checked = await repository.checkPullRequest(pending, base);
+  if (checked.isErr()) {
+    said.pullRequestFailed(checked.error.reason);
+    return err(ActionResult.failed());
+  }
+  const sdk = repository.sdkDirectory();
+  if (checked.value.kind === 'merged') {
+    const taken = await repository.takePullRequest(base, checked.value.tip);
+    if (taken.isErr()) {
+      said.pullRequestFailed(taken.error.reason);
+      return err(ActionResult.failed());
+    }
+    said.pullRequestTaken(sdk, pending);
+    return ok(undefined);
+  }
+  said.pullRequestPending(pending, checked.value.kind, await repository.pullRequestLink(pending));
+  const choice = force ? 'forget' : canAsk ? await said.pullRequestChoice(checked.value.kind) : 'wait';
+  if (choice === undefined) {
+    return err(ActionResult.cancelled());
+  }
+  if (choice === 'wait') {
+    said.pullRequestWaiting();
+    return err(ActionResult.failed());
+  }
+  const forgotten = await repository.forgetPullRequest();
+  if (forgotten.isErr()) {
+    said.pullRequestFailed(forgotten.error.reason);
+    return err(ActionResult.failed());
+  }
+  said.pullRequestForgotten(sdk);
+  return ok(undefined);
 }
 
 async function settleUnresolvedConflicts(
@@ -244,20 +321,46 @@ async function settleConflicts(
   sdk: DirectoryPath,
   canAsk: boolean,
   again: (side: ConflictSide) => Promise<Result<Regeneration, SdkRepositoryProblem>>,
-  ask: SdkGeneratePrompts['conflictChoice']
-): Promise<Result<Settlement, 'cancelled' | SdkRepositoryProblem>> {
+  ask: SdkGeneratePrompts['conflictChoice'],
+  policy?: ConflictPolicy
+): Promise<Result<Settlement, 'cancelled' | 'pullRequest' | SdkRepositoryProblem>> {
   const { plan } = regeneration.merge;
   if (!plan.hasConflicts()) {
     return ok(resolving(regeneration));
   }
-  const choice = canAsk ? await ask(plan, sdk) : 'resolve';
+  const choice = policy ?? (canAsk ? await ask(plan, sdk) : 'resolve');
   if (choice === undefined || choice === 'cancel') {
     return err('cancelled');
+  }
+  if (choice === 'pullRequest') {
+    return err('pullRequest');
   }
   if (choice === 'resolve') {
     return ok(resolving(regeneration));
   }
   return (await again(choice)).map((favoured) => favouring(choice, regeneration, favoured));
+}
+
+async function publishConflict(
+  repository: SdkRepositoryContext,
+  base: CommitId,
+  regeneration: Regeneration,
+  generation: SdkGeneration,
+  said: Pick<SdkGeneratePrompts, 'conflictsPublished' | 'conflictsNotPublished'>
+): Promise<ActionResult> {
+  const published = await repository.publishConflict(
+    base,
+    regeneration,
+    generation,
+    envInfo.getCLIVersion(),
+    await repository.remote()
+  );
+  if (published.isErr()) {
+    said.conflictsNotPublished(published.error.reason);
+    return ActionResult.failed();
+  }
+  said.conflictsPublished(repository.sdkDirectory(), published.value);
+  return ActionResult.failed(CONFLICT_IN_PULL_REQUEST);
 }
 
 async function recordSnapshot(
