@@ -155,6 +155,7 @@
         "commands": "./lib/commands",
         "dirname": "apimatic",
         "bin": "apimatic",
+        "repositoryPrefix": "<%- repo %>/blob/main/<%- commandPath %>",
         "description": "The official CLI for APIMatic. \nTo get started with APIMatic's CLI using a step by step wizard, run 'apimatic quickstart'.",
         "hooks": {
             "init": "./lib/hooks/node-version",

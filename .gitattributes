@@ -1,1 +1,2 @@
+# oclif readme finds its blocks only in an LF file; in a CRLF one it adds a second copy of each.
 /README.md text eol=lf
