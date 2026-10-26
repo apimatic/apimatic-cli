@@ -13,7 +13,7 @@ describe('SemVersion', () => {
     }
 
     // Each of these was accepted while the parts were checked with `Number`, and would have been
-    // written into plugin-config.json and the published package verbatim.
+    // written into apimatic.json and the published package verbatim.
     for (const value of [' 1.2.3', '1.2.3 ', '1.2. 3', '1.2.Infinity', '1.2.1e3', '1.2.0x10', '1.2.+3']) {
       it(`rejects ${JSON.stringify(value)}`, () => {
         expect(SemVersion.tryCreate(value).isErr()).to.be.true;

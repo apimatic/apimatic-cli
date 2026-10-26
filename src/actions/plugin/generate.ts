@@ -1,11 +1,15 @@
+import { ResultAsync } from 'neverthrow';
 import { withDirPath } from '../../infrastructure/tmp-extensions.js';
 import { PluginService } from '../../infrastructure/services/plugin-service.js';
+import { PublishingApiService } from '../../infrastructure/services/publishing-api-service.js';
 import { PluginGeneratePrompts } from '../../prompts/plugin/generate.js';
-import { BuildContext } from '../../types/build-context.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
-import { PluginConfigContext } from '../../types/plugin-config-context.js';
+import { PluginConfig } from '../../types/plugin-config-context.js';
 import { PluginContext } from '../../types/plugin-context.js';
+import { PluginGenerationProblem } from '../../types/plugin/generation-problem.js';
+import { ProjectContext } from '../../types/project-context.js';
+import { PublishingProfiles } from '../../types/publish/publishing-profiles.js';
 import { TempContext } from '../../types/temp-context.js';
 import { ActionResult } from '../action-result.js';
 import { PluginRecordMetadataAction } from './record-metadata.js';
@@ -13,6 +17,7 @@ import { PluginRecordMetadataAction } from './record-metadata.js';
 export class PluginGenerateAction {
   private readonly prompts: PluginGeneratePrompts = new PluginGeneratePrompts();
   private readonly pluginService: PluginService = new PluginService();
+  private readonly publishingApiService: PublishingApiService = new PublishingApiService();
   private readonly configDir: DirectoryPath;
   private readonly commandMetadata: CommandMetadata;
   private readonly authKey: string | null;
@@ -24,18 +29,18 @@ export class PluginGenerateAction {
   }
 
   public readonly execute = async (
-    buildDirectory: DirectoryPath,
+    project: ProjectContext,
     pluginDirectory: DirectoryPath,
     force: boolean
   ): Promise<ActionResult> => {
-    if (buildDirectory.isEqual(pluginDirectory)) {
+    const sourceDirectory = project.sourceDirectory();
+    if (project.isSourceDirectory(pluginDirectory)) {
       this.prompts.directoryCannotBeSame(pluginDirectory);
       return ActionResult.failed();
     }
 
-    const buildContext = new BuildContext(buildDirectory);
-    if (!(await buildContext.exists())) {
-      this.prompts.srcDirectoryDoesNotExist(buildDirectory);
+    if (!(await project.sourceExists())) {
+      this.prompts.sourceDirectoryDoesNotExist(sourceDirectory);
       return ActionResult.failed();
     }
 
@@ -45,55 +50,78 @@ export class PluginGenerateAction {
       return ActionResult.cancelled();
     }
 
-    let configState = await new PluginConfigContext(buildDirectory).getPluginConfigState();
+    const configContext = project.pluginConfig();
+    const configState = await configContext.getPluginConfigState();
     if (configState.state === 'unreadable') {
       this.prompts.pluginConfigUnreadable(configState.reason, configState.path);
       return ActionResult.failed();
     }
 
-    if (configState.state === 'missing' || !configState.hasMetadata()) {
-      const metadataResult = await new PluginRecordMetadataAction(
-        this.configDir,
-        this.commandMetadata,
-        this.authKey
-      ).execute(buildDirectory);
-      if (metadataResult.isCancelled()) {
-        this.prompts.metadataCancelled(metadataResult.getMessage());
-        return ActionResult.cancelled();
-      }
-      if (!metadataResult.isSuccess()) {
-        return metadataResult.discardValue();
-      }
-      configState = metadataResult.getValue();
+    const recorded = configState.state === 'missing' ? PluginConfig.empty : configState;
+    if (!recorded.isSetUp() && !this.prompts.canAsk()) {
+      this.prompts.setupNeedsTerminal(sourceDirectory, recorded);
+      return ActionResult.failed();
     }
 
-    if (!configState.hasPublishedSdks()) {
-      this.prompts.noPublishedSdks();
-      this.prompts.nextStepsPublishSdks();
-      return ActionResult.success();
+    const identified = recorded.hasMetadata()
+      ? ActionResult.success(recorded)
+      : await new PluginRecordMetadataAction(this.configDir, this.commandMetadata, this.authKey).execute(project);
+    if (!identified.isSuccess()) {
+      return identified.discardValue();
     }
 
-    return await withDirPath(async (tempDirectory) => {
+    const config = identified.getValue();
+    const selection = config.hasRecordedLanguages() ? config.recordedLanguages() : await this.prompts.selectLanguages();
+    if (!selection?.length) {
+      this.prompts.noLanguagesSelected();
+      return ActionResult.cancelled();
+    }
+    this.prompts.recordedLanguagesIncluded(config.recordedLanguages());
+
+    this.prompts.languagesNotIncluded(config.unsupportedLanguages());
+
+    // Asked before the config is written, so a declined run leaves no language claimed in it.
+    const couldPublishInstead =
+      selection.some((language) => !config.publishedLanguages().includes(language)) &&
+      (
+        await this.prompts.checkPublishingProfiles(
+          this.publishingApiService.getPublishingProfiles(this.configDir, this.commandMetadata.shell, this.authKey)
+        )
+      )
+        .andThen(PublishingProfiles.create)
+        .map((profiles) => profiles.getActiveProfiles().length > 0)
+        .unwrapOr(false);
+    if (couldPublishInstead && !(await this.prompts.confirmLocalPlugin(recorded.isSetUp()))) {
+      this.prompts.localPluginCancelled();
+      return ActionResult.cancelled();
+    }
+
+    const generated = await withDirPath(async (tempDirectory) => {
       const tempContext = new TempContext(tempDirectory);
-      const buildZipPath = await tempContext.zip(buildDirectory);
-
-      const response = await this.prompts.generatePlugin(
-        this.pluginService.generatePlugin(buildZipPath, this.configDir, this.commandMetadata, this.authKey)
-      );
-
-      if (response.isErr()) {
-        this.prompts.pluginGenerationError(response.error.errorMessage);
-        return ActionResult.failed();
-      }
-
-      const tempPluginZipPath = await tempContext.save(response.value);
-      await pluginContext.save(tempPluginZipPath);
-
-      this.prompts.pluginGenerated(pluginDirectory);
-      this.prompts.tryPluginLocally(pluginDirectory);
-      this.prompts.nextStepsPublishPlugin();
-
-      return ActionResult.success();
+      const written = await configContext.recordLanguages(selection);
+      return await written
+        .asyncAndThen(() => new ResultAsync(configContext.stageUpload(tempDirectory, selection)))
+        .mapErr((failure): PluginGenerationProblem => ({ kind: 'configNotPrepared', failure }))
+        .andThen((staged) => new ResultAsync(tempContext.zip(staged)))
+        .andThen((upload) =>
+          new ResultAsync(
+            this.prompts.generatePlugin(
+              this.pluginService.generatePlugin(upload, this.configDir, this.commandMetadata, this.authKey)
+            )
+          ).mapErr((error): PluginGenerationProblem => ({ kind: 'generationFailed', error }))
+        )
+        .andThen((stream) => new ResultAsync(tempContext.save(stream).then((archive) => pluginContext.save(archive))));
     });
+    if (generated.isErr()) {
+      this.prompts.pluginNotGenerated(generated.error, sourceDirectory);
+      return ActionResult.failed();
+    }
+
+    this.prompts.installPluginLocally(pluginDirectory);
+    if (couldPublishInstead) {
+      this.prompts.previewOnly();
+    }
+
+    return ActionResult.success();
   };
 }

@@ -1,69 +1,86 @@
+import { ok, Result, ResultAsync } from 'neverthrow';
 import { FileService } from '../infrastructure/file-service.js';
+import { ApimaticConfigContext, ApimaticConfigWriteFailure } from './apimatic-config-context.js';
+import { ApimaticConfigDocument, ConfigBlockName, findingClause } from './apimatic-config/document.js';
+import { isPublished, languagesOf, PluginLanguageEntry, PluginLanguages } from './apimatic-config/languages-block.js';
 import { DirectoryPath } from './file/directoryPath.js';
-import { FileName } from './file/fileName.js';
 import { FilePath } from './file/filePath.js';
-import { CodeGenerationVersion, Language } from './sdk/generate.js';
 import {
   DEFAULT_PLUGIN_LICENSE,
   PluginAuthor,
   PluginConfigData,
-  PluginLanguageEntry,
-  PluginLanguages,
+  PluginIdentityData,
   PluginMetadata
 } from './plugin/plugin-config.js';
+import { PortalLanguages } from './portal/portal-languages.js';
+import { SOURCE_DIRECTORY_NAME } from './project-layout.js';
 import { SemVersion } from './publish/version.js';
-import { err, ok, Result } from 'neverthrow';
-
-/** Also the rule the metadata prompt validates against, so a plugin ID is legal as a repository name. */
-export const PLUGIN_ID_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
-
-const MALFORMED_PLUGIN_ID =
-  `its 'pluginId' must be lower-case alphanumeric words separated by single dashes, ` +
-  `for example 'acme-payments'`;
-
-const MALFORMED_PLUGIN_VERSION =
-  `its 'pluginVersion' must be a version in the format major.minor.patch, for example '0.1.0'`;
+import { isAvailableLanguage, Language } from './sdk/generate.js';
 
 export type PluginReleaseData = { pluginId: string; version: SemVersion };
 
-/**
- * What a caller needs to know before generating. Metadata and languages are written by different
- * commands — `plugin generate` owns the first, `sdk publish` the second — so they are reported
- * separately. `path` rides on `unreadable` purely so the prompt can say where to fix the file.
- */
 export type PluginConfigState =
   | { state: 'missing' }
   | { state: 'unreadable'; reason: string; path: FilePath }
-  | PluginConfigPresent;
+  | PluginConfig;
 
-export class PluginConfigPresent {
+export class PluginConfig {
   public readonly state = 'present' as const;
 
-  private constructor(private readonly config: PluginConfigData) {}
+  /** What a project without `apimatic.json` has recorded: nothing. */
+  public static readonly empty = PluginConfig.create({ languages: {} });
 
-  public static create(config: PluginConfigData): PluginConfigPresent {
-    return new PluginConfigPresent(config);
-  }
+  private constructor(
+    private readonly config: PluginConfigData,
+    private readonly entries: readonly [Language, PluginLanguages[Language]][],
+    private readonly unsupported: readonly string[]
+  ) {}
 
-  public hasPublishedSdks(): boolean {
-    const languages = this.config.languages;
-    if (typeof languages !== 'object' || languages === null) {
-      return false;
+  /** The one place `languages` is sorted into what a plugin can carry and what it cannot. */
+  public static create(config: PluginConfigData): PluginConfig {
+    const entries: [Language, PluginLanguages[Language]][] = [];
+    const unsupported: string[] = [];
+
+    for (const [language, entry] of Object.entries(config.languages)) {
+      if (isAvailableLanguage(language)) {
+        entries.push([language, entry as PluginLanguages[Language]]);
+      } else {
+        unsupported.push(language);
+      }
     }
 
-    return Object.values(languages).some((entry) => entry?.source || entry?.package);
+    return new PluginConfig(config, entries, unsupported);
   }
 
+  public publishedLanguages(): readonly Language[] {
+    return this.entries.filter(([, entry]) => isPublished(entry)).map(([language]) => language);
+  }
+
+  /** What `languages` names that a plugin can carry. */
+  public recordedLanguages(): readonly Language[] {
+    return this.entries.map(([language]) => language);
+  }
+
+  public hasRecordedLanguages(): boolean {
+    return this.entries.length > 0;
+  }
+
+  public unsupportedLanguages(): readonly string[] {
+    return this.unsupported;
+  }
+
+  // Checked, not trusted: the config arrives through a cast of parsed JSON, so a hand-edited
+  // file can hold a number where the type promises a string.
   public hasMetadata(): boolean {
     const isNonBlankString = (value: unknown) => typeof value === 'string' && value.trim() !== '';
     return isNonBlankString(this.config.pluginId) && isNonBlankString(this.config.pluginName);
   }
 
-  /**
-   * Absent until `plugin generate` records the identity. The fields are checked rather than trusted:
-   * they reach this class through a cast of parsed JSON, so a hand-edited config can hold a number
-   * where the type promises a string.
-   */
+  /** Nothing is left for `plugin generate` to ask: the identity and the languages are both recorded. */
+  public isSetUp(): boolean {
+    return this.hasMetadata() && this.hasRecordedLanguages();
+  }
+
   public getRelease(): PluginReleaseData | undefined {
     const pluginId = typeof this.config.pluginId === 'string' ? this.config.pluginId.trim() : '';
     const rawVersion = typeof this.config.pluginVersion === 'string' ? this.config.pluginVersion.trim() : '';
@@ -78,181 +95,149 @@ export class PluginConfigPresent {
   }
 
   public hasNoSourceRepository(language: Language): boolean {
-    return !this.config.languages?.[language]?.source;
-  }
-
-  public assertNoCodegenVersionMismatch(
-    codegenVersion: CodeGenerationVersion,
-    language: Language,
-    entry: PluginLanguageEntry<Language>
-  ): Result<void, { expected: CodeGenerationVersion; actual: CodeGenerationVersion }> {
-    if (entry.package && entry.source) {
-      return ok();  // if both package and source are given, there is no possible mismatch
-    }
-
-    const existingEntry = this.config.languages?.[language];
-    if (!existingEntry) {
-      return ok();
-    }
-
-    if (!existingEntry.package && !existingEntry.source) {
-      return ok();
-    }
-
-    const extractedVersion = this.config.languages?.[language]?.codegenVersion;
-    if (!extractedVersion) {
-      return ok();
-    }
-
-    if (extractedVersion === codegenVersion) {
-      return ok();
-    }
-
-    return err({ expected: codegenVersion, actual: extractedVersion });
+    return !this.config.languages?.[language]?.publishing?.source;
   }
 }
 
-export type PluginConfigWriteFailure = 'unreadable' | 'unwritable';
+export type PluginConfigWriteFailure = ApimaticConfigWriteFailure;
 
-type ParseResult = { config: PluginConfigData } | { reason: string };
+const OWNED_BLOCKS: readonly ConfigBlockName[] = ['plugin', 'languages'];
 
-function isJsonObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
+/**
+ * A `languages` block holding what the selection covers plus every entry `keep` speaks for.
+ * Existing keys stay in place, so a merge that changes nothing writes nothing.
+ */
+const recorded = (
+  document: ApimaticConfigDocument,
+  languages: readonly Language[],
+  keep: (language: string, entry: PluginLanguageEntry<Language> | undefined) => boolean
+): Record<string, unknown> => {
+  const existing = languagesOf(document);
+  const covered = new Set<string>(languages);
+  const kept = Object.entries(existing).filter(([language, entry]) => covered.has(language) || keep(language, entry));
+  const added = languages.filter((language) => !(language in existing)).map((language) => [language, {}]);
+
+  return Object.fromEntries([...kept, ...added]);
+};
+
+/** In the user's file a cleared language goes, unless its entry records where an SDK was published. */
+const keepsRecord = (language: string, entry: PluginLanguageEntry<Language> | undefined): boolean =>
+  !isAvailableLanguage(language) || isPublished(entry);
+
+const isUnavailableLanguage = (language: string): boolean => !isAvailableLanguage(language);
+
+const namesNoLanguage = (document: ApimaticConfigDocument): boolean =>
+  PortalLanguages.namesNone(document.languages(), document.findingsFor('languages'));
+
+const withMetadata = (
+  document: ApimaticConfigDocument,
+  metadata: PluginMetadata,
+  author?: PluginAuthor
+): ApimaticConfigDocument => {
+  const plugin = (document.plugin() ?? {}) as PluginIdentityData;
+  return document.with('plugin', {
+    ...plugin,
+    pluginId: metadata.pluginId,
+    pluginName: metadata.pluginName,
+    pluginVersion: metadata.pluginVersion,
+    ...(!plugin.author && author && { author }),
+    license: plugin.license ?? DEFAULT_PLUGIN_LICENSE
+  });
+};
 
 export class PluginConfigContext {
+  private readonly configContext: ApimaticConfigContext;
   private readonly fileService = new FileService();
 
-  constructor(private readonly buildDirectory: DirectoryPath) {}
-
-  private get configPath(): FilePath {
-    return new FilePath(this.buildDirectory, new FileName('plugin-config.json'));
+  constructor(private readonly sourceDirectory: DirectoryPath) {
+    this.configContext = new ApimaticConfigContext(this.sourceDirectory);
   }
 
   public async getPluginConfigState(): Promise<PluginConfigState> {
-    if (!(await this.fileService.fileExists(this.configPath))) {
+    const state = await this.configContext.read();
+    if (state.state === 'missing') {
       return { state: 'missing' };
     }
-
-    const parsed = await this.parse();
-    if ('reason' in parsed) {
-      return { state: 'unreadable', reason: parsed.reason, path: this.configPath };
+    if (state.state === 'unparseable') {
+      return { state: 'unreadable', reason: findingClause(state.findings), path: state.path };
     }
 
-    return PluginConfigPresent.create(parsed.config);
+    const findings = state.document.findingsFor('root', ...OWNED_BLOCKS);
+    if (findings.length > 0) {
+      return { state: 'unreadable', reason: findingClause(findings), path: state.path };
+    }
+    return PluginConfig.create(PluginConfigContext.configOf(state.document));
   }
 
   public async upsertMetadata(
     metadata: PluginMetadata,
     author?: PluginAuthor
-  ): Promise<Result<PluginConfigPresent, PluginConfigWriteFailure>> {
-    return await this.merge((config) => ({
-      ...config,
-      pluginId: metadata.pluginId,
-      pluginName: metadata.pluginName,
-      pluginVersion: metadata.pluginVersion,
-      ...(!config.author && author && { author }),
-      license: config.license ?? DEFAULT_PLUGIN_LICENSE
-    }));
+  ): Promise<Result<PluginConfig, PluginConfigWriteFailure>> {
+    return await this.merge((document) => withMetadata(document, metadata, author));
   }
 
-  public async upsertLanguage<L extends Language>(
-    language: L,
-    entry: PluginLanguageEntry<L>
-  ): Promise<Result<PluginConfigPresent, PluginConfigWriteFailure>> {
-    return await this.merge((config) => {
-      const languages: PluginLanguages = { ...config.languages };
-      const existingEntry = config.languages?.[language];
-      languages[language] = {
-        ...existingEntry,
-        ...entry,
-        source: entry.source ?? existingEntry?.source,
-        package: entry.package ?? existingEntry?.package
-      };
-      return { ...config, languages };
-    });
+  // Merged against `plugin` alone: a file's `languages` is not what this write could spread or break.
+  public async addMetadataIfMissing(metadata: PluginMetadata): Promise<Result<void, PluginConfigWriteFailure>> {
+    const state = await this.configContext.read();
+    if (state.state === 'parsed' && state.document.has('plugin')) {
+      return ok(undefined);
+    }
+    const merged = await this.configContext.merge(['plugin'], (document) => withMetadata(document, metadata));
+    return merged.map(() => undefined);
+  }
+
+  public async languagesMissing(): Promise<boolean> {
+    const state = await this.configContext.read();
+    return state.state === 'parsed' && namesNoLanguage(state.document);
+  }
+
+  // Merged against `languages` alone, as `addMetadataIfMissing` is against `plugin`.
+  public async addLanguagesIfMissing(languages: readonly Language[]): Promise<Result<void, PluginConfigWriteFailure>> {
+    const merged = await this.configContext.merge(['languages'], (document) =>
+      namesNoLanguage(document) ? document.with('languages', recorded(document, languages, keepsRecord)) : document
+    );
+    return merged.map(() => undefined);
+  }
+
+  // A published entry survives a cleared checkbox: only `sdk publish` can write that record.
+  public async recordLanguages(
+    languages: readonly Language[]
+  ): Promise<Result<PluginConfig, PluginConfigWriteFailure>> {
+    return await this.merge((document) => document.with('languages', recorded(document, languages, keepsRecord)));
   }
 
   /**
-   * A file that exists but cannot be parsed is left alone rather than overwritten, and a write
-   * fault is reported rather than thrown: this runs after a publish that already succeeded, and
-   * nothing here may turn that into a crash. A success carries the config as it now stands, so a
-   * caller that has to decide something after writing does not have to read the file back.
+   * The `src/` to upload: a copy whose `languages` names exactly what the plugin covers. The
+   * user's file keeps the published entries this run leaves out; the service reads the copy.
    */
+  public async stageUpload(
+    into: DirectoryPath,
+    languages: readonly Language[]
+  ): Promise<Result<DirectoryPath, PluginConfigWriteFailure>> {
+    const staged = into.join(SOURCE_DIRECTORY_NAME);
+    await this.fileService.copyDirectoryContents(this.sourceDirectory, staged);
+
+    const config = new ApimaticConfigContext(staged);
+    const covered = await config.merge(OWNED_BLOCKS, (document) =>
+      document.with('languages', recorded(document, languages, isUnavailableLanguage))
+    );
+
+    // The merge writes nothing when it changes nothing, so a mark on the copy can outlive it —
+    // and the service reads this file with a parser that will not look past one.
+    return await covered.asyncAndThen(() => new ResultAsync(config.removeByteOrderMark())).map(() => staged);
+  }
+
   private async merge(
-    apply: (config: PluginConfigData) => PluginConfigData
-  ): Promise<Result<PluginConfigPresent, PluginConfigWriteFailure>> {
-    const existing = await this.read();
-    if ('reason' in existing) {
-      return err('unreadable');
-    }
-
-    const merged = apply(existing.config);
-
-    try {
-      await this.write(merged);
-    } catch {
-      return err('unwritable');
-    }
-
-    return ok(PluginConfigPresent.create(merged));
+    apply: (document: ApimaticConfigDocument) => ApimaticConfigDocument
+  ): Promise<Result<PluginConfig, PluginConfigWriteFailure>> {
+    const merged = await this.configContext.merge(OWNED_BLOCKS, apply);
+    return merged.map((document) => PluginConfig.create(PluginConfigContext.configOf(document)));
   }
 
-  private async read(): Promise<ParseResult> {
-    if (!(await this.fileService.fileExists(this.configPath))) {
-      return { config: { languages: {} } };
-    }
-    return await this.parse();
-  }
-
-  private async parse(): Promise<ParseResult> {
-    const BYTE_ORDER_MARK = 0xfeff; // Notepad and PowerShell redirection can write it
-    try {
-      // TODO: JSON Parsing/Stringify should be in a dedicated JSON infra layer which preferably uses zod
-      const contents = await this.fileService.getContents(this.configPath);
-      if (contents.trim() === '') {
-        return { reason: 'it is empty' };
-      }
-      if (contents.codePointAt(0) === BYTE_ORDER_MARK) {
-        return { reason: 'it starts with a byte-order mark, which JSON does not allow' };
-      }
-
-      const parsed: unknown = JSON.parse(contents);
-      if (!isJsonObject(parsed)) {
-        return { reason: 'it is not a JSON object' };
-      }
-      // Every write merges these by spreading them, which turns a string into `{"0":"a"}` and a
-      // number into nothing, so a wrong shape has to be refused before it can corrupt the file.
-      const languages = parsed.languages;
-      if (languages !== undefined) {
-        if (!isJsonObject(languages)) {
-          return { reason: `its 'languages' field is not a JSON object` };
-        }
-        for (const [language, entry] of Object.entries(languages)) {
-          if (!isJsonObject(entry)) {
-            return { reason: `its 'languages.${language}' entry is not a JSON object` };
-          }
-        }
-      }
-
-      const id = parsed.pluginId;
-      if (typeof id === 'string' && (id.trim() === '' || !PLUGIN_ID_PATTERN.test(id))) {
-        return { reason: MALFORMED_PLUGIN_ID };
-      }
-
-      const rawVersion = parsed.pluginVersion;
-      if (typeof rawVersion === 'string' && (rawVersion.trim() === '' || SemVersion.tryCreate(rawVersion).isErr())) {
-        return { reason: MALFORMED_PLUGIN_VERSION };
-      }
-
-      return { config: parsed as PluginConfigData };
-    } catch (error) {
-      return { reason: error instanceof Error ? error.message : String(error) };
-    }
-  }
-
-  private async write(config: PluginConfigData): Promise<void> {
-    await this.fileService.ensurePathExists(this.configPath);
-    await this.fileService.writeContents(this.configPath, JSON.stringify(config, null, 2));
+  private static configOf(document: ApimaticConfigDocument): PluginConfigData {
+    return {
+      ...(document.plugin() as PluginIdentityData | undefined),
+      languages: languagesOf(document)
+    };
   }
 }

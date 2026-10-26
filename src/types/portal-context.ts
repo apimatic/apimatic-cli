@@ -1,44 +1,113 @@
-import { FileService } from "../infrastructure/file-service.js";
-import { DirectoryPath } from "./file/directoryPath.js";
-import { FilePath } from "./file/filePath.js";
-import { FileName } from "./file/fileName.js";
-import { ZipService } from "../infrastructure/zip-service.js";
+import { err, ok, Result } from 'neverthrow';
+import { FileService } from '../infrastructure/file-service.js';
+import { DirectoryPath } from './file/directoryPath.js';
+import { FilePath } from './file/filePath.js';
+import { FileName } from './file/fileName.js';
+import { ZipService } from '../infrastructure/zip-service.js';
+import { errorMessage } from '../utils/error-utils.js';
+
+/** Emitted even by a failed build, so it never counts as a page. */
+export const SHELL_FILE_NAME = '_shell.html';
+
+export const NOT_FOUND_FILE_NAME = '404.html';
+
+export const ZIP_FILE_NAME = 'portal.zip';
+
+const STAGING_DIRECTORY = '.apimatic-staging';
+
+/**
+ * Why the finished site did not reach the portal directory. `stagingFailed` leaves the
+ * previous portal as it was; `replaceFailed` happened while it was being swapped out, so
+ * whatever did not make it into place is kept at `stagedAt` for the user to move by hand.
+ */
+export type PortalSaveProblem =
+  | { kind: 'stagingFailed'; reason: string }
+  | { kind: 'replaceFailed'; reason: string; stagedAt: DirectoryPath };
 
 export class PortalContext {
-
   private readonly fileService = new FileService();
   private readonly zipService = new ZipService();
 
-  constructor(private readonly portalDirectory: DirectoryPath) {
+  constructor(private readonly portalDirectory: DirectoryPath) {}
+
+  private get stagingDirectory(): DirectoryPath {
+    return this.portalDirectory.join(STAGING_DIRECTORY);
   }
 
-  private get ZipPath(): FilePath {
-    // TODO: add checks for build file path
-    return new FilePath(this.portalDirectory, new FileName("portal.zip"));
+  private get buildLogPath(): FilePath {
+    return new FilePath(this.portalDirectory.join('apimatic-debug'), new FileName('build.log'));
   }
 
-  private get reportPath(): FilePath {
-    // TODO: add checks for build file path
-    const debugPath = this.portalDirectory.join('apimatic-debug');
-    return new FilePath(debugPath, new FileName("apimatic-report.html"))
-  }
-
+  /**
+   * Whether anything is there to overwrite. A staging directory left by a save that could
+   * not finish counts, hidden as it is: it may hold the only complete copy of the site.
+   */
   public async exists() {
-    return !await this.fileService.directoryEmpty(this.portalDirectory);
+    return (
+      !(await this.fileService.directoryEmpty(this.portalDirectory)) ||
+      (await this.fileService.directoryExists(this.stagingDirectory))
+    );
   }
 
-  public async save(tempPortalFilePath: FilePath, zipPortal: boolean) {
-    await this.fileService.cleanDirectory(this.portalDirectory);
-    if (zipPortal) {
-      await this.fileService.copy(tempPortalFilePath, this.ZipPath);
-    } else {
-      await this.zipService.unArchive(tempPortalFilePath, this.portalDirectory);
+  /**
+   * Writes the finished site to the portal directory, as files or as a single archive.
+   * The site is staged inside the destination first, so the previous portal is only
+   * touched once the whole new one is on the same volume and what remains is a rename.
+   */
+  public async save(builtDirectory: DirectoryPath, asZip: boolean): Promise<Result<void, PortalSaveProblem>> {
+    const staged = await this.stage(builtDirectory, asZip);
+    if (staged.isErr()) {
+      await this.fileService.deleteDirectory(this.stagingDirectory).catch(() => undefined);
+      return err({ kind: 'stagingFailed', reason: staged.error });
+    }
+
+    try {
+      await this.fileService.cleanDirectoryExcluding(this.portalDirectory, [new FileName(STAGING_DIRECTORY)]);
+      await this.fileService.moveDirectoryContents(this.stagingDirectory, this.portalDirectory);
+    } catch (error) {
+      return err({ kind: 'replaceFailed', reason: errorMessage(error), stagedAt: this.stagingDirectory });
+    }
+
+    // Empty by now; a folder that cannot be removed (still open in Explorer) is not a failed save.
+    await this.fileService.deleteDirectory(this.stagingDirectory).catch(() => undefined);
+    return ok(undefined);
+  }
+
+  /**
+   * Keeps a failed build's output for the user to inspect after the temp project is gone.
+   * Null when the log itself could not be written.
+   */
+  public async saveBuildLog(log: string): Promise<FilePath | null> {
+    try {
+      await this.fileService.ensurePathExists(this.buildLogPath);
+      await this.fileService.writeContents(this.buildLogPath, log);
+      return this.buildLogPath;
+    } catch {
+      return null;
     }
   }
 
-  public async saveError(tempErrorFilePath: FilePath) {
-    await this.fileService.cleanDirectory(this.portalDirectory);
-    await this.zipService.unArchive(tempErrorFilePath, this.portalDirectory);
-    return this.reportPath;
+  private async stage(builtDirectory: DirectoryPath, asZip: boolean): Promise<Result<void, string>> {
+    try {
+      await this.addNotFoundPage(builtDirectory);
+      await this.fileService.cleanDirectory(this.stagingDirectory);
+      if (asZip) {
+        return await this.zipService.archive(
+          builtDirectory,
+          new FilePath(this.stagingDirectory, new FileName(ZIP_FILE_NAME))
+        );
+      }
+      await this.fileService.copyDirectoryContents(builtDirectory, this.stagingDirectory);
+      return ok(undefined);
+    } catch (error) {
+      return err(errorMessage(error));
+    }
+  }
+
+  private async addNotFoundPage(builtDirectory: DirectoryPath) {
+    const shell = new FilePath(builtDirectory, new FileName(SHELL_FILE_NAME));
+    if (await this.fileService.fileExists(shell)) {
+      await this.fileService.copy(shell, new FilePath(builtDirectory, new FileName(NOT_FOUND_FILE_NAME)));
+    }
   }
 }

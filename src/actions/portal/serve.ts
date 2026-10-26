@@ -1,25 +1,35 @@
-import { Server } from "node:http";
-import { err, ok, Result } from "neverthrow";
-import { createServer as createLiveReloadServer } from "livereload";
-import connectLiveReload from "connect-livereload";
-import express, { Express } from "express";
-import chokidar from "chokidar";
-import { PortalServePrompts } from "../../prompts/portal/serve.js";
-import { DirectoryPath } from "../../types/file/directoryPath.js";
-import { ActionResult } from "../action-result.js";
-import { CommandMetadata } from "../../types/common/command-metadata.js";
-import { GenerateAction } from "./generate.js";
-import { NetworkService } from "../../infrastructure/network-service.js";
-import { UrlPath } from "../../types/file/urlPath.js";
-import { LauncherService } from "../../infrastructure/launcher-service.js";
-import { DebounceService } from "../../infrastructure/debounce-service.js";
-import { BuildContext } from "../../types/build-context.js";
+import { Result } from 'neverthrow';
+import { PortalServePrompts } from '../../prompts/portal/serve.js';
+import { APIMATIC_CONFIG_FILE_NAME } from '../../types/apimatic-config/document.js';
+import { DirectoryPath } from '../../types/file/directoryPath.js';
+import { FileName } from '../../types/file/fileName.js';
+import { ActionResult } from '../action-result.js';
+import { CommandMetadata } from '../../types/common/command-metadata.js';
+import { ProjectContext } from '../../types/project-context.js';
+import { isSkippedByGlob } from '../../types/portal/content-tree.js';
+import { GeneratedPages } from '../../types/portal/generated-pages.js';
+import { PortalArtifacts } from '../../types/portal/portal-artifacts.js';
+import { PortalSettings, PortalSource, WatchedSource } from '../../types/portal/portal-source.js';
+import { PreviewConfig } from '../../types/portal/preview-config.js';
+import { PreviewContent } from '../../types/portal/preview-content.js';
+import { PreviewSpecs } from '../../types/portal/preview-specs.js';
+import { FileWatch, FileWatchService } from '../../infrastructure/file-watch-service.js';
+import { NetworkService } from '../../infrastructure/network-service.js';
+import { LauncherService } from '../../infrastructure/launcher-service.js';
+import { PortalDevServerService } from '../../infrastructure/portal-dev-server-service.js';
+import { PortalProjectService } from '../../infrastructure/portal-project-service.js';
+import { errorMessage } from '../../utils/error-utils.js';
+import { PreparePortalProjectAction } from './prepare-project.js';
+
+export const DEFAULT_PORTAL_PORT = 23513;
 
 export class PortalServeAction {
   private readonly prompts: PortalServePrompts = new PortalServePrompts();
   private readonly networkService: NetworkService = new NetworkService();
   private readonly launcherService: LauncherService = new LauncherService();
-  private readonly application: Express = express();
+  private readonly projectService = new PortalProjectService();
+  private readonly devServerService = new PortalDevServerService();
+  private readonly fileWatchService = new FileWatchService();
   private readonly configDir: DirectoryPath;
   private readonly commandMetadata: CommandMetadata;
   private readonly authKey: string | null;
@@ -30,177 +40,220 @@ export class PortalServeAction {
     this.authKey = authKey;
   }
 
-  public async execute(
-    buildDirectory: DirectoryPath,
-    portalDirectory: DirectoryPath,
+  public readonly execute = async (
+    project: ProjectContext,
     port: number,
     openInBrowser: boolean,
-    hotReload: boolean,
-    onAfterServe?: () => void
-  ): Promise<ActionResult> {
-    const buildContext = new BuildContext(buildDirectory);
-    if (!(await buildContext.exists())) {
-      this.prompts.noPortalSource(buildDirectory);
-      return ActionResult.failed();
-    }
-    let buildConfig;
-    try {
-      buildConfig = await buildContext.getBuildFileContents();
-    } catch {
-      this.prompts.invalidBuildConfig(buildDirectory);
-      return ActionResult.failed();
-    }
+    onServing?: () => void
+  ): Promise<ActionResult> => {
+    return await new PreparePortalProjectAction(this.configDir, this.commandMetadata, this.authKey).execute(project, {
+      onPrepared: async (portalProject, source, artifacts) => {
+        const servePort = await this.networkService.getServerPort([port, 3000, 3001, 3002]);
+        if (servePort !== port) {
+          this.prompts.usingFallbackPort(port, servePort);
+        }
 
-    const servePort = await this.networkService.getServerPort([port, 3000, 3001, 3002]);
-    if (servePort != port) {
-      this.prompts.usingFallbackPort(port, servePort);
-    }
-    const serveUrl = new UrlPath(`http://localhost:${servePort}`);
+        const server = await this.prompts.startPreview(this.devServerService.start(portalProject, servePort));
 
-    // Update the configured localhost base URL to the actual serve URL BEFORE
-    // generation bakes it into the portal artifacts; otherwise the portal would load
-    // its content from the wrong port and fail to render.
-    const updatedBuildConfig = buildConfig.updateBuildConfigBaseUrl(serveUrl);
-    if (updatedBuildConfig !== buildConfig) {
-      await buildContext.updateBuildFileContents(updatedBuildConfig);
-      this.prompts.baseUrlPortUpdated(serveUrl);
-    }
+        if (server.isErr()) {
+          this.prompts.startFailed(server.error.log);
+          return ActionResult.failed();
+        }
 
-    const generatePortalAction = new GenerateAction(this.configDir, this.commandMetadata, this.authKey);
-    const result = await generatePortalAction.execute(buildDirectory, portalDirectory, true, false);
-    if (result.isFailed()) {
-      return ActionResult.failed();
-    }
+        this.prompts.portalServed(server.value.url, project.sourceDirectory());
+        if (openInBrowser) {
+          await this.launcherService.openUrlInBrowser(server.value.url);
+        }
+        if (onServing) {
+          onServing();
+        }
 
-    const liveReloadPort = await this.networkService.getServerPort([35729, 35730, 35731, 35732]);
-    const liveReloadServer = createLiveReloadServer({ port: liveReloadPort });
+        // The content's tab names are checked against the generated sections, which apimatic.json
+        // adds and removes, and which the root nav.json makes tabs of or places in Home.
+        let generatedPages = source.generatedPages;
+        const contentWatch = this.watchContent(project, source, () => generatedPages, portalProject.projectDirectory);
+        const configWatch = this.watchConfig(project, source, artifacts, portalProject.projectDirectory, (settings) => {
+          const sectionsChanged = !settings.generatedPages.makesSameSectionsAs(generatedPages);
+          generatedPages = settings.generatedPages;
+          if (sectionsChanged) {
+            contentWatch?.recheck();
+          }
+        });
+        const specWatch = this.watchSpecs(project, source);
+        const closeWatches = async () => {
+          await specWatch?.close();
+          await configWatch?.close();
+          await contentWatch?.close();
+        };
 
-    // livereload attaches its "error" handler to the inner WebSocket server, not to the
-    // HTTP server it binds the port on, so a failed bind (e.g. the port was taken in the
-    // gap since getServerPort) emits an unhandled "error" that would crash the process.
-    // Guard the HTTP server the same way as the main server below.
-    const liveReloadHttpServer = (liveReloadServer as unknown as { config: { server: Server } }).config.server;
-    if ((await this.waitForServerListening(liveReloadHttpServer)).isErr()) {
-      liveReloadServer.close();
-      this.prompts.serverStartFailed(liveReloadPort);
-      return ActionResult.failed();
-    }
+        this.clearStandardInput();
 
-    const server = this.application
-      .use(connectLiveReload())
-      .use(express.static(portalDirectory.toString(), { extensions: ["html"] }))
-      .listen(servePort);
+        try {
+          // Raced with the exit too: waiting only on the signal left a crashed server advertised as running.
+          const interrupted = this.prompts.blockExecution().then(() => ({ kind: 'interrupted' as const }));
+          const stopped = server.value.exited.then((output) => ({ kind: 'exited' as const, output }));
+          const outcome = await Promise.race([interrupted, stopped]);
+          // First, so a save still being handled is not reported after the preview says it stops.
+          await closeWatches();
 
-    if ((await this.waitForServerListening(server)).isErr()) {
-      liveReloadServer.close();
-      this.prompts.serverStartFailed(servePort);
-      return ActionResult.failed();
-    }
+          if (outcome.kind === 'exited') {
+            this.prompts.previewStopped(outcome.output);
+            return ActionResult.failed();
+          }
 
-    this.prompts.portalServed(serveUrl);
-    if (openInBrowser) {
-      await this.launcherService.openUrlInBrowser(serveUrl);
-    }
-    this.prompts.promptForExit();
+          this.prompts.stopping();
+          await server.value.stop();
+          return ActionResult.stopped();
+        } finally {
+          // Before the portal project goes: a save being handled writes into it.
+          await closeWatches();
+        }
+      }
+    });
+  };
 
-    if (!hotReload) {
-      if (onAfterServe) {
-        onAfterServe();
+  /**
+   * Held to the rules a build applies: an edit a build would refuse is reported as `portal
+   * generate` would report it, and the preview keeps what it last accepted.
+   */
+  private watchConfig(
+    project: ProjectContext,
+    source: PortalSource,
+    artifacts: PortalArtifacts,
+    portalProjectDirectory: DirectoryPath,
+    onApplied: (settings: PortalSettings) => void
+  ): FileWatch | undefined {
+    const sourceDirectory = project.sourceDirectory();
+    const sourceContext = project.portalSource();
+    const preview = new PreviewConfig(source.config, source.staticDirectory !== null);
+
+    const applyEdit = async () => {
+      const reloaded = await sourceContext.resolveSettings(source.suggestedSite);
+      if (reloaded.isErr()) {
+        preview.refuse();
+        this.prompts.configRejected(reloaded.error, sourceDirectory);
+        return;
+      }
+      const settings = reloaded.value;
+      const { config } = settings;
+
+      const missing = settings.generatedPages.missingFrom(artifacts);
+      if (missing !== null) {
+        preview.refuse();
+        this.prompts.editNeedsRestart(missing);
+        return;
       }
 
-      this.clearStandardInput();
-      await this.prompts.blockExecution();
+      if (preview.staticDirectoryNotServed(config)) {
+        this.prompts.staticDirectoryNotServed(sourceDirectory);
+      }
 
-      liveReloadServer.close();
-      server.close();
-      return ActionResult.success();
+      const applied = await this.projectService.applyConfig(portalProjectDirectory, settings);
+      if (applied.isErr()) {
+        this.prompts.notApplied('config', applied.error, sourceDirectory);
+        return;
+      }
+      this.prompts.configShown(preview.show(config, applied.value));
+      onApplied(settings);
+    };
+
+    return this.startWatch('config', sourceDirectory, applyEdit, (onChange, onFailed) =>
+      this.fileWatchService.watch(sourceDirectory, new FileName(APIMATIC_CONFIG_FILE_NAME), onChange, onFailed)
+    );
+  }
+
+  /** Held to a build's rules, as `apimatic.json` is: a refused save is reported, and the preview kept as it was. */
+  private watchContent(
+    project: ProjectContext,
+    source: PortalSource,
+    generatedPages: () => GeneratedPages,
+    portalProjectDirectory: DirectoryPath
+  ): FileWatch | undefined {
+    const contentDirectory = source.contentDirectory;
+    if (contentDirectory === null) {
+      return undefined;
     }
+    const sourceDirectory = project.sourceDirectory();
+    const sourceContext = project.portalSource();
+    const preview = new PreviewContent(source.contentNotices);
 
-    this.prompts.hotReloadEnabled(buildDirectory);
+    const check = async () => {
+      const checked = await sourceContext.resolveContent(source.specs, generatedPages());
+      if (checked.isErr()) {
+        preview.refuse();
+        this.prompts.contentRejected(checked.error, sourceDirectory);
+        return;
+      }
+      const applied = await this.projectService.applyContent(
+        portalProjectDirectory,
+        contentDirectory,
+        checked.value.files
+      );
+      if (applied.isErr()) {
+        this.prompts.notApplied('content', applied.error, sourceDirectory);
+        return;
+      }
+      this.prompts.contentShown(preview.show(checked.value.notices), sourceDirectory);
+    };
 
-    const watcher = chokidar.watch(buildDirectory.toString(), {
-      ignored: [/(^|[/\\])\..+/],
-      ignoreInitial: true,
-      persistent: true,
-      awaitWriteFinish: true,
-      atomic: true
-    });
-
-    const deletedDirectories = new Set<string>();
-    const debounceService: DebounceService = new DebounceService();
-
-    watcher
-      .on("all", async (event, path) => {
-        // triggers folder deletion as a single event
-        if (event == "unlinkDir") {
-          deletedDirectories.add(path);
-        }
-        if (event == "unlink") {
-          for (const dir of deletedDirectories) {
-            if (path.startsWith(dir)) {
-              return;
-            }
-          }
-        }
-
-        await debounceService.batchSingleRequest(async () => {
-          this.prompts.changesDetected();
-          // Re-reconcile on every hot-reload cycle: portalSettings.baseUrl takes
-          // precedence over generatePortal.baseUrl and may have been added or changed
-          // since serve started. If a mismatch is found the file is rewritten, which
-          // triggers a second watcher event — the debounce queues it, and the second
-          // cycle sees no mismatch and generates cleanly.
-          try {
-            const latestConfig = await buildContext.getBuildFileContents();
-            const reconciledConfig = latestConfig.updateBuildConfigBaseUrl(serveUrl);
-            if (reconciledConfig !== latestConfig) {
-              await buildContext.updateBuildFileContents(reconciledConfig);
-              this.prompts.baseUrlPortUpdated(serveUrl);
-            }
-          } catch {
-            // Build file temporarily unreadable (e.g. mid-save); skip reconciliation
-            // this cycle. GenerateAction will surface the error if the file is broken.
-          }
-          await generatePortalAction.execute(buildDirectory, portalDirectory, true, false, false);
-          liveReloadServer.refresh(portalDirectory.toString());
-          this.clearStandardInput();
-        });
-      })
-      .on("error", async () => {
-        this.prompts.watcherError();
-      });
-
-    // Wait for SIGINT or SIGTERM
-    this.clearStandardInput();
-    await this.prompts.blockExecution();
-
-    await watcher.close();
-    debounceService.close();
-    liveReloadServer.close();
-    server.close();
-    return ActionResult.success();
+    // What the build never reads, as an editor's swap file, would only have the check run again.
+    return this.startWatch('content', sourceDirectory, check, (onChange, onFailed) =>
+      this.fileWatchService.watchTree(contentDirectory, onChange, onFailed, isSkippedByGlob)
+    );
   }
 
-  // Resolves ok once the server is bound, or err with the bind error (e.g. EADDRINUSE)
-  // so a failed listen is reported cleanly instead of crashing via an unhandled "error".
-  private waitForServerListening(server: Server): Promise<Result<void, Error>> {
-    return new Promise((resolve) => {
-      const onListening = () => {
-        server.removeListener("error", onError);
-        resolve(ok(undefined));
-      };
-      const onError = (error: Error) => {
-        server.removeListener("listening", onListening);
-        resolve(err(error));
-      };
-      server.once("listening", onListening);
-      server.once("error", onError);
-    });
+  /** Held to a build's rules, as `content/` is, but the preview itself leaves out a reference it cannot read. */
+  private watchSpecs(project: ProjectContext, source: PortalSource): FileWatch | undefined {
+    const sourceDirectory = project.sourceDirectory();
+    const sourceContext = project.portalSource();
+    const preview = new PreviewSpecs(source.specs);
+
+    const check = async () => {
+      const checked = await sourceContext.resolveSpecs();
+      if (checked.isErr()) {
+        preview.refuse();
+        this.prompts.specRejected(checked.error, sourceDirectory);
+        return;
+      }
+      this.prompts.specsShown(preview.show(checked.value), sourceDirectory);
+    };
+
+    // As for content: an editor's swap file, saved while a document is refused, would only repeat the refusal.
+    return this.startWatch('spec', sourceDirectory, check, (onChange, onFailed) =>
+      this.fileWatchService.watchTree(source.specDirectory, onChange, onFailed, isSkippedByGlob)
+    );
   }
 
-  // This clears the standard input to allow interrupts like CTRL+C to work properly.
+  /**
+   * Runs `handle` on each save the watch reports, and once at the start: what it handles was read
+   * before the preview started, which can take a minute, and a save made meanwhile reached no watch.
+   */
+  private startWatch(
+    watched: WatchedSource,
+    sourceDirectory: DirectoryPath,
+    handle: () => Promise<void>,
+    watch: (onChange: () => Promise<void>, onFailed: (reason: string) => void) => Result<FileWatch, string>
+  ): FileWatch | undefined {
+    // The watch drops whatever its handler throws, which would leave the preview stale without a word.
+    const onChange = async () => {
+      try {
+        await handle();
+      } catch (error) {
+        this.prompts.notChecked(watched, errorMessage(error), sourceDirectory);
+      }
+    };
+    const started = watch(onChange, (reason) => this.prompts.watchFailed(watched, reason, sourceDirectory));
+    if (started.isErr()) {
+      this.prompts.notWatched(watched, started.error, sourceDirectory);
+      return undefined;
+    }
+    started.value.recheck();
+    return started.value;
+  }
+
+  // Clack leaves stdin in raw mode, which swallows CTRL+C until it is released.
   private clearStandardInput() {
-    if (process.platform !== "darwin" && process.stdin.isTTY) {
+    if (process.platform !== 'darwin' && process.stdin.isTTY) {
       process.stdin.setRawMode(false);
       process.stdin.pause();
     }

@@ -9,8 +9,7 @@ import { PublishingProfileItem } from '../../../types/publish-api/publishing-pro
 import { ProfileId } from '../../../types/publish/profile-id.js';
 import { Language } from '../../../types/sdk/generate.js';
 import { SDK_PUBLISHING_OVERVIEW_URL } from '../../publishing/links.js';
-
-const PLUGIN_CONFIG_FILE = 'plugin-config.json';
+import { APIMATIC_CONFIG_FILE_NAME } from '../../../types/apimatic-config/document.js';
 
 export class SdkPublishNonInteractivePrompts {
   public directoryCannotBeSame(directory: DirectoryPath) {
@@ -20,7 +19,7 @@ export class SdkPublishNonInteractivePrompts {
     log.error(message);
   }
 
-  public srcDirectoryDoesNotExist(directory: DirectoryPath) {
+  public sourceDirectoryDoesNotExist(directory: DirectoryPath) {
     log.error(`The ${f.var('src')} does not exist at the provided location: ${f.path(directory)}`);
   }
 
@@ -90,10 +89,11 @@ export class SdkPublishNonInteractivePrompts {
     );
   }
 
+  /** A publish records itself, and a dry run is the one publish that has nothing to record. */
   public dryRunPluginConfigNotice() {
     const message =
-      `${f.flag('update-plugin-config')} was ignored because ${f.flag('dry-run')} does not publish the SDK. ` +
-      `Re-run without ${f.flag('dry-run')} to record it in ${f.var(PLUGIN_CONFIG_FILE)}.`;
+      `Nothing was recorded in ${f.var(APIMATIC_CONFIG_FILE_NAME)} because ${f.flag('dry-run')} does not ` +
+      `publish the SDK. Re-run without ${f.flag('dry-run')} to record it.`;
     log.info(message);
   }
 }

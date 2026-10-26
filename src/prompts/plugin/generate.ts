@@ -1,22 +1,49 @@
-import { confirm, isCancel, log } from '@clack/prompts';
+import { confirm, isCancel, log, multiselect } from '@clack/prompts';
 import { Result } from 'neverthrow';
 import { ServiceError } from '../../infrastructure/service-error.js';
+import { PublishingProfileItem } from '../../types/publish-api/publishing-profile-item.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { FilePath } from '../../types/file/filePath.js';
 import { format as f } from '../format.js';
-import { noteWrapped, withSpinner } from '../prompt.js';
+import { withSpinner } from '../prompt.js';
+import { APIMATIC_CONFIG_FILE_NAME } from '../../types/apimatic-config/document.js';
+import { PluginConfig } from '../../types/plugin-config-context.js';
+import { PluginGenerationProblem } from '../../types/plugin/generation-problem.js';
+import { LANGUAGES_EXAMPLE } from '../../types/apimatic-config/languages-block.js';
+import { AVAILABLE_LANGUAGES, Language, languageLabel } from '../../types/sdk/generate.js';
+import { listedInProse } from '../../utils/string-utils.js';
 
-const PLUGIN_CONFIG_FILE = 'plugin-config.json';
-
-// Each link lands on the section that covers loading an unpublished folder, not the page it sits in.
-const CLAUDE_CODE_PLUGINS_URL = 'https://code.claude.com/docs/en/plugins#test-your-plugins-locally';
-const CURSOR_PLUGINS_URL = 'https://cursor.com/docs/plugins#test-plugins-locally';
-const VS_CODE_PLUGINS_URL = 'https://code.visualstudio.com/docs/agent-customization/agent-plugins#_use-local-plugins';
-const CODEX_PLUGINS_URL = 'https://developers.openai.com/plugins/build/plugins#install-a-local-plugin-manually';
+function describeGenerationProblem(problem: PluginGenerationProblem, sourceDirectory: DirectoryPath): string {
+  const configFile = `${f.var(APIMATIC_CONFIG_FILE_NAME)} in ${f.path(sourceDirectory)}`;
+  switch (problem.kind) {
+    case 'configNotPrepared':
+      return problem.failure === 'unreadable'
+        ? `${configFile} could not be read. Check that it can be read and try again.`
+        : `${configFile} starts with a byte-order mark, which the plugin cannot be generated from, and it could ` +
+            `not be rewritten without one. Save the file as UTF-8 without a BOM and try again.`;
+    case 'generationFailed':
+      return problem.error.errorMessage;
+    case 'zipFailed':
+      return `${f.path(sourceDirectory)} could not be zipped for upload: ${problem.reason}`;
+    case 'unzipFailed':
+      return `${ServiceError.InvalidResponse.errorMessage}\n${problem.reason}`;
+  }
+}
 
 export class PluginGeneratePrompts {
+  // The spinner covers the service call only; until the save has run there is no path to name.
   public generatePlugin(fn: Promise<Result<NodeJS.ReadableStream, ServiceError>>) {
     return withSpinner('Generating Context Plugin', 'Plugin generated successfully.', 'Plugin Generation failed.', fn);
+  }
+
+  /** Advisory, and slow enough to look like a hang without a spinner over it. */
+  public checkPublishingProfiles(fn: Promise<Result<PublishingProfileItem[], ServiceError>>) {
+    return withSpinner(
+      'Checking your publishing profiles',
+      'Publishing profiles checked.',
+      'Could not check your publishing profiles.',
+      fn
+    );
   }
 
   public async overwritePlugin(directory: DirectoryPath): Promise<boolean> {
@@ -39,7 +66,7 @@ export class PluginGeneratePrompts {
     log.error(message);
   }
 
-  public srcDirectoryDoesNotExist(directory: DirectoryPath) {
+  public sourceDirectoryDoesNotExist(directory: DirectoryPath) {
     const message = `The ${f.var('src')} directory does not exist at the provided location: ${f.path(directory)}`;
     log.error(message);
   }
@@ -48,57 +75,113 @@ export class PluginGeneratePrompts {
     log.error('Please enter a different destination folder or remove the existing files and try again.');
   }
 
-  public pluginGenerationError(error: string) {
-    log.error(error);
+  public pluginNotGenerated(problem: PluginGenerationProblem, sourceDirectory: DirectoryPath) {
+    log.error(describeGenerationProblem(problem, sourceDirectory));
   }
 
   public pluginConfigUnreadable(reason: string, path: FilePath) {
     const message =
-      `${f.var(PLUGIN_CONFIG_FILE)} cannot be used: ${reason}. ` + `Fix or delete it at ${f.path(path)} and try again.`;
+      `${f.var(APIMATIC_CONFIG_FILE_NAME)} cannot be used: ${reason}. ` + `Fix it at ${f.path(path)} and try again.`;
     log.error(message);
   }
 
-  public metadataCancelled(reason: string) {
-    log.warn(`${reason}. Exiting without generating a plugin.`);
+  // Without a terminal a prompt never answers, and Node exits with nothing said.
+  public canAsk(): boolean {
+    return process.stdin.isTTY === true;
   }
 
-  public noPublishedSdks() {
-    log.info(`${f.var(PLUGIN_CONFIG_FILE)} has no published SDKs config yet.`);
+  public setupNeedsTerminal(sourceDirectory: DirectoryPath, config: PluginConfig) {
+    const command = `'${f.cmdAlt('apimatic', 'plugin', 'generate')}'`;
+    const configFile = `${f.var(APIMATIC_CONFIG_FILE_NAME)} in ${f.path(sourceDirectory)}`;
+    if (config.hasMetadata()) {
+      log.error(
+        `${configFile} names no language the plugin can carry, and there is no terminal to ask which. Add one to ` +
+          `its ${f.var('languages')} block, for example ${LANGUAGES_EXAMPLE}, or run ${command} in a terminal.`
+      );
+      return;
+    }
+    const [asked, kept] = config.hasRecordedLanguages() ? ['its name', 'it'] : ['its name and languages', 'both'];
+    log.error(
+      `A project's first plugin asks for ${asked}, and there is no terminal to ask in. Run ${command} in a ` +
+        `terminal once; later runs read ${kept} from ${configFile}.`
+    );
   }
 
-  public nextStepsPublishSdks() {
-    const message =
-      `Publish SDK for the language(s) to add it to plugin-config.json. ` +
-      `${f.var('Source Code')} details are required.\n\n` +
-      `Run '${f.cmdAlt('apimatic', 'sdk', 'publish')}'\n\n` +
-      `Then run '${f.cmdAlt('apimatic', 'plugin', 'generate')}'.`;
-    noteWrapped(message, 'Next Steps');
+  public recordedLanguagesIncluded(languages: readonly Language[]) {
+    if (languages.length === 0) {
+      return;
+    }
+    log.info(
+      `The plugin covers ${listedInProse(languages.map(languageLabel))}, as ${f.var(APIMATIC_CONFIG_FILE_NAME)} ` +
+        `records them. Edit its ${f.var('languages')} block to change that.`
+    );
   }
 
-  public pluginGenerated(plugin: DirectoryPath) {
-    log.info(`Plugin artifacts can be found at ${f.path(plugin)}.`);
+  public async selectLanguages(): Promise<Language[] | undefined> {
+    const selected = await multiselect<Language>({
+      message: 'Which languages should your plugin include?',
+      options: AVAILABLE_LANGUAGES.map((language) => ({ value: language, label: languageLabel(language) })),
+      initialValues: [...AVAILABLE_LANGUAGES],
+      required: false
+    });
+
+    return isCancel(selected) ? undefined : selected;
   }
 
-  /**
-   * Each assistant loads an unpublished folder its own way — a flag, a fixed directory, a settings
-   * entry — and each documents it, so the note points at those pages rather than restating three
-   * procedures that would then have to be kept current.
-   */
-  public tryPluginLocally(plugin: DirectoryPath) {
-    const message =
-      `Load the plugin from ${f.path(plugin)} to try it before publishing.\n\n` +
-      `${f.description('Claude Code')} ${f.link(CLAUDE_CODE_PLUGINS_URL)}\n` +
-      `${f.description('Cursor')} ${f.link(CURSOR_PLUGINS_URL)}\n` +
-      `${f.description('VS Code')} ${f.link(VS_CODE_PLUGINS_URL)}\n` +
-      `${f.description('Codex')} ${f.link(CODEX_PLUGINS_URL)}`;
-    noteWrapped(message, 'Try It Locally');
+  public noLanguagesSelected() {
+    log.warn('No languages selected. Exiting without generating a plugin.');
   }
 
-  public nextStepsPublishPlugin() {
-    const message =
-      `Publish the plugin to GitHub so the people using your SDKs can install it.
+  // Saying so is the only way the omission is visible; their entries are left alone.
+  public languagesNotIncluded(languages: readonly string[]) {
+    if (languages.length === 0) {
+      return;
+    }
 
-` + `Run '${f.cmdAlt('apimatic', 'plugin', 'publish')}' to see the commands.`;
-    noteWrapped(message, 'Next Steps');
+    const [verb, entries] = languages.length === 1 ? ['is', 'its entry'] : ['are', 'their entries'];
+    const names = languages.map((language) => languageLabel(language)).join(', ');
+
+    log.warn(
+      `${names} cannot be included in a context plugin and ${verb} left out of this one. ` +
+        `${f.var(APIMATIC_CONFIG_FILE_NAME)} keeps ${entries} unchanged.`
+    );
+  }
+
+  // A recommendation, then a confirm, never a fork; a set-up project, asked nothing, gets the recommendation alone.
+  public async confirmLocalPlugin(unattended: boolean): Promise<boolean> {
+    log.warn(
+      `You have a publishing profile set up.\n` +
+        `We recommend publishing your SDK first for a better plugin experience.`
+    );
+    if (unattended) {
+      return true;
+    }
+
+    const proceed = await confirm({
+      message: 'Do you still want to continue with a local plugin?',
+      initialValue: true
+    });
+
+    return isCancel(proceed) ? false : proceed;
+  }
+
+  public localPluginCancelled() {
+    log.warn(
+      `Exiting without generating a plugin. Run '${f.cmdAlt('apimatic', 'sdk', 'publish')}' to publish ` +
+        `your SDK first.`
+    );
+  }
+
+  // Only where a profile exists: a user without one cannot act on it.
+  public previewOnly() {
+    log.warn('Context plugin is preview only.\nFor production, publish your SDK and plugin.');
+  }
+
+  // Double quotes, not `f.path`: single quotes are not quoting to `cmd.exe`.
+  public installPluginLocally(plugin: DirectoryPath) {
+    const quotedPath = `"${plugin.relativeTo(DirectoryPath.workingDirectory())}"`;
+    const command = f.cmdAlt('npx', 'context-plugins', 'install', quotedPath);
+
+    log.info(`Run '${command}' to install your plugin.`);
   }
 }

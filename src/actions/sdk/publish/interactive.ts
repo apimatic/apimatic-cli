@@ -5,14 +5,13 @@ import { DirectoryPath } from '../../../types/file/directoryPath.js';
 import { PublishType } from '../../../types/publish-api/publishing-profile-item.js';
 import { PublishingProfile } from '../../../types/publish/publishing-profile.js';
 import { PublishingProfiles } from '../../../types/publish/publishing-profiles.js';
-import { getCodegenOptions } from '../../../types/sdk/generate.js';
+import { AVAILABLE_LANGUAGES, stabilityLevelsFor } from '../../../types/sdk/generate.js';
 import { formatPublishingDetails } from '../../../prompts/sdk/publish.js';
 import { ActionResult } from '../../action-result.js';
-import { PluginRecordSdkAction } from '../../plugin/record-sdk.js';
+import { RecordPublishedSdkAction } from '../record-published-sdk.js';
 import { SdkPublishAction } from '../publish.js';
-import { BuildContext } from '../../../types/build-context.js';
+import { ProjectContext } from '../../../types/project-context.js';
 import { ProfileId } from '../../../types/publish/profile-id.js';
-import { removeQuotes } from '../../../utils/string-utils.js';
 
 export class SdkPublishInteractiveAction {
   private readonly prompts: SdkPublishInteractivePrompts = new SdkPublishInteractivePrompts();
@@ -21,23 +20,22 @@ export class SdkPublishInteractiveAction {
   public constructor(private readonly configDir: DirectoryPath, private readonly commandMetadata: CommandMetadata) {}
 
   public readonly execute = async (
-    defaultBuildDirectory: DirectoryPath,
+    defaultProjectDirectory: DirectoryPath,
     onPublishSdkError: (errorMessage: string) => void
   ): Promise<ActionResult> => {
     const workingDirectory = await this.prompts.inputWorkingDirectory(
-      defaultBuildDirectory,
-      SdkPublishInteractiveAction.workingDirectoryValidator(defaultBuildDirectory)
+      defaultProjectDirectory,
+      SdkPublishInteractiveAction.workingDirectoryValidator(defaultProjectDirectory)
     );
     if (!workingDirectory) {
       await this.prompts.noInputDirectoryProvided();
       return ActionResult.cancelled();
     }
-    const buildDirectory = workingDirectory.join('src');
+    const project = ProjectContext.in(workingDirectory);
 
-    const defaultSdkDirectory = workingDirectory.join('sdk');
     const sdkDirectory = await this.prompts.inputSdkDirectory(
-      defaultSdkDirectory,
-      SdkPublishInteractiveAction.sdkDirectoryValidator(buildDirectory)
+      project.sdkDirectory(),
+      SdkPublishInteractiveAction.sdkDirectoryValidator(project)
     );
     if (!sdkDirectory) {
       await this.prompts.noSdkDirectoryProvided();
@@ -75,18 +73,24 @@ export class SdkPublishInteractiveAction {
 
     const publishingProfile = PublishingProfile.create(publishingProfileItem);
 
-    const language = await this.prompts.selectLanguage(publishingProfile);
+    // Offering one v4 cannot render would end the run after the version was already asked for.
+    const offered = publishingProfile.getEnabledLanguages().filter((enabled) => AVAILABLE_LANGUAGES.includes(enabled));
+    if (offered.length === 0) {
+      this.prompts.noAvailableLanguageOnProfile(publishingProfile.getEnabledLanguages());
+      return ActionResult.failed();
+    }
+
+    const language = await this.prompts.selectLanguage(publishingProfile, offered);
     if (!language) {
       this.prompts.noLanguageSelected();
       return ActionResult.cancelled();
     }
 
-    const codegenOptions = getCodegenOptions(language);
-    const codegenOption = codegenOptions.length === 1 ? codegenOptions[0]
-      : await this.prompts.selectCodegenVersion(codegenOptions);
-    if (!codegenOption) {
-        this.prompts.noCodegenVersionSelected();
-        return ActionResult.cancelled();
+    const levels = stabilityLevelsFor(language);
+    const stability = levels.length === 1 ? levels[0] : await this.prompts.selectStability(levels);
+    if (!stability) {
+      this.prompts.noStabilitySelected();
+      return ActionResult.cancelled();
     }
 
     const version = await this.prompts.inputVersion();
@@ -102,7 +106,7 @@ export class SdkPublishInteractiveAction {
       language,
       version,
       publishType: publishTypes,
-      codegenOption: codegenOptions.length === 1 ? undefined : codegenOption
+      stability: levels.length === 1 ? undefined : stability
     });
 
     this.prompts.publishingSummary(publishingSummary);
@@ -119,7 +123,7 @@ export class SdkPublishInteractiveAction {
 
     const publishingProfileId = ProfileId.createFromPublishingProfileItem(publishingProfileItem);
     const publishResult = await new SdkPublishAction(this.configDir, this.commandMetadata).execute(
-      buildDirectory,
+      project,
       sdkDirectory,
       language,
       publishTypes,
@@ -128,8 +132,7 @@ export class SdkPublishInteractiveAction {
       version,
       publishingProfile,
       false,
-      codegenOption,
-      false,
+      stability,
       publishingSummary,
       onPublishSdkError
     );
@@ -140,41 +143,25 @@ export class SdkPublishInteractiveAction {
       return ActionResult.cancelled();
     }
 
-    if (await this.prompts.confirmRecordSdk()) {
-      await new PluginRecordSdkAction().execute(
-        buildDirectory,
-        language,
-        publishingProfile,
-        publishTypes,
-        version,
-        codegenOption.codeGenerationVersion(),
-        true
-      );
-    }
+    await new RecordPublishedSdkAction().execute(project, language, publishingProfile, publishTypes, version);
 
     return ActionResult.success();
   };
 
   public static workingDirectoryValidator(
-    defaultBuildDirectory: DirectoryPath
+    defaultProjectDirectory: DirectoryPath
   ): (value: string | undefined) => string | undefined {
     return (value) => {
-      if (!value) {
-        if (!new BuildContext(defaultBuildDirectory.join('src')).existsSync())
-          return "The 'src' directory does not exist at the provided location. Please check the path and try again.";
-        return;
-      }
-      if (!new BuildContext(new DirectoryPath(removeQuotes(value.trim())).join('src')).existsSync())
+      const projectDirectory = value ? DirectoryPath.fromUserInput(value) : defaultProjectDirectory;
+      if (!ProjectContext.in(projectDirectory).sourceExistsSync())
         return "The 'src' directory does not exist at the provided location. Please check the path and try again.";
     };
   }
 
-  public static sdkDirectoryValidator(
-    buildDirectory: DirectoryPath
-  ): (value: string | undefined) => string | undefined {
+  public static sdkDirectoryValidator(project: ProjectContext): (value: string | undefined) => string | undefined {
     return (value) => {
       if (!value) return;
-      if (new DirectoryPath(removeQuotes(value.trim())).isEqual(buildDirectory))
+      if (project.isSourceDirectory(DirectoryPath.fromUserInput(value)))
         return 'SDK directory must be different from the src directory.';
     };
   }

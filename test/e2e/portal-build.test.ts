@@ -1,0 +1,985 @@
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
+import { createRequire } from 'node:module';
+import { execa } from 'execa';
+import { expect } from 'chai';
+import { PortalBuildService } from '../../src/infrastructure/portal-build-service';
+import { PortalProjectService } from '../../src/infrastructure/portal-project-service';
+import { PortalSourceContext } from '../../src/types/portal-source-context';
+import { PortalContext } from '../../src/types/portal-context';
+import { DirectoryPath } from '../../src/types/file/directoryPath';
+import { FilePath } from '../../src/types/file/filePath';
+import { CodeSampleCatalog, CodeSampleCatalogs } from '../../src/types/portal/code-samples';
+import { PortalArtifacts } from '../../src/types/portal/portal-artifacts';
+import { Language } from '../../src/types/sdk/generate';
+import { canonical } from '../../src/infrastructure/tmp-extensions';
+
+// A real Vite build takes tens of seconds and needs every runtime dependency installed,
+// so it stays out of the default run. CI switches it on for the platform matrix.
+const enabled = process.env.APIMATIC_E2E === '1';
+
+const CALCULATE_SAMPLE = 'const result = await calculator.calculate(OperationType.Sum, 4, 5);';
+const CODE_SAMPLES = new CodeSampleCatalogs([
+  CodeSampleCatalog.fromJson(Language.TYPESCRIPT, {
+    paths: { '/{operation}': { GET: { Example: CALCULATE_SAMPLE } } }
+  }) as CodeSampleCatalog
+]);
+
+/**
+ * What a run delivers as TypeScript's SDK docs, with a brace and a tag in its prose: MDX would
+ * read either as code, which is why the pages include the docs rather than hold them.
+ */
+const SDK_DOCS =
+  '## Installation\n\nInstall it with npm; its objects look like {id: 1}.<br>Then build it.\n\n' +
+  '```bash\nnpm install calc\n```\n\n## Quick Start\n\nCreate one client and reuse it.\n\n' +
+  'Use **identical method names**, **(identical)** and *`code`* here.\n';
+
+interface BuiltPortal {
+  root: string;
+  project: DirectoryPath;
+  output: DirectoryPath;
+}
+
+interface Delivered {
+  codeSampleCatalogs?: CodeSampleCatalogs;
+  plugin?: boolean;
+}
+
+/** What `/portal-artifacts` would deliver for a fixture whose one language is TypeScript. */
+function deliveredInto(
+  directory: string,
+  { codeSampleCatalogs = new CodeSampleCatalogs([]), plugin = false }: Delivered
+) {
+  fs.mkdirSync(directory, { recursive: true });
+  const file = (name: string, contents: string) => {
+    fs.writeFileSync(path.join(directory, name), contents);
+    return FilePath.create(path.join(directory, name))!;
+  };
+  return new PortalArtifacts(
+    codeSampleCatalogs,
+    new Map([['typescript', file('typescript.zip', 'PK typescript')]]),
+    new Map([['typescript', SDK_DOCS]]),
+    plugin ? file('plugin.zip', 'PK plugin') : undefined
+  );
+}
+
+/** Resolves, prepares, builds and saves a fixture as `portal generate` does. */
+async function buildFixture(name: string, delivered: Delivered = {}): Promise<BuiltPortal> {
+  const fixture = new DirectoryPath(process.cwd()).join('test/resources/portal-inputs').join(name).join('src');
+  const root = canonical(fs.mkdtempSync(path.join(os.tmpdir(), 'portal-e2e-')));
+
+  const source = (await new PortalSourceContext(fixture).resolve())._unsafeUnwrap();
+
+  const project = new DirectoryPath(root).join('build');
+  fs.mkdirSync(project.toString(), { recursive: true });
+  const artifacts = deliveredInto(path.join(root, 'delivered'), delivered);
+  expect(source.generatedPages.missingFrom(artifacts), 'the artifacts back every page').to.be.null;
+  const prepared = (await new PortalProjectService().prepare(project, source, artifacts))._unsafeUnwrap();
+
+  const build = await new PortalBuildService().build(prepared);
+  if (build.isErr()) {
+    throw new Error(`${build.error.message}\n${build.error.log.split('\n').slice(-20).join('\n')}`);
+  }
+  expect(build.value.pageCount).to.be.greaterThan(1);
+
+  const output = new DirectoryPath(root).join('portal');
+  (await new PortalContext(output).save(build.value.output, false))._unsafeUnwrap();
+  return { root, project, output };
+}
+
+function removeBuilt(built: BuiltPortal | undefined): void {
+  if (built !== undefined) fs.rmSync(built.root, { recursive: true, force: true });
+}
+
+/**
+ * One fixture built before a describe block's cases and removed after them, read through the
+ * accessors, which resolve the build lazily since the hooks run after the block is declared.
+ */
+function portalBuilt(name: string, delivered: Delivered = {}) {
+  let built: BuiltPortal | undefined;
+  const have = (): BuiltPortal => {
+    if (built === undefined) throw new Error(`${name} is not built`);
+    return built;
+  };
+
+  before(async () => {
+    built = await buildFixture(name, delivered);
+  });
+
+  after(() => removeBuilt(built));
+
+  return {
+    output: () => have().output,
+    project: () => have().project,
+    read: (relative: string) => fs.readFileSync(path.join(have().output.toString(), relative), 'utf8'),
+    exists: (relative: string) => fs.existsSync(path.join(have().output.toString(), relative))
+  };
+}
+
+/** Where each tab's link sits in a prerendered page's header, or -1 for a tab that is not there. */
+const tabPositions = (page: string, tabs: [href: string, name: string][]): number[] =>
+  tabs.map(([href, name]) => page.search(new RegExp(`href="${href}"[^>]*><span[^>]*>${name}</span></a>`)));
+
+/** The layout puts the tab bar in the header, and the prerendered page carries it before any script runs. */
+function expectTabsInOrder(page: string, tabs: [href: string, name: string][]): void {
+  const positions = tabPositions(page, tabs);
+
+  expect(
+    positions.every((at) => at !== -1),
+    'a tab is missing'
+  ).to.be.true;
+  expect(positions).to.deep.equal([...positions].sort((left, right) => left - right));
+}
+
+/**
+ * Vite strips types without checking them, and nothing else in the repository imports the
+ * routes and components, so this is the one place the template is held to its types. It runs
+ * after a build because the build generates the route tree the router imports.
+ */
+async function typeCheck(project: DirectoryPath) {
+  const require = createRequire(import.meta.url);
+  const typesDirectory = path.join(project.toString(), 'node_modules', '@types');
+  fs.mkdirSync(typesDirectory, { recursive: true });
+  // React's types are development dependencies of the CLI, so the prepared project does not
+  // link them the way it links the packages the build runs with.
+  for (const name of ['react', 'react-dom']) {
+    const target = path.dirname(require.resolve(`@types/${name}/package.json`));
+    fs.symlinkSync(target, path.join(typesDirectory, name), process.platform === 'win32' ? 'junction' : 'dir');
+  }
+
+  // The bare `typescript` dependency is the linter's TypeScript 6 copy (see "TypeScript
+  // toolchain" in .ai/instructions.md) and TypeScript 7 does not export its `bin` directory,
+  // so reach the compiler `build` runs through its manifest.
+  const manifest = require.resolve('@typescript/native/package.json');
+  const tsc = path.join(path.dirname(manifest), require(manifest).bin.tsc);
+  return execa(
+    process.execPath,
+    [tsc, '-p', path.join(project.toString(), 'tsconfig.json'), '--noEmit', '--pretty', 'false'],
+    { cwd: project.toString(), reject: false, all: true }
+  );
+}
+
+/** The browser's scripts, by name. */
+const scriptsOf = (output: DirectoryPath) =>
+  fs
+    .readdirSync(path.join(output.toString(), 'assets'))
+    .filter((name) => name.endsWith('.js'))
+    .map((name) => ({ name, text: fs.readFileSync(path.join(output.toString(), 'assets', name), 'utf8') }));
+
+const stylesheetOf = (output: DirectoryPath) => {
+  const assets = path.join(output.toString(), 'assets');
+  return fs
+    .readdirSync(assets)
+    .filter((name) => name.endsWith('.css'))
+    .map((name) => fs.readFileSync(path.join(assets, name), 'utf8'))
+    .join('\n');
+};
+
+(enabled ? describe : describe.skip)('portal build (end to end)', function () {
+  this.timeout(10 * 60 * 1000);
+
+  const fixture = new DirectoryPath(process.cwd()).join('test/resources/portal-inputs/default/src');
+  const portal = portalBuilt('default', { codeSampleCatalogs: CODE_SAMPLES });
+  const { read, exists } = portal;
+
+  /** The prerendered server-function cache entries carrying the sidebar tree. */
+  const treeCacheFiles = () => {
+    const cache = '__tsr/staticServerFnCache';
+    return fs
+      .readdirSync(path.join(portal.output().toString(), cache))
+      .map((name) => `${cache}/${name}`)
+      .filter((relative) => read(relative).includes('"pageTree"'));
+  };
+
+  it('writes a home page carrying the content page', () => {
+    expect(exists('index.html')).to.be.true;
+    expect(read('index.html')).to.contain('Hello from the fixture.');
+  });
+
+  // Addresses come from page slugs rather than tree position, so lifting the single
+  // specification's section out of the sidebar must leave every operation where it was.
+  it('writes a page per operation in the specification', () => {
+    expect(exists('api/apimatic-calculator/simple-calculator/Calculate/index.html')).to.be.true;
+  });
+
+  it('ignores files in spec/ that are not specifications', () => {
+    // APIMATIC-META.json sits beside the spec for SDK generation.
+    expect(exists('api/apimatic-meta')).to.be.false;
+  });
+
+  it('copies the static directory to the site root', () => {
+    expect(exists('images/logo.png')).to.be.true;
+  });
+
+  it('writes the not-found page static hosts serve for unknown paths', () => {
+    expect(exists('404.html')).to.be.true;
+  });
+
+  it('writes the markdown companion the page actions fetch', () => {
+    expect(read('index.md')).to.contain('Hello from the fixture.');
+  });
+
+  it('writes the one OAuth redirect URI every endpoint page authorizes through, kept out of search', () => {
+    expect(read('oauth/callback/index.html')).to.contain('<meta name="robots" content="noindex"');
+    // The cookie it reads is the browser's, so the page is built to wait for it.
+    expect(read('oauth/callback/index.html')).to.contain('Completing authorization…');
+    expect(read('sitemap.xml')).to.not.contain('/oauth/callback');
+  });
+
+  it('writes a search index and the llms files', () => {
+    expect(exists('api/search.json')).to.be.true;
+    expect(read('llms.txt')).to.contain('Welcome');
+  });
+
+  it('writes a sitemap and robots file naming the configured address', () => {
+    expect(read('sitemap.xml')).to.contain('https://docs.test/api/apimatic-calculator/simple-calculator/Calculate');
+    expect(read('robots.txt')).to.contain('Sitemap: https://docs.test/sitemap.xml');
+  });
+
+  it('marks each page canonical at its own address', () => {
+    expect(read('index.html')).to.contain('<link rel="canonical" href="https://docs.test/"');
+  });
+
+  it('keeps the server-side specification loader out of the browser bundle', () => {
+    const scripts = fs
+      .readdirSync(path.join(portal.output().toString(), 'assets'))
+      .filter((name) => name.endsWith('.js'));
+    const offenders = scripts.filter((name) => read('assets/' + name).includes('Failed to resolve input'));
+    expect(offenders).to.deep.equal([]);
+  });
+
+  /** Published files naming one of these build-machine directories, in any spelling. */
+  const filesNaming = (...directories: string[]) => {
+    // Three spellings of each: a bundler normalises separators either way, and a Windows
+    // path embedded in a string literal has its backslashes escaped.
+    const secrets = directories.flatMap((absolute) => {
+      const native = absolute.replace(/\//g, '\\');
+      return [native, native.replace(/\\/g, '\\\\'), absolute.replace(/\\/g, '/')];
+    });
+
+    const walk = (directory: string): string[] =>
+      fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+        const child = path.join(directory, entry.name);
+        return entry.isDirectory() ? walk(child) : [child];
+      });
+
+    return (
+      walk(portal.output().toString())
+        // Images and fonts cannot carry a path the build put there, and reading them as text
+        // only invites a false match.
+        .filter((file) => !/\.(png|jpe?g|gif|svg|ico|woff2?)$/i.test(file))
+        .filter((file) => {
+          const content = fs.readFileSync(file, 'utf8');
+          return secrets.some((secret) => content.includes(secret));
+        })
+        .map((file) => path.relative(portal.output().toString(), file))
+    );
+  };
+
+  // The `.server` split exists so the build machine's filesystem stays out of what is
+  // published: `portal.server.ts` holds the absolute path of every specification, and the
+  // prepared project's own location has no business in the output either.
+  it('publishes neither the specification paths nor the project directory', () => {
+    expect(filesNaming(portal.project().toString(), fixture.join('spec').toString())).to.deep.equal([]);
+  });
+
+  // `defineDocs({ dir })` compiles its directory into the client bundle as the collection's
+  // `base`, which is why the project reads a copy of the content by a relative name.
+  it('publishes no absolute path from the build machine at all', () => {
+    expect(filesNaming(fixture.join('content').toString(), fixture.toString())).to.deep.equal([]);
+  });
+
+  it('writes the sidebar tree to one cache file instead of into every page payload', () => {
+    expect(treeCacheFiles()).to.have.length(1);
+  });
+
+  // The only end-to-end proof that `nav.json` reaches the build: the Vite glob, the macro's
+  // `meta.files` restriction and the transformer over real on-disk storage. The folder is a tab
+  // only because the file lists it, and the defaults would put the SDKs above the reference.
+  it('orders the sidebar by nav.json, with the SDKs and the API reference where their tokens name them', () => {
+    const tree = read(treeCacheFiles()[0]);
+    const order = ['Welcome', 'Authentication', 'Developer Guides', 'API Reference', 'SDKs'].map((name) =>
+      tree.indexOf(`"${name}"`)
+    );
+
+    expect(
+      order.every((at) => at !== -1),
+      tree.slice(0, 600)
+    ).to.be.true;
+    expect(order).to.deep.equal([...order].sort((left, right) => left - right));
+  });
+
+  // With one specification the section's name only restates the portal title, so the level
+  // is lifted away and the tag folders sit directly under the reference.
+  it('leaves no section level in the sidebar for a single specification', () => {
+    const tree = read(treeCacheFiles()[0]);
+
+    // The tag group, which the specification names; and the section, which is named after
+    // the specification's file and is the level that should be gone.
+    expect(tree).to.contain('"Simple Calculator"');
+    expect(tree).to.not.contain('"Apimatic calculator"');
+  });
+
+  // The fixture's `content/guides/` is named by its `nav.json` rather than by its directory,
+  // which is the only proof the title reaches a real build rather than the in-memory loader.
+  it('names a folder from its nav.json instead of its directory', () => {
+    const tree = read(treeCacheFiles()[0]);
+
+    expect(tree).to.contain('"Developer Guides"');
+    expect(tree).to.not.contain('"Guides"');
+  });
+
+  it('ships only the syntax grammars a portal can contain', () => {
+    // Shiki's full catalogue is some 400 chunks and ten megabytes of unused grammars.
+    // `src/lib/shiki-bundle.ts` replaces it; this notices if that stops taking effect.
+    const assets = fs.readdirSync(path.join(portal.output().toString(), 'assets'));
+    const unusable = assets.filter((name) => /^(cobol|wolfram|emacs-lisp|abap|ballerina|apl)-/.test(name));
+
+    expect(unusable, 'grammars for languages a portal cannot contain').to.deep.equal([]);
+    expect(assets.length, 'asset count').to.be.below(150);
+  });
+
+  // Highlighting loads on demand; page code importing `shiki-bundle` would preload it on every page.
+  it('leaves the highlighter out of what a page preloads', () => {
+    expect(read('index.html')).to.not.contain('shiki-bundle');
+  });
+
+  it('carries the code samples placed on the operation into its page data', () => {
+    const page = read('api/apimatic-calculator/simple-calculator/Calculate/index.html');
+
+    expect(page).to.contain('x-apimatic-codeSamples');
+    expect(page).to.contain('calculator.calculate(OperationType.Sum, 4, 5)');
+  });
+
+  it('keeps an operation page small', () => {
+    const page = 'api/apimatic-calculator/simple-calculator/Calculate/index.html';
+    expect(fs.statSync(path.join(portal.output().toString(), page)).size).to.be.below(100 * 1024);
+  });
+
+  it('type-checks against the packages it is built with', async () => {
+    const result = await typeCheck(portal.project());
+
+    expect(result.exitCode, result.all).to.equal(0);
+  });
+
+  it('renders the top level as tabs in the header, in the order nav.json gives, Home named by it', () => {
+    expectTabsInOrder(read('index.html'), [
+      ['/', 'Overview'],
+      ['/guides/intro', 'Developer Guides'],
+      ['/api/apimatic-calculator/simple-calculator/Calculate', 'API Reference'],
+      ['/sdks', 'SDKs']
+    ]);
+  });
+
+  // The fixture's `languages` block names TypeScript; the pages come from the shipped templates.
+  it('writes the SDK pages, with the Markdown twins the page actions fetch', () => {
+    expect(exists('sdks/index.html')).to.be.true;
+    expect(exists('sdks/typescript/index.html')).to.be.true;
+    expect(exists('sdks.md')).to.be.true;
+    expect(read('sdks/typescript.md')).to.contain('# TypeScript SDK');
+  });
+
+  // The cards want the width a table of contents would take; the language pages keep theirs.
+  it('lays the SDKs page out wide, and each language page as any other', () => {
+    expect(read('sdks/index.html')).to.contain('data-full="true"');
+    expect(read('sdks/typescript/index.html')).to.contain('data-full="false"');
+  });
+
+  // Included, so MDX reads them as Markdown: their brace and tag render rather than fail the build.
+  it("carries each language's SDK docs, with their headings in the table of contents", () => {
+    const page = read('sdks/typescript/index.html');
+
+    expect(page).to.contain('its objects look like {id: 1}.<br/>Then build it.');
+    expect(page).to.match(/<h2[^>]*id="installation"/);
+    expect(page).to.contain('href="#quick-start"');
+    expect(read('sdks/typescript.md')).to.contain('## Quick Start');
+  });
+
+  // The generated pages' blocks only: a guide's are its author's to title.
+  it("heads each of the SDK docs' code blocks with its language, and leaves a guide's as written", () => {
+    expect(read('sdks/typescript/index.html')).to.match(/<figcaption[^>]*>Terminal<\/figcaption>/);
+    expect(read('sdks/typescript.md')).to.contain('```bash\nnpm install calc\n```');
+    expect(read('guides/intro/index.html')).to.contain('<pre');
+    expect(read('guides/intro/index.html')).to.not.contain('<figcaption');
+  });
+
+  // The template registers them, so an author's page names them without importing them. Only what
+  // the server renders is here: an inactive tab, a closed folder or accordion is drawn in the browser.
+  it("renders Fumadocs' components on an author's page", () => {
+    const page = read('guides/components/index.html');
+
+    for (const rendered of [
+      'Inline contents',
+      'Default callout body.',
+      'Idea title',
+      'Composed callout body.',
+      'href="/guides/intro"',
+      'Plain card body.',
+      'client.ts',
+      'python tab body',
+      'Composed first',
+      'Tab one',
+      'First tab body.',
+      'Right tab body.',
+      'fd-step',
+      'Accordion title',
+      'Multiple two',
+      'file-name.ts',
+      'closed-folder',
+      'typeTableField',
+      'deprecatedField',
+      'A guide from the fixture.'
+    ]) {
+      expect(page, `no ${rendered} on the page`).to.contain(rendered);
+    }
+  });
+
+  // Emphasis reaches these files through a Markdown serializer that has broken on it twice: once
+  // mangling the markers, once looping over one until the stack ran out. It has to read as written.
+  it("keeps the emphasis in a language's SDK docs, in its twin and in llms-full.txt", () => {
+    const written = 'Use **identical method names**, **(identical)** and *`code`* here.';
+
+    expect(read('sdks/typescript.md')).to.contain(written);
+    expect(read('llms-full.txt')).to.contain(written);
+    expect(read('sdks/typescript/index.html')).to.contain('<strong>identical method names</strong>');
+  });
+
+  it("offers each language's SDK from its card, its page and the site", () => {
+    const index = read('sdks/index.html');
+
+    expect(index).to.contain('href="/sdks/typescript"');
+    expect(index).to.contain('href="/__downloads/sdk/typescript.zip"');
+    expect(read('sdks/typescript/index.html')).to.contain('href="/__downloads/sdk/typescript.zip"');
+    expect(read('__downloads/sdk/typescript.zip')).to.equal('PK typescript');
+  });
+
+  // Read from the page's twin rather than its HTML, whose head may carry the spec's first
+  // paragraph as the site's description.
+  it("shows the SDK cards under the title, and nothing of the spec's description", () => {
+    const twin = read('sdks.md');
+
+    expect(twin).to.contain('- [TypeScript](/sdks/typescript): [Download SDK](/__downloads/sdk/typescript.zip)');
+    expect(twin).to.not.contain('<Sdk');
+    expect(twin).to.not.contain('Simple calculator API hosted on APIMATIC');
+  });
+
+  // What "View as Markdown" and the AI page actions hand over; llms-full.txt names each operation only.
+  it("gives an operation's twin the part of the specification its page renders", () => {
+    const twin = read('api/apimatic-calculator/simple-calculator/Calculate.md');
+    const full = read('llms-full.txt');
+
+    expect(twin).to.contain('`GET /{operation}`');
+    expect(twin).to.match(/```yaml\nopenapi: 3/);
+    expect(twin).to.contain(CALCULATE_SAMPLE);
+    expect(full).to.contain('`GET /{operation}`');
+    expect(full).to.not.contain('```yaml');
+  });
+
+  it('lists each language in the SDKs tab of the sidebar', () => {
+    const tree = read(treeCacheFiles()[0]);
+
+    expect(tree.indexOf('"SDKs"')).to.not.equal(-1);
+    expect(tree.indexOf('"TypeScript SDK"')).to.be.greaterThan(tree.indexOf('"SDKs"'));
+  });
+
+  it('writes no context plugin page for a project without a plugin block', () => {
+    expect(exists('context-plugin/index.html')).to.be.false;
+    expect(read('index.html')).to.not.contain('>Context Plugin</span>');
+  });
+
+  // The browser imports `portal.identity.json` whole, which is safe only because nothing in
+  // it, and nothing else the CLI writes, addresses the build machine.
+  it('ships what the browser is told, and nothing from the build-only config', () => {
+    const scripts = scriptsOf(portal.output());
+
+    expect(scripts.some((script) => script.text.includes('pageActions'))).to.be.true;
+    expect(
+      scripts.filter((script) => /contentDir|staticDir/.test(script.text)).map((script) => script.name)
+    ).to.deep.equal([]);
+  });
+
+  it('bundles Geist and loads the neutral theme', () => {
+    const css = stylesheetOf(portal.output());
+
+    expect(read('index.html')).not.to.contain('fonts.googleapis.com');
+    // Fumadocs' type tables and playground output use the `font-mono` class, which reads `--font-mono`.
+    expect(css).to.contain('--font-sans:"Geist Variable"');
+    expect(css).to.contain('--font-mono:"Geist Mono Variable"');
+    expect(css).to.contain('--default-font-family:var(--font-sans)');
+    expect(css).to.contain('--default-mono-font-family:var(--font-mono)');
+    expect(css).to.match(/url\(\/assets\/geist-latin-wght-normal-[\w-]+\.woff2\)/);
+    expect(css).to.match(/url\(\/assets\/geist-mono-latin-wght-normal-[\w-]+\.woff2\)/);
+    // The theme's light primary, which nothing in the fixture overrides.
+    expect(css).to.match(/--color-fd-primary:#171717/);
+  });
+
+  // Tailwind reads the template and the copy of the pages, and nothing else. A scan that missed the
+  // template stacked the SDK cards; one that took in node_modules grew this from 93 KB to 134 KB.
+  it('builds the stylesheet from the template and the pages alone', () => {
+    const css = stylesheetOf(portal.output());
+
+    expect(read('sdks/index.html')).to.contain('@2xl:grid-cols-2');
+    expect(css).to.contain('.\\@2xl\\:grid-cols-2');
+    expect(read('authentication/index.html')).to.contain('class="tracking-[0.3125em]"');
+    expect(css).to.contain('.tracking-\\[0\\.3125em\\]');
+    expect(css.length).to.be.below(100 * 1024);
+  });
+
+  // The counterpart of the branded portal's forced mode: the same label, present here.
+  it('offers the colour-mode switch when both modes are allowed', () => {
+    expect(read('index.html')).to.contain('aria-label="Toggle Theme"');
+  });
+});
+
+/**
+ * A second portal, so one more build covers the brand and navigation settings the default
+ * fixture leaves at their defaults: a logo per mode, a favicon, a primary colour, a forced
+ * colour mode and header links. Its specification has a deprecated operation, an internal one
+ * and one whose body is an image, and it has no content directory, so it also covers the
+ * fallback home page and a portal with no `nav.json`, which has Home alone. Its `plugin` block
+ * covers the context plugin page, and its TypeScript release the card of a published SDK.
+ */
+(enabled ? describe : describe.skip)('portal build, branded (end to end)', function () {
+  this.timeout(10 * 60 * 1000);
+
+  const portal = portalBuilt('branded', { plugin: true });
+  const { read, exists } = portal;
+
+  // The minifier may merge the two modes' rules when they match, as they do for a primary
+  // written once, so the selectors and their place are checked rather than one spelling.
+  it("lays the primary over the theme in both modes, after the theme's own rules", () => {
+    const css = stylesheetOf(portal.output());
+    // The theme's own dark background, which nothing the CLI writes sets.
+    const themeDark = css.search(/\.dark\{--color-fd-background:/);
+    const overrides = [...css.matchAll(/([^{}]+)\{--color-fd-primary:#1d4ed8;--color-fd-primary-foreground:#fafafa/g)];
+    const selectors = overrides.flatMap((rule) => rule[1].split(',').map((selector) => selector.trim()));
+
+    expect(themeDark).to.not.equal(-1);
+    expect(selectors).to.include.members([':root:not(.dark)', '.dark']);
+    expect(overrides.every((rule) => (rule.index ?? -1) > themeDark)).to.be.true;
+  });
+
+  it('shows the logo for each mode, and the favicon with its type', () => {
+    const page = read('index.html');
+
+    expect(page).to.match(/<img src="\/logo-light\.svg"[^>]*class="[^"]*dark:hidden/);
+    expect(page).to.match(/<img src="\/logo-dark\.svg"[^>]*class="[^"]*hidden[^"]*dark:block/);
+    expect(page).to.match(/<link rel="icon" href="\/favicon\.svg" type="image\/svg\+xml"/);
+    expect(exists('logo-dark.svg')).to.be.true;
+  });
+
+  // The DOM itself, after hydration, is checked by hand in a browser; the page as served
+  // carries the forced mode for next-themes' inline script and no switch to leave it.
+  it('fixes the colour mode to dark and offers no way out of it', () => {
+    const page = read('index.html');
+
+    expect(page).to.contain('"class","theme","dark","dark"');
+    expect(page).to.not.contain('aria-label="Toggle Theme"');
+  });
+
+  it('builds a home page without an index page, with the header link and a tab of its own', () => {
+    const page = read('index.html');
+    const tree = fs
+      .readdirSync(path.join(portal.output().toString(), '__tsr/staticServerFnCache'))
+      .map((name) => fs.readFileSync(path.join(portal.output().toString(), '__tsr/staticServerFnCache', name), 'utf8'))
+      .find((text) => text.includes('"pageTree"'));
+
+    expect(page).to.contain('href="https://status.example.com"');
+    expect(tree, 'no page tree').to.not.be.undefined;
+    expect(tree).to.contain('/tab/home');
+    expect(tree).to.contain('/page/home');
+  });
+
+  // The default portal's card is an unpublished one's, with the download in the command's place.
+  it("leads a published SDK's card with its install command, and links its package and source", () => {
+    const index = read('sdks/index.html');
+
+    expect(index).to.contain('title="npm install @branded/pets">npm install @branded/pets<');
+    expect(index).to.contain('href="https://www.npmjs.com/package/@branded/pets"');
+    expect(index).to.contain('href="https://github.com/branded/pets-ts"');
+    expect(read('sdks.md')).to.contain(
+      '- [TypeScript](/sdks/typescript): `npm install @branded/pets` · [Download SDK](/__downloads/sdk/typescript.zip) · ' +
+        '[View source](https://github.com/branded/pets-ts) · [View on npm](https://www.npmjs.com/package/@branded/pets)'
+    );
+  });
+
+  it('writes the context plugin page, and its Markdown twin, for the plugin block', () => {
+    const twin = read('context-plugin.md');
+
+    expect(exists('context-plugin/index.html')).to.be.true;
+    expect(twin).to.contain('```bash\nnpx context-plugins install "/__downloads/plugin.zip"\n```');
+    expect(twin).to.contain('- TypeScript');
+    expect(twin).to.contain('- Claude Code');
+    expect(twin).to.not.contain('<Plugin');
+  });
+
+  // The fixture names no address, so the prerendered page has only the path; the browser adds
+  // the origin it loaded the page from.
+  it('installs the bundled plugin from where the site serves it', () => {
+    expect(read('context-plugin/index.html')).to.match(
+      /npx context-plugins install (&quot;|")\/__downloads\/plugin\.zip(&quot;|")/
+    );
+    expect(read('context-plugin/index.html')).to.match(/<figcaption[^>]*>Terminal<\/figcaption>/);
+    expect(read('__downloads/plugin.zip')).to.equal('PK plugin');
+  });
+
+  // No nav.json, so no `tabs`, so no tab: every section is a folder in Home, and the header
+  // renders no tab bar over a single choice. Home is not looked for: the fallback home page's
+  // own sidebar link is `/` and reads Home too, so it would match whether or not a tab bar is there.
+  it('renders no tab bar when no nav.json names a tab, every section being in Home', () => {
+    expect(
+      tabPositions(read('index.html'), [
+        ['/sdks', 'SDKs'],
+        ['/context-plugin', 'Context Plugin'],
+        ['/api/[^"]+', 'API Reference']
+      ])
+    ).to.deep.equal([-1, -1, -1]);
+    expect(exists('sdks/index.html')).to.be.true;
+    expect(exists('context-plugin/index.html')).to.be.true;
+  });
+
+  it('documents the deprecated operation and leaves the internal one out, pages and sidebar alike', () => {
+    expect(exists('api/pets/pets/listPets/index.html')).to.be.true;
+    expect(exists('api/pets/pets/createPet/index.html')).to.be.true;
+    expect(exists('api/pets/pets/auditPets/index.html')).to.be.false;
+
+    const everything = fs
+      .readdirSync(path.join(portal.output().toString(), '__tsr/staticServerFnCache'))
+      .map((name) => fs.readFileSync(path.join(portal.output().toString(), '__tsr/staticServerFnCache', name), 'utf8'))
+      .join('\n');
+    expect(everything).to.contain('List pets');
+    expect(everything).to.contain('Create a pet');
+    expect(everything).to.not.contain('Audit the pets');
+  });
+});
+
+/**
+ * A third portal, whose root `nav.json` places the API reference and both generated sections
+ * in Home with `pages`, and names no tab. Home is then the only tab, so the header shows no tab
+ * bar, and each section is a folder in Home's sidebar served where it always is. Built from the
+ * default fixture's specification with a `plugin` block, so every section the CLI generates is
+ * placed.
+ */
+(enabled ? describe : describe.skip)('portal build, every section in Home (end to end)', function () {
+  this.timeout(10 * 60 * 1000);
+
+  const portal = portalBuilt('sections-in-home', { plugin: true });
+  const { read, exists } = portal;
+
+  interface TreeNode {
+    $id?: string;
+    name?: unknown;
+    children?: TreeNode[];
+  }
+
+  /** The top-level nodes of the prerendered sidebar tree: the array holding the Home tab. */
+  const rootNodes = (): TreeNode[] => {
+    const cache = path.join(portal.output().toString(), '__tsr/staticServerFnCache');
+    const carrying = fs
+      .readdirSync(cache)
+      .map((name) => fs.readFileSync(path.join(cache, name), 'utf8'))
+      .find((text) => text.includes('"pageTree"'));
+    expect(carrying, 'no page tree').to.not.be.undefined;
+
+    // The entry is seroval's encoding, as the start plugin writes it: an object is `{t:10,p:{k,v}}`
+    // with keys and values in step, an array `{t:9,a}`, a string `{t:1,s}`; anything else here
+    // is a constant the walk does not need.
+    const decode = (value: unknown): unknown => {
+      if (typeof value !== 'object' || value === null) return value;
+      const node = value as { t?: number; s?: unknown; a?: unknown[]; p?: { k: string[]; v: unknown[] } };
+      if (node.t === 1) return node.s;
+      if (node.t === 9) return (node.a ?? []).map(decode);
+      if (node.t === 10 && node.p !== undefined) {
+        return Object.fromEntries(node.p.k.map((key, index) => [key, decode(node.p?.v[index])]));
+      }
+      // A constant or a back-reference, which the walk does not need; or the plain wrapper around the root.
+      if (typeof node.t === 'number') return undefined;
+      return Object.fromEntries(Object.entries(node).map(([key, item]) => [key, decode(item)]));
+    };
+
+    const holdingHome = (value: unknown): TreeNode[] | undefined => {
+      if (Array.isArray(value)) {
+        if (value.some((item) => (item as TreeNode)?.$id === '/tab/home')) return value as TreeNode[];
+        for (const item of value) {
+          const found = holdingHome(item);
+          if (found !== undefined) return found;
+        }
+      } else if (typeof value === 'object' && value !== null) {
+        for (const item of Object.values(value)) {
+          const found = holdingHome(item);
+          if (found !== undefined) return found;
+        }
+      }
+      return undefined;
+    };
+    const found = holdingHome(decode(JSON.parse(carrying ?? '')));
+    expect(found, 'no Home tab in the tree').to.not.be.undefined;
+    return found ?? [];
+  };
+
+  const names = (nodes: TreeNode[]) => nodes.map((node) => (typeof node.name === 'string' ? node.name : '?'));
+
+  // The sections keep the CLI's order among the user's pages, and the reference keeps its title.
+  it('lists the API reference and each generated section in Home’s sidebar, where pages names them', () => {
+    const roots = rootNodes();
+    const home = roots[0];
+
+    expect(roots.map((node) => node.$id)).to.deep.equal(['/tab/home']);
+    expect(names(home.children ?? [])).to.deep.equal([
+      'Welcome',
+      'API Reference',
+      'Developer Guides',
+      'SDKs',
+      'Authentication',
+      'Context Plugin'
+    ]);
+    // The single specification is lifted away inside Home as it is in a tab of its own.
+    const reference = home.children?.find((node) => node.name === 'API Reference');
+    expect(names(reference?.children ?? [])).to.deep.equal(['Simple Calculator']);
+  });
+
+  it('serves each section where it always is, whatever the sidebar says', () => {
+    expect(exists('api/apimatic-calculator/simple-calculator/Calculate/index.html')).to.be.true;
+    expect(exists('sdks/index.html')).to.be.true;
+    expect(exists('sdks/typescript/index.html')).to.be.true;
+    expect(exists('context-plugin/index.html')).to.be.true;
+  });
+
+  // A switcher with one choice switches nothing, so the header carries none; the other builds
+  // prove the same markup is there whenever there is more than one tab.
+  it('renders no tab bar over Home alone', () => {
+    const page = read('index.html');
+
+    expect(page).to.contain('Every section sits in Home.');
+    expect(
+      tabPositions(page, [
+        ['/', 'Home'],
+        ['/sdks', 'SDKs'],
+        ['/context-plugin', 'Context Plugin'],
+        ['/api/[^"]+', 'API Reference']
+      ])
+    ).to.deep.equal([-1, -1, -1, -1]);
+  });
+});
+
+/**
+ * A portal whose address carries a path, `/api`, that its API reference's own pages start with:
+ * the case where a page could be taken for one already under the path and written without it.
+ */
+(enabled ? describe : describe.skip)('portal build, under a path (end to end)', function () {
+  this.timeout(10 * 60 * 1000);
+
+  let built: BuiltPortal | undefined;
+  let output: DirectoryPath;
+
+  before(async () => {
+    built = await buildFixture('subpath', { plugin: true });
+    ({ output } = built);
+  });
+
+  after(() => removeBuilt(built));
+
+  const read = (relative: string) => fs.readFileSync(path.join(output.toString(), relative), 'utf8');
+  const exists = (relative: string) => fs.existsSync(path.join(output.toString(), relative));
+
+  // The host serves the output's root at the path, so the path itself is no folder in it.
+  it('writes each page once, laid out as it would be at the root', () => {
+    for (const page of [
+      'index.html',
+      'index.md',
+      'authentication/index.html',
+      'api/search.json',
+      'api/apimatic-calculator/simple-calculator/Calculate/index.html'
+    ]) {
+      expect(exists(page), page).to.be.true;
+    }
+    expect(exists('api/api')).to.be.false;
+    expect(exists('api/authentication')).to.be.false;
+  });
+
+  it('points the page at its scripts, styles and the other pages under the path', () => {
+    const page = read('index.html');
+    const assets = [...page.matchAll(/\s(?:src|href)="([^"]*\/assets\/[^"]*)"/g)].map((match) => match[1]);
+
+    expect(assets).to.not.be.empty;
+    expect(assets.filter((asset) => !asset.startsWith('/api/assets/'))).to.deep.equal([]);
+    expect(page).to.contain('href="/api/authentication"');
+    expect(page).to.contain('href="/api/api/apimatic-calculator/');
+    expect(page).to.not.contain('href="/authentication"');
+  });
+
+  // Everything the page itself names on this host, the logo and favicon among them.
+  it('names nothing on its host outside the path', () => {
+    for (const page of [
+      'index.html',
+      'authentication/index.html',
+      'api/apimatic-calculator/simple-calculator/Calculate/index.html',
+      'sdks/index.html',
+      'sdks/typescript/index.html',
+      'context-plugin/index.html',
+      'oauth/callback/index.html'
+    ]) {
+      const addresses = [...read(page).matchAll(/\s(?:src|href)="(\/[^"]*)"/g)].map((match) => match[1]);
+
+      expect(addresses, page).to.not.be.empty;
+      expect(
+        addresses.filter((address) => !address.startsWith('/api/')),
+        page
+      ).to.deep.equal([]);
+    }
+    expect(read('index.html')).to.match(/<img src="\/api\/images\/logo\.png"/);
+    expect(read('index.html')).to.match(/<link rel="icon" href="\/api\/images\/logo\.png"/);
+    expect(read('sdks/index.html')).to.contain('href="/api/__downloads/sdk/typescript.zip"');
+  });
+
+  // Bundled, so it carries the base; a linked `/images/diagram.png` would be fetched from the host's
+  // root. The image is over Vite's 4 KiB inline limit, or it would be a data: URI and prove nothing.
+  it('bundles a Markdown image, under the path', () => {
+    expect(read('index.html')).to.match(/<img[^>]* src="\/api\/assets\/diagram[^"]*\.png"/);
+  });
+
+  // Fumadocs' `remarkImage` bundles inline images alone; the template writes this one inline first.
+  it('bundles a reference-style image too', () => {
+    expect(read('authentication/index.html')).to.match(/<img[^>]* src="\/api\/assets\/diagram[^"]*\.png"/);
+  });
+
+  // Fumadocs swapped a bundled image for its import's name, `<img src="__img0" />` (fuma-nama/fumadocs#3662).
+  it('keeps the images as written in the Markdown twins and llms-full.txt', () => {
+    const full = read('llms-full.txt');
+
+    expect(read('index.md')).to.contain('![How a calculation flows](/images/diagram.png)');
+    expect(read('authentication.md')).to.contain('![The flow, by reference][flow]');
+    expect(read('authentication.md')).to.contain('[flow]: /images/diagram.png');
+    expect(full).to.contain('![How a calculation flows](/images/diagram.png)');
+    expect(full).to.not.contain('__img');
+  });
+
+  // Fumadocs' own renderer fails the whole page over an image in a description; `ApiMarkdown` stands in for it.
+  it('renders an image and a code block in a description, the image under the path', () => {
+    const page = read('api/apimatic-calculator/simple-calculator/Calculate/index.html');
+
+    expect(page).to.match(/<img[^>]* src="\/api\/images\/diagram\.png"/);
+    expect(page).to.match(/<pre[^>]*><code><span class="line">\{ &quot;calculated&quot;: 9 \}<\/span><\/code><\/pre>/);
+  });
+
+  // The dialog would load a result's image from the host's root, as Fumadocs prefixes none.
+  it("searches a description's text without its image", () => {
+    const index = read('api/search.json');
+
+    expect(index).to.contain('Calculates the expression using the specified operation.');
+    expect(index).to.not.contain('diagram.png');
+  });
+
+  // The pages' own links: a description after one is the author's Markdown, which keeps its spelling.
+  it('links the pages under the path in llms.txt and llms-full.txt', () => {
+    const links = [...read('llms.txt').matchAll(/^\s*- \[[^\]]*\]\(([^)]*)\)/gm)].map((match) => match[1]);
+
+    expect(links).to.include.members(['/api/authentication']);
+    expect(links.some((link) => link.startsWith('/api/api/apimatic-calculator/'))).to.be.true;
+    expect(links.filter((link) => !link.startsWith('/api/'))).to.deep.equal([]);
+    expect(read('llms-full.txt')).to.contain('# Authentication (/api/authentication)');
+  });
+
+  it('writes no robots file, which crawlers read only at the root of a host', () => {
+    expect(exists('robots.txt')).to.be.false;
+    expect(exists('sitemap.xml')).to.be.true;
+  });
+
+  it('writes the path into the links and install command the Markdown twins carry', () => {
+    const sdks = read('sdks.md');
+
+    expect(sdks).to.contain('[TypeScript](/api/sdks/typescript)');
+    expect(sdks).to.contain('[Download SDK](/api/__downloads/sdk/typescript.zip)');
+    expect(read('context-plugin.md')).to.contain(
+      'npx context-plugins install "https://docs.test/api/__downloads/plugin.zip"'
+    );
+  });
+
+  // The prerender knows the configured address, which carries the path; the browser swaps in its own.
+  it('installs the bundled plugin from under the path', () => {
+    expect(read('context-plugin/index.html')).to.match(
+      /npx context-plugins install (&quot;|")https:\/\/docs\.test\/api\/__downloads\/plugin\.zip(&quot;|")/
+    );
+  });
+
+  // Without it every page reached by a link is the not-found page: the browser looks for the
+  // page's data at the host's root, while the build writes it where the host serves the path.
+  it('fetches the pages’ prerendered data from under the path, where the build writes it', () => {
+    const scripts = scriptsOf(output);
+    const fetchingFrom = (address: RegExp) =>
+      scripts.filter((script) => address.test(script.text)).map((script) => script.name);
+
+    expect(fetchingFrom(/[`'"]\/api\/__tsr\/staticServerFnCache\//)).to.not.be.empty;
+    expect(fetchingFrom(/[`'"]\/__tsr\/staticServerFnCache\//)).to.deep.equal([]);
+    expect(fs.readdirSync(path.join(output.toString(), '__tsr/staticServerFnCache'))).to.not.be.empty;
+    expect(exists('api/__tsr')).to.be.false;
+  });
+
+  it('gives the path in canonical links, og:url and the sitemap', () => {
+    const page = read('index.html');
+    const locations = [...read('sitemap.xml').matchAll(/<loc>([^<]*)<\/loc>/g)].map((match) => match[1]);
+
+    expect(page).to.contain('<link rel="canonical" href="https://docs.test/api/"');
+    expect(page).to.contain('<meta property="og:url" content="https://docs.test/api/"');
+    expect(locations).to.include('https://docs.test/api/api/apimatic-calculator/simple-calculator/Calculate');
+    expect(locations.filter((location) => !location.startsWith('https://docs.test/api/'))).to.deep.equal([]);
+  });
+});
+
+/**
+ * The layout the platform merges several APIs into one SDK from: a folder to each API, named in
+ * `APIMATIC-META.json`. Both APIs declare `GET /status`, and the orders API keeps a schema in a
+ * file of its own folder.
+ */
+(enabled ? describe : describe.skip)('portal build, merged spec folders (end to end)', function () {
+  this.timeout(10 * 60 * 1000);
+
+  const sample = (call: string) => ({ Example: `const result = await ${call};` });
+  const portal = portalBuilt('merged', {
+    codeSampleCatalogs: new CodeSampleCatalogs([
+      CodeSampleCatalog.fromJson(Language.TYPESCRIPT, {
+        paths: {
+          '/orders': { GET: sample('client.orders.listOrders()') },
+          '/stock': { GET: sample('client.stock.listStock()') },
+          '/status': { GET: sample('client.health.getOrdersStatus()') }
+        }
+      }) as CodeSampleCatalog
+    ])
+  });
+  const { read, exists } = portal;
+
+  const LIST_ORDERS = 'api/orders/orders/listOrders';
+  const LIST_STOCK = 'api/inventory/stock/listStock';
+  const STATUS_PAGES = ['api/orders/health/getOrdersStatus', 'api/inventory/health/getInventoryStatus'];
+
+  it('writes a section per merged folder, named after it, with a page per operation', () => {
+    for (const page of [LIST_ORDERS, LIST_STOCK, ...STATUS_PAGES]) {
+      expect(exists(`${page}/index.html`), page).to.be.true;
+    }
+    expect(exists('api/apimatic-meta')).to.be.false;
+  });
+
+  it("shows each API's own SDK sample and server on an operation only it declares", () => {
+    const orders = read(`${LIST_ORDERS}/index.html`);
+    const stock = read(`${LIST_STOCK}/index.html`);
+
+    expect(orders).to.contain('client.orders.listOrders()');
+    expect(orders).to.contain('https://orders.store.test');
+    expect(orders).to.not.contain('inventory.store.test');
+    expect(stock).to.contain('client.stock.listStock()');
+    expect(stock).to.contain('https://inventory.store.test');
+  });
+
+  // The samples hold one per method and path: the inventory page would show the orders API's call.
+  it('shows no SDK sample on an operation both APIs declare', () => {
+    for (const page of STATUS_PAGES) {
+      expect(read(`${page}/index.html`), page).to.not.contain('x-apimatic-codeSamples');
+    }
+  });
+
+  it('reads a schema kept in another file of the folder', () => {
+    expect(read(`${LIST_ORDERS}/index.html`)).to.contain('grandTotalCents');
+    expect(read(`${LIST_ORDERS}.md`)).to.contain('grandTotalCents');
+  });
+});

@@ -102,3 +102,6 @@ export interface PackageConfigurationForLanguage {
 }
 
 export type PackageConfigurationData = PackageConfigurationForLanguage[Language];
+
+/** A profile that never configured a language is not the same as one that turned it off. */
+export type PackageSettingsState = 'configured' | 'disabled' | 'absent';

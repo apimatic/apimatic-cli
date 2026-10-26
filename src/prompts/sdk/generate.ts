@@ -1,20 +1,28 @@
-import { isCancel, confirm, log, select } from "@clack/prompts";
-import { DirectoryPath } from "../../types/file/directoryPath.js";
-import { format as f } from "../format.js";
-import { Result } from "neverthrow";
-import { withSpinner } from "../prompt.js";
-import { ServiceError } from "../../infrastructure/service-error.js";
-import { GeneratedSdkResult } from "../../infrastructure/services/portal-service.js";
-import { CodeGenerationVersion, CodegenOption } from "../../types/sdk/generate.js";
+import { isCancel, confirm, log, select } from '@clack/prompts';
+import { DirectoryPath } from '../../types/file/directoryPath.js';
+import { FileProblem } from '../../types/file/file-problem.js';
+import { format as f } from '../format.js';
+import { Result } from 'neverthrow';
+import { withSpinner } from '../prompt.js';
+import { ServiceError } from '../../infrastructure/service-error.js';
+import { AVAILABLE_LANGUAGES, Language, languageLabel, UPCOMING_LANGUAGES } from '../../types/sdk/generate.js';
+import { VersionProblem } from '../../types/project-context.js';
+import { SdkSaveProblem } from '../../types/sdk-context.js';
+
+const names = (languages: readonly Language[]) => languages.map(languageLabel).join(', ');
 
 export class SdkGeneratePrompts {
-  public warnIfStabilityIgnored(codegenOption: CodegenOption, stabilityWasProvided: boolean) {
-    if (stabilityWasProvided && codegenOption.isV3()) {
-      log.warn(
-        `${f.flag("stability")} has no effect with ${f.flag("codegen-version", CodeGenerationVersion.V3)}. ` +
-          `The V3 code generator always produces a stable SDK.`
-      );
-    }
+  /**
+   * Named rather than listed as flag values: a user whose language is on its way back reads
+   * something different from one who mistyped, and neither is told to reach for a generator
+   * version that no longer exists.
+   */
+  public languageNotAvailable(language: Language) {
+    log.error(
+      `${languageLabel(language)} isn't available yet.\n` +
+        `Available now: ${names(AVAILABLE_LANGUAGES)}\n` +
+        `Coming soon: ${names(UPCOMING_LANGUAGES)}`
+    );
   }
 
   public async overwriteSdk(directory: DirectoryPath): Promise<boolean> {
@@ -30,15 +38,14 @@ export class SdkGeneratePrompts {
     return overwrite;
   }
 
-  public sameBuildAndSdkDir(directory: DirectoryPath) {
+  public sameSourceAndSdkDir(directory: DirectoryPath) {
     const message =
-      `The ${f.var("src")} and ${f.var("sdk")} directories must be different. ` +
-      `Current value: ${f.path(directory)}`;
+      `The ${f.var('src')} and ${f.var('sdk')} directories must be different. ` + `Current value: ${f.path(directory)}`;
     log.error(message);
   }
 
-  public srcDirectoryEmpty(directory: DirectoryPath) {
-    const message = `The ${f.var("src")} directory is either empty or invalid: ${f.path(directory)}`;
+  public sourceDirectoryEmpty(directory: DirectoryPath) {
+    const message = `The ${f.var('src')} directory is either empty or invalid: ${f.path(directory)}`;
     log.error(message);
   }
 
@@ -52,35 +59,41 @@ export class SdkGeneratePrompts {
     log.error(message);
   }
 
-  public generateSDK(fn: Promise<Result<GeneratedSdkResult, ServiceError>>) {
-    return withSpinner("Generating SDK", "SDK generated successfully.", "SDK Generation failed.", fn);
-  }
-
-  public generateV4SDK(fn: Promise<Result<NodeJS.ReadableStream, ServiceError>>) {
-    return withSpinner("Generating SDK", "SDK generated successfully.", "SDK Generation failed.", fn);
+  public generateSdk(fn: Promise<Result<NodeJS.ReadableStream, ServiceError>>) {
+    return withSpinner('Generating SDK', 'SDK generated successfully.', 'SDK Generation failed.', fn);
   }
 
   public sdkGenerationServiceError(serviceError: ServiceError) {
     log.error(serviceError.errorMessage);
   }
 
-  public invalidVersionedDocsDirectory(directory: DirectoryPath) {
-    const message = `The ${f.var("versioned_docs")} directory is either empty or invalid: ${f.path(directory)}`;
-    log.error(message);
+  public srcDirNotZipped(sourceDirectory: DirectoryPath, problem: FileProblem) {
+    log.error(`${f.path(sourceDirectory)} could not be zipped for upload: ${problem.reason}`);
+  }
+
+  public sdkNotUnzipped(problem: FileProblem) {
+    log.error(`${ServiceError.InvalidResponse.errorMessage}\n${problem.reason}`);
+  }
+
+  public sdkNotSaved(problem: SdkSaveProblem) {
+    log.error(`The SDK could not be saved to ${f.path(problem.sdkDirectory)}: ${problem.reason}`);
+  }
+
+  public noVersionToBuild(problem: VersionProblem, sourceDirectory: DirectoryPath) {
+    const messages: Record<VersionProblem, string> = {
+      noVersions: `The ${f.var('versioned_docs')} directory is either empty or invalid: ${f.path(sourceDirectory)}`,
+      versionNotFound: 'The selected API version is invalid.'
+    };
+    log.error(messages[problem]);
   }
 
   public apiVersionOnlyApplicableWithVersionedBuild() {
-    log.warn(`The ${f.flag("api-version")} is only applicable with a versioned build.`);
-  }
-
-  public versionNotFound() {
-    const message = `The selected API version is invalid.`;
-    log.error(message);
+    log.warn(`The ${f.flag('api-version')} is only applicable with a versioned build.`);
   }
 
   public async selectVersion(versions: string[]): Promise<string | undefined> {
     const version = await select({
-      message: "Select an API version for SDK generation:",
+      message: 'Select an API version for SDK generation:',
       options: versions.map((v) => ({ label: v, value: v }))
     });
 
@@ -92,10 +105,6 @@ export class SdkGeneratePrompts {
   }
 
   public sdkGenerated(sdk: DirectoryPath) {
-    log.info(`The generated SDK can be found at ${f.path(sdk)}.`);
-  }
-
-  public sdkCustomizationsNotSupportedForV4() {
-    log.warn(`The V4 Code Generator does not currently support SDK customizations.`);
+    log.info(`The generated SDK can be found at ${f.relativePath(sdk)}.`);
   }
 }

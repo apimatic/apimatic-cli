@@ -1,0 +1,119 @@
+openapi: 3.0.3
+info:
+  title: Payments API
+  version: 1.0.0
+servers:
+  - url: https://api.payments.test
+tags:
+  - name: Payments
+paths:
+  /payments:
+    get:
+      operationId: listPayments
+      summary: List payments
+      tags: [Payments]
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            example: 10
+      responses:
+        '200':
+          description: The payments.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Payment'
+    post:
+      operationId: createPayment
+      summary: Create a payment
+      tags: [Payments]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewPayment'
+            examples:
+              minimal:
+                summary: Only the required fields
+                value:
+                  amount: 1000
+                  currency: USD
+              full:
+                summary: Every field
+                value:
+                  amount: 1000
+                  currency: USD
+                  description: Order 42
+                  metadata:
+                    orderId: '42'
+      responses:
+        '201':
+          description: The created payment.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Payment'
+  /payments/{paymentId}:
+    summary: A single payment
+    parameters:
+      - name: paymentId
+        in: path
+        required: true
+        schema:
+          type: string
+          example: pay_123
+    get:
+      operationId: getPayment
+      summary: Get a payment
+      tags: [Payments]
+      responses:
+        '200':
+          description: The payment.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Payment'
+        '404':
+          description: No payment has this id.
+          content:
+            application/json:
+              schema:
+                $ref: './schemas/error.yaml'
+    delete:
+      operationId: cancelPayment
+      summary: Cancel a payment
+      tags: [Payments]
+      responses:
+        '204':
+          description: Cancelled.
+components:
+  schemas:
+    NewPayment:
+      type: object
+      required: [amount, currency]
+      properties:
+        amount:
+          type: integer
+        currency:
+          type: string
+        description:
+          type: string
+        metadata:
+          type: object
+          additionalProperties:
+            type: string
+    Payment:
+      allOf:
+        - $ref: '#/components/schemas/NewPayment'
+        - type: object
+          properties:
+            id:
+              type: string
+            status:
+              type: string
+              enum: [pending, succeeded, cancelled]

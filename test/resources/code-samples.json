@@ -1,0 +1,65 @@
+{
+  "typescript": {
+    "paths": {
+      "/payments": {
+        "GET": {
+          "Example": "const client = new Client({ accessToken: 'ACCESS_TOKEN' });\n\nconst { result } = await client.payments.listPayments(10);"
+        },
+        "POST": {
+          "minimal": "const client = new Client({ accessToken: 'ACCESS_TOKEN' });\n\nconst { result } = await client.payments.createPayment({\n  amount: 1000,\n  currency: 'USD',\n});",
+          "full": "const client = new Client({ accessToken: 'ACCESS_TOKEN' });\n\nconst { result } = await client.payments.createPayment({\n  amount: 1000,\n  currency: 'USD',\n  description: 'Order 42',\n  metadata: { orderId: '42' },\n});"
+        }
+      },
+      "/payments/{paymentId}": {
+        "GET": {
+          "Example": "const client = new Client({ accessToken: 'ACCESS_TOKEN' });\n\nconst { result } = await client.payments.getPayment('pay_123');"
+        },
+        "DELETE": {
+          "Example": "const client = new Client({ accessToken: 'ACCESS_TOKEN' });\n\nawait client.payments.cancelPayment('pay_123');"
+        }
+      }
+    }
+  },
+  "csharp": {
+    "paths": {
+      "/payments": {
+        "GET": {
+          "Example": "var client = new PaymentsClient.Builder().AccessToken(\"ACCESS_TOKEN\").Build();\n\nvar payments = await client.PaymentsController.ListPaymentsAsync(limit: 10);"
+        },
+        "POST": {
+          "minimal": "var client = new PaymentsClient.Builder().AccessToken(\"ACCESS_TOKEN\").Build();\n\nvar payment = await client.PaymentsController.CreatePaymentAsync(new NewPayment\n{\n    Amount = 1000,\n    Currency = \"USD\",\n});",
+          "full": "var client = new PaymentsClient.Builder().AccessToken(\"ACCESS_TOKEN\").Build();\n\nvar payment = await client.PaymentsController.CreatePaymentAsync(new NewPayment\n{\n    Amount = 1000,\n    Currency = \"USD\",\n    Description = \"Order 42\",\n    Metadata = new Dictionary<string, string> { [\"orderId\"] = \"42\" },\n});"
+        }
+      },
+      "/payments/{paymentId}": {
+        "GET": {
+          "Example": "var client = new PaymentsClient.Builder().AccessToken(\"ACCESS_TOKEN\").Build();\n\nvar payment = await client.PaymentsController.GetPaymentAsync(\"pay_123\");"
+        },
+        "DELETE": {
+          "Example": "var client = new PaymentsClient.Builder().AccessToken(\"ACCESS_TOKEN\").Build();\n\nawait client.PaymentsController.CancelPaymentAsync(\"pay_123\");"
+        }
+      }
+    }
+  },
+  "python": {
+    "paths": {
+      "/payments": {
+        "GET": {
+          "Example": "client = PaymentsClient(access_token='ACCESS_TOKEN')\n\npayments = client.payments.list_payments(limit=10)"
+        },
+        "POST": {
+          "minimal": "client = PaymentsClient(access_token='ACCESS_TOKEN')\n\npayment = client.payments.create_payment(NewPayment(amount=1000, currency='USD'))",
+          "full": "client = PaymentsClient(access_token='ACCESS_TOKEN')\n\npayment = client.payments.create_payment(NewPayment(\n    amount=1000,\n    currency='USD',\n    description='Order 42',\n    metadata={'orderId': '42'},\n))"
+        }
+      },
+      "/payments/{paymentId}": {
+        "GET": {
+          "Example": "client = PaymentsClient(access_token='ACCESS_TOKEN')\n\npayment = client.payments.get_payment('pay_123')"
+        },
+        "DELETE": {
+          "Example": "client = PaymentsClient(access_token='ACCESS_TOKEN')\n\nclient.payments.cancel_payment('pay_123')"
+        }
+      }
+    }
+  }
+}

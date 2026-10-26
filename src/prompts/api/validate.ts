@@ -1,34 +1,34 @@
-import { log } from "@clack/prompts";
-import { replaceHTML } from "../../utils/utils.js";
-import { ValidationMessages } from "../../types/utils.js";
-import { Result } from "neverthrow";
-import {  ValidationEntry, ValidationSummary } from "@apimatic/sdk";
-import { ServiceError } from "../../infrastructure/service-error.js";
-import { FilePath } from "../../types/file/filePath.js";
-import { format as f } from "../format.js";
-import { withSpinner } from "../prompt.js";
-import { ValidateApiResponse } from "../../infrastructure/services/validation-service.js";
+import { log } from '@clack/prompts';
+import { replaceHTML } from '../../utils/utils.js';
+import { listedInProse } from '../../utils/string-utils.js';
+import { ValidationMessages } from '../../types/utils.js';
+import { Result } from 'neverthrow';
+import { ValidateApiResult, ValidationEntry, ValidationSummary } from '@apimatic/sdk';
+import { FilePath } from '../../types/file/filePath.js';
+import { ResolveProblem } from '../../types/resource-context.js';
+import { format as f } from '../format.js';
+import { withSpinner } from '../prompt.js';
 
 export class ApiValidatePrompts {
-  public async validateApi(fn: Promise<Result<ValidateApiResponse, string>>) {
-    return withSpinner("Validating API", "API validation completed", "API validation failed", fn);
+  public async validateApi<E>(fn: Promise<Result<ValidateApiResult, E>>) {
+    return withSpinner('Validating API', 'API validation completed', 'API validation failed', fn);
   }
 
   displayValidationMessages({ warnings, errors, messages }: ValidationMessages): void {
     if (messages.length > 0) {
-      log.info("Messages");
+      log.info('Messages');
       messages.forEach((msg) => {
         log.message(`${replaceHTML(msg)}`);
       });
     }
     if (warnings.length > 0) {
-      log.warning("Warnings");
+      log.warn('Warnings');
       warnings.forEach((war) => {
         log.message(`${replaceHTML(war)}`);
       });
     }
     if (errors.length > 0) {
-      log.error("Errors");
+      log.error('Errors');
       errors.forEach((err) => {
         log.message(`${replaceHTML(err)}`);
       });
@@ -51,28 +51,28 @@ export class ApiValidatePrompts {
 
   public displayValidationSummary(summary: ValidationSummary): void {
     if (summary.blocking.length > 0) {
-      log.error("Blocking");
+      log.error('Blocking');
       for (const entry of summary.blocking) {
         log.message(this.formatValidationEntry(entry));
       }
     }
 
     if (summary.errors.length > 0) {
-      log.error("Errors");
+      log.error('Errors');
       for (const entry of summary.errors) {
         log.message(this.formatValidationEntry(entry));
       }
     }
 
     if (summary.warnings.length > 0) {
-      log.warning("Warnings");
+      log.warn('Warnings');
       for (const entry of summary.warnings) {
         log.message(this.formatValidationEntry(entry));
       }
     }
 
     if (summary.information.length > 0) {
-      log.info("Information");
+      log.info('Information');
       for (const entry of summary.information) {
         log.message(this.formatValidationEntry(entry));
       }
@@ -83,9 +83,44 @@ export class ApiValidatePrompts {
     log.error(error);
   }
 
-  public networkError(serviceError: ServiceError): void {
-    const message = serviceError.errorMessage;
-    log.error(message);
+  public specUnavailable(problem: ResolveProblem): void {
+    switch (problem.kind) {
+      case 'downloadFailed': {
+        log.error(problem.error.errorMessage);
+        return;
+      }
+      case 'fileUnreadable': {
+        log.error(`${f.path(problem.file)} does not exist or could not be read.`);
+        return;
+      }
+      case 'noSpec': {
+        const message =
+          `No API specification found in ${f.path(problem.specDirectory)}. Add yours there, point ` +
+          `${f.flag('input')} at the directory that holds ${f.var('src')}, or give a spec with ` +
+          `${f.flag('file')} or ${f.flag('url')}.`;
+        log.error(message);
+        return;
+      }
+      case 'unreadable': {
+        log.error(`${f.path(problem.specDirectory)} could not be read: ${problem.reason}`);
+        return;
+      }
+      case 'zipFailed': {
+        log.error(`${f.path(problem.specDirectory)} could not be zipped for upload: ${problem.reason}`);
+        return;
+      }
+      case 'symlinks': {
+        const names = listedInProse(
+          problem.symlinks.map((symlink) => f.var(symlink.relativeTo(problem.specDirectory)))
+        );
+        const one = problem.symlinks.length === 1;
+        const message =
+          `${names} in ${f.path(problem.specDirectory)} ${one ? 'is a symlink' : 'are symlinks'}, which cannot ` +
+          `be uploaded for validation. Replace ${one ? 'it' : 'each'} with a copy of the files it points to.`;
+        log.error(message);
+        return;
+      }
+    }
   }
 
   public transformedApiSaved(filePath: FilePath): void {

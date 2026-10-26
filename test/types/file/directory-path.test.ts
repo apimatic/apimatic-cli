@@ -1,0 +1,95 @@
+import path from 'node:path';
+import { expect } from 'chai';
+import { DirectoryPath } from '../../../src/types/file/directoryPath';
+
+// `DirectoryPath` resolves on construction, so every path the CLI holds is absolute. A command
+// that prints one for a reader to read or paste wants it as that reader would type it.
+describe('DirectoryPath.relativeTo', () => {
+  const base = new DirectoryPath(path.join('/', 'projects', 'petstore-api'));
+  const from = (...parts: string[]) => new DirectoryPath(path.join(base.toString(), ...parts));
+
+  it('writes a directory below the base as a relative path', () => {
+    expect(from('plugin').relativeTo(base)).to.equal('./plugin');
+  });
+
+  // The result is pasted into a shell, where a backslash is an escape rather than a separator.
+  it('keeps posix separators on every platform', () => {
+    expect(from('sdk', 'typescript').relativeTo(base)).to.equal('./sdk/typescript');
+  });
+
+  // Above or outside the base there is no short form worth reading: `../../..` tells a reader
+  // less than the path itself does.
+  it('leaves a directory outside the base absolute', () => {
+    const outside = new DirectoryPath(path.join('/', 'projects', 'other-api'));
+
+    expect(outside.relativeTo(base)).to.equal(outside.toString());
+  });
+
+  it('leaves the base itself absolute, having nothing shorter to say', () => {
+    expect(base.relativeTo(base)).to.equal(base.toString());
+  });
+});
+
+describe('DirectoryPath.isOnNetworkShare', () => {
+  it('holds a Windows share, however its slashes are typed, and no local path', function () {
+    if (process.platform !== 'win32') this.skip();
+
+    expect(new DirectoryPath('\\\\server\\share\\api').isOnNetworkShare()).to.equal(true);
+    expect(new DirectoryPath('//server/share/api').isOnNetworkShare()).to.equal(true);
+    expect(new DirectoryPath('C:\\api').isOnNetworkShare()).to.equal(false);
+    expect(new DirectoryPath('\\\\?\\C:\\api').isOnNetworkShare()).to.equal(false);
+  });
+});
+
+// What a file the build reads, and a log a reader compares to one, spell a path as on every platform.
+describe('DirectoryPath.toPosix', () => {
+  it('keeps the whole path with forward slashes between its segments', () => {
+    const spelt = new DirectoryPath(path.join('/', 'projects', 'petstore-api', 'src')).toPosix();
+
+    expect(spelt.endsWith('/projects/petstore-api/src')).to.equal(true);
+    expect(spelt).to.not.contain('\\');
+  });
+});
+
+describe('DirectoryPath.fromUserInput', () => {
+  const typed = path.join('/', 'projects', 'petstore api');
+
+  it('reads the path out of the quotes and spaces around it', () => {
+    expect(DirectoryPath.fromUserInput(`  "${typed}" `).toString()).to.equal(path.resolve(typed));
+    expect(DirectoryPath.fromUserInput(`'${typed}'`).toString()).to.equal(path.resolve(typed));
+  });
+
+  it('reads an unquoted path as it is', () => {
+    expect(DirectoryPath.fromUserInput(typed).toString()).to.equal(path.resolve(typed));
+  });
+});
+
+describe('DirectoryPath.isAncestorOf', () => {
+  const spec = new DirectoryPath(path.join('/', 'projects', 'petstore-api', 'src', 'spec'));
+
+  it('holds a directory anywhere below it, but not itself, its parent, or a sibling', () => {
+    expect(spec.isAncestorOf(spec.join('alpha'))).to.be.true;
+    expect(spec.isAncestorOf(spec.join('apis', 'alpha'))).to.be.true;
+    expect(spec.isAncestorOf(spec)).to.be.false;
+    expect(spec.isAncestorOf(spec.resolve('..'))).to.be.false;
+    expect(spec.isAncestorOf(spec.resolve('../content'))).to.be.false;
+  });
+
+  it('holds a directory whose name starts with two dots, which is no step up', () => {
+    expect(spec.isAncestorOf(spec.join('..v2'))).to.be.true;
+    expect(spec.contains(spec.join('..v2'))).to.be.true;
+  });
+});
+
+// What orders the folders of a spec directory that are merged without an order of their own.
+describe('DirectoryPath.compare', () => {
+  const spec = new DirectoryPath(path.join('/', 'projects', 'petstore-api', 'src', 'spec'));
+
+  it('orders sibling directories by name, by code point', () => {
+    const sorted = [spec.join('beta'), spec.join('alpha'), spec.join('Zeta')].sort((left, right) =>
+      left.compare(right)
+    );
+
+    expect(sorted.map((directory) => directory.leafName())).to.deep.equal(['Zeta', 'alpha', 'beta']);
+  });
+});

@@ -4,7 +4,8 @@ import { SubscriptionInfo } from '../../types/api/account.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { PluginAuthor, PluginMetadata } from '../../types/plugin/plugin-config.js';
-import { PluginConfigContext, PluginConfigPresent } from '../../types/plugin-config-context.js';
+import { PluginConfig } from '../../types/plugin-config-context.js';
+import { ProjectContext } from '../../types/project-context.js';
 import { ActionResult } from '../action-result.js';
 
 /**
@@ -34,12 +35,11 @@ export class PluginRecordMetadataAction {
     this.authKey = authKey;
   }
 
-  public readonly execute = async (
-    buildDirectory: DirectoryPath
-  ): Promise<ActionResult<PluginConfigPresent>> => {
+  public readonly execute = async (project: ProjectContext): Promise<ActionResult<PluginConfig>> => {
     const input = await this.prompts.inputPluginMetadata(DEFAULT_METADATA);
     if ('cancelled' in input) {
-      return ActionResult.cancelled(input.cancelled);
+      this.prompts.metadataCancelled(input.cancelled);
+      return ActionResult.cancelled();
     }
 
     const metadata = input.metadata;
@@ -51,7 +51,7 @@ export class PluginRecordMetadataAction {
     }
 
     const author = account.isOk() ? authorOf(account.value) : undefined;
-    const writeResult = await new PluginConfigContext(buildDirectory).upsertMetadata(metadata, author);
+    const writeResult = await project.pluginConfig().upsertMetadata(metadata, author);
     if (writeResult.isErr()) {
       switch (writeResult.error) {
         case 'unreadable':

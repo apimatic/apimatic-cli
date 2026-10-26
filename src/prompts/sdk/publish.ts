@@ -1,14 +1,17 @@
 import { log, spinner } from '@clack/prompts';
 import { Result } from 'neverthrow';
 import { ServiceError } from '../../infrastructure/service-error.js';
+import { sleep } from '../../infrastructure/timer-extensions.js';
 import { PublishLogItem } from '../../types/publish-api/publish-log.js';
 import { PublishingInfo } from '../../types/publish-api/publishing-info.js';
 import { PublishType } from '../../types/publish-api/publishing-profile-item.js';
 import { SemVersion } from '../../types/publish/version.js';
-import { CodegenOption, Language } from '../../types/sdk/generate.js';
+import { Language, Stability } from '../../types/sdk/generate.js';
 import { noteWrapped, withSpinner } from '../prompt.js';
 import { format as f } from '../format.js';
 import { PublishingProfile } from '../../types/publish/publishing-profile.js';
+import { DirectoryPath } from '../../types/file/directoryPath.js';
+import { FileProblem } from '../../types/file/file-problem.js';
 
 export type PublishingOutcome = 'succeeded' | 'failed' | 'cancelled';
 
@@ -19,6 +22,10 @@ export class SdkPublishPrompts {
 
   public sdkPublishingServiceError(serviceError: ServiceError) {
     log.error(serviceError.errorMessage);
+  }
+
+  public sdkNotZipped(sdkDirectory: DirectoryPath, problem: FileProblem) {
+    log.error(`The SDK in ${f.path(sdkDirectory)} could not be zipped for upload: ${problem.reason}`);
   }
 
   public dryRunNotice(publishingSummary: string): void {
@@ -44,10 +51,10 @@ ${f.link(publishingLogUrl)}`;
     const TERMINAL_STATES = new Set(['Succeeded', 'Failed', 'Exception', 'InternalError']);
     const POLL_INTERVAL_MS = 10000; // poll after every 10 seconds.
 
-    let abortWait: (() => void) | undefined;
+    const waitAbort = new AbortController();
     const spin = spinner({
       onCancel: () => {
-        abortWait?.();
+        waitAbort.abort();
       },
       cancelMessage: 'Publishing is still running on APIMatic and will continue without the CLI.'
     });
@@ -85,14 +92,11 @@ ${f.link(publishingLogUrl)}`;
       }
 
       spin.message(statusMessage);
-      await new Promise<void>((resolve) => {
-        const timer = setTimeout(resolve, POLL_INTERVAL_MS);
-        abortWait = () => {
-          clearTimeout(timer);
-          resolve();
-        };
-      });
-      abortWait = undefined;
+
+      const sleepResult = await sleep(POLL_INTERVAL_MS, waitAbort.signal);
+      if (sleepResult !== 'ok') {
+        return sleepResult;
+      }
     }
 
     return 'cancelled';
@@ -104,7 +108,7 @@ export interface PublishingDetails {
   language: Language;
   version: SemVersion;
   publishType: PublishType[];
-  codegenOption?: CodegenOption;
+  stability?: Stability;
 }
 
 export function formatPublishingDetails({
@@ -112,12 +116,12 @@ export function formatPublishingDetails({
   language,
   version,
   publishType,
-  codegenOption
+  stability
 }: PublishingDetails): string {
   const targets = [...publishType]
-    .map((t) => (t === PublishType.PackagePublishing ? "Package" : "Source Code"))
-    .join(" + ");
+    .map((t) => (t === PublishType.PackagePublishing ? 'Package' : 'Source Code'))
+    .join(' + ');
 
-  const generator = codegenOption ? `\n  Generator: ${codegenOption}` : "";
-  return `\n\n  Profile:   ${profile}\n  Language:  ${language}\n  Version:   ${version}\n  Targets:   ${targets}${generator}`;
+  const level = stability ? `\n  Stability: ${stability}` : '';
+  return `\n\n  Profile:   ${profile}\n  Language:  ${language}\n  Version:   ${version}\n  Targets:   ${targets}${level}`;
 }

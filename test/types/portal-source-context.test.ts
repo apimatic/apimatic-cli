@@ -1,0 +1,2938 @@
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
+import { Buffer } from 'node:buffer';
+import { pathToFileURL } from 'node:url';
+import Ajv from 'ajv';
+import { expect } from 'chai';
+import { Result } from 'neverthrow';
+import sinon from 'sinon';
+import { parse as parseYaml } from 'yaml';
+import { FileService } from '../../src/infrastructure/file-service';
+import { APIMATIC_SCHEMA_URL } from '../../src/types/apimatic-config/document';
+import { PortalSourceContext } from '../../src/types/portal-source-context';
+import { GeneratedPages } from '../../src/types/portal/generated-pages';
+import {
+  ContentProblem,
+  PortalSettings,
+  PortalSource,
+  PortalSourceProblem
+} from '../../src/types/portal/portal-source';
+import { PortalTab } from '../../src/types/portal/portal-tabs';
+import { DirectoryPath } from '../../src/types/file/directoryPath';
+import { FileName } from '../../src/types/file/fileName';
+import { FilePath } from '../../src/types/file/filePath';
+import { PLUGIN_SECTION, SDK_SECTION } from '../../src/types/portal/generated-pages';
+import { TabEntry } from '../../src/types/portal/portal-navigation';
+import { ZipService } from '../../src/infrastructure/zip-service';
+import { bundleSpec } from '../../portal-template/src/lib/openapi-bundle.server';
+
+const OPENAPI = JSON.stringify({ openapi: '3.0.0', info: { title: 'Calc', version: '1' }, paths: {} });
+
+describe('PortalSourceContext', () => {
+  let root: string;
+
+  const write = (relative: string, contents: string) => {
+    const target = path.join(root, relative);
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.writeFileSync(target, contents);
+  };
+
+  /** The smallest page the build accepts: front matter giving its title. */
+  const page = (title: string) => `---\ntitle: ${title}\n---\n`;
+
+  /** The smallest `languages` block the portal accepts. */
+  const LANGUAGES = { typescript: {} };
+
+  /** A configuration holding the given portal block and the smallest languages block. */
+  const writeConfig = (portal: object) => write('apimatic.json', JSON.stringify({ portal, languages: LANGUAGES }));
+
+  const REQUIRED_LANGUAGES = /^'languages' must name at least one SDK language/;
+
+  const resolve = () => new PortalSourceContext(new DirectoryPath(root)).resolve();
+
+  /** The ignored navigation files as the warning names them, relative to the source directory. */
+  const ignored = (source: PortalSource): string[] =>
+    source.contentNotices.ignoredNavigationFiles.map((file) => file.relativeTo(new DirectoryPath(root)));
+
+  /** The hidden pages as the warning names them, relative to the source directory. */
+  const hidden = (source: PortalSource): string[] =>
+    source.contentNotices.hiddenPages.map((file) => file.relativeTo(new DirectoryPath(root))).sort();
+
+  /** Every problem found in `content/`, when that is what refused the source. */
+  const contentProblems = (problem: PortalSourceProblem): ContentProblem[] => {
+    if (problem.kind !== 'invalidContent') {
+      throw new Error(`expected problems in content/, got '${problem.kind}'`);
+    }
+    return problem.problems;
+  };
+
+  /** The one problem found in `content/`. */
+  const contentProblem = (problem: PortalSourceProblem): ContentProblem => {
+    const problems = contentProblems(problem);
+    expect(problems.map(({ kind }) => kind)).to.have.lengthOf(1);
+    return problems[0];
+  };
+
+  /** Each file the block names that is not on disk: its setting, its path, and its spelling on disk in another case. */
+  const missingFiles = (result: Result<unknown, PortalSourceProblem>): [string, string, string | null][] => {
+    const problem = result._unsafeUnwrapErr();
+    if (problem.kind !== 'missingStaticFiles') {
+      throw new Error(`expected missing static files, got ${JSON.stringify(problem)}`);
+    }
+    const relative = (file: FilePath) => file.relativeTo(new DirectoryPath(root));
+    return problem.files.map(({ setting, file, foundAs }) => [
+      setting,
+      relative(file),
+      foundAs === null ? null : relative(foundAs)
+    ]);
+  };
+
+  beforeEach(() => {
+    root = fs.mkdtempSync(path.join(os.tmpdir(), 'portal-source-'));
+  });
+
+  afterEach(() => {
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  describe('apimatic.json', () => {
+    it('reports a missing config', async () => {
+      write('spec/api.json', OPENAPI);
+
+      expect((await resolve())._unsafeUnwrapErr()).to.deep.equal({ kind: 'missingConfig' });
+    });
+
+    // An APIMATIC-BUILD.json is not read for the portal any more, so its presence changes
+    // nothing about the answer.
+    it('reports a missing config the same way beside an old build file', async () => {
+      write('spec/api.json', OPENAPI);
+      write('APIMATIC-BUILD.json', JSON.stringify({ generatePortal: { pageTitle: 'Acme' } }));
+
+      expect((await resolve())._unsafeUnwrapErr()).to.deep.equal({ kind: 'missingConfig' });
+    });
+
+    it('reads inputs written with a byte-order mark', async () => {
+      const mark = '﻿';
+      write('apimatic.json', mark + JSON.stringify({ portal: { site: { name: 'Acme' } }, languages: LANGUAGES }));
+      write('spec/api.json', mark + OPENAPI);
+
+      const source = (await resolve())._unsafeUnwrap();
+
+      expect(source.config.siteTitle()).to.equal('Acme');
+      expect(source.specs).to.have.lengthOf(1);
+    });
+
+    it('passes the field errors through when the config is invalid', async () => {
+      writeConfig({ site: { name: '' } });
+      write('spec/api.json', OPENAPI);
+
+      expect((await resolve())._unsafeUnwrapErr()).to.deep.equal({
+        kind: 'invalidConfig',
+        errors: ["'portal.site.name' must be a non-empty string."],
+        missingPortal: false
+      });
+    });
+
+    it('names and describes the portal after its only specification when the block does not', async () => {
+      writeConfig({});
+      write(
+        'spec/api.json',
+        JSON.stringify({ openapi: '3.0.0', info: { title: 'Calc', version: '1', description: 'Adds.\n\nMore.' } })
+      );
+
+      const { config } = (await resolve())._unsafeUnwrap();
+
+      expect(config.siteTitle()).to.equal('Calc');
+      expect(config.identity().description).to.equal('Adds.');
+    });
+
+    it('lets the block describe the portal instead, or not at all', async () => {
+      write(
+        'spec/api.json',
+        JSON.stringify({ openapi: '3.0.0', info: { title: 'Calc', version: '1', description: 'x' } })
+      );
+
+      writeConfig({ site: { description: 'Our docs.' } });
+      expect((await resolve())._unsafeUnwrap().config.identity().description).to.equal('Our docs.');
+      writeConfig({ site: { description: '' } });
+      expect((await resolve())._unsafeUnwrap().config.identity().description).to.be.null;
+    });
+
+    // No one of several specifications speaks for the whole portal.
+    it('requires a name when there are several specifications', async () => {
+      writeConfig({});
+      write('spec/a.json', OPENAPI);
+      write('spec/b.json', OPENAPI);
+
+      expect((await resolve())._unsafeUnwrapErr()).to.deep.equal({
+        kind: 'invalidConfig',
+        errors: ["'portal.site.name' is required when 'spec' holds more than one specification."],
+        missingPortal: false
+      });
+    });
+
+    it('requires a languages block, and lists it with the portal errors', async () => {
+      write('apimatic.json', JSON.stringify({ portal: { site: { name: '' } } }));
+      write('spec/api.json', OPENAPI);
+
+      const problem = (await resolve())._unsafeUnwrapErr();
+
+      expect(problem.kind).to.equal('invalidConfig');
+      const errors = problem.kind === 'invalidConfig' ? problem.errors : [];
+      expect(errors).to.have.lengthOf(2);
+      expect(errors[0]).to.equal("'portal.site.name' must be a non-empty string.");
+      expect(errors[1]).to.match(REQUIRED_LANGUAGES);
+    });
+
+    it('reports a missing portal block as the one thing wrong, whatever else the file holds', async () => {
+      write('apimatic.json', JSON.stringify({ plugin: { pluginId: 'acme' }, languages: { csharp: {} } }));
+      write('spec/api.json', OPENAPI);
+
+      expect((await resolve())._unsafeUnwrapErr()).to.deep.equal({
+        kind: 'invalidConfig',
+        errors: ["'portal' is required."],
+        missingPortal: true
+      });
+    });
+
+    // There is a block to fix, so the quickstart hint would point away from it.
+    it('does not point at quickstart for a portal block that is not an object', async () => {
+      write('apimatic.json', JSON.stringify({ portal: 'Calc', languages: LANGUAGES }));
+      write('spec/api.json', OPENAPI);
+
+      expect((await resolve())._unsafeUnwrapErr()).to.deep.equal({
+        kind: 'invalidConfig',
+        errors: ["'portal' must be a JSON object."],
+        missingPortal: false
+      });
+    });
+
+    it('reports a file holding no JSON object as invalid, not missing', async () => {
+      write('apimatic.json', '{ not json');
+      write('spec/api.json', OPENAPI);
+
+      expect((await resolve())._unsafeUnwrapErr()).to.deep.equal({
+        kind: 'invalidConfig',
+        errors: ['apimatic.json is not valid JSON.'],
+        missingPortal: false
+      });
+    });
+
+    // Reading through the config context turns a fault into a problem rather than a throw.
+    it('reports a file it cannot read as invalid, naming the fault', async () => {
+      writeConfig({});
+      write('spec/api.json', OPENAPI);
+      const read = sinon.stub(FileService.prototype, 'getContents').rejects(new Error('EACCES: permission denied'));
+
+      try {
+        expect((await resolve())._unsafeUnwrapErr()).to.deep.equal({
+          kind: 'invalidConfig',
+          errors: ['apimatic.json could not be read: EACCES: permission denied.'],
+          missingPortal: false
+        });
+      } finally {
+        read.restore();
+      }
+    });
+
+    it('ignores root keys it does not know', async () => {
+      write(
+        'apimatic.json',
+        JSON.stringify({ $schema: 'https://example.com/schema.json', future: true, portal: {}, languages: LANGUAGES })
+      );
+      write('spec/api.json', OPENAPI);
+
+      expect((await resolve()).isOk()).to.be.true;
+    });
+
+    // The plugin's identity is the plugin commands' to judge; a broken one must not fail a build.
+    it('builds past a malformed plugin block', async () => {
+      write('apimatic.json', JSON.stringify({ portal: {}, languages: LANGUAGES, plugin: 7 }));
+      write('spec/api.json', OPENAPI);
+
+      expect((await resolve()).isOk()).to.be.true;
+    });
+
+    // The languages are the portal's too: they are the SDKs it documents.
+    it('refuses a malformed languages block, as the document found it', async () => {
+      write('apimatic.json', JSON.stringify({ portal: {}, languages: { typescript: 'yes' } }));
+      write('spec/api.json', OPENAPI);
+
+      expect((await resolve())._unsafeUnwrapErr()).to.deep.equal({
+        kind: 'invalidConfig',
+        errors: ["'languages.typescript' is not a JSON object."],
+        missingPortal: false
+      });
+    });
+
+    it('accepts the schema version it reads', async () => {
+      write('apimatic.json', JSON.stringify({ schemaVersion: 1, portal: {}, languages: LANGUAGES }));
+      write('spec/api.json', OPENAPI);
+
+      expect((await resolve()).isOk()).to.be.true;
+    });
+
+    it('refuses another schema version alongside the portal errors, so one edit fixes the file', async () => {
+      write(
+        'apimatic.json',
+        JSON.stringify({ schemaVersion: 2, portal: { site: { name: '' } }, languages: LANGUAGES })
+      );
+      write('spec/api.json', OPENAPI);
+
+      expect((await resolve())._unsafeUnwrapErr()).to.deep.equal({
+        kind: 'invalidConfig',
+        errors: [
+          "'schemaVersion' is 2, which this version of the CLI does not read; it reads 1.",
+          "'portal.site.name' must be a non-empty string."
+        ],
+        missingPortal: false
+      });
+    });
+  });
+
+  describe('static files', () => {
+    beforeEach(() => write('spec/api.json', OPENAPI));
+
+    it('reports a configured logo that is not on disk', async () => {
+      writeConfig({ brand: { logo: 'static/images/logo.png' } });
+
+      expect(missingFiles(await resolve())).to.deep.equal([['portal.brand.logo', 'static/images/logo.png', null]]);
+    });
+
+    it('reports every missing file at once, each with the setting that names it', async () => {
+      writeConfig({
+        brand: { logo: { light: 'static/light.svg', dark: 'static/dark.svg' }, favicon: 'static/favicon.ico' }
+      });
+      write('static/light.svg', 'x');
+
+      expect(missingFiles(await resolve())).to.deep.equal([
+        ['portal.brand.logo.dark', 'static/dark.svg', null],
+        ['portal.brand.favicon', 'static/favicon.ico', null]
+      ]);
+    });
+
+    // Windows and macOS open `logo.png` for `Logo.PNG`, and the site then 404s on a host that
+    // does not, so every name on the way is matched exactly.
+    it('reports a file spelt in another case, with its spelling on disk', async () => {
+      writeConfig({ brand: { logo: 'static/Images/Logo.PNG', favicon: 'static/favicon.ico' } });
+      write('static/images/logo.png', 'x');
+      write('static/favicon.ico', 'x');
+
+      expect(missingFiles(await resolve())).to.deep.equal([
+        ['portal.brand.logo', 'static/Images/Logo.PNG', 'static/images/logo.png']
+      ]);
+    });
+
+    it('accepts files that are there', async () => {
+      writeConfig({ brand: { logo: 'static/images/logo.png', favicon: 'static/favicon.ico' } });
+      write('static/images/logo.png', 'x');
+      write('static/favicon.ico', 'x');
+
+      expect((await resolve()).isOk()).to.be.true;
+    });
+
+    it('says nothing when none is configured', async () => {
+      writeConfig({});
+
+      expect((await resolve()).isOk()).to.be.true;
+    });
+  });
+
+  // What `portal serve` runs on each save of `apimatic.json`.
+  describe('resolveSettings', () => {
+    const context = () => new PortalSourceContext(new DirectoryPath(root));
+
+    beforeEach(() => write('spec/api.json', OPENAPI));
+
+    it('gives the config resolve gives, from the site the specifications suggested', async () => {
+      writeConfig({ brand: { colors: { primary: '#1d4ed8' } } });
+      const resolved = (await resolve())._unsafeUnwrap();
+
+      const reloaded = (await context().resolveSettings(resolved.suggestedSite))._unsafeUnwrap();
+
+      expect(reloaded.config.toJSON()).to.deep.equal(resolved.config.toJSON());
+      expect(reloaded.config.siteTitle()).to.equal(resolved.config.siteTitle());
+    });
+
+    // The specifications are not read again, so with several the name is still required.
+    it('holds the file to the rules resolve holds it to', async () => {
+      writeConfig({});
+
+      const errors = (await context().resolveSettings(null))._unsafeUnwrapErr();
+
+      expect(errors).to.deep.equal({
+        kind: 'invalidConfig',
+        errors: ["'portal.site.name' is required when 'spec' holds more than one specification."],
+        missingPortal: false
+      });
+    });
+
+    it('reports a file the block names that is not on disk', async () => {
+      writeConfig({ site: { name: 'Calc' }, brand: { favicon: 'static/favicon.ico' } });
+
+      expect(missingFiles(await context().resolveSettings(null))).to.deep.equal([
+        ['portal.brand.favicon', 'static/favicon.ico', null]
+      ]);
+    });
+
+    it('reports a file removed while the preview runs', async () => {
+      expect((await context().resolveSettings(null))._unsafeUnwrapErr()).to.deep.equal({ kind: 'missingConfig' });
+    });
+  });
+
+  /** A file the specifications could not be read from: the kind, the file, and the file that refers to it. */
+  const specProblem = (problem: PortalSourceProblem): [string, string, string | null] => {
+    if (problem.kind !== 'unreadableSpec' && problem.kind !== 'missingSpecReference') {
+      throw new Error(`expected a file the specifications are read from, got ${JSON.stringify(problem)}`);
+    }
+    const relative = (file: FilePath) => file.relativeTo(new DirectoryPath(root));
+    const file = problem.kind === 'missingSpecReference' ? problem.missing.file : problem.file;
+    return [problem.kind, relative(file), problem.referencedBy === null ? null : relative(problem.referencedBy)];
+  };
+
+  describe('resolveSpecs', () => {
+    const resolveSpecs = () => new PortalSourceContext(new DirectoryPath(root)).resolveSpecs();
+
+    it('answers with the specs a build would read, without an apimatic.json', async () => {
+      write('spec/api.json', OPENAPI);
+      write('spec/old.json', JSON.stringify({ swagger: '2.0', info: {}, paths: {} }));
+
+      expect((await resolveSpecs())._unsafeUnwrap().map((spec) => spec.slug)).to.deep.equal(['api']);
+    });
+
+    it('refuses a spec directory with no OpenAPI 3.x document, as resolve does', async () => {
+      write('spec/petstore.json', JSON.stringify({ swagger: '2.0', info: {}, paths: {} }));
+
+      expect((await resolveSpecs())._unsafeUnwrapErr().kind).to.equal('noOpenApiSpec');
+    });
+  });
+
+  describe('spec discovery', () => {
+    beforeEach(() => writeConfig({ site: { name: 'Calc' } }));
+
+    /** A file as a problem or a warning names it, relative to the source directory. */
+    const relative = (file: FilePath) => file.relativeTo(new DirectoryPath(root));
+
+    /** An OpenAPI 3.x document that declares these paths. */
+    const withPaths = (paths: object) =>
+      JSON.stringify({ openapi: '3.0.0', info: { title: 'Calc', version: '1' }, paths });
+
+    it('accepts json, yaml and yml documents, ordered by file name', async () => {
+      write('spec/b.json', OPENAPI);
+      write('spec/a.yaml', 'openapi: 3.0.0\ninfo:\n  title: A\n  version: "1"\npaths: {}\n');
+      write('spec/c.yml', 'openapi: 3.1.0\ninfo:\n  title: C\n  version: "1"\npaths: {}\n');
+
+      const source = (await resolve())._unsafeUnwrap();
+
+      expect(source.specs.map((spec) => spec.slug)).to.deep.equal(['a', 'b', 'c']);
+      expect(source.specDirectory.toString()).to.equal(path.join(root, 'spec'));
+    });
+
+    it('ignores documents that carry no version key', async () => {
+      write('spec/api.json', OPENAPI);
+      write('spec/APIMATIC-META.json', JSON.stringify({ anything: true }));
+      write('spec/shared-schemas.json', JSON.stringify({ components: {} }));
+
+      const source = (await resolve())._unsafeUnwrap();
+
+      expect(source.specs.map((spec) => spec.slug)).to.deep.equal(['api']);
+    });
+
+    it('ignores files that are not specifications at all', async () => {
+      write('spec/api.json', OPENAPI);
+      write('spec/notes.md', '# not a spec');
+
+      expect((await resolve())._unsafeUnwrap().specs).to.have.lengthOf(1);
+    });
+
+    it('skips a document in another format when an OpenAPI 3.x document is beside it', async () => {
+      write('spec/api.json', OPENAPI);
+      write('spec/old.json', JSON.stringify({ swagger: '2.0', info: {}, paths: {} }));
+
+      expect((await resolve())._unsafeUnwrap().specs.map((spec) => spec.slug)).to.deep.equal(['api']);
+    });
+
+    /** How the problem says to convert the directory: the file, its format, where `api transform` writes, and how many more. */
+    const conversion = async () => {
+      const problem = (await resolve())._unsafeUnwrapErr();
+      if (problem.kind !== 'noOpenApiSpec') {
+        throw new Error(`expected no OpenAPI 3.x document, got '${problem.kind}'`);
+      }
+      const { file, format, converted, others } = problem.conversion;
+      return [relative(file), format, relative(converted), others];
+    };
+
+    // Named, with where `api transform` writes the result: its own folder, which the portal does not read.
+    it('reports no OpenAPI 3.x document whatever format the others are in, naming one to convert', async () => {
+      write('spec/swagger.json', JSON.stringify({ swagger: '2.0', info: {}, paths: {} }));
+      write('spec/openapi2.json', JSON.stringify({ openapi: '2.0.0', info: {}, paths: {} }));
+      write('spec/postman.json', JSON.stringify({ info: { schema: 'postman' }, item: [] }));
+      write('spec/api.raml', '#%RAML 1.0\ntitle: Calc\n');
+
+      expect(await conversion()).to.deep.equal([
+        'spec/openapi2.json',
+        'OpenAPI 2.0.0',
+        'spec/transformations/openapi2_OpenApi3Yaml.yaml',
+        1
+      ]);
+    });
+
+    it('names a document that says nothing of its format ahead of any other file', async () => {
+      write('spec/README.md', '# Specs');
+      write('spec/api.raml', '#%RAML 1.0\ntitle: Calc\n');
+      write('spec/postman.json', JSON.stringify({ info: { schema: 'postman' }, item: [] }));
+
+      expect(await conversion()).to.deep.equal([
+        'spec/postman.json',
+        null,
+        'spec/transformations/postman_OpenApi3Yaml.yaml',
+        0
+      ]);
+    });
+
+    it('names the first file when nothing the portal reads is there', async () => {
+      write('spec/api.raml', '#%RAML 1.0\ntitle: Calc\n');
+
+      expect(await conversion()).to.deep.equal([
+        'spec/api.raml',
+        null,
+        'spec/transformations/api_OpenApi3Yaml.yaml',
+        0
+      ]);
+    });
+
+    it('reports a document it cannot parse, with what the parser said', async () => {
+      write('spec/broken.json', '{ not json');
+
+      const problem = (await resolve())._unsafeUnwrapErr();
+
+      expect(specProblem(problem)).to.deep.equal(['unreadableSpec', 'spec/broken.json', null]);
+      expect(
+        problem.kind === 'unreadableSpec' && problem.reason.kind === 'invalid' && problem.reason.message
+      ).to.contain('JSON');
+    });
+
+    // As the portal's bundler reads it: by what it holds.
+    it('reads a document whatever its extension says', async () => {
+      write('spec/api.json', 'openapi: 3.0.0\ninfo:\n  title: Calc\n  version: "1"\npaths: {}\n');
+
+      expect((await resolve())._unsafeUnwrap().specs.map((spec) => spec.slug)).to.deep.equal(['api']);
+    });
+
+    // The build reads past a file that is no API, and never bundles it.
+    it('skips a file holding nothing, only comments, or no key beside a document', async () => {
+      write('spec/api.json', OPENAPI);
+      write('spec/orders.yaml', '');
+      write('spec/notes.yaml', '# orders: to come\n');
+      write('spec/states.yaml', '- active\n- inactive\n');
+
+      expect((await resolve())._unsafeUnwrap().specs.map((spec) => spec.slug)).to.deep.equal(['api']);
+    });
+
+    // As a document caught empty mid-save is; with nothing else to build from, it is not one to convert.
+    it('reports a document left empty when every document there holds nothing', async () => {
+      write('spec/api.yaml', '');
+      write('spec/notes.yaml', '# to come\n');
+
+      const problem = (await resolve())._unsafeUnwrapErr();
+
+      expect(specProblem(problem)).to.deep.equal(['unreadableSpec', 'spec/api.yaml', null]);
+      expect(problem.kind === 'unreadableSpec' && problem.reason).to.deep.equal({ kind: 'empty' });
+    });
+
+    // As an editor that saves by renaming over the file leaves it for a moment.
+    it('reports a document gone since it was listed as one it cannot read, rather than leaving it out', async () => {
+      write('spec/api.json', OPENAPI);
+      sinon.stub(FileService.prototype, 'getContents').rejects(new Error('ENOENT: no such file or directory'));
+      sinon.stub(FileService.prototype, 'fileExists').resolves(false);
+
+      try {
+        const problem = (await new PortalSourceContext(new DirectoryPath(root)).resolveSpecs())._unsafeUnwrapErr();
+
+        expect(specProblem(problem)).to.deep.equal(['unreadableSpec', 'spec/api.json', null]);
+        expect(problem.kind === 'unreadableSpec' && problem.reason).to.deep.equal({ kind: 'gone' });
+      } finally {
+        sinon.restore();
+      }
+    });
+
+    it('reports a document it cannot open with what the file system said', async () => {
+      write('spec/api.json', OPENAPI);
+      sinon.stub(FileService.prototype, 'getContents').rejects(new Error('EACCES: permission denied'));
+
+      try {
+        const problem = (await new PortalSourceContext(new DirectoryPath(root)).resolveSpecs())._unsafeUnwrapErr();
+
+        expect(problem.kind === 'unreadableSpec' && problem.reason).to.deep.equal({
+          kind: 'unopened',
+          message: 'EACCES: permission denied'
+        });
+      } finally {
+        sinon.restore();
+      }
+    });
+
+    it('reports an empty or absent spec directory', async () => {
+      expect((await resolve())._unsafeUnwrapErr()).to.deep.equal({ kind: 'emptySpecDirectory', folders: [] });
+
+      fs.mkdirSync(path.join(root, 'spec'));
+      expect((await resolve())._unsafeUnwrapErr()).to.deep.equal({ kind: 'emptySpecDirectory', folders: [] });
+    });
+
+    // A placeholder, or a file the operating system keeps, is never an API definition to convert.
+    it('reads a spec directory holding only hidden files as empty', async () => {
+      write('spec/.gitkeep', '');
+      write('spec/.DS_Store', 'binary');
+
+      expect((await resolve())._unsafeUnwrapErr()).to.deep.equal({ kind: 'emptySpecDirectory', folders: [] });
+    });
+
+    // Where `api transform --destination=src/spec` puts its result.
+    it('names the folders of a spec directory that holds nothing else, whose documents are not read', async () => {
+      write('spec/transformations/api_OpenApi3Yaml.yaml', 'openapi: 3.0.0');
+
+      const problem = (await resolve())._unsafeUnwrapErr();
+
+      expect(problem.kind === 'emptySpecDirectory' && problem.folders.map((folder) => folder.leafName())).to.deep.equal(
+        ['transformations']
+      );
+    });
+
+    it('leaves a spec named after the search route with its own name', async () => {
+      write('spec/search.json', OPENAPI);
+
+      expect((await resolve())._unsafeUnwrap().specs[0].slug).to.equal('search');
+    });
+
+    it('gives colliding file names distinct slugs so neither section is lost', async () => {
+      write('spec/My API.json', OPENAPI);
+      write('spec/my-api.yaml', 'openapi: 3.0.0\ninfo:\n  title: A\n  version: "1"\npaths: {}\n');
+
+      const slugs = (await resolve())._unsafeUnwrap().specs.map((spec) => spec.slug);
+
+      expect(new Set(slugs).size).to.equal(2);
+      expect(slugs).to.include('my-api');
+    });
+
+    it('lists the operations of a path item kept in another file under the path that mounts it', async () => {
+      writeConfig({ site: { name: 'Calc' } });
+      write('spec/paths/pets.yaml', JSON.stringify({ get: {}, post: {} }));
+      write('spec/shared.json', JSON.stringify({ items: { owners: { delete: {} } } }));
+      write(
+        'spec/api.json',
+        JSON.stringify({
+          openapi: '3.1.0',
+          info: { title: 'Calc', version: '1' },
+          paths: {
+            '/health': { get: {} },
+            '/pets': { $ref: './paths/pets.yaml' },
+            '/owners': { $ref: 'shared.json#/items/owners' }
+          }
+        })
+      );
+
+      const [spec] = (await resolve())._unsafeUnwrap().specs;
+
+      expect(spec.endpoints.map(String)).to.deep.equal(['GET /health', 'GET /pets', 'POST /pets', 'DELETE /owners']);
+    });
+
+    // The layout the platform merges several APIs into one SDK from: a folder to each, and a metadata file above them.
+    describe('the folders a metadata file merges', () => {
+      const merging = (settings: object = {}) =>
+        write('spec/APIMATIC-META.json', JSON.stringify({ MergeConfiguration: { MergeApis: true, ...settings } }));
+
+      /** Each spec's slug and the file it was read from, in the order the sections are built. */
+      const read = async () => (await resolve())._unsafeUnwrap().specs.map((spec) => [spec.slug, relative(spec.file)]);
+
+      /** The metadata file the problem names, and the folders it merges that hold nothing to read. */
+      const emptyFolders = async () => {
+        const problem = (await resolve())._unsafeUnwrapErr();
+        if (problem.kind !== 'emptyMergedFolders') {
+          throw new Error(`expected merged folders with nothing to read, got '${problem.kind}'`);
+        }
+        return [
+          relative(problem.metadata),
+          problem.folders.map((folder) => folder.relativeTo(new DirectoryPath(root)))
+        ];
+      };
+
+      it('reads the folders the file lists, in its order, and names each section after its folder', async () => {
+        merging({ MergeOrderOfDirectories: ['beta', 'alpha'] });
+        write('spec/alpha/openapi.json', OPENAPI);
+        write('spec/beta/openapi.json', OPENAPI);
+        write('spec/gamma/openapi.json', OPENAPI);
+
+        expect(await read()).to.deep.equal([
+          ['beta', 'spec/beta/openapi.json'],
+          ['alpha', 'spec/alpha/openapi.json']
+        ]);
+      });
+
+      // Read twice, its every operation would count as declared by two specs, and lose its SDK samples.
+      it('reads a folder the file lists twice once, where it is first listed', async () => {
+        merging({ MergeOrderOfDirectories: ['beta', 'alpha', './beta/'] });
+        write('spec/alpha/openapi.json', OPENAPI);
+        write('spec/beta/openapi.json', OPENAPI);
+
+        expect(await read()).to.deep.equal([
+          ['beta', 'spec/beta/openapi.json'],
+          ['alpha', 'spec/alpha/openapi.json']
+        ]);
+      });
+
+      it('reads every folder, by name, when the file lists none', async () => {
+        merging();
+        write('spec/beta/b.json', OPENAPI);
+        write('spec/alpha/a.json', OPENAPI);
+
+        expect(await read()).to.deep.equal([
+          ['alpha', 'spec/alpha/a.json'],
+          ['beta', 'spec/beta/b.json']
+        ]);
+
+        merging({ MergeOrderOfDirectories: [] });
+
+        expect(await read()).to.deep.equal([
+          ['alpha', 'spec/alpha/a.json'],
+          ['beta', 'spec/beta/b.json']
+        ]);
+      });
+
+      it("keeps the dots of a folder's name, which end no extension", async () => {
+        merging();
+        write('spec/orders.v2/openapi.json', OPENAPI);
+
+        expect(await read()).to.deep.equal([['orders-v2', 'spec/orders.v2/openapi.json']]);
+      });
+
+      it("reads neither a folder's own metadata file nor a document at the top of the spec directory", async () => {
+        merging();
+        write('spec/alpha/openapi.json', OPENAPI);
+        write('spec/alpha/APIMATIC-META.json', JSON.stringify({ CodeGenSettings: {} }));
+        write('spec/stray.json', OPENAPI);
+
+        expect(await read()).to.deep.equal([['alpha', 'spec/alpha/openapi.json']]);
+      });
+
+      // The platform leaves them out of the SDKs too, and nothing else would say so. Shared parts the
+      // merged folders refer to may sit there too, with or without a version key.
+      it('names each API definition at the top of the spec directory, in any format, as left out', async () => {
+        merging();
+        write('spec/alpha/openapi.json', OPENAPI);
+        write('spec/old.json', withPaths({ '/old': { get: {} } }));
+        write('spec/older.yaml', JSON.stringify({ swagger: '2.0', info: {}, paths: { '/older': { get: {} } } }));
+        write('spec/events.yaml', JSON.stringify({ asyncapi: '2.6.0', info: {}, channels: { pets: {} } }));
+        write('spec/hooks.json', JSON.stringify({ openapi: '3.1.0', info: {}, webhooks: { newPet: { post: {} } } }));
+        write('spec/common.json', JSON.stringify({ openapi: '3.0.3', info: {}, paths: {}, components: {} }));
+        write('spec/shared-schemas.json', JSON.stringify({ components: { schemas: {} } }));
+        write('spec/broken.json', '{ not json');
+        write('spec/notes.md', '# Specs');
+
+        expect((await resolve())._unsafeUnwrap().leftOutSpecs.map(relative)).to.deep.equal([
+          'spec/events.yaml',
+          'spec/hooks.json',
+          'spec/old.json',
+          'spec/older.yaml'
+        ]);
+      });
+
+      it('names none left out when nothing merges the folders', async () => {
+        write('spec/a.json', OPENAPI);
+        write('spec/alpha/openapi.json', OPENAPI);
+
+        expect((await resolve())._unsafeUnwrap().leftOutSpecs).to.be.empty;
+      });
+
+      /** The files a refused folder names as its candidate definitions. */
+      const severalSpecs = async () => {
+        const problem = (await resolve())._unsafeUnwrapErr();
+        if (problem.kind !== 'severalSpecsInFolder') {
+          throw new Error(`expected a folder with several definitions, got '${problem.kind}'`);
+        }
+        return problem.files.map(relative);
+      };
+
+      // The platform builds the folder from one of them and drops the other without a word.
+      it('refuses a folder holding two OpenAPI 3.x documents, naming both', async () => {
+        merging();
+        write('spec/alpha/a.json', withPaths({ '/a': { get: {} } }));
+        write('spec/alpha/b.json', withPaths({ '/b': { get: {} } }));
+
+        expect(await severalSpecs()).to.deep.equal(['spec/alpha/a.json', 'spec/alpha/b.json']);
+      });
+
+      // Written as an OpenAPI document so that it passes a linter; the platform builds from it when it sorts first.
+      it('refuses an OpenAPI document of shared parts beside the definition', async () => {
+        merging();
+        write('spec/alpha/components.json', OPENAPI);
+        write('spec/alpha/openapi.json', withPaths({ '/pets': { get: {} } }));
+
+        expect(await severalSpecs()).to.deep.equal(['spec/alpha/components.json', 'spec/alpha/openapi.json']);
+      });
+
+      // The platform takes any file with a version key, so it would build the SDKs from the Swagger file, which sorts first.
+      it('refuses a definition in another format beside the OpenAPI 3.x document', async () => {
+        merging();
+        write('spec/alpha/a-legacy.json', JSON.stringify({ swagger: '2.0', info: {}, paths: { '/a': { get: {} } } }));
+        write('spec/alpha/openapi.json', withPaths({ '/pets': { get: {} } }));
+
+        expect(await severalSpecs()).to.deep.equal(['spec/alpha/a-legacy.json', 'spec/alpha/openapi.json']);
+      });
+
+      // The platform looks for the definition at the top of the folder first, whatever the folder inside it is named.
+      it('reads a definition whose OpenAPI document of shared parts sits in a folder inside it', async () => {
+        merging();
+        write('spec/alpha/common/components.json', OPENAPI);
+        write('spec/alpha/openapi.json', withPaths({ '/pets': { get: {} } }));
+
+        expect(await read()).to.deep.equal([['alpha', 'spec/alpha/openapi.json']]);
+      });
+
+      // The platform also reads other names starting `APIMATIC-META`; a project for this CLI uses the one.
+      it('follows no metadata file under another name, which is read as any other file', async () => {
+        write('spec/APIMATIC-META-MAIN.json', JSON.stringify({ MergeConfiguration: { MergeApis: true } }));
+        write('spec/alpha/openapi.json', OPENAPI);
+
+        expect(await conversion()).to.deep.equal([
+          'spec/APIMATIC-META-MAIN.json',
+          null,
+          'spec/transformations/APIMATIC-META-MAIN_OpenApi3Yaml.yaml',
+          0
+        ]);
+      });
+
+      it('reads a folder whose other documents hold only parts of its definition', async () => {
+        merging();
+        write('spec/alpha/openapi.json', OPENAPI);
+        write('spec/alpha/components.json', JSON.stringify({ components: { schemas: {} } }));
+
+        expect(await read()).to.deep.equal([['alpha', 'spec/alpha/openapi.json']]);
+      });
+
+      it('reads a path item kept in another file of the folder', async () => {
+        merging();
+        write('spec/alpha/paths/pets.yaml', JSON.stringify({ get: {} }));
+        write(
+          'spec/alpha/openapi.json',
+          JSON.stringify({
+            openapi: '3.1.0',
+            info: { title: 'Calc', version: '1' },
+            paths: { '/pets': { $ref: './paths/pets.yaml' } }
+          })
+        );
+
+        const [spec] = (await resolve())._unsafeUnwrap().specs;
+
+        expect(spec.endpoints.map(String)).to.deep.equal(['GET /pets']);
+      });
+
+      // The metadata file is there for the SDK's settings alone, and is not offered for conversion.
+      it('leaves the folders unread when no metadata file merges them', async () => {
+        write('spec/APIMATIC-META.json', JSON.stringify({ CodeGenSettings: {} }));
+        write('spec/alpha/openapi.json', OPENAPI);
+
+        const problem = (await resolve())._unsafeUnwrapErr();
+
+        expect(
+          problem.kind === 'emptySpecDirectory' && problem.folders.map((folder) => folder.leafName())
+        ).to.deep.equal(['alpha']);
+      });
+
+      // The platform is sent `spec/` alone, and finds a folder only by its exact name.
+      // The platform is sent `spec/` alone, and finds a folder only by its exact name.
+      it('reports each listed folder the platform would not find, wherever and however it is named', async () => {
+        merging({ MergeOrderOfDirectories: ['alpha', 'misnamed', 'Beta', '.', '../content', 'empty'] });
+        write('spec/alpha/openapi.json', OPENAPI);
+        write('spec/beta/openapi.json', OPENAPI);
+        write('spec/top.json', OPENAPI);
+        write('content/openapi.json', OPENAPI);
+        fs.mkdirSync(path.join(root, 'spec', 'empty'));
+
+        const problem = (await resolve())._unsafeUnwrapErr();
+
+        expect(
+          problem.kind === 'missingMergedFolders' &&
+            problem.folders.map((folder) => folder.relativeTo(new DirectoryPath(root)))
+        ).to.deep.equal(['./spec/misnamed', './spec/Beta', './spec', './content']);
+      });
+
+      it('reports each merged folder with nothing to read, hidden files aside', async () => {
+        merging({ MergeOrderOfDirectories: ['alpha', 'empty', 'hidden'] });
+        write('spec/alpha/openapi.json', OPENAPI);
+        fs.mkdirSync(path.join(root, 'spec', 'empty'));
+        write('spec/hidden/.gitkeep', '');
+
+        expect(await emptyFolders()).to.deep.equal(['spec/APIMATIC-META.json', ['./spec/empty', './spec/hidden']]);
+      });
+
+      // Named `..v2`, it sits inside the spec directory, however much it reads like a step up.
+      it('reads a folder whose name starts with two dots', async () => {
+        merging({ MergeOrderOfDirectories: ['..v2'] });
+        write('spec/..v2/openapi.json', OPENAPI);
+
+        expect(await read()).to.deep.equal([['v2', 'spec/..v2/openapi.json']]);
+      });
+
+      it('reports a file that merges where there is no folder to merge', async () => {
+        merging();
+        write('spec/api.json', OPENAPI);
+
+        const problem = (await resolve())._unsafeUnwrapErr();
+
+        expect(problem.kind === 'noFoldersToMerge' && relative(problem.metadata)).to.equal('spec/APIMATIC-META.json');
+      });
+
+      it('points a folder with no OpenAPI 3.x document at its conversion, inside that folder', async () => {
+        merging();
+        write('spec/alpha/openapi.json', OPENAPI);
+        write('spec/beta/swagger.json', JSON.stringify({ swagger: '2.0', info: {}, paths: {} }));
+
+        expect(await conversion()).to.deep.equal([
+          'spec/beta/swagger.json',
+          'Swagger 2.0',
+          'spec/beta/transformations/swagger_OpenApi3Yaml.yaml',
+          0
+        ]);
+      });
+
+      it('names a document it cannot parse with its folder', async () => {
+        merging();
+        write('spec/alpha/openapi.json', '{ not json');
+
+        expect(specProblem((await resolve())._unsafeUnwrapErr())).to.deep.equal([
+          'unreadableSpec',
+          'spec/alpha/openapi.json',
+          null
+        ]);
+      });
+
+      it('skips a file holding nothing beside the definition of a folder, and reports one alone', async () => {
+        merging();
+        write('spec/alpha/openapi.json', OPENAPI);
+        write('spec/alpha/notes.yaml', '');
+
+        expect(await read()).to.deep.equal([['alpha', 'spec/alpha/openapi.json']]);
+
+        fs.rmSync(path.join(root, 'spec', 'alpha', 'openapi.json'));
+
+        expect(specProblem((await resolve())._unsafeUnwrapErr())).to.deep.equal([
+          'unreadableSpec',
+          'spec/alpha/notes.yaml',
+          null
+        ]);
+      });
+
+      it('reports a metadata file it cannot parse', async () => {
+        write('spec/APIMATIC-META.json', '{ not json');
+        write('spec/alpha/openapi.json', OPENAPI);
+
+        const problem = (await resolve())._unsafeUnwrapErr();
+
+        expect(problem.kind === 'unreadableMetadata' && relative(problem.file)).to.equal('spec/APIMATIC-META.json');
+      });
+    });
+
+    // The platform builds the SDKs, and so the code samples, from one spec unless the specs are merged.
+    describe('what the SDKs and their samples cover', () => {
+      it('names several specs at the top of the spec directory, which nothing merges', async () => {
+        write('spec/a.json', OPENAPI);
+        write('spec/b.json', OPENAPI);
+        write('spec/APIMATIC-META.json', JSON.stringify({ CodeGenSettings: {} }));
+
+        expect((await resolve())._unsafeUnwrap().unmergedSpecs.map(relative)).to.deep.equal([
+          'spec/a.json',
+          'spec/b.json'
+        ]);
+      });
+
+      it('names none when there is one spec, or the specs are merged', async () => {
+        write('spec/a.json', OPENAPI);
+
+        expect((await resolve())._unsafeUnwrap().unmergedSpecs).to.be.empty;
+
+        fs.rmSync(path.join(root, 'spec'), { recursive: true });
+        write('spec/APIMATIC-META.json', JSON.stringify({ MergeConfiguration: { MergeApis: true } }));
+        write('spec/alpha/openapi.json', OPENAPI);
+        write('spec/beta/openapi.json', OPENAPI);
+
+        expect((await resolve())._unsafeUnwrap().unmergedSpecs).to.be.empty;
+      });
+
+      it('names each operation more than one spec declares, with the specs that do', async () => {
+        write('spec/APIMATIC-META.json', JSON.stringify({ MergeConfiguration: { MergeApis: true } }));
+        write('spec/alpha/openapi.json', withPaths({ '/status': { get: {} }, '/alpha': { get: {} } }));
+        write('spec/beta/openapi.json', withPaths({ '/status': { get: {}, post: {} }, '/beta': { get: {} } }));
+
+        const shared = (await resolve())._unsafeUnwrap().sharedEndpoints;
+
+        expect(shared.map(({ key, files }) => [`${key}`, files.map(relative)])).to.deep.equal([
+          ['GET /status', ['spec/alpha/openapi.json', 'spec/beta/openapi.json']]
+        ]);
+      });
+
+      it('names none when no two specs declare the same operation', async () => {
+        write('spec/a.json', withPaths({ '/a': { get: {} } }));
+        write('spec/b.json', withPaths({ '/b': { get: {} } }));
+
+        expect((await resolve())._unsafeUnwrap().sharedEndpoints).to.be.empty;
+      });
+
+      // A path item's own method beside its `$ref` declares the operation a second time, in the one spec.
+      it('reads an operation one spec declares twice once, and names none shared', async () => {
+        write('spec/paths/pets.json', JSON.stringify({ get: {} }));
+        write('spec/api.json', withPaths({ '/pets': { $ref: './paths/pets.json', get: {} } }));
+
+        const source = (await resolve())._unsafeUnwrap();
+
+        expect(source.specs[0].endpoints.map(String)).to.deep.equal(['GET /pets']);
+        expect(source.sharedEndpoints).to.be.empty;
+      });
+    });
+  });
+
+  describe('the files a specification refers to', () => {
+    beforeEach(() => writeConfig({ site: { name: 'Calc' } }));
+    afterEach(() => sinon.restore());
+
+    /** `spec/api.json`, whose schemas are the given ones. */
+    const writeSpec = (schemas: Record<string, unknown>, extra: Record<string, unknown> = {}) =>
+      write(
+        'spec/api.json',
+        JSON.stringify({
+          openapi: '3.0.0',
+          info: { title: 'Calc', version: '1' },
+          paths: {},
+          components: { schemas },
+          ...extra
+        })
+      );
+
+    it('refuses a file a specification refers to that is not there, naming the file that refers to it', async () => {
+      writeSpec({ Pet: { $ref: './schemas/Pet.yaml' } });
+
+      expect(specProblem((await resolve())._unsafeUnwrapErr())).to.deep.equal([
+        'missingSpecReference',
+        'spec/schemas/Pet.yaml',
+        'spec/api.json'
+      ]);
+    });
+
+    // As a file system that matches case, which the build may run on, would miss it.
+    it('names the file a missing reference is spelt as on disk, in another case', async () => {
+      writeSpec({ Pet: { $ref: './schemas/pet.yaml' } });
+      write('spec/schemas/Pet.yaml', 'type: object\n');
+      const named = sinon.match((file: FilePath) => file.toString() === path.join(root, 'spec', 'schemas', 'pet.yaml'));
+      sinon
+        .stub(FileService.prototype, 'getContents')
+        .callThrough()
+        .withArgs(named)
+        .rejects(new Error('ENOENT: no such file or directory'));
+      sinon.stub(FileService.prototype, 'fileExists').callThrough().withArgs(named).resolves(false);
+
+      const problem = (await resolve())._unsafeUnwrapErr();
+
+      expect(specProblem(problem)).to.deep.equal(['missingSpecReference', 'spec/schemas/pet.yaml', 'spec/api.json']);
+      expect(
+        problem.kind === 'missingSpecReference' && problem.missing.foundAs?.relativeTo(new DirectoryPath(root))
+      ).to.equal('spec/schemas/Pet.yaml');
+    });
+
+    // Read here on a file system that ignores case, as Windows and macOS do; a build on Linux would miss it.
+    it('refuses a file or a folder named in another case than on disk, wherever it reads', async () => {
+      write('spec/schemas/Pet.yaml', 'type: object\n');
+      const foundAs = async () => {
+        const problem = (await resolve())._unsafeUnwrapErr();
+        expect(specProblem(problem)[0]).to.equal('missingSpecReference');
+        return problem.kind === 'missingSpecReference'
+          ? problem.missing.foundAs?.relativeTo(new DirectoryPath(root))
+          : null;
+      };
+
+      writeSpec({ Pet: { $ref: './schemas/pet.yaml' } });
+      expect(await foundAs()).to.equal('spec/schemas/Pet.yaml');
+
+      writeSpec({ Pet: { $ref: './Schemas/Pet.yaml' } });
+      expect(await foundAs()).to.equal('spec/schemas/Pet.yaml');
+    });
+
+    // As a name stored in another Unicode form, or a folder that cannot be listed, is.
+    it('accepts a file it reads but finds in no listing, rather than calling it misspelt', async () => {
+      writeSpec({ Pet: { $ref: './schemas/Pet.yaml' } });
+      write('spec/schemas/Pet.yaml', 'type: object\n');
+      sinon
+        .stub(FileService.prototype, 'spellingsOnDisk')
+        .callsFake(async (_root: DirectoryPath, files: FilePath[]) => files.map(() => null));
+
+      expect((await resolve()).isOk()).to.be.true;
+    });
+
+    // Its folders above the source directory are where the build runs, not the user's to spell.
+    it('accepts a file outside the source directory', async () => {
+      const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'portal-shared-'));
+      try {
+        fs.writeFileSync(path.join(outside, 'Pet.yaml'), 'type: object\n');
+        writeSpec({ Pet: { $ref: path.relative(path.join(root, 'spec'), path.join(outside, 'Pet.yaml')) } });
+
+        expect((await resolve()).isOk()).to.be.true;
+      } finally {
+        fs.rmSync(outside, { recursive: true, force: true });
+      }
+    });
+
+    it('refuses a file referred to in turn that does not parse, naming the file that refers to it', async () => {
+      writeSpec({ Pet: { $ref: './schemas/Pet.yaml' } });
+      write('spec/schemas/Pet.yaml', 'type: object\nproperties:\n  owner:\n    $ref: ./Owner.yaml\n');
+      write('spec/schemas/Owner.yaml', 'type: object\nrequired: [name\n');
+
+      const problem = (await resolve())._unsafeUnwrapErr();
+
+      expect(specProblem(problem)).to.deep.equal([
+        'unreadableSpec',
+        'spec/schemas/Owner.yaml',
+        'spec/schemas/Pet.yaml'
+      ]);
+      expect(problem.kind === 'unreadableSpec' && problem.reason.kind === 'invalid' && problem.reason.message).to.match(
+        /line \d+, column \d+$/
+      );
+    });
+
+    it('says a reference that names a folder names one', async () => {
+      writeSpec({ Pet: { $ref: './schemas/' } });
+      write('spec/schemas/Pet.yaml', 'type: object\n');
+
+      const problem = (await resolve())._unsafeUnwrapErr();
+
+      expect(specProblem(problem)).to.deep.equal(['unreadableSpec', 'spec/schemas', 'spec/api.json']);
+      expect(problem.kind === 'unreadableSpec' && problem.reason).to.deep.equal({ kind: 'folder' });
+    });
+
+    it('refuses an empty reference, naming the file it is written in', async () => {
+      writeSpec({ Pet: { $ref: './schemas/Pet.yaml' } });
+      write('spec/schemas/Pet.yaml', 'properties:\n  owner:\n    $ref: ""\n');
+
+      const problem = (await resolve())._unsafeUnwrapErr();
+      if (problem.kind !== 'unresolvableSpecReference') {
+        expect.fail(`expected a $ref the build cannot resolve, got '${problem.kind}'`);
+      }
+
+      const { file, ref } = problem.reference;
+      expect([file.relativeTo(new DirectoryPath(root)), ref]).to.deep.equal(['spec/schemas/Pet.yaml', '']);
+    });
+
+    it('follows a reference out of the spec directory, as the build does', async () => {
+      writeSpec({ Pet: { $ref: '../shared/Pet.yaml' } });
+
+      expect(specProblem((await resolve())._unsafeUnwrapErr())).to.deep.equal([
+        'missingSpecReference',
+        'shared/Pet.yaml',
+        'spec/api.json'
+      ]);
+
+      write('shared/Pet.yaml', 'type: object\n');
+      expect((await resolve()).isOk()).to.be.true;
+    });
+
+    it('reads each file once, however often it is referred to, and ends at a cycle', async () => {
+      writeSpec({ Pet: { $ref: './schemas/Pet.yaml' }, Pets: { items: { $ref: './schemas/Pet.yaml#/Pet' } } });
+      write('spec/schemas/Pet.yaml', 'Pet:\n  properties:\n    owner:\n      $ref: ./Owner.yaml\n');
+      write('spec/schemas/Owner.yaml', 'properties:\n  pets:\n    $ref: ./Pet.yaml\n');
+      const reads = sinon.spy(FileService.prototype, 'getContents');
+
+      expect((await resolve()).isOk()).to.be.true;
+      const specFiles = reads.args
+        .map(([file]) => file.relativeTo(new DirectoryPath(root)))
+        .filter((file) => file.startsWith('spec/'));
+      expect(specFiles.sort()).to.deep.equal(['spec/api.json', 'spec/schemas/Owner.yaml', 'spec/schemas/Pet.yaml']);
+    });
+
+    // Held to the bundler itself, since a file refused here would otherwise have built.
+    describe('as the portal bundles it', () => {
+      beforeEach(() => sinon.stub(globalThis.console, 'warn'));
+
+      const bundles = () =>
+        bundleSpec(path.join(root, 'spec', 'api.json')).then(
+          () => true,
+          () => false
+        );
+
+      /** `spec/api.json`, whose schema `Pet` is the file `schemas/<name>` holding `contents`. */
+      const writeReferenced = (name: string, contents: string) => {
+        writeSpec({ Pet: { $ref: `./schemas/${name}` } });
+        write(`spec/schemas/${name}`, contents);
+      };
+
+      // `empty`: the bundler builds, with the reference pointing at nothing, so the page renders without it.
+      const BUNDLED = {
+        builds: 'as the bundler builds it',
+        fails: 'as the bundler fails on it',
+        empty: 'which the bundler reads as nothing'
+      };
+
+      const cases: [string, () => void, keyof typeof BUNDLED][] = [
+        ['a file that is there', () => writeReferenced('Pet.yaml', 'type: object\n'), 'builds'],
+        ['a file that is not there', () => writeSpec({ Pet: { $ref: './schemas/Pet.yaml' } }), 'fails'],
+        ['a file of half-written YAML', () => writeReferenced('Pet.yaml', 'type: object\nrequired: [name\n'), 'fails'],
+        ['a file of half-written JSON', () => writeReferenced('Pet.json', '{ "type": "obj'), 'empty'],
+        ['a JSON file holding YAML', () => writeReferenced('Pet.json', 'type: object\n'), 'builds'],
+        ['a YAML file that opens as JSON does', () => writeReferenced('Pet.yaml', '{ type: object }\n'), 'empty'],
+        [
+          'a YAML file that opens as JSON does only past its first 50 characters',
+          () => writeReferenced('Pet.yaml', `${' '.repeat(50)}{ type: object }\n`),
+          'builds'
+        ],
+        ['a file left empty', () => writeReferenced('Pet.yaml', ''), 'empty'],
+        ['a file holding only a comment', () => writeReferenced('Pet.yaml', '# type: object\n'), 'empty'],
+        [
+          'a file named in a file that is a list',
+          () => {
+            writeSpec({ Pet: { allOf: { $ref: './schemas/parts.yaml' } } });
+            write('spec/schemas/parts.yaml', '- $ref: ./Base.yaml\n');
+          },
+          'fails'
+        ],
+        [
+          'a file named in example data',
+          () => writeSpec({ Pet: { type: 'object', example: { $ref: './examples/pet.json' } } }),
+          'fails'
+        ],
+        [
+          'a file named beside a reference, which is not read',
+          () => {
+            writeSpec({ Pet: { $ref: './Pet.yaml', properties: { owner: { $ref: './Owner.yaml' } } } });
+            write('spec/Pet.yaml', 'type: object\n');
+          },
+          'builds'
+        ],
+        [
+          'two files that refer to each other',
+          () => {
+            writeSpec({ Pet: { $ref: './Pet.yaml' } });
+            write('spec/Pet.yaml', 'properties:\n  owner:\n    $ref: ./Owner.yaml\n');
+            write('spec/Owner.yaml', 'properties:\n  pet:\n    $ref: ./Pet.yaml\n');
+          },
+          'builds'
+        ],
+        [
+          'a file named from the folder of the file that refers to it',
+          () => {
+            writeReferenced('Pet.yaml', 'properties:\n  owner:\n    $ref: ./Owner.yaml\n');
+            write('spec/schemas/Owner.yaml', 'type: object\n');
+          },
+          'builds'
+        ],
+        [
+          'a file named in a part of a file that no reference points into',
+          () => {
+            writeSpec({ Pet: { $ref: './schemas/models.yaml#/Pet' } });
+            write('spec/schemas/models.yaml', 'Pet:\n  type: object\nOwner:\n  $ref: ./Owner.yaml\n');
+          },
+          'fails'
+        ],
+        [
+          'a file outside the spec directory',
+          () => {
+            writeSpec({ Pet: { $ref: '../shared/Pet.yaml' } });
+            write('shared/Pet.yaml', 'type: object\n');
+          },
+          'builds'
+        ],
+        [
+          'a name written with a percent escape, which is not decoded',
+          () => {
+            writeSpec({ Pet: { $ref: './my%20pet.yaml' } });
+            write('spec/my pet.yaml', 'type: object\n');
+          },
+          'fails'
+        ],
+        [
+          'a schema named by its $id',
+          () => writeSpec({ Pet: { $id: 'pet.json', type: 'object' }, Pets: { items: { $ref: 'pet.json' } } }),
+          'builds'
+        ],
+        [
+          'a schema named by its $id from another file',
+          () => {
+            writeSpec({ Pet: { $id: 'pet.json', type: 'object' }, Owner: { $ref: './schemas/Owner.yaml' } });
+            write('spec/schemas/Owner.yaml', 'properties:\n  pet:\n    $ref: pet.json\n');
+          },
+          'builds'
+        ],
+        [
+          'a file named only under the keys the bundler writes',
+          () => writeSpec({}, { 'x-ext': { abc123: { $ref: './embedded.yaml' } } }),
+          'builds'
+        ],
+        ['an empty reference', () => writeSpec({ Pet: { $ref: '' } }), 'fails'],
+        [
+          'an empty reference in a file named',
+          () => writeReferenced('Pet.yaml', 'properties:\n  owner:\n    $ref: ""\n'),
+          'fails'
+        ],
+        ['a bare # in the document bundled', () => writeSpec({ Pet: { $ref: '#' } }), 'fails'],
+        [
+          'a schema named by its $anchor in the document bundled',
+          () => writeSpec({ Pet: { $anchor: 'pet', type: 'object' }, Pets: { items: { $ref: '#pet' } } }),
+          'fails'
+        ],
+        [
+          'a bare # or an anchor in a file named, which the bundler turns into pointers',
+          () => writeReferenced('Pet.yaml', 'properties:\n  self:\n    $ref: "#"\n  tag:\n    $ref: "#tag"\n'),
+          'builds'
+        ],
+        [
+          'a file named by a file: URL, which the bundler reads as a path',
+          () => {
+            writeSpec({ Pet: { $ref: pathToFileURL(path.join(root, 'spec', 'Pet.yaml')).href } });
+            write('spec/Pet.yaml', 'type: object\n');
+          },
+          'fails'
+        ],
+        ['a name with another scheme', () => writeSpec({ Pet: { $ref: 'urn:pet' } }), 'fails'],
+        [
+          'a folder',
+          () => {
+            writeSpec({ Pet: { $ref: './schemas' } });
+            write('spec/schemas/Pet.yaml', 'type: object\n');
+          },
+          'fails'
+        ],
+        [
+          'a part of a file that is not there, which the page renders without',
+          () => {
+            writeSpec({ Pet: { $ref: './Pet.yaml#/nope' } });
+            write('spec/Pet.yaml', 'type: object\n');
+          },
+          'builds'
+        ]
+      ];
+
+      cases.forEach(([label, arrange, bundled]) => {
+        it(`${bundled === 'builds' ? 'accepts' : 'refuses'} ${label}, ${BUNDLED[bundled]}`, async () => {
+          arrange();
+
+          expect(await bundles(), 'the bundler').to.equal(bundled !== 'fails');
+          expect((await resolve()).isOk(), 'the check').to.equal(bundled === 'builds');
+        });
+      });
+
+      // Resolved against the $id, which names no folder of the specification, so the check leaves it to the build.
+      it('accepts a file named below an $id, which the bundler fails on', async () => {
+        writeSpec({ Pet: { $id: 'pet.json', properties: { tag: { $ref: './tag.yaml' } } } });
+
+        expect(await bundles(), 'the bundler').to.be.false;
+        expect((await resolve()).isOk(), 'the check').to.be.true;
+      });
+    });
+  });
+
+  describe('optional directories', () => {
+    beforeEach(() => {
+      writeConfig({ site: { name: 'Calc' } });
+      write('spec/api.json', OPENAPI);
+    });
+
+    // Swallowing the failure would pass the tree off as empty, and a nav.json in it would go
+    // unvalidated to a build that drops bad entries without a word.
+    it('reports a content tree that cannot be walked instead of treating it as empty', async () => {
+      write('content/index.md', page('Home'));
+      // Only the content tree fails; the spec directory is walked the same way and must not.
+      const content = new DirectoryPath(root).join('content');
+      const original = FileService.prototype.getDirectory;
+      const getDirectory = sinon
+        .stub(FileService.prototype, 'getDirectory')
+        .callsFake(function (this: FileService, directory: DirectoryPath) {
+          return directory.isEqual(content) ? Promise.reject(new Error('EACCES')) : original.call(this, directory);
+        });
+
+      try {
+        expect((await resolve())._unsafeUnwrapErr()).to.deep.equal({
+          kind: 'invalidContent',
+          problems: [{ kind: 'unreadableContent' }]
+        });
+      } finally {
+        getDirectory.restore();
+      }
+    });
+
+    // A glob over the tree would skip such an entry; failing the whole build for one is worse
+    // than describing the pages that are there.
+    it('walks past an entry that cannot be examined, such as a link to nothing', async function () {
+      write('content/index.md', page('Home'));
+      write('content/nav.json', JSON.stringify({ pages: ['index'] }));
+      const target = path.join(root, 'content', 'gone');
+      try {
+        fs.symlinkSync(target, path.join(root, 'content', 'dangling.md'), 'file');
+      } catch {
+        // A file link needs a privilege some Windows accounts lack; a junction does not, and
+        // a junction to nothing fails to stat just the same.
+        try {
+          fs.symlinkSync(target, path.join(root, 'content', 'dangling'), 'junction');
+        } catch {
+          this.skip();
+        }
+      }
+
+      expect((await resolve()).isOk()).to.be.true;
+    });
+
+    it('reports content and static as absent when they do not exist', async () => {
+      const source = (await resolve())._unsafeUnwrap();
+
+      expect(source.contentDirectory).to.be.null;
+      expect(source.staticDirectory).to.be.null;
+    });
+
+    // The section's generated metadata lists only the reference pages, and metadata hides
+    // whatever it does not name, so the page never reaches the sidebar.
+    it('reports a page inside a specification’s section as hidden', async () => {
+      write('content/api/api/authentication.md', page('Authentication'));
+
+      expect(hidden((await resolve())._unsafeUnwrap())).to.deep.equal(['content/api/api/authentication.md']);
+    });
+
+    it('reports a page hidden however deep it sits in the section', async () => {
+      write('content/api/api/pets/guide.mdx', page('Guide'));
+      write('content/api/api/pets/(drafts)/notes.md', page('Notes'));
+
+      expect(hidden((await resolve())._unsafeUnwrap())).to.deep.equal([
+        'content/api/api/pets/(drafts)/notes.md',
+        'content/api/api/pets/guide.mdx'
+      ]);
+    });
+
+    // The reference emits no page at the section's own address, so a page there is served
+    // and shown: as the section's landing page, or beside it.
+    for (const landing of ['content/api/api.md', 'content/api/api/index.md']) {
+      it(`does not report ${landing}, at the section’s own address`, async () => {
+        write(landing, page('Landing'));
+
+        expect(hidden((await resolve())._unsafeUnwrap())).to.deep.equal([]);
+      });
+    }
+
+    // An index page is a folder's own link, and the folders directly below a section are the
+    // tag folders, which the CLI cannot tell from the user's without reading the specification.
+    it('does not report an index page one folder below the section, where the tag folders sit', async () => {
+      write('content/api/api/pets/index.md', page('Pets'));
+      write('content/api/api/pets/deeper/index.md', page('Deeper'));
+
+      expect(hidden((await resolve())._unsafeUnwrap())).to.deep.equal(['content/api/api/pets/deeper/index.md']);
+    });
+
+    // The page tree is keyed on the path as written: a differently cased directory, or a
+    // route group on the way, is another folder, and no metadata hides what is in it.
+    it('does not report pages whose directories only resolve to the section’s address', async () => {
+      write('content/API/api/guide.md', page('Guide'));
+      write('content/api/API/guide.md', page('Guide'));
+      write('content/api/(guides)/api/notes.md', page('Notes'));
+
+      expect(hidden((await resolve())._unsafeUnwrap())).to.deep.equal([]);
+    });
+
+    it('does not report pages under content/api in a folder that is no specification', async () => {
+      write('content/api/guides/intro.md', page('Intro'));
+      write('content/api/overview.md', page('Overview'));
+      write('content/api/index.md', page('API reference'));
+
+      expect(hidden((await resolve())._unsafeUnwrap())).to.deep.equal([]);
+    });
+
+    it('names the static files that replace ones the build generates', async () => {
+      write('static/robots.txt', 'User-agent: *');
+      write('static/sitemap.xml', '<urlset/>');
+      write('static/logo.png', 'x');
+
+      const source = (await resolve())._unsafeUnwrap();
+
+      expect(source.shadowedFiles.map(String).sort()).to.deep.equal(['robots.txt', 'sitemap.xml']);
+    });
+
+    it('reports nothing when the static directory holds only its own files', async () => {
+      write('static/logo.png', 'x');
+
+      expect((await resolve())._unsafeUnwrap().shadowedFiles).to.deep.equal([]);
+    });
+
+    it('ignores a generated name sitting below the top of the static directory', async () => {
+      write('static/docs/robots.txt', 'User-agent: *');
+
+      expect((await resolve())._unsafeUnwrap().shadowedFiles).to.deep.equal([]);
+    });
+
+    it('survives an entry in the static directory that cannot be read', async function () {
+      write('static/robots.txt', 'User-agent: *');
+      const dangling = path.join(root, 'static', 'assets');
+      const target = path.join(root, 'gone');
+      fs.mkdirSync(target);
+      try {
+        fs.symlinkSync(target, dangling, 'junction');
+      } catch {
+        // Creating links is a privileged operation on some Windows runners.
+        this.skip();
+      }
+      fs.rmSync(target, { recursive: true, force: true });
+
+      const source = (await resolve())._unsafeUnwrap();
+
+      expect(source.shadowedFiles.map(String)).to.deep.equal(['robots.txt']);
+    });
+
+    it('reports them once they exist', async () => {
+      write('content/index.md', page('hi'));
+      write('static/logo.png', 'x');
+
+      const source = (await resolve())._unsafeUnwrap();
+
+      expect(source.contentDirectory).to.not.be.null;
+      expect(source.staticDirectory).to.not.be.null;
+    });
+  });
+
+  describe('the generated pages', () => {
+    beforeEach(() => write('spec/api.json', OPENAPI));
+
+    const writeFile = (file: object) => write('apimatic.json', JSON.stringify(file));
+
+    /** Each generated page as its folder and file. */
+    const generated = (settings: PortalSettings) =>
+      settings.generatedPages.pages().map((page) => `${page.section.folder}/${page.fileName}`);
+
+    it('carries a page per language, in the order the block lists them', async () => {
+      writeFile({ portal: {}, languages: { python: {}, typescript: {} } });
+
+      expect(generated((await resolve())._unsafeUnwrap())).to.deep.equal([
+        'sdks/index.mdx',
+        'sdks/python.mdx',
+        'sdks/typescript.mdx'
+      ]);
+    });
+
+    it('carries the context plugin page only when there is a plugin block', async () => {
+      writeFile({ portal: {}, languages: LANGUAGES, plugin: {} });
+      expect(generated((await resolve())._unsafeUnwrap())).to.include('context-plugin/index.mdx');
+
+      writeFile({ portal: {}, languages: LANGUAGES });
+      expect(generated((await resolve())._unsafeUnwrap())).to.not.include('context-plugin/index.mdx');
+    });
+
+    /** What the context plugin page tells readers to install from. */
+    const installPath = (settings: PortalSettings) =>
+      settings.generatedPages.pages().find((page) => page.template === 'context-plugin')?.data.installPath;
+
+    it('installs the plugin block from the copy bundled into the portal', async () => {
+      writeFile({ portal: {}, languages: LANGUAGES, plugin: {} });
+
+      expect(installPath((await resolve())._unsafeUnwrap())).to.equal('/__downloads/plugin.zip');
+    });
+
+    // The portal artifacts carry no plugin when it is hosted elsewhere.
+    it('carries the page for a pluginUrl, with or without a plugin block, installing from it', async () => {
+      writeFile({ portal: { pluginUrl: 'https://plugins.acme.test/calc.zip' }, languages: LANGUAGES });
+      expect(installPath((await resolve())._unsafeUnwrap())).to.equal('https://plugins.acme.test/calc.zip');
+
+      writeFile({ portal: { pluginUrl: 'https://plugins.acme.test/calc.zip' }, languages: LANGUAGES, plugin: {} });
+      expect(installPath((await resolve())._unsafeUnwrap())).to.equal('https://plugins.acme.test/calc.zip');
+    });
+
+    // The plugin commands judge the block; a build does not fail over it, and gets no page.
+    it('treats a plugin block that is not an object as no block', async () => {
+      writeFile({ portal: {}, languages: LANGUAGES, plugin: 'yes' });
+
+      expect(generated((await resolve())._unsafeUnwrap())).to.not.include('context-plugin/index.mdx');
+    });
+
+    // Nothing in the block is read, so an identity the plugin commands would refuse still gets the page.
+    it('carries the context plugin page for a block whose identity is malformed', async () => {
+      writeFile({ portal: {}, languages: LANGUAGES, plugin: { pluginId: 'Bad Id!', pluginVersion: 'one' } });
+
+      expect(generated((await resolve())._unsafeUnwrap())).to.include('context-plugin/index.mdx');
+    });
+
+    it('reads them again for portal serve', async () => {
+      // Named, because nothing suggests a site when the specifications are not read again.
+      writeFile({ portal: { site: { name: 'Calc' } }, languages: { csharp: {} }, plugin: {} });
+
+      const reloaded = (await new PortalSourceContext(new DirectoryPath(root)).resolveSettings(null))._unsafeUnwrap();
+
+      expect(generated(reloaded)).to.deep.equal(['sdks/index.mdx', 'sdks/csharp.mdx', 'context-plugin/index.mdx']);
+    });
+  });
+
+  describe('the addresses the generated pages are served at', () => {
+    beforeEach(() => {
+      writeConfig({ site: { name: 'Calc' } });
+      write('spec/api.json', OPENAPI);
+      write('content/index.md', page('Home'));
+    });
+
+    /** Each refused page as the file, where it would be served, and the section it collides with. */
+    const reserved = (refused: PortalSourceProblem): string[] => {
+      const problem = contentProblem(refused);
+      if (problem.kind !== 'reservedAddresses') {
+        throw new Error(`expected a 'reservedAddresses' problem, got '${problem.kind}'`);
+      }
+      return problem.pages
+        .map(
+          ({ file, address, keptFor }) => `${file.relativeTo(new DirectoryPath(root))} ${address} ${keptFor.address}`
+        )
+        .sort();
+    };
+
+    (
+      [
+        [
+          // Three of them share /sdks as well, which is not said again.
+          'refuses every page the SDK pages would share an address with, naming each',
+          ['content/sdks.md', 'content/sdks/setup.mdx', 'content/(intro)/sdks.md', 'content/sdks/index.md'],
+          [
+            'content/(intro)/sdks.md /sdks /sdks',
+            'content/sdks.md /sdks /sdks',
+            'content/sdks/index.md /sdks /sdks',
+            'content/sdks/setup.mdx /sdks/setup /sdks'
+          ]
+        ],
+        [
+          // Reserved with or without a plugin block, so adding one never refuses a page that built.
+          'refuses a page at the context plugin address although there is no plugin block',
+          ['content/context-plugin.md', 'content/context-plugin/faq.md'],
+          [
+            'content/context-plugin.md /context-plugin /context-plugin',
+            'content/context-plugin/faq.md /context-plugin/faq /context-plugin'
+          ]
+        ],
+        [
+          // The template's route wins over the page, which would build, sit in the sidebar and never be shown.
+          'refuses a page at the OAuth callback address, and only there',
+          [
+            'content/oauth/callback.md',
+            'content/(auth)/oauth/callback/index.mdx',
+            'content/oauth/index.md',
+            'content/oauth/callback/setup.md'
+          ],
+          [
+            'content/(auth)/oauth/callback/index.mdx /oauth/callback /oauth/callback',
+            'content/oauth/callback.md /oauth/callback /oauth/callback'
+          ]
+        ]
+      ] as const
+    ).forEach(([name, files, refused]) => {
+      it(name, async () => {
+        files.forEach((file) => write(file, page('Page')));
+
+        expect(reserved((await resolve())._unsafeUnwrapErr())).to.deep.equal(refused);
+      });
+    });
+
+    // A group folder's name is not part of the address; only the folder it groups is.
+    it('accepts pages whose address only starts with the same letters, or sits deeper', async () => {
+      write('content/sdks-overview.md', page('Overview'));
+      write('content/guides/sdks.md', page('Nested'));
+      write('content/(sdks)/intro.md', page('Grouped'));
+      write('content/plugin.md', page('Plugin'));
+
+      expect((await resolve()).isOk()).to.be.true;
+    });
+
+    it('leaves a nav.json alone in a directory of that name, which is no page', async () => {
+      write('content/sdks/nav.json', JSON.stringify({ pages: [] }));
+
+      expect((await resolve()).isOk()).to.be.true;
+    });
+
+    it('answers an entry that names a generated section with its token', async () => {
+      write('content/nav.json', JSON.stringify({ pages: ['index', 'sdks', 'context-plugin'] }));
+
+      const problem = contentProblem((await resolve())._unsafeUnwrapErr());
+
+      expect(problem.kind === 'invalidNavigation' && problem.errors).to.deep.equal([
+        "content/nav.json: 'sdks' is not a page or folder in this directory. 'apimatic:sdks' positions the SDK pages.",
+        "content/nav.json: 'context-plugin' is not a page or folder in this directory. 'apimatic:plugin' positions the context plugin page."
+      ]);
+    });
+  });
+
+  describe('the addresses the pages are served at', () => {
+    beforeEach(() => {
+      writeConfig({ site: { name: 'Calc' } });
+      write('spec/api.json', OPENAPI);
+      write('content/index.md', page('Home'));
+    });
+
+    /** Each shared address with the pages that would be served there. */
+    const shared = (refused: PortalSourceProblem): string[] => {
+      const problem = contentProblem(refused);
+      if (problem.kind !== 'sharedAddresses') {
+        throw new Error(`expected a 'sharedAddresses' problem, got '${problem.kind}'`);
+      }
+      return problem.addresses
+        .map(({ key, files }) => `${key} ${files.map((page) => page.relativeTo(new DirectoryPath(root))).sort()}`)
+        .sort();
+    };
+
+    it('refuses a page named like a (group) folder, which Fumadocs throws on', async () => {
+      write('content/(intro).md', page('Intro'));
+
+      expect(contentProblem((await resolve())._unsafeUnwrapErr())).to.deep.equal({
+        kind: 'groupNamedPages',
+        pages: [new FilePath(new DirectoryPath(root).join('content'), new FileName('(intro).md'))]
+      });
+    });
+
+    // It has no address, so it cannot share one with the page it looks like it would.
+    it('refuses such a page only for its name', async () => {
+      write('content/(intro).md', page('Intro'));
+      write('content/(start)/(intro).md', page('Intro again'));
+
+      expect(contentProblem((await resolve())._unsafeUnwrapErr()).kind).to.equal('groupNamedPages');
+    });
+
+    // Vite's glob, which the build reads the content through, never loads them.
+    it('leaves out dot files, dot folders and node_modules, whatever they hold', async () => {
+      write('content/._index.md', 'binary AppleDouble data');
+      write('content/.drafts/notes.md', '# No front matter');
+      write('content/.drafts/nav.json', 'not even JSON');
+      write('content/node_modules/pkg/README.md', '# Readme');
+      write('content/nav.json', JSON.stringify({ pages: ['index'] }));
+
+      const source = (await resolve())._unsafeUnwrap();
+
+      expect(source.contentNotices.hiddenPages).to.deep.equal([]);
+    });
+
+    it('does not count a dot folder as one a nav.json entry can name', async () => {
+      write('content/.drafts/notes.md', page('Notes'));
+      write('content/nav.json', JSON.stringify({ pages: ['index', '.drafts'] }));
+
+      const problem = contentProblem((await resolve())._unsafeUnwrapErr());
+
+      expect(problem.kind === 'invalidNavigation' && problem.errors).to.deep.equal([
+        "content/nav.json: '.drafts' is not a page or folder in this directory."
+      ]);
+    });
+
+    // The build would serve the page there and move the folder's own to /guides/index.
+    it('refuses a page beside a folder whose index page has the same address', async () => {
+      write('content/guides.md', page('Guides page'));
+      write('content/guides/index.md', page('Guides'));
+
+      expect(shared((await resolve())._unsafeUnwrapErr())).to.deep.equal([
+        '/guides content/guides.md,content/guides/index.md'
+      ]);
+    });
+
+    it('refuses every address two pages share, through a (group) folder or two extensions', async () => {
+      write('content/(start)/index.md', page('Start'));
+      write('content/intro.md', page('Intro'));
+      write('content/(learn)/intro.mdx', page('Grouped intro'));
+      write('content/faq.md', page('FAQ'));
+      write('content/faq.mdx', page('FAQ again'));
+
+      expect(shared((await resolve())._unsafeUnwrapErr())).to.deep.equal([
+        '/ content/(start)/index.md,content/index.md',
+        '/faq content/faq.md,content/faq.mdx',
+        '/intro content/(learn)/intro.mdx,content/intro.md'
+      ]);
+    });
+
+    it('names an address as the build serves it, encoded as a URL is', async () => {
+      write('content/café.md', page('Café'));
+      write('content/(menu)/café.mdx', page('Café again'));
+
+      expect(shared((await resolve())._unsafeUnwrapErr())).to.deep.equal([
+        '/caf%C3%A9 content/(menu)/café.mdx,content/café.md'
+      ]);
+    });
+
+    it('accepts a page beside a folder of the same name that has no index page', async () => {
+      write('content/guides.md', page('Guides page'));
+      write('content/guides/intro.md', page('Intro'));
+
+      expect((await resolve()).isOk()).to.be.true;
+    });
+  });
+
+  // What `portal serve` runs on each save in content/, with the specifications `resolve` found.
+  describe('resolveContent', () => {
+    beforeEach(() => {
+      writeConfig({ site: { name: 'Calc' } });
+      write('spec/api.json', OPENAPI);
+      write('content/index.md', page('Home'));
+    });
+
+    it('refuses what resolve refuses about the content, and accepts it once fixed', async () => {
+      const { specs, generatedPages } = (await resolve())._unsafeUnwrap();
+      const context = new PortalSourceContext(new DirectoryPath(root));
+
+      write('content/nav.json', JSON.stringify({ pages: ['index', 'missing'] }));
+      const refused = (await context.resolveContent(specs, generatedPages))._unsafeUnwrapErr();
+      write('content/nav.json', JSON.stringify({ pages: ['index'] }));
+
+      expect(refused.map(({ kind }) => kind)).to.deep.equal(['invalidNavigation']);
+      expect((await context.resolveContent(specs, generatedPages)).isOk()).to.be.true;
+    });
+
+    // The reference's folders are the specifications' own, which it takes as they were at startup.
+    it('lets content/api/nav.json name a specification without reading it again', async () => {
+      const { specs, generatedPages } = (await resolve())._unsafeUnwrap();
+      write('content/api/nav.json', JSON.stringify({ pages: [specs[0].slug] }));
+      fs.rmSync(path.join(root, 'spec/api.json'));
+
+      const content = await new PortalSourceContext(new DirectoryPath(root)).resolveContent(specs, generatedPages);
+
+      expect(content.isOk()).to.be.true;
+    });
+
+    it('gives the notices resolve gives about the content', async () => {
+      write('content/guides/intro.md', page('Intro'));
+      write('content/nav.json', JSON.stringify({ tabs: ['guides'], pages: ['index'] }));
+      write('content/api/api/notes.md', page('Notes'));
+      write('content/guides/Nav.json', JSON.stringify({ pages: ['intro'] }));
+      const source = (await resolve())._unsafeUnwrap();
+
+      const accepted = await new PortalSourceContext(new DirectoryPath(root)).resolveContent(
+        source.specs,
+        source.generatedPages
+      );
+
+      expect(accepted._unsafeUnwrap().notices).to.deep.equal(source.contentNotices);
+      expect(hidden(source)).to.deep.equal(['content/api/api/notes.md']);
+      expect(ignored(source)).to.deep.equal(['content/guides/Nav.json']);
+    });
+
+    // What `portal serve` writes into the preview's copy, since a save made after it read them went unchecked.
+    it('gives each page and nav.json it accepted, as it read them', async () => {
+      write('content/guides/intro.md', page('Intro'));
+      write('content/nav.json', JSON.stringify({ tabs: ['guides'], pages: ['index'] }));
+      write('content/logo.png', 'x');
+      const { specs, generatedPages } = (await resolve())._unsafeUnwrap();
+
+      const { files } = (
+        await new PortalSourceContext(new DirectoryPath(root)).resolveContent(specs, generatedPages)
+      )._unsafeUnwrap();
+
+      expect(
+        files.map(({ file, contents }) => [file.relativeTo(new DirectoryPath(root)), contents]).sort()
+      ).to.deep.equal([
+        ['content/guides/intro.md', page('Intro')],
+        ['content/index.md', page('Home')],
+        ['content/nav.json', JSON.stringify({ tabs: ['guides'], pages: ['index'] })]
+      ]);
+    });
+
+    // `portal serve` passes the generated pages the preview shows, which an edit to apimatic.json changes.
+    it('names the tabs against the generated pages it is given', async () => {
+      write('content/extensions/first.md', page('First'));
+      write('content/extensions/nav.json', JSON.stringify({ title: 'Context Plugin' }));
+      write('content/nav.json', JSON.stringify({ tabs: ['extensions', 'apimatic:plugin'], pages: ['index'] }));
+      const { specs, generatedPages: withoutPlugin } = (await resolve())._unsafeUnwrap();
+      write('apimatic.json', JSON.stringify({ portal: { site: { name: 'Calc' } }, languages: LANGUAGES, plugin: {} }));
+      const { generatedPages: withPlugin } = (await resolve())._unsafeUnwrap();
+      const context = new PortalSourceContext(new DirectoryPath(root));
+
+      const names = async (generatedPages: GeneratedPages) =>
+        (await context.resolveContent(specs, generatedPages))
+          ._unsafeUnwrap()
+          .notices.sharedTabNames.map(({ name }) => name);
+
+      expect(await names(withoutPlugin)).to.deep.equal([]);
+      expect(await names(withPlugin)).to.deep.equal(['Context Plugin']);
+    });
+  });
+
+  // One run lists all of it, so a project upgraded from 1.x is not fixed one kind of mistake at a time.
+  describe('every problem in the content', () => {
+    beforeEach(() => {
+      writeConfig({ site: { name: 'Calc' } });
+      write('spec/api.json', OPENAPI);
+      write('content/index.md', page('Home'));
+    });
+
+    const kinds = async () => contentProblems((await resolve())._unsafeUnwrapErr()).map(({ kind }) => kind);
+
+    it('reports the front matter and the nav.json files together', async () => {
+      write('content/notes.md', '# Notes');
+      write('content/nav.json', JSON.stringify({ pages: ['index', 'missing'] }));
+
+      expect(await kinds()).to.deep.equal(['invalidFrontMatter', 'invalidNavigation']);
+    });
+
+    it('reports every kind of page at the wrong address together, with the front matter', async () => {
+      write('content/(intro).md', page('Intro'));
+      write('content/sdks.md', page('Mine'));
+      write('content/faq.md', page('FAQ'));
+      write('content/faq.mdx', '# FAQ again');
+
+      expect(await kinds()).to.deep.equal([
+        'groupNamedPages',
+        'reservedAddresses',
+        'sharedAddresses',
+        'invalidFrontMatter'
+      ]);
+    });
+
+    // An entry naming such a page would be answered as if the page were served where it sits.
+    it('leaves the nav.json files until every page has an address of its own', async () => {
+      write('content/guides.md', page('Guides page'));
+      write('content/guides/index.md', page('Guides'));
+      write('content/nav.json', JSON.stringify({ pages: ['index', 'guides', 'missing'] }));
+
+      expect(await kinds()).to.deep.equal(['sharedAddresses']);
+    });
+  });
+
+  // The build fails as a whole over one page its schema refuses, with a stack trace for a message.
+  describe('the front matter of the pages', () => {
+    beforeEach(() => {
+      writeConfig({ site: { name: 'Calc' } });
+      write('spec/api.json', OPENAPI);
+      write('content/index.md', page('Home'));
+    });
+
+    it('refuses every page whose front matter the build would refuse, naming each', async () => {
+      write('content/notes.md', 'Just a body, no front matter.');
+      write('content/guides/intro.mdx', '---\ntitle: 2024\n---\n');
+
+      const problem = contentProblem((await resolve())._unsafeUnwrapErr());
+
+      expect(problem.kind === 'invalidFrontMatter' && [...problem.errors].sort()).to.deep.equal([
+        "content/guides/intro.mdx: 'title' must be text. Put it in quotes if it looks like a number or true or false.",
+        'content/notes.md has no front matter, which is where its title goes.'
+      ]);
+    });
+
+    it('reports a page it cannot read, rather than throwing', async () => {
+      write('content/notes.md', page('Notes'));
+      const getContents = FileService.prototype.getContents;
+      const read = sinon
+        .stub(FileService.prototype, 'getContents')
+        .callsFake(function (this: FileService, file: FilePath) {
+          return file.name().is('notes.md') ? Promise.reject(new Error('EACCES')) : getContents.call(this, file);
+        });
+
+      try {
+        const problem = contentProblem((await resolve())._unsafeUnwrapErr());
+
+        expect(problem.kind === 'invalidFrontMatter' && problem.errors).to.deep.equal([
+          'content/notes.md could not be read.'
+        ]);
+      } finally {
+        read.restore();
+      }
+    });
+
+    it('checks the pages below content/api too, which the build compiles as well', async () => {
+      write('content/api/overview.md', '# Overview');
+
+      const problem = contentProblem((await resolve())._unsafeUnwrapErr());
+
+      expect(problem.kind === 'invalidFrontMatter' && problem.errors).to.deep.equal([
+        'content/api/overview.md has no front matter, which is where its title goes.'
+      ]);
+    });
+  });
+
+  // The build imports each Markdown image, and fails as a whole over one it cannot find.
+  describe('the images the pages show', () => {
+    beforeEach(() => {
+      writeConfig({ site: { name: 'Calc' } });
+      write('spec/api.json', OPENAPI);
+      write('static/images/logo.png', 'png');
+      write('content/guides/diagram.png', 'png');
+    });
+
+    /** Each missing image: its page and line, as written, where it was looked for and what is there instead. */
+    const missingImages = async () => {
+      const problem = contentProblem((await resolve())._unsafeUnwrapErr());
+      if (problem.kind !== 'missingImages') {
+        throw new Error(`expected missing images, got '${problem.kind}'`);
+      }
+      const relative = (file: FilePath | null) => (file === null ? null : file.relativeTo(new DirectoryPath(root)));
+      return problem.images.map(({ page, line, url, missing }) => [
+        `${relative(page)}:${line}`,
+        url,
+        relative(missing?.file ?? null),
+        relative(missing?.foundAs ?? null)
+      ]);
+    };
+
+    it('accepts images in the static directory and beside their page, whatever the query or encoding', async () => {
+      write('static/images/team photo.png', 'png');
+      write(
+        'content/guides/index.md',
+        page('Guides') +
+          '![Logo](/images/logo.png)\n\n![Diagram](./diagram.png?v=2)\n\n![Again](diagram.png#top)\n\n' +
+          '![Team](/images/team%20photo.png)\n\n![Remote](https://example.com/x.png)\n\n![Inline](data:image/png;base64,AA)\n'
+      );
+
+      expect((await resolve()).isOk()).to.be.true;
+    });
+
+    it('names each image the build would not find, with its page and line', async () => {
+      write(
+        'content/guides/index.md',
+        page('Guides') + '\n![Logo](/images/missing.png)\n\nText ![Diagram](./missing.png) inline.\n'
+      );
+
+      expect(await missingImages()).to.deep.equal([
+        ['content/guides/index.md:5', '/images/missing.png', 'static/images/missing.png', null],
+        ['content/guides/index.md:7', './missing.png', 'content/guides/missing.png', null]
+      ]);
+    });
+
+    // Found by this machine's file system, and lost by a build on one that matches case.
+    it('names the spelling on disk of an image written in another case', async () => {
+      write('content/index.md', page('Home') + '![Logo](/images/Logo.png)\n');
+
+      expect(await missingImages()).to.deep.equal([
+        ['content/index.md:4', '/images/Logo.png', 'static/images/Logo.png', 'static/images/logo.png']
+      ]);
+    });
+
+    it('refuses a static image when there is no static directory', async () => {
+      fs.rmSync(path.join(root, 'static'), { recursive: true });
+      write('content/index.md', page('Home') + '![Logo](/images/logo.png)\n');
+
+      expect(await missingImages()).to.deep.equal([
+        ['content/index.md:4', '/images/logo.png', 'static/images/logo.png', null]
+      ]);
+    });
+
+    // The build reads a copy of content/, which neither of these is in.
+    it('refuses an image beside the page that points out of content/ or into a folder the build skips', async () => {
+      write('content/.drafts/sketch.png', 'png');
+      write('content/index.md', page('Home') + '![Logo](../static/images/logo.png)\n\n![Sketch](.drafts/sketch.png)\n');
+
+      expect(await missingImages()).to.deep.equal([
+        ['content/index.md:4', '../static/images/logo.png', null, null],
+        ['content/index.md:6', '.drafts/sketch.png', null, null]
+      ]);
+    });
+
+    it('reads an image in a code block or inline code as the text it is', async () => {
+      write('content/index.md', page('Home') + '```md\n![Logo](/images/missing.png)\n```\n\nWrite `![a](/b.png)`.\n');
+
+      expect((await resolve()).isOk()).to.be.true;
+    });
+
+    it('reads an .mdx page as MDX, where an image inside a component is still an image', async () => {
+      write('content/index.mdx', page('Home') + '<Callout>\n\n![Logo](/images/missing.png)\n\n</Callout>\n');
+
+      expect(await missingImages()).to.deep.equal([
+        ['content/index.mdx:6', '/images/missing.png', 'static/images/missing.png', null]
+      ]);
+    });
+
+    it('reports the images with the other problems in the content', async () => {
+      write('content/notes.md', '# Notes');
+      write('content/index.md', page('Home') + '![Logo](/images/missing.png)\n');
+
+      const kinds = contentProblems((await resolve())._unsafeUnwrapErr()).map(({ kind }) => kind);
+
+      expect(kinds).to.deep.equal(['invalidFrontMatter', 'missingImages']);
+    });
+  });
+
+  describe('nav.json', () => {
+    beforeEach(() => {
+      writeConfig({ site: { name: 'Calc' } });
+      write('spec/api.json', OPENAPI);
+      write('content/index.md', page('Home'));
+      write('content/authentication.md', page('Auth'));
+    });
+
+    /** The errors behind an `invalidNavigation` problem, as their own type. */
+    const navigationErrors = (refused: PortalSourceProblem): string[] => {
+      const problem = contentProblem(refused);
+      if (problem.kind !== 'invalidNavigation') {
+        throw new Error(`expected an 'invalidNavigation' problem, got '${problem.kind}'`);
+      }
+      return problem.errors;
+    };
+
+    it('accepts a file naming the pages beside it, and both tokens at the root as tabs', async () => {
+      write(
+        'content/nav.json',
+        JSON.stringify({ tabs: ['apimatic:sdks', 'apimatic:api'], pages: ['index', 'authentication'] })
+      );
+
+      expect((await resolve()).isOk()).to.be.true;
+    });
+
+    // A token in `pages` places its section in Home's sidebar.
+    it('accepts the tokens in pages beside an empty tabs, which places the sections in Home', async () => {
+      write(
+        'content/nav.json',
+        JSON.stringify({ tabs: [], pages: ['index', 'apimatic:sdks', 'authentication', 'apimatic:api'] })
+      );
+
+      expect((await resolve()).isOk()).to.be.true;
+    });
+
+    it('reports a file it cannot read, rather than throwing', async () => {
+      write('content/nav.json', JSON.stringify({ pages: ['index'] }));
+      const getContents = FileService.prototype.getContents;
+      const read = sinon
+        .stub(FileService.prototype, 'getContents')
+        .callsFake(function (this: FileService, file: FilePath) {
+          return file.name().is('nav.json') ? Promise.reject(new Error('EACCES')) : getContents.call(this, file);
+        });
+
+      try {
+        expect(navigationErrors((await resolve())._unsafeUnwrapErr())).to.deep.equal([
+          'content/nav.json could not be read.'
+        ]);
+      } finally {
+        read.restore();
+      }
+    });
+
+    it('resolves with no navigation file at all', async () => {
+      expect((await resolve()).isOk()).to.be.true;
+    });
+
+    // The build parses the file as JSON whatever its size, so an empty one has to be refused
+    // here rather than pass as if it were absent.
+    it('refuses an empty file the same way as a broken one', async () => {
+      write('content/nav.json', '');
+
+      const errors = navigationErrors((await resolve())._unsafeUnwrapErr());
+
+      expect(errors).to.deep.equal(['content/nav.json is not valid JSON.']);
+    });
+
+    it('names the file and the entry when a page does not exist', async () => {
+      write('content/nav.json', JSON.stringify({ pages: ['index', 'missing'] }));
+
+      const errors = navigationErrors((await resolve())._unsafeUnwrapErr());
+
+      expect(errors).to.deep.equal(["content/nav.json: 'missing' is not a page or folder in this directory."]);
+    });
+
+    // The reference is mounted in content/api, one folder per specification, so the nav.json
+    // there positions those folders as it does the user's own pages.
+    it('lets the nav.json in content/api name the specifications beside its pages', async () => {
+      write('spec/billing.json', OPENAPI);
+      write('content/api/overview.md', page('Overview'));
+      write('content/api/nav.json', JSON.stringify({ pages: ['overview', 'api', 'billing'] }));
+
+      expect((await resolve()).isOk()).to.be.true;
+    });
+
+    // Listing a folder in the content root's file is what makes it a tab.
+    it('reports a root setting in a folder’s nav.json as unknown', async () => {
+      write('content/tutorials/first-call.md', page('First call'));
+      write('content/tutorials/nav.json', JSON.stringify({ root: true }));
+
+      const errors = navigationErrors((await resolve())._unsafeUnwrapErr());
+
+      expect(errors).to.deep.equal([
+        "content/tutorials/nav.json: 'root' is not a nav.json setting. The settings are 'pages' and 'title'."
+      ]);
+    });
+
+    it('accepts tabs naming the folders that are tabs, with pages ordering the rest inside Home', async () => {
+      write('content/tutorials/first-call.md', page('First call'));
+      write('content/guides/intro.md', page('Intro'));
+      write('content/concepts/pets.md', page('Pets'));
+      write('content/nav.json', JSON.stringify({ tabs: ['tutorials', 'guides'], pages: ['index', 'concepts', '...'] }));
+
+      expect((await resolve()).isOk()).to.be.true;
+    });
+
+    // With no `tabs` there is no tab, so the file has one reading: every entry orders Home's sidebar.
+    it('accepts a root file with no tabs that lists a folder or a token in pages', async () => {
+      write('content/tutorials/first-call.md', page('First call'));
+      write('content/nav.json', JSON.stringify({ pages: ['index', 'tutorials', 'apimatic:api'] }));
+
+      expect((await resolve()).isOk()).to.be.true;
+    });
+
+    it('refuses tabs below the content root', async () => {
+      write('content/guides/intro.md', page('Intro'));
+      write('content/guides/nav.json', JSON.stringify({ tabs: ['intro'] }));
+
+      const errors = navigationErrors((await resolve())._unsafeUnwrapErr());
+
+      expect(errors).to.have.lengthOf(1);
+      expect(errors[0]).to.contain("content/guides/nav.json: 'tabs' is only read in the nav.json at the top");
+    });
+
+    it('refuses a name shared by a page and a folder, since only the folder could be positioned', async () => {
+      write('content/guides.md', page('Guides'));
+      write('content/guides/intro.md', page('Intro'));
+      write('content/nav.json', JSON.stringify({ tabs: [], pages: ['guides', 'index'] }));
+
+      const errors = navigationErrors((await resolve())._unsafeUnwrapErr());
+
+      expect(errors[0]).to.contain("content/nav.json: 'guides' is both a page and a folder");
+    });
+
+    // The reference is mounted at content/api with no directory there to see, so nothing in
+    // the tree makes `api` look like two children. Listing it is what turns the entry the
+    // template would honour as the reference into an error rather than a silent reordering.
+    it('refuses api at the root when a page carries the name the reference is mounted at', async () => {
+      write('content/api.md', page('My API notes'));
+      write('content/nav.json', JSON.stringify({ tabs: [], pages: ['index', 'api'] }));
+
+      const errors = navigationErrors((await resolve())._unsafeUnwrapErr());
+
+      expect(errors).to.have.lengthOf(1);
+      expect(errors[0]).to.contain("content/nav.json: 'api' is where the API reference is mounted");
+    });
+
+    // The mount point is a child of the content root in every portal, so the entry positions
+    // the reference whether or not the user keeps a directory of their own there.
+    it('accepts api at the root with nothing of that name on disk at all', async () => {
+      write('content/nav.json', JSON.stringify({ tabs: [], pages: ['index', 'api'] }));
+
+      expect((await resolve()).isOk()).to.be.true;
+    });
+
+    it('accepts api at the root when a directory of that name holds the user’s own pages', async () => {
+      write('content/api/overview.md', page('Overview'));
+      write('content/nav.json', JSON.stringify({ tabs: [], pages: ['index', 'api'] }));
+
+      expect((await resolve()).isOk()).to.be.true;
+    });
+
+    // One node, so the two spellings name it twice wherever the directory came from.
+    it('refuses api together with the token, with or without a directory of that name', async () => {
+      write('content/api/overview.md', page('Overview'));
+      write('content/nav.json', JSON.stringify({ tabs: [], pages: ['index', 'api', 'apimatic:api'] }));
+
+      const errors = navigationErrors((await resolve())._unsafeUnwrapErr());
+
+      expect(errors[0]).to.contain("'api' and 'apimatic:api' both position the API reference");
+    });
+
+    // The specification's folder is one child; a page of the same name beside it is another.
+    it('refuses a specification’s name when a page under content/api carries it too', async () => {
+      write('content/api/api.md', page('Landing'));
+      write('content/api/nav.json', JSON.stringify({ pages: ['api'] }));
+
+      const errors = navigationErrors((await resolve())._unsafeUnwrapErr());
+
+      expect(errors[0]).to.contain("content/api/nav.json: 'api' is both a page and a folder");
+    });
+
+    it('refuses a specification named anywhere but in content/api', async () => {
+      write('content/guides/intro.md', page('Intro'));
+      write('content/guides/nav.json', JSON.stringify({ pages: ['intro', 'api'] }));
+
+      const errors = navigationErrors((await resolve())._unsafeUnwrapErr());
+
+      expect(errors[0]).to.contain("content/guides/nav.json: 'api' is not a page or folder");
+    });
+
+    it('validates a nested file against its own directory', async () => {
+      write('content/guides/intro.md', page('Intro'));
+      write('content/nav.json', JSON.stringify({ tabs: ['guides'], pages: ['index'] }));
+      write('content/guides/nav.json', JSON.stringify({ pages: ['intro'] }));
+
+      expect((await resolve()).isOk()).to.be.true;
+    });
+
+    // A folder's index page is what the folder itself links to, not one of its children.
+    it('refuses index in a nested file while keeping it at the content root', async () => {
+      write('content/guides/index.md', page('Guides'));
+      write('content/guides/intro.md', page('Intro'));
+      write('content/nav.json', JSON.stringify({ tabs: ['guides'], pages: ['index'] }));
+      write('content/guides/nav.json', JSON.stringify({ pages: ['index', 'intro'] }));
+
+      const errors = navigationErrors((await resolve())._unsafeUnwrapErr());
+
+      expect(errors).to.have.lengthOf(1);
+      expect(errors[0]).to.contain("content/guides/nav.json: 'index' is the page this folder opens on");
+    });
+
+    it('refuses a page named in the wrong directory', async () => {
+      write('content/guides/intro.md', page('Intro'));
+      // 'authentication' is a sibling of the content root's nav.json, not of this one.
+      write('content/guides/nav.json', JSON.stringify({ pages: ['authentication'] }));
+
+      const errors = navigationErrors((await resolve())._unsafeUnwrapErr());
+
+      expect(errors[0]).to.contain("content/guides/nav.json: 'authentication' is not a page or folder");
+    });
+
+    it('refuses an apimatic token outside the content root', async () => {
+      write('content/guides/intro.md', page('Intro'));
+      write('content/guides/nav.json', JSON.stringify({ pages: ['intro', 'apimatic:api'] }));
+
+      const errors = navigationErrors((await resolve())._unsafeUnwrapErr());
+
+      expect(errors[0]).to.contain("content/guides/nav.json: 'apimatic:api' can only be used");
+    });
+
+    it('collects the errors of every file in the tree', async () => {
+      write('content/guides/intro.md', page('Intro'));
+      write('content/nav.json', JSON.stringify({ pages: ['nope'] }));
+      write('content/guides/nav.json', JSON.stringify({ pages: ['also-nope'] }));
+
+      const errors = navigationErrors((await resolve())._unsafeUnwrapErr());
+
+      expect(errors).to.have.lengthOf(2);
+      expect(errors.join('\n')).to.contain('content/nav.json');
+      expect(errors.join('\n')).to.contain('content/guides/nav.json');
+    });
+
+    it('addresses a page by its name without the extension, for both md and mdx', async () => {
+      write('content/tour.mdx', page('Tour'));
+      write('content/nav.json', JSON.stringify({ pages: ['index', 'tour', 'authentication'] }));
+
+      expect((await resolve()).isOk()).to.be.true;
+    });
+
+    // The sidebar shows no folder for a directory with no pages under it, so an entry naming
+    // one would resolve to nothing.
+    it('refuses a directory that holds no pages', async () => {
+      write('content/assets/logo.png', 'x');
+      write('content/nav.json', JSON.stringify({ pages: ['index', 'assets'] }));
+
+      const errors = navigationErrors((await resolve())._unsafeUnwrapErr());
+
+      expect(errors[0]).to.contain("'assets' is a folder with no page in it or below it");
+    });
+
+    // The template drops the empty folder Fumadocs would otherwise build for it.
+    it('refuses a directory that holds only a nav.json', async () => {
+      write('content/guides/nav.json', JSON.stringify({ pages: [] }));
+      write('content/nav.json', JSON.stringify({ tabs: ['guides'], pages: ['index'] }));
+
+      const errors = navigationErrors((await resolve())._unsafeUnwrapErr());
+
+      expect(errors).to.deep.equal([
+        "content/nav.json: 'guides' is a folder with no page in it or below it, so it is not in the sidebar. " +
+          'Add a page to it, or remove the entry.'
+      ]);
+    });
+
+    it('refuses to make a tab of a (group) folder that serves the home page, however deep', async () => {
+      fs.rmSync(path.join(root, 'content/index.md'));
+      write('content/(start)/(welcome)/index.md', page('Welcome'));
+      write('content/nav.json', JSON.stringify({ tabs: ['(start)'], pages: ['authentication'] }));
+
+      const errors = navigationErrors((await resolve())._unsafeUnwrapErr());
+
+      expect(errors).to.have.lengthOf(1);
+      expect(errors[0]).to.match(
+        /^content\/nav\.json: '\(start\)' serves the home page, which belongs to the Home tab/
+      );
+    });
+
+    it('makes a tab of a (group) folder that does not serve the home page', async () => {
+      write('content/(start)/intro/index.md', page('Intro'));
+      write('content/nav.json', JSON.stringify({ tabs: ['(start)'], pages: ['index'] }));
+
+      expect((await resolve()).isOk()).to.be.true;
+    });
+
+    it('orders a (group) folder that serves the home page inside Home when pages names it', async () => {
+      fs.rmSync(path.join(root, 'content/index.md'));
+      write('content/(start)/index.md', page('Welcome'));
+      write('content/nav.json', JSON.stringify({ tabs: [], pages: ['authentication', '(start)'] }));
+
+      expect((await resolve()).isOk()).to.be.true;
+    });
+
+    it('accepts a directory whose pages are nested below it', async () => {
+      write('content/guides/deep/intro.md', page('Intro'));
+      write('content/nav.json', JSON.stringify({ tabs: ['guides'], pages: ['index'] }));
+
+      expect((await resolve()).isOk()).to.be.true;
+    });
+
+    // The docs glob matches by code point, so `Guide.MD` is not a page in the build either.
+    it('does not offer a page whose extension differs in case', async () => {
+      write('content/Guide.MD', '# Guide');
+      write('content/nav.json', JSON.stringify({ pages: ['index', 'Guide'] }));
+
+      const errors = navigationErrors((await resolve())._unsafeUnwrapErr());
+
+      expect(errors[0]).to.contain("'Guide' is not a page or folder in this directory");
+    });
+
+    it('hands each resolve its own list rather than a shared one', async () => {
+      write('content/Nav.json', JSON.stringify({ pages: ['index'] }));
+
+      const first = (await resolve())._unsafeUnwrap();
+      first.contentNotices.ignoredNavigationFiles.length = 0;
+
+      expect(ignored((await resolve())._unsafeUnwrap())).to.deep.equal(['content/Nav.json']);
+    });
+
+    it('reports no ignored files when there are none', async () => {
+      write('content/nav.json', JSON.stringify({ pages: ['index'] }));
+
+      expect(ignored((await resolve())._unsafeUnwrap())).to.deep.equal([]);
+    });
+
+    // The build matches `**/nav.json` by code point, so a case variant orders nothing. It is
+    // reported rather than validated, because validating it would describe a file nothing reads.
+    it('reports a case variant of nav.json instead of applying it', async () => {
+      write('content/Nav.json', JSON.stringify({ pages: ['nonsense'] }));
+
+      const source = (await resolve())._unsafeUnwrap();
+
+      expect(ignored(source)).to.deep.equal(['content/Nav.json']);
+    });
+
+    // The build loads `**/nav.json` alone, so any other JSON or YAML in the content directory
+    // is neither read nor remarked upon, whatever it contains.
+    it('says nothing about other JSON and YAML files in the content directory', async () => {
+      write('content/meta.json', JSON.stringify({ pages: ['nonsense'] }));
+      write('content/guides/intro.md', page('Intro'));
+      write('content/guides/nav.yaml', 'pages: [nonsense]');
+
+      const source = (await resolve())._unsafeUnwrap();
+
+      expect(ignored(source)).to.deep.equal([]);
+    });
+  });
+
+  describe('the tab bar notices', () => {
+    beforeEach(() => {
+      writeConfig({ site: { name: 'Calc' } });
+      write('spec/api.json', OPENAPI);
+      write('content/index.md', page('Welcome'));
+    });
+
+    const rootNavigation = () => new FilePath(new DirectoryPath(root).join('content'), new FileName('nav.json'));
+    const notices = async () => (await resolve())._unsafeUnwrap().contentNotices;
+
+    const sdks: TabEntry = { kind: 'generated', section: SDK_SECTION };
+    const plugin: TabEntry = { kind: 'generated', section: PLUGIN_SECTION };
+    const apiReference: TabEntry = { kind: 'apiReference' };
+
+    it('says once that a root file with no tabs makes no tab, naming the nodes nothing places', async () => {
+      write('content/nav.json', JSON.stringify({ pages: ['index', '...'] }));
+
+      expect((await notices()).noTabsListed).to.deep.equal({ file: rootNavigation(), unplaced: [sdks, apiReference] });
+
+      write('apimatic.json', JSON.stringify({ portal: { site: { name: 'Calc' } }, languages: LANGUAGES, plugin: {} }));
+
+      expect((await notices()).noTabsListed?.unplaced).to.deep.equal([sdks, plugin, apiReference]);
+    });
+
+    // A node `pages` names is in Home because that is what `pages` means, so the line offered leaves it out.
+    it('leaves out what pages places, however the reference is spelled, and says nothing once it places all', async () => {
+      write('content/nav.json', JSON.stringify({ pages: ['index', 'apimatic:sdks', '...'] }));
+
+      expect((await notices()).noTabsListed?.unplaced).to.deep.equal([apiReference]);
+
+      write('content/nav.json', JSON.stringify({ pages: ['index', 'api', 'apimatic:sdks'] }));
+
+      expect((await notices()).noTabsListed).to.be.undefined;
+    });
+
+    it('says the same of a project with no root file', async () => {
+      expect((await notices()).noTabsListed).to.deep.equal({ file: undefined, unplaced: [sdks, apiReference] });
+    });
+
+    it('takes an empty tabs as said on purpose', async () => {
+      write('content/nav.json', JSON.stringify({ tabs: [], pages: ['index', '...'] }));
+
+      expect((await notices()).noTabsListed).to.be.undefined;
+    });
+
+    it('says a Home title shows nowhere while Home is the only tab', async () => {
+      write('content/nav.json', JSON.stringify({ title: 'Docs', tabs: [], pages: ['index'] }));
+
+      expect((await notices()).unseenHomeTitle).to.deep.equal(rootNavigation());
+
+      write('content/nav.json', JSON.stringify({ title: 'Docs', tabs: ['apimatic:api'], pages: ['index'] }));
+
+      expect((await notices()).unseenHomeTitle).to.be.undefined;
+    });
+  });
+
+  describe('tab names', () => {
+    beforeEach(() => {
+      writeConfig({ site: { name: 'Calc' } });
+      write('spec/api.json', OPENAPI);
+      write('content/index.md', '---\ntitle: Welcome\n---\n');
+    });
+
+    /** A tab as its kind and, when a file names it, that file. */
+    const described = ({ owner, namedBy }: PortalTab) =>
+      namedBy === null ? owner.kind : `${owner.kind} ${namedBy.relativeTo(new DirectoryPath(root))}`;
+
+    /** Each name more than one tab shares, with its tabs described and sorted. */
+    const shared = async (): Promise<[string, string[]][]> => {
+      const source = (await resolve())._unsafeUnwrap();
+      return source.contentNotices.sharedTabNames.map(({ name, tabs }) => [name, tabs.map(described).sort()]);
+    };
+
+    /** A folder directly under `content/`, which `listFolders` makes a tab. */
+    const folder = (directory: string, title?: string, indexTitle?: string) => {
+      write(`content/${directory}/first.md`, '---\ntitle: First\n---\n');
+      if (title !== undefined) {
+        write(`content/${directory}/nav.json`, JSON.stringify({ title }));
+      }
+      if (indexTitle !== undefined) {
+        write(`content/${directory}/index.md`, `---\ntitle: ${indexTitle}\n---\n`);
+      }
+    };
+
+    /** The root `nav.json`, making a tab of each of these folders and of every section, and naming Home if given a title. */
+    const listFolders = (folders: string[], title?: string) =>
+      write(
+        'content/nav.json',
+        JSON.stringify({
+          ...(title === undefined ? {} : { title }),
+          tabs: [...folders, 'apimatic:sdks', 'apimatic:plugin', 'apimatic:api'],
+          pages: ['index']
+        })
+      );
+
+    it('finds none when every tab has a name of its own', async () => {
+      folder('tutorials', 'Tutorials');
+      listFolders(['tutorials']);
+
+      expect(await shared()).to.deep.equal([]);
+    });
+
+    it('finds a folder tab titled like the Home tab', async () => {
+      folder('start', 'Home');
+      listFolders(['start']);
+
+      expect(await shared()).to.deep.equal([['Home', ['folder content/start/nav.json', 'home']]]);
+    });
+
+    it('finds the Home tab titled like a folder tab in another case', async () => {
+      folder('guides', 'Guides');
+      listFolders(['guides'], 'guides');
+
+      expect(await shared()).to.deep.equal([['guides', ['folder content/guides/nav.json', 'home content/nav.json']]]);
+    });
+
+    it('finds the Home tab titled like a folder tab its index page names', async () => {
+      folder('guides', undefined, 'Guides');
+      listFolders(['guides'], 'Guides');
+
+      expect(await shared()).to.deep.equal([['Guides', ['folder content/guides/index.md', 'home content/nav.json']]]);
+    });
+
+    it('names a folder tab after its directory when nothing else does', async () => {
+      folder('getting-started');
+      listFolders(['getting-started'], 'Getting started');
+
+      expect(await shared()).to.deep.equal([['Getting started', ['folder', 'home content/nav.json']]]);
+    });
+
+    it('prefers the title in a folder tab’s nav.json to its index page’s', async () => {
+      folder('guides', 'Learn', 'Home');
+      listFolders(['guides']);
+
+      expect(await shared()).to.deep.equal([]);
+    });
+
+    it('finds a folder tab titled like the API reference, which no directory has to back', async () => {
+      folder('reference', 'API Reference');
+      listFolders(['reference']);
+
+      expect(await shared()).to.deep.equal([['API Reference', ['apiReference', 'folder content/reference/nav.json']]]);
+    });
+
+    it('names the API reference by content/api/nav.json, then by its index page', async () => {
+      folder('guides', 'Guides');
+      folder('tutorials', 'Tutorials');
+      listFolders(['guides', 'tutorials']);
+      write('content/api/index.md', '---\ntitle: Tutorials\n---\n');
+      write('content/api/nav.json', JSON.stringify({ title: 'Guides' }));
+
+      expect(await shared()).to.deep.equal([
+        ['Guides', ['apiReference content/api/nav.json', 'folder content/guides/nav.json']]
+      ]);
+
+      fs.rmSync(path.join(root, 'content/api/nav.json'));
+
+      expect(await shared()).to.deep.equal([
+        ['Tutorials', ['apiReference content/api/index.md', 'folder content/tutorials/nav.json']]
+      ]);
+    });
+
+    it('finds a folder tab titled like a generated tab', async () => {
+      folder('downloads', 'SDKs');
+      listFolders(['downloads']);
+
+      expect(await shared()).to.deep.equal([['SDKs', ['folder content/downloads/nav.json', 'generated']]]);
+    });
+
+    it('counts the context plugin’s tab only when there is a plugin block', async () => {
+      folder('assistant', 'Context Plugin');
+      listFolders(['assistant']);
+
+      expect(await shared()).to.deep.equal([]);
+
+      write('apimatic.json', JSON.stringify({ portal: { site: { name: 'Calc' } }, languages: LANGUAGES, plugin: {} }));
+
+      expect(await shared()).to.deep.equal([['Context Plugin', ['folder content/assistant/nav.json', 'generated']]]);
+    });
+
+    it('does not count a folder the root nav.json does not list, which stays in Home', async () => {
+      folder('start', 'Home');
+      listFolders([]);
+
+      expect(await shared()).to.deep.equal([]);
+    });
+  });
+
+  describe('scaffold', () => {
+    let source: DirectoryPath;
+
+    /** A specification outside the source directory, where the wizard downloads it to. */
+    const writeSpec = (info: Record<string, unknown>, name = 'petstore.json'): FilePath => {
+      write(path.join('downloads', name), JSON.stringify({ openapi: '3.0.0', info, paths: {} }));
+      return new FilePath(new DirectoryPath(root).join('downloads'), new FileName(name));
+    };
+
+    const scaffold = async (specPath: FilePath) =>
+      (await new PortalSourceContext(source).scaffold(specPath, APIMATIC_SCHEMA_URL))._unsafeUnwrap();
+    const read = (relative: string) => fs.readFileSync(path.join(source.toString(), relative), 'utf8');
+
+    /** What the user adds by hand before the portal builds: nothing in quickstart writes it yet. */
+    const addLanguages = () => {
+      const file = path.join(source.toString(), 'apimatic.json');
+      fs.writeFileSync(file, JSON.stringify({ ...JSON.parse(fs.readFileSync(file, 'utf8')), languages: LANGUAGES }));
+    };
+
+    const frontMatterOf = (markdown: string): Record<string, unknown> => {
+      const match = /^---\r?\n([\s\S]*?)\r?\n---/.exec(markdown);
+      expect(match, `no front matter in:\n${markdown}`).to.not.be.null;
+      return parseYaml((match as RegExpExecArray)[1]);
+    };
+
+    beforeEach(() => {
+      source = new DirectoryPath(root).join('project').join('src');
+    });
+
+    it('writes a source directory it accepts itself, once a language is named', async () => {
+      await scaffold(writeSpec({ title: 'Petstore', version: '1' }));
+
+      const unnamed = (await new PortalSourceContext(source).resolve())._unsafeUnwrapErr();
+      expect(unnamed.kind === 'invalidConfig' ? unnamed.errors : []).to.have.lengthOf(1);
+      addLanguages();
+
+      const resolved = (await new PortalSourceContext(source).resolve())._unsafeUnwrap();
+      expect(resolved.config.siteTitle()).to.equal('Petstore');
+      expect(resolved.specs.map((spec) => spec.slug)).to.deep.equal(['petstore']);
+      expect(resolved.contentDirectory).to.not.be.null;
+    });
+
+    it('describes the portal from the specification, with every default spelled out', async () => {
+      await scaffold(writeSpec({ title: 'Petstore', version: '1', description: 'All the pets.' }));
+
+      const written = JSON.parse(read('apimatic.json'));
+      // The schema first, where an editor looks for it, and no `languages` block: nothing in
+      // the wizard asks for the project's languages yet.
+      expect(Object.keys(written)).to.deep.equal(['$schema', 'schemaVersion', 'portal']);
+      expect(written.$schema).to.equal(APIMATIC_SCHEMA_URL);
+      expect(written.schemaVersion).to.equal(1);
+      expect(written.portal.site).to.deep.equal({ name: 'Petstore', description: 'All the pets.' });
+      expect(Object.keys(written.portal)).to.deep.equal(['site', 'brand', 'navigation', 'ai']);
+      expect(read('apimatic.json').endsWith('\n')).to.be.true;
+    });
+
+    // Defaults are applied twice, on purpose: written into a new block, and filled in for a
+    // block written by hand. The two have to make the same portal.
+    it('writes a block that resolves to the portal an empty block makes', async () => {
+      await scaffold(writeSpec({ title: 'Petstore', version: '1', description: 'All the pets.' }));
+      addLanguages();
+      const scaffolded = (await new PortalSourceContext(source).resolve())._unsafeUnwrap().config;
+
+      write('project/src/apimatic.json', JSON.stringify({ portal: {}, languages: LANGUAGES }));
+      const empty = (await new PortalSourceContext(source).resolve())._unsafeUnwrap().config;
+
+      expect(scaffolded.toJSON()).to.deep.equal(empty.toJSON());
+      expect(scaffolded.identity()).to.deep.equal(empty.identity());
+    });
+
+    // Every block the wizard writes has to pass the schema it points editors at.
+    it('writes a file the schema it names accepts', async () => {
+      await scaffold(writeSpec({ title: 'Petstore', version: '1', description: 'All the pets.' }));
+      const schema = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'apimatic.schema.json'), 'utf8'));
+      const validate = new Ajv({ strict: true, allErrors: true }).compile(schema);
+
+      expect(validate(JSON.parse(read('apimatic.json'))), JSON.stringify(validate.errors)).to.be.true;
+    });
+
+    it('answers with the apimatic.json it wrote', async () => {
+      const configFile = await scaffold(writeSpec({ title: 'Petstore', version: '1' }));
+
+      expect(configFile.isEqual(new FilePath(source, new FileName('apimatic.json')))).to.be.true;
+      expect(fs.existsSync(configFile.toString())).to.be.true;
+    });
+
+    it('keeps a tab for each generated section, and orders the sidebar with the welcome page first', async () => {
+      await scaffold(writeSpec({ title: 'Petstore', version: '1' }));
+
+      expect(JSON.parse(read('content/nav.json'))).to.deep.equal({
+        tabs: ['apimatic:sdks', 'apimatic:plugin', 'apimatic:api'],
+        pages: ['index', '...']
+      });
+    });
+
+    // A freshly scaffolded project must not carry a file the build never reads, such as a
+    // `meta.json`, which the CLI would not remark on and the sidebar would not honour.
+    it('writes a navigation file the build reads, and nothing it ignores', async () => {
+      await scaffold(writeSpec({ title: 'Petstore', version: '1' }));
+      addLanguages();
+
+      const contentFiles = fs.readdirSync(path.join(source.toString(), 'content')).sort();
+      const scaffolded = (await new PortalSourceContext(source).resolve())._unsafeUnwrap();
+
+      expect(contentFiles).to.deep.equal(['index.md', 'nav.json']);
+      expect(scaffolded.contentNotices.ignoredNavigationFiles).to.deep.equal([]);
+    });
+
+    it('falls back to a placeholder title for a specification it cannot read', async () => {
+      write('downloads/broken.json', '{ not json');
+
+      await scaffold(new FilePath(new DirectoryPath(root).join('downloads'), new FileName('broken.json')));
+
+      expect(JSON.parse(read('apimatic.json')).portal.site).to.deep.equal({ name: 'My API' });
+    });
+
+    // The wizard asks its questions before it writes anything, so a fault here has to come back
+    // as a message it can report -- a throw would leave oclif to print a stack over the wizard.
+    it('reports a configuration it cannot write into rather than throwing', async () => {
+      write('project/src/apimatic.json', '{ not json');
+
+      const scaffolded = await new PortalSourceContext(source).scaffold(
+        writeSpec({ title: 'Petstore', version: '1' }),
+        APIMATIC_SCHEMA_URL
+      );
+
+      expect(scaffolded._unsafeUnwrapErr()).to.deep.equal({ kind: 'configUnreadable' });
+    });
+
+    it('reports a source directory it cannot write rather than throwing', async () => {
+      const failing = sinon.stub(FileService.prototype, 'writeContents').rejects(new Error('EACCES: denied'));
+
+      try {
+        const scaffolded = await new PortalSourceContext(source).scaffold(
+          writeSpec({ title: 'Petstore', version: '1' }),
+          APIMATIC_SCHEMA_URL
+        );
+
+        expect(scaffolded._unsafeUnwrapErr()).to.deep.equal({
+          kind: 'sourceUnwritable',
+          reason: 'EACCES: denied'
+        });
+      } finally {
+        failing.restore();
+      }
+    });
+
+    it('reports a split specification it cannot unpack rather than throwing', async () => {
+      const archive = new FilePath(new DirectoryPath(root), new FileName('spec.zip'));
+      fs.writeFileSync(archive.toString(), Buffer.from([0x50, 0x4b, 0x03, 0x04, 0x00]));
+
+      const scaffolded = await new PortalSourceContext(source).scaffold(archive, APIMATIC_SCHEMA_URL);
+
+      const problem = scaffolded._unsafeUnwrapErr();
+      expect(problem.kind).to.equal('sourceUnwritable');
+      expect(problem).to.have.property('reason').that.is.not.empty;
+    });
+
+    it('unpacks a split specification into the spec directory', async () => {
+      write('split/openapi.json', JSON.stringify({ openapi: '3.0.0', info: { title: 'Split', version: '1' } }));
+      write('split/paths/pets.json', '{}');
+      const archive = new FilePath(new DirectoryPath(root), new FileName('spec.zip'));
+      (await new ZipService().archive(new DirectoryPath(root).join('split'), archive))._unsafeUnwrap();
+
+      await scaffold(archive);
+
+      expect(fs.existsSync(path.join(source.toString(), 'spec', 'openapi.json'))).to.be.true;
+      expect(fs.existsSync(path.join(source.toString(), 'spec', 'paths', 'pets.json'))).to.be.true;
+      // The parts of an archive are left to the build to read, so nothing names the portal yet.
+      expect(JSON.parse(read('apimatic.json')).portal.site).to.deep.equal({ name: 'My API' });
+    });
+
+    describe('the welcome page front matter', () => {
+      const titles = [
+        'Swagger Petstore',
+        'Swagger Petstore: Extended',
+        'Swagger Petstore:',
+        'Swagger Petstore:Extended',
+        'Petstore #1',
+        'Petstore - v2',
+        'The "Best" API',
+        'C:\\petstore',
+        "Ann's API",
+        '@petstore',
+        'yes',
+        '1.0',
+        '[bracketed]',
+        '{braced}',
+        'a: b: c'
+      ];
+
+      titles.forEach((title) => {
+        it(`parses, and keeps the title intact, for ${JSON.stringify(title)}`, async () => {
+          await scaffold(writeSpec({ title, version: '1' }));
+
+          expect(frontMatterOf(read('content/index.md')).description).to.equal(`Getting started with ${title}`);
+        });
+      });
+    });
+
+    // What a build downloaded from the platform arrives as: `spec/` filled, beside its own `apimatic.json`.
+    describe('adopt', () => {
+      const inSource = (relative: string) => path.join('project', 'src', relative);
+      const writeSourceSpec = (name: string, document: Record<string, unknown>) =>
+        write(inSource(path.join('spec', name)), JSON.stringify({ openapi: '3.0.0', paths: {}, ...document }));
+      const writeSourceConfig = (config: object) => write(inSource('apimatic.json'), JSON.stringify(config));
+      const adopt = async () => {
+        const context = new PortalSourceContext(source);
+        const [first] = (await context.resolveSpecs())._unsafeUnwrap();
+        return (await context.adopt(first))._unsafeUnwrap();
+      };
+      const portalBlock = () => JSON.parse(read('apimatic.json')).portal;
+
+      it('writes the tree around a specification already in the source directory', async () => {
+        writeSourceSpec('petstore.json', { info: { title: 'Petstore', version: '1' } });
+        writeSourceConfig({ languages: LANGUAGES });
+
+        await adopt();
+
+        const resolved = (await new PortalSourceContext(source).resolve())._unsafeUnwrap();
+        expect(resolved.config.siteTitle()).to.equal('Petstore');
+        // The one that was there, and no copy of it beside itself.
+        expect(fs.readdirSync(path.join(source.toString(), 'spec'))).to.deep.equal(['petstore.json']);
+      });
+
+      it('leaves the apimatic.json and content/ the project carries as they are', async () => {
+        writeSourceSpec('petstore.json', { info: { title: 'Petstore', version: '1' } });
+        const config = JSON.stringify({ portal: { site: { name: 'My Company Docs', description: 'Ours' } } });
+        write(inSource('apimatic.json'), config);
+        write(inSource('content/index.md'), page('Our own welcome'));
+        write(inSource('content/nav.json'), JSON.stringify({ pages: ['index', 'guides'] }));
+
+        await adopt();
+
+        expect(read('apimatic.json')).to.equal(config);
+        expect(read('content/index.md')).to.equal(page('Our own welcome'));
+        expect(read('content/nav.json')).to.equal(JSON.stringify({ pages: ['index', 'guides'] }));
+      });
+
+      it('adds a site to a portal block that has none, and keeps the rest of the block', async () => {
+        writeSourceSpec('petstore.json', { info: { title: 'Petstore', version: '1', description: 'All the pets.' } });
+        writeSourceConfig({ portal: { ai: { pageActions: false } } });
+
+        await adopt();
+
+        expect(portalBlock()).to.deep.equal({
+          site: { name: 'Petstore', description: 'All the pets.' },
+          ai: { pageActions: false }
+        });
+      });
+
+      it('adds a portal block holding only the site to a file that has none', async () => {
+        writeSourceSpec('petstore.json', { info: { title: 'Petstore', version: '1' } });
+        writeSourceConfig({ languages: LANGUAGES });
+
+        await adopt();
+
+        expect(portalBlock()).to.deep.equal({ site: { name: 'Petstore' } });
+      });
+
+      it('names a site that has no name, and keeps the rest of it where it was', async () => {
+        writeSourceSpec('petstore.json', { info: { title: 'Petstore', version: '1', description: 'All the pets.' } });
+        writeSourceConfig({ portal: { ai: { pageActions: false }, site: { url: 'https://docs.example.com' } } });
+
+        await adopt();
+
+        expect(portalBlock().site).to.deep.equal({ name: 'Petstore', url: 'https://docs.example.com' });
+        expect(Object.keys(portalBlock())).to.deep.equal(['ai', 'site']);
+      });
+
+      const unreadBlocks: [string, unknown][] = [
+        ['a portal block', 'petstore'],
+        ['a site', { site: 'petstore' }]
+      ];
+
+      unreadBlocks.forEach(([what, portal]) => {
+        it(`leaves ${what} that is not an object for the build to report`, async () => {
+          writeSourceSpec('petstore.json', { info: { title: 'Petstore', version: '1' } });
+          writeSourceConfig({ portal });
+
+          await adopt();
+
+          expect(portalBlock()).to.deep.equal(portal);
+        });
+      });
+
+      it('writes the welcome page and the page order when there is no content/, named as the file names the site', async () => {
+        writeSourceSpec('petstore.json', { info: { title: 'Petstore', version: '1' } });
+        writeSourceConfig({ portal: { site: { name: 'My Company Docs' } } });
+
+        await adopt();
+
+        expect(read('content/index.md')).to.contain('Welcome to the My Company Docs documentation.');
+        expect(fs.readdirSync(path.join(source.toString(), 'content')).sort()).to.deep.equal(['index.md', 'nav.json']);
+      });
+
+      // The spec the build reads first, which is not always the first file in `spec/`.
+      const layouts: [string, [string, Record<string, unknown>][], string][] = [
+        [
+          'shared schemas beside the spec',
+          [
+            ['components.yaml', { openapi: undefined, components: { schemas: {} } }],
+            ['openapi.yaml', { info: { title: 'Pets', version: '1' } }]
+          ],
+          'Pets'
+        ],
+        [
+          'the build settings beside the spec',
+          [
+            ['APIMATIC-META.json', { openapi: undefined, CodeGenSettings: {} }],
+            ['petstore.json', { info: { title: 'Petstore', version: '1' } }]
+          ],
+          'Petstore'
+        ],
+        [
+          'a Swagger 2.0 spec before its OpenAPI 3 conversion',
+          [
+            ['a-legacy.json', { openapi: undefined, swagger: '2.0', info: { title: 'Legacy Swagger', version: '1' } }],
+            ['b-current.json', { info: { title: 'Current API', version: '1' } }]
+          ],
+          'Current API'
+        ]
+      ];
+
+      layouts.forEach(([layout, specs, name]) => {
+        it(`names the portal as the build would, for ${layout}`, async () => {
+          specs.forEach(([fileName, document]) => writeSourceSpec(fileName, document));
+          writeSourceConfig({ portal: {}, languages: LANGUAGES });
+
+          await adopt();
+
+          expect(portalBlock().site.name).to.equal(name);
+          const resolved = (await new PortalSourceContext(source).resolve())._unsafeUnwrap();
+          expect(resolved.config.siteTitle()).to.equal(name);
+        });
+      });
+
+      const unnamedPortals: [string, object][] = [
+        ['no site', {}],
+        ['the empty site the template ships', { site: {} }]
+      ];
+
+      unnamedPortals.forEach(([shape, portal]) => {
+        it(`names a portal of several specs with ${shape} after the first, since the build then needs the name written`, async () => {
+          writeSourceSpec('alpha.json', { info: { title: 'Alpha', version: '1' } });
+          writeSourceSpec('zebra.yaml', { info: { title: 'Zebra', version: '1' } });
+          writeSourceConfig({ portal, languages: LANGUAGES });
+
+          await adopt();
+
+          expect(portalBlock().site.name).to.equal('Alpha');
+          expect((await new PortalSourceContext(source).resolve()).isOk()).to.be.true;
+        });
+      });
+    });
+  });
+});

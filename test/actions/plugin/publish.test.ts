@@ -8,34 +8,33 @@ import { PluginPublishPrompts } from '../../../src/prompts/plugin/publish.js';
 import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
 import { PluginContents } from '../../../src/types/plugin/plugin-contents.js';
 import { PluginReleaseData } from '../../../src/types/plugin-config-context.js';
+import { ProjectContext } from '../../../src/types/project-context.js';
 
 describe('PluginPublishAction', () => {
   let tmpDirResult: DirectoryResult;
-  let buildDirectory: string;
+  let sourceDirectory: string;
   let pluginDirectory: string;
   let action: PluginPublishAction;
 
   const execute = (plugin = pluginDirectory) =>
-    action.execute(new DirectoryPath(buildDirectory), new DirectoryPath(plugin));
+    action.execute(ProjectContext.in(new DirectoryPath(path.dirname(sourceDirectory))), new DirectoryPath(plugin));
 
-  const writeConfig = (config: unknown) => fsExtra.writeJson(path.join(buildDirectory, 'plugin-config.json'), config);
+  const configPath = () => path.join(sourceDirectory, 'apimatic.json');
+  const writeConfig = (config: unknown) => fsExtra.writeJson(configPath(), config);
 
-  const validConfig = {
-    pluginId: 'hamza',
-    pluginName: 'Hamza Plugin',
-    pluginVersion: '0.1.67',
-    languages: { csharp: { source: { repositoryUrl: 'https://github.com/acme/acme-csharp' } } }
-  };
+  const IDENTITY = { pluginId: 'hamza', pluginName: 'Hamza Plugin', pluginVersion: '0.1.67' };
+  const LANGUAGES = { csharp: { source: { repositoryUrl: 'https://github.com/acme/acme-csharp' } } };
+  const validConfig = { plugin: IDENTITY, languages: LANGUAGES };
 
   const spy = (method: keyof PluginPublishPrompts) => sinon.spy(PluginPublishPrompts.prototype, method);
 
   beforeEach(async () => {
     tmpDirResult = await tmpDir({ unsafeCleanup: true });
     const workingDirectory = path.join(tmpDirResult.path, 'acme-payments');
-    buildDirectory = path.join(workingDirectory, 'src');
+    sourceDirectory = path.join(workingDirectory, 'src');
     pluginDirectory = path.join(workingDirectory, 'plugin');
 
-    await fsExtra.ensureDir(buildDirectory);
+    await fsExtra.ensureDir(sourceDirectory);
     await writeConfig(validConfig);
 
     await fsExtra.ensureDir(path.join(pluginDirectory, 'skills', 'auth'));
@@ -52,10 +51,10 @@ describe('PluginPublishAction', () => {
   });
 
   describe('input validation', () => {
-    it('refuses to publish the build directory itself', async () => {
+    it('refuses to publish the source directory itself', async () => {
       const prompt = spy('directoryCannotBeSame');
 
-      const result = await execute(buildDirectory);
+      const result = await execute(sourceDirectory);
 
       expect(result.isFailed()).to.be.true;
       expect(prompt.calledOnce).to.be.true;
@@ -94,10 +93,10 @@ describe('PluginPublishAction', () => {
     });
   });
 
-  describe('plugin-config.json', () => {
+  describe('apimatic.json', () => {
     it('fails when the file is absent', async () => {
       const prompt = spy('pluginConfigMissing');
-      await fsExtra.remove(path.join(buildDirectory, 'plugin-config.json'));
+      await fsExtra.remove(configPath());
 
       const result = await execute();
 
@@ -107,7 +106,7 @@ describe('PluginPublishAction', () => {
 
     it('fails when the file cannot be parsed', async () => {
       const prompt = spy('pluginConfigUnreadable');
-      await fsExtra.writeFile(path.join(buildDirectory, 'plugin-config.json'), '{ nope');
+      await fsExtra.writeFile(configPath(), '{ nope');
 
       const result = await execute();
 
@@ -117,7 +116,7 @@ describe('PluginPublishAction', () => {
 
     it('asks for the plugin details when the id is absent', async () => {
       const prompt = spy('pluginDetailsNotSet');
-      await writeConfig({ ...validConfig, pluginId: undefined });
+      await writeConfig({ ...validConfig, plugin: { ...IDENTITY, pluginId: undefined } });
 
       const result = await execute();
 
@@ -127,7 +126,18 @@ describe('PluginPublishAction', () => {
 
     it('asks for the plugin details when the version is absent', async () => {
       const prompt = spy('pluginDetailsNotSet');
-      await writeConfig({ ...validConfig, pluginVersion: undefined });
+      await writeConfig({ ...validConfig, plugin: { ...IDENTITY, pluginVersion: undefined } });
+
+      const result = await execute();
+
+      expect(result.isFailed()).to.be.true;
+      expect(prompt.calledOnce).to.be.true;
+    });
+
+    // It exists, so saying it was not found would be false; it is the details that are missing.
+    it('asks for the plugin details when the file carries no plugin block at all', async () => {
+      const prompt = spy('pluginDetailsNotSet');
+      await writeConfig({ languages: LANGUAGES });
 
       const result = await execute();
 
@@ -137,27 +147,37 @@ describe('PluginPublishAction', () => {
 
     it('refuses the file when the id is not kebab-case', async () => {
       const prompt = spy('pluginConfigUnreadable');
-      await writeConfig({ ...validConfig, pluginId: 'Hamza Plugin' });
+      await writeConfig({ ...validConfig, plugin: { ...IDENTITY, pluginId: 'Hamza Plugin' } });
 
       const result = await execute();
 
       expect(result.isFailed()).to.be.true;
-      expect(prompt.firstCall.args[0]).to.contain(`'pluginId'`);
+      expect(prompt.firstCall.args[0]).to.contain(`'plugin.pluginId'`);
     });
 
     it('refuses the file when the version is not semver', async () => {
       const prompt = spy('pluginConfigUnreadable');
-      await writeConfig({ ...validConfig, pluginVersion: '1.2' });
+      await writeConfig({ ...validConfig, plugin: { ...IDENTITY, pluginVersion: '1.2' } });
 
       const result = await execute();
 
       expect(result.isFailed()).to.be.true;
-      expect(prompt.firstCall.args[0]).to.contain(`'pluginVersion'`);
+      expect(prompt.firstCall.args[0]).to.contain(`'plugin.pluginVersion'`);
     });
 
     it('publishes without a display name, which it never reads', async () => {
       const prompt = spy('firstPublishInstructions');
-      await writeConfig({ ...validConfig, pluginName: undefined });
+      await writeConfig({ ...validConfig, plugin: { ...IDENTITY, pluginName: undefined } });
+
+      const result = await execute();
+
+      expect(result.isSuccess()).to.be.true;
+      expect(prompt.calledOnce).to.be.true;
+    });
+
+    it('publishes past a malformed portal block, which is not its to read', async () => {
+      const prompt = spy('firstPublishInstructions');
+      await writeConfig({ ...validConfig, portal: 'not a portal' });
 
       const result = await execute();
 

@@ -1,24 +1,21 @@
-import { FileService } from "../infrastructure/file-service.js";
-import { DirectoryPath } from "./file/directoryPath.js";
-import { FilePath } from "./file/filePath.js";
-import { FileName } from "./file/fileName.js";
-import { Language } from "./sdk/generate.js";
-import { ZipService } from "../infrastructure/zip-service.js";
+import { ok, Result } from 'neverthrow';
+import { FileService } from '../infrastructure/file-service.js';
+import { DirectoryPath } from './file/directoryPath.js';
+import { FilePath } from './file/filePath.js';
+import { FileName } from './file/fileName.js';
+import { FileProblem } from './file/file-problem.js';
+import { Language } from './sdk/generate.js';
+import { ZipService } from '../infrastructure/zip-service.js';
+
+export type SdkSaveProblem = FileProblem & { sdkDirectory: DirectoryPath };
 
 export class SdkContext {
   private readonly fileService = new FileService();
   private readonly zipService = new ZipService();
   private readonly sdkDirectory: DirectoryPath;
 
-  constructor(
-    private readonly language: Language,
-    sdkDirectory: DirectoryPath,
-    requireUncustomizedDir: boolean,
-    version?: string
-  ) {
-    const baseDirectory = requireUncustomizedDir ? sdkDirectory.join('uncustomized') : sdkDirectory;
-
-    this.sdkDirectory = version ? baseDirectory.join(version).join(language) : baseDirectory.join(language);
+  constructor(private readonly language: Language, sdkDirectory: DirectoryPath, version?: string) {
+    this.sdkDirectory = version ? sdkDirectory.join(version).join(language) : sdkDirectory.join(language);
   }
 
   private get zipPath(): FilePath {
@@ -29,34 +26,25 @@ export class SdkContext {
     return !(await this.fileService.directoryEmpty(this.sdkDirectory));
   }
 
-  public async save(tempSdkDirectory: DirectoryPath, zipSdk: boolean): Promise<DirectoryPath> {
+  public async save(tempSdkDirectory: DirectoryPath, zipSdk: boolean): Promise<Result<DirectoryPath, SdkSaveProblem>> {
     await this.fileService.cleanDirectory(this.sdkDirectory);
     if (!zipSdk) {
       await this.fileService.copyDirectoryContents(tempSdkDirectory, this.sdkDirectory);
-    } else {
-      await this.zipService.archive(tempSdkDirectory, this.zipPath);
+      return ok(this.sdkDirectory);
     }
-    return this.sdkDirectory;
+    const archived = await this.zipService.archive(tempSdkDirectory, this.zipPath);
+    return archived
+      .map(() => this.sdkDirectory)
+      .mapErr((reason): SdkSaveProblem => ({ kind: 'zipFailed', reason, sdkDirectory: this.sdkDirectory }));
   }
 
-  public async loadSdkInTempDirectory(tempDirectory: DirectoryPath, tempSdk: FilePath): Promise<DirectoryPath> {
+  public async loadSdkInTempDirectory(
+    tempDirectory: DirectoryPath,
+    tempSdk: FilePath
+  ): Promise<Result<DirectoryPath, FileProblem>> {
     const tempSdkDirectory = tempDirectory.join('sdk-original');
     await this.fileService.createDirectoryIfNotExists(tempSdkDirectory);
-    await this.zipService.unArchive(tempSdk, tempSdkDirectory);
-    return tempSdkDirectory;
-  }
-
-  public async loadSdkWithSourceTreeInTempDirectory(
-    tempDirectory: DirectoryPath,
-    tempSdk: FilePath,
-    tempSdkSourceTree: FilePath
-  ): Promise<DirectoryPath> {
-    const tempSdkDirectory = tempDirectory.join('sdk');
-    await this.fileService.createDirectoryIfNotExists(tempSdkDirectory);
-    await this.zipService.unArchive(tempSdk, tempSdkDirectory);
-    const gitSourceTreeDir = tempSdkDirectory.join('.git');
-    await this.fileService.createDirectoryIfNotExists(gitSourceTreeDir);
-    await this.zipService.unArchive(tempSdkSourceTree, gitSourceTreeDir);
-    return tempSdkDirectory;
+    const unpacked = await this.zipService.unArchive(tempSdk, tempSdkDirectory);
+    return unpacked.map(() => tempSdkDirectory).mapErr((reason): FileProblem => ({ kind: 'unzipFailed', reason }));
   }
 }

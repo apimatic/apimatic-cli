@@ -1,8 +1,10 @@
 import { Command, Flags } from '@oclif/core';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { FlagsProvider } from '../../types/flags-provider.js';
-import { CodeGenerationVersion, CodegenOption, Language, Stability } from '../../types/sdk/generate.js';
+import { CodeGenerationVersion, Language, Stability } from '../../types/sdk/generate.js';
+import { StabilityChoice } from '../../types/sdk/stability-choice.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
+import { ProjectContext } from '../../types/project-context.js';
 import { format, intro, outro } from '../../prompts/format.js';
 import { PublishType } from '../../types/publish-api/publishing-profile-item.js';
 import { TelemetryService } from '../../infrastructure/services/telemetry-service.js';
@@ -30,9 +32,7 @@ export default class SdkPublish extends Command {
     language: Flags.string({
       char: 'l',
       description: 'Language of the SDK to generate and publish.',
-      options: Object.values(Language)
-        .filter((l) => l !== Language.GO)
-        .map((l) => l.valueOf())
+      options: Object.values(Language).map((l) => l.valueOf())
     }),
     ...FlagsProvider.force,
     ...FlagsProvider.input,
@@ -50,17 +50,11 @@ export default class SdkPublish extends Command {
     'codegen-version': Flags.string({
       description: 'Version of the code generator to use',
       options: Object.values(CodeGenerationVersion).map((v) => v.valueOf()),
-      default: CodeGenerationVersion.V3
+      default: CodeGenerationVersion.V4
     }),
-    'stability': Flags.string({
-      description: 'Stability level of the generated SDK',
-      options: Object.values(Stability).map((s) => s.valueOf()),
-      default: Stability.STABLE
-    }),
-    'update-plugin-config': Flags.boolean({
-      default: false,
-      description:
-        "Record the published SDK in 'plugin-config.json', creating the file if it does not exist. Interactive runs are asked instead."
+    stability: Flags.string({
+      description: 'Stability level of the generated SDK. Defaults to the level the language offers.',
+      options: Object.values(Stability).map((s) => s.valueOf())
     })
   };
 
@@ -73,21 +67,16 @@ export default class SdkPublish extends Command {
       'publish-type',
       PublishType.SourceCodePublishing
     )}`,
-    `${SdkPublish.cmdTxt} ${format.flag('profile-id', 'b2c3d4e5f6a1b2c3d4e5f6a1')} ${format.flag('language', 'java')} ${format.flag(
-      'version',
-      '2.0.0'
-    )} ${format.flag('publish-type', PublishType.SourceCodePublishing)}`,
-    `${SdkPublish.cmdTxt} ${format.flag('profile-id', 'c3d4e5f6a1b2c3d4e5f6a1b2')} ${format.flag('language', 'python')} ${format.flag(
-      'version',
-      '1.0.0'
-    )} ${format.flag('publish-type', PublishType.PackagePublishing)} ${format.flag('dry-run')}`,
-    `${SdkPublish.cmdTxt} ${format.flag('profile-id', 'd4e5f6a1b2c3d4e5f6a1b2c3')} ${format.flag(
+    `${SdkPublish.cmdTxt} ${format.flag('profile-id', 'b2c3d4e5f6a1b2c3d4e5f6a1')} ${format.flag(
       'language',
       'csharp'
-    )} ${format.flag('version', '1.0.0')} ${format.flag(
-      'publish-type',
-      PublishType.PackagePublishing
-    )} ${format.flag('codegen-version', 'v4')} ${format.flag('stability', 'beta')}`
+    )} ${format.flag('version', '2.0.0')} ${format.flag('publish-type', PublishType.SourceCodePublishing)}`,
+    `${SdkPublish.cmdTxt} ${format.flag('profile-id', 'c3d4e5f6a1b2c3d4e5f6a1b2')} ${format.flag(
+      'language',
+      'python'
+    )} ${format.flag('version', '1.0.0')} ${format.flag('publish-type', PublishType.PackagePublishing)} ${format.flag(
+      'dry-run'
+    )}`
   ];
 
   async run() {
@@ -101,11 +90,9 @@ export default class SdkPublish extends Command {
         input,
         'publish-type': publishType,
         'dry-run': dryRun,
-        'codegen-version': codegenVersion,
         stability,
-        'update-plugin-config': updatePluginConfig
-      },
-      metadata
+        'codegen-version': codegenVersion
+      }
     } = await this.parse(SdkPublish);
 
     const publishTypes = [...new Set(publishType)] as PublishType[];
@@ -115,9 +102,7 @@ export default class SdkPublish extends Command {
       shell: this.config.shell
     };
 
-    const workingDirectory = DirectoryPath.createInput(input);
-    const buildDirectory = input ? new DirectoryPath(input, 'src') : workingDirectory.join('src');
-    const sdkDirectory = destination ? new DirectoryPath(destination) : workingDirectory.join('sdk');
+    const project = ProjectContext.at(input);
 
     const configDir = this.getConfigDir();
     const telemetryService = new TelemetryService(configDir);
@@ -135,8 +120,8 @@ export default class SdkPublish extends Command {
               language,
               ...(force && { force }),
               'publish-type': publishTypes,
-              'codegen-version': codegenVersion,
-              stability
+              stability,
+              'codegen-version': codegenVersion
             }),
             commandMetadata.shell
           );
@@ -144,19 +129,17 @@ export default class SdkPublish extends Command {
     intro('Publish SDK');
     const result = interactive
       ? await new SdkPublishInteractiveAction(configDir, commandMetadata).execute(
-          workingDirectory,
+          DirectoryPath.createInput(input),
           onPublishSdkError
         )
       : await new SdkPublishNonInteractiveAction(configDir, commandMetadata).execute(
-          buildDirectory,
-          sdkDirectory,
+          project,
+          project.sdkDirectory(destination),
           language as Language,
           publishTypes,
           force,
           dryRun,
-          CodegenOption.create(codegenVersion as CodeGenerationVersion, stability as Stability),
-          metadata.flags.stability?.setFromDefault !== true,
-          updatePluginConfig,
+          StabilityChoice.for(language as Language, stability),
           onPublishSdkError,
           profileId,
           version

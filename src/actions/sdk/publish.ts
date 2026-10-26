@@ -8,9 +8,10 @@ import { PublishType } from '../../types/publish-api/publishing-profile-item.js'
 import { PublishingInfo } from '../../types/publish-api/publishing-info.js';
 import { ProfileId } from '../../types/publish/profile-id.js';
 import { SemVersion } from '../../types/publish/version.js';
-import { CodegenOption, Language } from '../../types/sdk/generate.js';
+import { Language, Stability } from '../../types/sdk/generate.js';
 import { PublishingProfile } from '../../types/publish/publishing-profile.js';
 import { PackageSettingsContext } from '../../types/package-settings-context.js';
+import { ProjectContext } from '../../types/project-context.js';
 import { TempContext } from '../../types/temp-context.js';
 import { ActionResult } from '../action-result.js';
 import { GenerateAction } from './generate.js';
@@ -25,7 +26,7 @@ export class SdkPublishAction {
   public constructor(private readonly configDir: DirectoryPath, private readonly commandMetadata: CommandMetadata) {}
 
   public readonly execute = async (
-    buildDirectory: DirectoryPath,
+    project: ProjectContext,
     outputDirectory: DirectoryPath,
     language: Language,
     publishType: PublishType[],
@@ -34,8 +35,7 @@ export class SdkPublishAction {
     semVersion: SemVersion,
     publishingProfile: PublishingProfile,
     dryRun: boolean,
-    codegenOption: CodegenOption,
-    stabilityWasProvided: boolean,
+    stability: Stability,
     publishingSummary: string,
     onPublishSdkError: (errorMessage: string) => void
   ): Promise<ActionResult> => {
@@ -51,17 +51,13 @@ export class SdkPublishAction {
 
       const sdkGenerateAction = new GenerateAction(this.configDir, this.commandMetadata);
       const sdkGenerationResult = await sdkGenerateAction.execute(
-        buildDirectory,
+        project,
         outputDirectory,
         language,
+        stability,
         force,
         false,
-        false,
-        false,
-        codegenOption,
-        stabilityWasProvided,
         undefined,
-        semVersion,
         packageSettingsDirectory
       );
       if (sdkGenerationResult.isFailed()) {
@@ -81,11 +77,15 @@ export class SdkPublishAction {
       }
 
       const tempContext = new TempContext(tempDirectory);
-      const sdkFilePath = await tempContext.zip(sdkLanguageDirectory);
+      const sdkFile = await tempContext.zip(sdkLanguageDirectory);
+      if (sdkFile.isErr()) {
+        this.prompts.sdkNotZipped(sdkLanguageDirectory, sdkFile.error);
+        return ActionResult.failed();
+      }
 
       const publishSdkResponse = await this.prompts.publishSdk(
         this.publishingApiService.publishSdkPackage(
-          sdkFilePath,
+          sdkFile.value,
           profileId,
           language,
           semVersion,

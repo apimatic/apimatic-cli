@@ -1,0 +1,37 @@
+import { log } from '@clack/prompts';
+import { APIMATIC_CONFIG_FILE_NAME } from '../../types/apimatic-config/document.js';
+import { Language } from '../../types/sdk/generate.js';
+import { format as f } from '../format.js';
+
+export class RecordPublishedSdkPrompts {
+  public sdkRecorded(language: Language, configExists: boolean) {
+    const message =
+      (configExists
+        ? `Updated ${f.var(APIMATIC_CONFIG_FILE_NAME)} for ${f.var(language)}. `
+        : `Created ${f.var(APIMATIC_CONFIG_FILE_NAME)} and added ${f.var(language)}. `) +
+      `Run '${f.cmdAlt('apimatic', 'plugin', 'generate')}' to build your context plugin.`;
+    log.info(message);
+  }
+
+  public noSourceRepository(language: Language) {
+    const message =
+      `Context plugin generation needs a source repository, and none was published for ${f.var(language)}. ` +
+      `Publish the SDK's source code to complete its ${f.var(APIMATIC_CONFIG_FILE_NAME)} entry.`;
+    log.warn(message);
+  }
+
+  public configUnreadable(reason?: string) {
+    const cause = reason ? `: ${reason}` : '';
+    const message =
+      `${f.var(
+        APIMATIC_CONFIG_FILE_NAME
+      )} cannot be used${cause}, so this published SDK's details were not added to it. ` + `Fix it and try again.`;
+    log.warn(message);
+  }
+
+  public configNotWritten() {
+    log.warn(
+      `${f.var(APIMATIC_CONFIG_FILE_NAME)} could not be written, so this published SDK's details were not added to it.`
+    );
+  }
+}

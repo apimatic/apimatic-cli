@@ -94,7 +94,7 @@ These patterns exist in the current codebase and are flagged for awareness:
 |---|---|
 | `src/types/file/directoryPath.ts:31` | `leafName()` returns `string` — should return `FileName` |
 | `src/types/sdk-context.ts` | `sdkLanguageDirectory` getter exposes `DirectoryPath` — needs justification comment if kept |
-| `src/types/toc-context.ts` | `tocPath` getter exposes `FilePath` — prefer returning it only from the `save()` operation result |
+
 
 ---
 
@@ -122,7 +122,7 @@ These patterns exist in the current codebase and are flagged for awareness:
 |---|---|
 | Ideal simple wrapper — private field, `static create()`, `toString()` only | `src/types/file/urlPath.ts` |
 | `static createInput()` fallback, rich join/equality methods | `src/types/file/directoryPath.ts` |
-| Rich predicate (`isMarkDown`) and transform (`normalize`) returning rich type | `src/types/file/fileName.ts` |
+| Rich predicate (`hasExtension`) and transform (`normalize`) returning rich type | `src/types/file/fileName.ts` |
 | Composed value object — holds two rich types, `static create()` splits at boundary | `src/types/file/filePath.ts` |
 | Correct boundary unwrapping — all `.toString()` calls at `fs.*` / `path.*` sites | `src/infrastructure/file-service.ts` |
 | Context with flagged public getter (display use) | `src/types/sdk-context.ts` |

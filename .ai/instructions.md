@@ -10,7 +10,7 @@ APIMatic CLI (`@apimatic/cli`) — the official CLI for APIMatic, built on oclif
 
 ```bash
 # Build
-pnpm build             # tsc -b → outputs to lib/
+pnpm build             # tsc (TypeScript 7) → outputs to lib/
 
 # Lint
 pnpm lint              # ESLint on src/**/*.{js,ts}
@@ -26,7 +26,7 @@ pnpm test              # tsx + mocha, runs test/**/*.test.ts
 pnpm exec tsx node_modules/mocha/bin/_mocha "test/actions/portal/serve.test.ts" --timeout 99999
 
 # Run CLI locally
-pnpm build:watch       # tsc -b --watch: recompiles src/ → lib/ on change; keep running in a separate terminal
+pnpm build:watch       # tsc --watch: recompiles src/ → lib/ on change; keep running in a separate terminal
 pnpm apimatic <command>
 pnpm apimatic <command> -i <abs-path-to-dir-containing-src>   # -i: for commands operating on a project directory containing src/
 ```
@@ -37,6 +37,34 @@ pnpm apimatic <command> -i <abs-path-to-dir-containing-src>   # -i: for commands
 
 If you hit `ERR_PNPM_PACKAGE_RECENTLY_PUBLISHED` adding a fresh release, either wait it out or run a one-off install with `pnpm install --ignore-minimum-release-age` (CI uses `--frozen-lockfile`, which bypasses the check entirely, so this only blocks manual `pnpm add` / `pnpm update`).
 
+## TypeScript toolchain — two compilers, on purpose
+
+`tsc` is **TypeScript 7** (the native compiler) and is what `build`, `build:watch` and
+`pretest` run. The bare `typescript` dependency is **TypeScript 6**, aliased to
+`@typescript/typescript6`, and exists only so `@typescript-eslint` can load: every published
+version of it declares `typescript >=4.8.4 <6.1.0` and throws at module init on TypeScript 7,
+which would take out `lint`, `posttest` and the pre-commit hook. TypeScript 6 is also
+available directly as `tsc6` if you need to compare the two.
+
+This is Microsoft's documented side-by-side arrangement, and it is temporary. **Delete it
+once typescript-eslint supports TypeScript 7** (tracked at
+<https://github.com/typescript-eslint/typescript-eslint/issues/10940>): drop the
+`@typescript/native` alias, point `typescript` back at `^7`, and bump `@typescript-eslint/*`
+to whatever release added support. The one other dependent is
+`test/e2e/portal-build.test.ts`, which resolves the compiler through
+`@typescript/native/package.json`; point it back at `typescript` in the same change.
+
+Two traps while it is in place:
+
+- `pnpm outdated` lists both entries under the real name `typescript` and recommends bumping
+  the linter's copy to 7.x. Don't: `posttest` will fail with a module-init throw that reads
+  like a broken install. `pnpm update --latest` is safe, because `@typescript/typescript6`
+  has never published above 6.x.
+- TypeScript 6 dropped the automatic sweep of `node_modules/@types`, so any type-only global
+  a project relies on must be named in that project's `types` array. `test/tsconfig.json`
+  does this; the source project needs no list because it reaches its types through `node:`
+  imports.
+
 ## Architecture — 5-Layer Stack
 
 ```
@@ -45,11 +73,11 @@ Command → Action → Application → Prompts / Infrastructure → Types
 
 1. **Commands** (`src/commands/`) — oclif `Command` subclasses. Parse flags, build `CommandMetadata`, call `intro()` → `action.execute()` → `outro(result)`. No business logic.
 2. **Actions** (`src/actions/`) — One per command. Orchestrate use-case: validate inputs via Context objects, coordinate services, return `ActionResult<T>`. Never throw to Command.
-3. **Application** (`src/application/`) — Complex reusable domain algorithms (e.g., TOC generators, recipe generators). Pure transformations: data in → data out. No prompts, no API calls.
+3. **Application** (`src/application/`) — Complex reusable domain algorithms. Pure transformations: data in → data out. No prompts, no API calls. (No such algorithms exist today; the directory reappears when one does.)
 4. **Prompts** (`src/prompts/`) — All terminal UI via `@clack/prompts`. One class per command mirroring `actions/`. Uses `withSpinner` for async operations. No business logic.
 5. **Infrastructure** (`src/infrastructure/`) — I/O adapters: `FileService`, `ZipService`, `NetworkService`, API services in `services/`. All return `Result<T, ServiceError>` (neverthrow).
 
-Supporting: **Types** (`src/types/`) for value objects, context objects, and domain events, **client-utils** for auth credential management, **utils** for pure string helpers, **config** for shared Axios instance, **hooks** (`src/hooks/`) for oclif lifecycle hooks (e.g., command-not-found suggestions), **env-info** (`src/infrastructure/env-info.ts`) singleton for CLI version, user-agent string, and base URL resolution.
+Supporting: **Types** (`src/types/`) for value objects, context objects, and domain events, **client-utils** for auth credential management, **utils** for pure string helpers, **config** for shared Axios instance, **hooks** (`src/hooks/`) for oclif lifecycle hooks (the engine-floor check on `init`, and command-not-found suggestions), **env-info** (`src/infrastructure/env-info.ts`) singleton for CLI version, user-agent string, and base URL resolution.
 
 ## Critical Code Conventions
 
@@ -67,31 +95,45 @@ Supporting: **Types** (`src/types/`) for value objects, context objects, and dom
 - **Commands use `export default class`** — oclif requires default export; actions, prompts, and services use named exports (`export class`)
 - **Static fields use `readonly`** — `static readonly summary`, `static readonly description`, `static readonly cmdTxt` on every Command
 - **Topic separator is space** — `apimatic portal generate`, not `apimatic portal:generate`
-- **No AI-generated comments** — comment only to explain non-obvious *why*: a constraint, a workaround, a subtle invariant. Never restate what the code already says, narrate a change, or leave notes addressed to a future agent. Default to no comment; existing comment density in nearby code is never a reason to add more.
+- **Comments are a design smell** — improve the design until they are unnecessary; if one is unavoidable, keep it to one line explaining *why*. Never restate the code, narrate a change, or address a future agent; nearby comment density is never a reason to add more.
+- **Reuse infra** — network, file I/O, OS calls, sleep, time: use existing services, Node.js standard libraries and built-in JS APIs.
+- **Readability is king** — simple names, simple domain models, composed with simple functions that turn one type into another instead of passing primitives around.
+- **Validate once, up front** — no repeated runtime type checks; later code works with guaranteed types.
 - **Telemetry** — After `outro(result)`, commands optionally track failures via `result.mapAll(() => {}, async () => { await new TelemetryService(configDir).trackEvent(new SomeFailedEvent(...), shell) }, () => {})`. Event classes extend `DomainEvent` (`src/types/events/`). Only the failure callback is populated; success/cancel are no-ops.
 
 ## Branching
 
-Always start work from `dev` — never from `main`. This applies to branches and worktrees alike.
+Always start work from `dev`, the default branch. This applies to branches and worktrees alike.
 
 - Make sure `dev` is current (`git fetch origin dev`) and branch from `origin/dev`.
 - Open pull requests against `dev`.
-- Never commit to, branch from, or target `main` directly. If a task appears to require it, stop and ask.
+- Never commit to `main`, and never branch from or target it unless the task is a hotfix you were asked for. If a task appears to require it otherwise, stop and ask.
 
-**Worktrees** — a new worktree starts from this repo's default branch, `beta`, so move it onto `dev` before making any changes: `git fetch origin dev && git reset --hard origin/dev` (fresh, clean worktrees only). Confirm with `git log --oneline -1` that HEAD matches the `origin/dev` tip.
+**Worktrees** — a new worktree may not start at the `origin/dev` tip, so move it there before making any changes: `git fetch origin dev && git reset --hard origin/dev` (fresh, clean worktrees only). Confirm with `git log --oneline -1` that HEAD matches the `origin/dev` tip.
+
+## Releases
+
+A merge into `main`, `beta` or `1.x` is the release: semantic-release picks the version from commit headers, publishes to npm and GitHub Releases, and commits nothing back. Never bump `version` or write a changelog by hand, and never name an npm dist-tag in code. For a promotion, hotfix or back-merge, follow section 8 of `.ai/plans/release-pipeline.md`; a 1.x fix follows its 7.6.
 
 ## Commit Conventions
 
 Uses [Conventional Commits](https://www.conventionalcommits.org/) enforced by commitlint + husky. Pre-commit runs lint-staged (ESLint + Prettier).
 
+A PR into `dev` is squash-merged, and its title alone becomes the commit header that decides the release and its line in the notes. Write it for users as a Conventional Commit header, title a revert `revert(scope): …`, and mark a breaking change with `!` (`feat(sdk)!: …`) in a title or any commit; a `BREAKING CHANGE:` footer alone is ignored by the release, and the checks refuse one under a header without `!`.
+
 **Do not commit or push automatically.** Always wait for explicit instruction from the user before running `git commit` or `git push`.
 
 ## Testing
 
-- **Framework**: mocha + chai (expect style) + sinon + nock + mock-fs
-- **Test location**: mirrors source — `test/commands/`, `test/actions/`, `test/application/`
+- **Framework**: mocha + chai (expect style) + sinon + nock
+- **Test location**: mirrors source — `test/commands/`, `test/actions/`, `test/types/`, `test/infrastructure/`
 - **HTTP mocking**: nock for API calls
 - **Run via tsx** (not ts-node) for ESM compatibility
+- **Filesystem**: real directories under `os.tmpdir()`, made with `fs.mkdtempSync` and removed in
+  `afterEach`. Do not reach for `mock-fs`: Node 26.8 rewrote `fs.readFile` to open, read and close
+  in one thread-pool job, so the binding interception mock-fs relies on never fires. It throws at
+  import, and patching past that only makes reads fall through to the real disk unnoticed
+  (<https://github.com/tschaub/mock-fs/issues/447>).
 
 ## Skills
 

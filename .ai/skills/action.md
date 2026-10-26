@@ -73,10 +73,10 @@ Actions live at `src/actions/` and are the single use-case orchestrators for eac
 | Standard action (multiple params + overwrite guard) | `src/actions/api/transform.ts` |
 | Standard action (Context + TempContext + service) | `src/actions/portal/generate.ts` |
 | Standard action (SDK generation + version selection) | `src/actions/sdk/generate.ts` |
-| Standard action (interactive prompts + neverthrow) | `src/actions/portal/copilot.ts` |
+| Standard action (gate + services + withDirPath) | `src/actions/portal/generate.ts` |
 | Minimal action (configDir only, no services) | `src/actions/auth/logout.ts` |
 | Minimal action (configDir + commandMetadata, no auth) | `src/actions/auth/status.ts` |
-| Minimal action (shorthand constructor) | `src/actions/portal/toc/new-toc.ts` |
+| Minimal action (shorthand constructor) | `src/actions/auth/status.ts` |
 | Delegation action (routes to sub-actions) | `src/actions/quickstart.ts` |
 | Multi-step flow (withDirPath + multiple cancellation points) | `src/actions/sdk/quickstart.ts` |
 | Multi-step flow (interactive wizard + withDirPath) | `src/actions/portal/quickstart.ts` |
@@ -92,8 +92,8 @@ Use when creating a new Action class. Choose the variant that matches the action
 
 ### What to determine
 
-1. **Topic** — action group folder (e.g., `api`, `sdk`, `portal`). Can be nested: `portal/toc`, `portal/recipe`
-2. **Action name** — file name, lowercase hyphenated (e.g., `validate`, `generate`, `new-toc`)
+1. **Topic** — action group folder (e.g., `api`, `sdk`, `portal`). Can be nested: `sdk/publish`, `publishing/profile`
+2. **Action name** — file name, lowercase hyphenated (e.g., `validate`, `generate`, `record-sdk`)
 3. **Class name** — PascalCase with `Action` suffix (e.g., `ValidateAction`, `PortalNewTocAction`)
 4. **Variant** — one of:
    - `standard` — full constructor with configDir, commandMetadata, authKey; services, withDirPath, prompts
@@ -102,7 +102,7 @@ Use when creating a new Action class. Choose the variant that matches the action
 5. **Needs auth** — whether the action receives `authKey: string | null = null`
 6. **Needs services** — which infrastructure services are used (e.g., `PortalService`, `ValidationService`)
 7. **Needs temp directory** — whether to wrap logic in `withDirPath()`
-8. **Needs Context objects** — which contexts are used (e.g., `BuildContext`, `TempContext`, `ResourceContext`)
+8. **Needs Context objects** — which contexts are used (e.g., `ProjectContext`, `TempContext`, `ResourceContext`)
 9. **Prompts class** — the paired Prompts class name and import path
 10. **Execute parameters** — typed parameters the execute method receives from the Command layer
 
@@ -112,7 +112,7 @@ Use when creating a new Action class. Choose the variant that matches the action
 
 **Path:** `src/actions/{topic}/{name}.ts`
 
-For nested topics like `portal/toc`, add one more `../` to all relative import paths.
+For nested topics like `sdk/publish`, add one more `../` to all relative import paths.
 
 ```typescript
 import { DirectoryPath } from "../../types/file/directoryPath.js";
@@ -124,7 +124,7 @@ import { withDirPath } from "../../infrastructure/tmp-extensions.js";
 // If context objects needed:
 // import { ResourceContext } from "../../types/resource-context.js";
 // import { TempContext } from "../../types/temp-context.js";
-// import { BuildContext } from "../../types/build-context.js";
+// import { ProjectContext } from "../../types/project-context.js";
 // If services needed:
 // import { {ServiceName} } from "../../infrastructure/services/{service-file}.js";
 // If ResourceInput parameter:
@@ -157,9 +157,8 @@ export class {PascalName}Action {
     */
   ): Promise<ActionResult> => {
     // 1. Input validation via Context objects
-    //    const buildContext = new BuildContext(buildDirectory);
-    //    if (!(await buildContext.validate())) {
-    //      this.prompts.invalidBuildDirectory(buildDirectory);
+    //    if (!(await project.sourceExists())) {
+    //      this.prompts.invalidSourceDirectory(project.sourceDirectory());
     //      return ActionResult.failed();
     //    }
 
@@ -172,17 +171,16 @@ export class {PascalName}Action {
     // 3. Business logic wrapped in withDirPath for temp directory
     return await withDirPath(async (tempDirectory) => {
       // 4. Resolve resources / prepare context
-      //    const resourceContext = new ResourceContext(tempDirectory);
-      //    const specFileDirResult = await resourceContext.resolveTo(resourcePath);
-      //    if (specFileDirResult.isErr()) {
-      //      this.prompts.networkError(specFileDirResult.error);
+      //    const spec = await ResourceContext.resolveTo(resourcePath, tempDirectory);
+      //    if (spec.isErr()) {
+      //      this.prompts.specUnavailable(spec.error);
       //      return ActionResult.failed();
       //    }
 
       // 5. Service call via prompts spinner
       //    const response = await this.prompts.spinnerMethod(
       //      this.someService.doSomething({
-      //        file: specFileDirResult.value,
+      //        file: spec.value.file(),
       //        commandMetadata: this.commandMetadata,
       //        authKey: this.authKey
       //      })

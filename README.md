@@ -8,6 +8,11 @@ The official CLI for APIMatic.
 [![Downloads/week](https://img.shields.io/npm/dw/@apimatic/cli.svg)](https://npmjs.org/package/@apimatic/cli)
 [![License](https://img.shields.io/npm/l/@apimatic/cli.svg)](https://github.com/apimatic/apimatic-cli/blob/master/package.json)
 
+# Requirements
+
+Node.js 24 or newer, for every command. npm only warns when your Node is older, so the
+install succeeds and the CLI then refuses to run, naming the version it found.
+
 # Getting Started
 
 To get started with APIMatic's CLI using a step by step wizard, run the following command: 
@@ -23,7 +28,7 @@ $ npm install -g @apimatic/cli
 $ apimatic COMMAND
 running command...
 $ apimatic (--version)
-@apimatic/cli/1.1.0-beta.16 win32-x64 node-v23.4.0
+@apimatic/cli/1.3.1 win32-x64 node-v24.19.0
 $ apimatic --help [COMMAND]
 USAGE
   $ apimatic COMMAND
@@ -42,20 +47,16 @@ USAGE
 * [`apimatic help [COMMAND]`](#apimatic-help-command)
 * [`apimatic plugin generate`](#apimatic-plugin-generate)
 * [`apimatic plugin publish`](#apimatic-plugin-publish)
-* [`apimatic portal copilot`](#apimatic-portal-copilot)
 * [`apimatic portal generate`](#apimatic-portal-generate)
-* [`apimatic portal recipe new`](#apimatic-portal-recipe-new)
 * [`apimatic portal serve`](#apimatic-portal-serve)
-* [`apimatic portal toc new`](#apimatic-portal-toc-new)
 * [`apimatic publishing profile list`](#apimatic-publishing-profile-list)
 * [`apimatic quickstart`](#apimatic-quickstart)
 * [`apimatic sdk generate`](#apimatic-sdk-generate)
 * [`apimatic sdk publish`](#apimatic-sdk-publish)
-* [`apimatic sdk save-changes`](#apimatic-sdk-save-changes)
 
 ## `apimatic api transform`
 
-Transform API specifications between different formats.
+Transform API specifications between different formats
 
 ```
 USAGE
@@ -64,17 +65,17 @@ USAGE
     0|graphqlschema [--file <value>] [--url <value>] [-d <value>] [-f] [-k <value>]
 
 FLAGS
-  -d, --destination=<value>  [default: ./] directory to save the transformed file to
+  -d, --destination=<value>  [default: ./] Directory to save the transformed file to
   -f, --force                overwrite changes without asking for user consent.
   -k, --auth-key=<value>     override current authentication state with an authentication key.
-      --file=<value>         path to the API specification file to transform
-      --format=<option>      (required) specification format to transform API specification into
+      --file=<value>         Path to the API specification file to transform
+      --format=<option>      (required) Specification format to transform API specification into
                              <options: apimatic|wadl2009|wsdl|swagger10|swagger20|swaggeryaml|oas3|openapi3yaml|apibluep
                              rint|raml|raml10|postman10|postman20|graphqlschema>
       --url=<value>          URL to the API specification file to transform (publicly accessible)
 
 DESCRIPTION
-  Transform API specifications between different formats.
+  Transform API specifications between different formats
 
   Transform API specifications from one format to another.
   Supports multiple formats including OpenAPI/Swagger, RAML, WSDL, and Postman Collections.
@@ -85,37 +86,44 @@ EXAMPLES
   apimatic api transform --format=raml --url="https://petstore.swagger.io/v2/swagger.json" --destination=./
 ```
 
-_See code: [src/commands/api/transform.ts](https://github.com/apimatic/apimatic-cli/blob/beta/src/commands/api/transform.ts)_
+_See code: [src/commands/api/transform.ts](https://github.com/apimatic/apimatic-cli/blob/v1.3.1/src/commands/api/transform.ts)_
 
 ## `apimatic api validate`
 
-Validate API specification for syntactic and semantic correctness.
+Validate API specification for syntactic and semantic correctness
 
 ```
 USAGE
-  $ apimatic api validate [--file <value>] [--url <value>] [-k <value>]
+  $ apimatic api validate [--file <value> | --url <value> | -i <value>] [-k <value>]
 
 FLAGS
+  -i, --input=<value>     [default: ./] path to the parent directory containing the 'src' directory, which includes API
+                          specifications and configuration files.
   -k, --auth-key=<value>  override current authentication state with an authentication key.
       --file=<value>      Path to the API specification file to validate
       --url=<value>       URL to the API specification file to validate (publicly accessible)
 
 DESCRIPTION
-  Validate API specification for syntactic and semantic correctness.
+  Validate API specification for syntactic and semantic correctness
 
-  Validate your API specification to ensure it adheres to syntactic and semantic standards.
+  Validate the API specification in your 'src/spec' directory, or the one --file or --url points to, to ensure it
+  adheres to syntactic and semantic standards.
 
 EXAMPLES
+  apimatic api validate
+
+  apimatic api validate --input=./
+
   apimatic api validate --file=./specs/sample.json
 
   apimatic api validate --url="https://petstore.swagger.io/v2/swagger.json"
 ```
 
-_See code: [src/commands/api/validate.ts](https://github.com/apimatic/apimatic-cli/blob/beta/src/commands/api/validate.ts)_
+_See code: [src/commands/api/validate.ts](https://github.com/apimatic/apimatic-cli/blob/v1.3.1/src/commands/api/validate.ts)_
 
 ## `apimatic auth login`
 
-Login to your APIMatic account.
+Login to your APIMatic account
 
 ```
 USAGE
@@ -125,7 +133,7 @@ FLAGS
   -k, --auth-key=<value>  Sets authentication key for all commands.
 
 DESCRIPTION
-  Login to your APIMatic account.
+  Login to your APIMatic account
 
   Login using your APIMatic credentials or an API Key
 
@@ -135,7 +143,7 @@ EXAMPLES
   apimatic auth login --auth-key={api-key}
 ```
 
-_See code: [src/commands/auth/login.ts](https://github.com/apimatic/apimatic-cli/blob/beta/src/commands/auth/login.ts)_
+_See code: [src/commands/auth/login.ts](https://github.com/apimatic/apimatic-cli/blob/v1.3.1/src/commands/auth/login.ts)_
 
 ## `apimatic auth logout`
 
@@ -154,7 +162,7 @@ EXAMPLES
   apimatic auth logout
 ```
 
-_See code: [src/commands/auth/logout.ts](https://github.com/apimatic/apimatic-cli/blob/beta/src/commands/auth/logout.ts)_
+_See code: [src/commands/auth/logout.ts](https://github.com/apimatic/apimatic-cli/blob/v1.3.1/src/commands/auth/logout.ts)_
 
 ## `apimatic auth status`
 
@@ -171,7 +179,7 @@ EXAMPLES
   apimatic auth status
 ```
 
-_See code: [src/commands/auth/status.ts](https://github.com/apimatic/apimatic-cli/blob/beta/src/commands/auth/status.ts)_
+_See code: [src/commands/auth/status.ts](https://github.com/apimatic/apimatic-cli/blob/v1.3.1/src/commands/auth/status.ts)_
 
 ## `apimatic autocomplete [SHELL]`
 
@@ -182,7 +190,7 @@ USAGE
   $ apimatic autocomplete [SHELL] [-r]
 
 ARGUMENTS
-  SHELL  (zsh|bash|powershell) Shell type
+  [SHELL]  (zsh|bash|powershell) Shell type
 
 FLAGS
   -r, --refresh-cache  Refresh cache (ignores displaying instructions)
@@ -202,7 +210,7 @@ EXAMPLES
   $ apimatic autocomplete --refresh-cache
 ```
 
-_See code: [@oclif/plugin-autocomplete](https://github.com/oclif/plugin-autocomplete/blob/main/src/commands/autocomplete/index.ts)_
+_See code: [@oclif/plugin-autocomplete](https://github.com/oclif/plugin-autocomplete/blob/v3.2.47/src/commands/autocomplete/index.ts)_
 
 ## `apimatic help [COMMAND]`
 
@@ -213,7 +221,7 @@ USAGE
   $ apimatic help [COMMAND...] [-n]
 
 ARGUMENTS
-  COMMAND...  Command to show help for.
+  [COMMAND...]  Command to show help for.
 
 FLAGS
   -n, --nested-commands  Include all nested commands in the output.
@@ -222,11 +230,11 @@ DESCRIPTION
   Display help for apimatic.
 ```
 
-_See code: [@oclif/plugin-help](https://github.com/oclif/plugin-help/blob/main/src/commands/help.ts)_
+_See code: [@oclif/plugin-help](https://github.com/oclif/plugin-help/blob/6.2.46/src/commands/help.ts)_
 
 ## `apimatic plugin generate`
 
-Generate a context plugin for your published SDKs.
+Generate a context plugin for your SDKs.
 
 ```
 USAGE
@@ -240,10 +248,12 @@ FLAGS
   -k, --auth-key=<value>     override current authentication state with an authentication key.
 
 DESCRIPTION
-  Generate a context plugin for your published SDKs.
+  Generate a context plugin for your SDKs.
 
   Generate a context plugin that teaches an AI coding assistant how to use your SDKs. Requires an input directory
-  containing a `src` directory with a `plugin-config.json`.
+  containing a `src` directory with your API specification — `apimatic.json` is created if it is not there. It asks
+  for the plugin's name on the first run, and for its languages only when `apimatic.json` records none (`sdk publish`
+  records them). Later runs read both from `apimatic.json` without asking.
 
 EXAMPLES
   apimatic plugin generate
@@ -251,7 +261,7 @@ EXAMPLES
   apimatic plugin generate --input="./" --destination="./plugin"
 ```
 
-_See code: [src/commands/plugin/generate.ts](https://github.com/apimatic/apimatic-cli/blob/beta/src/commands/plugin/generate.ts)_
+_See code: [src/commands/plugin/generate.ts](https://github.com/apimatic/apimatic-cli/blob/v1.3.1/src/commands/plugin/generate.ts)_
 
 ## `apimatic plugin publish`
 
@@ -278,45 +288,15 @@ EXAMPLES
   apimatic plugin publish --input="./" --destination="./plugin"
 ```
 
-_See code: [src/commands/plugin/publish.ts](https://github.com/apimatic/apimatic-cli/blob/beta/src/commands/plugin/publish.ts)_
-
-## `apimatic portal copilot`
-
-Configure API Copilot for your API Documentation portal
-
-```
-USAGE
-  $ apimatic portal copilot [-i <value>] [--disable] [-f] [-k <value>]
-
-FLAGS
-  -f, --force             overwrite changes without asking for user consent.
-  -i, --input=<value>     [default: ./] path to the parent directory containing the 'src' directory, which includes API
-                          specifications and configuration files.
-  -k, --auth-key=<value>  override current authentication state with an authentication key.
-      --disable           marks the API Copilot as disabled in the configuration
-
-DESCRIPTION
-  Configure API Copilot for your API Documentation portal
-
-  Displays available API Copilots associated with your account and allows you to select which one to integrate with your
-  portal. Each APIMatic account includes one Copilot by default. The selected Copilot will be added to your
-  'APIMATIC-BUILD.json' file
-
-EXAMPLES
-  apimatic portal copilot --input=./
-
-  apimatic portal copilot --input=./ --disable
-```
-
-_See code: [src/commands/portal/copilot.ts](https://github.com/apimatic/apimatic-cli/blob/beta/src/commands/portal/copilot.ts)_
+_See code: [src/commands/plugin/publish.ts](https://github.com/apimatic/apimatic-cli/blob/v1.3.1/src/commands/plugin/publish.ts)_
 
 ## `apimatic portal generate`
 
-Generate an API Documentation portal.
+Generate a static API Documentation Portal.
 
 ```
 USAGE
-  $ apimatic portal generate [-i <value>] [-d <value>] [-f] [--zip] [-k <value>]
+  $ apimatic portal generate [--zip] [-i <value>] [-d <value>] [-f] [-k <value>]
 
 FLAGS
   -d, --destination=<value>  [default: <input>/portal] path where the portal will be generated.
@@ -324,127 +304,67 @@ FLAGS
   -i, --input=<value>        [default: ./] path to the parent directory containing the 'src' directory, which includes
                              API specifications and configuration files.
   -k, --auth-key=<value>     override current authentication state with an authentication key.
-      --zip                  download the generated portal as a .zip archive
+      --zip                  write the generated portal as a .zip archive.
 
 DESCRIPTION
-  Generate an API Documentation portal.
+  Generate a static API Documentation Portal.
 
-  Generate an API Documentation portal. Requires an input directory containing API specifications, a config file and
-  optionally, markdown guides. For details, refer to the [documentation](https://docs.apimatic.io/platform-api/#/http/gu
-  ides/generating-on-prem-api-portal/build-file-reference)
+  Builds a documentation portal from the OpenAPI documents and Markdown pages in your 'src' directory.
+
+  Each OpenAPI document at the top of 'src/spec' gets a section of the API reference, and the SDKs are built from one of
+  them. To build the SDKs from several, put each in a folder of its own and set 'MergeConfiguration.MergeApis' to true
+  in an 'APIMATIC-META.json' beside the folders; each folder then gets a section.
+
+  The portal is built on your machine and written as static files for any static host, served at its root or, when
+  'portal.site.url' has a path such as 'https://example.com/docs', at that path. Configure it with 'src/apimatic.json',
+  whose 'languages' block gives the portal a page for each SDK language, and whose 'plugin' block, or a 'pluginUrl' in
+  its 'portal' block for a plugin hosted elsewhere, a page for the context plugin.
 
 EXAMPLES
   apimatic portal generate
 
-  apimatic portal generate --input="./" --destination="./portal"
+  apimatic portal generate --input=./ --destination=./portal
+
+  apimatic portal generate --zip
 ```
 
-_See code: [src/commands/portal/generate.ts](https://github.com/apimatic/apimatic-cli/blob/beta/src/commands/portal/generate.ts)_
-
-## `apimatic portal recipe new`
-
-Add an API Recipe to your API documentation portal.
-
-```
-USAGE
-  $ apimatic portal recipe new [--name <value>] [-i <value>] [-f]
-
-FLAGS
-  -f, --force          overwrite changes without asking for user consent.
-  -i, --input=<value>  [default: ./] path to the parent directory containing the 'src' directory, which includes API
-                       specifications and configuration files.
-      --name=<value>   name for the recipe
-
-DESCRIPTION
-  Add an API Recipe to your API documentation portal.
-
-  This command adds a new API Recipe file to your documentation portal.
-
-  To learn more about API Recipes, visit:
-  https://docs.apimatic.io/platform-api/#/http/guides/generating-on-prem-api-portal/api-recipes
-
-EXAMPLES
-  apimatic portal recipe new
-
-  apimatic portal recipe new --name="My API Recipe" --input="./"
-```
-
-_See code: [src/commands/portal/recipe/new.ts](https://github.com/apimatic/apimatic-cli/blob/beta/src/commands/portal/recipe/new.ts)_
+_See code: [src/commands/portal/generate.ts](https://github.com/apimatic/apimatic-cli/blob/v1.3.1/src/commands/portal/generate.ts)_
 
 ## `apimatic portal serve`
 
-Generate and serve an API Documentation Portal with hot reload.
+Preview your API Documentation Portal with live reload.
 
 ```
 USAGE
-  $ apimatic portal serve [-p 3000] [-i <value>] [-d <value>] [-o] [--no-reload] [-k <value>]
+  $ apimatic portal serve [-p 23513] [-o] [-i <value>] [-k <value>]
 
 FLAGS
-  -d, --destination=<value>  [default: <input>/portal] path where the portal will be generated.
-  -i, --input=<value>        [default: ./] path to the parent directory containing the 'src' directory, which includes
-                             API specifications and configuration files.
-  -k, --auth-key=<value>     override current authentication state with an authentication key.
-  -o, --open                 open the portal in the default browser.
-  -p, --port=3000            [default: 3000] port to serve the portal.
-      --no-reload            disable hot reload.
+  -i, --input=<value>     [default: ./] path to the parent directory containing the 'src' directory, which includes API
+                          specifications and configuration files.
+  -k, --auth-key=<value>  override current authentication state with an authentication key.
+  -o, --open              open the portal in the default browser.
+  -p, --port=23513        [default: 23513] port to serve the portal on.
 
 DESCRIPTION
-  Generate and serve an API Documentation Portal with hot reload.
+  Preview your API Documentation Portal with live reload.
 
-  Requires an input directory with API specifications, a config file, and optionally markdown guides. Supports disabling
-  hot reload and opening the portal in the default browser.
+  Serves the portal described by 'src/apimatic.json' from your machine, reloading the browser as you edit the Markdown
+  pages in 'src/content', reorder them in a 'nav.json', edit the documents in 'src/spec', or change the 'portal',
+  'languages' or 'plugin' block of 'apimatic.json'.
+
+  Adding a language or a 'plugin' block, adding or removing a page in 'src/content', creating 'src/static', changing
+  which documents are in 'src/spec' or which folders its 'APIMATIC-META.json' merges, or changing the path in
+  'portal.site.url', needs the preview restarted.
+
+  Nothing is written to disk; run 'apimatic portal generate' to produce the static files.
 
 EXAMPLES
   apimatic portal serve
 
-  apimatic portal serve --input=./ --destination=./portal --port=3000 --open --no-reload
+  apimatic portal serve --input=./ --port=23513 --open
 ```
 
-_See code: [src/commands/portal/serve.ts](https://github.com/apimatic/apimatic-cli/blob/beta/src/commands/portal/serve.ts)_
-
-## `apimatic portal toc new`
-
-Generate a Table of Contents (TOC) file for your API documentation portal
-
-```
-USAGE
-  $ apimatic portal toc new [-d <value>] [-i <value>] [-f] [--expand-endpoints] [--expand-models]
-    [--expand-webhooks] [--expand-callbacks]
-
-FLAGS
-  -d, --destination=<value>  [default: <input>/src/content] path where the toc.yml will be generated.
-  -f, --force                overwrite changes without asking for user consent.
-  -i, --input=<value>        [default: ./] path to the parent directory containing the 'src' directory, which includes
-                             API specifications and configuration files.
-      --expand-callbacks     include individual entries for each callback in the generated 'toc.yml'. Requires a valid
-                             API specification in the working directory.
-      --expand-endpoints     include individual entries for each endpoint in the generated 'toc.yml'. Requires a valid
-                             API specification in the working directory.
-      --expand-models        include individual entries for each model in the generated 'toc.yml'. Requires a valid API
-                             specification in the working directory.
-      --expand-webhooks      include individual entries for each webhook in the generated 'toc.yml'. Requires a valid
-                             API specification in the working directory.
-
-DESCRIPTION
-  Generate a Table of Contents (TOC) file for your API documentation portal
-
-  This command generates a new Table of Contents (TOC) file used in the
-  generation of your API documentation portal.
-
-  The output is a YAML file with the .yml extension.
-
-  To learn more about the TOC file and APIMatic build directory structure, visit:
-  https://docs.apimatic.io/platform-api/#/http/guides/generating-on-prem-api-portal/overview-generating-api-portal
-
-EXAMPLES
-  apimatic portal toc new --destination=./src/content/
-
-  apimatic portal toc new --input=./
-
-  apimatic portal toc new --input=./ --destination=./src/content/
-```
-
-_See code: [src/commands/portal/toc/new.ts](https://github.com/apimatic/apimatic-cli/blob/beta/src/commands/portal/toc/new.ts)_
+_See code: [src/commands/portal/serve.ts](https://github.com/apimatic/apimatic-cli/blob/v1.3.1/src/commands/portal/serve.ts)_
 
 ## `apimatic publishing profile list`
 
@@ -463,26 +383,27 @@ EXAMPLES
   apimatic publishing profile list
 ```
 
-_See code: [src/commands/publishing/profile/list.ts](https://github.com/apimatic/apimatic-cli/blob/beta/src/commands/publishing/profile/list.ts)_
+_See code: [src/commands/publishing/profile/list.ts](https://github.com/apimatic/apimatic-cli/blob/v1.3.1/src/commands/publishing/profile/list.ts)_
 
 ## `apimatic quickstart`
 
-Create your first SDK or API Portal using APIMatic.
+Create your API Documentation Portal, SDKs and Context Plugins.
 
 ```
 USAGE
   $ apimatic quickstart
 
 DESCRIPTION
-  Create your first SDK or API Portal using APIMatic.
+  Create your API Documentation Portal, SDKs and Context Plugins.
 
-  Get started with your first SDK or API Portal in four easy steps.
+  Point the CLI at your API specification and it builds a documentation portal, SDKs, and a context plugin that teaches
+  an AI coding assistant to use them.
 
 EXAMPLES
   apimatic quickstart
 ```
 
-_See code: [src/commands/quickstart.ts](https://github.com/apimatic/apimatic-cli/blob/beta/src/commands/quickstart.ts)_
+_See code: [src/commands/quickstart.ts](https://github.com/apimatic/apimatic-cli/blob/v1.3.1/src/commands/quickstart.ts)_
 
 ## `apimatic sdk generate`
 
@@ -490,9 +411,8 @@ Generate an SDK for your API
 
 ```
 USAGE
-  $ apimatic sdk generate -l csharp|java|php|python|ruby|typescript|go [-d <value>] [--skip-changes]
-    [--api-version <value>] [--zip] [--track-changes] [--codegen-version v3|v4] [--stability stable|beta] [-i <value>]
-    [-f] [-k <value>]
+  $ apimatic sdk generate -l csharp|java|php|python|ruby|typescript|go [-d <value>] [--api-version <value>]
+    [--zip] [--codegen-version v4] [--stability stable|beta] [-i <value>] [-f] [-k <value>]
 
 FLAGS
   -d, --destination=<value>       [default: <input>/sdk/<language> | <input>/sdk/<api-version>/<language>] path where
@@ -504,29 +424,27 @@ FLAGS
   -l, --language=<option>         (required) Programming language for SDK generation
                                   <options: csharp|java|php|python|ruby|typescript|go>
       --api-version=<value>       Version of the API to use for SDK generation (if multiple versions exist)
-      --codegen-version=<option>  [default: v3] Version of the code generator to use
-                                  <options: v3|v4>
-      --skip-changes              Do not apply the saved changes to the generated SDK
-      --stability=<option>        [default: stable] Stability level of the generated SDK
+      --codegen-version=<option>  [default: v4] Version of the code generator to use
+                                  <options: v4>
+      --stability=<option>        Stability level of the generated SDK. Defaults to the level the language offers.
                                   <options: stable|beta>
-      --track-changes             Enable change tracking for SDK generation (only required for initial setup)
       --zip                       Download the generated SDK as a .zip archive
 
 DESCRIPTION
   Generate an SDK for your API
 
-  Generate Software Development Kits (SDKs) from API specifications.
-  Supports multiple programming languages including Java, C#, Python, JavaScript, and more.
+  Generate a Software Development Kit (SDK) from an API specification.
+  C#, TypeScript and Python are available; Java, Ruby, Go and PHP are coming soon.
 
 EXAMPLES
-  apimatic sdk generate --language=java
+  apimatic sdk generate --language=typescript
 
   apimatic sdk generate --language=csharp --input=./
 
   apimatic sdk generate --language=python --destination=./sdk --zip
 ```
 
-_See code: [src/commands/sdk/generate.ts](https://github.com/apimatic/apimatic-cli/blob/beta/src/commands/sdk/generate.ts)_
+_See code: [src/commands/sdk/generate.ts](https://github.com/apimatic/apimatic-cli/blob/v1.3.1/src/commands/sdk/generate.ts)_
 
 ## `apimatic sdk publish`
 
@@ -534,8 +452,9 @@ Generate and publish an SDK to a package registry and/or source repository
 
 ```
 USAGE
-  $ apimatic sdk publish [-p <value>] [-v <value>] [-d <value>] [-l csharp|java|php|python|ruby|typescript] [-f]
-    [-i <value>] [--publish-type package|sourcecode...] [--dry-run] [--codegen-version v3|v4] [--stability stable|beta]
+  $ apimatic sdk publish [-p <value>] [-v <value>] [-d <value>] [-l csharp|java|php|python|ruby|typescript|go]
+    [-f] [-i <value>] [--publish-type package|sourcecode...] [--dry-run] [--codegen-version v4] [--stability
+    stable|beta]
 
 FLAGS
   -d, --destination=<value>       [default: <input>/sdk] path where the sdk will be generated.
@@ -543,16 +462,16 @@ FLAGS
   -i, --input=<value>             [default: ./] path to the parent directory containing the 'src' directory, which
                                   includes API specifications and configuration files.
   -l, --language=<option>         Language of the SDK to generate and publish.
-                                  <options: csharp|java|php|python|ruby|typescript>
+                                  <options: csharp|java|php|python|ruby|typescript|go>
   -p, --profile-id=<value>        Id of the publishing profile to use.
   -v, --version=<value>           Semantic version of the SDK to publish (e.g. 1.0.0).
-      --codegen-version=<option>  [default: v3] Version of the code generator to use
-                                  <options: v3|v4>
+      --codegen-version=<option>  [default: v4] Version of the code generator to use
+                                  <options: v4>
       --dry-run                   Generate the SDK locally for review without publishing.
       --publish-type=<option>...  One or more publishing targets: 'package' for a package registry, 'sourcecode' for a
                                   git repository.
                                   <options: package|sourcecode>
-      --stability=<option>        [default: stable] Stability level of the generated SDK
+      --stability=<option>        Stability level of the generated SDK. Defaults to the level the language offers.
                                   <options: stable|beta>
 
 DESCRIPTION
@@ -567,44 +486,10 @@ EXAMPLES
 
   apimatic sdk publish --profile-id=a1b2c3d4e5f6a1b2c3d4e5f6 --language=typescript --version=1.0.0 --publish-type=package --publish-type=sourcecode
 
-  apimatic sdk publish --profile-id=b2c3d4e5f6a1b2c3d4e5f6a1 --language=java --version=2.0.0 --publish-type=sourcecode
+  apimatic sdk publish --profile-id=b2c3d4e5f6a1b2c3d4e5f6a1 --language=csharp --version=2.0.0 --publish-type=sourcecode
 
   apimatic sdk publish --profile-id=c3d4e5f6a1b2c3d4e5f6a1b2 --language=python --version=1.0.0 --publish-type=package --dry-run
-
-  apimatic sdk publish --profile-id=d4e5f6a1b2c3d4e5f6a1b2c3 --language=csharp --version=1.0.0 --publish-type=package --codegen-version=v4 --stability=beta
 ```
 
-_See code: [src/commands/sdk/publish.ts](https://github.com/apimatic/apimatic-cli/blob/beta/src/commands/sdk/publish.ts)_
-
-## `apimatic sdk save-changes`
-
-Save customizations made to an auto-generated SDK
-
-```
-USAGE
-  $ apimatic sdk save-changes -l csharp|java|php|python|ruby|typescript|go [--sdk <value>] [--api-version <value>] [-i
-    <value>]
-
-FLAGS
-  -i, --input=<value>        [default: ./] path to the parent directory containing the 'src' directory, which includes
-                             API specifications and configuration files.
-  -l, --language=<option>    (required) Programming language of the SDK
-                             <options: csharp|java|php|python|ruby|typescript|go>
-      --api-version=<value>  Version of the API where changes should be saved (if multiple versions exist).
-      --sdk=<value>          [default: ./sdk/<language> | ./sdk/<api-version>/<language>] path to the folder containing
-                             the updated SDK.
-
-DESCRIPTION
-  Save customizations made to an auto-generated SDK
-
-  Requires an input directory with API specifications, a path to the updated SDK directory, and the programming
-  language.
-
-EXAMPLES
-  apimatic sdk save-changes --language=csharp
-
-  apimatic sdk save-changes --language=java --sdk=./sdk
-```
-
-_See code: [src/commands/sdk/save-changes.ts](https://github.com/apimatic/apimatic-cli/blob/beta/src/commands/sdk/save-changes.ts)_
+_See code: [src/commands/sdk/publish.ts](https://github.com/apimatic/apimatic-cli/blob/v1.3.1/src/commands/sdk/publish.ts)_
 <!-- commandsstop -->

@@ -1,15 +1,18 @@
 import { Status } from '@apimatic/sdk';
 import { err, ok, Result } from 'neverthrow';
+import { REQUEST_TIMEOUT_MS } from '../config/axios-config.js';
+import { replaceHTML } from '../utils/utils.js';
 import { ServiceError } from './service-error.js';
+import { sleep } from './timer-extensions.js';
 
-export const STATUS_POLL_INTERVAL_MS = 3000;
+export const TIMING_DEFAULTS = {
+  pollIntervalMs: 3000,
+  // Past `/portal-artifacts`' own 25-minute limit, so the user reads the server's overrun message.
+  generationTimeoutMs: 30 * 60 * 1000,
+  requestTimeoutMs: REQUEST_TIMEOUT_MS
+};
 
-/**
- * Set well clear of any plausible run: it exists to end a generation that is stuck, not to
- * cap a slow one. No duration data exists for real runs, so this is the number to revisit
- * if a legitimate generation ever reports a timeout.
- */
-export const GENERATION_TIMEOUT_MS = 30 * 60 * 1000;
+export type GenerationTimings = Partial<typeof TIMING_DEFAULTS>;
 
 export interface GenerationStatus {
   status: string;
@@ -40,7 +43,7 @@ export async function pollUntilCompleted<T extends GenerationStatus>({
   const deadline = Date.now() + timeout.budgetMs;
 
   for (;;) {
-    await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+    await sleep(pollIntervalMs);
 
     const statusResult = await fetchStatus();
     if (statusResult.isErr()) {
@@ -61,7 +64,7 @@ export async function pollUntilCompleted<T extends GenerationStatus>({
     }
     if (status === Status.SubscriptionError) {
       const message = Object.values(asMessages(errors)).flat()[0];
-      return err(ServiceError.forbidden('Access denied to resource.' + (message ? '\n- ' + message : '')));
+      return err(ServiceError.forbidden('Access denied to resource.' + (message ? '\n' + bulleted([message]) : '')));
     }
 
     // Every other status keeps the run alive rather than ending it: an endpoint reporting
@@ -75,9 +78,13 @@ export async function pollUntilCompleted<T extends GenerationStatus>({
   }
 }
 
+/** Each message under a bullet of its own, any further line of it indented beneath. */
+export const bulleted = (messages: string[]): string =>
+  messages.map((message) => `- ${message.replaceAll('\n', '\n  ')}`).join('\n');
+
 export const formatValidationErrors: ValidationErrorFormatter = (errors) => {
   const messages = Object.values(errors).flat();
-  return 'One or more validation errors occurred.' + (messages.length ? '\n- ' + messages.join('\n- ') : '');
+  return 'One or more validation errors occurred.' + (messages.length ? '\n' + bulleted(messages) : '');
 };
 
 const timedOutMessage = (label: string, budgetMs: number): string => {
@@ -88,5 +95,11 @@ const timedOutMessage = (label: string, budgetMs: number): string => {
   return `${label} timed out after ${minutes} ${minutes === 1 ? 'minute' : 'minutes'}.`;
 };
 
+// The server writes its messages as HTML; the terminal gets their text.
 const asMessages = (errors: Record<string, unknown> | undefined): Record<string, string[]> =>
-  (errors ?? {}) as Record<string, string[]>;
+  Object.fromEntries(
+    Object.entries(errors ?? {}).map(([key, messages]) => [
+      key,
+      (Array.isArray(messages) ? messages : [messages]).map((message) => replaceHTML(String(message)))
+    ])
+  );

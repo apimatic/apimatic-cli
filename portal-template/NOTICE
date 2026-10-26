@@ -1,0 +1,37 @@
+This directory is the build project the APIMatic CLI copies into a temporary
+directory to generate a documentation portal. It is distributed under the MIT
+licence, with the rest of @apimatic/cli.
+
+It is derived from the Fumadocs and TanStack Start starter templates, and at
+build time it runs against the packages below. Each is MIT licensed and carries
+its own copyright:
+
+  Fumadocs (fumadocs-core, fumadocs-ui, fumadocs-mdx, fumadocs-openapi)
+    Copyright (c) 2023 Fuma Nama
+
+  TanStack Start and TanStack Router (@tanstack/react-start, @tanstack/react-router,
+  @tanstack/start-static-server-functions)
+    Copyright (c) 2021-present Tanner Linsley
+
+  Shiki, Tailwind CSS, React, Vite and rehype-raw are likewise MIT licensed; see
+  their own packages for the full notices.
+
+The SDK and context plugin pages draw these marks, copied into
+src/components/logos.tsx:
+
+  The C#, Python and TypeScript logos, from Devicon 2.17.0
+    Copyright (c) 2015 konpa, MIT licensed
+    https://github.com/devicons/devicon
+
+  The Claude, Cursor and GitHub Copilot logos, from Simple Icons 16.32.0
+    CC0 1.0 Universal, https://github.com/simple-icons/simple-icons
+
+  Each mark remains the trademark of its owner, and is shown to name the
+  language or tool it stands for.
+
+The generated portal also bundles the Geist and Geist Mono typefaces, from the
+Fontsource packages @fontsource-variable/geist and @fontsource-variable/geist-mono.
+They are licensed under the SIL Open Font License 1.1, not MIT:
+
+  Geist and Geist Mono
+    Copyright 2024 The Geist Project Authors (https://github.com/vercel/geist-font)

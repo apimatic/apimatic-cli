@@ -10,13 +10,13 @@ Prompts live at `src/prompts/` and are the sole terminal UI layer for each comma
 - **DO** omit the constructor — prompts classes are always stateless with no fields.
 - **DO** import only the `@clack/prompts` functions actually used (e.g., `{ log, confirm, isCancel }`).
 - **DO** alias the format import: `import { format as f } from "../format.js"` (add one more `../` per nesting level).
-- **DO** use `withSpinner(intro, success, failure, fn)` from `../prompt.js` for all async `Result` operations.
+- **DO** use `withSpinner(intro, success, failure, fn, options?)` from `../prompt.js` for all async `Result` operations. `success` and `failure` are strings, or functions of the value or error when the message depends on it; pass `{ indicator: 'timer' }` for work measured in tens of seconds.
 - **DO** always check `isCancel()` on interactive prompts (`confirm`, `select`, `text`, `multiselect`) before using the value.
 - **DO** return `false` from `confirm` methods on cancel — not `undefined`.
 - **DO** return `undefined` from `select`, `text`, and `multiselect` methods on cancel.
 - **DO** use `confirm({ message: "...", initialValue: false })` for overwrite/destructive confirmations.
 - **DO** use format helpers for all dynamic content: `f.var("name")` for variables, `f.path(dir)` for paths, `f.link(url)` for URLs.
-- **DO** use `log.error()` for errors, `log.info()` for success/info, `log.warning()` for warnings, `log.message()` for multi-line output, `log.step()` for step markers.
+- **DO** use `log.error()` for errors, `log.info()` for success/info, `log.warn()` for warnings, `log.message()` for multi-line output, `log.step()` for step markers.
 - **DO** use `noteWrapped(message, title)` from `../prompt.js` for multi-line notes (e.g., next steps).
 - **DO** use `getTree()` from `../format.js` when displaying directory structures.
 - **DO** name spinner methods after their operation, matching the paired service call (e.g., `generatePortal(fn)`, `validateApi(fn)`).
@@ -80,8 +80,8 @@ Use when creating a new Prompts class. Choose the variant that matches the comma
 
 ### What to determine
 
-1. **Topic** — folder path matching the action (e.g., `auth`, `api`, `sdk`, `portal`, `portal/toc`)
-2. **Name** — file name, lowercase hyphenated (e.g., `login`, `generate`, `new-toc`)
+1. **Topic** — folder path matching the action (e.g., `auth`, `api`, `sdk`, `portal`, `sdk/publish`)
+2. **Name** — file name, lowercase hyphenated (e.g., `login`, `generate`, `record-sdk`)
 3. **Class name** — PascalCase with `Prompts` suffix (e.g., `LoginPrompts`, `SdkGeneratePrompts`)
 4. **Variant** — one of:
    - `simple` — log methods and optional spinner; no interactive prompts
@@ -128,7 +128,7 @@ export class {PascalName}Prompts {
 **Notes:**
 - Omit `withSpinner` import entirely if the command has no async service call.
 - Add `import { format as f } from "../format.js"` when any message includes a dynamic value.
-- Adjust `../` depth: one more level per nesting (e.g., `portal/toc/` uses `../../`).
+- Adjust `../` depth: one more level per nesting (e.g., `sdk/publish/` uses `../../`).
 
 ### Standard Template
 

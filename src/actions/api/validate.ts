@@ -1,12 +1,15 @@
-import { DirectoryPath } from "../../types/file/directoryPath.js";
-import { ActionResult } from "../action-result.js";
-import { ApiValidatePrompts } from "../../prompts/api/validate.js";
-import { UnallowedFeaturesResponse, ValidationService } from "../../infrastructure/services/validation-service.js";
-import { CommandMetadata } from "../../types/common/command-metadata.js";
-import { ResourceInput } from "../../types/file/resource-input.js";
-import { withDirPath } from "../../infrastructure/tmp-extensions.js";
-import { ResourceContext } from "../../types/resource-context.js";
-import { ValidationSummary } from "@apimatic/sdk";
+import { DirectoryPath } from '../../types/file/directoryPath.js';
+import { ActionResult } from '../action-result.js';
+import { ApiValidatePrompts } from '../../prompts/api/validate.js';
+import { ValidationService } from '../../infrastructure/services/validation-service.js';
+import { CommandMetadata } from '../../types/common/command-metadata.js';
+import { ResourceInput } from '../../types/file/resource-input.js';
+import { withDirPath } from '../../infrastructure/tmp-extensions.js';
+import { ResourceContext } from '../../types/resource-context.js';
+import { ValidationSummary } from '@apimatic/sdk';
+
+/** `unchecked`: the spec never reached the validation service, or the service did not answer, so nothing is known of it. */
+export type ValidateActionFailure = 'invalid' | 'unchecked';
 
 export class ValidateAction {
   private readonly prompts: ApiValidatePrompts = new ApiValidatePrompts();
@@ -21,42 +24,46 @@ export class ValidateAction {
   }
 
   public readonly execute = async (
-    resourcePath: ResourceInput,
+    spec: ResourceInput | ResourceContext,
     displayValidationSummary = true
-  ): Promise<ActionResult<UnallowedFeaturesResponse | null>> => {
-    return await withDirPath(async (tempDirectory) => {
-      const resourceContext = new ResourceContext(tempDirectory);
-      const specFileDirResult = await resourceContext.resolveTo(resourcePath);
-      if (specFileDirResult.isErr()) {
-        this.prompts.networkError(specFileDirResult.error);
-        return ActionResult.failed();
-      }
-      const validationSummaryResult = await this.prompts.validateApi(
-        this.validationService.validateViaFile({
-          file: specFileDirResult.value,
-          commandMetadata: this.commandMetadata,
-          authKey: this.authKey
-        })
-      );
+  ): Promise<ActionResult<void, ValidateActionFailure>> => {
+    if (!(spec instanceof ResourceContext)) {
+      return await withDirPath(async (tempDirectory) => {
+        const resolved = await ResourceContext.resolveTo(spec, tempDirectory);
+        if (resolved.isErr()) {
+          this.prompts.specUnavailable(resolved.error);
+          return ActionResult.failed(undefined, 'unchecked');
+        }
+        return await this.execute(resolved.value, displayValidationSummary);
+      });
+    }
+    const validationSummaryResult = await this.prompts.validateApi(
+      this.validationService.validateViaFile({
+        file: spec.file(),
+        commandMetadata: this.commandMetadata,
+        authKey: this.authKey
+      })
+    );
 
-      if (validationSummaryResult.isErr()) {
-        this.prompts.logValidationError(validationSummaryResult.error);
-        return ActionResult.failed();
+    if (validationSummaryResult.isErr()) {
+      this.prompts.logValidationError(validationSummaryResult.error.message);
+      return ActionResult.failed(
+        undefined,
+        validationSummaryResult.error.kind === 'rejected' ? 'invalid' : 'unchecked'
+      );
+    }
+    const { validation, linting } = validationSummaryResult.value;
+    if (displayValidationSummary) {
+      if (this.hasValidationIssues(validation)) {
+        this.prompts.displayValidationSummary(validation);
       }
-      const validationSummary = validationSummaryResult.value;
-      if (displayValidationSummary) {
-        if (this.hasValidationIssues(validationSummary.result.validation)) {
-          this.prompts.displayValidationSummary(validationSummary.result.validation);
-        }
-        if (this.hasValidationIssues(validationSummary.result.linting)) {
-          this.prompts.displayValidationSummary(validationSummary.result.linting);
-        }
+      if (this.hasValidationIssues(linting)) {
+        this.prompts.displayValidationSummary(linting);
       }
-      if (!validationSummary.result.validation.isSuccess || !validationSummary.result.linting.isSuccess) {
-        return ActionResult.failed();
-      }
-      return ActionResult.success(validationSummary.unallowedFeatures);
-    });
+    }
+    return validation.isSuccess && linting.isSuccess
+      ? ActionResult.success()
+      : ActionResult.failed(undefined, 'invalid');
   };
 
   private hasValidationIssues(summary: ValidationSummary): boolean {

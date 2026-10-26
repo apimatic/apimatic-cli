@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "portal": {
+    "site": {
+      "name": "Payments API",
+      "description": "A small payments API with SDK code samples."
+    }
+  },
+  "languages": {
+    "typescript": {},
+    "csharp": {},
+    "python": {}
+  }
+}

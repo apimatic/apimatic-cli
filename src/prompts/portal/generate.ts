@@ -1,10 +1,24 @@
-import { isCancel, confirm, log } from "@clack/prompts";
-import { DirectoryPath } from "../../types/file/directoryPath.js";
-import { format as f } from "../format.js";
-import { Result } from "neverthrow";
-import { FilePath } from "../../types/file/filePath.js";
-import {ServiceError } from "../../infrastructure/service-error.js";
-import { noteWrapped, withSpinner } from "../prompt.js";
+import { isCancel, confirm, log } from '@clack/prompts';
+import { DirectoryPath } from '../../types/file/directoryPath.js';
+import { FilePath } from '../../types/file/filePath.js';
+import { PortalBuildFailure, PortalBuildResult } from '../../infrastructure/portal-build-service.js';
+import { NOT_FOUND_FILE_NAME, PortalSaveProblem, ZIP_FILE_NAME } from '../../types/portal-context.js';
+import { SiteAddress } from '../../types/portal/config/site-address.js';
+import { Result } from 'neverthrow';
+import { format as f } from '../format.js';
+import { logTail, noteWrapped, withSpinner } from '../prompt.js';
+
+function describeSaveProblem(problem: PortalSaveProblem): string {
+  switch (problem.kind) {
+    case 'stagingFailed':
+      return `The portal could not be written (${problem.reason}). The previous portal is unchanged.`;
+    case 'replaceFailed':
+      return (
+        `The previous portal could not be replaced (${problem.reason}). ` +
+        `Whatever could not be moved into place is still at ${f.path(problem.stagedAt)}; move it up a level by hand.`
+      );
+  }
+}
 
 export class PortalGeneratePrompts {
   public async overwritePortal(directory: DirectoryPath): Promise<boolean> {
@@ -21,52 +35,82 @@ export class PortalGeneratePrompts {
   }
 
   public directoryCannotBeSame(directory: DirectoryPath) {
-    const message = `The ${f.var("src")} and ${f.var("portal")} directories must be different. Current value: ${f.path(
+    const message = `The ${f.var('src')} and ${f.var('portal')} directories must be different. Current value: ${f.path(
       directory
     )}`;
     log.error(message);
   }
 
-  public srcDirectoryEmpty(directory: DirectoryPath) {
-    const message = `The ${f.var("src")} directory is either empty or invalid: ${f.path(directory)}`;
-    log.error(message);
-  }
-
   public portalDirectoryNotEmpty() {
-    const message = `Please enter a different destination folder or remove the existing files and try again.`;
+    log.error('Please enter a different destination folder or remove the existing files and try again.');
+  }
+
+  public destinationContainsSource(sourceDirectory: DirectoryPath, portalDirectory: DirectoryPath) {
+    const message =
+      `The destination ${f.path(portalDirectory)} contains your source directory ` +
+      `${f.path(sourceDirectory)}, and everything in the destination is replaced by the ` +
+      `generated portal. Choose a destination outside it, such as ` +
+      `${f.flag('destination', './portal')}.`;
     log.error(message);
   }
 
-  public generatePortal(fn: Promise<Result<NodeJS.ReadableStream, ServiceError | NodeJS.ReadableStream>>) {
+  /**
+   * A portal build runs for tens of seconds with no output of its own, so the spinner
+   * carries an elapsed timer rather than a static message.
+   */
+  public buildPortal(fn: Promise<Result<PortalBuildResult, PortalBuildFailure>>) {
     return withSpinner(
-      "Generating API Portal",
-      "Portal generated successfully.",
-      "Portal Generation failed.",
-      fn
+      'Building the portal',
+      ({ pageCount }) => `Built ${pageCount} ${pageCount === 1 ? 'page' : 'pages'}.`,
+      (failure) => failure.message,
+      fn,
+      { indicator: 'timer' }
     );
   }
 
-  public portalGenerationError(error: string) {
-    log.error(error);
+  public buildFailed(output: string, logPath: FilePath | null) {
+    const tail = logTail(output);
+    if (tail.length > 0) {
+      log.message(tail);
+    }
+    if (logPath === null) {
+      log.error('The full build log could not be written beside the portal.');
+    } else {
+      log.error(`The full build log is at ${f.path(logPath)}.`);
+    }
   }
 
-  public portalGenerationSdkMergeFailed(sdkMergeFailedErrors: string[]) {
-    log.error(`Saved changes couldn't be applied to one or more SDKs.`);
-    const language = sdkMergeFailedErrors.length === 1 ? sdkMergeFailedErrors[0] : "<language>";
-    log.error(`Merge conflicts found in:\n- ${sdkMergeFailedErrors.join("\n- ")}`);
-    const message = `Review and resolve the conflicts first by running:
-'${f.cmdAlt("apimatic", "sdk", "generate")} ${f.flag("language", language)}'
-After resolving merge conflicts, retry ${f.cmdAlt("apimatic", "portal", "generate")}.`;
-    noteWrapped(message, "Next Steps");
-  }
-
-  public portalGenerationErrorWithReport(reportPath: FilePath) {
-    const message = `An error occurred during portal generation.
-A report has been written at the destination path ${f.path(reportPath)}`;
-    log.error(message);
+  public savePortal(fn: Promise<Result<void, PortalSaveProblem>>) {
+    return withSpinner('Writing the portal', 'Portal written.', describeSaveProblem, fn);
   }
 
   public portalGenerated(portal: DirectoryPath) {
     log.info(`Portal artifacts can be found at ${f.path(portal)}.`);
+  }
+
+  public nextSteps(portal: DirectoryPath, zipped: boolean, site: SiteAddress | null) {
+    if (site === null || !site.hasPath()) {
+      const upload = zipped
+        ? `Unpack ${f.var(ZIP_FILE_NAME)} in ${f.path(portal)} onto any static host.`
+        : `Upload the contents of ${f.path(portal)} to any static host.`;
+      const message = `${upload}\nConfigure ${f.var(NOT_FOUND_FILE_NAME)} as the error document so deep links resolve.`;
+      noteWrapped(message, 'Next steps');
+      return;
+    }
+
+    const served = f.link(site.addressOf('/'));
+    const upload = zipped
+      ? `Unpack ${f.var(ZIP_FILE_NAME)} in ${f.path(portal)} so its contents are served at ${served}.`
+      : `Upload the contents of ${f.path(portal)} so they are served at ${served}.`;
+    const sitemapLine = `Sitemap: ${site.addressOf('/sitemap.xml')}`;
+    const message = [
+      upload,
+      `To check the portal locally, serve it under ${f.var(site.path())}: from the root of a local server, its ` +
+        'pages load without their styles and scripts.',
+      `Serve ${f.var(NOT_FOUND_FILE_NAME)} for missing pages under ${f.var(site.path())}, so deep links resolve.`,
+      `Crawlers read ${f.var('robots.txt')} only at the root of a host, so none is generated. If you control the ` +
+        `root, add ${f.var(sitemapLine)} to its ${f.var('robots.txt')}.`
+    ].join('\n');
+    noteWrapped(message, 'Next steps');
   }
 }

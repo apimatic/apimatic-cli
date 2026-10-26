@@ -1,0 +1,1265 @@
+# Plan: the `portal` block v2 — site, brand and tabs
+
+Status: rewritten 2026-09-23 for `src/apimatic.json`, and implemented the same
+day on `saeedjamshaid/portal-config`, one commit per step of section 11. The
+sample repository's change is committed on its own branch there and not yet
+pushed. Replaces the 2026-09-21 draft written against `portal.json`; section 14
+records what changed and why, so the older reasoning is not rediscovered.
+Findings made while implementing are marked *as built* or *verified* in the
+section they concern. A review of the whole branch the same day found gaps in
+input validation, the API filter, tabs and the serve watcher; each fix is
+marked *as reviewed* where its rule is stated. On 2026-09-24 the block was
+trimmed for the first release; section 15 lists what was cut and why, and the
+sections above describe what remains.
+
+**Amended 2026-09-25** on `saeedjamshaid/portal-home-tab`, after two rounds of
+QA of the tabs: section 5 states the rules as they now stand, and ends with how
+they got there. There is no Guides tab and no `"root": true`: Home comes first
+and holds every loose page, and a folder the root `nav.json` lists is a tab.
+Passages elsewhere that still mention the Guides tab, `/tab/guides`, `root` or
+its checks and tests describe the first cut and are superseded by section 5.
+
+**Amended 2026-09-29** on `saeedjamshaid/nav-json-tabs`, proposed and not yet
+built: the root `nav.json` gains a `tabs` list, and its `pages` orders Home's
+sidebar only, so a folder at the top level can be ordered inside Home without
+becoming a tab, and a generated section can sit in Home rather than in a tab of
+its own. Section 5 states the rules as they will stand; `dev` still makes a tab
+of each folder the root `pages` lists, until section 16 is delivered. Where this
+plan says a listed folder is a tab, or that the tokens place tabs, read
+section 5.
+
+Builds on `.ai/plans/fumadocs-portal.md` (PR #343), `.ai/plans/portal-navigation.md`
+(`nav.json`, PR #346) and `.ai/plans/apimatic-config.md` (`apimatic.json`,
+PR #348, with the language entry's `publishing` level from #350), all
+implemented on `dev`. Section 13 lists what those plans need amended.
+
+Reference: the PM's proposal "Portal Configuration: MVP Structure" (Abdul Hannan,
+2026-09-18). It was used for *capabilities*; key names were chosen against
+Fumadocs' own prop names, Mintlify's `docs.json`, Starlight and Docusaurus. The
+proposal is internal, so deviating from it needs no sign-off; the deviations are
+listed in section 2.
+
+## 1. Goal and scope
+
+Give the `portal` block of `src/apimatic.json` the shape it will keep, make the
+portal brandable — logo, favicon, primary colour,
+light/dark mode, header links — and render the top level of the site as
+tabs. The tabs come from the root `nav.json`, which already orders the top
+level; `apimatic.json` says how the portal looks and behaves, `nav.json` says
+how it is arranged.
+
+The block is unreleased: today's flat shape (`title`, `description`, `logo`,
+`siteUrl`, `aiPageActions`) exists only on `dev`. Restructuring it is free until
+2.0 ships and a breaking change after, which is why the whole key structure
+lands in this release even where a behaviour ships thin.
+
+Required for `portal generate` and `portal serve`: the `portal` block, a
+top-level `languages` block with at least one entry, and `portal.site.name`
+when `spec/` holds two or more specifications. Everything else is optional.
+
+In scope: the block's schema, the `languages` requirement on the portal path,
+CLI-side validation and defaults, tabs from `nav.json`, the template changes
+that apply each key, leaving internal operations out of the API reference, re-applying the config under
+`portal serve`, the quickstart scaffold, and `apimatic.schema.json` for editors.
+
+Out of scope:
+
+- The generated SDK page and its content. `apimatic:sdks` is reserved and
+  resolves to nothing until that page exists, so no SDKs tab renders in this
+  release (section 5). The page is the navigation plan's second change.
+  *(2026-09-24: landed, with a context plugin page beside it;
+  `.ai/plans/generated-pages.md`.)*
+- Writing `languages` for a portal project. For now the user adds it to
+  `src/apimatic.json` by hand; a quickstart step that writes it is a separate
+  PR (section 12).
+- Raw token overrides (section 15), i18n, the AI section's pages, and a
+  hidden sidebar on the Home tab.
+
+Delivered as **one PR** (section 11).
+
+## 2. Decisions (2026-09-23)
+
+| Topic | Decision |
+|---|---|
+| Where navigation lives | The root `src/content/nav.json`. Its entries, in order, decide the tabs and their order (section 5). `apimatic.json` carries no tab order and no section list. *(Amended 2026-09-29: its `tabs` decides the tabs and their order, and its `pages` orders Home's sidebar.)* |
+| Tabs | Always on. Each top-level node belongs to exactly one tab; there is no flat-sidebar mode. *(Amended 2026-09-29: Home is always a tab, a folder is one when `tabs` lists it, and a generated section is one unless `pages` places it in Home. A portal that places the API and every generated section in Home has Home alone and shows no tab bar.)* *(Amended 2026-09-30: a generated section and the API reference are tabs when `tabs` names them, like a folder; `tabs` is the whole tab bar after Home. A file with no `tabs`, or no file, has Home alone and shows no tab bar.)* |
+| Content tabs | A folder directly under `content/` becomes its own tab when the root `nav.json` lists it; otherwise it stays a group in Home's sidebar (section 5). *(Amended 2026-09-29: when its `tabs` lists it; its `pages` orders it inside Home.)* |
+| Tab labels | Home takes the root `nav.json`'s `title`, then "Home". A folder tab takes its `nav.json` `title`, then its index page's title, then the folder name; the API tab takes `content/api/nav.json`'s `title`, then a `content/api/index` page, then "API Reference" — both as `dev` already does. "SDKs" and "Context Plugin" are fixed, set by the generated folders' `nav.json` titles (`.ai/plans/generated-pages.md`). Only root-level tabs are affected; nothing nested changes. |
+| Tokens | `apimatic:api` stays and places the API tab. `apimatic:pages` is renamed `apimatic:sdks` and places the SDKs tab; the old name is reported as an unknown entry. A later AI section gets its own token rather than sharing a group, because each generated section is its own tab. *(Amended 2026-09-24: `apimatic:plugin` places the Context Plugin tab, a generated section given its own token by this rule; the AI section is still to come.)* *(Amended 2026-09-29: a token in `tabs` places the section's tab, in `pages` places the section inside Home, and in neither leaves it a tab at its default place. Still valid only in the root file.)* *(Amended 2026-09-30: in neither, the section is a folder in Home, in Fumadocs' order.)* |
+| Home | `content/index.md` rendered in the docs layout, in the Home tab, which always comes first and also holds every page and folder that is no tab of its own, in the file's order, opening on the home page (section 5). |
+| `languages` | The shared top-level block `sdk publish` writes. Required for the portal: at least one entry, each keyed by a `Language` enum value and holding an object. Its `publishing` record (#350) is optional: an entry without one is a language that is wanted but not yet published, and counts. An unknown language key is an error on the portal path (the plugin path stays lenient and preserves it). |
+| Layout | Fumadocs' notebook layout with the tabs in the header, fixed (section 15). |
+| Primary colour | Overrides `--color-fd-primary`, a contrast-picked `--color-fd-primary-foreground`, and `--color-fd-ring`. Fumadocs' neutral theme supplies every other token (section 15). |
+| Fonts | Geist and Geist Mono from Google Fonts, fixed in the template (section 15). *Amended 2026-09-25:* bundled with the portal instead (section 15). |
+| Favicon default | The light logo; none when there is no logo. The APIMatic mark is never shipped onto a customer's domain. |
+| Site name default | Derived from `info.title` when the project has exactly one spec. With two or more, `site.name` is required. |
+| Unknown keys | Reported by dotted path, `'portal.brand.colour' is not a 'portal' setting.` No near-miss hints, including for today's flat keys: `title` is reported as unknown like any other key. The live `url`/`site` → `siteUrl` hints are deleted. |
+| JSON schema | `apimatic.schema.json` describes the whole file: root lenient, `portal` strict, `plugin` and `languages` typed with additional properties allowed. Ships in the npm package, referenced from a CDN URL; the scaffold writes `$schema`. A test keeps the `portal` definition and the parser in step. |
+| Defaults | Applied twice, deliberately: the scaffold writes every default into the block ("ship populated"), and `resolve()` fills them for a hand-written minimal block. An explicit default and an absent key produce the same portal. |
+| Generated files, not substitution | The CLI writes `portal.identity.json` (client-safe, imported by `portal.ts`) and `src/styles/theme.css`. Re-applying a config edit under `portal serve` is a plain write of those two files; the only substitutions left are the content-directory literals prepare makes once. |
+| Operation filtering | Operations marked `x-internal: true` are left out of the bundled document before pages are generated, and deprecated ones are documented, struck through (section 7). Fixed, with the reference grouped by tag (section 15). |
+| Colour formats | `#rgb` and `#rrggbb` for `brand.colors.primary`, because the foreground derivation has to parse it (narrowed 2026-09-24, section 15). |
+| Key names | Deviations from the PM draft: `brand.colors`, `brand.colorMode`, `navigation.links`, and tabs in `nav.json` rather than a `sections` list. |
+
+Rejected, with reasons:
+
+- **Tabs as `portal.navigation.sections` in `apimatic.json`** (the 2026-09-21
+  draft). Splits ordering across two files — tab order in one, page order in
+  the other; tab reordering would need the config watcher rather than
+  Fumadocs' native metadata reload; it throws away the `nav.json` tokens #346
+  shipped; and five fixed section ids allow exactly one content tab. What it
+  offered — per-tab options beside the tab — is covered by `portal.home` and
+  `portal.api`, which are behaviour rather than arrangement anyway.
+- **Per-tab options inside `nav.json`.** Fumadocs validates every `nav.json`
+  against its `metaSchema`: `pages` entries must be strings and unknown keys are
+  stripped before the template sees them (section 10). An object entry or a
+  custom key would need a schema override in the template. *(Amended
+  2026-09-29: `tabs` takes that override for one list of strings, typed as
+  `pages` is; per-tab options stay rejected.)*
+- **Every top-level folder as a tab.** A project that groups its guides into
+  folders would grow a row of tabs on upgrade. A folder is a tab only when the
+  root `nav.json` lists it (section 5).
+- **Configurable labels for SDKs and Context Plugin.** No place for them in
+  `nav.json` (see above), and a second place to name tabs in `apimatic.json` for
+  two words nobody has asked to change. Additive later if asked for. Home's was
+  asked for after QA, and the root `nav.json`'s `title` gives it (section 5).
+- **Near-miss hints for the flat `dev` keys.** The flat block never shipped, and
+  the project carries no migration messaging.
+- **Home as a plain tab, not a root folder.** Fumadocs builds tab groups from
+  the root folders on the current page's path; a page outside every root folder
+  renders no tabs at all (section 10).
+- **A landing page on Fumadocs' HomeLayout.** A second layout with its own
+  navbar rules and a fourth page type in the routes, for a CTA a button covers.
+- **Tinting accent, secondary and muted from the primary.** Hue and chroma math
+  per preset, and it fights presets like `vitepress` and `ocean` that restyle
+  surfaces themselves. `advanced.tokens` was the escape hatch until section 15
+  cut it.
+- **Free-text Google Fonts family names.** A typo only shows as a fallback font
+  at runtime, and the weight axis differs per family so the URL cannot be
+  derived reliably.
+- **Filtering the document before Fumadocs bundles it.** The document-object
+  input form carries no base path for relative `$ref`s to resolve against. The
+  filter runs on the bundled document instead (section 7).
+- **Filtering the generated pages after `staticSource`.** Leaves emptied tag
+  folders whose metadata has to be found and removed too, and each page's
+  `payload.bundled` would still carry the hidden operations.
+- **Substituting a literal into `portal.ts` for the identity** (today's
+  mechanism). A separate client-safe file has nothing to leak, and a file is
+  what a watcher can rewrite.
+- **`brand.preset` as its own key.** The preset is a palette; beside the
+  primary under `brand.colors` it reads as one decision.
+
+## 3. The file
+
+```json
+{
+  "$schema": "https://cdn.jsdelivr.net/npm/@apimatic/cli@2/apimatic.schema.json",
+  "schemaVersion": 1,
+  "portal": {
+    "site": {
+      "name": "Calculator API",
+      "url": "https://docs.example.com",
+      "description": "A tiny calculator, documented."
+    },
+    "brand": {
+      "logo": { "light": "static/images/logo.svg", "dark": "static/images/logo-dark.svg" },
+      "favicon": "static/favicon.ico",
+      "colors": { "primary": { "light": "#1d4ed8", "dark": "#93c5fd" } },
+      "colorMode": "both"
+    },
+    "navigation": {
+      "links": [{ "label": "Status", "url": "https://status.example.com" }]
+    },
+    "ai": { "pageActions": true }
+  },
+  "languages": {
+    "typescript": {
+      "publishing": { "package": { "name": "@acme/calculator", "version": "1.0.0" }, "codegenVersion": "v4" }
+    },
+    "python": {}
+  }
+}
+```
+
+Since #350 a language entry carries its publishing record one level down, under
+`publishing` (`source`, `package`, `codegenVersion`), and an entry with no
+`publishing` block — `"python": {}` above — means "this language is wanted,
+nothing is published yet". That is exactly the entry the portal asks a user to
+write by hand (section 12).
+
+`$schema` and `schemaVersion` are root keys, owned by `ApimaticConfigDocument`:
+`$schema` is ignored, and `schemaVersion` stays `1` — the block's restructure
+happens before any release, so no reader of version 1 ever saw the flat shape.
+`plugin` is omitted above and untouched by this plan.
+
+| Key | Type | Default | Rule |
+|---|---|---|---|
+| `portal.site.name` | string | `info.title` of the only spec | Required when `spec/` holds two or more specifications, counted as `PortalSourceContext.specs()` counts them: a JSON file with no OpenAPI or Swagger version key, such as `APIMATIC-META.json`, is not one. Header, page titles, `og:site_name`. |
+| `portal.site.url` | string | none | Origin only, as today's `siteUrl`. Enables canonical links, sitemap, robots, absolute `og:url`. |
+| `portal.site.description` | string | first paragraph of `info.description` of the only spec, whitespace-collapsed, capped at 300 characters on a word boundary | Blank is none. A change from today's `OpenApiDocument.suggestedConfig`, which collapses the whole description: a paragraph ends at a blank line, so wrapped prose without one is still whole. |
+| `portal.brand.logo` | string or `{light, dark}` | none | Paths relative to `src/` inside `static/`; a string sets both. Each file must exist. *As reviewed:* every name on the path must be there and not `.`, since `static//logo.png` finds the file and is then served as `//logo.png`, another host; each name is escaped in the URL; and the file must exist in the case written, since Windows and macOS find `Logo.PNG` for `logo.png` and the host does not. |
+| `portal.brand.favicon` | string | the light logo | Path inside `static/`; must exist. The link's `type` is set when the extension is known. The logo's path rules apply. |
+| `portal.brand.colors.primary` | colour or `{light, dark}` | the theme's | A string sets both modes. `#rgb` or `#rrggbb`, per section 2. |
+| `portal.brand.colorMode` | enum | `both` | `light`, `dark`, `both`. A forced mode hides the switch and the `D` hotkey. |
+| `portal.navigation.links[]` | `{label, url}` | `[]` | Rendered in the navbar and the mobile menu. `label` a non-empty string. `url` an absolute `http:` or `https:` URL, marked external, or a site-relative path starting with `/`; anything else (`mailto:`, a bare `docs/x`, `javascript:`) is refused. *As reviewed:* a path is resolved as a browser resolves it and refused when that leaves the site (`/\host`, a tab after the slash) or holds an empty segment, which past its dot segments can resolve to `//host` (`/.//host`, `/docs/..//host`), and written as resolved; the schema's pattern refuses the same empty segment, so the two agree; an absolute URL must carry its `//`, since a browser reads `https:example.com` on an https site as a path of that site. |
+| `portal.ai.pageActions` | boolean | `true` | Today's `aiPageActions`, moved. |
+| `languages` | map | none, required | At least one entry. Keys are `Language` values from `src/types/sdk/generate.ts`: `csharp`, `java`, `php`, `python`, `ruby`, `typescript`, `go`. Each value an object, and its `publishing`, when present, an object too — both shape checks are `ApimaticConfigDocument`'s findings, which the portal now reads (section 8). Nothing inside `publishing` is checked by the portal in this release. |
+
+Every error carries its dotted path from the root, and every error is reported
+at once, as `PortalConfig.fromBlock` does today. `languages` errors are listed
+with the `portal` errors in the same report.
+
+## 4. How each key reaches the portal
+
+The browser gets an identity with nothing machine-specific in it; everything
+that addresses the build machine stays in `portal.config.json` behind
+`portal.server.ts`. This plan widens both, and moves the identity from the
+`__APIMATIC_PORTAL_IDENTITY__` literal substituted into `portal.ts` to a
+`portal.identity.json` that `portal.ts` imports, so a config edit under
+`portal serve` is a file write Vite hot-reloads.
+
+Browser identity: `name`, `description`, `siteUrl`, `logo` (`{light, dark}` or
+null, the same URL twice for one image), `favicon` (`{url, type}` or null, the
+type from the extension), `colorMode`, `links` (each `{label, url, external}`),
+`pageActions`. Tabs are not in it: they come from the page tree, which already
+carries `nav.json`.
+
+Server-only (`portal.config.json`): `specs`, `contentDir` and `staticDir`. The prerender list also
+needs `siteUrl`, which `vite.config.ts` reads from `portal.identity.json`.
+
+Generated stylesheet: the CLI writes `src/styles/theme.css` into the build
+project; `app.css` imports it last and is otherwise fixed apart from the
+content-directory `@source` line prepare already substitutes.
+
+| Key | Applied where | Fumadocs mechanism |
+|---|---|---|
+| `site.*` | `__root.tsx`, `$.tsx` head, `seo.ts`, `llms.server.ts` | As today. |
+| `brand.logo` | `layout.shared.tsx` `nav.title` | Two `<img>` with `dark:hidden` / `hidden dark:block`; the `dark` variant is defined by Fumadocs' `base.css`. |
+| `brand.favicon` | `__root.tsx` `links` | `<link rel="icon">` with `type` from the extension. |
+| `brand.colors.primary` | `theme.css` | `:root:not(.dark) { --color-fd-primary; --color-fd-primary-foreground; --color-fd-ring }` and the dark trio under `.dark`. Both blocks always emitted. The light block is scoped with `:not(.dark)` because a bare `:root` has the same specificity as the theme's `.dark` block and comes later, so a light-only value would win in dark mode. |
+| `brand.colorMode` | `__root.tsx` `RootProvider`, layout props | `theme={{ forcedTheme, enableSystem: false, hotKey: false }}` when forced; `themeSwitch={{ enabled: false }}` on the layout. `both` is Fumadocs' default. |
+| `navigation.links` | `layout.shared.tsx` `links` | Fumadocs `MainItemType` `{ text, url, external }`. |
+| `ai.pageActions` | `$.tsx` | As today. |
+| `languages` | nowhere yet | Validated only. The SDK page reads it when it lands. |
+
+## 5. Tabs from `nav.json`
+
+### What the user writes
+
+The root `src/content/nav.json` lists the tabs after Home in `tabs`, and orders Home's
+sidebar in `pages`, as every other `nav.json` orders its folder's:
+
+```json
+{
+  "title": "Overview",
+  "tabs": ["tutorials", "apimatic:sdks", "apimatic:api"],
+  "pages": ["index", "getting-started", "authentication", "guides", "apimatic:plugin", "..."]
+}
+```
+
+```json
+// src/content/tutorials/nav.json
+{ "title": "Tutorials", "pages": ["first-call", "..."] }
+```
+
+That yields the tabs Overview, Tutorials, SDKs and API Reference, in that order. Overview is
+Home, and its sidebar lists the index page, the getting-started folder, the authentication
+page, the guides folder and the Context Plugin folder, in that order, then everything else at
+the top level. `dev` cannot order top-level folders inside Home: naming one in `pages` makes
+it a tab, and the unnamed ones land together where `...` stands, after any unnamed page and in
+Fumadocs' order, alphabetical (section 10, Default order). The block can sit between two
+named pages, but its folders cannot be ordered among themselves or split around a page.
+
+### How nodes map to tabs
+
+After `navigationTransformer` has ordered the root, each top-level node is assigned to one tab:
+
+| Node | Tab | Label |
+|---|---|---|
+| a folder the root file's `tabs` lists, other than one serving `/` | its own | its `nav.json` `title`, then its index page's title, then the folder name |
+| the `api` folder, when the root file's `tabs` names it as `api` or `apimatic:api` | API | `content/api/nav.json` `title`, then `content/api/index` title, then "API Reference" |
+| a generated folder, when the root file's `tabs` names its token | its own | its generated `nav.json` `title`: "SDKs", "Context Plugin" |
+| any other page or folder, and the synthetic fallback-home node | Home | the root `nav.json` `title`, then "Home" |
+
+Home always comes first: it opens the site, and it holds every loose page, so where one of
+them is listed says nothing about where the tab belongs. Its sidebar keeps the order of the
+root file's `pages`, and it opens on the home page wherever `index` sits (`src/lib/tabs.ts`).
+The other tabs follow in the order `tabs` lists them, and there are no others. *(Amended
+2026-09-30, second review; until then a section or API named in neither list kept a tab at a
+default place, before or after what `tabs` named.)* A section or the API reference that `tabs`
+does not name is a folder in Home's sidebar, where `pages` puts it or, unnamed, in Fumadocs'
+order among the other folders (section 10, Default order). No `nav.json` at all, or one with
+no `tabs`, gives Home alone and no tab bar. So that a fresh portal looks as it did, the
+scaffold and the sample repository's root file name the three sections in `tabs`.
+
+A folder `tabs` does not list stays a group in Home's sidebar, where `pages` or `...` puts it,
+so no tab appears unasked when a folder is added under the scaffold's `["index", "..."]`. A
+top-level folder that serves `/`, as a `(group)` folder's index page does, is never a tab, so
+Home always holds the home page: the CLI refuses a `tabs` entry naming one, and the template
+keeps it in Home. A generated section placed in Home is a folder in its sidebar, served where
+it always is: `/sdks`, `/context-plugin` and `/api` do not move, as tree position never sets
+an address. Surveyed alternatives: a per-folder flag (Fumadocs' `root`, Nextra's
+`type: 'page'`, this plan's first cut) and a central list (Mintlify, Fern, Docusaurus,
+VitePress, Redocly); no tool makes every top-level folder a tab. `tabs` is the central list,
+kept in the file that already orders the top level.
+
+### Mechanism
+
+A second transformer, `tabsTransformer`, registered after `navigationTransformer`,
+has only a `root` hook. It receives the assembled root, which the `folder` hook
+at `''` has already ordered (confirmed on the pinned version: `root()` builds
+the content root's folder, running every `folder` hook, before any `root`
+hook), and regroups the children into one `Folder` per tab with `root: true`:
+
+- A tab is told apart by what `dev` already uses: `index` by URL `/`, the API by
+  `$ref.folder === apiBaseDir`, generated folders by the loader source key
+  (`isFromSource(…, GENERATED_SOURCE)`), and folder tabs by the root `nav.json`'s
+  entries, read through `readSettings`. No slug is reserved for this. *(Amended
+  2026-09-29: folder tabs by the entries of `tabs`; the API and a generated
+  folder are tabs unless `pages` names them. `readSettings` returns `tabs`
+  beside `pages` and `title`.)* *(Amended 2026-09-30: every tab by the entries
+  of `tabs`, the API and a generated folder by their tokens.)*
+- *(Added 2026-09-29.)* The folder hook at `''` orders Home's nodes by `pages`,
+  as it orders every directory; a token there claims its section into that
+  place. `groupIntoTabs` then orders the tabs by `tabs`. Both order one list of
+  nodes against entries, so `reorder` serves both, run before the tabs lose
+  their `$ref`, through which it matches a folder entry. *(Amended 2026-09-30:
+  `reorder` has no defaults of its own any more. What an order does not name
+  keeps Fumadocs' order, at the root as below it, and a directory with no
+  `pages` is not reordered at all.)*
+- *(Added 2026-09-29.)* The content collection in `src/lib/source.ts` passes
+  `metaSchema.extend({ tabs: metaSchema.shape.pages })` as `meta.schema`, so the
+  key survives Fumadocs' validation, typed as `pages` is. The schema lives in a
+  module of its own, which `source.ts` and a test both import: `defineDocs`
+  from `fumadocs-mdx/macro` throws when its module is loaded without the bundler
+  plugin, so no test can import `source.ts`. The macro evaluates the module in
+  the build process keeping the imports a call depends on, and in the app
+  replaces the whole call, so the schema never reaches the browser bundle.
+  Only the `docs` collection needs it: the CLI writes the generated folders'
+  `nav.json` files, and none holds `tabs`.
+- A folder tab keeps its own node, flagged `root: true`, rather than being
+  wrapped, so its `$ref` stays as it is. Its index page, if any, moves from
+  `index` to the front of its children: a root folder's own link is not listed
+  in its sidebar, and `isLayoutTabActive` searches only a tab's children. So
+  the CLI refuses an `index` entry in a folder's `nav.json` with its own
+  sentence. The same applies to the API tab.
+- Fumadocs never reads a folder's metadata from `nav.json`: its builder takes it
+  from `meta.json` only, which the content collection does not load, so only
+  this hook decides which folders are tabs.
+- Home's `$id` is fixed, `/tab/home`, and so is the fallback home's node,
+  `/page/home`, so React keys and the tree context's root tracking stay stable
+  across renders. Fumadocs ids a node by its path relative to the content
+  directory, which never starts with a slash.
+- *As reviewed:* the tab folders lose their `$ref`. Fumadocs' `collectTabs`
+  points a tab at the page with the same relative path in the tab being left,
+  found through those references, so from `/tutorials/overview` the API tab
+  linked to `/api/overview`. Nothing past the transformer reads a folder's
+  `$ref`.
+- A tab with no nodes is not created. Home always has one, SDKs always exists,
+  and Context Plugin exists with a plugin.
+- The fallback home page gets a tree node. `$.tsx` already renders a landing
+  page at `/` when the content has no `index.md`, but that page has no node in
+  the tree, so it would sit outside every root folder and show no tabs. When no
+  index page exists the hook adds a synthetic `page` node with URL `/` to Home.
+- Tab URLs are computed in the template, not by Fumadocs. `getLayoutTabs` links
+  a root folder to its `index` or its first *direct* page child; the API tab
+  has only folders under it, as does a folder tab whose pages sit in folders.
+  `layout.tsx` passes an explicit `tabs` list, computed in `src/lib/tabs.ts`:
+  one per root folder, `$folder` bound so active-state detection keeps
+  working, `url` the home page for Home and otherwise the first page found
+  depth-first.
+- Tabs do not change URLs. Fumadocs derives them from slugs, not tree position,
+  so a root-level guide stays at `/authentication`. A folder tab's pages were
+  already at `/tutorials/...`.
+- Every portal has at least Home and API, so there is always a tab switcher.
+  The single-tab inlining rule of the 2026-09-21 draft is dropped. *(Amended
+  2026-09-29: a portal whose root `pages` places the API and every generated
+  section in Home has Home alone. `portalTabs` then returns no tab, so no
+  switcher renders over a single choice.)* *(Amended 2026-09-30: Home alone
+  whenever `tabs` names nothing.)*
+
+The switcher renders in the top bar, the notebook layout's `navbar` mode, which
+is the one layout since section 15.
+
+### Validation (CLI, `PortalNavigation`)
+
+- `apimatic:sdks` replaces `apimatic:pages`; the old token is reported as an
+  unknown entry like any other `apimatic:` string. Both tokens stay valid only
+  in the content root's file.
+- The known settings are `pages`, `title` and, in the root file only, `tabs`;
+  anything else, `root` included, is reported as unknown. The root file's
+  `title` names Home, and a folder's names the folder. *(`tabs` added
+  2026-09-29.)* Below the root, `tabs` is refused with its own sentence: the
+  tabs are decided at the top of the content directory.
+- `tabs` is an array of strings, each one of: a folder directly under `content/`
+  with a page in or below it; `api` or `apimatic:api`, one of the two, as
+  `pages` already rules; `apimatic:sdks`; `apimatic:plugin`. Refused, each with
+  its own sentence: a page, which can only be ordered in Home, so the sentence
+  points to `pages`; `...`, since a tab for every unlisted folder is the
+  "every top-level folder a tab" design this plan rejects; a `(group)` folder
+  serving `/`, which belongs to Home (moved here from `pages`); a name that is
+  no child, with the same near-miss suggestion `pages` gives; a duplicate; and
+  a node `pages` also names, since a node is either a tab or in Home's sidebar.
+  The last two are keyed by the node an entry positions, as `entryErrors` keys
+  one list today, so `api` in one list and `apimatic:api` in the other are the
+  same node named twice.
+- The root file's `pages` may name any top-level page or folder, a `(group)`
+  folder serving `/` included, and any token: each places its node in Home's
+  sidebar. Below the root, a token is refused as today, and the sentence names
+  both places it can go: "list it in the root `nav.json`'s `tabs` to make it a
+  tab, or in its `pages` to place it in Home".
+- Tabs that would show the same name, or names that differ only in case -- a
+  folder tab titled "Home" or "SDKs", or Home renamed after a folder tab -- are
+  reported as a warning, since the build succeeds. Each tab is named as the
+  template names it: its `nav.json` `title`, then its index page's front-matter
+  `title`, then "Home", "API Reference" or the directory's name as Fumadocs
+  spells it. A section placed in Home is no tab and is not compared.
+  *(Amended 2026-09-29:)* the notice naming the folders the file made tabs of
+  goes. It existed because listing a folder in `pages` was all it took; `tabs`
+  says so in its own name.
+- *(Added 2026-09-29, removed 2026-09-30.)* A root file with no `tabs` whose
+  `pages` named a top-level folder, `api` or a token was refused for a day, as
+  2.0.0-beta.1 made tabs of those entries and the file then had two readings.
+  The second review made `tabs` the whole tab bar, so a file with no `tabs`
+  has one reading, no tab, and there is nothing left to ask: it is read as
+  `"tabs": []`.
+- *(Added 2026-09-30, third review.)* Two notices, given as the shared-name
+  warning is: the build succeeds. A root file with no `tabs`, or no root file,
+  makes no tab, and a 2.0.0-beta.1 project had the sections as tabs, so the
+  CLI says so once, naming the sections now in Home and both ways to settle
+  it: `"tabs"` listing their tokens to have them back, `"tabs": []` to keep
+  the sidebar and say so on purpose. And a root `title` while Home is the only
+  tab names nothing a reader sees, since one tab draws no tab bar, so the CLI
+  says that too rather than accept a setting that does nothing.
+- *(Added 2026-09-30, third review.)* Every entry is resolved once, to what it
+  names -- the rest entry, an `apimatic:` string that positions nothing here,
+  the API reference, a section, a folder, a page, an empty folder or nothing
+  -- and the duplicate check, each list's rules, the tabs the CLI names and
+  the near-miss hint all read that one answer. `api` and `apimatic:api` being
+  one node is ruled on there alone on the CLI side; the template keeps its own
+  copy, as it keeps everything. A page named `api` beside the mount point is
+  refused when the entry is `api`, the one spelling that might have meant the
+  page; the token never did, and the scaffold writes it, so under the token the
+  page is accepted and stays unpositioned, as on 2.0.0-beta.1.
+- Every problem in `content/` is reported in one run, the front matter and the
+  `nav.json` files together; the `nav.json` entries are judged only once no two
+  pages would be served at one address, since an entry naming one of them would
+  be answered as if the page were served where it sits.
+
+### Under `portal serve`
+
+Each save in `content/` runs the checks a build runs. The dev server reads a copy
+of `content/` inside the project, made before it starts, and a save a build would
+accept is applied to it -- the pages and `nav.json` files as the checks read them,
+every other file as it is on disk -- while a save it would refuse leaves the copy,
+and so the browser, on what it last accepted. The warnings above are given on the
+save that brings them about, and an edit to `apimatic.json` that adds or removes
+a generated section checks the content again. `portal generate` reads `content/`
+where it is.
+
+### History
+
+- 2026-09-24 (`.ai/plans/generated-pages.md`, section 5): each generated folder
+  became a tab of its own, and the synthetic `/tab/sdks` went.
+- 2026-09-25, first QA of the tabs: the fixed Home and Guides tabs became one Home
+  tab. A folder called `guides/` had sat inside Guides as Guides › Guides, giving
+  it `"root": true` made two tabs named Guides, Guides opened on whichever loose
+  page came first, and Home held a single page. The root `nav.json`'s `title`,
+  refused until then, came to name Home.
+- 2026-09-25, later: listing a folder in the root `nav.json` replaced a folder's
+  own `"root": true`, whose seven refusals had no counterpart once only the root
+  file's entries make tabs. `root` was never in a release.
+- 2026-09-25, second QA: Home leads always, having stood where the file listed
+  `index`; tab names are compared without regard to case; and the preview keeps
+  the last content a build would accept rather than answering HTTP 500.
+- 2026-09-29, after 2.0.0-beta.1: the root `pages` carried two decisions, which
+  nodes are tabs and where Home's nodes go, so a top-level folder could not be
+  ordered inside Home without becoming a tab. Unnamed, the folders fell
+  together where `...` stood, in alphabetical order, and the only way to order
+  them among themselves was a parent folder, which moves every address below
+  it. `tabs` took the first decision; `pages` means at the root what it means
+  everywhere else. The tokens became placeable in Home in the same change,
+  since with `tabs` a generated section is one more top-level node,
+  in `tabs` or in Home. Below the root they stay refused: a subfolder's
+  `nav.json` could not claim a node that lives at the root without the
+  transformer moving nodes between folders, which is what makes losing a page
+  structurally impossible today, and the section's address would not follow it
+  there. A per-folder `"tab": true` was weighed again and rejected: it brings
+  back `root`'s refusals, scatters the tab bar across files, and still orders
+  tabs and Home's nodes in one list. A review the same day turned the beta.1
+  file's warning into a refusal, for the reason its rule gives.
+- 2026-09-30, second review: a section or the API reference that `tabs` did
+  not name kept a tab at a default place, so `{}` and `"tabs": []` gave Home
+  and three tabs while every folder went into Home, and the tab bar was not
+  what `tabs` said. Now `tabs` is the whole tab bar after Home; a section it
+  does not name is a folder in Home in Fumadocs' order, as any folder is; and
+  a file with no `tabs` reads as `"tabs": []`, so the beta.1 refusal goes with
+  the ambiguity it guarded. The scaffold and the sample repository name the
+  three sections in `tabs`, so a fresh portal keeps the tabs it had.
+- 2026-09-30, third review: the upgrade was silent, so a root file with no
+  `tabs` is now told once what it lost and how to have it back, and a Home
+  `title` with no tab bar to show in is told it shows nowhere. An unnamed
+  section's alphabetical place among the folders is kept on purpose: the
+  bands that put it last existed so that a release adding a section left a
+  sidebar alone, but a section that is one more folder in Home is the rule
+  `tabs` promises, and naming its token in either list places it exactly.
+  The cost is accepted with open eyes: the scaffold writes `nav.json` once,
+  so a release that adds a section lands it alphabetically in Home in every
+  existing portal, and that release must tell them to name its token. The
+  CLI resolves each entry once for every rule; the template claims the tabs
+  the way `reorder` claims an entry, rather than matching folders to entries
+  and entries to folders in turn; and `portalTabs` draws no tab bar for one
+  tab, whichever it is.
+- 2026-10-02, fourth review: resolving both spellings to the reference had
+  made `apimatic:api` refuse a page named `api` too, which failed the build
+  of every scaffolded portal that added `content/api.md`; the refusal is back
+  to `api` spelled out, the one spelling that might have meant the page. The
+  no-tabs notice first gained the folders the root `pages` named, as beta.1
+  made tabs of those, and lost them again the same day: the line it offered
+  was refused when followed, a node being in one list or the other, and the
+  CLI's messages describe how `nav.json` works now, not what beta.1 did --
+  that is for the release notes. The notice names only the sections and the
+  reference that nothing places, and says nothing once `pages` places them
+  all; the text that leaned on the history is in present terms.
+
+## 6. Template changes
+
+- **`src/lib/navigation.ts`**: `tabsTransformer` from section 5, registered
+  in `source.server.ts` after `navigationTransformer`; `INJECTED_PAGES_TOKEN`
+  becomes `apimatic:sdks`; `readSettings` returns `root`.
+- **`src/lib/tabs.ts`** (new): the explicit tab list, kept apart from
+  `layout.tsx` so it is unit-testable without the generated identity file.
+- **`src/lib/layout.tsx`** (new): the notebook layout with `nav.mode: 'top'`
+  and `tabMode: 'navbar'`, given the explicit `tabs` list. (Until the cut of
+  section 15 it chose between four layouts, each with props of its own.)
+- **`app.css`**: keeps its `neutral.css` import and its Geist `@theme`
+  families, now followed by Tailwind's fallback stacks, loses the Google Fonts
+  `@import`, and gains a fixed `@import './theme.css'` after the Fumadocs and
+  OpenAPI presets, so the generated rules come last.
+- **`src/styles/theme.css`** (written by the CLI, rewritten on re-apply):
+  `:root:not(.dark)` with the light primary trio and `.dark` with the dark
+  one, or no rule at all when the block sets no primary.
+- **`portal.identity.json`** (written by the CLI, rewritten on re-apply) and
+  **`portal.ts`**, which imports it and exports it typed as `Portal`. The file
+  holds the identity fields from section 4 and nothing else, which is what makes
+  a whole-module JSON import safe here.
+- **`__root.tsx`**: favicon link; the fixed Google Fonts stylesheet link for
+  Geist, in place of `app.css`'s `@import`, so it loads alongside the
+  stylesheet; `RootProvider` theme props from `colorMode`.
+- **`layout.shared.tsx`**: two logos, `links`, `themeSwitch.enabled`.
+- **`$.tsx`**: the notebook layout's page components.
+- **`src/lib/openapi-section.server.ts`**: already the one place both
+  `openapi.server.ts` and `prerender-pages.ts` build a section from. It bundles,
+  filters (section 7) and calls `staticSource` grouped by tag, as today.
+
+## 7. Deprecated and internal operations
+
+Fumadocs stores `deprecated` on each generated page's `_openapi` metadata and
+renders it struck through, so deprecated operations are documented as they
+are. It has no notion of `x-internal`, and an internal operation is never
+documented.
+
+`openApiSection` filters the document, not the pages:
+
+1. Create the server on the file path as today and take `getSchema(id).bundled`,
+   the document with every external reference already folded into
+   `#/components` or `x-ext`.
+2. Walk `paths` and `webhooks`. Remove an operation when it carries
+   `x-internal: true`. Remove a path item left with no operations. As built in step 5
+   (`src/lib/openapi-filter.ts`): OpenAPI 3.2's `query` and
+   `additionalOperations` are filtered too; `x-internal: true` on a path item
+   hides the whole path; a path item that is a `#/…` reference is followed, and
+   inlined only when something in it is hidden, since another path may share
+   the component; only a literal `true` hides. *As reviewed:* a reference is
+   followed to the end of its chain, which is how a split specification reaches
+   a path item once bundled, with the fields beside each `$ref` winning, as
+   Fumadocs reads them; and a tag that only hidden operations carried is dropped
+   from `tags` and `x-tagGroups`, since every page's payload carries the
+   document's tags, as is a group no remaining operation carries once every tag
+   under it has gone. Fumadocs 11.4.1 builds pages only for `get`, `put`, `post`,
+   `delete`, `head` and `patch`, so filtering the other methods keeps them out of
+   the payloads rather than off a page. Fumadocs itself gives an operation
+   behind a path-item `$ref` under `paths` no page at all. The filter inlining
+   such an item only when it hides something therefore made whether its visible
+   operations get pages depend on the filter. PR #354 inlines every path item
+   before Fumadocs reads the document, which settles that; it is left to that
+   PR (decided 2026-09-23).
+3. Create a second server with the filtered document as its `input` value,
+   which `createOpenAPI` accepts, and call `staticSource` on that one.
+
+Step 1 and the walk always run, since only the walk can tell whether anything
+is to be removed. When it removes nothing, step 3 is skipped and the first
+server's `staticSource` is used, so the common case costs no second server;
+that is the whole saving.
+
+*Stacked on #354 (2026-09-23):* that PR bundles the specification itself,
+through `bundleSpecification` in `src/lib/openapi-bundle.server.ts`, and hands
+Fumadocs the document through the function form of `input`. `openApiSection`
+therefore filters that document inside the same function, and steps 1 and 3
+collapse into one server that never sees a hidden operation. The filter's
+reference-following now matters for `webhooks` alone: every path item under
+`paths` arrives inlined.
+
+Because the page generator never sees a removed operation, no page, sidebar row
+or emptied tag folder exists for it, and each page's `payload.bundled` is the
+filtered document too. `llms.server.ts`, `sitemap.server.ts`, the search index
+and the prerender list all go through `openApiSection` or the loader, so they
+follow.
+
+*As reviewed:* `groupBy: route` had two Fumadocs defects, handled in
+`openApiSection` until `groupBy` was cut (section 15): the operations on `/`
+formed a folder named `''` whose `meta.json` hid the section's own, and a path
+and a webhook of one name shared a page. One check stays: grouped by tag,
+Fumadocs names a page after its tag and operationId, so two operations sharing
+an operationId would share a page and one would be dropped without a word, as
+would one operation listing a tag twice, which Fumadocs writes a page for each
+time. `openApiSection` refuses both, asking for an operationId of each one's
+own and each tag listed once.
+
+## 8. CLI changes
+
+Following `.ai/instructions.md` and the skills in `.ai/skills/`.
+
+- **Types.** `PortalConfig` becomes the root of nested value objects, one per
+  namespace: `SiteConfig`, `BrandConfig` (holding `Logo` and `BrandColors`),
+  `NavigationConfig` and `AiConfig`. Each parses its own subtree and returns errors with dotted
+  paths; `PortalConfig.fromBlock` concatenates them. One helper, `Color`: parse
+  the accepted formats, relative luminance, WCAG contrast ratio, foreground
+  choice between the neutral preset's 98 % and 9 % greys. `RENAMED_FIELDS`
+  goes; `unknownFieldErrors` is called without a rename map.
+- **`PortalLanguages`** (new value object, `src/types/portal/`): built from
+  `ApimaticConfigDocument.languages()` plus that block's findings. Refuses an
+  absent or empty block and an unknown language key; an entry that is not an
+  object, or whose `publishing` is not one, arrives as a document finding.
+  Holds the language list, in the block's order, for the SDK pages to read.
+  *As reviewed:* whether each language is published went, since nothing reads
+  it yet; so did `PortalConfig`'s `siteDescription`, `siteOrigin`,
+  `navigationSettings` and `aiSettings`, whose values reach the portal through
+  `identity()` alone.
+- **Finding partition.** `PortalSourceContext.readConfig` reads
+  `findingsFor('root', 'languages')` instead of `'root'` alone, and adds the
+  `portal` and `PortalLanguages` errors to the same `invalidConfig` report. This
+  revisits `apimatic-config.md` decision 8 as that plan anticipated: a
+  malformed `languages` block now fails a portal build, and the plugin path is
+  unchanged. `missingPortal` keeps its meaning; a missing `languages` block gets
+  no quickstart hint, since quickstart does not write one yet.
+- **Completion.** `resolve()` already parses every spec. It completes the
+  config from the single spec (name, description) or reports `site.name`
+  missing when there are several, and checks the dark logo and the favicon
+  exist as it checks the logo today. Warnings ride the Ok value the way
+  `shadowedFiles` does, since the types layer cannot print.
+- **Stylesheet.** A `PortalStylesheet` value object renders `theme.css` from a
+  completed config, so the CSS is unit-testable without a build.
+- **Project service.** `PortalProjectService` writes `theme.css`,
+  `portal.identity.json` and the widened `portal.config.json`. The
+  content-directory substitutions into `source.ts` and `app.css` stay; the
+  identity substitution into `portal.ts` and `PORTAL_IDENTITY_PLACEHOLDER` go.
+- **`portal serve` re-applies `apimatic.json`.** Today a config edit needs a
+  restart, which was tolerable for a title and a logo and is not for colour and
+  font tweaks. A new infrastructure service watches `src/apimatic.json` and
+  reports each change as a `Result`. On change the serve action re-runs the
+  config half of `resolve()` — the block and `languages` parsers, the
+  existence checks on the logo, dark logo and favicon, the name and
+  description derived from the spec, and the `site.name` rule for several
+  specs — so an edit is accepted under exactly the rules `generate` applies,
+  and a mistyped favicon path is refused rather than re-applied as a broken
+  link. That half is split out of `resolve()` as its own method for this; the
+  spec list it needs is the one read at startup, since changing the specs
+  needs a restart anyway. It then compares the result with the last good one;
+  a write that changes neither — `sdk publish` or `plugin
+  generate` touching only their blocks — is ignored without a message. On a
+  real change that parses, it asks `PortalProjectService` to rewrite
+  `theme.css` and `portal.identity.json`, which Vite hot-reloads. On failure
+  the prompts print the same errors `generate` would and the last good state
+  stays. Changes to the specs still need a restart, because `vite.config.ts`
+  and the prerender list read them once. The serve command description and
+  `prompts/portal/serve.ts` stop saying every `apimatic.json` edit needs a
+  restart. As built in step 6: `FileWatchService` (`src/infrastructure/`)
+  watches the source directory rather than the file, so an editor's
+  write-and-rename save keeps being seen. It gathers a save's events for 150 ms,
+  never runs two handlers at once, and waits for one in flight on `close()`.
+  `PortalSourceContext.resolveConfig(suggested)` is the split-out half, fed the
+  `suggestedSite` that `PortalSource` now carries from startup.
+  `PortalProjectService.applyConfig` writes each generated file only when its
+  contents change, and its answer is what "a real change" means. *As
+  reviewed:* it replaces each one whole, written beside it and renamed over,
+  since the watching dev server could read one written in place truncated. The watcher
+  failing to start is reported, and the preview serves regardless. *As
+  reviewed:* the file is read again once the watch starts, since a save made
+  while the preview started, which can take a minute, reached no watch; saves
+  landing while one is handled are handled once more, not once each; a watch
+  that fails while running says so; and it is closed before the preview says it
+  stops. Vite serves `static/` only if it existed at startup, so a file added
+  to a newly created `src/static` is reported as needing a restart, once, and
+  the restart list in the command description names it.
+- **Quickstart.** `scaffold` writes, through `ApimaticConfigContext.merge`,
+  `$schema`, `schemaVersion` and a populated `portal` block: the derived `site`
+  fields and every brand, navigation, API and AI default spelled out.
+  `site.url` stays absent and the closing note names it.
+  `PortalConfig.toJSON`'s "minimal" rule goes with it. No `languages` block is
+  written: the user adds it by hand, so the action stops after the scaffold
+  rather than serving a project that cannot validate (decided 2026-09-23,
+  section 12). `PortalQuickstartAction` no longer calls `PortalServeAction`;
+  `nextSteps` is printed directly instead of from the serve callback, and
+  shows the `languages` entry to add and the `apimatic portal serve` command
+  to run after. The Node-version and portal-entitlement checks stay where
+  they are, before any question: the user's next command is `portal serve`,
+  which refuses on both, and learning that after the wizard is the outcome
+  those checks exist to prevent. When the language-step PR lands, the serve
+  call comes back. The scaffolded root `nav.json` stays `["index", "..."]`.
+- **JSON schema.** `apimatic.schema.json` at the repository root, listed in
+  `files`. Hand-written. Root: `$schema`, `schemaVersion` (`const: 1`),
+  `portal`, `plugin`, `languages`, `additionalProperties: true`. `portal`:
+  strict, `additionalProperties: false` at every level. `plugin`: today's
+  identity fields typed, `pluginId` pattern and semver pattern, additional
+  properties allowed. `languages`: `propertyNames` limited to the seven
+  `Language` values, so a misspelt key is flagged in the editor as the portal
+  would refuse it (nothing on the plugin path reads the schema, so this makes
+  no command stricter). Each entry an object with an optional `publishing`
+  object, additional properties allowed at both levels, so the hand-written
+  `"typescript": {}` section 12 recommends validates. Inside `publishing`,
+  `source`, `package` (per language, as `plugin-config.ts` types them) and
+  `codegenVersion` (`v3`, `v4`) are typed and none is required, matching the
+  plugin path's leniency: the mismatch check then read a missing
+  `codegenVersion` as no mismatch. *(Superseded: `codegenVersion` and its
+  check have both since left; the field is no longer typed in the schema.)* `languages` is optional in the schema: the "at least one"
+  rule is the portal command's, and a file `sdk publish` alone created is
+  valid. The `$schema` URL, and the schema's `$id`,
+  is `https://cdn.jsdelivr.net/npm/@apimatic/cli@beta/apimatic.schema.json`.
+  *As reviewed:* jsDelivr resolves a major range to its newest stable release
+  and never to a prerelease, so `@2` leads nowhere until 2.0.0 ships. The
+  `beta` dist-tag reaches the newest prerelease, so every scaffold names it
+  (decided 2026-09-29, replacing the per-version `schemaUrlFor` of 2026-09-23).
+  *(Superseded 2026-10-26: the 2.0.0 release candidate moved both to `@2`.)*
+- **Prompts.** New source problems: a missing dark logo or favicon named with
+  its key; `site.name` required for several specs; the languages errors; the
+  serve watcher's re-applied and rejected messages.
+- **Messages elsewhere.** `portal-navigation.ts` names `portal.site.name`;
+  README's "Upgrading from 1.x" names the new keys (`site`, `brand`, ...) and
+  the `languages` requirement; the README is regenerated if a command or flag
+  description changes.
+
+## 9. Tests
+
+- Value objects: every key's accepted and rejected forms, unknown keys at every
+  level reported by dotted path, a flat `dev` key such as `title` reported as
+  unknown with no hint, colour formats, link URLs (absolute
+  `https:`, site-relative `/x` accepted; `mailto:`, `docs/x`, `javascript:`
+  refused).
+- `PortalLanguages`: absent, empty, not an object, an unknown key, an entry that
+  is not an object, a `publishing` that is not an object, one valid entry with
+  no `publishing` block, one with a full `publishing` record.
+- `PortalSourceContext`: the languages errors reported beside `portal` errors
+  in one list; a malformed `plugin` block still not failing the resolve; name
+  and description derived from one spec, `site.name` required for two, missing
+  dark logo and favicon reported.
+- `Color`: parsing, luminance against known values, the foreground choice on
+  both sides of the crossover.
+- `PortalStylesheet`: the emitted CSS, the light block scoped with
+  `:not(.dark)`, both blocks present when the primary is one string.
+- `PortalNavigation`: `apimatic:sdks` accepted at the root, `apimatic:pages`
+  reported, `root` accepted on a top-level folder and refused at the root, in a
+  nested folder, in `content/api/`, and when not a boolean.
+- Schema conformance: every `portal` block fixture agrees between `ajv` (dev
+  dependency) run against the `portal` definition and `PortalConfig.fromBlock`;
+  every `languages` fixture agrees between the `languages` definition's key
+  rule and `PortalLanguages` (the schema's minimum of zero entries aside); one
+  whole-file fixture with unknown root keys and unknown `plugin` fields
+  validates, and so does one whose only language entry is `{}`.
+- Scaffold: the written file carries `$schema`, `schemaVersion` and every
+  default; resolving it with a `languages` entry added gives the same config as
+  resolving an empty `portal` block with that entry.
+- Serve watcher: a favicon edited to a missing file is refused with the
+  `generate` message and the last good files kept;
+  a change outside `portal` and `languages` re-applies nothing;
+  a brand change rewrites both generated files; an invalid edit keeps the last
+  good files and reports.
+- Template units, in `test/portal-template/`, on synthetic trees: Home, Guides,
+  a `root: true` folder and API to four root folders in first-appearance order;
+  Home moved first when `index` is not named and kept in place when it is;
+  loose pages either side of a folder tab both in Guides; an empty Guides not
+  created; `root: true` ignored on a nested folder and on `api`; the synthetic
+  Home node when there is no index; folder-tab and API
+  labels from `nav.json` `title`; the explicit tab list (a URL found through
+  nested folders, `$folder` bound) *(amended 2026-09-25: there is no Guides tab
+  or `root` setting; the tab tests follow section 5 as amended)*; the document filter (internal operations
+  removed and deprecated ones kept, an emptied path item removed, `x-ext`
+  references intact, a document with nothing internal left untouched).
+- Fixtures: `test/resources/portal-inputs/default/apimatic.json` moves to the
+  nested shape and gains a `languages` entry.
+- End-to-end, extending `test/e2e/portal-build.test.ts`: the default fixture;
+  the emitted CSS carries the theme's tokens and the primary override; a
+  `colorMode: dark` fixture emits no theme switch and names `dark` in
+  next-themes' inline script (the DOM check stays a manual headless-Chrome
+  step); the `notebook-navbar` header carries the tabs; an internal operation
+  gets no page and no sidebar row, and a deprecated one does;
+  the client-bundle assertion also
+  covers `portal.identity.json`.
+
+## 10. Verified Fumadocs behaviour
+
+Read from the pinned `fumadocs-ui@16.15.8`, `fumadocs-core@16.15.8`,
+`fumadocs-openapi@11.4.1` and `next-themes@0.4.6` on 2026-09-21, and
+`metaSchema` re-read on 2026-09-23 after #347 (Node 24, TypeScript 7), which
+did not change the pins. Re-check each entry if a pin moves.
+
+- **Metadata schema.** `fumadocs-core/source/schema`'s `metaSchema` is a plain
+  Zod object of `title`, `pages` (strings only), `pagesIndex`, `description`,
+  `root` (boolean or string), `defaultOpen`, `collapsible`, `icon`. Unknown
+  keys are stripped. This is why section 5 adds `root` and nothing custom, and
+  why per-tab options live in `apimatic.json`. *(Re-read 2026-09-29 on
+  `fumadocs-core@16.15.15`: the same eight keys, a Zod 4 object. `fumadocs-mdx@15.4.0`'s
+  `defineDocs` takes `meta.schema`, typed `metaSchema` by default, which is
+  where section 5's `tabs` extension goes.)*
+- **Default order.** *(Read 2026-09-29 on `fumadocs-core@16.15.15`.)* With no
+  metadata naming them, a directory's children are sorted by path, the index
+  page first and every folder after every page: the comparator adds a folder
+  bias of 10 to `localeCompare`.
+- **Tab bar.** *(Read 2026-09-29 on `fumadocs-ui@16.15.15`.)* The notebook
+  header shows the tabs when `tabMode` is `navbar` and there is at least one
+  tab group, and the sidebar's dropdown when `tabs` is not empty; one tab
+  still renders both.
+- **Presets.** `fumadocs-ui/css/` holds twelve theme files. `shadcn.css` maps
+  every token to a host application's own variables, so eleven are usable
+  standalone. Each is `@theme { --color-fd-* }` for light plus a `.dark { }`
+  block; `vitepress` also restyles the sidebar and prose, `ocean` adds a dark
+  gradient. The seventeen overridable tokens: `background`, `foreground`,
+  `muted`, `muted-foreground`, `popover`, `popover-foreground`, `card`,
+  `card-foreground`, `border`, `primary`, `primary-foreground`, `secondary`,
+  `secondary-foreground`, `accent`, `accent-foreground`, `ring`, `overlay`.
+  `info`, `warning`, `error`, `success`, `idea` and the four `diff-*` tokens are
+  `@theme static` and not per-mode.
+- **Layout variables.** Docs and notebook expose `--fd-layout-width`,
+  `--fd-sidebar-width`, `--fd-toc-width`, `--fd-header-height` among others;
+  glass uses `--fd-main-width`, `--fd-left-width`, `--fd-right-width` instead.
+- **Layouts.** `layouts/docs`, `layouts/notebook`, `layouts/glass`,
+  `layouts/flux`, `layouts/home`, each with its own `page` module. Notebook's
+  `tabMode` is `'sidebar' | 'navbar'` and its `nav.mode` is `'top' | 'auto'`.
+  In navbar mode the header renders the tabs on large screens and grows from
+  `--spacing(14)` to `--spacing(24)`; the sidebar dropdown is `lg:hidden`.
+  Glass's CSS is `css/generated/glass.css` and is not in `preset.css`; its
+  `sidebar` prop is its own provider's `{ collapsible }`; its page module has
+  `toc`, `full`, `tableOfContent` only. Flux imports `motion`.
+- **Tabs.** `getLayoutTabs` walks the tree in order and emits one tab per
+  folder with `root`, linking to `index?.url` or the first child of type
+  `page`; it does not descend, so a root folder holding only folders yields no
+  tab. All four layouts accept an explicit `tabs: LayoutTab[]` instead, and
+  `isLayoutTabActive` uses the bound `$folder`. `useTabsGroups` builds the
+  visible tab group from the root folders on the current page's path; a page
+  outside every root folder yields no group, so no folder-derived tabs render.
+  The sidebar root is the last root folder on the path, else the whole tree.
+- **Page tree.** `Folder` carries `root?: boolean | string`, `index?: Item`,
+  `name`, `description`, `defaultOpen`, `collapsible`, `children`, `$id`. The
+  same URL may not appear twice in the tree. Transformers expose `file`,
+  `folder`, `separator` and `root` hooks; `root` receives the assembled tree.
+- **Theme provider.** `RootProvider.theme` is next-themes' `ThemeProviderProps`
+  plus `enabled` and `hotKey` (default `d`): `forcedTheme`, `defaultTheme`,
+  `enableSystem`, `attribute`, `storageKey`, `disableTransitionOnChange`.
+  Layouts take `themeSwitch: { enabled, mode: 'light-dark' | 'light-dark-system' }`.
+- **Links.** `BaseLayoutProps.links` accepts `main`, `icon`, `button`, `menu`
+  and `custom` items with `on: 'menu' | 'nav' | 'all'` and
+  `active: 'url' | 'nested-url' | 'none'`; `githubUrl` is a shortcut.
+- **OpenAPI.** `groupBy` is `'tag' | 'route' | 'none' | fn`, default `none`
+  (the template passes `tag`). Tags whose `kind` is neither absent nor `nav`
+  are skipped when grouping. `deprecated` is copied onto each page's `_openapi`
+  meta and the loader plugin wraps the sidebar name in `line-through`. Nothing
+  reads `x-internal`. `input` accepts a file path, URL or document object, and
+  `getSchema(id)` returns `{ bundled }`, the same document each page's
+  `getOpenAPIPageProps().payload.bundled` carries.
+- **Fonts.** `app.css` loads Geist and Geist Mono from Google Fonts and sets
+  `--default-font-family` / `--default-mono-font-family` in `@theme`.
+  *Amended 2026-09-25:* see the note at the end of section 15.
+
+## 11. Delivery
+
+One PR against `dev`, `feat(portal)`, on a branch cut from `dev`. It changes a
+block no release has shipped, so it carries no `BREAKING CHANGE:` footer; that
+stays on the last PR of the apimatic-config series, and the release-notes draft
+there is updated to the new keys (section 13).
+
+It is independent of the series' quickstart-adopts PR: whichever lands second
+adapts the scaffold to the other.
+
+Implementation steps inside the PR, each leaving build, lint on touched files
+and the affected tests green, each stopped at for review:
+
+1. **Block shape.** The value objects, `Color`, the font table, `PortalLanguages`,
+   the finding partition, completion, the fixture. CLI only.
+2. **Schema.** `apimatic.schema.json`, the conformance test, `files`.
+3. **Generated files.** `PortalStylesheet`, `portal.identity.json`,
+   `portal.config.json` widened, `app.css`/`portal.ts` changes, and the template
+   applying site, brand, layout, links, CTA and page actions.
+4. **Tabs.** `PortalNavigation` (`apimatic:sdks`, `root`), the `root` hook, tab
+   URLs, the template unit tests.
+5. **API options.** `openApiSection` taking `groupBy` and the filter; prerender
+   through it.
+6. **Serve re-apply.** The watcher service, the serve action and prompts.
+7. **Scaffold, docs, e2e.** Populated scaffold with `$schema`, README, the e2e
+   cases, the plan amendments in section 13, and the sample repository's v2
+   branch as a separate PR in its own repo.
+
+*As built.* Only the scaffold writes `$schema`, through
+`ApimaticConfigDocument.referencingSchema()`. `empty()` is unchanged, so the
+files the plugin and publishing commands create do not carry it, which keeps
+this PR to the portal. `PortalServeAction.execute` loses its `onAfterServe`
+hook, which only quickstart used; the language-step PR brings it back with the
+serve call. The e2e cases share one extra build: a `branded` fixture that sets
+forced dark, a primary and a header link, and
+documents a deprecated operation while hiding an internal one. It has no content directory, so it
+also covers the fallback home page and its Home tab. The sample repository's
+`v2` change is branch `saeedjamshaid/portal-config` in
+`sample-docs-as-code-portal`: `portal.json` → `apimatic.json`, `meta.json` →
+`nav.json`, a Java `languages` entry, and Node 24 in its workflow. It is
+verified to build 22 pages with this branch's CLI.
+
+## 12. Risks and things to verify during implementation
+
+- **The user writes `languages` by hand** (decided 2026-09-23). `languages` is
+  required and nothing in this PR writes it for a portal project: the scaffold
+  does not, and a quickstart step that does is a separate, later PR. So a fresh
+  quickstart project reports `'languages' is required` until the user adds an
+  entry to `src/apimatic.json`. The wizard therefore does not serve
+  immediately: its closing note shows the entry to add — `"languages": {
+  "typescript": {} }` — and the command to run afterwards. The missing-block
+  error carries the same example, and mentions that `apimatic sdk publish`
+  records an entry too. When the quickstart step lands it removes the note and
+  restores the serve.
+- **A portal cannot be built before a language is named.** Hand-writing an
+  entry (`"typescript": {}`) is enough, since the portal checks only the key.
+  Today a `{}` entry is inert for the plugin commands: `hasPublishedSdks` needs
+  `publishing.source` or `publishing.package`, so `plugin generate` still
+  reports no published SDKs. *(The mismatch check that also skipped such an
+  entry has since been removed with `codegenVersion`.)*
+- **The hand-written entry is not inert for long.** Since #350 an entry with no
+  `publishing` block means "this language is wanted, nothing is published
+  yet", which is the state the coming bundling change turns into an SDK
+  generated and bundled by `plugin generate`. A user who writes
+  `"typescript": {}` only to satisfy the portal is also asking for a
+  TypeScript SDK in their plugin. That is the intended reading — one list of
+  the project's languages, shared by both halves — but the missing-block error
+  and the quickstart note say it in one line, so nobody names a language they
+  do not ship.
+- **`languages` is required before anything uses it.** No SDKs tab or page
+  renders in this release, so the requirement buys only a schema locked before
+  2.0. Kept here deliberately (decided 2026-09-23); the error message carries
+  the one-line fix.
+- **One large PR.** CLI types, schema, theming, tabs, the API filter and a
+  watcher in one change (decided 2026-09-23). The seven steps of section 11
+  are reviewed and committed one at a time inside it; the watcher, step 6, is
+  the most separable if review stalls.
+- An unlayered `:root:not(.dark) { --color-fd-primary }` after the preset
+  import beats the preset's `@theme` declaration under Tailwind 4's layering,
+  and stays out of dark mode. Confirm in the built CSS in both modes.
+  *Verified in step 3:* the preset's light tokens land in `@layer theme`, the
+  override is unlayered, and the generated `.dark` rule follows the preset's.
+  Headless Chrome shows each mode's primary with its own foreground.
+- A bare-specifier `@import 'fumadocs-ui/css/<preset>.css'` at the top of
+  `theme.css`, itself imported from `app.css`, resolves through the linked
+  `node_modules` under Tailwind 4's Vite plugin. *Verified in step 3.*
+- A token value is written into `theme.css` as it stands, so one holding `;`,
+  `{`, `}` or `/*` would reach past its declaration. *Added in step 3:* the
+  parser and the schema refuse those. *As reviewed:* not enough; see the
+  token row of section 3. `portal-stylesheet.test.ts` now compiles the
+  generated file through Tailwind for every preset. *Moot since section 15:*
+  no token is written, and the test compiles against the neutral theme alone.
+- A bundled document handed back to `createOpenAPI` as a document object
+  round-trips: `x-ext` references stay resolvable and the pages match those the
+  file-path server produced for an unfiltered spec. *Verified in step 5* by
+  `test/portal-template/openapi-section.test.ts` on a specification with a
+  relative `$ref`. That test runs under mocha; a plain `tsx` script importing
+  `fumadocs-openapi/server` fails to link a vendored module under its
+  `dist/node_modules` (`does not provide an export named 'upgrade'`). The build
+  is unaffected.
+- The `root` hook runs after the `folder` hook for `''`, so it receives the
+  root already ordered by `nav.json`. Confirm on the pinned version; if not,
+  the hook calls `reorder` itself. *Confirmed in step 4.*
+- Synthetic root folders survive `serializePageTree` / `deserializePageTree`
+  and `$id`-based tab matching on the client. *Verified in step 4* in headless
+  Chrome under all four layouts: the active tab follows the page.
+- The client bundle carries `portal.identity.json` whole and nothing else from
+  the CLI-written files.
+- Bundle delta from importing all four layouts statically. *Measured in step
+  3:* about 38 KB of script, 8 KB gzipped, over notebook alone. *Moot since
+  section 15:* only notebook is imported.
+- The Google Fonts weight axis for each shortlisted family; the CSS2 URL
+  differs between variable fonts (`wght@100..900`) and static ones. *Moot
+  since section 15:* only Geist and Geist Mono load, both variable.
+- A `full` OpenAPI page under the glass layout. *Verified in step 3* in
+  headless Chrome. *Moot since section 15.*
+- The watcher's comparison must be on the resolved config, not the file text:
+  the plugin writers re-serialise the whole file, so a text diff would re-apply
+  on every `sdk publish`. *Done in step 6* by comparing the generated files'
+  contents. Also verified then against a running dev server: rewriting both
+  files changes the name, preset and primary on the next load, with no
+  restart. An already-open tab relies on Vite's own module and CSS updates for
+  the same files, and was not checked separately.
+- Whether the one-entry sidebar on the Home tab grates enough to hide it. Docs
+  has `sidebar.enabled`; notebook and glass do not. Deferred. *(2026-09-25: since
+  Home holds the loose pages too, only a project whose content is its index page
+  alone still has it.)*
+
+## 13. Changes to the other plans
+
+Made in step 7, as dated amendments rather than rewrites, since all three
+plans are implemented.
+
+`.ai/plans/portal-navigation.md`:
+
+- `apimatic:pages` is renamed `apimatic:sdks` and places the SDKs tab; the group
+  rationale in section 1 is superseded, because each generated section is its
+  own tab and gets its own token.
+- Root-level entries decide the tabs (this plan, section 5); `root` is a new
+  `nav.json` key on top-level folders.
+- Section 4: the `languages` requirement lands with this plan, not with the SDK
+  page. Open question 2 of section 11 is answered by it.
+- Section 6: the fallback home page now exists and gets a tree node here.
+
+`.ai/plans/apimatic-config.md`:
+
+- Section 1: the `portal generate` half of "requires a `languages` entry" moves
+  into this plan's PR; the `plugin generate` half stays in the series.
+- Section 2, "Which findings reach which command": revisited as that row
+  anticipated — the portal path now reads `languages` findings.
+- Section 10: the portal-config bullet is superseded by this plan.
+- Section 13: the release-notes line listing `title`, `description`, `logo`,
+  `siteUrl` names the new namespaces and the `languages` requirement.
+
+`.ai/plans/fumadocs-portal.md`:
+
+- Section 3: replace the v1 `portal` block shape with a pointer to this plan.
+- Section 4: the template's fixed `neutral.css` import and Geist lines move
+  into the generated `theme.css` and a head link; the identity literal in
+  `portal.ts` becomes a JSON import.
+- Section 9: the Google Fonts risk now covers a shortlist and has a `system`
+  opt-out.
+
+*2026-09-24:* the cuts of section 15 are recorded as second dated amendments in
+`fumadocs-portal.md` sections 3, 4 and 9, and in the release notes of
+`apimatic-config.md` section 13.
+
+## 14. What changed from the 2026-09-21 draft
+
+Kept so the older reasoning is not re-litigated:
+
+- The file is the `portal` block of `src/apimatic.json`, not `portal.json`.
+  `$schema` and `schemaVersion` are root keys; paths in messages carry the
+  `portal.` prefix; `PortalConfig.parse` is `PortalConfig.fromBlock`.
+- `sdks.languages` is gone; the portal requires the shared top-level
+  `languages` block, in this PR.
+- `navigation.sections` is gone. Tabs come from `nav.json` (section 2 records
+  why). The section-specific keys moved: the Home CTA to `portal.home.cta`, the
+  API options to `portal.api`. The AI section has no tab until it has pages.
+- The `apimatic:` tokens are not dropped: #346 shipped them, and they now place
+  tabs. `apimatic:pages` became `apimatic:sdks`.
+- Injected pages are recognised by loader source key, as #346 implemented, not
+  by a reserved slug.
+- The shared OpenAPI module already exists (`openapi-section.server.ts`); it is
+  extended rather than created.
+- The rename hints and the pre-2.0 migration table are gone: no messaging for
+  keys that never shipped, and none for 1.x.
+- The schema covers the whole file; the draft's single-block schema is
+  superseded.
+- Two PRs became one.
+
+## 15. Cut for the first release (2026-09-24)
+
+The first release keeps only the settings a portal needs to carry its owner's
+name, address and brand, so that there is less to build, test and keep working
+against Fumadocs. Where a setting is cut, the behaviour its default gave stays,
+fixed, so bringing one back later changes nothing for a portal that leaves it
+out. A block that still names a cut key is refused like any other unknown key:
+none of them has shipped.
+
+What remains is `site.name`, `site.url`, `site.description`, `brand.logo`,
+`brand.favicon`, `brand.colors.primary`, `brand.colorMode`, `navigation.links`
+and `ai.pageActions`.
+
+- **`brand.colors.primary` takes hex only.** `rgb()` and `hsl()`, in both CSS
+  syntaxes, and `#rrggbbaa` are refused. Brand guidelines give colours in hex,
+  and reading the functional forms to CSS's own rules was most of `Color`. A
+  see-through primary has no use on a button, and the contrast check ignored its
+  alpha anyway.
+- **`navigation.layout`** is gone; every portal uses the notebook layout with
+  the tabs in the header, which was the default. Four layouts meant four sets of
+  props that Fumadocs changes between versions, glass's own stylesheet, every
+  layout's page components in the bundle (about 38 KB of script), and each
+  other setting to be checked under each of them.
+- **`brand.colors.preset`** is gone; every portal uses Fumadocs' neutral theme,
+  which was the default, imported by `app.css` again rather than by the
+  generated `theme.css`. `brand.colors` stays an object holding `primary`, so a
+  preset or an accent colour can come back as a key beside it. The primary
+  covers "make it ours"; eleven themes were eleven palettes to check every other
+  setting against, several of which restyle the sidebar beyond any token.
+- **`brand.fonts`** is gone; every portal uses Geist and Geist Mono from Google
+  Fonts, which was the default, with the link in `__root.tsx` and the families
+  in `app.css`. A company's own brand font was rarely on the shortlist, so the
+  setting seldom delivered one, and each family's weight axis had to be checked
+  by hand against Google, where one wrong entry fails the whole font request.
+  The identity loses `fontsUrl`, and `theme.css` its `@theme` block.
+  *Amended 2026-09-25 (PR #366):* the fonts are bundled, not linked from Google:
+  the stylesheet held up first paint and hydration by 1–3 s on a first visit.
+  `app.css` imports `@fontsource-variable/geist` and `geist-mono`, which the CLI
+  copies into the build project (`COPIED_DEPENDENCIES`) so their `url()`s
+  resolve on the project's drive, and sets `--font-sans` / `--font-mono` so the
+  `font-sans` and `font-mono` classes get Geist too. The link in `__root.tsx`
+  is gone.
+- **`home.cta`** is gone, and the `home` namespace with it; no home page has a
+  button under its title, which was the default. A portal that wants a landing
+  page writes `content/index.md`, which can link wherever it likes. The
+  identity loses `homeCta`.
+- **`api.groupBy`, `api.showDeprecated` and `api.showInternal`** are gone, and
+  the `api` namespace with them. The reference is grouped by tag, deprecated
+  operations are documented and struck through, and operations marked
+  `x-internal: true` are always left out, which were the defaults. Specs are
+  written around tags, and a grouping that moved every page's URL was a setting
+  to regret after publishing; showing deprecated operations is a matter of
+  taste; and hiding internal ones is the safe behaviour, which stays built in.
+  With them go the route-grouping workarounds in `openApiSection`, the `api`
+  field of `portal.config.json` and its type check, and `portal serve`'s
+  restart-needed notice, since nothing left in the block is read only at
+  startup. The operationId check of section 7 stays, with a message that no
+  longer names the setting.
+- **`advanced.tokens`** is gone, and the `advanced` namespace with it; no
+  Fumadocs colour variable but the primary trio can be set, which was the
+  default. It tied the public config to Fumadocs' internal variable names,
+  which an upgrade could rename under a published config, and it was the one
+  setting written raw into CSS, which is what its character and parenthesis
+  checks were for. With only the primary written, `theme.css` no longer names
+  `#nd-sidebar`: the neutral theme gives the sidebar muted and secondary tokens
+  of its own, which only a token could clash with, and none of the primary
+  trio, which the sidebar inherits (checked against `fumadocs-ui` 16.15.8, the
+  pinned version).
+
+## 16. The `tabs` key (2026-09-29)
+
+Proposed on `saeedjamshaid/nav-json-tabs`, not yet built. Section 5 states the
+rules and its history says why; this section lists what delivering them
+touches.
+
+### Template
+
+- **`src/lib/navigation-schema.ts`** (new): the extended schema, and
+  **`src/lib/source.ts`** passing it as the `docs` collection's `meta.schema`
+  (section 5, Mechanism). The `generated` collection is unchanged.
+- **`src/lib/navigation.ts`**: `readSettings` returns `tabs`. `isTabFolder`
+  reads `tabs` instead of `pages`. `groupIntoTabs` makes a tab of what `tabs`
+  names, the API by `api` or `apimatic:api` and a section by its token, and
+  orders them by `tabs` through `reorder`, which keeps Fumadocs' order for
+  what an order does not name *(as amended 2026-09-30)*.
+  `GENERATED_SECTIONS` and `apiBaseDir` are unchanged.
+- **`src/lib/tabs.ts`**: `portalTabs` returns no tab when Home is the only root
+  folder.
+
+### CLI
+
+- **`src/types/portal/portal-navigation.ts`**: `tabs` known in the root file and
+  refused below it with its own sentence, where the unknown-setting sentence
+  keeps listing `pages` and `title`; `NavigationSettings.tabs`; the `tabs`
+  entry rules and the node-in-both check; `pages` loses its refusal of a
+  folder serving `/`, which moves to `tabs`; the below-root token sentence
+  names both places. *(The refusal of a beta.1 root file, added here on
+  2026-09-29, went the next day; section 5, Validation.)*
+  `NavigationContext` gains the names of the subfolders with a page in or
+  below them, which the `tabs` refusal of a page needs:
+  `childNames` mixes pages and folders, and `emptyFolders` lists only the
+  others. `content-tree.ts`'s `visit` already holds them.
+- **`src/types/portal/content-tree.ts`**: `tabs()` takes every tab from
+  `tabs`, and nothing else is one.
+- **`content-notices.ts`, `preview-content.ts`, `src/prompts/portal/source.ts`**:
+  `folderTabs` and `reportFolderTabs` go. *(2026-09-30: `noTabsListed` and
+  `unseenHomeTitle` come, given once under `portal serve` like the others.)*
+- **`portal serve`**: no new behaviour. A `nav.json` save already runs every
+  check, and an `apimatic.json` edit that adds or removes the plugin already
+  checks the content again. `GeneratedPages.makesSameTabsAs` becomes
+  `makesSameSectionsAs`, and `serve.ts`'s `tabsChanged` and the comment above
+  it follow: a section can now sit in Home, so what they compare is sections.
+- **Doc comments that state the old rule** follow in the step that changes
+  it: `generated-pages.ts`'s `GeneratedSection`, its `token` and
+  `GeneratedNavigation`, which call every section a tab, and in the template
+  `GENERATED_SECTIONS` and `tabsTransformer` in `navigation.ts`.
+
+### Docs, fixtures, other plans
+
+- **README**: the bullet on tabs is rewritten for `tabs` and `pages`, with the
+  tokens placeable in either.
+- **`test/resources/portal-inputs/default/src/content/nav.json`** lists
+  `guides`, `apimatic:api` and `apimatic:sdks` in `pages` today. They move to
+  `tabs`, so the e2e build keeps its tabs, and `authentication` stays in `pages`.
+- **The sample repository**: its `v2` root file is `{ "pages": ["index", "..."] }`
+  (checked 2026-09-29). *(Amended 2026-09-30: with no `tabs` making no tab,
+  that file gives Home alone, so it names the three sections in `tabs` to keep
+  the tabs it had; the scaffold writes the same.)*
+- **`.ai/plans/portal-navigation.md` and `.ai/plans/generated-pages.md`** carry
+  an amendment note pointing here, added with this section.
+
+### Tests
+
+- `test/types/portal/portal-navigation.test.ts`: each `tabs` rule and refusal,
+  `api` and `apimatic:api` split across the two lists, `tabs` below the root,
+  tokens in the root `pages`, the reworded below-root sentence, a folder
+  serving `/` accepted in `pages` with no `tabs`, and a root file with no
+  `tabs` read as an empty list.
+- `test/types/portal/content-tree.test.ts`: tabs from `tabs`, and sections
+  placed in Home left out of the tabs and out of the shared-name check.
+- `test/types/portal/preview-content.test.ts` and
+  `test/prompts/portal/source.test.ts`: `folderTabs`' and `reportFolderTabs`'
+  cases removed.
+- `test/types/portal/generated-pages.test.ts`: the renamed
+  `makesSameSectionsAs`.
+- `test/types/portal-source-context.test.ts`: a source with `tabs` validated
+  whole.
+- `test/portal-template/navigation.test.ts` and `tabs.test.ts`: a top-level
+  folder ordered among Home's pages, tab order from `tabs` with the defaults,
+  the API and the plugin in Home, an unnamed SDKs tab last when the API is in
+  Home, and no tab for Home alone. One case holds the two halves together:
+  `navigation-schema.ts` keeps every setting the CLI accepts, `tabs` among
+  them, rather than stripping it, since the CLI would otherwise validate a key
+  the template never sees.
+- Every existing test whose root `nav.json` lists a folder, `api` or a token in
+  `pages` and means it as a tab moves those entries to `tabs` in the step whose
+  rules it tests: `test/portal-template/navigation.test.ts` and `tabs.test.ts`
+  in step 1, `test/types/portal/portal-navigation.test.ts`,
+  `test/types/portal-source-context.test.ts` and the default fixture in step 2,
+  since `pages` no longer makes one.
+- `test/e2e/portal-build.test.ts`: the moved fixture, and one build with a
+  generated section in Home, checked in the rendered sidebar.
+
+### Delivery
+
+One PR against `dev`, `feat(portal)`, three steps, each stopped at for review:
+
+1. **Template.** The schema, the navigation and tabs changes, their unit tests.
+2. **CLI.** Validation, the content tree, the notices and prompts, their unit
+   tests, and the default fixture's move to `tabs`.
+3. **E2e, README.** The Home-placement build and the README bullet.
+
+Each step leaves the build, lint on touched files and its unit tests green. The
+e2e suite is green again from step 2: after step 1 the template reads `tabs`
+while the CLI still refuses the key, so the default fixture can neither keep
+its old form nor take the new one. Neither order of the two halves avoids
+that, and they stay separate steps to keep each review to one side.
+
+No `BREAKING CHANGE:` footer: `nav.json` is new since 1.x, so against the last
+stable release this breaks nothing. The next beta's release notes say what
+changed for a beta.1 root file: a folder or token its `pages` named is in Home
+until `tabs` names it. *(2026-09-30: the refusal that said so in the terminal,
+and the ticket to remove it, went with the second review.)*
+
+### To verify during implementation
+
+- The API reference inside Home: the lifted tag folders under "API Reference",
+  the active page, the breadcrumb, and the reference page's layout, as they are
+  in its tab.
+- The Context Plugin inside Home: a folder holding only its index page, which
+  may render as an expander with nothing under it rather than as a plain link.
+- Home alone: the header in `navbar` mode with no tab row. The sidebar's
+  dropdown is settled: `DocsLayout` uses a given `tabs` array as it is, and
+  renders the dropdown only when it is not empty.
+- `metaSchema.extend` keeps stripping unknown keys, so a misspelt `tab` is still
+  the CLI's to report.
+
+### Decided
+
+- **Home alone hides the tab bar** (2026-09-29), rather than keeping a single
+  Home tab so every portal's header looks the same: a switcher with one choice
+  switches nothing.

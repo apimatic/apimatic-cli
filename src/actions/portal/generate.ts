@@ -1,19 +1,17 @@
-import { PortalGeneratePrompts } from "../../prompts/portal/generate.js";
-import { PortalService } from "../../infrastructure/services/portal-service.js";
-import { DirectoryPath } from "../../types/file/directoryPath.js";
-import { ActionResult } from "../action-result.js";
-import { BuildContext } from "../../types/build-context.js";
-import { PortalContext } from "../../types/portal-context.js";
-import { withDirPath } from "../../infrastructure/tmp-extensions.js";
-import { LauncherService } from "../../infrastructure/launcher-service.js";
-import { TempContext } from "../../types/temp-context.js";
-import { CommandMetadata } from "../../types/common/command-metadata.js";
-import { ServiceError } from "../../infrastructure/service-error.js";
+import { PortalBuildService } from '../../infrastructure/portal-build-service.js';
+import { PortalProjectPaths } from '../../infrastructure/portal-project-service.js';
+import { PortalGeneratePrompts } from '../../prompts/portal/generate.js';
+import { CommandMetadata } from '../../types/common/command-metadata.js';
+import { DirectoryPath } from '../../types/file/directoryPath.js';
+import { PortalContext } from '../../types/portal-context.js';
+import { SiteAddress } from '../../types/portal/config/site-address.js';
+import { ProjectContext } from '../../types/project-context.js';
+import { ActionResult } from '../action-result.js';
+import { PreparePortalProjectAction } from './prepare-project.js';
 
 export class GenerateAction {
   private readonly prompts: PortalGeneratePrompts = new PortalGeneratePrompts();
-  private readonly launcherService: LauncherService = new LauncherService();
-  private readonly portalService: PortalService = new PortalService();
+  private readonly buildService = new PortalBuildService();
   private readonly configDir: DirectoryPath;
   private readonly commandMetadata: CommandMetadata;
   private readonly authKey: string | null;
@@ -25,65 +23,67 @@ export class GenerateAction {
   }
 
   public readonly execute = async (
-    buildDirectory: DirectoryPath,
+    project: ProjectContext,
     portalDirectory: DirectoryPath,
     force: boolean,
-    zipPortal: boolean,
-    displayMessages: boolean = true
+    zipPortal: boolean
   ): Promise<ActionResult> => {
-    if (buildDirectory.isEqual(portalDirectory)) {
+    if (project.isSourceDirectory(portalDirectory)) {
       this.prompts.directoryCannotBeSame(portalDirectory);
       return ActionResult.failed();
     }
 
-    const buildContext = new BuildContext(buildDirectory);
-    if (!(await buildContext.validate())) {
-      this.prompts.srcDirectoryEmpty(buildDirectory);
+    // The destination is emptied before the site is written, so a destination that holds
+    // the source would delete the very files being built from.
+    if (project.isSourceWithin(portalDirectory)) {
+      this.prompts.destinationContainsSource(project.sourceDirectory(), portalDirectory);
       return ActionResult.failed();
     }
 
     const portalContext = new PortalContext(portalDirectory);
-    if (!force && (await portalContext.exists()) && !(await this.prompts.overwritePortal(portalDirectory))) {
-      this.prompts.portalDirectoryNotEmpty();
-      return ActionResult.cancelled();
-    }
-
-    return await withDirPath(async (tempDirectory) => {
-      const tempContext = new TempContext(tempDirectory);
-      const buildZipPath = await tempContext.zip(buildDirectory);
-
-      const response = await this.prompts.generatePortal(
-        this.portalService.generatePortal(buildZipPath, this.configDir, this.commandMetadata, this.authKey)
-      );
-
-      if (response.isErr()) {
-        const error = response.error;
-        if (error instanceof ServiceError) {
-          const sdkMergeFailedErrors = error.getError("sdkMergeFailed");
-          if (sdkMergeFailedErrors) {
-            this.prompts.portalGenerationSdkMergeFailed(sdkMergeFailedErrors);
-          } else {
-            this.prompts.portalGenerationError(error.errorMessage);
-          }
-        } else if (typeof error === "string") {
-          this.prompts.portalGenerationError(error);
-        } else {
-          const errorZipPath = await tempContext.save(error);
-          const reportPath = await portalContext.saveError(errorZipPath);
-          await this.launcherService.openFile(reportPath);
-          this.prompts.portalGenerationErrorWithReport(reportPath);
-        }
-        return ActionResult.failed();
-      }
-
-      const tempPortalZipPath = await tempContext.save(response.value);
-      await portalContext.save(tempPortalZipPath, zipPortal);
-
-      if (displayMessages) {
-        this.prompts.portalGenerated(portalDirectory);
-      }
-
-      return ActionResult.success();
+    return await new PreparePortalProjectAction(this.configDir, this.commandMetadata, this.authKey).execute(project, {
+      confirm: () => this.confirmOverwrite(portalContext, portalDirectory, force),
+      onPrepared: (portalProject, source) =>
+        this.build(portalProject, source.config.siteAddress(), portalContext, portalDirectory, zipPortal)
     });
   };
+
+  private async confirmOverwrite(
+    portalContext: PortalContext,
+    portalDirectory: DirectoryPath,
+    force: boolean
+  ): Promise<boolean> {
+    if (force || !(await portalContext.exists()) || (await this.prompts.overwritePortal(portalDirectory))) {
+      return true;
+    }
+    this.prompts.portalDirectoryNotEmpty();
+    return false;
+  }
+
+  private async build(
+    portalProject: PortalProjectPaths,
+    site: SiteAddress | null,
+    portalContext: PortalContext,
+    portalDirectory: DirectoryPath,
+    zipPortal: boolean
+  ): Promise<ActionResult> {
+    const build = await this.prompts.buildPortal(this.buildService.build(portalProject));
+
+    if (build.isErr()) {
+      // Written before the temp directory is removed, so the log outlives the build.
+      const logPath = await portalContext.saveBuildLog(build.error.log);
+      this.prompts.buildFailed(build.error.log, logPath);
+      return ActionResult.failed();
+    }
+
+    const saved = await this.prompts.savePortal(portalContext.save(build.value.output, zipPortal));
+    if (saved.isErr()) {
+      return ActionResult.failed();
+    }
+
+    this.prompts.portalGenerated(portalDirectory);
+    this.prompts.nextSteps(portalDirectory, zipPortal, site);
+
+    return ActionResult.success();
+  }
 }

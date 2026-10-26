@@ -1,6 +1,6 @@
-import path from "path";
-import { FileName } from "./fileName.js";
-import { DirectoryPath } from "./directoryPath.js";
+import path from 'path';
+import { FileName } from './fileName.js';
+import { asTypedFrom, DirectoryPath, posix } from './directoryPath.js';
 
 export class FilePath {
   private readonly fileName: FileName;
@@ -11,12 +11,53 @@ export class FilePath {
     this.directoryPath = path;
   }
 
+  /** The leaf name, so callers can ask about it without unwrapping the whole path. */
+  public name(): FileName {
+    return this.fileName;
+  }
+
+  public directory(): DirectoryPath {
+    return this.directoryPath;
+  }
+
   public replaceDirectory(newDirectory: DirectoryPath): FilePath {
     return new FilePath(newDirectory, this.fileName);
   }
 
+  /** The file at the same place below `to` as this one sits below `from`. */
+  public rebased(from: DirectoryPath, to: DirectoryPath): FilePath {
+    return new FilePath(to.resolve(path.relative(from.toString(), this.directoryPath.toString())), this.fileName);
+  }
+
+  /** The same path, spelt the same way: `Logo.png` is not `logo.png`. */
+  public isEqual(other: FilePath): boolean {
+    return this.directoryPath.isEqual(other.directoryPath) && this.fileName.isEqual(other.fileName);
+  }
+
   public toString(): string {
     return path.join(this.directoryPath.toString(), this.fileName.toString());
+  }
+
+  public toPosix(): string {
+    return `${this.directoryPath.toPosix()}/${this.fileName}`;
+  }
+
+  /**
+   * How a message names this file to someone standing in `directory`: the path from there,
+   * with forward slashes whatever the platform, so the same file reads the same everywhere.
+   */
+  public relativeTo(directory: DirectoryPath): string {
+    return posix(path.relative(directory.toString(), this.toString()));
+  }
+
+  public asTypedFrom(from: DirectoryPath): string {
+    return asTypedFrom(this.toString(), from);
+  }
+
+  /** The file `relativePath` names from `directory`, with `/` between its segments as a page or a setting writes it. */
+  public static resolve(directory: DirectoryPath, relativePath: string): FilePath {
+    const resolved = path.resolve(directory.toString(), relativePath);
+    return new FilePath(new DirectoryPath(path.dirname(resolved)), new FileName(path.basename(resolved)));
   }
 
   public static create(filePath: string): FilePath | undefined {

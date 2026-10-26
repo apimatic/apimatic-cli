@@ -1,34 +1,67 @@
-import * as path from "path";
-import { err, ok, Result } from "neverthrow";
-import { UrlPath } from "./file/urlPath.js";
-import { FilePath } from "./file/filePath.js";
-import { DirectoryPath } from "./file/directoryPath.js";
-import { FileName } from "./file/fileName.js";
-import { FileDownloadService } from "../infrastructure/services/file-download-service.js";
-import { FileService } from "../infrastructure/file-service.js";
-import { ResourceInput } from "./file/resource-input.js";
-import { ServiceError } from "../infrastructure/service-error.js";
+import { err, ok, Result } from 'neverthrow';
+import { UrlPath } from './file/urlPath.js';
+import { FilePath } from './file/filePath.js';
+import { DirectoryPath } from './file/directoryPath.js';
+import { FileDownloadService } from '../infrastructure/services/file-download-service.js';
+import { FileService } from '../infrastructure/file-service.js';
+import { ResourceInput } from './file/resource-input.js';
+import { ServiceError } from '../infrastructure/service-error.js';
+import { ProjectContext, SpecZipProblem } from './project-context.js';
+
+export type ResourceKind = 'file' | 'url' | 'project';
+
+export type DownloadProblem = { kind: 'downloadFailed'; url: UrlPath; error: ServiceError };
+
+export type FileReadProblem = { kind: 'fileUnreadable'; file: FilePath };
+
+export type ResolveProblem = SpecZipProblem | DownloadProblem | FileReadProblem;
 
 export class ResourceContext {
-  private readonly fileDownloadService = new FileDownloadService();
-  private readonly fileService = new FileService();
+  private constructor(private readonly input: ResourceInput, private readonly resolvedFile: FilePath) {}
 
-  constructor(private readonly tempDirectory: DirectoryPath) {}
-
-  public async resolveTo(resourcePath: ResourceInput): Promise<Result<FilePath, ServiceError>> {
-    const fileName = new FileName(path.basename(resourcePath.toString()));
-    const destinationFilePath = new FilePath(this.tempDirectory, fileName);
-
-    if (resourcePath instanceof UrlPath) {
-      const downloadFileResult = await this.fileDownloadService.downloadFile(resourcePath);
-      if (downloadFileResult.isErr()) {
-        return err(downloadFileResult.error);
+  public static resolveTo(
+    input: FilePath | UrlPath,
+    tempDirectory: DirectoryPath
+  ): Promise<Result<ResourceContext, DownloadProblem | FileReadProblem>>;
+  public static resolveTo(
+    input: ResourceInput,
+    tempDirectory: DirectoryPath
+  ): Promise<Result<ResourceContext, ResolveProblem>>;
+  public static async resolveTo(
+    input: ResourceInput,
+    tempDirectory: DirectoryPath
+  ): Promise<Result<ResourceContext, ResolveProblem>> {
+    if (input instanceof ProjectContext) {
+      return (await input.specZip(tempDirectory)).map((zip) => new ResourceContext(input, zip));
+    }
+    const fileService = new FileService();
+    await fileService.createDirectoryIfNotExists(tempDirectory);
+    if (input instanceof UrlPath) {
+      const downloaded = await new FileDownloadService().downloadFile(input);
+      if (downloaded.isErr()) {
+        return err({ kind: 'downloadFailed', url: input, error: downloaded.error });
       }
-      await this.fileService.writeFile(destinationFilePath, downloadFileResult.value.stream);
+      const file = new FilePath(tempDirectory, downloaded.value.filename);
+      await fileService.writeFile(file, downloaded.value.stream);
+      return ok(new ResourceContext(input, file));
     }
-    if (resourcePath instanceof FilePath) {
-      await this.fileService.copy(resourcePath, destinationFilePath);
+    const copy = input.replaceDirectory(tempDirectory);
+    try {
+      await fileService.copy(input, copy);
+    } catch {
+      return err({ kind: 'fileUnreadable', file: input });
     }
-    return ok(destinationFilePath);
+    return ok(new ResourceContext(input, copy));
+  }
+
+  public kind(): ResourceKind {
+    if (this.input instanceof ProjectContext) {
+      return 'project';
+    }
+    return this.input instanceof UrlPath ? 'url' : 'file';
+  }
+
+  public file(): FilePath {
+    return this.resolvedFile;
   }
 }

@@ -1,0 +1,26 @@
+{
+  "$schema": "https://cdn.jsdelivr.net/npm/@apimatic/cli@2/apimatic.schema.json",
+  "schemaVersion": 1,
+  "portal": {
+    "site": { "name": "Branded Pets" },
+    "brand": {
+      "logo": { "light": "static/logo-light.svg", "dark": "static/logo-dark.svg" },
+      "favicon": "static/favicon.svg",
+      "colors": { "primary": "#1d4ed8" },
+      "colorMode": "dark"
+    },
+    "navigation": {
+      "links": [{ "label": "Status", "url": "https://status.example.com" }]
+    }
+  },
+  "languages": {
+    "typescript": {
+      "publishing": {
+        "source": { "repositoryUrl": "https://github.com/branded/pets-ts" },
+        "package": { "version": "1.0.0" },
+        "packageConfiguration": { "name": "@branded/pets" }
+      }
+    }
+  },
+  "plugin": { "pluginId": "branded-pets", "pluginName": "Branded Pets", "pluginVersion": "0.1.0" }
+}

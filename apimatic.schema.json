@@ -1,0 +1,550 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://cdn.jsdelivr.net/npm/@apimatic/cli@2/apimatic.schema.json",
+  "title": "apimatic.json",
+  "description": "The APIMatic CLI's project file, src/apimatic.json: the documentation portal, the context plugin's identity, and the project's SDK languages.",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "Where editors find this schema. Ignored by the CLI."
+    },
+    "schemaVersion": {
+      "const": 1,
+      "description": "The format of this file. The CLI refuses a version it does not read."
+    },
+    "portal": {
+      "$ref": "#/definitions/portal"
+    },
+    "plugin": {
+      "$ref": "#/definitions/plugin"
+    },
+    "languages": {
+      "$ref": "#/definitions/languages"
+    }
+  },
+  "additionalProperties": true,
+  "definitions": {
+    "nonBlank": {
+      "type": "string",
+      "pattern": "\\S"
+    },
+    "semver": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "staticPath": {
+      "type": "string",
+      "description": "A path relative to 'src' inside the 'static' directory, for example 'static/images/logo.png'.",
+      "pattern": "^\\s*(?:\\.[\\\\/])?static(?:[\\\\/](?!\\.{1,2}(?:[\\\\/]|\\s*$))[^\\\\/]*[^\\\\/\\s][^\\\\/]*)+\\s*$"
+    },
+    "color": {
+      "type": "string",
+      "description": "#rgb or #rrggbb, for example '#1d4ed8'.",
+      "pattern": "^\\s*#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})\\s*$"
+    },
+    "link": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["label", "url"],
+      "properties": {
+        "label": {
+          "$ref": "#/definitions/nonBlank"
+        },
+        "url": {
+          "type": "string",
+          "description": "A page of the portal starting with '/', or an address starting with 'https://' or 'http://'.",
+          "pattern": "^\\s*(?:/(?![\\t\\n\\r]*[/\\\\])(?:(?![/\\\\][\\t\\n\\r]*[/\\\\])[^?#])*(?:[?#][\\s\\S]*)?|[hH][tT][tT][pP][sS]?://[^\\s/?#]+(?:[/?#][\\s\\S]*)?\\s*)$"
+        }
+      }
+    },
+    "portal": {
+      "type": "object",
+      "description": "The documentation portal that 'apimatic portal generate' and 'apimatic portal serve' build.",
+      "additionalProperties": false,
+      "properties": {
+        "site": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "name": {
+              "allOf": [
+                {
+                  "$ref": "#/definitions/nonBlank"
+                }
+              ],
+              "description": "The portal's name. Defaults to the title of the only specification; required when 'spec' holds more than one."
+            },
+            "url": {
+              "type": "string",
+              "description": "The address the portal is hosted at, for example 'https://docs.example.com' or 'https://example.com/docs'.",
+              "pattern": "^\\s*[hH][tT][tT][pP][sS]?://[^\\s/?#\\\\]+(?:/(?!\\.{1,2}(?:/|\\s*$))(?![A-Za-z0-9._~-]*\\.[hH][tT][mM][lL]?/?\\s*$)[A-Za-z0-9._~-]+)*/?\\s*$"
+            },
+            "description": {
+              "type": "string",
+              "description": "Defaults to the first paragraph of the only specification's description. Blank is none."
+            }
+          }
+        },
+        "brand": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "logo": {
+              "description": "One image for both colour modes, or one per mode.",
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/staticPath"
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["light", "dark"],
+                  "properties": {
+                    "light": {
+                      "$ref": "#/definitions/staticPath"
+                    },
+                    "dark": {
+                      "$ref": "#/definitions/staticPath"
+                    }
+                  }
+                }
+              ]
+            },
+            "favicon": {
+              "allOf": [
+                {
+                  "$ref": "#/definitions/staticPath"
+                }
+              ],
+              "description": "Defaults to the light logo."
+            },
+            "colors": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "primary": {
+                  "description": "One colour for both modes, or one per mode.",
+                  "anyOf": [
+                    {
+                      "$ref": "#/definitions/color"
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["light", "dark"],
+                      "properties": {
+                        "light": {
+                          "$ref": "#/definitions/color"
+                        },
+                        "dark": {
+                          "$ref": "#/definitions/color"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            "colorMode": {
+              "enum": ["light", "dark", "both"],
+              "default": "both",
+              "description": "A forced mode hides the switch."
+            }
+          }
+        },
+        "navigation": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "links": {
+              "type": "array",
+              "description": "Links in the header and the mobile menu.",
+              "items": {
+                "$ref": "#/definitions/link"
+              }
+            }
+          }
+        },
+        "ai": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "pageActions": {
+              "type": "boolean",
+              "default": true,
+              "description": "Whether each page offers to open itself in an external AI assistant."
+            }
+          }
+        },
+        "pluginUrl": {
+          "type": "string",
+          "description": "Where the context plugin is hosted, starting with 'https://' and with no spaces. The Context Plugin page installs it from here, and the portal carries no copy of its own.",
+          "pattern": "^[hH][tT][tT][pP][sS]://[^\\s/?#]+(?:[/?#]\\S*)?$"
+        }
+      }
+    },
+    "plugin": {
+      "type": "object",
+      "description": "The context plugin's identity, which 'apimatic plugin generate' records. Its ID, name and version are required to generate the plugin.",
+      "additionalProperties": true,
+      "required": ["pluginId", "pluginName", "pluginVersion"],
+      "properties": {
+        "pluginId": {
+          "type": "string",
+          "description": "Lower-case alphanumeric words separated by single dashes, for example 'acme-payments'.",
+          "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+        },
+        "pluginName": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/nonBlank"
+            }
+          ],
+          "description": "The name the plugin is shown by, for example 'Acme Payments'."
+        },
+        "pluginVersion": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/semver"
+            }
+          ],
+          "description": "major.minor.patch, for example '0.1.0'."
+        },
+        "pluginKey": {
+          "type": "string"
+        },
+        "author": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "email": {
+              "type": "string"
+            }
+          }
+        },
+        "license": {
+          "type": "string"
+        },
+        "homepage": {
+          "type": "string"
+        },
+        "repository": {
+          "type": "string"
+        }
+      }
+    },
+    "languages": {
+      "type": "object",
+      "description": "The project's SDK languages, which 'apimatic sdk publish' adds to. An entry without 'publishing' is a language that is wanted but not yet published.",
+      "propertyNames": {
+        "enum": ["csharp", "typescript", "python"]
+      },
+      "properties": {
+        "csharp": {
+          "$ref": "#/definitions/csharpEntry"
+        },
+        "typescript": {
+          "$ref": "#/definitions/typescriptEntry"
+        },
+        "python": {
+          "$ref": "#/definitions/pythonEntry"
+        }
+      },
+      "additionalProperties": false
+    },
+    "source": {
+      "type": "object",
+      "description": "The repository 'apimatic sdk publish' published the SDK's source to.",
+      "additionalProperties": false,
+      "properties": {
+        "repositoryUrl": {
+          "type": "string"
+        },
+        "branch": {
+          "type": "string"
+        }
+      }
+    },
+    "release": {
+      "type": "object",
+      "description": "The published release. The package's name is not here: it is read from 'packageConfiguration'.",
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "$ref": "#/definitions/semver"
+        }
+      }
+    },
+    "csharpEntry": {
+      "type": "object",
+      "description": "An SDK language. Without 'publishing', the language is wanted but not published yet.",
+      "additionalProperties": false,
+      "properties": {
+        "publishing": {
+          "type": "object",
+          "description": "Where the SDK is published.",
+          "additionalProperties": false,
+          "dependencies": {
+            "package": ["packageConfiguration"]
+          },
+          "properties": {
+            "source": {
+              "$ref": "#/definitions/source"
+            },
+            "package": {
+              "$ref": "#/definitions/release"
+            },
+            "packageConfiguration": {
+              "$ref": "#/definitions/csharpPackageConfiguration"
+            }
+          }
+        }
+      }
+    },
+    "pythonEntry": {
+      "type": "object",
+      "description": "An SDK language. Without 'publishing', the language is wanted but not published yet.",
+      "additionalProperties": false,
+      "properties": {
+        "publishing": {
+          "type": "object",
+          "description": "Where the SDK is published.",
+          "additionalProperties": false,
+          "dependencies": {
+            "package": ["packageConfiguration"]
+          },
+          "properties": {
+            "source": {
+              "$ref": "#/definitions/source"
+            },
+            "package": {
+              "$ref": "#/definitions/release"
+            },
+            "packageConfiguration": {
+              "$ref": "#/definitions/pythonPackageConfiguration"
+            }
+          }
+        }
+      }
+    },
+    "typescriptEntry": {
+      "type": "object",
+      "description": "An SDK language. Without 'publishing', the language is wanted but not published yet.",
+      "additionalProperties": false,
+      "properties": {
+        "publishing": {
+          "type": "object",
+          "description": "Where the SDK is published.",
+          "additionalProperties": false,
+          "dependencies": {
+            "package": ["packageConfiguration"]
+          },
+          "properties": {
+            "source": {
+              "$ref": "#/definitions/source"
+            },
+            "package": {
+              "$ref": "#/definitions/release"
+            },
+            "packageConfiguration": {
+              "$ref": "#/definitions/typescriptPackageConfiguration"
+            }
+          }
+        }
+      }
+    },
+    "csharpPackageConfiguration": {
+      "type": "object",
+      "description": "How the NuGet package is set up. Written by 'apimatic sdk publish' from the publishing profile.",
+      "additionalProperties": false,
+      "required": ["packageId"],
+      "properties": {
+        "packageId": {
+          "type": "string",
+          "description": "The NuGet package id, which the SDK card installs."
+        },
+        "authors": {
+          "type": ["string", "null"]
+        },
+        "description": {
+          "type": ["string", "null"]
+        },
+        "title": {
+          "type": ["string", "null"]
+        },
+        "packageTags": {
+          "type": ["string", "null"]
+        },
+        "repositoryUrl": {
+          "type": ["string", "null"]
+        },
+        "repositoryType": {
+          "type": ["string", "null"]
+        },
+        "packageProjectUrl": {
+          "type": ["string", "null"]
+        },
+        "packageIcon": {
+          "type": ["string", "null"]
+        },
+        "packageReleaseNotes": {
+          "type": ["string", "null"]
+        },
+        "copyright": {
+          "type": ["string", "null"]
+        }
+      }
+    },
+    "pythonPackageConfiguration": {
+      "type": "object",
+      "description": "How the PyPI distribution is set up. Written by 'apimatic sdk publish' from the publishing profile.",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The PyPI project name, which the SDK card installs."
+        },
+        "description": {
+          "type": ["string", "null"]
+        },
+        "authors": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "email": {
+                "type": ["string", "null"]
+              },
+              "name": {
+                "type": ["string", "null"]
+              }
+            }
+          }
+        },
+        "maintainers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "email": {
+                "type": ["string", "null"]
+              },
+              "name": {
+                "type": ["string", "null"]
+              }
+            }
+          }
+        },
+        "keywords": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "classifiers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "urls": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "typescriptPackageConfiguration": {
+      "type": "object",
+      "description": "How the npm package is set up. Written by 'apimatic sdk publish' from the publishing profile.",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The npm package name, which the SDK card installs."
+        },
+        "author": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "name": {
+              "type": ["string", "null"]
+            },
+            "email": {
+              "type": ["string", "null"]
+            },
+            "url": {
+              "type": ["string", "null"]
+            }
+          }
+        },
+        "description": {
+          "type": ["string", "null"]
+        },
+        "contributors": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": ["string", "null"]
+              },
+              "email": {
+                "type": ["string", "null"]
+              },
+              "url": {
+                "type": ["string", "null"]
+              }
+            }
+          }
+        },
+        "bugs": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "url": {
+              "type": ["string", "null"]
+            },
+            "email": {
+              "type": ["string", "null"]
+            }
+          }
+        },
+        "keywords": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "homepage": {
+          "type": ["string", "null"]
+        },
+        "repository": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "type": ["string", "null"]
+            },
+            "url": {
+              "type": ["string", "null"]
+            },
+            "directory": {
+              "type": ["string", "null"]
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -19,7 +19,7 @@ These three layers are always created together and mirror each other in path str
 - **DO** follow the exact `run()` flow: parse → type-convert → CommandMetadata → `intro()` → `action.execute()` → `outro(result)`.
 - **DO** use `private readonly getConfigDir = () => new DirectoryPath(this.config.configDir)` when the action needs `configDir`.
 - **DO** import only `{ Command }` if no flags, `{ Command, Flags }` if flags exist.
-- **DO** add one more `../` to relative imports for each nesting level (e.g., `portal/toc/new.ts` uses `../../../` instead of `../../`).
+- **DO** add one more `../` to relative imports for each nesting level (e.g., `publishing/profile/list.ts` uses `../../../` instead of `../../`).
 - **DO** always define both `summary` and `description` static properties.
 
 ### Commands — DON'T
@@ -62,7 +62,7 @@ These three layers are always created together and mirror each other in path str
 - **DO** use named export: `export class {PascalName}Prompts`.
 - **DO** import only the `@clack/prompts` functions actually used (e.g., `{ log, confirm, isCancel }`).
 - **DO** alias the format import: `import { format as f } from "../format.js"`.
-- **DO** use `withSpinner(startMsg, successMsg, failureMsg, promise)` for async operations — it takes `Promise<Result<T, E>>`.
+- **DO** use `withSpinner(startMsg, successMsg, failureMsg, promise, options?)` for async operations — it takes `Promise<Result<T, E>>`; the messages may be functions of the value or error, and `{ indicator: 'timer' }` shows elapsed time.
 - **DO** always check `isCancel()` on interactive prompts (`confirm`, `select`, `text`, `multiselect`) and return `false` or `undefined` on cancel.
 - **DO** use `confirm({ message: "...", initialValue: false })` for overwrite confirmations.
 - **DO** use format helpers for all dynamic content: `f.var("name")` for names, `f.path(dirOrFile)` for paths, `f.link(url)` for URLs.
@@ -123,10 +123,10 @@ These three layers are always created together and mirror each other in path str
 | Complex command (multiple flags, FlagsProvider) | `src/commands/sdk/generate.ts` |
 | Simple command (ResourceInput, file/url) | `src/commands/api/validate.ts` |
 | Minimal command (no flags) | `src/commands/auth/logout.ts` |
-| Command with nested topic (3-level) | `src/commands/portal/toc/new.ts` |
+| Command with nested topic (3-level) | `src/commands/publishing/profile/list.ts` |
 | Action with withDirPath + Context objects | `src/actions/portal/generate.ts` |
 | Action with Result error handling | `src/actions/api/validate.ts` |
-| Action with simpler constructor (no authKey) | `src/actions/portal/toc/new-toc.ts` |
+| Action with simpler constructor (no authKey) | `src/actions/auth/status.ts` |
 | Action that delegates to sub-actions | `src/actions/quickstart.ts` |
 | Prompts with spinner + confirm + select | `src/prompts/sdk/generate.ts` |
 | Prompts with error display methods | `src/prompts/portal/generate.ts` |
@@ -141,13 +141,14 @@ Use when creating a new command triple (Command + Action + Prompts).
 
 ### What to determine
 
-1. **Topic** — command group (e.g., `api`, `sdk`, `portal`). Can be nested: `portal/toc`, `portal/recipe`
+1. **Topic** — command group (e.g., `api`, `sdk`, `portal`). Can be nested: `sdk/publish`, `publishing/profile`
 2. **Command name** — subcommand (e.g., `validate`, `generate`, `new`)
 3. **Summary** — one-line description
 4. **Description** — multi-line description (template literal)
 5. **Input type** — one of:
    - `ResourceInput` — adds `file` + `url` flags, uses `createResourceInput(file, url)`
-   - `DirectoryPath` — adds `FlagsProvider.input`, uses `DirectoryPath.createInput(input)`
+   - `Project` — adds `FlagsProvider.input`, uses `ProjectContext.at(input)`; the action takes the `ProjectContext`
+   - `DirectoryPath` — adds `FlagsProvider.input`, uses `DirectoryPath.createInput(input)`, for a directory that is not a project
    - `None` — no input flags
 6. **Needs API auth** — adds `FlagsProvider.authKey`, passes `authKey` to Action constructor
 7. **Needs force flag** — adds `FlagsProvider.force` for overwrite confirmation
@@ -159,12 +160,14 @@ Use when creating a new command triple (Command + Action + Prompts).
 
 **Path:** `src/commands/{topic}/{name}.ts`
 
-For nested topics like `portal/toc`, add one more `../` to all relative import paths.
+For nested topics like `publishing/profile`, add one more `../` to all relative import paths.
 
 ```typescript
 import { Command, Flags } from "@oclif/core";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { FlagsProvider } from "../../types/flags-provider.js";
+// If a project input:
+// import { ProjectContext } from "../../types/project-context.js";
 // If ResourceInput:
 // import { createResourceInput } from "../../types/file/resource-input.js";
 import { {PascalName}Action } from "../../actions/{topic}/{name}.js";
@@ -177,7 +180,7 @@ export default class {PascalName} extends Command {
   static readonly description = `{description}`;
 
   // Each topic level is a separate argument to format.cmd
-  // e.g., format.cmd("apimatic", "portal", "toc", "new")
+  // e.g., format.cmd("apimatic", "publishing", "profile", "list")
   static readonly cmdTxt = format.cmd("apimatic", "{topic}", "{name}");
 
   static examples = [
@@ -200,10 +203,9 @@ export default class {PascalName} extends Command {
 
     // Build typed paths from raw flag strings:
     //
-    // For DirectoryPath input:
-    //   const workingDirectory = DirectoryPath.createInput(input);
-    //   const buildDirectory = input ? new DirectoryPath(input, "src") : workingDirectory.join("src");
-    //   const outputDirectory = destination ? new DirectoryPath(destination) : workingDirectory.join("{artifact}");
+    // For a project input (the --input flag and a src/ inside it), never join "src" here:
+    //   const project = ProjectContext.at(input);
+    //   const outputDirectory = project.sdkDirectory(destination); // or portalDirectory / pluginDirectory
     //
     // For ResourceInput:
     //   const resourceInput = createResourceInput(file, url);
@@ -264,9 +266,8 @@ export class {PascalName}Action {
     /* parameters matching what Command passes */
   ): Promise<ActionResult> => {
     // 1. Input validation via Context objects
-    //    const buildContext = new BuildContext(buildDirectory);
-    //    if (!(await buildContext.validate())) {
-    //      this.prompts.directoryEmpty(buildDirectory);
+    //    if (!(await project.sourceExists())) {
+    //      this.prompts.directoryEmpty(project.sourceDirectory());
     //      return ActionResult.failed();
     //    }
 
@@ -280,7 +281,7 @@ export class {PascalName}Action {
     // 3. Business logic (wrap in withDirPath if temp dirs needed)
     //    return await withDirPath(async (tempDirectory) => {
     //      const tempContext = new TempContext(tempDirectory);
-    //      const zipPath = await tempContext.zip(buildDirectory);
+    //      const zipPath = await tempContext.zip(sourceDirectory);
     //
     //      const response = await this.prompts.spinnerMethod(
     //        this.someService.doSomething(zipPath, this.configDir, this.commandMetadata, this.authKey)

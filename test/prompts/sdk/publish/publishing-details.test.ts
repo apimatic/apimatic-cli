@@ -1,53 +1,41 @@
-import { expect } from "chai";
-import { formatPublishingDetails } from "../../../../src/prompts/sdk/publish.js";
-import { PublishType } from "../../../../src/types/publish-api/publishing-profile-item.js";
-import { PublishingProfile } from "../../../../src/types/publish/publishing-profile.js";
-import { SemVersion } from "../../../../src/types/publish/version.js";
-import { CodeGenerationVersion, CodegenOption, Language, Stability } from "../../../../src/types/sdk/generate.js";
+import { expect } from 'chai';
+import { formatPublishingDetails } from '../../../../src/prompts/sdk/publish.js';
+import { PublishType } from '../../../../src/types/publish-api/publishing-profile-item.js';
+import { PublishingProfile } from '../../../../src/types/publish/publishing-profile.js';
+import { SemVersion } from '../../../../src/types/publish/version.js';
+import { Language } from '../../../../src/types/sdk/generate.js';
 
-const profile = { toString: () => "My Profile" } as unknown as PublishingProfile;
-const version = SemVersion.tryCreate("1.2.3")._unsafeUnwrap();
+const profile = { toString: () => 'My Profile' } as unknown as PublishingProfile;
+const version = SemVersion.tryCreate('1.2.3')._unsafeUnwrap();
 
-const details = (publishType: PublishType[], codegenOption?: CodegenOption) =>
+const details = (publishType: PublishType[]) =>
   formatPublishingDetails({
     profile,
     language: Language.CSHARP,
     version,
-    publishType,
-    codegenOption
+    publishType
   });
 
-describe("formatPublishingDetails", () => {
-  it("renders the profile, language, version and targets", () => {
-    const output = details([PublishType.PackagePublishing], CodegenOption.v3);
-
-    expect(output).to.contain("Profile:   My Profile");
-    expect(output).to.contain("Language:  csharp");
-    expect(output).to.contain("Version:   1.2.3");
-    expect(output).to.contain("Targets:   Package");
-  });
-
-  it("omits the generator row when no codegen option is given, leaving pre-existing output unchanged", () => {
+describe('formatPublishingDetails', () => {
+  it('renders the profile, language, version and targets', () => {
     const output = details([PublishType.PackagePublishing]);
 
-    expect(output).to.not.contain("Generator:");
+    expect(output).to.contain('Profile:   My Profile');
+    expect(output).to.contain('Language:  csharp');
+    expect(output).to.contain('Version:   1.2.3');
+    expect(output).to.contain('Targets:   Package');
   });
 
-  it("names the generator once it is no longer the default", () => {
-    const output = details(
-      [PublishType.PackagePublishing],
-      CodegenOption.create(CodeGenerationVersion.V4, Stability.BETA)
-    );
+  it('names both targets when a run publishes both', () => {
+    const output = details([PublishType.SourceCodePublishing, PublishType.PackagePublishing]);
 
-    expect(output).to.contain("Generator: V4 (beta)");
+    expect(output).to.contain('Targets:   Source Code + Package');
   });
 
-  it("reports v3 as stable even when beta was requested", () => {
-    const output = details(
-      [PublishType.PackagePublishing],
-      CodegenOption.create(CodeGenerationVersion.V3, Stability.BETA)
-    );
+  // There is one code generator now, so naming it would be a row that never changes.
+  it('says nothing about the code generator', () => {
+    const output = details([PublishType.PackagePublishing]);
 
-    expect(output).to.contain("Generator: V3 (stable)");
+    expect(output).to.not.contain('Generator');
   });
 });

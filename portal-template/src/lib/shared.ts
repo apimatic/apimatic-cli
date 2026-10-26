@@ -1,0 +1,51 @@
+import type * as PageTree from 'fumadocs-core/page-tree';
+import { createGetUrl } from 'fumadocs-core/source';
+
+export const docsRoute = '/';
+
+/**
+ * Where the reference pages of every specification are mounted, one folder per section
+ * beneath it. Shared so the navigation transformer positions the same folder the OpenAPI
+ * sections are written into.
+ */
+export const apiBaseDir = 'api';
+
+const getDocsUrl = createGetUrl(docsRoute);
+
+/** Whether a page at `url` sits among these nodes, at any depth. */
+export function containsUrl(nodes: PageTree.Node[], url: string): boolean {
+  return nodes.some((node) => {
+    if (node.type === 'page') {
+      return node.url === url;
+    }
+    return node.type === 'folder' && (node.index?.url === url || containsUrl(node.children, url));
+  });
+}
+
+export function getPageMarkdownUrl(page: { slugs: string[]; locale?: string }) {
+  const segments = [...page.slugs];
+  if (segments.length === 0) {
+    segments.push('index.md');
+  } else {
+    segments[segments.length - 1] += '.md';
+  }
+
+  return { segments, url: getDocsUrl(segments, page.locale) };
+}
+
+export function slugsFromSplat(splat: string | undefined): string[] {
+  return (splat ?? '')
+    .split('/')
+    .filter((segment) => segment.length > 0)
+    .map(encodeURI);
+}
+
+/** @returns page slugs */
+export function decodeMarkdownUrl(segments: string[]) {
+  if (segments.length === 0) return [];
+
+  const out = [...segments];
+  out[out.length - 1] = (out.at(-1) ?? '').replace(/\.md$/, '');
+  if (out.length === 1 && out[0] === 'index') out.pop();
+  return out;
+}

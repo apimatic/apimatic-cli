@@ -2,13 +2,11 @@ import { isCancel, log, text } from '@clack/prompts';
 import { Result } from 'neverthrow';
 import { ServiceError } from '../../infrastructure/service-error.js';
 import { SubscriptionInfo } from '../../types/api/account.js';
-import { PluginMetadata } from '../../types/plugin/plugin-config.js';
-import { PLUGIN_ID_PATTERN } from '../../types/plugin-config-context.js';
+import { PLUGIN_ID_PATTERN, PluginMetadata } from '../../types/plugin/plugin-config.js';
 import { SemVersion } from '../../types/publish/version.js';
 import { format as f } from '../format.js';
 import { noteWrapped, withSpinner } from '../prompt.js';
-
-const PLUGIN_CONFIG_FILE = 'plugin-config.json';
+import { APIMATIC_CONFIG_FILE_NAME } from '../../types/apimatic-config/document.js';
 
 /**
  * Which answer was missing, so a caller that abandons the run can say what it was waiting for
@@ -17,6 +15,10 @@ const PLUGIN_CONFIG_FILE = 'plugin-config.json';
 export type PluginMetadataResult = { metadata: PluginMetadata } | { cancelled: string };
 
 export class PluginRecordMetadataPrompts {
+  public metadataCancelled(reason: string) {
+    log.warn(`${reason}. Exiting without generating a plugin.`);
+  }
+
   public spinnerAccountInfo(fn: Promise<Result<SubscriptionInfo, ServiceError>>) {
     return withSpinner(
       'Retrieving your subscription info',
@@ -28,7 +30,7 @@ export class PluginRecordMetadataPrompts {
 
   /**
    * Required fields get a `placeholder` but no `defaultValue`, so an empty answer re-prompts.
-   * Optional ones get both, so Enter accepts the suggestion — the same split `sdk quickstart` uses.
+   * Optional ones get both, so Enter accepts the suggestion — the same split `quickstart` uses.
    */
   public async inputPluginMetadata(defaults: PluginMetadata): Promise<PluginMetadataResult> {
     const pluginId = await text({
@@ -60,24 +62,26 @@ export class PluginRecordMetadataPrompts {
           return 'Please enter a valid version in the format major.minor.patch (e.g., 0.1.0).';
       }
     });
-    if (isCancel(pluginVersion)) return { cancelled: 'A plugin version is required' };
+    if (isCancel(pluginVersion)) return { cancelled: 'No plugin version was chosen' };
 
     return { metadata: { pluginId, pluginName, pluginVersion } };
   }
 
   public accountInfoUnavailable() {
-    log.warn(`Could not read your subscription info, so the author was left out of ${f.var(PLUGIN_CONFIG_FILE)}.`);
+    log.warn(
+      `Could not read your subscription info, so the author was left out of ${f.var(APIMATIC_CONFIG_FILE_NAME)}.`
+    );
   }
 
   public pluginConfigUnreadable() {
     const message =
-      `${f.var(PLUGIN_CONFIG_FILE)} could not be read, so its plugin details were not written. ` +
-      `Fix or delete it and try again.`;
+      `${f.var(APIMATIC_CONFIG_FILE_NAME)} could not be read, so its plugin details were not written. ` +
+      `Fix it and try again.`;
     log.error(message);
   }
 
   public pluginConfigNotWritten() {
-    log.error(`${f.var(PLUGIN_CONFIG_FILE)} could not be written, so its plugin details were not saved.`);
+    log.error(`${f.var(APIMATIC_CONFIG_FILE_NAME)} could not be written, so its plugin details were not saved.`);
   }
 
   public metadataRecorded(metadata: PluginMetadata) {
@@ -85,7 +89,7 @@ export class PluginRecordMetadataPrompts {
       `Plugin ID: ${f.var(metadata.pluginId)}\n` +
       `Plugin Name: ${f.var(metadata.pluginName)}\n` +
       `Version: ${f.var(metadata.pluginVersion)}\n\n` +
-      `Configuration saved to: ${f.var(PLUGIN_CONFIG_FILE)}`;
+      `Configuration saved to: ${f.var(APIMATIC_CONFIG_FILE_NAME)}`;
     noteWrapped(message, 'Plugin Configuration');
   }
 }
