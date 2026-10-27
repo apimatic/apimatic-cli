@@ -4,7 +4,7 @@ import path from 'node:path';
 import { TextDecoder } from 'node:util';
 import { execa, ExecaError } from 'execa';
 import { RelativeFilePath } from '../types/file/relativeFilePath.js';
-import { DirectoryPath } from '../types/file/directoryPath.js';
+import { DirectoryPath, posix } from '../types/file/directoryPath.js';
 import { FileName } from '../types/file/fileName.js';
 import { FilePath } from '../types/file/filePath.js';
 import { CommitId } from '../types/git/commit-id.js';
@@ -21,6 +21,19 @@ export type CommitDescription = { parents: CommitId[]; authorName: string; subje
 
 /** A remote that does not answer within this is reported, not waited for. */
 const REMOTE_TIMEOUT_MS = 30_000;
+
+// A git hook runs the CLI with its own repository in the environment; every command here is about the one it is given.
+const OWN_REPOSITORY = { GIT_DIR: undefined, GIT_WORK_TREE: undefined, GIT_INDEX_FILE: undefined };
+
+/** An operation git is in the middle of, by the file it leaves in the repository while it is. */
+const OPERATIONS = {
+  MERGE_HEAD: 'merge',
+  REBASE_HEAD: 'rebase',
+  CHERRY_PICK_HEAD: 'cherry-pick',
+  REVERT_HEAD: 'revert'
+} as const;
+
+export type GitOperation = (typeof OPERATIONS)[keyof typeof OPERATIONS];
 
 /** What the server itself said, which git relays as `remote:` lines; failing that, git's first line. */
 function remoteSaid(stderr: string): string {
@@ -41,7 +54,8 @@ const EMPTY_TREE = '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
 /**
  * The system git, driven through its plumbing. Every call carries the same `-c` settings so a
  * developer's own configuration cannot change a tree, a merge or its markers, and no command
- * here touches the working tree, the index or a branch of the repository it runs in.
+ * here touches the working tree or a branch of the repository it runs in; the index only to
+ * mark conflicts and to unmark them.
  */
 export class GitService {
   public async version(): Promise<GitVersion | undefined> {
@@ -65,6 +79,24 @@ export class GitService {
 
   public async init(directory: DirectoryPath): Promise<void> {
     await this.run(directory, ['init', '--quiet', '--initial-branch=main', '.']);
+  }
+
+  /** Whether the repository's ignore rules exclude `directory`, which need not exist. */
+  public async isIgnored(root: DirectoryPath, directory: DirectoryPath): Promise<boolean> {
+    const relative = posix(path.relative(root.toString(), directory.toString()));
+    const { exitCode } = await this.run(root, ['check-ignore', '-q', '--', relative], {}, undefined, undefined, 'utf8', [
+      0, 1
+    ]);
+    return exitCode === 0;
+  }
+
+  /** The operation the repository is in the middle of, if any, such as a `git merge` with conflicts left to resolve. */
+  public async operationInProgress(root: DirectoryPath): Promise<GitOperation | undefined> {
+    const files = Object.keys(OPERATIONS);
+    const { stdout } = await this.run(root, ['rev-parse', ...files.flatMap((file) => ['--git-path', file])]);
+    const paths = stdout.trim().split('\n');
+    const found = files.find((_, index) => fs.existsSync(root.resolve(paths[index]).toString()));
+    return found === undefined ? undefined : OPERATIONS[found as keyof typeof OPERATIONS];
   }
 
   /**
@@ -428,6 +460,7 @@ export class GitService {
       return await execa('git', ['-c', 'credential.interactive=false', ...args], {
         cwd: cwd.toString(),
         env: {
+          ...OWN_REPOSITORY,
           GIT_TERMINAL_PROMPT: '0',
           LC_ALL: 'C',
           GIT_SSH_COMMAND: process.env.GIT_SSH_COMMAND ?? 'ssh -o BatchMode=yes'
@@ -473,7 +506,7 @@ export class GitService {
     try {
       result = await execa('git', [...settings, ...args], {
         cwd: cwd.toString(),
-        env: { ...env, GIT_TERMINAL_PROMPT: '0', LC_ALL: 'C' },
+        env: { ...OWN_REPOSITORY, ...env, GIT_TERMINAL_PROMPT: '0', LC_ALL: 'C' },
         input,
         encoding: encoding as 'utf8',
         // Bytes are read by length, and stripping would take a final CR with the newline.

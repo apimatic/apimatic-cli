@@ -12,7 +12,7 @@ import { FileName } from './file/fileName.js';
 import { FileProblem } from './file/file-problem.js';
 import { SdkGeneration } from './sdk/generation-record.js';
 import { destinationFor, SdkDestination, Unresolved } from './sdk/sdk-destination.js';
-import { NestedSdkDirectory, SdkRepositoryContext, SdkRepositoryProblem } from './sdk-repository-context.js';
+import { InspectionProblem, SdkRepositoryContext, SdkRepositoryProblem } from './sdk-repository-context.js';
 
 const GIT_DIRECTORY = '.git';
 
@@ -52,9 +52,7 @@ export class SdkContext {
    * How a run will write the directory, from what git and the enclosing repository say about
    * it; `unresolved` when the last run's markers are still in the files. Nothing is asked here.
    */
-  public async destination(
-    generation: SdkGeneration
-  ): Promise<Result<SdkDestination | Unresolved, NestedSdkDirectory | SdkRepositoryProblem>> {
+  public async destination(generation: SdkGeneration): Promise<Result<SdkDestination | Unresolved, InspectionProblem>> {
     const version = await this.git.version();
     if (!version?.isSupported()) {
       return ok({ kind: 'overwrite', found: version });
@@ -67,13 +65,22 @@ export class SdkContext {
     return state.map((found) => destinationFor(repository, found));
   }
 
-  /** The repository enclosing the SDK directory, which need not exist yet, or none when nothing does. */
+  /**
+   * The repository enclosing the SDK directory, which need not exist yet, or none when nothing
+   * does. A repository whose ignore rules exclude the directory does not count: its index and
+   * its remote are not meant to hold the SDK, so the directory gets a repository of its own.
+   */
   public async repository(): Promise<SdkRepositoryContext | undefined> {
     const { real, existing } = realSpelling(this.sdkDirectory);
-    const root = await this.git.topLevel(existing);
-    return root === undefined
-      ? undefined
-      : SdkRepositoryContext.create(new DirectoryPath(canonical(root.toString())), real);
+    const found = await this.git.topLevel(existing);
+    if (found === undefined) {
+      return undefined;
+    }
+    const root = new DirectoryPath(canonical(found.toString()));
+    if (!root.isEqual(real) && (await this.git.isIgnored(root, real))) {
+      return undefined;
+    }
+    return SdkRepositoryContext.create(root, real);
   }
 
   /** Makes the SDK directory a repository of its own, creating it when it is not there yet. */

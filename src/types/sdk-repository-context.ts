@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { err, ok, Result } from 'neverthrow';
 import { FileService } from '../infrastructure/file-service.js';
-import { GitService } from '../infrastructure/git-service.js';
+import { GitOperation, GitService } from '../infrastructure/git-service.js';
 import { errorMessage } from '../utils/error-utils.js';
 import { DirectoryPath, posix } from './file/directoryPath.js';
 import { FileName } from './file/fileName.js';
@@ -40,6 +40,12 @@ export type SdkRepositoryProblem =
  * snapshots. `encloses` says the other one is the outer directory.
  */
 export type NestedSdkDirectory = { kind: 'nestedSdkDirectory'; other: DirectoryPath; encloses: boolean };
+
+/** The repository is in the middle of a git operation of the developer's own, which a run must not merge over. */
+export type OperationInProgress = { kind: 'operationInProgress'; operation: GitOperation; root: DirectoryPath };
+
+/** Why a run could not find out how to write the SDK directory. */
+export type InspectionProblem = SdkRepositoryProblem | NestedSdkDirectory | OperationInProgress;
 
 /** Why a recorded snapshot is still absent after the one place it could have come from was tried. */
 export type SnapshotFetch =
@@ -127,16 +133,31 @@ export class SdkRepositoryContext {
   }
 
   /**
-   * Everything a run needs to know before it decides how to write; a nested SDK directory is
-   * the one refusal. A recorded snapshot the repository lacks is fetched from `remote` first.
+   * Everything a run needs to know before it decides how to write. Refused while the developer
+   * is in the middle of a merge of their own, and for a nested SDK directory. Files the last
+   * run left unmerged come first, whatever the record says, so no run writes over them. A
+   * recorded snapshot the repository lacks is fetched from `remote` first.
    */
   public async inspect(
     generation: SdkGeneration,
     remote: string | undefined
-  ): Promise<Result<SdkRepositoryState, SdkRepositoryProblem | NestedSdkDirectory>> {
+  ): Promise<Result<SdkRepositoryState, InspectionProblem>> {
+    let operation: GitOperation | undefined;
+    try {
+      operation = await this.git.operationInProgress(this.rootDirectory);
+    } catch (error) {
+      return err(gitFailed(errorMessage(error)));
+    }
+    if (operation !== undefined) {
+      return err({ kind: 'operationInProgress', operation, root: this.rootDirectory });
+    }
     const notNested = await this.verifyNotNested();
     if (notNested.isErr()) {
       return err(notNested.error);
+    }
+    const paths = await this.unresolvedConflicts();
+    if (paths.length > 0) {
+      return ok({ kind: 'unresolved', paths });
     }
     const record = await this.readRecord();
     if (record === undefined) {
@@ -158,8 +179,7 @@ export class SdkRepositoryContext {
         return ok({ kind: 'snapshotMissing', fetch: { kind: 'absent', remote } });
       }
     }
-    const paths = await this.unresolvedConflicts();
-    return ok(paths.length > 0 ? { kind: 'unresolved', paths } : { kind: 'ready', base });
+    return ok({ kind: 'ready', base });
   }
 
   /**

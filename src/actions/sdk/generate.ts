@@ -85,11 +85,7 @@ export class GenerateAction {
       looked = await sdkContext.destination(generation);
     }
     if (looked.isErr()) {
-      if (looked.error.kind === 'nestedSdkDirectory') {
-        this.prompts.nestedSdkDirectory(sdk, looked.error);
-      } else {
-        this.prompts.directoryNotInspected(looked.error.reason);
-      }
+      this.prompts.directoryNotInspected(sdk, looked.error);
       return ActionResult.failed();
     }
     if (looked.value.kind === 'unresolved') {

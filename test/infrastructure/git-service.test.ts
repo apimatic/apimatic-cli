@@ -67,6 +67,15 @@ describe('GitService', () => {
 
     expect((await git.topLevel(nested))?.isEqual(repo)).to.be.true;
     expect(await git.topLevel(outside)).to.be.undefined;
+    // A hook runs the CLI with its own repository in the environment, which must not stand in for the one asked about.
+    const other = await repository('other');
+    process.env.GIT_DIR = other.join('.git').toString();
+    try {
+      expect((await git.topLevel(nested))?.isEqual(repo)).to.be.true;
+      expect(await git.topLevel(outside)).to.be.undefined;
+    } finally {
+      delete process.env.GIT_DIR;
+    }
     expect(fs.readFileSync(path.join(repo.toString(), '.git', 'HEAD'), 'utf-8').trim()).to.equal(
       'ref: refs/heads/main'
     );

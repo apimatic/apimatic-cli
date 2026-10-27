@@ -2,6 +2,8 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { expect } from 'chai';
+import { GitService } from '../../src/infrastructure/git-service.js';
+import { canonical } from '../../src/infrastructure/tmp-extensions.js';
 import { DirectoryPath } from '../../src/types/file/directoryPath.js';
 import { FileName } from '../../src/types/file/fileName.js';
 import { FilePath } from '../../src/types/file/filePath.js';
@@ -19,6 +21,31 @@ describe('SdkContext', () => {
   });
 
   afterEach(() => fs.rmSync(root, { recursive: true, force: true }));
+
+  describe('repository', () => {
+    const git = new GitService();
+
+    it('finds the repository enclosing the SDK directory, which need not exist yet', async () => {
+      await git.init(new DirectoryPath(root));
+
+      const repository = await context.repository();
+
+      expect(repository?.root().isEqual(new DirectoryPath(canonical(root)))).to.be.true;
+      expect(repository?.sdkDirectory().isEqual(new DirectoryPath(canonical(root), 'sdk', 'python'))).to.be.true;
+    });
+
+    it('finds none when that repository ignores the SDK directory, until the directory is a repository of its own', async () => {
+      await git.init(new DirectoryPath(root));
+      fs.writeFileSync(inRoot('.gitignore'), '/sdk/\n');
+
+      expect(await context.repository()).to.be.undefined;
+
+      fs.mkdirSync(inRoot('sdk', 'python'), { recursive: true });
+      await git.init(new DirectoryPath(inRoot('sdk', 'python')));
+      const own = await context.repository();
+      expect(own?.root().isEqual(new DirectoryPath(canonical(root), 'sdk', 'python'))).to.be.true;
+    });
+  });
 
   describe('save', () => {
     it('replaces what the SDK directory holds, except its .git', async () => {

@@ -433,6 +433,28 @@ describe('SdkRepositoryContext', () => {
   });
 
   describe('inspect', () => {
+    it('refuses while the repository is in the middle of an operation of the developer’s own, before anything else', async () => {
+      const repository = await project();
+      fs.writeFileSync(path.join(repository.root().toString(), '.git', 'REBASE_HEAD'), `${'a'.repeat(40)}\n`);
+      await unmerged(repository, 'sdk/typescript/a.ts');
+
+      expect((await repository.inspect(TYPESCRIPT, undefined))._unsafeUnwrapErr()).to.deep.equal({
+        kind: 'operationInProgress',
+        operation: 'rebase',
+        root: repository.root()
+      });
+    });
+
+    it('names the files git holds as unmerged before looking at the record, so there is one without it too', async () => {
+      const repository = await project();
+      await unmerged(repository, 'sdk/typescript/a.ts');
+
+      expect((await repository.inspect(TYPESCRIPT, undefined))._unsafeUnwrap()).to.deep.equal({
+        kind: 'unresolved',
+        paths: [rel('a.ts')]
+      });
+    });
+
     it('finds no record', async () => {
       const repository = await project();
 

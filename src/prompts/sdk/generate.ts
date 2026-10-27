@@ -20,7 +20,7 @@ import {
 } from '../../types/sdk/merge-plan.js';
 import { SHARE_HOOK_CALL } from '../../types/sdk/share-hook.js';
 import {
-  NestedSdkDirectory,
+  InspectionProblem,
   NotApplied,
   ShareHookInstall,
   SnapshotFetch
@@ -132,15 +132,23 @@ export class SdkGeneratePrompts {
     log.warn(`${reason}, so your customizations to the generated SDK will not persist across regenerations.`);
   }
 
-  public nestedSdkDirectory(sdk: DirectoryPath, nested: NestedSdkDirectory) {
-    const where = nested.encloses
-      ? `it sits inside the SDK at ${f.relativePath(nested.other)}`
-      : `the SDK at ${f.relativePath(nested.other)} sits inside it`;
-    log.error(`The SDK cannot be generated at ${f.relativePath(sdk)}: ${where}.`);
-  }
-
-  public directoryNotInspected(reason: string) {
-    log.error(`The SDK directory could not be inspected for your customizations: ${reason}`);
+  /** Why the run stopped before generating: what the SDK directory and its repository are in the way of. */
+  public directoryNotInspected(sdk: DirectoryPath, problem: InspectionProblem) {
+    switch (problem.kind) {
+      case 'nestedSdkDirectory': {
+        const where = problem.encloses
+          ? `it sits inside the SDK at ${f.relativePath(problem.other)}`
+          : `the SDK at ${f.relativePath(problem.other)} sits inside it`;
+        return log.error(`The SDK cannot be generated at ${f.relativePath(sdk)}: ${where}.`);
+      }
+      case 'operationInProgress':
+        return log.error(
+          `The repository at ${f.relativePath(problem.root)} is in the middle of a ${problem.operation}. ` +
+            `Finish it, or abort it with ${f.var(`git ${problem.operation} --abort`)}, then rerun.`
+        );
+      default:
+        return log.error(`The SDK directory could not be inspected for your customizations: ${problem.reason}`);
+    }
   }
 
   public recordNotForThisGeneration(recorded: SdkGeneration, requested: SdkGeneration, sdk: DirectoryPath) {
