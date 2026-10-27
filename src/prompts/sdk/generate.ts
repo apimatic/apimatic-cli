@@ -13,7 +13,6 @@ import {
   ConflictChoice,
   ConflictKind,
   ConflictSide,
-  GENERATOR_FILES,
   MergePlan,
   UnresolvedChoice,
   YOUR_FILES
@@ -44,7 +43,9 @@ const RESOLVED_HEADINGS: Record<ConflictSide, string> = {
   yours: 'Resolved using your changes:'
 };
 
-/** The generator's own files are a count; the developer's are named. */
+/** The generator's own files are a count, and so are the merged ones, which are also named below; the rest of yours are named. */
+const COUNTED_FILES = ['added', 'updated', 'merged', 'removed'] as const;
+
 const YOUR_FILE_HEADINGS: Record<(typeof YOUR_FILES)[number], string> = {
   merged: 'Merged with your changes:',
   kept: 'Kept as yours:'
@@ -153,7 +154,15 @@ export class SdkGeneratePrompts {
 
   public recordNotForThisGeneration(recorded: SdkGeneration, requested: SdkGeneration, sdk: DirectoryPath) {
     const [was, now] = describeApart(recorded, requested);
-    log.warn(`${f.relativePath(sdk)} holds a ${was} SDK; a ${now} SDK cannot be merged into it.`);
+    const advice =
+      recorded.language !== requested.language
+        ? `Generate it into another directory, with ${f.flag('destination')}.`
+        : `To merge into it, rerun with ${
+            recorded.stability !== requested.stability
+              ? f.flag('stability', recorded.stability)
+              : f.flag('codegen-version', recorded.codegenVersion)
+          }.`;
+    log.warn(`${f.relativePath(sdk)} holds a ${was} SDK; a ${now} SDK cannot be merged into it. ${advice}`);
   }
 
   public snapshotMissing(fetch: SnapshotFetch) {
@@ -232,6 +241,14 @@ export class SdkGeneratePrompts {
     log.error(`Your customizations could not be merged into the regenerated SDK: ${reason}`);
   }
 
+  /** The first run could not make the SDK directory a repository, so nothing was written. */
+  public repositoryNotInitialised(sdk: DirectoryPath, reason: string) {
+    log.error(
+      `A git repository could not be created in ${f.relativePath(sdk)}, where the SDK's snapshots would be kept: ` +
+        `${reason}\nNothing was written.`
+    );
+  }
+
   /** A file the merge could not write or remove, and whether the directory is back as it was. */
   public sdkNotWritten(sdk: DirectoryPath, problem: NotApplied) {
     const what = problem.operation === 'write' ? 'written' : 'removed';
@@ -248,11 +265,20 @@ export class SdkGeneratePrompts {
     log.error(lines.join('\n'));
   }
 
+  /** On a first run, where there is no earlier record to fall back on. */
   public snapshotNotRecorded(reason: string) {
-    const message =
+    log.warn(
       `The SDK was written, but its snapshot could not be recorded: ${reason}\n` +
-      `The next run will replace the SDK instead of merging your customizations into it.`;
-    log.warn(message);
+        'The next run will replace the SDK instead of merging your customizations into it.'
+    );
+  }
+
+  /** After a merge, where the record of the run before stays in place. */
+  public snapshotNotRecordedAfterMerge(reason: string) {
+    log.warn(
+      `The SDK was written, but its snapshot could not be recorded: ${reason}\n` +
+        "The next run will merge against the snapshot recorded before this one, and list this run's generated changes as yours."
+    );
   }
 
   public conflictsNotStaged(reason: string) {
@@ -284,7 +310,7 @@ export class SdkGeneratePrompts {
   }
 
   public sdkMerged(sdk: DirectoryPath, plan: MergePlan) {
-    const generated = GENERATOR_FILES.filter((kind) => plan.files[kind].length > 0).map(
+    const generated = COUNTED_FILES.filter((kind) => plan.files[kind].length > 0).map(
       (kind) => `${plural(plan.files[kind].length, 'file')} ${kind}`
     );
     if (plan.hasConflicts()) {
@@ -334,12 +360,12 @@ export class SdkGeneratePrompts {
 
   /** The conflicted files with what to do about them, for a run that could not ask. */
   public conflicts(plan: MergePlan, sdk: DirectoryPath) {
-    noteWrapped([...conflictLines(plan, sdk), '', ...steps(plan)].join('\n'), attentionTitle(plan));
+    noteWrapped([...conflictLines(plan, sdk), '', ...steps(plan, false)].join('\n'), attentionTitle(plan));
   }
 
   /** What to do about the conflicts the developer chose to resolve, listed just before. */
   public conflictSteps(plan: MergePlan) {
-    noteWrapped(steps(plan).join('\n'), 'Next steps');
+    noteWrapped(steps(plan, true).join('\n'), 'Next steps');
   }
 }
 
@@ -364,7 +390,8 @@ function conflictLines(plan: MergePlan, sdk: DirectoryPath): string[] {
   );
 }
 
-function steps(plan: MergePlan): string[] {
+/** `canAskLater` is whether a rerun can offer to settle what is left, which only a terminal without --force does. */
+function steps(plan: MergePlan, canAskLater: boolean): string[] {
   const marked = plan.hasMarkedConflicts();
   const unmarked = plan.hasUnmarkedConflicts();
   const steps = [
@@ -377,7 +404,7 @@ function steps(plan: MergePlan): string[] {
         ]
       : []),
     'Rerun the command; nothing needs committing first.',
-    'Or rerun and let the CLI resolve what is left, using either side.'
+    ...(canAskLater ? ['Or rerun and let the CLI resolve what is left, using either side.'] : [])
   ];
   return steps.map((step, index) => `${index + 1}. ${step}`);
 }

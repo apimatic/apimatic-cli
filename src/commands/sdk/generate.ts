@@ -51,7 +51,7 @@ With git ${GitVersion.required()} or newer installed, your edits to the generate
       options: Object.values(Stability).map((s) => s.valueOf())
     }),
     ...FlagsProvider.input,
-    ...FlagsProvider.force,
+    ...FlagsProvider.forceSdk,
     ...FlagsProvider.authKey
   };
 

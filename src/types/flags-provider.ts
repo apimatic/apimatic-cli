@@ -41,11 +41,20 @@ export class FlagsProvider {
     })
   };
 
-  public static force = {
-    force: Flags.boolean({
-      char: 'f',
-      default: false,
-      description: 'overwrite changes without asking for user consent.'
-    })
-  };
+  public static forceWith(description: string) {
+    return {
+      force: Flags.boolean({
+        char: 'f',
+        default: false,
+        description
+      })
+    };
+  }
+
+  public static force = FlagsProvider.forceWith('overwrite changes without asking for user consent.');
+
+  /** For the SDK commands, where a run keeps edits and asks before it writes over them. */
+  public static forceSdk = FlagsProvider.forceWith(
+    'never ask: an SDK that cannot be merged is replaced, and conflicts are left marked in the files.'
+  );
 }

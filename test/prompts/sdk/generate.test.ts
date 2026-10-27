@@ -8,6 +8,8 @@ import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
 import { Language } from '../../../src/types/sdk/generate.js';
 import { RelativeFilePath } from '../../../src/types/file/relativeFilePath.js';
 import { ConflictKind, MergePlan } from '../../../src/types/sdk/merge-plan.js';
+import { CodeGenerationVersion, Stability } from '../../../src/types/sdk/generate.js';
+import { SdkGeneration } from '../../../src/types/sdk/generation-record.js';
 
 describe('SdkGeneratePrompts.languageNotAvailable', () => {
   const prompts = new SdkGeneratePrompts();
@@ -116,7 +118,7 @@ describe('SdkGeneratePrompts.sdkMerged', () => {
 
     expect(stripVTControlCharacters(info.firstCall.args[0])).to.equal(
       [
-        "Regenerated the SDK at './sdk/typescript': 1 file added and 2 files updated.",
+        "Regenerated the SDK at './sdk/typescript': 1 file added, 2 files updated and 1 file merged.",
         'Merged with your changes:',
         "  './sdk/typescript/src/models/book.ts'",
         'Kept as yours:',
@@ -140,6 +142,20 @@ describe('SdkGeneratePrompts.sdkMerged', () => {
     );
   });
 
+  it('counts a merged file in the headline, so it never says nothing changed above one', () => {
+    const info = sinon.stub(log, 'info');
+
+    new SdkGeneratePrompts().sdkMerged(sdk, plan({ merged: ['src/models/book.ts'] }));
+
+    expect(stripVTControlCharacters(info.firstCall.args[0])).to.equal(
+      [
+        "Regenerated the SDK at './sdk/typescript': 1 file merged.",
+        'Merged with your changes:',
+        "  './sdk/typescript/src/models/book.ts'"
+      ].join('\n')
+    );
+  });
+
   it('counts the conflicted files in the headline, so it never says nothing changed above a conflict', () => {
     const info = sinon.stub(log, 'info');
 
@@ -150,6 +166,63 @@ describe('SdkGeneratePrompts.sdkMerged', () => {
 
     expect(stripVTControlCharacters(info.firstCall.args[0])).to.equal(
       "Regenerated the SDK at './sdk/typescript': 1 file in conflict."
+    );
+  });
+});
+
+describe('SdkGeneratePrompts.recordNotForThisGeneration', () => {
+  const sdk = new DirectoryPath(process.cwd()).join('sdk', 'python');
+  const stable: SdkGeneration = {
+    language: Language.PYTHON,
+    codegenVersion: CodeGenerationVersion.V4,
+    stability: Stability.STABLE
+  };
+
+  afterEach(() => {
+    sinon.restore();
+  });
+
+  it('advises the recorded stability when that is what sets the two apart', () => {
+    const warn = sinon.stub(log, 'warn');
+
+    new SdkGeneratePrompts().recordNotForThisGeneration(stable, { ...stable, stability: Stability.BETA }, sdk);
+
+    expect(stripVTControlCharacters(warn.firstCall.args[0])).to.equal(
+      "'./sdk/python' holds a stable python SDK; a beta python SDK cannot be merged into it. " +
+        'To merge into it, rerun with --stability=stable.'
+    );
+  });
+
+  it('advises another directory for another language', () => {
+    const warn = sinon.stub(log, 'warn');
+
+    new SdkGeneratePrompts().recordNotForThisGeneration(stable, { ...stable, language: Language.TYPESCRIPT }, sdk);
+
+    expect(stripVTControlCharacters(warn.firstCall.args[0])).to.equal(
+      "'./sdk/python' holds a stable python SDK; a stable typescript SDK cannot be merged into it. " +
+        'Generate it into another directory, with --destination.'
+    );
+  });
+});
+
+describe('SdkGeneratePrompts.snapshotNotRecorded', () => {
+  afterEach(() => {
+    sinon.restore();
+  });
+
+  it('says what the next run does without the record: replace, or merge against the one before', () => {
+    const warn = sinon.stub(log, 'warn');
+
+    new SdkGeneratePrompts().snapshotNotRecorded('git broke');
+    new SdkGeneratePrompts().snapshotNotRecordedAfterMerge('git broke');
+
+    expect(stripVTControlCharacters(warn.firstCall.args[0])).to.equal(
+      'The SDK was written, but its snapshot could not be recorded: git broke\n' +
+        'The next run will replace the SDK instead of merging your customizations into it.'
+    );
+    expect(stripVTControlCharacters(warn.secondCall.args[0])).to.equal(
+      'The SDK was written, but its snapshot could not be recorded: git broke\n' +
+        "The next run will merge against the snapshot recorded before this one, and list this run's generated changes as yours."
     );
   });
 });

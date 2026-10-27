@@ -34,7 +34,7 @@ export default class SdkPublish extends Command {
       description: 'Language of the SDK to generate and publish.',
       options: Object.values(Language).map((l) => l.valueOf())
     }),
-    ...FlagsProvider.force,
+    ...FlagsProvider.forceSdk,
     ...FlagsProvider.input,
     'publish-type': Flags.string({
       description:

@@ -148,7 +148,22 @@ describe('GenerateAction (sdk) — writing the SDK', () => {
       expect((await execute({ 'README.md': '# sdk' })).isSuccess()).to.be.true;
 
       expect(read('README.md')).to.equal('# sdk');
-      expect(snapshotNotRecorded.firstCall.args[0]).to.equal('git broke');
+      expect(snapshotNotRecorded.firstCall.args).to.deep.equal(['git broke']);
+    });
+
+    it('fails with its own message, writing nothing, when the SDK directory cannot be made a repository', async () => {
+      sinon
+        .stub(SdkContext.prototype, 'initRepository')
+        .resolves(err({ kind: 'gitFailed', reason: 'git broke' }));
+      const notInitialised = sinon.stub(SdkGeneratePrompts.prototype, 'repositoryNotInitialised');
+      const customCodeFailed = sinon.stub(SdkGeneratePrompts.prototype, 'customCodeFailed');
+
+      expect((await execute({ 'README.md': '# sdk' })).isFailed()).to.be.true;
+
+      expect(fs.existsSync(path.join(sdk().toString(), 'README.md'))).to.be.false;
+      expect(notInitialised.firstCall.args[0].isEqual(sdk())).to.be.true;
+      expect(notInitialised.firstCall.args[1]).to.equal('git broke');
+      expect(customCodeFailed.called).to.be.false;
     });
   });
 
