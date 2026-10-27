@@ -68,7 +68,7 @@ describe('GenerateAction (sdk) — the destination', () => {
     await git.init(new DirectoryPath(root));
     const repository = (await sdkContext().repository())!;
     const tree = (await repository.snapshotGenerated(sdk()))._unsafeUnwrap();
-    (await repository.recordGeneration(tree, STABLE, '0.0.0'))._unsafeUnwrap();
+    (await repository.recordGeneration(tree, STABLE))._unsafeUnwrap();
     return repository;
   };
 
@@ -87,7 +87,12 @@ describe('GenerateAction (sdk) — the destination', () => {
     sinon.stub(SdkGeneratePrompts.prototype, 'sdkGenerated');
     sinon.stub(SdkGeneratePrompts.prototype, 'sdkMerged');
     sinon.stub(SdkGeneratePrompts.prototype, 'repositoryInitialised');
+    sinon.stub(SdkGeneratePrompts.prototype, 'repositoryNotCreated');
+    sinon.stub(SdkGeneratePrompts.prototype, 'shareHookInstalled');
   });
+
+  /** A terminal run, where the questions can be asked. */
+  const interactive = () => sinon.stub(terminal, 'isInteractive').returns(true);
 
   afterEach(() => {
     sinon.restore();
@@ -109,11 +114,39 @@ describe('GenerateAction (sdk) — the destination', () => {
     });
   }
 
-  it('records into a repository of its own when nothing encloses the SDK directory', async () => {
-    expect((await execute()).isSuccess()).to.be.true;
+  describe('when nothing encloses the SDK directory', () => {
+    it('asks, and on yes records into a repository of its own', async () => {
+      interactive();
+      const createRepository = sinon.stub(SdkGeneratePrompts.prototype, 'createRepository').resolves(true);
 
-    expect(fs.readFileSync(at('.git/HEAD'), 'utf-8').trim()).to.equal('ref: refs/heads/main');
-    expect(record().isFor(STABLE)).to.be.true;
+      expect((await execute({ force: false })).isSuccess()).to.be.true;
+
+      expect(createRepository.firstCall.args[0].isEqual(sdk())).to.be.true;
+      expect(fs.readFileSync(at('.git/HEAD'), 'utf-8').trim()).to.equal('ref: refs/heads/main');
+      expect(record().isFor(STABLE)).to.be.true;
+    });
+
+    it('on no, writes the SDK without a repository and warns that edits will not persist', async () => {
+      interactive();
+      sinon.stub(SdkGeneratePrompts.prototype, 'createRepository').resolves(false);
+      const notCreated = SdkGeneratePrompts.prototype.repositoryNotCreated as sinon.SinonStub;
+
+      expect((await execute({ force: false })).isSuccess()).to.be.true;
+
+      expect(notCreated.firstCall.args[0].isEqual(sdk())).to.be.true;
+      expect(fs.readdirSync(sdk().toString())).to.deep.equal(['README.md']);
+    });
+
+    it('does not ask with --force or without a terminal: no repository, the warning, exit 0', async () => {
+      const createRepository = sinon.stub(SdkGeneratePrompts.prototype, 'createRepository');
+      const notCreated = SdkGeneratePrompts.prototype.repositoryNotCreated as sinon.SinonStub;
+
+      expect((await execute({ force: true })).isSuccess()).to.be.true;
+
+      expect(createRepository.called).to.be.false;
+      expect(notCreated.calledOnce).to.be.true;
+      expect(fs.readdirSync(sdk().toString())).to.deep.equal(['README.md']);
+    });
   });
 
   it('records into the enclosing repository when the directory has no record', async () => {
@@ -126,28 +159,59 @@ describe('GenerateAction (sdk) — the destination', () => {
     expect((await git.resolveRef(new DirectoryPath(root), ref))?.isEqual(record().pristineCommit())).to.be.true;
   });
 
-  it('records over an SDK generated at another stability, after saying so', async () => {
+  it('records over an SDK generated at another stability, after saying so and asking', async () => {
     await recorded({ 'README.md': '# sdk' });
+    interactive();
     const notForThis = sinon.stub(SdkGeneratePrompts.prototype, 'recordNotForThisGeneration');
+    sinon.stub(SdkGeneratePrompts.prototype, 'overwriteSdk').resolves(true);
 
-    expect((await execute({ stability: Stability.BETA })).isSuccess()).to.be.true;
+    expect((await execute({ stability: Stability.BETA, force: false })).isSuccess()).to.be.true;
 
     expect(notForThis.firstCall.args[0]).to.deep.equal(STABLE);
     expect(notForThis.firstCall.args[1].stability).to.equal(Stability.BETA);
     expect(record().isFor(STABLE)).to.be.false;
   });
 
-  it('records over an SDK whose snapshot the repository does not hold, after saying so', async () => {
+  it('records over an SDK whose snapshot the repository does not hold, after saying so and asking', async () => {
     await recorded({ 'README.md': '# sdk' });
     const missing = CommitId.create('f'.repeat(40))!;
-    write('.apimatic/generation.json', GenerationRecord.written(STABLE, missing, new Date(), '0.0.0').toJson());
+    write('.apimatic/generation.json', GenerationRecord.written(STABLE, missing).toJson());
+    interactive();
     const snapshotMissing = sinon.stub(SdkGeneratePrompts.prototype, 'snapshotMissing');
+    sinon.stub(SdkGeneratePrompts.prototype, 'overwriteSdk').resolves(true);
 
-    expect((await execute()).isSuccess()).to.be.true;
+    expect((await execute({ force: false })).isSuccess()).to.be.true;
 
     expect(snapshotMissing.firstCall.args[0]).to.deep.equal({ kind: 'noRemote' });
     expect(record().pristineCommit().isEqual(missing)).to.be.false;
   });
+
+  for (const [what, prepare] of [
+    ['another stability', async () => ({ stability: Stability.BETA })],
+    [
+      'a snapshot the repository does not hold',
+      async () => {
+        write('.apimatic/generation.json', GenerationRecord.written(STABLE, CommitId.create('f'.repeat(40))!).toJson());
+        return {};
+      }
+    ]
+  ] as const) {
+    it(`refuses, with --force, to replace an SDK recorded for ${what}, before anything is uploaded`, async () => {
+      await recorded({ 'README.md': '# sdk' });
+      write('README.md', '# edited');
+      sinon.stub(SdkGeneratePrompts.prototype, 'recordNotForThisGeneration');
+      sinon.stub(SdkGeneratePrompts.prototype, 'snapshotMissing');
+      const notReplaced = sinon.stub(SdkGeneratePrompts.prototype, 'recordedSdkNotReplaced');
+      const options = await prepare();
+
+      const result = await execute({ ...options, force: true });
+
+      expect(result.isFailed()).to.be.true;
+      expect(notReplaced.firstCall.args[0].isEqual(sdk())).to.be.true;
+      expect(generateSdk.called).to.be.false;
+      expect(read('README.md')).to.equal('# edited');
+    });
+  }
 
   it('merges in a clone only once the pristine refs were fetched by hand, and says how', async () => {
     const remote = fs.mkdtempSync(path.join(os.tmpdir(), 'sdk-destination-remote-'));
@@ -345,7 +409,9 @@ describe('GenerateAction (sdk) — the destination', () => {
     });
 
     it('goes ahead on yes', async () => {
+      interactive();
       sinon.stub(SdkGeneratePrompts.prototype, 'overwriteSdk').resolves(true);
+      sinon.stub(SdkGeneratePrompts.prototype, 'createRepository').resolves(true);
 
       expect((await execute({ force: false })).isSuccess()).to.be.true;
 
@@ -416,7 +482,7 @@ describe('GenerateAction (sdk) — the destination', () => {
         await git.init(new DirectoryPath(published));
         const repository = (await new SdkContext(new DirectoryPath(published)).repository())!;
         const tree = (await repository.snapshotGenerated(new DirectoryPath(published)))._unsafeUnwrap();
-        const base = (await repository.recordGeneration(tree, STABLE, '0.0.0'))._unsafeUnwrap().pristineCommit();
+        const base = (await repository.recordGeneration(tree, STABLE))._unsafeUnwrap().pristineCommit();
         await sh(published, 'add', '.');
         await sh(published, 'commit', '-qm', 'sdk');
         await sh(published, 'init', '-q', '--bare', '--initial-branch=main', origin);

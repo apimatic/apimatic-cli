@@ -1,5 +1,6 @@
 import { confirm, isCancel, log, select } from '@clack/prompts';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
+import { FilePath } from '../../types/file/filePath.js';
 import { FileProblem } from '../../types/file/file-problem.js';
 import { format as f } from '../format.js';
 import { Result } from 'neverthrow';
@@ -228,6 +229,39 @@ export class SdkGeneratePrompts {
 
   public sdkGenerated(sdk: DirectoryPath) {
     log.info(`The generated SDK can be found at ${f.relativePath(sdk)}.`);
+  }
+
+  /** Whether to make the SDK directory a repository, asked on a first run nothing encloses; no when the developer backs out. */
+  public async createRepository(sdk: DirectoryPath): Promise<boolean> {
+    const create = await confirm({
+      message:
+        `No git repository encloses ${f.path(sdk)}. Create one there, ` +
+        `so your edits to the SDK are kept when you regenerate it?`,
+      initialValue: true
+    });
+    return isCancel(create) ? false : create;
+  }
+
+  public repositoryNotCreated(sdk: DirectoryPath) {
+    log.warn(
+      `No git repository encloses ${f.relativePath(sdk)} and none was created, so your customizations ` +
+        `to the generated SDK will not persist across regenerations. Run git init in the project, ` +
+        `or in that directory, to keep them.`
+    );
+  }
+
+  /** `--force` never replaces an SDK that has a generation record, since that may hold customizations. */
+  public recordedSdkNotReplaced(sdk: DirectoryPath) {
+    log.error(
+      `${f.relativePath(sdk)} holds an SDK with a generation record, which ${f.flag('force')} does not replace, ` +
+        `so nothing was generated. Rerun without ${f.flag('force')} to be asked, or remove the directory to start over.`
+    );
+  }
+
+  public shareHookInstalled(file: FilePath) {
+    log.info(
+      `Added a pre-push hook at ${f.relativePath(file)}, so every git push also shares the SDK's snapshots.`
+    );
   }
 
   public repositoryInitialised(sdk: DirectoryPath) {

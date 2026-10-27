@@ -97,13 +97,14 @@ describe('GenerateAction (sdk)', () => {
   });
 
   it('expands the generated SDK into its language directory and records it for the next run', async () => {
-    sinon.stub(SdkGeneratePrompts.prototype, 'repositoryInitialised');
+    await new GitService().init(new DirectoryPath(root));
+    sinon.stub(SdkGeneratePrompts.prototype, 'shareHookInstalled');
 
     expect((await execute()).isSuccess()).to.be.true;
 
     expect(fs.readFileSync(at('README.md'), 'utf-8')).to.equal('# sdk');
     const record = GenerationRecord.parse(fs.readFileSync(at('.apimatic/generation.json'), 'utf-8'))!;
-    const pristine = await new GitService().resolveRef(sdk(), SnapshotRef.pristine(''));
+    const pristine = await new GitService().resolveRef(new DirectoryPath(root), SnapshotRef.pristine('sdk/python'));
     expect(record.pristineCommit().isEqual(pristine!)).to.be.true;
   });
 

@@ -3,7 +3,6 @@ import { SdkGenerationService } from '../../infrastructure/services/sdk-generati
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { ActionResult } from '../action-result.js';
 import { withDirPath } from '../../infrastructure/tmp-extensions.js';
-import { envInfo } from '../../infrastructure/env-info.js';
 import { MERGE_NEEDS_RESOLVING, SdkGeneratePrompts } from '../../prompts/sdk/generate.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { TempContext } from '../../types/temp-context.js';
@@ -108,6 +107,10 @@ export class GenerateAction {
     } else if (destination.kind === 'record' && destination.because.kind === 'snapshotMissing') {
       this.prompts.snapshotMissing(destination.because.fetch);
     }
+    if (force && destination.kind === 'record' && destination.because.kind !== 'noRepository' && destination.because.kind !== 'noRecord') {
+      this.prompts.recordedSdkNotReplaced(sdk);
+      return ActionResult.failed();
+    }
     if (
       !force &&
       replacesDirectory(destination) &&
@@ -116,6 +119,13 @@ export class GenerateAction {
     ) {
       this.prompts.destinationDirNotEmpty();
       return ActionResult.cancelled();
+    }
+    const withRepository =
+      destination.kind !== 'record' ||
+      destination.repository !== undefined ||
+      (canAsk && (await this.prompts.createRepository(sdk)));
+    if (!withRepository) {
+      this.prompts.repositoryNotCreated(sdk);
     }
 
     return await withDirPath(async (tempDirectory) => {
@@ -142,7 +152,7 @@ export class GenerateAction {
         return tempSdk.error;
       }
 
-      if (destination.kind === 'overwrite') {
+      if (destination.kind === 'overwrite' || !withRepository) {
         this.prompts.sdkGenerated(await sdkContext.save(tempSdk.value));
         return ActionResult.success();
       }
@@ -165,6 +175,7 @@ export class GenerateAction {
           generation,
           this.prompts.snapshotNotRecorded,
           this.prompts.shareHookNotInstalled,
+          this.prompts.shareHookInstalled,
           this.prompts.shareHookNeedsOneStep
         );
         this.prompts.sdkGenerated(sdk);
@@ -197,6 +208,7 @@ export class GenerateAction {
         generation,
         this.prompts.snapshotNotRecordedAfterMerge,
         this.prompts.shareHookNotInstalled,
+        this.prompts.shareHookInstalled,
         this.prompts.shareHookNeedsOneStep
       );
       return closeMerge(
@@ -260,10 +272,11 @@ async function recordSnapshot(
   generation: SdkGeneration,
   snapshotNotRecorded: (reason: string) => void,
   shareHookNotInstalled: (reason: string) => void,
+  shareHookInstalled: (file: FilePath) => void,
   shareHookNeedsOneStep: (needed: Extract<ShareHookInstall, { kind: 'elsewhere' | 'notShell' }>) => void
 ): Promise<void> {
   const recorded = await generated.asyncAndThen(
-    (tree) => new ResultAsync(repository.recordGeneration(tree, generation, envInfo.getCLIVersion()))
+    (tree) => new ResultAsync(repository.recordGeneration(tree, generation))
   );
   if (recorded.isErr()) {
     return snapshotNotRecorded(recorded.error.reason);
@@ -274,6 +287,8 @@ async function recordSnapshot(
   }
   if (hook.value.kind !== 'installed') {
     shareHookNeedsOneStep(hook.value);
+  } else if (hook.value.written) {
+    shareHookInstalled(hook.value.file);
   }
 }
 

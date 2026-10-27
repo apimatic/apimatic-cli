@@ -62,13 +62,14 @@ export type SdkRepositoryState =
   | { kind: 'ready'; base: CommitId };
 
 /**
- * The pre-push hook that shares snapshots runs the script, or the one line the developer has to
- * add to `file` so that it does: because git runs hooks from `hooksPath`, which is in the
- * repository (`inRepository`) or, as `~/.githooks`, the developer's own, or because the hook
- * there is not a shell script the CLI can add to.
+ * The pre-push hook that shares snapshots runs the script (`written` when this run put the
+ * call there), or the one line the developer has to add to `file` so that it does: because
+ * git runs hooks from `hooksPath`, which is in the repository (`inRepository`) or, as
+ * `~/.githooks`, the developer's own, or because the hook there is not a shell script the
+ * CLI can add to.
  */
 export type ShareHookInstall =
-  | { kind: 'installed'; file: FilePath }
+  | { kind: 'installed'; file: FilePath; written: boolean }
   | { kind: 'elsewhere'; file: FilePath; hooksPath: string; inRepository: boolean; script: FilePath }
   | { kind: 'notShell'; file: FilePath; shebang: string; script: FilePath };
 
@@ -198,7 +199,7 @@ export class SdkRepositoryContext {
         const inRepository = this.rootDirectory.contains(file.directory());
         return ok(
           ShareHook.calls(await this.read(file))
-            ? { kind: 'installed', file }
+            ? { kind: 'installed', file, written: false }
             : { kind: 'elsewhere', file, hooksPath, inRepository, script }
         );
       }
@@ -207,16 +208,16 @@ export class SdkRepositoryContext {
       const hook = ShareHook.installInto(existing);
       switch (hook.kind) {
         case 'present':
-          return ok({ kind: 'installed', file });
+          return ok({ kind: 'installed', file, written: false });
         case 'notShell':
           return ok(
             ShareHook.calls(existing)
-              ? { kind: 'installed', file }
+              ? { kind: 'installed', file, written: false }
               : { kind: 'notShell', file, shebang: hook.shebang, script }
           );
         case 'installed':
           await this.writeExecutable(file, hook.content);
-          return ok({ kind: 'installed', file });
+          return ok({ kind: 'installed', file, written: true });
       }
     } catch (error) {
       return err({ kind: 'hookNotWritten', reason: errorMessage(error) });
@@ -334,14 +335,13 @@ export class SdkRepositoryContext {
   /** The pristine snapshot first, then the record naming it, so the two never disagree. */
   public async recordGeneration(
     generated: TreeId,
-    generation: SdkGeneration,
-    cliVersion: string
+    generation: SdkGeneration
   ): Promise<Result<GenerationRecord, SdkRepositoryProblem>> {
     const pristine = await this.recordPristine(generated, generation);
     if (pristine.isErr()) {
       return err(pristine.error);
     }
-    const record = GenerationRecord.written(generation, pristine.value, new Date(), cliVersion);
+    const record = GenerationRecord.written(generation, pristine.value);
     return (await this.writeRecord(record)).map(() => record);
   }
 

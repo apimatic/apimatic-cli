@@ -12,8 +12,6 @@ const json = (overrides: Record<string, unknown> = {}) =>
     codegenVersion: 'v4',
     stability: 'stable',
     pristine: SHA,
-    generatedAt: '2026-10-20T10:00:00.000Z',
-    cliVersion: '2.3.0',
     ...overrides
   });
 
@@ -21,9 +19,7 @@ describe('GenerationRecord', () => {
   it('round-trips through its file form', () => {
     const record = GenerationRecord.written(
       { language: Language.PYTHON, codegenVersion: CodeGenerationVersion.V4, stability: Stability.BETA },
-      CommitId.create(SHA)!,
-      new Date('2026-10-20T10:00:00Z'),
-      '2.3.0'
+      CommitId.create(SHA)!
     );
 
     const parsed = GenerationRecord.parse(record.toJson())!;
@@ -47,9 +43,7 @@ describe('GenerationRecord', () => {
         '  "language": "typescript",',
         '  "codegenVersion": "v4",',
         '  "stability": "stable",',
-        `  "pristine": "${SHA}",`,
-        '  "generatedAt": "2026-10-20T10:00:00.000Z",',
-        '  "cliVersion": "2.3.0"',
+        `  "pristine": "${SHA}"`,
         '}',
         ''
       ].join('\n')
@@ -63,12 +57,12 @@ describe('GenerationRecord', () => {
     expect(GenerationRecord.parse(json({ language: 'cobol' }))).to.be.undefined;
     expect(GenerationRecord.parse(json({ stability: 'alpha' }))).to.be.undefined;
     expect(GenerationRecord.parse(json({ pristine: 'HEAD' }))).to.be.undefined;
-    expect(GenerationRecord.parse(json({ generatedAt: 'yesterday' }))).to.be.undefined;
-    expect(GenerationRecord.parse(json({ cliVersion: 2 }))).to.be.undefined;
   });
 
-  it('reads a record an earlier CLI wrote with a conflict list, and drops the list', () => {
-    const record = GenerationRecord.parse(json({ conflicts: ['src/index.ts'] }))!;
+  it('reads a record an earlier CLI wrote with a conflict list, a date and a version, whatever they hold, and drops them', () => {
+    const record = GenerationRecord.parse(
+      json({ conflicts: ['src/index.ts'], generatedAt: 'yesterday', cliVersion: 2 })
+    )!;
 
     expect(
       record.isFor({
@@ -78,5 +72,7 @@ describe('GenerationRecord', () => {
       })
     ).to.be.true;
     expect(record.toJson()).to.not.contain('conflicts');
+    expect(record.toJson()).to.not.contain('generatedAt');
+    expect(record.toJson()).to.not.contain('cliVersion');
   });
 });

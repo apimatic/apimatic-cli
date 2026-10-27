@@ -77,7 +77,7 @@ describe('GenerateAction (sdk) — writing the SDK', () => {
     await git.init(new DirectoryPath(root));
     const repository = (await sdkContext().repository())!;
     const tree = (await repository.snapshotGenerated(sdk()))._unsafeUnwrap();
-    const written = (await repository.recordGeneration(tree, STABLE, '0.0.0'))._unsafeUnwrap();
+    const written = (await repository.recordGeneration(tree, STABLE))._unsafeUnwrap();
     return { repository, base: written.pristineCommit() };
   };
 
@@ -108,10 +108,13 @@ describe('GenerateAction (sdk) — writing the SDK', () => {
   });
 
   describe('record', () => {
-    it('initialises a repository in the SDK directory, says so, and records the snapshot', async () => {
+    it('initialises a repository in the SDK directory when the developer says yes, says so, and records the snapshot', async () => {
+      sinon.stub(terminal, 'isInteractive').returns(true);
+      sinon.stub(SdkGeneratePrompts.prototype, 'createRepository').resolves(true);
+      sinon.stub(SdkGeneratePrompts.prototype, 'shareHookInstalled');
       const repositoryInitialised = sinon.stub(SdkGeneratePrompts.prototype, 'repositoryInitialised');
 
-      const result = await execute({ 'README.md': '# sdk', 'a.py': 'x' });
+      const result = await execute({ 'README.md': '# sdk', 'a.py': 'x' }, false);
 
       expect(result.isSuccess()).to.be.true;
       expect(repositoryInitialised.firstCall.args[0].isEqual(sdk())).to.be.true;
@@ -139,7 +142,7 @@ describe('GenerateAction (sdk) — writing the SDK', () => {
     });
 
     it('still succeeds, with a warning, when the snapshot cannot be recorded', async () => {
-      sinon.stub(SdkGeneratePrompts.prototype, 'repositoryInitialised');
+      await git.init(new DirectoryPath(root));
       sinon
         .stub(SdkRepositoryContext.prototype, 'recordGeneration')
         .resolves(err({ kind: 'gitFailed', reason: 'git broke' }));
@@ -152,13 +155,15 @@ describe('GenerateAction (sdk) — writing the SDK', () => {
     });
 
     it('fails with its own message, writing nothing, when the SDK directory cannot be made a repository', async () => {
+      sinon.stub(terminal, 'isInteractive').returns(true);
+      sinon.stub(SdkGeneratePrompts.prototype, 'createRepository').resolves(true);
       sinon
         .stub(SdkContext.prototype, 'initRepository')
         .resolves(err({ kind: 'gitFailed', reason: 'git broke' }));
       const notInitialised = sinon.stub(SdkGeneratePrompts.prototype, 'repositoryNotInitialised');
       const customCodeFailed = sinon.stub(SdkGeneratePrompts.prototype, 'customCodeFailed');
 
-      expect((await execute({ 'README.md': '# sdk' })).isFailed()).to.be.true;
+      expect((await execute({ 'README.md': '# sdk' }, false)).isFailed()).to.be.true;
 
       expect(fs.existsSync(path.join(sdk().toString(), 'README.md'))).to.be.false;
       expect(notInitialised.firstCall.args[0].isEqual(sdk())).to.be.true;
@@ -397,23 +402,27 @@ describe('GenerateAction (sdk) — writing the SDK', () => {
   });
 
   describe('the hook that shares snapshots', () => {
-    beforeEach(() => {
-      sinon.stub(SdkGeneratePrompts.prototype, 'repositoryInitialised');
+    beforeEach(async () => {
+      await git.init(new DirectoryPath(root));
     });
 
     const recordOne = () => execute({ 'README.md': '# sdk' });
 
-    it('is installed after recording, without a word', async () => {
+    it('is installed after recording, and announced once, when its file is written', async () => {
       const file = new FilePath(new DirectoryPath(root), new FileName('pre-push'));
-      const install = sinon
-        .stub(SdkRepositoryContext.prototype, 'installShareHook')
-        .resolves(ok({ kind: 'installed', file }));
+      const install = sinon.stub(SdkRepositoryContext.prototype, 'installShareHook');
+      install.onFirstCall().resolves(ok({ kind: 'installed', file, written: true }));
+      install.onSecondCall().resolves(ok({ kind: 'installed', file, written: false }));
+      const shareHookInstalled = sinon.stub(SdkGeneratePrompts.prototype, 'shareHookInstalled');
       const shareHookNeedsOneStep = sinon.stub(SdkGeneratePrompts.prototype, 'shareHookNeedsOneStep');
       const shareHookNotInstalled = sinon.stub(SdkGeneratePrompts.prototype, 'shareHookNotInstalled');
 
       expect((await recordOne()).isSuccess()).to.be.true;
+      expect((await recordOne()).isSuccess()).to.be.true;
 
-      expect(install.calledOnce).to.be.true;
+      expect(install.calledTwice).to.be.true;
+      expect(shareHookInstalled.calledOnce).to.be.true;
+      expect(shareHookInstalled.firstCall.args[0]).to.equal(file);
       expect(shareHookNeedsOneStep.called).to.be.false;
       expect(shareHookNotInstalled.called).to.be.false;
     });

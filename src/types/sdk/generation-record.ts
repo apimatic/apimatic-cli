@@ -15,31 +15,23 @@ const isOneOf = <T extends string>(values: readonly T[], value: unknown): value 
 
 /**
  * What `.apimatic/generation.json` records: the pristine snapshot an SDK directory was last
- * written from. Committed with the SDK, so a branch or a clone merges against the base it
- * was generated from. The conflicts a run leaves are git's unmerged index entries, not the
- * record's, since only the index says when the developer has resolved them.
+ * written from, and nothing that changes from run to run, so a regeneration that changed
+ * nothing leaves it untouched. Committed with the SDK, so a branch or a clone merges against
+ * the base it was generated from. The conflicts a run leaves are git's unmerged index
+ * entries, not the record's, since only the index says when the developer has resolved them.
  */
 export class GenerationRecord {
   private readonly generation: SdkGeneration;
   private readonly pristine: CommitId;
-  private readonly generatedAt: Date;
-  private readonly cliVersion: string;
 
-  private constructor(generation: SdkGeneration, pristine: CommitId, generatedAt: Date, cliVersion: string) {
+  private constructor(generation: SdkGeneration, pristine: CommitId) {
     this.generation = generation;
     this.pristine = pristine;
-    this.generatedAt = generatedAt;
-    this.cliVersion = cliVersion;
   }
 
   /** Written by a run that just recorded `pristine`. */
-  public static written(
-    generation: SdkGeneration,
-    pristine: CommitId,
-    generatedAt: Date,
-    cliVersion: string
-  ): GenerationRecord {
-    return new GenerationRecord(generation, pristine, generatedAt, cliVersion);
+  public static written(generation: SdkGeneration, pristine: CommitId): GenerationRecord {
+    return new GenerationRecord(generation, pristine);
   }
 
   public static parse(json: string): GenerationRecord | undefined {
@@ -54,24 +46,18 @@ export class GenerationRecord {
     }
     const record = parsed as Record<string, unknown>;
     const pristine = typeof record.pristine === 'string' ? CommitId.create(record.pristine) : undefined;
-    const generatedAt = typeof record.generatedAt === 'string' ? new Date(record.generatedAt) : undefined;
     if (
       record.schemaVersion !== SCHEMA_VERSION ||
       !isOneOf(Object.values(Language), record.language) ||
       !isOneOf(Object.values(CodeGenerationVersion), record.codegenVersion) ||
       !isOneOf(Object.values(Stability), record.stability) ||
-      pristine === undefined ||
-      generatedAt === undefined ||
-      Number.isNaN(generatedAt.getTime()) ||
-      typeof record.cliVersion !== 'string'
+      pristine === undefined
     ) {
       return undefined;
     }
     return new GenerationRecord(
       { language: record.language, codegenVersion: record.codegenVersion, stability: record.stability },
-      pristine,
-      generatedAt,
-      record.cliVersion
+      pristine
     );
   }
 
@@ -99,9 +85,7 @@ export class GenerationRecord {
         language: this.generation.language,
         codegenVersion: this.generation.codegenVersion,
         stability: this.generation.stability,
-        pristine: this.pristine.toString(),
-        generatedAt: this.generatedAt.toISOString(),
-        cliVersion: this.cliVersion
+        pristine: this.pristine.toString()
       },
       null,
       2

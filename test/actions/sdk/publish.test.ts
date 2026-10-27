@@ -8,6 +8,7 @@ import { err, ok } from 'neverthrow';
 import sinon from 'sinon';
 import { SdkPublishAction } from '../../../src/actions/sdk/publish.js';
 import { SdkPublishNonInteractiveAction } from '../../../src/actions/sdk/publish/non-interactive.js';
+import { GitService } from '../../../src/infrastructure/git-service.js';
 import { LauncherService } from '../../../src/infrastructure/launcher-service.js';
 import { PublishingApiService } from '../../../src/infrastructure/services/publishing-api-service.js';
 import { SdkGenerationService } from '../../../src/infrastructure/services/sdk-generation-service.js';
@@ -79,9 +80,10 @@ describe('SdkPublishAction', () => {
     fs.rmSync(root, { recursive: true, force: true });
   });
 
-  it('uploads the files git would commit, without the snapshots’ .git or the CLI’s record', async () => {
+  it('uploads the files git would commit, without the CLI’s record', async () => {
+    await new GitService().init(new DirectoryPath(root));
     sinon.stub(SdkGeneratePrompts.prototype, 'sdkGenerated');
-    sinon.stub(SdkGeneratePrompts.prototype, 'repositoryInitialised');
+    sinon.stub(SdkGeneratePrompts.prototype, 'shareHookInstalled');
     sinon.stub(SdkPublishPrompts.prototype, 'publishSdk').callsFake((fn) => fn);
     sinon.stub(SdkPublishPrompts.prototype, 'publishingRunningNotice');
     sinon.stub(SdkPublishPrompts.prototype, 'publishingLogsMessage');
@@ -96,7 +98,6 @@ describe('SdkPublishAction', () => {
     expect((await execute()).isSuccess()).to.be.true;
 
     expect(publishSdkPackage.calledOnce).to.be.true;
-    expect(fs.existsSync(path.join(sdk().toString(), '.git'))).to.be.true;
     expect(fs.existsSync(path.join(sdk().toString(), '.apimatic', 'generation.json'))).to.be.true;
     const uploaded = (await publishSdkPackage.firstCall.returnValue)._unsafeUnwrap().publishingLogUrl;
     expect(uploaded).to.equal('https://logs.test/README.md');
@@ -104,7 +105,7 @@ describe('SdkPublishAction', () => {
 
   it('generates into the SDK directory on a dry run and opens it, uploading nothing', async () => {
     sinon.stub(SdkGeneratePrompts.prototype, 'sdkGenerated');
-    sinon.stub(SdkGeneratePrompts.prototype, 'repositoryInitialised');
+    sinon.stub(SdkGeneratePrompts.prototype, 'repositoryNotCreated');
     const dryRunNotice = sinon.stub(SdkPublishPrompts.prototype, 'dryRunNotice');
     const opened = sinon.stub(LauncherService.prototype, 'openDirectoryInEditorOrFileExplorer').resolves();
     const publishSdkPackage = sinon.stub(PublishingApiService.prototype, 'publishSdkPackage');
@@ -143,7 +144,7 @@ describe('SdkPublishAction', () => {
     sinon.stub(SdkPublishNonInteractivePrompts.prototype, 'sourceCodeOnlyPublishingNotice');
     sinon.stub(SdkPublishNonInteractivePrompts.prototype, 'dryRunPluginConfigNotice');
     sinon.stub(SdkGeneratePrompts.prototype, 'sdkGenerated');
-    sinon.stub(SdkGeneratePrompts.prototype, 'repositoryInitialised');
+    sinon.stub(SdkGeneratePrompts.prototype, 'repositoryNotCreated');
     sinon.stub(SdkPublishPrompts.prototype, 'dryRunNotice');
     const opened = sinon.stub(LauncherService.prototype, 'openDirectoryInEditorOrFileExplorer').resolves();
 
