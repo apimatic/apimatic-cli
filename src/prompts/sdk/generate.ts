@@ -271,7 +271,7 @@ export class SdkGeneratePrompts {
           `${f.relativePath(needed.script)} is not run on push.`;
     const steps = [
       `Add this line to ${f.relativePath(needed.file)}:\n   ${SHARE_HOOK_CALL}`,
-      ...(needed.kind === 'elsewhere' ? ['Commit it; every clone shares from then on.'] : [])
+      ...(needed.kind === 'elsewhere' && needed.inRepository ? ['Commit it; every clone shares from then on.'] : [])
     ];
     noteWrapped(
       [because, '', ...steps.map((step, index) => `${index + 1}. ${step}`)].join('\n'),

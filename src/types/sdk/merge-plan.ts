@@ -27,8 +27,11 @@ export type ConflictKind =
   /** A shape git reports that fits none of the above, such as both sides renaming one file differently; `message` is git's. */
   | 'other';
 
-/** A file to write, as the blob the merged tree holds for it. */
-export type FileWrite = { path: RelativeFilePath; blob: string };
+/**
+ * A file to write, as the blob the merged tree holds for it. `settle` names the side whose
+ * lines win in each block of markers the blob holds, where the developer chose one.
+ */
+export type FileWrite = { path: RelativeFilePath; blob: string; settle?: ConflictSide };
 
 /** Whose lines win where you and the generator changed the same ones. */
 export type ConflictSide = 'generated' | 'yours';
@@ -252,20 +255,30 @@ export class MergePlan {
   }
 
   /**
-   * The same plan with every conflict settled whole for `side`, as `chosen` decides: that
-   * side's version written, yours left as it is on disk, or the file left deleted. A conflict
-   * of another shape, such as a file of yours inside a directory the generator renamed, keeps
-   * git's own placement, which the plan already holds, and stays listed as what happened to it.
-   * Every other path keeps what the merge decided.
+   * The same plan with every conflict settled for `side`. A file with markers is settled block
+   * by block when written, that side's lines winning and the rest merged as git did. Any other
+   * conflict is settled whole, as `chosen` decides: that side's version written, yours left as
+   * it is on disk, or the file left deleted. A conflict of another shape, such as a file of
+   * yours inside a directory the generator renamed, keeps git's own placement, which the plan
+   * already holds, and stays listed as what happened to it. Every other path keeps what the
+   * merge decided.
    */
   public taking(side: ConflictSide): MergePlan {
     const writes = new Map(this.writes.map((write) => [write.path.toString(), write]));
     const deletes = new Map(this.deletes.map((path) => [path.toString(), path]));
     const updated = [...this.files.updated];
+    const merged = [...this.files.merged];
     const kept = [...this.files.kept];
-    for (const { path, kind } of this.conflicts) {
+    for (const conflict of this.conflicts) {
+      const { path, kind } = conflict;
       const key = path.toString();
       if (kind === 'other') {
+        continue;
+      }
+      const marked = writes.get(key);
+      if (leavesMarkers(conflict) && marked !== undefined) {
+        writes.set(key, { ...marked, settle: side });
+        merged.push(path);
         continue;
       }
       const sides = this.sides.get(key) ?? { yours: undefined, generated: undefined };
@@ -284,6 +297,7 @@ export class MergePlan {
     return new MergePlan([...writes.values()], [...deletes.values()], [], this.renames, {
       ...this.files,
       updated,
+      merged,
       kept
     });
   }

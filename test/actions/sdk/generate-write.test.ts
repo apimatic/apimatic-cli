@@ -406,7 +406,7 @@ describe('GenerateAction (sdk) — writing the SDK', () => {
     it('shows the one step when git runs hooks from elsewhere, and still succeeds', async () => {
       const file = new FilePath(new DirectoryPath(root), new FileName('pre-push'));
       const script = new FilePath(new DirectoryPath(root), new FileName('apimatic-pre-push'));
-      const needed = { kind: 'elsewhere' as const, file, hooksPath: '.husky/_', script };
+      const needed = { kind: 'elsewhere' as const, file, hooksPath: '.husky/_', inRepository: true, script };
       sinon.stub(SdkRepositoryContext.prototype, 'installShareHook').resolves(ok(needed));
       const shareHookNeedsOneStep = sinon.stub(SdkGeneratePrompts.prototype, 'shareHookNeedsOneStep');
 

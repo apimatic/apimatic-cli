@@ -12,9 +12,9 @@ import { RelativeFilePath } from './file/relativeFilePath.js';
 import { CommitId } from './git/commit-id.js';
 import { StageEntry } from './git/merge-tree.js';
 import { TreeId } from './git/tree-id.js';
-import { relabelMarkers } from './sdk/conflict-markers.js';
+import { relabelMarkers, settleMarkers } from './sdk/conflict-markers.js';
 import { describeGeneration, GenerationRecord, RECORD_ATTRIBUTES, SdkGeneration } from './sdk/generation-record.js';
-import { ConflictSide, MergePlan } from './sdk/merge-plan.js';
+import { ConflictSide, FileWrite, MergePlan } from './sdk/merge-plan.js';
 import { settledContent } from './sdk/unresolved-file.js';
 import { SHARE_HOOK_SCRIPT, SHARE_HOOK_SCRIPT_NAME, ShareHook } from './sdk/share-hook.js';
 import { SnapshotRef } from './sdk/snapshot-ref.js';
@@ -63,12 +63,13 @@ export type SdkRepositoryState =
 
 /**
  * The pre-push hook that shares snapshots runs the script, or the one line the developer has to
- * add to `file` so that it does: because git runs hooks from `hooksPath`, or because the hook
+ * add to `file` so that it does: because git runs hooks from `hooksPath`, which is in the
+ * repository (`inRepository`) or, as `~/.githooks`, the developer's own, or because the hook
  * there is not a shell script the CLI can add to.
  */
 export type ShareHookInstall =
   | { kind: 'installed'; file: FilePath }
-  | { kind: 'elsewhere'; file: FilePath; hooksPath: string; script: FilePath }
+  | { kind: 'elsewhere'; file: FilePath; hooksPath: string; inRepository: boolean; script: FilePath }
   | { kind: 'notShell'; file: FilePath; shebang: string; script: FilePath };
 
 /** The plan, the merged tree, and git's versions of every conflicted path, below the SDK directory. */
@@ -78,8 +79,6 @@ export type MergeOutcome = { plan: MergePlan; merged: TreeId; stages: StageEntry
 export type Regeneration = { generated: TreeId; merge: MergeOutcome };
 
 /** The merge's two commits are yours (`ours`) and the generator's (`theirs`). */
-const GIT_SIDES: Record<ConflictSide, 'ours' | 'theirs'> = { yours: 'ours', generated: 'theirs' };
-
 const RECORD_DIRECTORY = '.apimatic';
 const RECORD_FILE = 'generation.json';
 const RECORD_ATTRIBUTES_FILE = '.gitattributes';
@@ -195,11 +194,12 @@ export class SdkRepositoryContext {
       await this.writeExecutable(script, SHARE_HOOK_SCRIPT);
       const hooksPath = await this.git.hooksPathConfigured(this.rootDirectory);
       if (hooksPath !== undefined) {
-        const file = this.hookRunFrom(hooksPath);
+        const file = this.hookRunFrom(await this.git.hooksRunFrom(this.rootDirectory));
+        const inRepository = this.rootDirectory.contains(file.directory());
         return ok(
           ShareHook.calls(await this.read(file))
             ? { kind: 'installed', file }
-            : { kind: 'elsewhere', file, hooksPath, script }
+            : { kind: 'elsewhere', file, hooksPath, inRepository, script }
         );
       }
       const file = new FilePath(hooks, new FileName('pre-push'));
@@ -223,8 +223,7 @@ export class SdkRepositoryContext {
     }
   }
 
-  private hookRunFrom(hooksPath: string): FilePath {
-    const directory = this.rootDirectory.resolve(hooksPath);
+  private hookRunFrom(directory: DirectoryPath): FilePath {
     const scripts = path.basename(directory.toString()) === '_' ? directory.join('..') : directory;
     return new FilePath(scripts, new FileName('pre-push'));
   }
@@ -374,18 +373,13 @@ export class SdkRepositoryContext {
    * pristine base as temporary commits, `merge-tree` merges them, and the plan says which
    * paths differ between the disk and the result.
    */
-  public async merge(
-    base: CommitId,
-    disk: TreeId,
-    generated: TreeId,
-    favour?: ConflictSide
-  ): Promise<Result<MergeOutcome, SdkRepositoryProblem>> {
+  public async merge(base: CommitId, disk: TreeId, generated: TreeId): Promise<Result<MergeOutcome, SdkRepositoryProblem>> {
     const root = this.rootDirectory;
     try {
       const baseTree = await this.git.treeOfCommit(root, base);
       const yours = await this.git.commitTree(root, disk, [base], 'apimatic: your changes');
       const theirs = await this.git.commitTree(root, generated, [base], 'apimatic: generated');
-      const merge = await this.git.mergeTree(root, yours, theirs, favour && GIT_SIDES[favour]);
+      const merge = await this.git.mergeTree(root, yours, theirs);
       const yourChanges = (await this.git.diffTrees(root, baseTree, disk, true)).filter(
         (change) => !change.path.toString().startsWith(`${RECORD_DIRECTORY}/`)
       );
@@ -404,13 +398,9 @@ export class SdkRepositoryContext {
 
   /**
    * The generation in `generated` merged over the directory against `base`, in one step: both
-   * trees are snapshotted, then merged, favouring one side where asked.
+   * trees are snapshotted, then merged.
    */
-  public async regenerate(
-    base: CommitId,
-    generated: DirectoryPath,
-    favour?: ConflictSide
-  ): Promise<Result<Regeneration, SdkRepositoryProblem>> {
+  public async regenerate(base: CommitId, generated: DirectoryPath): Promise<Result<Regeneration, SdkRepositoryProblem>> {
     const generatedTree = await this.snapshotGenerated(generated);
     if (generatedTree.isErr()) {
       return err(generatedTree.error);
@@ -419,7 +409,7 @@ export class SdkRepositoryContext {
     if (disk.isErr()) {
       return err(disk.error);
     }
-    return (await this.merge(base, disk.value, generatedTree.value, favour)).map((merge) => ({
+    return (await this.merge(base, disk.value, generatedTree.value)).map((merge) => ({
       generated: generatedTree.value,
       merge
     }));
@@ -457,10 +447,9 @@ export class SdkRepositoryContext {
         path: write.path,
         operation: 'write' as const,
         run: async () => {
-          const content = blobs.get(write.blob)!;
-          const labelled = plan.hasMarkers(write.path) ? relabelMarkers(content) : content;
+          const content = this.markersOf(plan, write, blobs.get(write.blob)!);
           const file = write.path.in(this.sdk);
-          return this.put(file, await this.withLineEnding(labelled, file, write.path.in(generated)));
+          return this.put(file, await this.withLineEnding(content, file, write.path.in(generated)));
         }
       }))
     ];
@@ -480,6 +469,14 @@ export class SdkRepositoryContext {
       }
     }
     return ok(undefined);
+  }
+
+  private markersOf(plan: MergePlan, write: FileWrite, content: Uint8Array): Uint8Array {
+    if (write.settle !== undefined) {
+      const labelled = relabelMarkers(content);
+      return settleMarkers(labelled, write.settle) ?? labelled;
+    }
+    return plan.hasMarkers(write.path) ? relabelMarkers(content) : content;
   }
 
   private async undo(previous: CommitId, touched: readonly RelativeFilePath[]): Promise<NotApplied['undo']> {

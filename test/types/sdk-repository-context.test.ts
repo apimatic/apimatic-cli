@@ -673,6 +673,7 @@ describe('SdkRepositoryContext', () => {
       const plain = (await repository.installShareHook())._unsafeUnwrap();
 
       expect(plain.kind === 'elsewhere' && plain.hooksPath).to.equal('.githooks');
+      expect(plain.kind === 'elsewhere' && plain.inRepository).to.be.true;
       expect(plain.kind === 'elsewhere' && plain.file.toString()).to.equal(
         path.join(repository.root().toString(), '.githooks', 'pre-push')
       );
@@ -686,6 +687,32 @@ describe('SdkRepositoryContext', () => {
       expect(husky.kind === 'elsewhere' && husky.file.toString()).to.equal(
         path.join(repository.root().toString(), '.husky', 'pre-push')
       );
+    });
+
+    it('names the developer’s own hook file for a hooks path under the home directory, with no commit step', async () => {
+      const repository = await project();
+      const home = path.join(root, 'home');
+      await sh(repository.root(), 'config', 'core.hooksPath', '~/.githooks');
+      const previous = process.env.HOME;
+      process.env.HOME = home;
+      try {
+        const needed = (await repository.installShareHook())._unsafeUnwrap();
+
+        expect(needed.kind === 'elsewhere' && needed.file.toString()).to.equal(path.join(home, '.githooks', 'pre-push'));
+        expect(needed.kind === 'elsewhere' && needed.inRepository).to.be.false;
+        expect(fs.existsSync(path.join(repository.root().toString(), '~'))).to.be.false;
+
+        write(new DirectoryPath(home), path.join('.githooks', 'pre-push'), `#!/bin/sh\n${SHARE_HOOK_CALL}\n`);
+        const again = (await repository.installShareHook())._unsafeUnwrap();
+
+        expect(again.kind).to.equal('installed');
+      } finally {
+        if (previous === undefined) {
+          delete process.env.HOME;
+        } else {
+          process.env.HOME = previous;
+        }
+      }
     });
 
     it('is quiet once the hook elsewhere runs the script', async () => {

@@ -228,21 +228,6 @@ describe('GitService', () => {
       expect((await filesOf(repo, merged.tree)).get('gone.txt')).to.equal('kept\n');
     });
 
-    it('settles each overlapping hunk for the side it favours, and merges the rest as usual', async () => {
-      const repo = await repository();
-      const base = await commit(repo, 'base', { 'a.txt': 'a\nb\nc\nd\ne\nf\ng\n' }, []);
-      const ours = await commit(repo, 'ours', { 'a.txt': 'A\nb\nc\nd\ne\nf\ng ours\n' }, [base]);
-      const theirs = await commit(repo, 'theirs', { 'a.txt': 'a\nb\nc\nD\ne\nf\ng theirs\n' }, [base]);
-
-      const forOurs = await git.mergeTree(repo, ours, theirs, 'ours');
-      const forTheirs = await git.mergeTree(repo, ours, theirs, 'theirs');
-
-      expect(forOurs.stages).to.deep.equal([]);
-      expect((await filesOf(repo, forOurs.tree)).get('a.txt')).to.equal('A\nb\nc\nD\ne\nf\ng ours\n');
-      expect(forTheirs.stages).to.deep.equal([]);
-      expect((await filesOf(repo, forTheirs.tree)).get('a.txt')).to.equal('A\nb\nc\nD\ne\nf\ng theirs\n');
-    });
-
     it('reads a clean merge as the merged tree and nothing else', async () => {
       const repo = await repository();
       const base = await commit(repo, 'base', { 'a.txt': 'a\n', 'b.txt': 'b\n' }, []);
@@ -344,14 +329,52 @@ describe('GitService', () => {
 
     it('names git’s own hooks directory, and whether core.hooksPath moved the hooks elsewhere', async () => {
       const repo = await repository();
+      const own = path.join(repo.toString(), '.git', 'hooks');
 
-      expect((await git.hooksDirectory(repo)).toString()).to.equal(path.join(repo.toString(), '.git', 'hooks'));
+      expect((await git.hooksDirectory(repo)).toString()).to.equal(own);
       expect(await git.hooksPathConfigured(repo)).to.be.undefined;
+      expect((await git.hooksRunFrom(repo)).toString()).to.equal(own);
 
       await execa('git', ['config', 'core.hooksPath', '.husky'], { cwd: repo.toString() });
 
       expect(await git.hooksPathConfigured(repo)).to.equal('.husky');
-      expect((await git.hooksDirectory(repo)).toString()).to.equal(path.join(repo.toString(), '.git', 'hooks'));
+      expect((await git.hooksDirectory(repo)).toString()).to.equal(own);
+      expect((await git.hooksRunFrom(repo)).toString()).to.equal(path.join(repo.toString(), '.husky'));
+    });
+
+    it('resolves a hooks path under the home directory as git does, not under the repository', async () => {
+      const repo = await repository();
+      const home = path.join(root, 'home');
+      await execa('git', ['config', 'core.hooksPath', '~/.githooks'], { cwd: repo.toString() });
+      const previous = process.env.HOME;
+      process.env.HOME = home;
+      try {
+        expect((await git.hooksRunFrom(repo)).toString()).to.equal(path.join(home, '.githooks'));
+      } finally {
+        if (previous === undefined) {
+          delete process.env.HOME;
+        } else {
+          process.env.HOME = previous;
+        }
+      }
+    });
+
+    it('leaves an SSH client the developer configured in charge of the connection', async () => {
+      const repo = await repository();
+      const marker = path.join(root, 'ssh-ran').replace(/\\/g, '/');
+      const script = path.join(root, 'ssh.sh').replace(/\\/g, '/');
+      fs.writeFileSync(script, `printf x > "${marker}"\nexit 1\n`);
+      await execa('git', ['config', 'core.sshCommand', `sh "${script}"`], { cwd: repo.toString() });
+
+      let failure: unknown;
+      try {
+        await git.fetchRef(repo, 'ssh://example.invalid/sdk.git', ref);
+      } catch (error) {
+        failure = error;
+      }
+
+      expect(failure).to.not.be.undefined;
+      expect(fs.existsSync(marker)).to.be.true;
     });
 
     it('tells an ancestor from a stranger', async () => {

@@ -107,7 +107,7 @@ describe('SdkRepositoryContext: the merge', () => {
     const baseCommit = (
       await repository.recordPristine((await repository.snapshotGenerated(baseDirectory))._unsafeUnwrap(), TYPESCRIPT)
     )._unsafeUnwrap();
-    const regeneration = (await repository.regenerate(baseCommit, generatedDirectory, favour))._unsafeUnwrap();
+    const regeneration = (await repository.regenerate(baseCommit, generatedDirectory))._unsafeUnwrap();
     expect(regeneration.generated.isEqual((await repository.snapshotGenerated(generatedDirectory))._unsafeUnwrap())).to
       .be.true;
     const plan = favour === undefined ? regeneration.merge.plan : regeneration.merge.plan.taking(favour);
@@ -386,6 +386,23 @@ describe('SdkRepositoryContext: the merge', () => {
   });
 
   describe('settled for a side, as the first question’s answer is', () => {
+    it('settles each overlapping hunk for that side and merges the rest, with the file’s own line ending', async () => {
+      const base = 'a\r\nb\r\nc\r\nd\r\ne\r\nf\r\ng\r\n';
+      const yours = 'A\r\nb\r\nc\r\nd\r\ne\r\nf\r\ng yours\r\n';
+      const generated = 'a\nb\nc\nD\ne\nf\ng generated\n';
+      const expected = {
+        generated: 'A\r\nb\r\nc\r\nD\r\ne\r\nf\r\ng generated\r\n',
+        yours: 'A\r\nb\r\nc\r\nD\r\ne\r\nf\r\ng yours\r\n'
+      };
+      for (const favour of ['generated', 'yours'] as const) {
+        const { plan, read } = await run({ 'a.ts': base }, { 'a.ts': yours }, { 'a.ts': generated }, { favour });
+
+        expect(read('a.ts'), favour).to.equal(expected[favour]);
+        expect(plan.hasConflicts(), favour).to.be.false;
+        expect(plan.files.merged.map(String), favour).to.deep.equal(['a.ts']);
+      }
+    });
+
     it('keeps an edited file the generator stopped producing, for the generator’s side too', async () => {
       const { plan, read } = await run(
         { 'models/book.ts': MODEL_V1, 'helper.ts': 'helper\n' },

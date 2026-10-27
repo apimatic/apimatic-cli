@@ -242,13 +242,7 @@ export class GitService {
    * tree's id, then one entry per stage of every conflicted path, then, after an empty entry, the
    * messages git would have shown during a merge, each as a count, that many paths, a type and the text.
    */
-  /** `favour` settles every content conflict for that side, hunk by hunk, as `git merge -X ours|theirs` would. */
-  public async mergeTree(
-    root: DirectoryPath,
-    ours: CommitId,
-    theirs: CommitId,
-    favour?: 'ours' | 'theirs'
-  ): Promise<MergeTreeOutput> {
+  public async mergeTree(root: DirectoryPath, ours: CommitId, theirs: CommitId): Promise<MergeTreeOutput> {
     return withDirPath(async (temporary) => {
       const result = await this.run(
         root,
@@ -256,7 +250,6 @@ export class GitService {
           'merge-tree',
           '--write-tree',
           '-z',
-          ...(favour === undefined ? [] : [`--strategy-option=${favour}`]),
           ours.toString(),
           theirs.toString()
         ],
@@ -403,6 +396,12 @@ export class GitService {
     return this.tryRun(root, ['config', '--get', 'core.hooksPath']);
   }
 
+  /** The directory git runs hooks from, as git resolves it: `core.hooksPath` with `~` expanded, else `.git/hooks`. */
+  public async hooksRunFrom(root: DirectoryPath): Promise<DirectoryPath> {
+    const { stdout } = await this.run(root, ['rev-parse', '--git-path', 'hooks']);
+    return new DirectoryPath(path.resolve(root.toString(), stdout.trim()));
+  }
+
   /**
    * Takes `paths` out of the unmerged state once the CLI settled them: each index entry goes back
    * to what HEAD holds, or is forgotten where there is no HEAD yet, so `git status` stops saying
@@ -463,7 +462,7 @@ export class GitService {
           ...OWN_REPOSITORY,
           GIT_TERMINAL_PROMPT: '0',
           LC_ALL: 'C',
-          GIT_SSH_COMMAND: process.env.GIT_SSH_COMMAND ?? 'ssh -o BatchMode=yes'
+          ...(await this.batchSsh(cwd))
         },
         timeout: REMOTE_TIMEOUT_MS,
         reject: false
@@ -475,6 +474,16 @@ export class GitService {
           : errorMessage(error)
       );
     }
+  }
+
+  // The developer's own SSH client, set by GIT_SSH_COMMAND, core.sshCommand or GIT_SSH, is
+  // left alone; only the default ssh is told not to ask for a passphrase.
+  private async batchSsh(cwd: DirectoryPath): Promise<{ GIT_SSH_COMMAND?: string }> {
+    const configured =
+      process.env.GIT_SSH_COMMAND !== undefined ||
+      process.env.GIT_SSH !== undefined ||
+      (await this.tryRun(cwd, ['config', '--get', 'core.sshCommand'])) !== undefined;
+    return configured ? {} : { GIT_SSH_COMMAND: 'ssh -o BatchMode=yes' };
   }
 
   private async gitDir(root: DirectoryPath): Promise<string> {

@@ -216,19 +216,14 @@ describe('MergePlan.from', () => {
     expect(settled.hasConflicts()).to.be.false;
     expect(settled.writes).to.have.deep.members([
       { path: rel('other.ts'), blob: blob('og') },
-      { path: rel('same.ts'), blob: blob('sg') },
-      { path: rel('added.ts'), blob: blob('ag') },
+      { path: rel('same.ts'), blob: blob('sm'), settle: 'generated' },
+      { path: rel('added.ts'), blob: blob('am'), settle: 'generated' },
       { path: rel('logo.png'), blob: blob('lg') },
       { path: rel('deleted-by-you.ts'), blob: blob('bg') }
     ]);
     expect(settled.deletes).to.deep.equal([]);
-    expect(settled.files.updated.map(String)).to.have.members([
-      'other.ts',
-      'same.ts',
-      'added.ts',
-      'logo.png',
-      'deleted-by-you.ts'
-    ]);
+    expect(settled.files.updated.map(String)).to.have.members(['other.ts', 'logo.png', 'deleted-by-you.ts']);
+    expect(settled.files.merged.map(String)).to.have.members(['same.ts', 'added.ts']);
     expect(settled.files.kept.map(String)).to.deep.equal(['dropped.ts']);
     expect(settled.files.removed).to.deep.equal([]);
     expect(plan.hasConflicts()).to.be.true;
@@ -267,15 +262,20 @@ describe('MergePlan.from', () => {
     }
   });
 
-  it('settles every conflict your way when asked to: each file left as it is on disk, which is your side', () => {
+  it('settles every conflict your way when asked to: your lines in each marked block, and a whole file left as it is on disk', () => {
     const plan = conflicted();
 
     const settled = plan.taking('yours');
 
     expect(settled.hasConflicts()).to.be.false;
-    expect(settled.writes).to.deep.equal([{ path: rel('other.ts'), blob: blob('og') }]);
+    expect(settled.writes).to.have.deep.members([
+      { path: rel('other.ts'), blob: blob('og') },
+      { path: rel('same.ts'), blob: blob('sm'), settle: 'yours' },
+      { path: rel('added.ts'), blob: blob('am'), settle: 'yours' }
+    ]);
     expect(settled.deletes).to.deep.equal([]);
-    expect(settled.files.kept.map(String)).to.have.members(['same.ts', 'added.ts', 'logo.png', 'dropped.ts']);
+    expect(settled.files.merged.map(String)).to.have.members(['same.ts', 'added.ts']);
+    expect(settled.files.kept.map(String)).to.have.members(['logo.png', 'dropped.ts']);
     expect(settled.files.updated.map(String)).to.deep.equal(['other.ts']);
     expect(settled.files.removed).to.deep.equal([]);
   });

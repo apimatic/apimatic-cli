@@ -9,12 +9,18 @@ const rel = (value: string) => RelativeFilePath.fromGit(value);
 
 const NO_FILES: MergeFiles = { added: [], updated: [], merged: [], removed: [], kept: [], unchanged: [] };
 
-/** A regeneration whose merge left `conflicts`, each with the generator's side known and yours on disk. */
+/**
+ * A regeneration whose merge left `conflicts`: a file with markers is written as git merged it,
+ * the generator's side of every other one is known, and yours is on disk.
+ */
 const regeneration = (conflicts: Conflict[]): Regeneration => {
   const sides = new Map<string, Sides<string>>(
     conflicts.map((conflict) => [conflict.path.toString(), { yours: 'blob-of-yours', generated: 'blob-of-generated' }])
   );
-  const plan = new MergePlan([], [], conflicts, [], NO_FILES, sides);
+  const writes = conflicts
+    .filter((conflict) => conflict.kind === 'bothChanged' || conflict.kind === 'bothAdded')
+    .map((conflict) => ({ path: conflict.path, blob: 'blob-with-markers' }));
+  const plan = new MergePlan(writes, [], conflicts, [], NO_FILES, sides);
   return {
     generated: TreeId.fromGit('a'.repeat(40)),
     merge: { plan, merged: TreeId.fromGit('b'.repeat(40)), stages: [] }
@@ -33,34 +39,36 @@ describe('Settlement', () => {
     expect(settlement.settled).to.be.undefined;
   });
 
-  it('writes the merge run the generator’s way, naming the files the first merge left in conflict', () => {
+  it('settles the merge the generator’s way, naming every file the merge left in conflict', () => {
     const original = regeneration([
       { path: rel('a.py'), kind: 'bothChanged' },
-      { path: rel('b.py'), kind: 'noLongerGenerated' }
+      { path: rel('b.py'), kind: 'deletedByYou' }
     ]);
-    const favoured = regeneration([{ path: rel('b.py'), kind: 'noLongerGenerated' }]);
 
-    const settlement = favouring('generated', original, favoured);
+    const settlement = favouring('generated', original);
 
-    expect(settlement.regeneration).to.equal(favoured);
+    expect(settlement.regeneration).to.equal(original);
     expect(settlement.plan.hasConflicts()).to.be.false;
-    expect(settlement.plan.writes.map((write) => write.path.toString())).to.deep.equal(['b.py']);
+    expect(settlement.plan.writes).to.deep.equal([
+      { path: rel('a.py'), blob: 'blob-with-markers', settle: 'generated' },
+      { path: rel('b.py'), blob: 'blob-of-generated' }
+    ]);
     expect(settlement.settled?.side).to.equal('generated');
     expect(settlement.settled?.paths.map(String)).to.deep.equal(['a.py', 'b.py']);
   });
 
-  it('writes the merge run your way, leaving what is still in conflict as it is on disk', () => {
+  it('settles the merge your way: markers for you, and a file left whole as it is on disk', () => {
     const original = regeneration([
       { path: rel('a.py'), kind: 'bothChanged' },
       { path: rel('b.py'), kind: 'noLongerGenerated' }
     ]);
-    const favoured = regeneration([{ path: rel('b.py'), kind: 'noLongerGenerated' }]);
 
-    const settlement = favouring('yours', original, favoured);
+    const settlement = favouring('yours', original);
 
-    expect(settlement.regeneration).to.equal(favoured);
+    expect(settlement.regeneration).to.equal(original);
     expect(settlement.plan.hasConflicts()).to.be.false;
-    expect(settlement.plan.writes).to.deep.equal([]);
+    expect(settlement.plan.writes).to.deep.equal([{ path: rel('a.py'), blob: 'blob-with-markers', settle: 'yours' }]);
+    expect(settlement.plan.files.merged.map(String)).to.deep.equal(['a.py']);
     expect(settlement.plan.files.kept.map(String)).to.deep.equal(['b.py']);
     expect(settlement.settled?.side).to.equal('yours');
     expect(settlement.settled?.paths.map(String)).to.deep.equal(['a.py', 'b.py']);

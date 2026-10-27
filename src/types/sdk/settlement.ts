@@ -18,14 +18,11 @@ export function resolving(regeneration: Regeneration): Settlement {
   return { regeneration, plan: regeneration.merge.plan };
 }
 
-/**
- * The merge run again with `side` winning every overlapping hunk, and whatever that still
- * leaves in conflict settled whole for `side`, so every file `original` left in conflict is settled.
- */
-export function favouring(side: ConflictSide, original: Regeneration, favoured: Regeneration): Settlement {
+/** The merge with every conflict settled for `side`, as `MergePlan.taking` does. */
+export function favouring(side: ConflictSide, regeneration: Regeneration): Settlement {
   return {
-    regeneration: favoured,
-    plan: favoured.merge.plan.taking(side),
-    settled: { side, paths: original.merge.plan.conflictedPaths() }
+    regeneration,
+    plan: regeneration.merge.plan.taking(side),
+    settled: { side, paths: regeneration.merge.plan.conflictedPaths() }
   };
 }
