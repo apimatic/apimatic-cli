@@ -4,6 +4,7 @@ import { FileName } from '../../../src/types/file/fileName';
 import { FilePath } from '../../../src/types/file/filePath';
 import { ContentNotices } from '../../../src/types/portal/content-notices';
 import { GeneratedSection, PLUGIN_SECTION, SDK_SECTION } from '../../../src/types/portal/generated-pages';
+import { LeftOutHtml } from '../../../src/types/portal/left-out-html';
 import { TabEntry } from '../../../src/types/portal/portal-navigation';
 import { PortalTab, SharedTabName } from '../../../src/types/portal/portal-tabs';
 import { PreviewContent } from '../../../src/types/portal/preview-content';
@@ -14,6 +15,7 @@ describe('PreviewContent', () => {
   const folder = (name: string) => content.join(name);
 
   const NONE: ContentNotices = {
+    leftOutHtml: [],
     hiddenPages: [],
     ignoredNavigationFiles: [],
     sharedTabNames: [],
@@ -112,6 +114,23 @@ describe('PreviewContent', () => {
 
     expect(noticesAfter(titled, NONE).unseenHomeTitle).to.deep.equal(titled.unseenHomeTitle);
     expect(noticesAfter(titled, titled).unseenHomeTitle).to.be.undefined;
+  });
+
+  it('gives the left-out HTML again when a page has a piece it did not have, not when one moves', () => {
+    const index = new FilePath(content, new FileName('index.md'));
+    const before = notices({ leftOutHtml: [new LeftOutHtml(index, [{ line: 5, text: '<br>' }])] });
+    const moved = notices({ leftOutHtml: [new LeftOutHtml(index, [{ line: 9, text: '<br>' }])] });
+    const added = notices({
+      leftOutHtml: [
+        new LeftOutHtml(index, [
+          { line: 9, text: '<br>' },
+          { line: 14, text: '<details>' }
+        ])
+      ]
+    });
+
+    expect(noticesAfter(moved, before).leftOutHtml).to.deep.equal([]);
+    expect(noticesAfter(added, before).leftOutHtml).to.deep.equal(added.leftOutHtml);
   });
 
   it('gives a name shared by another tab than before', () => {

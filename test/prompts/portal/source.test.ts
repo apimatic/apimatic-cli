@@ -4,6 +4,7 @@ import sinon from 'sinon';
 import { log } from '@clack/prompts';
 import { PortalServePrompts } from '../../../src/prompts/portal/serve.js';
 import {
+  reportLeftOutHtml,
   reportLeftOutSpecs,
   reportNoTabsListed,
   reportShadowedFiles,
@@ -17,7 +18,19 @@ import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
 import { FileName } from '../../../src/types/file/fileName.js';
 import { FilePath } from '../../../src/types/file/filePath.js';
 import { PLUGIN_SECTION, SDK_SECTION } from '../../../src/types/portal/generated-pages.js';
+import { LeftOutHtml } from '../../../src/types/portal/left-out-html.js';
 import { OAUTH_CALLBACK } from '../../../src/types/portal/content-tree.js';
+
+/** What `log.warn` and `log.message` print from here on, without colours, until `sinon.restore`. */
+function recordedLines(): string[] {
+  const lines: string[] = [];
+  const record = (text?: string | string[]) => {
+    lines.push(stripVTControlCharacters(String(text)));
+  };
+  sinon.stub(log, 'warn').callsFake(record);
+  sinon.stub(log, 'message').callsFake(record);
+  return lines;
+}
 
 describe('reportSourceProblem', () => {
   const source = new DirectoryPath('project').join('src');
@@ -592,12 +605,7 @@ describe('reportSharedTabNames', () => {
   const printed = () => lines.join('\n');
 
   beforeEach(() => {
-    lines = [];
-    const record = (text?: string | string[]) => {
-      lines.push(stripVTControlCharacters(String(text)));
-    };
-    sinon.stub(log, 'warn').callsFake(record);
-    sinon.stub(log, 'message').callsFake(record);
+    lines = recordedLines();
   });
 
   afterEach(() => {
@@ -851,5 +859,67 @@ describe('reportLeftOutSpecs', () => {
         'merges only the folders beside it. To include them, move each into a folder of its own, adding the ' +
         "folders to 'MergeOrderOfDirectories' when the file lists folders."
     ]);
+  });
+});
+
+describe('reportLeftOutHtml', () => {
+  const source = new DirectoryPath('project').join('src');
+  const index = new FilePath(source.join('content'), new FileName('index.md'));
+  const intro = new FilePath(source.join('content', 'guides'), new FileName('intro.md'));
+  let lines: string[];
+
+  beforeEach(() => {
+    lines = recordedLines();
+  });
+
+  afterEach(() => {
+    sinon.restore();
+  });
+
+  it('says nothing when no .md page has HTML', () => {
+    reportLeftOutHtml([], source);
+
+    expect(lines).to.deep.equal([]);
+  });
+
+  it('names the HTML of a page with its lines, and how to keep it', () => {
+    reportLeftOutHtml(
+      [
+        new LeftOutHtml(index, [
+          { line: 5, text: '<br>' },
+          { line: 9, text: '<Callout type="warn">' }
+        ])
+      ],
+      source
+    );
+
+    expect(lines.join('\n').split('\n')).to.deep.equal([
+      `A '.md' page in '${source.toString()}' has HTML or components, which the portal leaves out:`,
+      "  • 'content/index.md', line 5: '<br>'",
+      "  • 'content/index.md', line 9: '<Callout type=\"warn\">'",
+      "Rename the page to '.mdx' to keep them. MDX needs empty tags closed, such as '<br />', and comments written " +
+        "as '{/* … */}'."
+    ]);
+  });
+
+  it('counts what a page does not show', () => {
+    const pieces = ['<br>', '<details>', '<span>', '<kbd>', '<i>'].map((text, index) => ({ line: index + 1, text }));
+
+    reportLeftOutHtml([new LeftOutHtml(index, pieces)], source);
+
+    expect(lines[1].split('\n').at(-1)).to.equal('    and 2 more on this page');
+  });
+
+  it('speaks of each page when there are several', () => {
+    reportLeftOutHtml(
+      [new LeftOutHtml(index, [{ line: 5, text: '<br>' }]), new LeftOutHtml(intro, [{ line: 3, text: '<Cards>' }])],
+      source
+    );
+
+    expect(lines[0]).to.equal(
+      `Some '.md' pages in '${source.toString()}' have HTML or components, which the portal leaves out:`
+    );
+    expect(lines[1]).to.contain("'content/guides/intro.md', line 3: '<Cards>'");
+    expect(lines[2]).to.match(/^Rename each page to '\.mdx'/);
   });
 });
