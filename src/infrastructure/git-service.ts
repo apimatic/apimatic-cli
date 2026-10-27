@@ -70,18 +70,27 @@ export class GitService {
   /**
    * `directory` as a tree in `root`'s object database, through a temporary index. With
    * `include: 'all'` every file goes in; otherwise the directory's own `.gitignore` is honoured,
-   * except for the listed paths, which go in regardless.
+   * except for the listed paths, which go in regardless. Line endings are normalised to LF, so
+   * a CRLF file and its LF twin compare equal and merge line by line, unless `asIs` is asked for.
    */
   public async treeOf(
     root: DirectoryPath,
     directory: DirectoryPath,
-    include: 'all' | readonly RelativeFilePath[]
+    include: 'all' | readonly RelativeFilePath[],
+    lineEndings: 'normalized' | 'asIs' = 'normalized'
   ): Promise<TreeId> {
     const gitDir = await this.gitDir(root);
     return withDirPath(async (temporary) => {
       const env = { GIT_INDEX_FILE: new FilePath(temporary, new FileName('index')).toString() };
+      const attributesIn = lineEndings === 'normalized' ? temporary : undefined;
       const inWorkTree = (args: string[], input?: string) =>
-        this.run(directory, ['--git-dir', gitDir, '--work-tree', directory.toString(), ...args], env, temporary, input);
+        this.run(
+          directory,
+          ['--git-dir', gitDir, '--work-tree', directory.toString(), ...args],
+          env,
+          attributesIn,
+          input
+        );
       await inWorkTree(['add', '--all', ...(include === 'all' ? ['--force'] : []), '--', '.']);
       const forced =
         include === 'all' ? [] : include.filter((relative) => fs.existsSync(relative.in(directory).toString()));
@@ -467,6 +476,8 @@ export class GitService {
         env: { ...env, GIT_TERMINAL_PROMPT: '0', LC_ALL: 'C' },
         input,
         encoding: encoding as 'utf8',
+        // Bytes are read by length, and stripping would take a final CR with the newline.
+        stripFinalNewline: encoding === 'utf8',
         reject: false
       });
     } catch (error) {

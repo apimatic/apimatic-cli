@@ -8,6 +8,16 @@ describe('SnapshotRef', () => {
     expect(SnapshotRef.pristine('').toString()).to.equal('refs/apimatic/pristine');
   });
 
+  it('spells a path git would refuse as a ref name in %XX, and reads it back', () => {
+    const ref = SnapshotRef.pristine('My API/sdk/.typescript/v1.lock/café~2');
+
+    expect(ref.toString()).to.equal('refs/apimatic/pristine/My%20API/sdk/%2Etypescript/v1%2Elock/caf%C3%A9%7E2');
+    expect(ref.sdkPath()).to.equal('My API/sdk/.typescript/v1.lock/café~2');
+    expect(SnapshotRef.fromGit(ref.toString()).isEqual(ref)).to.be.true;
+    expect(SnapshotRef.fromGit('refs/apimatic/pristine').sdkPath()).to.equal('');
+    expect(SnapshotRef.previous('sdk/typescript').sdkPath()).to.equal('sdk/typescript');
+  });
+
   it('maps itself onto itself for push and fetch, forced when the other side may have moved on', () => {
     const ref = SnapshotRef.pristine('sdk/typescript');
 

@@ -198,7 +198,7 @@ export class GenerateAction {
         this.prompts.customCodeFailed(error.reason);
         return ActionResult.failed();
       }
-      const written = await repository.write(base, settled.value.plan);
+      const written = await repository.write(base, settled.value.plan, tempSdk.value);
       if (written.isErr()) {
         if (written.error.kind === 'notApplied') {
           this.prompts.sdkNotWritten(sdk, written.error);

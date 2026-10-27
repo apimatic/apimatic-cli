@@ -175,6 +175,20 @@ describe('SdkRepositoryContext', () => {
       expect(files.get('src/index.ts')).to.equal('export {};');
     });
 
+    it('records an SDK whose path holds a space and a folder starting with a dot, and finds it again', async () => {
+      const repository = await project(path.join('My API', 'sdk', '.typescript'));
+
+      const commit = (await record(repository, { 'README.md': '# v1' }))._unsafeUnwrap();
+      await writeRecord(repository, GenerationRecord.written(TYPESCRIPT, commit, new Date(), '2.3.0'));
+
+      expect(repository.pristineRef().toString()).to.equal('refs/apimatic/pristine/My%20API/sdk/%2Etypescript');
+      expect((await git.resolveRef(repository.root(), repository.pristineRef()))?.isEqual(commit)).to.be.true;
+      expect((await repository.inspect(TYPESCRIPT, undefined))._unsafeUnwrap()).to.deep.equal({
+        kind: 'ready',
+        base: commit
+      });
+    });
+
     it('chains the next snapshot onto the last and moves the ref', async () => {
       const repository = await project();
       const first = (await record(repository, { 'README.md': '# v1' }))._unsafeUnwrap();

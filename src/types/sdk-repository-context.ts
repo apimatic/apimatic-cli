@@ -1,3 +1,4 @@
+import { Buffer } from 'node:buffer';
 import fs from 'node:fs';
 import path from 'node:path';
 import { err, ok, Result } from 'neverthrow';
@@ -248,8 +249,7 @@ export class SdkRepositoryContext {
         if (settled === undefined) {
           await fs.promises.rm(file.toString(), { force: true });
         } else if (settled !== disk) {
-          await fs.promises.mkdir(file.directory().toString(), { recursive: true });
-          await fs.promises.writeFile(file.toString(), settled);
+          await this.put(file, await this.withLineEnding(settled, file));
         }
       }
       await this.git.unstage(
@@ -275,11 +275,14 @@ export class SdkRepositoryContext {
    * The SDK directory as it is on disk: its `.gitignore` is honoured, except that every path
    * `base` holds goes in, so a generated file an ignore rule matches is never taken for deleted.
    */
-  public async snapshotDisk(base: CommitId | undefined): Promise<Result<TreeId, SdkRepositoryProblem>> {
+  public async snapshotDisk(
+    base: CommitId | undefined,
+    lineEndings: 'normalized' | 'asIs' = 'normalized'
+  ): Promise<Result<TreeId, SdkRepositoryProblem>> {
     try {
       const include =
         base === undefined ? [] : (await this.git.listTree(this.rootDirectory, base)).map((entry) => entry.path);
-      return ok(await this.git.treeOf(this.rootDirectory, this.sdk, include));
+      return ok(await this.git.treeOf(this.rootDirectory, this.sdk, include, lineEndings));
     } catch (error) {
       return err(gitFailed(errorMessage(error)));
     }
@@ -323,9 +326,9 @@ export class SdkRepositoryContext {
     return (await this.writeRecord(record)).map(() => record);
   }
 
-  /** Keeps the SDK directory as it is on disk, replacing what the last run kept, so a merge can be undone. */
+  /** Keeps the SDK directory as it is on disk, byte for byte, replacing what the last run kept, so a merge can be undone. */
   public async savePrevious(base: CommitId | undefined): Promise<Result<CommitId, SdkRepositoryProblem>> {
-    const disk = await this.snapshotDisk(base);
+    const disk = await this.snapshotDisk(base, 'asIs');
     if (disk.isErr()) {
       return err(disk.error);
     }
@@ -408,12 +411,20 @@ export class SdkRepositoryContext {
    * removal that fails ends the run and puts back, from that ref, every path it had changed, so
    * the directory is as it was; the ref stays for a developer to restore from by hand.
    */
-  public async write(base: CommitId, plan: MergePlan): Promise<Result<void, SdkRepositoryProblem>> {
+  public async write(
+    base: CommitId,
+    plan: MergePlan,
+    generated: DirectoryPath
+  ): Promise<Result<void, SdkRepositoryProblem>> {
     const previous = await this.savePrevious(base);
-    return previous.isErr() ? err(previous.error) : this.apply(plan, previous.value);
+    return previous.isErr() ? err(previous.error) : this.apply(plan, previous.value, generated);
   }
 
-  private async apply(plan: MergePlan, previous: CommitId): Promise<Result<void, SdkRepositoryProblem>> {
+  private async apply(
+    plan: MergePlan,
+    previous: CommitId,
+    generated: DirectoryPath
+  ): Promise<Result<void, SdkRepositoryProblem>> {
     let blobs: Map<string, Uint8Array>;
     try {
       blobs = await this.git.readBlobs(this.rootDirectory, [...new Set(plan.writes.map((write) => write.blob))]);
@@ -425,9 +436,11 @@ export class SdkRepositoryContext {
       ...plan.writes.map((write) => ({
         path: write.path,
         operation: 'write' as const,
-        run: () => {
+        run: async () => {
           const content = blobs.get(write.blob)!;
-          return this.put(write.path.in(this.sdk), plan.hasMarkers(write.path) ? relabelMarkers(content) : content);
+          const labelled = plan.hasMarkers(write.path) ? relabelMarkers(content) : content;
+          const file = write.path.in(this.sdk);
+          return this.put(file, await this.withLineEnding(labelled, file, write.path.in(generated)));
         }
       }))
     ];
@@ -466,6 +479,25 @@ export class SdkRepositoryContext {
     } catch (error) {
       return { kind: 'failed', reason: errorMessage(error), previous: this.previousRef() };
     }
+  }
+
+  /**
+   * Trees hold LF, so a blob written to disk gets the line ending the file there uses, else
+   * the generator's fresh copy of it, else LF. A blob with a CR of its own, or binary, is
+   * written as it is.
+   */
+  private async withLineEnding(content: Uint8Array, file: FilePath, ...samples: FilePath[]): Promise<Uint8Array> {
+    if (content.includes(0x0d) || content.subarray(0, 8000).includes(0)) {
+      return content;
+    }
+    for (const sample of [file, ...samples]) {
+      if (await this.fileService.fileExists(sample)) {
+        const crlf = (await fs.promises.readFile(sample.toString())).includes('\r\n');
+        const text = Buffer.from(content).toString('latin1');
+        return crlf ? new Uint8Array(Buffer.from(text.replace(/\n/g, '\r\n'), 'latin1')) : content;
+      }
+    }
+    return content;
   }
 
   private async put(file: FilePath, content: Uint8Array): Promise<void> {
@@ -573,9 +605,7 @@ export class SdkRepositoryContext {
 
   private async pristineRefsIn(): Promise<SnapshotRef[]> {
     const namespace = SnapshotRef.pristineNamespace();
-    return (await this.git.listRefs(this.rootDirectory, namespace)).map((name) =>
-      SnapshotRef.pristine(name === namespace ? '' : name.slice(namespace.length + 1))
-    );
+    return (await this.git.listRefs(this.rootDirectory, namespace)).map((name) => SnapshotRef.fromGit(name));
   }
 
   private sdkPath(): string {

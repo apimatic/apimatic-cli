@@ -112,7 +112,7 @@ describe('SdkRepositoryContext: the merge', () => {
       .be.true;
     const plan = favour === undefined ? regeneration.merge.plan : regeneration.merge.plan.taking(favour);
     beforeWrite?.();
-    const written = await repository.write(baseCommit, plan);
+    const written = await repository.write(baseCommit, plan, generatedDirectory);
     if (beforeWrite === undefined) {
       written._unsafeUnwrap();
     }
@@ -418,7 +418,7 @@ describe('SdkRepositoryContext: the merge', () => {
   });
 
   describe('a write that fails partway', () => {
-    const BEFORE: Files = { 'a.ts': '1\n', 'b.ts': '1\n', 'c.ts': '1\n' };
+    const BEFORE: Files = { 'a.ts': '1\r\n', 'b.ts': '1\n', 'c.ts': '1\n' };
     const AFTER: Files = { 'a.ts': '2\n', 'b.ts': '2\n', 'd.ts': 'new\n' };
 
     /** Makes every write of a file named `name` fail, and of `a.ts` too when it is being put back to `1`. */
@@ -427,14 +427,14 @@ describe('SdkRepositoryContext: the merge', () => {
       sinon.stub(fs.promises, 'writeFile').callsFake((file, data, ...rest) => {
         const target = String(file);
         const text = typeof data === 'string' ? data : Buffer.from(data as Uint8Array).toString();
-        const restoringA = andRestoringA && target.endsWith('a.ts') && text === '1\n';
+        const restoringA = andRestoringA && target.endsWith('a.ts') && text === '1\r\n';
         return target.endsWith(name) || restoringA
           ? Promise.reject(new Error(`EACCES: permission denied, open '${target}'`))
           : real.call(fs.promises, file, data, ...rest);
       });
     };
 
-    it('names the file, puts back what it had changed, and leaves the directory as it was', async () => {
+    it('names the file, puts back what it had changed byte for byte, and leaves the directory as it was', async () => {
       const { written, read, paths } = await run(BEFORE, BEFORE, AFTER, { beforeWrite: breaking('b.ts') });
 
       const problem = written._unsafeUnwrapErr();
@@ -447,7 +447,7 @@ describe('SdkRepositoryContext: the merge', () => {
       expect(problem.reason).to.contain('EACCES');
       expect(problem.undo).to.deep.equal({ kind: 'done' });
       expect(paths()).to.deep.equal(['a.ts', 'b.ts', 'c.ts']);
-      expect([read('a.ts'), read('b.ts'), read('c.ts')]).to.deep.equal(['1\n', '1\n', '1\n']);
+      expect([read('a.ts'), read('b.ts'), read('c.ts')]).to.deep.equal(['1\r\n', '1\n', '1\n']);
     });
 
     it('says what could not be put back, and which snapshot to restore from', async () => {
@@ -460,23 +460,45 @@ describe('SdkRepositoryContext: the merge', () => {
       }
       expect(problem.undo.reason).to.contain('a.ts');
       expect(problem.undo.previous.isEqual(repository.previousRef())).to.be.true;
-      expect(read('a.ts')).to.equal('2\n');
+      expect(read('a.ts')).to.equal('2\r\n');
       expect(read('c.ts')).to.equal('1\n');
     });
   });
 
   describe('content rules', () => {
-    it('reads a line ending alone as no change, writes a merged file with LF, and leaves an untouched CRLF file as it is', async () => {
+    it('reads a line ending alone as no change, writes a merged file with the ending it has on disk, and leaves an untouched CRLF file as it is', async () => {
       const { plan, read } = await run(
         { 'a.ts': 'one\ntwo\n', 'b.ts': 'b\n' },
         { 'a.ts': 'one\r\ntwo\r\nthree\r\n', 'b.ts': 'b\r\n' },
         { 'a.ts': 'zero\none\ntwo\n', 'b.ts': 'b\n' }
       );
 
-      expect(read('a.ts')).to.equal('zero\none\ntwo\nthree\n');
+      expect(read('a.ts')).to.equal('zero\r\none\r\ntwo\r\nthree\r\n');
       expect(read('b.ts')).to.equal('b\r\n');
       expect(plan.files.merged).to.have.length(1);
       expect(plan.hasConflicts()).to.be.false;
+    });
+
+    it('keeps the generator’s CRLF in a file it changes, gives a new file the generator’s ending, and keeps LF where you chose it', async () => {
+      const { read } = await run(
+        { 'a.cs': 'one\r\ntwo\r\n', 'b.cs': 'one\r\ntwo\r\n', 'c.cs': 'c\r\n' },
+        { 'a.cs': 'one\r\ntwo\r\n', 'b.cs': 'mine\none\ntwo\n', 'c.cs': 'c\r\n' },
+        { 'a.cs': 'one\r\ntwo\r\nthree\r\n', 'b.cs': 'one\r\ntwo\r\nthree\r\n', 'c.cs': 'c\r\n', 'd.cs': 'new\r\n' }
+      );
+
+      expect(read('a.cs')).to.equal('one\r\ntwo\r\nthree\r\n');
+      expect(read('b.cs')).to.equal('mine\none\ntwo\nthree\n');
+      expect(read('d.cs')).to.equal('new\r\n');
+    });
+
+    it('labels the markers of a CRLF file on CRLF lines', async () => {
+      const { read } = await run(
+        { 'a.cs': 'one\r\ntwo\r\n' },
+        { 'a.cs': 'one\r\nmine\r\n' },
+        { 'a.cs': 'one\r\ntheirs\r\n' }
+      );
+
+      expect(read('a.cs')).to.equal(`one\r\n${YOURS_MARKER}\r\nmine\r\n=======\r\ntheirs\r\n${GENERATED_MARKER}\r\n`);
     });
 
     it('replaces an unedited binary and keeps an edited one, as a conflict when the generator changed it too', async () => {

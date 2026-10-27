@@ -3,6 +3,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { TextDecoder } from 'node:util';
+import { Buffer } from 'node:buffer';
 import { expect } from 'chai';
 import { canonical } from '../../src/infrastructure/tmp-extensions.js';
 import { execa } from 'execa';
@@ -106,6 +107,20 @@ describe('GitService', () => {
 
       expect(files.get('crlf.txt')).to.equal('one\ntwo\n');
       expect(files.get('lf.txt')).to.equal('one\ntwo\n');
+    });
+
+    it('keeps every byte when asked for the files as they are, and reads a last blob ending in CR whole', async () => {
+      const repo = await repository();
+      write(repo, 'crlf.txt', 'one\r\ntwo\r\n');
+      write(repo, 'cr-at-end.bin', 'x\r');
+
+      const entries = await git.listTree(repo, await git.treeOf(repo, repo, 'all', 'asIs'));
+      const crlf = entries.find((entry) => entry.path.toString() === 'crlf.txt')!;
+      const cr = entries.find((entry) => entry.path.toString() === 'cr-at-end.bin')!;
+      const blobs = await git.readBlobs(repo, [crlf.oid, cr.oid]);
+
+      expect(Buffer.from(blobs.get(crlf.oid)!).toString()).to.equal('one\r\ntwo\r\n');
+      expect([...blobs.get(cr.oid)!]).to.deep.equal([0x78, 0x0d]);
     });
   });
 
