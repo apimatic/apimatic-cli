@@ -109,7 +109,7 @@ describe('PlacedCodeSamples', () => {
       expect(unplacedIn(unplaced)).to.deep.equal([['./spec', ['GET /owners']]]);
     });
 
-    it('names, of the samples filed under a spec, those it does not declare, and checks nothing else', () => {
+    it('names, of the samples filed under a spec, those it does not declare, and none of paths', () => {
       const unplaced = placedOn(
         [
           catalog(Language.TYPESCRIPT, {
@@ -117,8 +117,7 @@ describe('PlacedCodeSamples', () => {
             specs: {
               'orders/openapi.yaml': {
                 paths: { '/orders': { GET: { Example: 'orders' } }, '/refunds': { POST: { Example: 'refund' } } }
-              },
-              'gamma/openapi.json': { paths: { '/gamma': { GET: { Example: 'gamma' } } } }
+              }
             }
           })
         ],
@@ -126,6 +125,25 @@ describe('PlacedCodeSamples', () => {
       ).unplaced();
 
       expect(unplacedIn(unplaced)).to.deep.equal([['spec/orders/openapi.yaml', ['POST /refunds']]]);
+    });
+
+    // A merged folder built from another file than the OpenAPI document the portal reads (apimatic-io#2307).
+    it('names every sample filed under a file no spec is read from, once across languages', () => {
+      const collection = (call: string) => ({
+        paths: {},
+        specs: {
+          'inventory/collection.json': {
+            paths: { '/status': { GET: { Example: call } }, '/stock': { GET: { Example: call } } }
+          }
+        }
+      });
+
+      const unplaced = placedOn(
+        [catalog(Language.TYPESCRIPT, collection('ts')), catalog(Language.CSHARP, collection('cs'))],
+        [spec('inventory', 'inventory/openapi.json', ['GET /status', 'GET /stock'])]
+      ).unplaced();
+
+      expect(unplacedIn(unplaced)).to.deep.equal([['spec/inventory/collection.json', ['GET /status', 'GET /stock']]]);
     });
   });
 

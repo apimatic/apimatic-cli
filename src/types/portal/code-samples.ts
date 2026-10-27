@@ -31,7 +31,7 @@ export interface EndpointSample {
 /** An operation more than one spec declares, which one code sample per method and path cannot serve. */
 export type SharedEndpoint = Shared<Endpoint>;
 
-/** Samples no operation in `where` takes: a spec, for its own samples, or `spec/`, for the rest. */
+/** Samples no operation in `where` takes: the file they are filed under, a spec or not, or `spec/`, for the rest. */
 export interface UnplacedSamples {
   where: FilePath | DirectoryPath;
   endpoints: Endpoint[];
@@ -65,6 +65,11 @@ export class CodeSampleCatalog {
 
   public samplesOf(specFile: string): EndpointSample[] {
     return this.specs.get(specFile) ?? [];
+  }
+
+  /** The files the samples are filed under. */
+  public specFiles(): string[] {
+    return [...this.specs.keys()];
   }
 }
 
@@ -101,6 +106,10 @@ export class PlacedCodeSamples {
     const declared = this.specs.flatMap(({ endpoints }) => endpoints);
     return [
       ...this.specs.map((spec) => ({ where: spec.file, endpoints: undeclared(this.ownSamples(spec), spec.endpoints) })),
+      ...this.unreadSpecFiles().map((specFile) => ({
+        where: FilePath.resolve(this.specDirectory, specFile),
+        endpoints: endpointsOf(this.samplesOf(specFile))
+      })),
       { where: this.specDirectory, endpoints: undeclared(this.unfiledSamples(), declared) }
     ].filter(({ endpoints }) => endpoints.length > 0);
   }
@@ -119,8 +128,17 @@ export class PlacedCodeSamples {
   }
 
   private ownSamples({ file }: PortalSpec): EndpointSample[] {
-    const specFile = file.relativeTo(this.specDirectory);
+    return this.samplesOf(file.relativeTo(this.specDirectory));
+  }
+
+  private samplesOf(specFile: string): EndpointSample[] {
     return this.catalogs.flatMap((catalog) => catalog.samplesOf(specFile));
+  }
+
+  /** The files samples are filed under that no spec is read from: the platform built an API from another file. */
+  private unreadSpecFiles(): string[] {
+    const read = new Set(this.specs.map(({ file }) => file.relativeTo(this.specDirectory)));
+    return [...new Set(this.catalogs.flatMap((catalog) => catalog.specFiles()))].filter((file) => !read.has(file));
   }
 
   private unfiledSamples(): EndpointSample[] {
@@ -128,11 +146,15 @@ export class PlacedCodeSamples {
   }
 }
 
+/** The endpoints of `samples`, each once. */
+function endpointsOf(samples: EndpointSample[]): Endpoint[] {
+  return [...new Map(samples.map(({ endpoint }) => [String(endpoint), endpoint])).values()];
+}
+
 /** The endpoints of `samples` that `declared` leaves out, each once. */
 function undeclared(samples: EndpointSample[], declared: Endpoint[]): Endpoint[] {
   const names = new Set(declared.map(String));
-  const sampled = new Map(samples.map(({ endpoint }) => [String(endpoint), endpoint]));
-  return [...sampled.values()].filter((endpoint) => !names.has(String(endpoint)));
+  return endpointsOf(samples).filter((endpoint) => !names.has(String(endpoint)));
 }
 
 /** Languages in the order given, each endpoint's samples together. */
