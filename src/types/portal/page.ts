@@ -18,7 +18,7 @@ export interface PageImage {
   line: number;
   /** An image written as `/…` is read from the static directory, any other from beside its page. */
   from: 'static' | 'page';
-  /** Decoded, without its query or fragment, with `/` between segments. */
+  /** Decoded, without the spaces around it or its query or fragment, with `/` between segments. */
   path: string;
 }
 
@@ -159,7 +159,8 @@ function addressOf(node: MarkdownNode, definitions: Map<string, string>): string
 }
 
 function located(url: string): Omit<PageImage, 'line'> | null {
-  const address = url.split(/[?#]/, 1)[0];
+  // A browser drops the spaces around an `<img>`'s address.
+  const address = url.trim().split(/[?#]/, 1)[0];
   if (address.length === 0 || address.endsWith('/') || NOT_A_FILE.test(address)) {
     return null;
   }

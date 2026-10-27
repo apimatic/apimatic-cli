@@ -4,7 +4,7 @@ import { remark } from 'remark';
 import remarkMdx from 'remark-mdx';
 import { FileName } from '../../src/types/file/fileName';
 import { parsePage } from '../../src/types/portal/page';
-import { remarkJsxImages } from '../../portal-template/src/lib/remark-jsx-images';
+import { remarkJsxImages } from '../../portal-template/remark-jsx-images';
 
 describe('the <img> tags of the .mdx content pages', () => {
   const project = path.resolve('/portal');
@@ -35,8 +35,8 @@ describe('the <img> tags of the .mdx content pages', () => {
     );
   });
 
-  it('reads the address without its query or fragment, and decoded', () => {
-    expect(transformed('<img src="./my%20flow.png?v=2#top" />\n')).to.equal(
+  it('reads the address without the spaces around it or its query or fragment, and decoded', () => {
+    expect(transformed('<img src=" ./my%20flow.png?v=2#top " />\n')).to.equal(
       'import __jsxImg0 from "./my flow.png"\n\n<img src={__jsxImg0} />\n'
     );
   });
@@ -115,7 +115,8 @@ describe('the <img> tags of the .mdx content pages', () => {
   it('imports exactly the files the CLI checks', async () => {
     const mdx =
       '---\ntitle: Images\n---\n\n<img src="/images/a%20b.png?v=1" />\n\nInline <img src="./c.png#top" /> here.\n\n' +
-      '<Card>\n  <img src="../d.png" />\n</Card>\n\n<img src="https://example.com/e.png" />\n\n<img src={f} />\n';
+      '<Card>\n  <img src="../d.png" />\n</Card>\n\n<img src="https://example.com/e.png" />\n\n<img src={f} />\n\n' +
+      '<img src=" ./g.png " />\n';
     const checked = (await parsePage(mdx, new FileName('page.mdx'), 'content/guides/page.mdx')).images;
     const imported = [...transformed(mdx).matchAll(/^import __jsxImg\d+ from "(.+)"$/gm)].map(([, source]) =>
       path.join(pageDirectory, source)

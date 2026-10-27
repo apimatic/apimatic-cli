@@ -161,6 +161,12 @@ describe('parsePage', () => {
       ]);
     });
 
+    it('reads the src of an <img> without the spaces around it, as a browser does', async () => {
+      expect(await images('<img src=" /images/a.png " />\n', 'page.mdx')).to.deep.equal([
+        { url: ' /images/a.png ', line: 1, from: 'static', path: 'images/a.png' }
+      ]);
+    });
+
     it('leaves out an <img> whose src names no file or is code, and other tags', async () => {
       const mdx =
         '<img src="https://example.com/a.png" />\n\n<img src={logo} />\n\n<img alt="None" />\n\n' +

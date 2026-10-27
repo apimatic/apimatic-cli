@@ -54,7 +54,6 @@ export function remarkJsxImages({ publicDir }: { publicDir: string | false }) {
   };
 }
 
-/** The `src` attribute of each `<img>` in the tree whose value is a string, with that value. */
 function* imageSources(node: MarkdownNode): Generator<[JsxAttribute, string]> {
   if ((node.type === 'mdxJsxFlowElement' || node.type === 'mdxJsxTextElement') && node.name === 'img') {
     const src = node.attributes?.find(({ type, name }) => type === 'mdxJsxAttribute' && name === 'src');
@@ -63,9 +62,9 @@ function* imageSources(node: MarkdownNode): Generator<[JsxAttribute, string]> {
   for (const child of node.children ?? []) yield* imageSources(child);
 }
 
-/** Without its query or fragment and decoded: `/…` from the static directory, any other from beside the page. */
 function fileOf(address: string, publicDir: string | false, dirname: string): string | null {
-  const written = address.split(/[?#]/, 1)[0];
+  // A browser drops the spaces around an address.
+  const written = address.trim().split(/[?#]/, 1)[0];
   if (written.length === 0 || written.endsWith('/') || NOT_A_FILE.test(written)) return null;
   const decoded = decodedAddress(written);
   if (!decoded.startsWith('/')) return path.join(dirname, decoded);
