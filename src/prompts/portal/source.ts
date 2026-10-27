@@ -2,7 +2,8 @@ import { log } from '@clack/prompts';
 import { APIMATIC_CONFIG_FILE_NAME } from '../../types/apimatic-config/document.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { listedInProse } from '../../utils/string-utils.js';
-import { ContentNotices, NoTabsListed, TaggedPage } from '../../types/portal/content-notices.js';
+import { ContentNotices, NoTabsListed } from '../../types/portal/content-notices.js';
+import { LeftOutHtml } from '../../types/portal/left-out-html.js';
 import { API_REFERENCE_TOKEN, NAVIGATION_FILE_NAME, TabEntry } from '../../types/portal/portal-navigation.js';
 import {
   ContentProblem,
@@ -33,9 +34,6 @@ import { format as f } from '../format.js';
 const TITLE_EXAMPLE = ['---', 'title: Getting started', '---'].join('\n');
 
 const ROOT_NAVIGATION_FILE = `${CONTENT_DIRECTORY_NAME}/${NAVIGATION_FILE_NAME}`;
-
-// Renaming the page keeps every tag in it, so a few of its tag names say enough.
-const TAG_NAMES_SHOWN_PER_PAGE = 3;
 
 const mergeTheFolders = (): string =>
   `set ${f.var(`${MERGE_SETTINGS.configuration}.${MERGE_SETTINGS.mergeApis}`)} to true in an ` +
@@ -446,7 +444,7 @@ export function reportIgnoredNavigationFiles(files: FilePath[], sourceDirectory:
 }
 
 export function reportContentNotices(notices: ContentNotices, sourceDirectory: DirectoryPath): void {
-  reportTaggedPages(notices.taggedPages, sourceDirectory);
+  reportLeftOutHtml(notices.leftOutHtml, sourceDirectory);
   reportHiddenPages(notices.hiddenPages, sourceDirectory);
   reportIgnoredNavigationFiles(notices.ignoredNavigationFiles, sourceDirectory);
   reportSharedTabNames(notices.sharedTabNames, sourceDirectory);
@@ -530,22 +528,16 @@ export function reportSharedTabNames(shared: SharedTabName[], sourceDirectory: D
   );
 }
 
-export function reportTaggedPages(pages: TaggedPage[], sourceDirectory: DirectoryPath): void {
+export function reportLeftOutHtml(pages: LeftOutHtml[], sourceDirectory: DirectoryPath): void {
   if (pages.length === 0) {
     return;
   }
   const one = pages.length === 1;
-  const lines = pages.flatMap(({ page, tags }) => {
-    // Each name once, where the page first has it, or forty `<br>`s would hide the `<details>` after them.
-    const named = tags.filter((tag, index) => tags.findIndex(({ name }) => name === tag.name) === index);
-    const more = named.length - TAG_NAMES_SHOWN_PER_PAGE;
-    return [
-      ...named.slice(0, TAG_NAMES_SHOWN_PER_PAGE).map(({ name, closing, line }) => {
-        const written = `<${closing ? '/' : ''}${name}>`;
-        return `  • ${relative(page, sourceDirectory)}, line ${line}: ${f.var(written)}`;
-      }),
-      ...(more > 0 ? [`    and ${more} more on this page`] : [])
-    ];
+  const lines = pages.flatMap((html) => {
+    const page = relative(html.page, sourceDirectory);
+    const shown = html.shown().map(({ line, text }) => `  • ${page}, line ${line}: ${f.var(text)}`);
+    const unshown = html.unshown();
+    return unshown === 0 ? shown : [...shown, `    and ${unshown} more on this page`];
   });
   const holding = one
     ? `A ${f.var('.md')} page in ${f.path(sourceDirectory)} has`

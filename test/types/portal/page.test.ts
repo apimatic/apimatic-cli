@@ -182,61 +182,47 @@ describe('parsePage', () => {
   });
 
   // The build leaves out every piece of HTML in a `.md` page, and the reader loses what it says.
-  describe('the tags of a .md page', () => {
-    const tags = async (markdown: string, name?: string) => (await page(markdown, name)).droppedTags;
+  describe('the HTML of a .md page', () => {
+    const html = async (markdown: string, name?: string) => (await page(markdown, name)).leftOutHtml;
 
-    it('names each piece of HTML by the first tag it opens, or else the first it closes, at its line', async () => {
+    it('names each piece of HTML by the line it starts on, as written', async () => {
       const markdown =
         '---\ntitle: Tags\n---\n\nLine one<br>line two.\n\n<details>\n<summary>More</summary>\n\nHidden.\n\n' +
-        '</details>\n\n<Cards>\n  <Card title="A" href="/a" />\n</Cards>\n';
+        '</details>\n\n<Callout type="warn">\nKeep it secret.\n</Callout>\n';
 
-      expect(await tags(markdown)).to.deep.equal([
-        { name: 'br', closing: false, line: 5 },
-        { name: 'details', closing: false, line: 7 },
-        { name: 'details', closing: true, line: 12 },
-        { name: 'Cards', closing: false, line: 14 }
+      expect(await html(markdown)).to.deep.equal([
+        { line: 5, text: '<br>' },
+        { line: 7, text: '<details>' },
+        { line: 14, text: '<Callout type="warn">' }
       ]);
     });
 
-    it('names a tag opened after one is closed at the line it is opened on', async () => {
-      const markdown = '<details>\n<summary>A</summary>\n\nText.\n\n</details>\n<details>\n<summary>B</summary>\n';
-
-      expect(await tags(markdown)).to.deep.equal([
-        { name: 'details', closing: false, line: 1 },
-        { name: 'details', closing: false, line: 7 }
-      ]);
-    });
-
-    // Markdown shows the opening tag of a component with a `{…}` attribute as text, and leaves out its end.
-    it('names a piece that only closes a tag, such as the end of a component or text after a closing tag', async () => {
-      const markdown = "<Tabs items={['npm', 'pnpm']}>\n\nnpm i\n\n</Tabs>\n\n</div>\nThis line is left out too.\n";
-
-      expect(await tags(markdown)).to.deep.equal([
-        { name: 'Tabs', closing: true, line: 5 },
-        { name: 'div', closing: true, line: 7 }
-      ]);
-    });
-
-    // A comment shows on no page either way.
-    it('leaves out a comment and a tag inside one, but not a tag after one', async () => {
+    it('names a piece that leaves text out after a closing tag or a comment', async () => {
       const markdown =
-        '<!-- <b>Draft</b> -->\n\nText <!-- note --> here.\n\n<!--\nA note.\n--> <span>Kept?</span>\n\n' +
-        '<!---> <i>After an empty comment</i>\n';
+        '</div>\nThis line is left out too.\n\n<!-- TODO --> And this one.\n\n<!---> <i>After an empty comment</i>\n';
 
-      expect(await tags(markdown)).to.deep.equal([
-        { name: 'span', closing: false, line: 7 },
-        { name: 'i', closing: false, line: 9 }
+      expect(await html(markdown)).to.deep.equal([
+        { line: 1, text: '</div>' },
+        { line: 4, text: '<!-- TODO --> And this one.' },
+        { line: 6, text: '<!---> <i>After an empty comment</i>' }
       ]);
+    });
+
+    it('leaves out a piece of nothing but comments and closing tags', async () => {
+      const markdown =
+        '<!-- <b>Draft</b> -->\n\nText <!-- note --> here.\n\n</details>\n\nPress <kbd>Ctrl</kbd>.\n\n<!--->\n';
+
+      expect(await html(markdown)).to.deep.equal([{ line: 7, text: '<kbd>' }]);
     });
 
     it('reads code, inline code and an autolink as the text they are', async () => {
       const markdown = '```html\n<div>\n```\n\nWrite `<br>` for a break, or see <https://example.com>.\n';
 
-      expect(await tags(markdown)).to.deep.equal([]);
+      expect(await html(markdown)).to.deep.equal([]);
     });
 
-    it('names none in an .mdx page, which renders its tags', async () => {
-      expect(await tags('Line one<br />line two.\n\n<details>\n\nText.\n\n</details>\n', 'page.mdx')).to.deep.equal([]);
+    it('names none in an .mdx page, which renders its HTML', async () => {
+      expect(await html('Line one<br />line two.\n\n<details>\n\nText.\n\n</details>\n', 'page.mdx')).to.deep.equal([]);
     });
   });
 });

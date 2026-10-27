@@ -22,21 +22,18 @@ export interface PageImage {
   path: string;
 }
 
-/** A piece of HTML in a `.md` page, by the first tag it opens, or else the first it closes. */
-export interface PageTag {
-  /** As written: `br`, `details` or `Cards`. */
-  name: string;
-  /** A piece that opens none, such as the `</Tabs>` of a component Markdown shows as text. */
-  closing: boolean;
+/** A piece of HTML in a `.md` page, by the line it starts on and that line as written. */
+export interface HtmlPiece {
   line: number;
+  text: string;
 }
 
-/** A page as the build reads it, as far as the checks go. */
+/** A page as the build parses it. */
 export interface ParsedPage {
   frontMatter: Result<PageFrontMatter, string[]>;
   images: PageImage[];
-  /** None in an `.mdx` page, which renders its tags. */
-  droppedTags: PageTag[];
+  /** None in an `.mdx` page, which renders its HTML. */
+  leftOutHtml: HtmlPiece[];
 }
 
 type SchemaIssue = NonNullable<ReturnType<typeof pageSchema.safeParse>['error']>['issues'][number];
@@ -59,10 +56,7 @@ const NOT_A_FILE = /^(?:[a-z][a-z\d+.-]*:|\/\/)/i;
 
 // As CommonMark reads one, where `<!-->` and `<!--->` are whole comments.
 const COMMENT = /<!--(?:-?>|[\s\S]*?(?:-->|$))/g;
-
-// A tag name as CommonMark reads one.
-const OPENING_TAG = /<([a-z][a-z\d-]*)/i;
-const CLOSING_TAG = /<\/([a-z][a-z\d-]*)/i;
+const CLOSING_TAG = /<\/[a-z][a-z\d-]*\s*>/gi;
 
 /** Parsed once, as the build parses it, `.mdx` as MDX; a body that does not parse is the build's to report. */
 export async function parsePage(contents: string, fileName: FileName, label: string): Promise<ParsedPage> {
@@ -74,7 +68,7 @@ export async function parsePage(contents: string, fileName: FileName, label: str
     return {
       frontMatter: err([`${label}: its front matter is not valid YAML. ${reason}`]),
       images: [],
-      droppedTags: []
+      leftOutHtml: []
     };
   }
   // Blanked rather than cut, so every line keeps its number.
@@ -85,7 +79,7 @@ export async function parsePage(contents: string, fileName: FileName, label: str
   return {
     frontMatter: await checkedFrontMatter(parsed, label),
     images: imagesIn(nodes),
-    droppedTags: isMdx ? [] : tagsIn(nodes)
+    leftOutHtml: isMdx ? [] : htmlIn(nodes)
   };
 }
 
@@ -144,7 +138,6 @@ async function parsedBody(body: string, isMdx: boolean): Promise<MarkdownNode | 
   }
 }
 
-/** Each node before its children, in the order the page has them. */
 function nodesOf(node: MarkdownNode): MarkdownNode[] {
   return [node, ...(node.children ?? []).flatMap(nodesOf)];
 }
@@ -165,21 +158,12 @@ function imagesIn(nodes: MarkdownNode[]): PageImage[] {
   });
 }
 
-function tagsIn(nodes: MarkdownNode[]): PageTag[] {
-  return nodes
-    .filter(({ type }) => type === 'html')
-    .flatMap(({ value, position }) => {
-      // A comment shows on no page either way, and a tag in one is text; blanked, so the lines still count.
-      const html = (value ?? '').replace(COMMENT, (comment) => comment.replace(/./g, ' '));
-      const opening = OPENING_TAG.exec(html);
-      const tag = opening ?? CLOSING_TAG.exec(html);
-      if (tag === null) {
-        return [];
-      }
-      // The tag's own line: a piece can close one tag before it opens another, `</details>` then `<details>`.
-      const line = (position?.start.line ?? 0) + html.slice(0, tag.index).split('\n').length - 1;
-      return [{ name: tag[1], closing: opening === null, line }];
-    });
+function htmlIn(nodes: MarkdownNode[]): HtmlPiece[] {
+  // Comments and closing tags leave out nothing a reader would see.
+  const shows = (html: string) => html.replace(COMMENT, '').replace(CLOSING_TAG, '').trim() !== '';
+  return nodes.flatMap(({ type, value = '', position }) =>
+    type === 'html' && shows(value) ? [{ line: position?.start.line ?? 0, text: value.split('\n')[0].trim() }] : []
+  );
 }
 
 function addressOf(node: MarkdownNode, definitions: Map<string, string>): string | undefined {

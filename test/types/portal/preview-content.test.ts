@@ -4,6 +4,7 @@ import { FileName } from '../../../src/types/file/fileName';
 import { FilePath } from '../../../src/types/file/filePath';
 import { ContentNotices } from '../../../src/types/portal/content-notices';
 import { GeneratedSection, PLUGIN_SECTION, SDK_SECTION } from '../../../src/types/portal/generated-pages';
+import { LeftOutHtml } from '../../../src/types/portal/left-out-html';
 import { TabEntry } from '../../../src/types/portal/portal-navigation';
 import { PortalTab, SharedTabName } from '../../../src/types/portal/portal-tabs';
 import { PreviewContent } from '../../../src/types/portal/preview-content';
@@ -14,7 +15,7 @@ describe('PreviewContent', () => {
   const folder = (name: string) => content.join(name);
 
   const NONE: ContentNotices = {
-    taggedPages: [],
+    leftOutHtml: [],
     hiddenPages: [],
     ignoredNavigationFiles: [],
     sharedTabNames: [],
@@ -115,19 +116,21 @@ describe('PreviewContent', () => {
     expect(noticesAfter(titled, titled).unseenHomeTitle).to.be.undefined;
   });
 
-  // By page and tag name, or every edit above a tag would give the notice again.
-  it('gives the tagged pages again for a page or a tag not there before, not for a tag on another line', () => {
+  it('gives the left-out HTML again when a page has a piece it did not have, not when one moves', () => {
     const index = new FilePath(content, new FileName('index.md'));
-    const intro = new FilePath(folder('guides'), new FileName('intro.md'));
-    const tag = (name: string, line: number) => ({ name, closing: false, line });
-    const before = notices({ taggedPages: [{ page: index, tags: [tag('br', 5)] }] });
-    const moved = notices({ taggedPages: [{ page: index, tags: [tag('br', 9), tag('br', 12)] }] });
-    const newName = notices({ taggedPages: [{ page: index, tags: [tag('br', 9), tag('details', 14)] }] });
-    const newPage = notices({ taggedPages: [...moved.taggedPages, { page: intro, tags: [tag('br', 3)] }] });
+    const before = notices({ leftOutHtml: [new LeftOutHtml(index, [{ line: 5, text: '<br>' }])] });
+    const moved = notices({ leftOutHtml: [new LeftOutHtml(index, [{ line: 9, text: '<br>' }])] });
+    const added = notices({
+      leftOutHtml: [
+        new LeftOutHtml(index, [
+          { line: 9, text: '<br>' },
+          { line: 14, text: '<details>' }
+        ])
+      ]
+    });
 
-    expect(noticesAfter(moved, before).taggedPages).to.deep.equal([]);
-    expect(noticesAfter(newName, before).taggedPages).to.deep.equal(newName.taggedPages);
-    expect(noticesAfter(newPage, before).taggedPages).to.deep.equal(newPage.taggedPages);
+    expect(noticesAfter(moved, before).leftOutHtml).to.deep.equal([]);
+    expect(noticesAfter(added, before).leftOutHtml).to.deep.equal(added.leftOutHtml);
   });
 
   it('gives a name shared by another tab than before', () => {

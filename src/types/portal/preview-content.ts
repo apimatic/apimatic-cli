@@ -1,5 +1,5 @@
 import { FilePath } from '../file/filePath.js';
-import { ContentNotices, NoTabsListed, TaggedPage } from './content-notices.js';
+import { ContentNotices, NoTabsListed } from './content-notices.js';
 import { isSameTabEntry } from './portal-navigation.js';
 import { SharedTabName, TabOwner } from './portal-tabs.js';
 import { PreviewRefusal } from './preview-refusal.js';
@@ -33,7 +33,9 @@ export class PreviewContent {
 
   private static since(current: ContentNotices, previous: ContentNotices): ContentNotices {
     return {
-      taggedPages: whenAnyNew(current.taggedPages, previous.taggedPages, isSameTaggedPage),
+      leftOutHtml: whenAnyNew(current.leftOutHtml, previous.leftOutHtml, (html, earlier) =>
+        html.addsNothingTo(earlier)
+      ),
       hiddenPages: whenAnyNew(current.hiddenPages, previous.hiddenPages, (left, right) => left.isEqual(right)),
       ignoredNavigationFiles: whenAnyNew(
         current.ignoredNavigationFiles,
@@ -61,14 +63,6 @@ function whenNew<T>(
 
 function isSameFile(left: FilePath | undefined, right: FilePath | undefined): boolean {
   return left === undefined || right === undefined ? left === right : left.isEqual(right);
-}
-
-// The same page with no tag it lacked before; not by line, or every edit above a tag would give the notice again.
-function isSameTaggedPage(current: TaggedPage, earlier: TaggedPage): boolean {
-  return (
-    current.page.isEqual(earlier.page) &&
-    current.tags.every(({ name }) => earlier.tags.some((tag) => tag.name === name))
-  );
 }
 
 function isSameNoTabs(left: NoTabsListed, right: NoTabsListed): boolean {

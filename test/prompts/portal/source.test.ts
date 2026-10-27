@@ -4,13 +4,13 @@ import sinon from 'sinon';
 import { log } from '@clack/prompts';
 import { PortalServePrompts } from '../../../src/prompts/portal/serve.js';
 import {
+  reportLeftOutHtml,
   reportLeftOutSpecs,
   reportNoTabsListed,
   reportShadowedFiles,
   reportSharedEndpoints,
   reportSharedTabNames,
   reportSourceProblem,
-  reportTaggedPages,
   reportUnmergedSpecs,
   reportUnseenHomeTitle
 } from '../../../src/prompts/portal/source.js';
@@ -20,6 +20,7 @@ import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
 import { FileName } from '../../../src/types/file/fileName.js';
 import { FilePath } from '../../../src/types/file/filePath.js';
 import { PLUGIN_SECTION, SDK_SECTION } from '../../../src/types/portal/generated-pages.js';
+import { LeftOutHtml } from '../../../src/types/portal/left-out-html.js';
 import { OAUTH_CALLBACK } from '../../../src/types/portal/content-tree.js';
 
 /** What `log.warn` and `log.message` print from here on, without colours, until `sinon.restore`. */
@@ -863,11 +864,10 @@ describe('reportLeftOutSpecs', () => {
   });
 });
 
-describe('reportTaggedPages', () => {
+describe('reportLeftOutHtml', () => {
   const source = new DirectoryPath('project').join('src');
   const index = new FilePath(source.join('content'), new FileName('index.md'));
   const intro = new FilePath(source.join('content', 'guides'), new FileName('intro.md'));
-  const tag = (name: string, line: number, closing = false) => ({ name, closing, line });
   let lines: string[];
 
   beforeEach(() => {
@@ -878,49 +878,43 @@ describe('reportTaggedPages', () => {
     sinon.restore();
   });
 
-  it('says nothing when no .md page has a tag', () => {
-    reportTaggedPages([], source);
+  it('says nothing when no .md page has HTML', () => {
+    reportLeftOutHtml([], source);
 
     expect(lines).to.deep.equal([]);
   });
 
-  it('names each tag of a page with its line, and how to keep them', () => {
-    reportTaggedPages([{ page: index, tags: [tag('br', 5), tag('details', 9)] }], source);
+  it('names the HTML of a page with its lines, and how to keep it', () => {
+    reportLeftOutHtml(
+      [
+        new LeftOutHtml(index, [
+          { line: 5, text: '<br>' },
+          { line: 9, text: '<Callout type="warn">' }
+        ])
+      ],
+      source
+    );
 
     expect(lines.join('\n').split('\n')).to.deep.equal([
       `A '.md' page in '${source.toString()}' has HTML or components, which the portal leaves out:`,
       "  • 'content/index.md', line 5: '<br>'",
-      "  • 'content/index.md', line 9: '<details>'",
+      "  • 'content/index.md', line 9: '<Callout type=\"warn\">'",
       "Rename the page to '.mdx' to keep them. MDX needs empty tags closed, such as '<br />', and comments written " +
         "as '{/* … */}'."
     ]);
   });
 
-  it('names each tag of a page once, where it first has it, up to three, and counts the rest', () => {
-    const tags = [tag('br', 5), tag('br', 9), tag('details', 12), tag('details', 20, true), tag('span', 24)];
+  it('counts what a page does not show', () => {
+    const pieces = ['<br>', '<details>', '<span>', '<kbd>', '<i>'].map((text, index) => ({ line: index + 1, text }));
 
-    reportTaggedPages([{ page: index, tags: [...tags, tag('Tabs', 30, true), tag('i', 33)] }], source);
+    reportLeftOutHtml([new LeftOutHtml(index, pieces)], source);
 
-    expect(lines[1].split('\n')).to.deep.equal([
-      "  • 'content/index.md', line 5: '<br>'",
-      "  • 'content/index.md', line 12: '<details>'",
-      "  • 'content/index.md', line 24: '<span>'",
-      '    and 2 more on this page'
-    ]);
-  });
-
-  it('writes a tag the page only closes as it closes it', () => {
-    reportTaggedPages([{ page: index, tags: [tag('Tabs', 30, true)] }], source);
-
-    expect(lines[1]).to.equal("  • 'content/index.md', line 30: '</Tabs>'");
+    expect(lines[1].split('\n').at(-1)).to.equal('    and 2 more on this page');
   });
 
   it('speaks of each page when there are several', () => {
-    reportTaggedPages(
-      [
-        { page: index, tags: [tag('br', 5)] },
-        { page: intro, tags: [tag('Cards', 3)] }
-      ],
+    reportLeftOutHtml(
+      [new LeftOutHtml(index, [{ line: 5, text: '<br>' }]), new LeftOutHtml(intro, [{ line: 3, text: '<Cards>' }])],
       source
     );
 
