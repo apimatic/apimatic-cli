@@ -161,9 +161,11 @@ describe('parsePage', () => {
       ]);
     });
 
-    it('reads the src of an <img> without the spaces around it, as a browser does', async () => {
-      expect(await images('<img src=" /images/a.png " />\n', 'page.mdx')).to.deep.equal([
-        { url: ' /images/a.png ', line: 1, from: 'static', path: 'images/a.png' }
+    // The build looks for the second as written, spaces and all.
+    it('reads the src of an <img> without the spaces around it, and a Markdown image with them', async () => {
+      expect(await images('<img src=" /images/a.png " />\n\n![b](< ./b.png >)\n', 'page.mdx')).to.deep.equal([
+        { url: '/images/a.png', line: 1, from: 'static', path: 'images/a.png' },
+        { url: ' ./b.png ', line: 3, from: 'page', path: ' ./b.png ' }
       ]);
     });
 

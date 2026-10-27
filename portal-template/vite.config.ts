@@ -9,9 +9,9 @@ import { downloads } from './downloads.ts';
 import { generatedPagesReload } from './generated-pages-reload.ts';
 import { readBuildPaths, readPortalIdentity } from './portal-config.ts';
 import { prerenderPages } from './prerender-pages.ts';
+import { remarkJsxImages } from './remark-jsx-images.ts';
 import { specReload } from './spec-reload.ts';
 import { remarkImageReferences } from './src/lib/remark-image-references.ts';
-import { remarkJsxImages } from './remark-jsx-images.ts';
 import { staticFunctionsBase } from './static-functions-base.ts';
 import { staticImages } from './static-images.ts';
 

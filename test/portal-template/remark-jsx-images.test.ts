@@ -41,17 +41,18 @@ describe('the <img> tags of the .mdx content pages', () => {
     );
   });
 
+  const namingNoFile = [
+    '<img src="https://example.com/a.png" />',
+    '<img src="//cdn.example.com/a.png" />',
+    '<img src="data:image/png;base64,AAAA" />',
+    '<img src="" />',
+    '<img src="images/" />',
+    '<img src={logo} />',
+    '<img alt="No address" />'
+  ];
+
   it('leaves an address that names no file as written, and an <img> without one', () => {
-    const mdx =
-      [
-        '<img src="https://example.com/a.png" />',
-        '<img src="//cdn.example.com/a.png" />',
-        '<img src="data:image/png;base64,AAAA" />',
-        '<img src="" />',
-        '<img src="images/" />',
-        '<img src={logo} />',
-        '<img alt="No address" />'
-      ].join('\n\n') + '\n';
+    const mdx = namingNoFile.join('\n\n') + '\n';
 
     expect(transformed(mdx)).to.equal(mdx);
   });
@@ -114,28 +115,38 @@ describe('the <img> tags of the .mdx content pages', () => {
   // The CLI reports a missing file before a build that would otherwise fail over its import, naming no page.
   it('imports exactly the files the CLI checks', async () => {
     const mdx =
-      '---\ntitle: Images\n---\n\n<img src="/images/a%20b.png?v=1" />\n\nInline <img src="./c.png#top" /> here.\n\n' +
-      '<Card>\n  <img src="../d.png" />\n</Card>\n\n<img src="https://example.com/e.png" />\n\n<img src={f} />\n\n' +
-      '<img src=" ./g.png " />\n';
+      [
+        '---\ntitle: Images\n---',
+        '<img src="/images/a%20b.png?v=1" />',
+        'Inline <img src="./c.png#top" /> here.',
+        '<Card>\n  <img src="../d.png" />\n</Card>',
+        '<img src=" ./g.png " />',
+        '<img src="./h%E0.png" />',
+        ...namingNoFile
+      ].join('\n\n') + '\n';
     const checked = (await parsePage(mdx, new FileName('page.mdx'), 'content/guides/page.mdx')).images;
-    const imported = [...transformed(mdx).matchAll(/^import __jsxImg\d+ from "(.+)"$/gm)].map(([, source]) =>
-      path.join(pageDirectory, source)
-    );
+    const imported = (publicDir: string | false) =>
+      [...transformed(mdx, publicDir).matchAll(/^import __jsxImg\d+ from "(.+)"$/gm)].map(([, source]) =>
+        path.join(pageDirectory, source)
+      );
 
-    expect(imported).to.deep.equal(
+    expect(imported(staticDirectory)).to.deep.equal(
       checked.map(({ from, path: file }) => path.join(from === 'static' ? staticDirectory : pageDirectory, file))
+    );
+    // Without a static directory the CLI refuses a `/…` image as missing, so the two need to agree only on the rest.
+    expect(imported(false)).to.deep.equal(
+      checked.flatMap(({ from, path: file }) => (from === 'page' ? [path.join(pageDirectory, file)] : []))
     );
   });
 
-  (process.platform === 'win32' ? it : it.skip)(
-    'imports a static file on another drive by its own path, which static-images.ts resolves',
-    () => {
-      const tree = processor.parse('<img src="/images/logo.png" />\n');
-      remarkJsxImages({ publicDir: 'D:\\static' })(tree, { dirname: 'C:\\portal\\content' });
+  it('imports a static file on another drive by its own path, which static-images.ts resolves', function () {
+    if (process.platform !== 'win32') this.skip();
 
-      expect(processor.stringify(tree)).to.equal(
-        'import __jsxImg0 from "./D:/static/images/logo.png"\n\n<img src={__jsxImg0} />\n'
-      );
-    }
-  );
+    const tree = processor.parse('<img src="/images/logo.png" />\n');
+    remarkJsxImages({ publicDir: 'D:\\static' })(tree, { dirname: 'C:\\portal\\content' });
+
+    expect(processor.stringify(tree)).to.equal(
+      'import __jsxImg0 from "./D:/static/images/logo.png"\n\n<img src={__jsxImg0} />\n'
+    );
+  });
 });
