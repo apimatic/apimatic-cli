@@ -30,11 +30,12 @@ describe('settledContent', () => {
     expect(settledContent('generated', file(undefined, 'yours', 'generated'))).to.be.undefined;
   });
 
-  it('removes a file the generator no longer produces for its side, and keeps it for yours', () => {
-    const dropped = file('your edited file', 'your edited file', undefined);
+  it('keeps a file the generator no longer produces, as it is on disk, for either side', () => {
+    const dropped = file('your edited file, edited again', 'your edited file', undefined);
 
-    expect(settledContent('generated', dropped)).to.be.undefined;
-    expect(text(settledContent('yours', dropped))).to.equal('your edited file');
+    expect(text(settledContent('generated', dropped))).to.equal('your edited file, edited again');
+    expect(text(settledContent('yours', dropped))).to.equal('your edited file, edited again');
+    expect(settledContent('generated', file(undefined, 'your edited file', undefined))).to.be.undefined;
   });
 
   it('keeps a file you deleted deleted for your side, and has the generator’s version for its own', () => {

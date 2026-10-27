@@ -208,7 +208,7 @@ describe('MergePlan.from', () => {
       })
     );
 
-  it('settles every conflict the generator’s way when asked to, leaving the rest of the plan alone', () => {
+  it('settles every conflict the generator’s way when asked to, keeping an edited file it no longer produces', () => {
     const plan = conflicted();
 
     const settled = plan.taking('generated');
@@ -221,7 +221,7 @@ describe('MergePlan.from', () => {
       { path: rel('logo.png'), blob: blob('lg') },
       { path: rel('deleted-by-you.ts'), blob: blob('bg') }
     ]);
-    expect(settled.deletes).to.deep.equal(['dropped.ts'].map(rel));
+    expect(settled.deletes).to.deep.equal([]);
     expect(settled.files.updated.map(String)).to.have.members([
       'other.ts',
       'same.ts',
@@ -229,8 +229,42 @@ describe('MergePlan.from', () => {
       'logo.png',
       'deleted-by-you.ts'
     ]);
-    expect(settled.files.removed.map(String)).to.deep.equal(['dropped.ts']);
+    expect(settled.files.kept.map(String)).to.deep.equal(['dropped.ts']);
+    expect(settled.files.removed).to.deep.equal([]);
     expect(plan.hasConflicts()).to.be.true;
+  });
+
+  it('leaves a conflict of another shape as git placed it, for either side', () => {
+    const plan = MergePlan.from(
+      inputs({
+        basePaths: ['models/book.ts'].map(rel),
+        yours: [{ status: 'A', path: rel('models/custom.ts'), blob: blob('cy') }],
+        generated: [{ status: 'R', from: rel('models/book.ts'), path: rel('model/book.ts'), blob: blob('bg') }],
+        applied: [
+          { status: 'D', path: rel('models/book.ts') },
+          { status: 'A', path: rel('model/book.ts'), blob: blob('bg') },
+          { status: 'D', path: rel('models/custom.ts') },
+          { status: 'A', path: rel('model/custom.ts'), blob: blob('cy') }
+        ],
+        merge: merge({
+          messages: [
+            {
+              paths: ['model/custom.ts'].map(rel),
+              type: 'CONFLICT (file location)',
+              message: 'CONFLICT (file location): models/custom.ts added inside a directory that was renamed'
+            }
+          ]
+        })
+      })
+    );
+
+    for (const side of ['generated', 'yours'] as const) {
+      const settled = plan.taking(side);
+      expect(settled.writes).to.deep.equal(plan.writes);
+      expect(settled.deletes).to.deep.equal(plan.deletes);
+      expect(settled.files.kept.map(String)).to.deep.equal(['models/custom.ts']);
+      expect(settled.hasConflicts()).to.be.false;
+    }
   });
 
   it('settles every conflict your way when asked to: each file left as it is on disk, which is your side', () => {

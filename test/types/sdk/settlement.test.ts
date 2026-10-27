@@ -1,7 +1,7 @@
 import { expect } from 'chai';
 import { RelativeFilePath } from '../../../src/types/file/relativeFilePath.js';
 import { TreeId } from '../../../src/types/git/tree-id.js';
-import { Conflict, ConflictSides, MergeFiles, MergePlan } from '../../../src/types/sdk/merge-plan.js';
+import { Conflict, MergeFiles, MergePlan, Sides } from '../../../src/types/sdk/merge-plan.js';
 import { favouring, resolving } from '../../../src/types/sdk/settlement.js';
 import { Regeneration } from '../../../src/types/sdk-repository-context.js';
 
@@ -11,8 +11,8 @@ const NO_FILES: MergeFiles = { added: [], updated: [], merged: [], removed: [], 
 
 /** A regeneration whose merge left `conflicts`, each with the generator's side known and yours on disk. */
 const regeneration = (conflicts: Conflict[]): Regeneration => {
-  const sides = new Map<string, ConflictSides>(
-    conflicts.map((conflict) => [conflict.path.toString(), { generated: 'blob-of-generated', youDeleted: false }])
+  const sides = new Map<string, Sides<string>>(
+    conflicts.map((conflict) => [conflict.path.toString(), { yours: 'blob-of-yours', generated: 'blob-of-generated' }])
   );
   const plan = new MergePlan([], [], conflicts, [], NO_FILES, sides);
   return {

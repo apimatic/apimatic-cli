@@ -41,8 +41,18 @@ export type UnresolvedChoice = 'resolve' | ConflictSide;
 
 export type Conflict = { path: RelativeFilePath; kind: ConflictKind; message?: string };
 
-/** What each side holds for a conflicted path: the generator's blob, none where it no longer produces the file, and whether you deleted it. */
-export type ConflictSides = { generated: string | undefined; youDeleted: boolean };
+/** Each side's version of a file git could not merge line by line; none where that side has no file. */
+export type Sides<T> = { yours: T | undefined; generated: T | undefined };
+
+/**
+ * The version a conflicted file settles to, whole, for `side`. The generator's side falls back
+ * to yours where the generator no longer produces the file, so an edit of yours is never thrown
+ * away by a choice that promises to keep your other edits; your side stays deleted where you
+ * deleted the file.
+ */
+export function chosen<T>(side: ConflictSide, sides: Sides<T>): T | undefined {
+  return side === 'generated' ? sides.generated ?? sides.yours : sides.yours;
+}
 
 export type Rename = { from: RelativeFilePath; to: RelativeFilePath; by: 'generator' | 'you' };
 
@@ -147,8 +157,8 @@ export class MergePlan {
   public readonly conflicts: readonly Conflict[];
   public readonly renames: readonly Rename[];
   public readonly files: MergeFiles;
-  /** For each conflicted path, what each side holds for it. */
-  private readonly sides: ReadonlyMap<string, ConflictSides>;
+  /** For each conflicted path, the blob each side holds for it. */
+  private readonly sides: ReadonlyMap<string, Sides<string>>;
 
   constructor(
     writes: readonly FileWrite[],
@@ -156,7 +166,7 @@ export class MergePlan {
     conflicts: readonly Conflict[],
     renames: readonly Rename[],
     files: MergeFiles,
-    sides: ReadonlyMap<string, ConflictSides> = new Map()
+    sides: ReadonlyMap<string, Sides<string>> = new Map()
   ) {
     this.writes = writes;
     this.deletes = deletes;
@@ -233,42 +243,49 @@ export class MergePlan {
     ];
 
     const sides = new Map(
-      conflicts.map((conflict): [string, ConflictSides] => {
+      conflicts.map((conflict): [string, Sides<string>] => {
         const key = conflict.path.toString();
-        return [key, { generated: generated.get(key)?.blob, youDeleted: yours.get(key)?.status === 'D' }];
+        return [key, { yours: yours.get(key)?.blob, generated: generated.get(key)?.blob }];
       })
     );
     return new MergePlan(writes, deletes, conflicts, renames, files, sides);
   }
 
   /**
-   * The same plan with every conflict settled whole for `side`. The generator's: its file
-   * written over yours, or removed where it no longer produces one. Yours: the file left as it
-   * is on disk, which is your side, deleted where you deleted it. Every other path keeps what
-   * the merge decided.
+   * The same plan with every conflict settled whole for `side`, as `chosen` decides: that
+   * side's version written, yours left as it is on disk, or the file left deleted. A conflict
+   * of another shape, such as a file of yours inside a directory the generator renamed, keeps
+   * git's own placement, which the plan already holds, and stays listed as what happened to it.
+   * Every other path keeps what the merge decided.
    */
   public taking(side: ConflictSide): MergePlan {
-    const conflicted = new Set(this.conflicts.map((conflict) => conflict.path.toString()));
-    const writes = this.writes.filter((write) => !conflicted.has(write.path.toString()));
-    const deletes = this.deletes.filter((path) => !conflicted.has(path.toString()));
+    const writes = new Map(this.writes.map((write) => [write.path.toString(), write]));
+    const deletes = new Map(this.deletes.map((path) => [path.toString(), path]));
     const updated = [...this.files.updated];
-    const removed = [...this.files.removed];
     const kept = [...this.files.kept];
-    for (const { path } of this.conflicts) {
-      const sides = this.sides.get(path.toString());
-      if (side === 'yours') {
-        if (!sides?.youDeleted) {
-          kept.push(path);
-        }
-      } else if (sides?.generated === undefined) {
-        deletes.push(path);
-        removed.push(path);
+    for (const { path, kind } of this.conflicts) {
+      const key = path.toString();
+      if (kind === 'other') {
+        continue;
+      }
+      const sides = this.sides.get(key) ?? { yours: undefined, generated: undefined };
+      const blob = chosen(side, sides);
+      deletes.delete(key);
+      if (blob === undefined) {
+        writes.delete(key);
+      } else if (blob === sides.yours) {
+        writes.delete(key);
+        kept.push(path);
       } else {
-        writes.push({ path, blob: sides.generated });
+        writes.set(key, { path, blob });
         updated.push(path);
       }
     }
-    return new MergePlan(writes, deletes, [], this.renames, { ...this.files, updated, removed, kept });
+    return new MergePlan([...writes.values()], [...deletes.values()], [], this.renames, {
+      ...this.files,
+      updated,
+      kept
+    });
   }
 
   public hasConflicts(): boolean {

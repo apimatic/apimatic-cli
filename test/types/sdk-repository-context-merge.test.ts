@@ -11,7 +11,7 @@ import { SdkContext } from '../../src/types/sdk-context.js';
 import { DirectoryPath } from '../../src/types/file/directoryPath.js';
 import { CodeGenerationVersion, Language, Stability } from '../../src/types/sdk/generate.js';
 import { SdkGeneration } from '../../src/types/sdk/generation-record.js';
-import { MergePlan } from '../../src/types/sdk/merge-plan.js';
+import { ConflictSide, MergePlan } from '../../src/types/sdk/merge-plan.js';
 import { SdkRepositoryContext, SdkRepositoryProblem } from '../../src/types/sdk-repository-context.js';
 
 const TYPESCRIPT: SdkGeneration = {
@@ -81,8 +81,16 @@ describe('SdkRepositoryContext: the merge', () => {
     }
   };
 
-  /** `beforeWrite` runs once the plan is made and before it lands, for a test that breaks the write; the write must succeed without it. */
-  const run = async (base: Files, disk: Files, generated: Files, beforeWrite?: () => void): Promise<Run> => {
+  /**
+   * `favour` settles the conflicts for that side, as the first question's answer does. `beforeWrite` runs once the
+   * plan is made and before it lands, for a test that breaks the write; the write must succeed without it.
+   */
+  const run = async (
+    base: Files,
+    disk: Files,
+    generated: Files,
+    { favour, beforeWrite }: { favour?: ConflictSide; beforeWrite?: () => void } = {}
+  ): Promise<Run> => {
     const project = new DirectoryPath(path.join(root, `project-${counter++}`));
     const sdk = project.join('sdk', 'typescript');
     fs.mkdirSync(sdk.toString(), { recursive: true });
@@ -98,10 +106,10 @@ describe('SdkRepositoryContext: the merge', () => {
     const baseCommit = (
       await repository.recordPristine((await repository.snapshotGenerated(baseDirectory))._unsafeUnwrap(), TYPESCRIPT)
     )._unsafeUnwrap();
-    const regeneration = (await repository.regenerate(baseCommit, generatedDirectory))._unsafeUnwrap();
+    const regeneration = (await repository.regenerate(baseCommit, generatedDirectory, favour))._unsafeUnwrap();
     expect(regeneration.generated.isEqual((await repository.snapshotGenerated(generatedDirectory))._unsafeUnwrap())).to
       .be.true;
-    const { plan } = regeneration.merge;
+    const plan = favour === undefined ? regeneration.merge.plan : regeneration.merge.plan.taking(favour);
     beforeWrite?.();
     const written = await repository.write(baseCommit, plan);
     if (beforeWrite === undefined) {
@@ -363,6 +371,38 @@ describe('SdkRepositoryContext: the merge', () => {
     });
   });
 
+  describe('settled for a side, as the first question’s answer is', () => {
+    it('keeps an edited file the generator stopped producing, for the generator’s side too', async () => {
+      const { plan, read } = await run(
+        { 'models/book.ts': MODEL_V1, 'helper.ts': 'helper\n' },
+        { 'models/book.ts': MODEL_V1_WITH_HELPER, 'helper.ts': 'helper, edited\n' },
+        { 'models/book.ts': MODEL_V2 },
+        { favour: 'generated' }
+      );
+
+      expect(read('helper.ts')).to.equal('helper, edited\n');
+      expect(read('models/book.ts')).to.equal(MODEL_V2 + HELPER);
+      expect(plan.files.kept.map(String)).to.deep.equal(['helper.ts']);
+      expect(plan.hasConflicts()).to.be.false;
+    });
+
+    it('keeps a file you added inside a directory the generator renamed, for either side', async () => {
+      for (const favour of ['generated', 'yours'] as const) {
+        const { paths, read } = await run(
+          { 'models/book.ts': MODEL_V1, 'b.ts': 'b\n' },
+          { 'models/book.ts': MODEL_V1, 'models/custom.ts': 'custom\n', 'b.ts': 'b\n' },
+          { 'model/book.ts': MODEL_V2, 'b.ts': 'b\n' },
+          { favour }
+        );
+
+        const custom = paths().find((relative) => relative.endsWith('custom.ts'));
+        expect(custom, favour).to.not.be.undefined;
+        expect(read(custom!)).to.equal('custom\n');
+        expect(read('model/book.ts')).to.equal(MODEL_V2);
+      }
+    });
+  });
+
   describe('a write that fails partway', () => {
     const BEFORE: Files = { 'a.ts': '1\n', 'b.ts': '1\n', 'c.ts': '1\n' };
     const AFTER: Files = { 'a.ts': '2\n', 'b.ts': '2\n', 'd.ts': 'new\n' };
@@ -381,7 +421,7 @@ describe('SdkRepositoryContext: the merge', () => {
     };
 
     it('names the file, puts back what it had changed, and leaves the directory as it was', async () => {
-      const { written, read, paths } = await run(BEFORE, BEFORE, AFTER, breaking('b.ts'));
+      const { written, read, paths } = await run(BEFORE, BEFORE, AFTER, { beforeWrite: breaking('b.ts') });
 
       const problem = written._unsafeUnwrapErr();
       expect(problem.kind).to.equal('notApplied');
@@ -397,7 +437,7 @@ describe('SdkRepositoryContext: the merge', () => {
     });
 
     it('says what could not be put back, and which snapshot to restore from', async () => {
-      const { written, read, repository } = await run(BEFORE, BEFORE, AFTER, breaking('b.ts', true));
+      const { written, read, repository } = await run(BEFORE, BEFORE, AFTER, { beforeWrite: breaking('b.ts', true) });
 
       const problem = written._unsafeUnwrapErr();
       expect(problem.kind).to.equal('notApplied');

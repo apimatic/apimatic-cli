@@ -311,7 +311,7 @@ describe('SdkRepositoryContext', () => {
 
       expect(read(repository, 'marked.ts')).to.equal('top\ntheirs\nbottom\n');
       expect(read(repository, 'by-hand.ts')).to.equal('resolved by hand, not staged');
-      expect(exists(repository, 'dropped.ts')).to.be.false;
+      expect(read(repository, 'dropped.ts')).to.equal('your edited file');
       expect(read(repository, 'deleted-by-you.ts')).to.equal('generated version');
       expect(read(repository, 'logo.png')).to.equal('generated\0binary');
       expect(exists(repository, 'gone.ts')).to.be.false;

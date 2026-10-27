@@ -1,6 +1,6 @@
 import { TextDecoder, TextEncoder } from 'node:util';
 import { resolveMarkers } from './conflict-markers.js';
-import { ConflictSide } from './merge-plan.js';
+import { chosen, ConflictSide } from './merge-plan.js';
 
 /**
  * A file the last run left in conflict and git still holds as unmerged: as it is now, and the
@@ -34,25 +34,25 @@ function withMarkersResolved(content: Uint8Array, side: ConflictSide): Uint8Arra
 }
 
 /**
- * The file's content once its remaining conflict is settled for `side`; none where that side
- * removes it. Markers still in the file are settled in place, keeping every line around them.
- * Without markers, whichever side git could not merge decides: a file one side deleted stays
- * or goes with that side, and a binary file takes that side's version. A text file whose
- * markers are all gone was resolved by hand and stays as it is.
+ * The file's content once its remaining conflict is settled for `side`; none where it stays
+ * deleted. Markers still in the file are settled in place, keeping every line around them.
+ * Without markers, a file git could not merge line by line, because one side has no version
+ * or it is binary, settles whole as `chosen` decides, yours being the file as it is on disk. A
+ * text file whose markers are all gone was resolved by hand and stays as it is.
  */
 export function settledContent(side: ConflictSide, file: UnresolvedFile): Uint8Array | undefined {
   const marked = file.disk === undefined ? undefined : withMarkersResolved(file.disk, side);
   if (marked !== undefined) {
     return marked;
   }
-  if (file.generated === undefined) {
-    return side === 'generated' ? undefined : file.disk;
+  const whole =
+    file.yours === undefined || file.generated === undefined || isBinary(file.yours) || isBinary(file.generated);
+  if (!whole) {
+    return file.disk;
   }
-  if (file.yours === undefined) {
-    return side === 'yours' ? undefined : file.disk ?? file.generated;
+  const content = chosen(side, file);
+  if (content === undefined) {
+    return undefined;
   }
-  if (isBinary(file.yours) || isBinary(file.generated)) {
-    return side === 'generated' ? file.generated : file.disk ?? file.yours;
-  }
-  return file.disk;
+  return content === file.yours ? file.disk : content;
 }

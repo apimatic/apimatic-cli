@@ -301,6 +301,22 @@ describe('GenerateAction (sdk) — writing the SDK', () => {
       );
     });
 
+    it('keeps an edited file the generator stopped producing when settling for the generator', async () => {
+      await recorded({ 'README.md': '# sdk', 'models/book.py': MODEL_V1, 'helpers/old.py': 'old' });
+      writeFiles(sdk().toString(), { 'models/book.py': DECORATED + MODEL_V1_EDITED, 'helpers/old.py': 'old, edited' });
+      sinon.stub(terminal, 'isInteractive').returns(true);
+      sinon.stub(SdkGeneratePrompts.prototype, 'sdkMerged');
+      sinon.stub(SdkGeneratePrompts.prototype, 'conflictChoice').resolves('generated');
+      const conflictsResolved = sinon.stub(SdkGeneratePrompts.prototype, 'conflictsResolved');
+
+      const result = await execute(NEXT, false);
+
+      expect(result.isSuccess()).to.be.true;
+      expect(read('helpers/old.py')).to.equal('old, edited');
+      expect(read('models/book.py')).to.equal(DECORATED + MODEL_V2);
+      expect(conflictsResolved.firstCall.args[1].map(String)).to.have.members(['helpers/old.py', 'models/book.py']);
+    });
+
     it('settles the overlapping hunks for you on request, with the generator’s other changes in the same file', async () => {
       await conflicting();
       sinon.stub(SdkGeneratePrompts.prototype, 'conflictChoice').resolves('yours');
