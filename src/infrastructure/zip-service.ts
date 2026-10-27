@@ -5,14 +5,20 @@ import { err, ok, Result } from 'neverthrow';
 import { DirectoryPath } from '../types/file/directoryPath.js';
 import { FileName } from '../types/file/fileName.js';
 import { FilePath } from '../types/file/filePath.js';
+import { RelativeFilePath } from '../types/file/relativeFilePath.js';
 import { errorMessage } from '../utils/error-utils.js';
 
 type ZipEntry = { file: FilePath; metadataPath: string };
 
 export class ZipService {
-  public async archive(sourceDir: DirectoryPath, outputZipPath: FilePath): Promise<Result<void, string>> {
+  /** Zips everything under `sourceDir`, or only `files` when given. */
+  public async archive(
+    sourceDir: DirectoryPath,
+    outputZipPath: FilePath,
+    files?: readonly RelativeFilePath[]
+  ): Promise<Result<void, string>> {
     try {
-      await this.write(sourceDir, outputZipPath);
+      await this.write(sourceDir, outputZipPath, files);
       return ok(undefined);
     } catch (error) {
       await fs.promises.rm(outputZipPath.toString(), { force: true }).catch(() => undefined);
@@ -29,8 +35,11 @@ export class ZipService {
     }
   }
 
-  private async write(sourceDir: DirectoryPath, outputZipPath: FilePath): Promise<void> {
-    const entries = this.entriesUnder(sourceDir, '');
+  private async write(sourceDir: DirectoryPath, outputZipPath: FilePath, files?: readonly RelativeFilePath[]): Promise<void> {
+    const entries =
+      files === undefined
+        ? this.entriesUnder(sourceDir, '')
+        : files.map((file) => ({ file: file.in(sourceDir), metadataPath: file.toString() }));
     const zipfile = new yazl.ZipFile();
 
     return new Promise((resolve, reject) => {

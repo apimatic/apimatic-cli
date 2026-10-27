@@ -8,6 +8,7 @@ import { ZipService } from '../../src/infrastructure/zip-service.js';
 import { DirectoryPath } from '../../src/types/file/directoryPath.js';
 import { FileName } from '../../src/types/file/fileName.js';
 import { FilePath } from '../../src/types/file/filePath.js';
+import { RelativeFilePath } from '../../src/types/file/relativeFilePath.js';
 
 describe('ZipService', () => {
   let root: string;
@@ -33,6 +34,18 @@ describe('ZipService', () => {
   });
 
   describe('archive', () => {
+    it('zips only the listed files when given them', async () => {
+      write('README.md', '# sdk');
+      write(path.join('models', 'book.py'), 'class Book: ...');
+      write(path.join('dist', 'built.js'), 'built');
+
+      const files = ['README.md', 'models/book.py'].map((value) => RelativeFilePath.fromGit(value));
+      (await new ZipService().archive(source, archive, files))._unsafeUnwrap();
+
+      const names = new AdmZip(archive.toString()).getEntries().map((entry) => entry.entryName);
+      expect(names).to.have.members(['README.md', 'models/book.py']);
+    });
+
     it('names every entry with forward slashes, whatever the platform separator', async () => {
       write('openapi.json', '{}');
       write(path.join('paths', 'pets.json'), '[]');

@@ -1,7 +1,9 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import AdmZip from 'adm-zip';
 import { expect } from 'chai';
+import { execa } from 'execa';
 import { GitService } from '../../src/infrastructure/git-service.js';
 import { canonical } from '../../src/infrastructure/tmp-extensions.js';
 import { DirectoryPath } from '../../src/types/file/directoryPath.js';
@@ -44,6 +46,44 @@ describe('SdkContext', () => {
       await git.init(new DirectoryPath(inRoot('sdk', 'python')));
       const own = await context.repository();
       expect(own?.root().isEqual(new DirectoryPath(canonical(root), 'sdk', 'python'))).to.be.true;
+    });
+  });
+
+  describe('archive', () => {
+    const git = new GitService();
+    const entries = (archive: string) => new AdmZip(archive).getEntries().map((entry) => entry.entryName);
+
+    it('zips the files git would commit: not .git, the record, or what the SDK’s .gitignore excludes', async () => {
+      await git.init(new DirectoryPath(root));
+      fs.mkdirSync(inRoot('sdk', 'python', 'models'), { recursive: true });
+      fs.writeFileSync(inRoot('sdk', 'python', 'models', 'book.py'), 'class Book: ...');
+      await execa('git', ['add', '.'], { cwd: root });
+      fs.writeFileSync(inRoot('sdk', 'python', 'README.md'), '# sdk');
+      fs.writeFileSync(inRoot('sdk', 'python', '.gitignore'), 'dist/\n');
+      fs.mkdirSync(inRoot('sdk', 'python', 'dist'));
+      fs.writeFileSync(inRoot('sdk', 'python', 'dist', 'built.py'), 'built');
+      fs.mkdirSync(inRoot('sdk', 'python', '.apimatic'));
+      fs.writeFileSync(inRoot('sdk', 'python', '.apimatic', 'generation.json'), '{}');
+      fs.mkdirSync(inRoot('temp'));
+
+      const archive = (await context.archive(new DirectoryPath(inRoot('temp'))))._unsafeUnwrap();
+
+      expect(entries(archive.toString())).to.have.members(['.gitignore', 'README.md', 'models/book.py']);
+    });
+
+    it('zips every file but .git and the record when the directory is in no repository', async () => {
+      fs.mkdirSync(inRoot('sdk', 'python', 'models'), { recursive: true });
+      fs.writeFileSync(inRoot('sdk', 'python', 'models', 'book.py'), 'class Book: ...');
+      fs.writeFileSync(inRoot('sdk', 'python', 'README.md'), '# sdk');
+      fs.mkdirSync(inRoot('sdk', 'python', '.git'));
+      fs.writeFileSync(inRoot('sdk', 'python', '.git', 'HEAD'), 'ref: refs/heads/main');
+      fs.mkdirSync(inRoot('sdk', 'python', '.apimatic'));
+      fs.writeFileSync(inRoot('sdk', 'python', '.apimatic', 'generation.json'), '{}');
+      fs.mkdirSync(inRoot('temp'));
+
+      const archive = (await context.archive(new DirectoryPath(inRoot('temp'))))._unsafeUnwrap();
+
+      expect(entries(archive.toString())).to.have.members(['README.md', 'models/book.py']);
     });
   });
 

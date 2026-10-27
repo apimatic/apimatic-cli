@@ -81,6 +81,23 @@ describe('GitService', () => {
     );
   });
 
+  it('lists the files git tracks or would add below a directory, leaving out ignored and deleted ones', async () => {
+    const repo = await repository();
+    const sdk = repo.join('sdk');
+    write(sdk, 'tracked.py', 'tracked');
+    write(sdk, 'gone.py', 'gone');
+    await execa('git', ['add', '.'], { cwd: repo.toString() });
+    fs.rmSync(path.join(sdk.toString(), 'gone.py'));
+    write(sdk, 'untracked.py', 'untracked');
+    write(sdk, '.gitignore', 'dist/\n');
+    write(sdk, 'dist/built.py', 'built');
+    write(repo, 'outside.py', 'outside');
+
+    const files = await git.filesToCommit(sdk);
+
+    expect(files.map(String)).to.have.members(['.gitignore', 'tracked.py', 'untracked.py']);
+  });
+
   describe('treeOf', () => {
     it('honours the directory’s own .gitignore, except for the paths told to include', async () => {
       const repo = await repository();

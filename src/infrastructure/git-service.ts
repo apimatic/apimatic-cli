@@ -90,6 +90,19 @@ export class GitService {
     return exitCode === 0;
   }
 
+  /**
+   * Every file below `directory` that git tracks or would add: the untracked ones its ignore
+   * rules allow, so a `node_modules` or `dist` stays out. A tracked file deleted from disk is not listed.
+   */
+  public async filesToCommit(directory: DirectoryPath): Promise<RelativeFilePath[]> {
+    const { stdout } = await this.run(directory, ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', '.']);
+    return stdout
+      .split('\0')
+      .filter((entry) => entry !== '')
+      .map((entry) => RelativeFilePath.fromGit(entry))
+      .filter((file) => fs.existsSync(file.in(directory).toString()));
+  }
+
   /** The operation the repository is in the middle of, if any, such as a `git merge` with conflicts left to resolve. */
   public async operationInProgress(root: DirectoryPath): Promise<GitOperation | undefined> {
     const files = Object.keys(OPERATIONS);

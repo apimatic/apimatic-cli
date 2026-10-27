@@ -8,18 +8,15 @@ import { PublishingProfile } from '../../../types/publish/publishing-profile.js'
 import { Language } from '../../../types/sdk/generate.js';
 import { StabilityChoice } from '../../../types/sdk/stability-choice.js';
 import { ActionResult } from '../../action-result.js';
-import { getDownloadsDirectory } from '../../../infrastructure/os-extensions.js';
 import { SemVersion } from '../../../types/publish/version.js';
 import { ProfileId } from '../../../types/publish/profile-id.js';
 import { ProjectContext } from '../../../types/project-context.js';
 import { RecordPublishedSdkAction } from '../record-published-sdk.js';
 import { SdkPublishAction } from '../publish.js';
-import { FileService } from '../../../infrastructure/file-service.js';
 
 export class SdkPublishNonInteractiveAction {
   private readonly prompts: SdkPublishNonInteractivePrompts = new SdkPublishNonInteractivePrompts();
   private readonly publishingApiService: PublishingApiService = new PublishingApiService();
-  private readonly fileService: FileService = new FileService();
 
   public constructor(private readonly configDir: DirectoryPath, private readonly commandMetadata: CommandMetadata) {}
 
@@ -113,12 +110,9 @@ export class SdkPublishNonInteractiveAction {
       // Named only when the user chose it, so a run that took the default reads as the doc does.
       stability: stability.chosenLevel()
     });
-    const generateInto = dryRun
-      ? (await this.fileService.getAvailableDirectoryPath(getDownloadsDirectory('apimatic-sdk'))).join(language)
-      : (sdkDirectory ?? project.sdkDirectory(language));
     const publishResult = await new SdkPublishAction(this.configDir, this.commandMetadata).execute(
       project,
-      generateInto,
+      sdkDirectory ?? project.sdkDirectory(language),
       language,
       publishTypes,
       force,

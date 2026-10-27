@@ -10,9 +10,11 @@ import { DirectoryPath } from './file/directoryPath.js';
 import { FilePath } from './file/filePath.js';
 import { FileName } from './file/fileName.js';
 import { FileProblem } from './file/file-problem.js';
+import { RelativeFilePath } from './file/relativeFilePath.js';
 import { SdkGeneration } from './sdk/generation-record.js';
 import { destinationFor, SdkDestination, Unresolved } from './sdk/sdk-destination.js';
-import { InspectionProblem, SdkRepositoryContext, SdkRepositoryProblem } from './sdk-repository-context.js';
+import { InspectionProblem, RECORD_DIRECTORY, SdkRepositoryContext, SdkRepositoryProblem } from './sdk-repository-context.js';
+import { TempContext } from './temp-context.js';
 
 const GIT_DIRECTORY = '.git';
 
@@ -102,6 +104,35 @@ export class SdkContext {
     await this.fileService.cleanDirectoryExcluding(this.sdkDirectory, [new FileName(GIT_DIRECTORY)]);
     await this.fileService.copyDirectoryContents(tempSdkDirectory, this.sdkDirectory);
     return this.sdkDirectory;
+  }
+
+  /**
+   * The SDK zipped for upload, in `tempDirectory`: the files git would commit, so the SDK's own
+   * `.gitignore` keeps a `node_modules` or `dist` out, and never `.git` or the CLI's record.
+   * Without a repository, every file but those.
+   */
+  public async archive(tempDirectory: DirectoryPath): Promise<Result<FilePath, FileProblem>> {
+    const repository = await this.repository();
+    const files = repository === undefined ? ok(await this.everyFile()) : await repository.filesToShare();
+    if (files.isErr()) {
+      return err({ kind: 'zipFailed', reason: files.error.reason });
+    }
+    return new TempContext(tempDirectory).zip(this.sdkDirectory, files.value);
+  }
+
+  private async everyFile(below = ''): Promise<RelativeFilePath[]> {
+    const directory = this.sdkDirectory.resolve(below);
+    const entries = await fs.promises.readdir(directory.toString(), { withFileTypes: true });
+    const files = await Promise.all(
+      entries.map(async (entry): Promise<RelativeFilePath[]> => {
+        const relative = below === '' ? entry.name : `${below}/${entry.name}`;
+        if (below === '' && (entry.name === GIT_DIRECTORY || entry.name === RECORD_DIRECTORY)) {
+          return [];
+        }
+        return entry.isDirectory() ? this.everyFile(relative) : [RelativeFilePath.fromGit(relative)];
+      })
+    );
+    return files.flat();
   }
 
   public async loadSdkInTempDirectory(

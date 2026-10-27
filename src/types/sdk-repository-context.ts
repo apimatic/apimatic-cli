@@ -79,7 +79,7 @@ export type MergeOutcome = { plan: MergePlan; merged: TreeId; stages: StageEntry
 export type Regeneration = { generated: TreeId; merge: MergeOutcome };
 
 /** The merge's two commits are yours (`ours`) and the generator's (`theirs`). */
-const RECORD_DIRECTORY = '.apimatic';
+export const RECORD_DIRECTORY = '.apimatic';
 const RECORD_FILE = 'generation.json';
 const RECORD_ATTRIBUTES_FILE = '.gitattributes';
 
@@ -534,6 +534,16 @@ export class SdkRepositoryContext {
       } catch {
         return;
       }
+    }
+  }
+
+  /** The files the SDK directory shares: those git tracks or would add, never the CLI's own record. */
+  public async filesToShare(): Promise<Result<RelativeFilePath[], SdkRepositoryProblem>> {
+    try {
+      const files = await this.git.filesToCommit(this.sdk);
+      return ok(files.filter((file) => file.inside(RECORD_DIRECTORY) === undefined));
+    } catch (error) {
+      return err(gitFailed(errorMessage(error)));
     }
   }
 
