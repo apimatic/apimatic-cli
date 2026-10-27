@@ -1,5 +1,4 @@
-import { TextDecoder, TextEncoder } from 'node:util';
-import { resolveMarkers } from './conflict-markers.js';
+import { settleMarkers } from './conflict-markers.js';
 import { chosen, ConflictSide } from './merge-plan.js';
 
 /**
@@ -15,23 +14,9 @@ export type UnresolvedFile = {
   generated: Uint8Array | undefined;
 };
 
-const decoder = new TextDecoder('utf-8', { fatal: true });
-const encoder = new TextEncoder();
-
 // Git's own test: a NUL in the first 8000 bytes makes a file binary, and a binary file is never merged line by line.
 const isBinary = (content: Uint8Array | undefined): boolean =>
   content !== undefined && content.subarray(0, 8000).includes(0);
-
-function withMarkersResolved(content: Uint8Array, side: ConflictSide): Uint8Array | undefined {
-  let text: string;
-  try {
-    text = decoder.decode(content);
-  } catch {
-    return undefined;
-  }
-  const resolved = resolveMarkers(text, side);
-  return resolved === text ? undefined : encoder.encode(resolved);
-}
 
 /**
  * The file's content once its remaining conflict is settled for `side`; none where it stays
@@ -41,7 +26,7 @@ function withMarkersResolved(content: Uint8Array, side: ConflictSide): Uint8Arra
  * text file whose markers are all gone was resolved by hand and stays as it is.
  */
 export function settledContent(side: ConflictSide, file: UnresolvedFile): Uint8Array | undefined {
-  const marked = file.disk === undefined ? undefined : withMarkersResolved(file.disk, side);
+  const marked = file.disk === undefined ? undefined : settleMarkers(file.disk, side);
   if (marked !== undefined) {
     return marked;
   }

@@ -11,6 +11,7 @@ import { SdkContext } from '../../src/types/sdk-context.js';
 import { DirectoryPath } from '../../src/types/file/directoryPath.js';
 import { CodeGenerationVersion, Language, Stability } from '../../src/types/sdk/generate.js';
 import { SdkGeneration } from '../../src/types/sdk/generation-record.js';
+import { GENERATED_MARKER, YOURS_MARKER } from '../../src/types/sdk/conflict-markers.js';
 import { ConflictSide, MergePlan } from '../../src/types/sdk/merge-plan.js';
 import { SdkRepositoryContext, SdkRepositoryProblem } from '../../src/types/sdk-repository-context.js';
 
@@ -307,6 +308,19 @@ describe('SdkRepositoryContext: the merge', () => {
         { from: rel('models/book.ts'), to: rel('models/catalog/book.ts'), by: 'you' }
       ]);
       expect(plan.hasConflicts()).to.be.false;
+    });
+
+    it('labels the markers in a file you moved with the sides, where git names the old path too', async () => {
+      const { plan, read } = await run(
+        { 'models/book.ts': MODEL_V1, 'b.ts': 'b\n' },
+        { 'models/catalog/book.ts': MODEL_V1.replace('Price in USD.', 'Price in USD, VAT included.'), 'b.ts': 'b\n' },
+        { 'models/book.ts': MODEL_V2, 'b.ts': 'b\n' }
+      );
+
+      const content = read('models/catalog/book.ts')!;
+      expect(content).to.contain(`${YOURS_MARKER}\n`).and.to.contain(`${GENERATED_MARKER}\n`);
+      expect(content).to.not.match(/^[<>]{7} [0-9a-f]{40}/m);
+      expect(plan.conflicts.map((conflict) => conflict.kind)).to.deep.equal(['bothChanged']);
     });
 
     it('carries your edit to a file the generator renamed, and removes the old name', async () => {

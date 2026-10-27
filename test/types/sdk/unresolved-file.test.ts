@@ -1,3 +1,4 @@
+import { Buffer } from 'node:buffer';
 import { TextDecoder, TextEncoder } from 'node:util';
 import { expect } from 'chai';
 import { settledContent, UnresolvedFile } from '../../../src/types/sdk/unresolved-file.js';
@@ -55,9 +56,13 @@ describe('settledContent', () => {
     expect(text(settledContent('yours', binary))).to.equal('yours\0');
   });
 
-  it('reads a file that is not UTF-8 as having no markers', () => {
-    const latin = { disk: new Uint8Array([0xff, 0xfe, 0x41]), yours: bytes('yours'), generated: bytes('generated') };
+  it('settles a file that is not UTF-8 like any other, and keeps one without markers as it is', () => {
+    const marked = new Uint8Array(Buffer.from(`\xff\n${MARKED}`, 'latin1'));
+    const plain = { disk: new Uint8Array([0xff, 0xfe, 0x41]), yours: bytes('yours'), generated: bytes('generated') };
 
-    expect(settledContent('generated', latin)).to.equal(latin.disk);
+    const settled = settledContent('generated', { ...plain, disk: marked });
+
+    expect(Buffer.from(settled!).toString('latin1')).to.equal('\xff\ntop\ntheirs\nbottom\n');
+    expect(settledContent('generated', plain)).to.equal(plain.disk);
   });
 });
