@@ -12,7 +12,6 @@ import { envInfo } from '../../../src/infrastructure/env-info';
 import { DirectoryPath } from '../../../src/types/file/directoryPath';
 import { FileName } from '../../../src/types/file/fileName';
 import { FilePath } from '../../../src/types/file/filePath';
-import { Endpoint } from '../../../src/types/portal/endpoint';
 
 const GENERATION_ID = '11111111-2222-3333-4444-555555555555';
 const AUTH_KEY = 'test-auth-key';
@@ -25,6 +24,7 @@ const CATALOG = {
 describe('PortalArtifactsService', () => {
   let server: http.Server;
   let workDir: string;
+  let source: DirectoryPath;
   let build: FilePath;
   let configDir: DirectoryPath;
   let service: PortalArtifactsService;
@@ -101,8 +101,9 @@ describe('PortalArtifactsService', () => {
     fs.mkdirSync(path.join(sourceDir, 'spec'), { recursive: true });
     fs.writeFileSync(path.join(sourceDir, 'apimatic.json'), JSON.stringify({ schemaVersion: 1 }));
     fs.writeFileSync(path.join(sourceDir, 'spec', 'openapi.json'), '{}');
+    source = new DirectoryPath(sourceDir);
     build = new FilePath(new DirectoryPath(workDir), new FileName('build.zip'));
-    (await new ZipService().archive(new DirectoryPath(sourceDir), build))._unsafeUnwrap();
+    (await new ZipService().archive(source, build))._unsafeUnwrap();
 
     // No config.json here, so the explicit authKey is used.
     configDir = new DirectoryPath(workDir);
@@ -144,8 +145,8 @@ describe('PortalArtifactsService', () => {
     it('reads a catalog per language into the samples the build merges', async () => {
       const artifacts = (await generate())._unsafeUnwrap();
 
-      const samples = artifacts.codeSampleCatalogs.samplesFor(new Endpoint('GET', '/payments'));
-      expect(samples.map((sample) => sample.lang)).to.deep.equal(['csharp']);
+      const { paths } = artifacts.codeSampleCatalogs.placedOn([], source.join('spec')).toJson();
+      expect(paths['/payments'].GET.map((sample) => sample.lang)).to.deep.equal(['csharp']);
     });
 
     // Keyed by the delivered name rather than parsed, so placement is a copy under the same name.
@@ -178,7 +179,7 @@ describe('PortalArtifactsService', () => {
     it('succeeds with no samples, no SDKs and no plugin', async () => {
       const artifacts = (await generate())._unsafeUnwrap();
 
-      expect(artifacts.codeSampleCatalogs.samplesFor(new Endpoint('GET', '/payments'))).to.be.empty;
+      expect(artifacts.codeSampleCatalogs.isEmpty()).to.be.true;
       expect(artifacts.sdks.size).to.equal(0);
       expect(artifacts.sdkDocs.size).to.equal(0);
       expect(artifacts.plugin).to.be.undefined;
