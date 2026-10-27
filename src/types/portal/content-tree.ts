@@ -190,8 +190,8 @@ export class ContentTree {
     const rootNavigation = navigation.root.navigation;
     const unplaced = ContentTree.unplaced(rootNavigation?.settings, generatedPages);
     return ok({
-      droppedTags: read.pages.flatMap(({ file, parsed }) =>
-        (parsed?.droppedTags ?? []).map((tag) => ({ page: file, ...tag }))
+      taggedPages: read.pages.flatMap(({ file, parsed }) =>
+        parsed === undefined || parsed.droppedTags.length === 0 ? [] : [{ page: file, tags: parsed.droppedTags }]
       ),
       hiddenPages: ContentTree.hiddenPages(pages, specs),
       ignoredNavigationFiles: navigation.ignoredFiles,

@@ -99,7 +99,7 @@ describe('ContentTree', () => {
     expect(problems[0]).to.deep.equal({ kind: 'missingImages', images: [image] });
   });
 
-  it('names each tag a .md page leaves out, with its page', async () => {
+  it('names each .md page with HTML, and its tags', async () => {
     const tagged = await parsed(
       [inContent('index.md'), '---\ntitle: Home\n---\n\nLine one<br>line two.\n'],
       [inContent('guides', 'intro.mdx'), '---\ntitle: Intro\n---\n\nLine one<br />line two.\n']
@@ -111,7 +111,7 @@ describe('ContentTree', () => {
 
     const notices = tree.check({ pages: tagged, navigationFiles, missingImages: [] }, [], GENERATED)._unsafeUnwrap();
 
-    expect(notices.droppedTags).to.deep.equal([{ page: inContent('index.md'), name: 'br', line: 5 }]);
+    expect(notices.taggedPages).to.deep.equal([{ page: inContent('index.md'), tags: [{ name: 'br', line: 5 }] }]);
   });
 
   it('names the tabs from what it is handed', () => {

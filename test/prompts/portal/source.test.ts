@@ -4,13 +4,13 @@ import sinon from 'sinon';
 import { log } from '@clack/prompts';
 import { PortalServePrompts } from '../../../src/prompts/portal/serve.js';
 import {
-  reportDroppedTags,
   reportLeftOutSpecs,
   reportNoTabsListed,
   reportShadowedFiles,
   reportSharedEndpoints,
   reportSharedTabNames,
   reportSourceProblem,
+  reportTaggedPages,
   reportUnmergedSpecs,
   reportUnseenHomeTitle
 } from '../../../src/prompts/portal/source.js';
@@ -857,7 +857,7 @@ describe('reportLeftOutSpecs', () => {
   });
 });
 
-describe('reportDroppedTags', () => {
+describe('reportTaggedPages', () => {
   const source = new DirectoryPath('project').join('src');
   const index = new FilePath(source.join('content'), new FileName('index.md'));
   const intro = new FilePath(source.join('content', 'guides'), new FileName('intro.md'));
@@ -877,16 +877,21 @@ describe('reportDroppedTags', () => {
   });
 
   it('says nothing when no .md page has a tag', () => {
-    reportDroppedTags([], source);
+    reportTaggedPages([], source);
 
     expect(lines).to.deep.equal([]);
   });
 
   it('names each tag of a page with its line, and how to keep them', () => {
-    reportDroppedTags(
+    reportTaggedPages(
       [
-        { page: index, line: 5, name: 'br' },
-        { page: index, line: 9, name: 'details' }
+        {
+          page: index,
+          tags: [
+            { name: 'br', line: 5 },
+            { name: 'details', line: 9 }
+          ]
+        }
       ],
       source
     );
@@ -899,11 +904,24 @@ describe('reportDroppedTags', () => {
     ]);
   });
 
+  it('names the first three tags of a page, and counts the rest', () => {
+    const tags = [5, 9, 12, 14, 20].map((line) => ({ name: 'br', line }));
+
+    reportTaggedPages([{ page: index, tags }], source);
+
+    expect(lines[1].split('\n')).to.deep.equal([
+      "  • 'content/index.md', line 5: '<br>'",
+      "  • 'content/index.md', line 9: '<br>'",
+      "  • 'content/index.md', line 12: '<br>'",
+      '    and 2 more on this page'
+    ]);
+  });
+
   it('speaks of each page when there are several', () => {
-    reportDroppedTags(
+    reportTaggedPages(
       [
-        { page: index, line: 5, name: 'br' },
-        { page: intro, line: 3, name: 'Cards' }
+        { page: index, tags: [{ name: 'br', line: 5 }] },
+        { page: intro, tags: [{ name: 'Cards', line: 3 }] }
       ],
       source
     );

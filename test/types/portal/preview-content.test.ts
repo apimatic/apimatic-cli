@@ -14,7 +14,7 @@ describe('PreviewContent', () => {
   const folder = (name: string) => content.join(name);
 
   const NONE: ContentNotices = {
-    droppedTags: [],
+    taggedPages: [],
     hiddenPages: [],
     ignoredNavigationFiles: [],
     sharedTabNames: [],
@@ -115,23 +115,30 @@ describe('PreviewContent', () => {
     expect(noticesAfter(titled, titled).unseenHomeTitle).to.be.undefined;
   });
 
-  // By page and name, or every edit above a tag would give the notice again.
-  it('gives the dropped tags again for a tag a page did not have, not for one on another line', () => {
+  // By page and tag name, or every edit above a tag would give the notice again.
+  it('gives the tagged pages again for a page or a tag not there before, not for a tag on another line', () => {
     const index = new FilePath(content, new FileName('index.md'));
     const intro = new FilePath(folder('guides'), new FileName('intro.md'));
-    const before = notices({ droppedTags: [{ page: index, line: 5, name: 'br' }] });
+    const before = notices({ taggedPages: [{ page: index, tags: [{ name: 'br', line: 5 }] }] });
     const moved = notices({
-      droppedTags: [
-        { page: index, line: 9, name: 'br' },
-        { page: index, line: 12, name: 'br' }
+      taggedPages: [
+        {
+          page: index,
+          tags: [
+            { name: 'br', line: 9 },
+            { name: 'br', line: 12 }
+          ]
+        }
       ]
     });
-    const newName = notices({ droppedTags: [...moved.droppedTags, { page: index, line: 14, name: 'details' }] });
-    const newPage = notices({ droppedTags: [...moved.droppedTags, { page: intro, line: 3, name: 'br' }] });
+    const newName = notices({
+      taggedPages: [{ page: index, tags: [...moved.taggedPages[0].tags, { name: 'details', line: 14 }] }]
+    });
+    const newPage = notices({ taggedPages: [...moved.taggedPages, { page: intro, tags: [{ name: 'br', line: 3 }] }] });
 
-    expect(noticesAfter(moved, before).droppedTags).to.deep.equal([]);
-    expect(noticesAfter(newName, before).droppedTags).to.deep.equal(newName.droppedTags);
-    expect(noticesAfter(newPage, before).droppedTags).to.deep.equal(newPage.droppedTags);
+    expect(noticesAfter(moved, before).taggedPages).to.deep.equal([]);
+    expect(noticesAfter(newName, before).taggedPages).to.deep.equal(newName.taggedPages);
+    expect(noticesAfter(newPage, before).taggedPages).to.deep.equal(newPage.taggedPages);
   });
 
   it('gives a name shared by another tab than before', () => {

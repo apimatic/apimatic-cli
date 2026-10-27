@@ -2,7 +2,7 @@ import { log } from '@clack/prompts';
 import { APIMATIC_CONFIG_FILE_NAME } from '../../types/apimatic-config/document.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { listedInProse } from '../../utils/string-utils.js';
-import { ContentNotices, DroppedTag, NoTabsListed } from '../../types/portal/content-notices.js';
+import { ContentNotices, NoTabsListed, TaggedPage } from '../../types/portal/content-notices.js';
 import { API_REFERENCE_TOKEN, NAVIGATION_FILE_NAME, TabEntry } from '../../types/portal/portal-navigation.js';
 import {
   ContentProblem,
@@ -33,6 +33,9 @@ import { format as f } from '../format.js';
 const TITLE_EXAMPLE = ['---', 'title: Getting started', '---'].join('\n');
 
 const ROOT_NAVIGATION_FILE = `${CONTENT_DIRECTORY_NAME}/${NAVIGATION_FILE_NAME}`;
+
+// Renaming the page keeps every tag in it, so its first few say enough.
+const TAGS_SHOWN_PER_PAGE = 3;
 
 const mergeTheFolders = (): string =>
   `set ${f.var(`${MERGE_SETTINGS.configuration}.${MERGE_SETTINGS.mergeApis}`)} to true in an ` +
@@ -443,7 +446,7 @@ export function reportIgnoredNavigationFiles(files: FilePath[], sourceDirectory:
 }
 
 export function reportContentNotices(notices: ContentNotices, sourceDirectory: DirectoryPath): void {
-  reportDroppedTags(notices.droppedTags, sourceDirectory);
+  reportTaggedPages(notices.taggedPages, sourceDirectory);
   reportHiddenPages(notices.hiddenPages, sourceDirectory);
   reportIgnoredNavigationFiles(notices.ignoredNavigationFiles, sourceDirectory);
   reportSharedTabNames(notices.sharedTabNames, sourceDirectory);
@@ -527,22 +530,27 @@ export function reportSharedTabNames(shared: SharedTabName[], sourceDirectory: D
   );
 }
 
-export function reportDroppedTags(tags: DroppedTag[], sourceDirectory: DirectoryPath): void {
-  if (tags.length === 0) {
+export function reportTaggedPages(pages: TaggedPage[], sourceDirectory: DirectoryPath): void {
+  if (pages.length === 0) {
     return;
   }
-  const onePage = tags.every(({ page }) => page.isEqual(tags[0].page));
-  const pages = onePage
+  const one = pages.length === 1;
+  const lines = pages.flatMap(({ page, tags }) => {
+    const more = tags.length - TAGS_SHOWN_PER_PAGE;
+    return [
+      ...tags
+        .slice(0, TAGS_SHOWN_PER_PAGE)
+        .map(({ line, name }) => `  • ${relative(page, sourceDirectory)}, line ${line}: ${f.var(`<${name}>`)}`),
+      ...(more > 0 ? [`    and ${more} more on this page`] : [])
+    ];
+  });
+  const holding = one
     ? `A ${f.var('.md')} page in ${f.path(sourceDirectory)} has`
     : `Some ${f.var('.md')} pages in ${f.path(sourceDirectory)} have`;
-  log.warn(`${pages} HTML or components, which the portal leaves out:`);
+  log.warn(`${holding} HTML or components, which the portal leaves out:`);
+  log.message(lines.join('\n'));
   log.message(
-    tags
-      .map(({ page, line, name }) => `  • ${relative(page, sourceDirectory)}, line ${line}: ${f.var(`<${name}>`)}`)
-      .join('\n')
-  );
-  log.message(
-    `Rename ${onePage ? 'the page' : 'each page'} to ${f.var('.mdx')} to keep them, and close empty tags such as ` +
+    `Rename ${one ? 'the page' : 'each page'} to ${f.var('.mdx')} to keep them, and close empty tags such as ` +
       `${f.var('<br />')}.`
   );
 }

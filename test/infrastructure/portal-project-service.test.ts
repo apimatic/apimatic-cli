@@ -69,7 +69,7 @@ describe('PortalProjectService', () => {
     staticDirectory: null,
     shadowedFiles: [],
     contentNotices: {
-      droppedTags: [],
+      taggedPages: [],
       hiddenPages: [],
       ignoredNavigationFiles: [],
       sharedTabNames: [],
