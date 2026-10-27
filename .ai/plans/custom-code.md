@@ -1,8 +1,9 @@
 # Plan: keep your edits when regenerating an SDK
 
 Status: implemented on branch `asadali214/custom-code-injection`, cut from `dev` at
-`4baa9485`, in nine phases reviewed one by one between 2026-10-20 and 2026-10-22 (section 8
-lists the commits); draft PR #445 into `dev`. Section 10 is the architecture, layer by layer;
+`4baa9485`, in nine phases reviewed one by one between 2026-10-20 and 2026-10-22, then
+reworked on review (section 8 lists the commits, the review follow-ups included); PR #445
+into `dev`, under review. Section 10 is the architecture, layer by layer;
 section 11 lists what still needs a decision. The design was tested against Speakeasy's
 generator first; section 7 records what that lab measured and what this plan does on the
 same cases, and the APIMatic Customization Lab replays them on the real CLI.
@@ -143,9 +144,9 @@ snapshot that is nowhere is reported as missing and the run asks before replacin
 
 - The ref name is the path, so an SDK directory nested inside another SDK directory is
   refused before anything is uploaded (the refs would collide).
-- `.git/` is never part of a snapshot. `.apimatic/` is in a previous snapshot (so an undo
-  restores the record too) but never in a pristine one, and the merge leaves it alone since
-  only the disk side has it.
+- `.git/` is never part of a snapshot. `.apimatic/` is in a previous snapshot (so a restore
+  by hand puts the record back too) but never in a pristine one, and the merge leaves it
+  alone since only the disk side has it.
 - A snapshot of the disk honours the SDK's own `.gitignore` (so a `node_modules` or `dist`
   never enters a tree), except that every path the pristine snapshot holds is added
   regardless, so a generated file an ignore rule happens to match is still seen and never
@@ -180,7 +181,7 @@ flowchart TD
   F -- yes --> C1[Zip src/ and upload; poll; download the SDK zip into a temp directory]
   C1 --> R1[git init in the SDK directory if no repository encloses it]
   R1 --> E[Write the SDK; an overwrite empties the directory but keeps any existing .git]
-  D -- yes --> G{Markers left from the last run?}
+  D -- yes --> G{Files still unmerged from the last run?}
   G -- yes --> Y([Failed: resolve those files first])
   G -- no --> C2[Zip src/ and upload; poll; download the SDK zip into a temp directory]
   C2 --> H[Save disk state to refs/apimatic/previous]
@@ -199,11 +200,14 @@ how the SDK will be written, before the upload:
 1. `git --version`. Absent, or older than 2.38: warn that customizations will not persist;
    `overwrite`, writing no `.git` and no `.apimatic/`.
 2. `SdkContext.repository()` finds the enclosing repository (from the
-   nearest existing ancestor, since a first run's directory is not there yet), the nesting
-   check, the record, whether its commit is present, and which listed files still hold
-   markers. A nested SDK directory is refused here.
+   nearest existing ancestor, since a first run's directory is not there yet; one whose
+   ignore rules exclude the SDK directory does not count), then `inspect`: a merge, rebase,
+   cherry-pick or revert in progress is refused, a nested SDK directory is refused, files git
+   still holds as unmerged come next, and only then the record and whether its commit is
+   present.
 3. No repository, no record, a record for another generation, or a missing commit: `record`,
-   each with its message. Markers left: refused. Otherwise `merge` against the recorded base.
+   each with its message. Unmerged files: refused, or asked about (6.1). Otherwise `merge`
+   against the recorded base.
 4. The overwrite question is asked for `overwrite` and `record` when the directory holds
    files, never for `merge`, and never with `--force`.
 
@@ -273,10 +277,13 @@ the file is written:
 
 The other kinds carry no markers: a file no longer generated stays as yours; a file you
 deleted comes back in its new version; a binary keeps yours. All are listed by kind in a
-block after the summary, "N files need your attention", with the steps: open each file, keep
-what is right, remove the markers and stage the file (`git status` lists them as both
-modified, `git mergetool` opens them, `git add` marks them resolved); rerun, nothing needs
-committing first; the pre-run state is under `refs/apimatic/previous/…`.
+block after the summary, "N files need your attention", with the steps: open each marked
+file, keep what is right, remove the markers and stage it; for a file left whole, decide
+whether it stays or goes and stage that; rerun, nothing needs committing first; or rerun and
+let the CLI resolve what is left, using either side. Git's own tools apply throughout:
+`git status` lists the files as both modified, `git mergetool` opens them, `git add` marks
+them resolved. The steps do not name `refs/apimatic/previous/…`; that ref is the safety net
+of section 3, named only when a write failed and could not be undone.
 
 The result is failed, so the exit code is 1 and scripts and CI notice; the outro says the
 conflicts need resolving, not that generation failed. Nothing is lost: every other file is
@@ -302,22 +309,26 @@ is absent, the action lists the conflicted files with their kind and asks
 - **I'll resolve them myself**: the run goes on as above, markers, exit 1, and the steps
   (ending with "Or rerun and let the CLI resolve what is left, using either side."). The
   `--force` and non-interactive default, which prints the list with the steps as before.
-- **Resolve using generator changes**: the merge is run again with
-  `--strategy-option=theirs`, so every overlapping hunk goes the generator's way and your other
-  edits in the same file survive; a file one side deleted, or a binary one, is settled whole
-  by `MergePlan.taking('generated')` (the generator's version back, or the file removed).
-- **Resolve using my changes**: the mirror image, with `--strategy-option=ours`: every
-  overlapping hunk keeps your lines and the generator's other changes in the same file still
-  apply; what is still in conflict after that is left as it is on disk, which is your side
-  (`MergePlan.taking('yours')`), so a file you deleted stays deleted and a customized file the
-  generator dropped stays. The next run sees your lines as your edits and keeps them.
+- **Resolve using generator changes**: every marked block is settled for the generator's
+  side as the file is written (`settleMarkers`, the same code the next run uses on a file
+  left unresolved), so only the overlapping hunks go the generator's way and your other edits
+  in the same file survive; a file one side deleted, or a binary one, is settled whole by
+  `MergePlan.taking('generated')`: the generator's version where it has one, else yours
+  stays, so a customized file the generator dropped is never thrown away by this answer.
+- **Resolve using my changes**: the mirror image: every marked block keeps your lines and the
+  generator's other changes in the same file still apply; a file left whole stays as it is on
+  disk, which is your side (`MergePlan.taking('yours')`), so a file you deleted stays deleted
+  and a customized file the generator dropped stays. The next run sees your lines as your
+  edits and keeps them.
 - **Cancel this run**, or backing out of the question: nothing written, nothing recorded, no
   previous ref saved; the result is cancelled. The previous ref is saved only after the
   decision, so this answer leaves no trace.
 
-For either side the two merges become one `Settlement` (`favouring(side, …)`), which
-remembers the files the first merge left in conflict so the run can name them, under
-"Resolved using …", once they are written; it records a clean snapshot and succeeds.
+For either side the merge becomes a `Settlement` (`favouring(side, regeneration)`), which
+remembers the files the merge left in conflict so the run can name them, under "Resolved
+using …", once they are written; it records a clean snapshot and succeeds. The merge runs
+once: `merge-tree -X ours|theirs` would need git 2.43, and settling the markers as the file
+is written gives the same result on 2.38.
 
 The next run, while git holds any of the SDK's files as unmerged, asks before generating
 (`SdkGeneratePrompts.unresolvedChoice`); `--force` and a run without a terminal get the
@@ -389,8 +400,9 @@ Every row of section 5 and this table is a test over real repositories in
 | 10 | this file | Review follow-up: `SdkPrepareAction` and `SdkWriteAction` folded into `GenerateAction.execute`, their prompts into `SdkGeneratePrompts`; `SdkMergeConflictedEvent`, `ConflictOutcome`, `MergePlan.conflictsByKind` and the result payload removed; the two action tests now drive `GenerateAction` through `test/helpers/sdk-generation.ts`. |
 | 11 | this file | Functional core, imperative shell: `SdkDestination` carrying its reason, `destinationFor` (`unresolved` included), `replacesDirectory`; `Regeneration` and `Settlement` (`resolving`, `favouringGenerator`); `SdkContext.destination`, `SdkRepositoryContext.regenerate` and `write`; `execute` the one place that speaks, with no other method on the action and no logic in the prompts. |
 | 12 | this file | Review follow-up: the conflicts a run leaves are found from git's unmerged index entries (`GitService.unmergedPaths`, `ls-files -u` below the SDK directory), as git itself finds them, instead of a conflict list in the record plus a scan for marker text; `GenerationRecord` drops `conflicts` (older records still parse), `hasConflictMarkers` goes, `restorePrevious` takes the paths to settle, the second-run messages say "unresolved" and the first-run steps say to stage each file. |
-| 13 | this file | Review follow-up: "Resolve using my changes" on both questions (`-X ours`, `MergePlan.taking(side)`, `favouring(side, …)`, `resolveMarkers(content, side)`), the first question's third answer renamed "Cancel this run", and the second question's undo removed with `restorePrevious`, `previousRestored` and `GitService.checkoutTree`; the second run settles files without markers from the index's stages (`GitService.unmergedStages`, `settledContent`), so a customized file the generator dropped is removed for the generator's side. |
+| 13 | this file | Review follow-up: "Resolve using my changes" on both questions (`-X ours`, `MergePlan.taking(side)`, `favouring(side, …)`, `resolveMarkers(content, side)`), the first question's third answer renamed "Cancel this run", and the second question's undo removed with `restorePrevious`, `previousRestored` and `GitService.checkoutTree`; the second run settles files without markers from the index's stages (`GitService.unmergedStages`, `settledContent`). It removed a customized file the generator dropped for the generator's side; row 15 reversed that, and dropped `-X`. |
 | 14 | this file | Review follow-up: `.apimatic/.gitattributes` written beside the record (`RECORD_ATTRIBUTES`), so a pull where two clones both regenerated leaves the puller's record whole instead of writing markers into it; a test pulls between two real clones. |
+| 15 | `f7b52fc8` to `4d95a2f2` | PR #445 review: removals before writes, and the directory put back from the previous ref when a write fails (`NotApplied`); the generator's side keeps a customized file it no longer produces (`chosen`); every label git writes on a marker is read, a half-resolved file is left whole, a non-UTF-8 file settles byte for byte; any SDK path is recorded (ref segments percent-encoded), every byte of a blob is kept, files are written with their own line endings; a run refuses over unmerged files before reading the record, over a merge, rebase, cherry-pick or revert in progress, and treats an ignored SDK directory as having no enclosing repository, with `GIT_DIR` cleared from every git call; no `merge-tree -X` (settled at write time, floor stays 2.38), a configured SSH client left alone, `core.hooksPath` resolved by git; `sdk publish` uploads the files git would commit, without `.git` or `.apimatic/`, and a dry run previews the real SDK directory. |
 
 PR into `dev`, squash-merged, title `feat(sdk): keep your edits when regenerating an SDK`.
 
@@ -421,26 +433,26 @@ flowchart TB
     C["SdkGenerate.run()<br/>flags → GenerateAction.execute → outro(result)"]
   end
   subgraph ACT["Actions — src/actions/sdk/"]
-    G["GenerateAction.execute(project, sdkDir?, language, stability, force, apiVersion?, packageSettings?) → ActionResult<br/>the only method; every prompt is called here<br/>validate · SdkContext.destination; unresolved → unresolvedChoice, settleUnresolved(side), conflictsResolved, destination again once<br/>gitUnavailable | recordNotForThisGeneration | snapshotMissing · overwriteSdk unless --force or !replacesDirectory<br/>withDirPath: zip → generateSdk → save → unzip<br/>overwrite → save, sdkGenerated · record → initRepository?, save, snapshotGenerated, recordGeneration, installShareHook, sdkGenerated<br/>merge → regenerate → resolving | conflictChoice: regenerate favouring a side → favouring(side) | cancel (runCancelled)<br/>write → recordGeneration, installShareHook → conflictsResolved?, sdkMerged; markers → stageConflicts, conflicts | conflictSteps"]
+    G["GenerateAction.execute(project, sdkDir?, language, stability, force, apiVersion?, packageSettings?) → ActionResult<br/>the only method; every prompt is called here<br/>validate · SdkContext.destination; unresolved → unresolvedChoice, settleUnresolved(side), conflictsResolved, destination again once<br/>gitUnavailable | recordNotForThisGeneration | snapshotMissing · overwriteSdk unless --force or !replacesDirectory<br/>withDirPath: zip → generateSdk → save → unzip<br/>overwrite → save, sdkGenerated · record → initRepository?, save, snapshotGenerated, recordGeneration, installShareHook, sdkGenerated<br/>merge → regenerate → resolving | conflictChoice → favouring(side) | cancel (runCancelled)<br/>write (notApplied → sdkNotWritten) → recordGeneration, installShareHook → conflictsResolved?, sdkMerged; markers → stageConflicts, conflicts | conflictSteps"]
   end
   subgraph PR["Prompts — src/prompts/sdk/ (wording only)"]
-    GP["SdkGeneratePrompts (wording only, no branching)<br/>gitUnavailable · overwriteSdk · recordNotForThisGeneration · snapshotMissing · nestedSdkDirectory<br/>conflictsUnresolved · unresolvedChoice · resolveLater · conflictsResolved · conflictsNotSettled<br/>sdkGenerated · repositoryInitialised · sdkMerged · conflictChoice · runCancelled<br/>conflicts · conflictSteps · conflictsNotStaged · snapshotNotRecorded · customCodeFailed<br/>shareHookNeedsOneStep · shareHookNotInstalled"]
+    GP["SdkGeneratePrompts (wording only, no branching)<br/>gitUnavailable · overwriteSdk · recordNotForThisGeneration · snapshotMissing · directoryNotInspected<br/>conflictsUnresolved · unresolvedChoice · resolveLater · conflictsResolved · conflictsNotSettled<br/>sdkGenerated · repositoryInitialised · sdkMerged · conflictChoice · runCancelled<br/>conflicts · conflictSteps · conflictsNotStaged · snapshotNotRecorded · customCodeFailed · sdkNotWritten<br/>shareHookNeedsOneStep · shareHookNotInstalled"]
   end
   subgraph TY["Types — src/types/"]
-    SC["SdkContext<br/>directory · exists · destination(generation) → SdkDestination | Unresolved · repository() · initRepository · save · loadSdkInTempDirectory"]
-    RC["SdkRepositoryContext (sdk-repository-context.ts)<br/>remote · inspect → SdkRepositoryState · regenerate → Regeneration{generated, merge} · write(base, plan)<br/>snapshotGenerated · snapshotDisk · savePrevious · merge → MergeOutcome · apply · stageConflicts<br/>recordPristine/recordGeneration · readRecord · installShareHook → ShareHookInstall · settleUnresolved(side, paths)"]
-    MP["MergePlan (sdk/merge-plan.ts)<br/>from(inputs) · writes/deletes/conflicts/renames/files · taking(side)<br/>ConflictKind · ConflictSide · ConflictChoice · UnresolvedChoice"]
-    CMK["conflict-markers.ts<br/>relabelMarkers · resolveMarkers(content, side) · unresolved-file.ts: settledContent"]
+    SC["SdkContext<br/>directory · exists · destination(generation) → SdkDestination | Unresolved · repository() · initRepository · save · archive · loadSdkInTempDirectory"]
+    RC["SdkRepositoryContext (sdk-repository-context.ts)<br/>remote · inspect → SdkRepositoryState · regenerate → Regeneration{generated, merge} · write(base, plan)<br/>snapshotGenerated · snapshotDisk · savePrevious · merge → MergeOutcome · apply · stageConflicts<br/>recordPristine/recordGeneration · readRecord · installShareHook → ShareHookInstall · settleUnresolved(side, paths) · filesToShare"]
+    MP["MergePlan (sdk/merge-plan.ts)<br/>from(inputs) · writes/deletes/conflicts/renames/files · taking(side) → FileWrite.settle<br/>ConflictKind · ConflictSide · ConflictChoice · UnresolvedChoice"]
+    CMK["conflict-markers.ts<br/>relabelMarkers · resolveMarkers(content, side) · settleMarkers · unresolved-file.ts: settledContent"]
     GR["GenerationRecord (sdk/generation-record.ts)<br/>generation.json: language, codegen, stability, pristine commit · describeApart"]
-    SR["SnapshotRef (sdk/snapshot-ref.ts)<br/>refs/apimatic/pristine|previous/‹path› · refspec · sdkPath · collidesWith"]
+    SR["SnapshotRef (sdk/snapshot-ref.ts)<br/>refs/apimatic/pristine|previous/‹path›, segments percent-encoded · fromGit · sdkPath · collidesWith"]
     SH["ShareHook (sdk/share-hook.ts)<br/>SHARE_HOOK_SCRIPT · SHARE_HOOK_CALL · SHARE_HOOK_BLOCK · installInto · calls"]
     SD["SdkDestination (sdk/sdk-destination.ts)<br/>overwrite{found} | record{repository?, because} | merge{repository, base} · Unresolved{repository, paths}<br/>destinationFor(repository, SdkRepositoryState) · replacesDirectory"]
-    ST["Settlement (sdk/settlement.ts)<br/>{regeneration, plan, settled?: {side, paths}}<br/>resolving(regeneration) · favouring(side, original, favoured)"]
+    ST["Settlement (sdk/settlement.ts)<br/>{regeneration, plan, settled?: {side, paths}}<br/>resolving(regeneration) · favouring(side, regeneration)"]
     GT["git/ · CommitId · TreeId · GitVersion · merge-tree (Change, StageEntry, MergeTreeOutput)"]
     RF["file/ · RelativeFilePath · FilePath · DirectoryPath"]
   end
   subgraph INF["Infrastructure — src/infrastructure/"]
-    GS["GitService (git-service.ts)<br/>version · init · treeOf · commitTree · updateRef · resolveRef · hasCommit · describe<br/>mergeTree · diffTrees · listTree · readBlobs · stageConflicts (update-index) · unmergedStages (ls-files -u) · unstage<br/>remoteOf · fetchRef (no prompts, 30 s) · hooksDirectory · hooksPathConfigured"]
+    GS["GitService (git-service.ts)<br/>version · topLevel · init · isIgnored · operationInProgress · filesToCommit · treeOf · commitTree · updateRef · resolveRef · hasCommit<br/>mergeTree · diffTrees · listTree · readBlobs · stageConflicts (update-index) · unmergedStages (ls-files -u) · unstage<br/>remoteOf · fetchRef (no prompts, 30 s) · hooksDirectory · hooksPathConfigured · hooksRunFrom"]
     FS["FileService"]
     TU["utils/terminal-utils.ts · terminal.isInteractive"]
   end
@@ -537,8 +549,9 @@ What each layer owns:
   hooks yet).
 - **Conflicts ask.** Decided 2026-10-22, reworded 2026-10-23 on review: the first run offers
   resolve by hand (the `--force` and CI default, so a job never discards edits silently),
-  resolve using generator changes or using my changes (hunk by hunk, git's `-X theirs` and
-  `-X ours`; never the whole file or SDK, since dropping what merged cleanly is more than
+  resolve using generator changes or using my changes (hunk by hunk: each marked block is
+  settled for the side as the file is written, which `merge-tree -X` would also do but only
+  from git 2.43; never the whole file or SDK, since dropping what merged cleanly is more than
   asked), or cancel the run. The run after, while files are still unresolved, offers to
   finish resolving or to resolve what remains for either side; undo and cancel are not on it.
   No `--on-conflict` flag: `--force` keeps today's path and nothing else was asked for.
