@@ -95,8 +95,8 @@ describe('SdkRepositoryContext: the merge', () => {
     const project = new DirectoryPath(path.join(root, `project-${counter++}`));
     const sdk = project.join('sdk', 'typescript');
     fs.mkdirSync(sdk.toString(), { recursive: true });
-    await git.init(project);
-    const repository = (await new SdkContext(sdk).repository())!;
+    (await git.init(project))._unsafeUnwrap();
+    const repository = (await new SdkContext(sdk).repository())._unsafeUnwrap()!;
     const baseDirectory = new DirectoryPath(path.join(root, `base-${counter}`));
     const generatedDirectory = new DirectoryPath(path.join(root, `generated-${counter}`));
     fs.mkdirSync(baseDirectory.toString());
@@ -116,7 +116,7 @@ describe('SdkRepositoryContext: the merge', () => {
     if (beforeWrite === undefined) {
       written._unsafeUnwrap();
     }
-    expect(await git.resolveRef(project, repository.previousRef())).to.not.be.undefined;
+    expect((await git.resolveRef(project, repository.previousRef()))._unsafeUnwrap()).to.not.be.undefined;
 
     const at = (relative: string) => path.join(sdk.toString(), relative);
     const list = (directory: string): string[] =>
@@ -439,17 +439,19 @@ describe('SdkRepositoryContext: the merge', () => {
     const AFTER: Files = { 'a.ts': '2\n', 'b.ts': '2\n', 'd.ts': 'new\n' };
 
     /** Makes every write of a file named `name` fail, and of `a.ts` too when it is being put back to `1`. */
-    const breaking = (name: string, andRestoringA = false) => () => {
-      const real = fs.promises.writeFile;
-      sinon.stub(fs.promises, 'writeFile').callsFake((file, data, ...rest) => {
-        const target = String(file);
-        const text = typeof data === 'string' ? data : Buffer.from(data as Uint8Array).toString();
-        const restoringA = andRestoringA && target.endsWith('a.ts') && text === '1\r\n';
-        return target.endsWith(name) || restoringA
-          ? Promise.reject(new Error(`EACCES: permission denied, open '${target}'`))
-          : real.call(fs.promises, file, data, ...rest);
-      });
-    };
+    const breaking =
+      (name: string, andRestoringA = false) =>
+      () => {
+        const real = fs.promises.writeFile;
+        sinon.stub(fs.promises, 'writeFile').callsFake((file, data, ...rest) => {
+          const target = String(file);
+          const text = typeof data === 'string' ? data : Buffer.from(data as Uint8Array).toString();
+          const restoringA = andRestoringA && target.endsWith('a.ts') && text === '1\r\n';
+          return target.endsWith(name) || restoringA
+            ? Promise.reject(new Error(`EACCES: permission denied, open '${target}'`))
+            : real.call(fs.promises, file, data, ...rest);
+        });
+      };
 
     it('names the file, puts back what it had changed byte for byte, and leaves the directory as it was', async () => {
       const { written, read, paths } = await run(BEFORE, BEFORE, AFTER, { beforeWrite: breaking('b.ts') });

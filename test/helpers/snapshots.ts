@@ -6,8 +6,8 @@ import { CommitId } from '../../src/types/git/commit-id.js';
 /** The files a snapshot commit holds, by path below the SDK directory, as text. */
 export async function snapshotFiles(root: DirectoryPath, commit: CommitId): Promise<Map<string, string>> {
   const git = new GitService();
-  const entries = (await git.listTree(root, commit)).filter((entry) => entry.type === 'blob');
-  const blobs = await git.readBlobs(root, [...new Set(entries.map((entry) => entry.oid))]);
+  const entries = (await git.listTree(root, commit))._unsafeUnwrap().filter((entry) => entry.type === 'blob');
+  const blobs = (await git.readBlobs(root, [...new Set(entries.map((entry) => entry.oid))]))._unsafeUnwrap();
   const decoder = new TextDecoder();
   return new Map(entries.map((entry) => [entry.path.toString(), decoder.decode(blobs.get(entry.oid)!)]));
 }

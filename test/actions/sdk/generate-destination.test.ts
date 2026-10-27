@@ -4,7 +4,7 @@ import path from 'path';
 import { expect } from 'chai';
 import { canonical } from '../../../src/infrastructure/tmp-extensions.js';
 import { execa } from 'execa';
-import { err } from 'neverthrow';
+import { errAsync, okAsync } from 'neverthrow';
 import sinon from 'sinon';
 import { GenerateAction } from '../../../src/actions/sdk/generate.js';
 import { GitService } from '../../../src/infrastructure/git-service.js';
@@ -47,7 +47,7 @@ describe('GenerateAction (sdk) — the destination', () => {
   /** A merge keeps the base as the pristine snapshot (the generation is unchanged) and saves the pre-run state. */
   const mergedAgainst = async (repository: SdkRepositoryContext, base: CommitId) =>
     record().pristineCommit().isEqual(base) &&
-    (await git.resolveRef(repository.root(), repository.previousRef())) !== undefined;
+    (await git.resolveRef(repository.root(), repository.previousRef()))._unsafeUnwrap() !== undefined;
 
   const execute = async (
     options: { force?: boolean; stability?: Stability; files?: Files; destination?: DirectoryPath } = {}
@@ -65,8 +65,8 @@ describe('GenerateAction (sdk) — the destination', () => {
   /** A recorded generation of `files`, so the directory has a base. */
   const recorded = async (files: Files): Promise<SdkRepositoryContext> => {
     writeFiles(sdk().toString(), files);
-    await git.init(new DirectoryPath(root));
-    const repository = (await sdkContext().repository())!;
+    (await git.init(new DirectoryPath(root)))._unsafeUnwrap();
+    const repository = (await sdkContext().repository())._unsafeUnwrap()!;
     const tree = (await repository.snapshotGenerated(sdk()))._unsafeUnwrap();
     (await repository.recordGeneration(tree, STABLE))._unsafeUnwrap();
     return repository;
@@ -104,7 +104,9 @@ describe('GenerateAction (sdk) — the destination', () => {
     ['an older git', 'git version 2.30.2']
   ] as const) {
     it(`with ${found}, warns that customizations will not persist and overwrites`, async () => {
-      sinon.stub(GitService.prototype, 'version').resolves(output === undefined ? undefined : GitVersion.parse(output));
+      sinon
+        .stub(GitService.prototype, 'version')
+        .returns(okAsync(output === undefined ? undefined : GitVersion.parse(output)));
       const gitUnavailable = sinon.stub(SdkGeneratePrompts.prototype, 'gitUnavailable');
 
       expect((await execute()).isSuccess()).to.be.true;
@@ -150,13 +152,14 @@ describe('GenerateAction (sdk) — the destination', () => {
   });
 
   it('records into the enclosing repository when the directory has no record', async () => {
-    await git.init(new DirectoryPath(root));
+    (await git.init(new DirectoryPath(root)))._unsafeUnwrap();
 
     expect((await execute()).isSuccess()).to.be.true;
 
     expect(fs.existsSync(at('.git'))).to.be.false;
     const ref = SnapshotRef.pristine('sdk/python');
-    expect((await git.resolveRef(new DirectoryPath(root), ref))?.isEqual(record().pristineCommit())).to.be.true;
+    expect((await git.resolveRef(new DirectoryPath(root), ref))._unsafeUnwrap()?.isEqual(record().pristineCommit())).to
+      .be.true;
   });
 
   it('records over an SDK generated at another stability, after saying so and asking', async () => {
@@ -240,7 +243,7 @@ describe('GenerateAction (sdk) — the destination', () => {
       await sh(clone, 'fetch', '-q', 'origin', '+refs/apimatic/pristine/*:refs/apimatic/pristine/*');
 
       expect((await execute({ force: false })).isSuccess()).to.be.true;
-      expect(await mergedAgainst((await sdkContext().repository())!, base)).to.be.true;
+      expect(await mergedAgainst((await sdkContext().repository())._unsafeUnwrap()!, base)).to.be.true;
     } finally {
       fs.rmSync(remote, { recursive: true, force: true });
       fs.rmSync(clone, { recursive: true, force: true });
@@ -384,8 +387,8 @@ describe('GenerateAction (sdk) — the destination', () => {
   });
 
   it('reports a directory git could not inspect', async () => {
-    await git.init(new DirectoryPath(root));
-    sinon.stub(SdkRepositoryContext.prototype, 'inspect').resolves(err({ kind: 'gitFailed', reason: 'git broke' }));
+    (await git.init(new DirectoryPath(root)))._unsafeUnwrap();
+    sinon.stub(SdkRepositoryContext.prototype, 'inspect').returns(errAsync({ kind: 'gitFailed', reason: 'git broke' }));
     const notInspected = sinon.stub(SdkGeneratePrompts.prototype, 'directoryNotInspected');
 
     expect((await execute()).isFailed()).to.be.true;
@@ -466,7 +469,7 @@ describe('GenerateAction (sdk) — the destination', () => {
       try {
         expect((await execute()).isSuccess()).to.be.true;
 
-        expect(await mergedAgainst((await sdkContext().repository())!, base)).to.be.true;
+        expect(await mergedAgainst((await sdkContext().repository())._unsafeUnwrap()!, base)).to.be.true;
       } finally {
         fs.rmSync(clone, { recursive: true, force: true });
         fs.rmSync(origin, { recursive: true, force: true });
@@ -479,8 +482,8 @@ describe('GenerateAction (sdk) — the destination', () => {
       const published = path.join(root, 'published-sdk');
       try {
         writeFiles(published, GENERATED);
-        await git.init(new DirectoryPath(published));
-        const repository = (await new SdkContext(new DirectoryPath(published)).repository())!;
+        (await git.init(new DirectoryPath(published)))._unsafeUnwrap();
+        const repository = (await new SdkContext(new DirectoryPath(published)).repository())._unsafeUnwrap()!;
         const tree = (await repository.snapshotGenerated(new DirectoryPath(published)))._unsafeUnwrap();
         const base = (await repository.recordGeneration(tree, STABLE))._unsafeUnwrap().pristineCommit();
         await sh(published, 'add', '.');

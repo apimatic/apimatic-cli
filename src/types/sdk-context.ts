@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { err, ok, Result } from 'neverthrow';
+import { err, ok, okAsync, Result, ResultAsync } from 'neverthrow';
 import { FileService } from '../infrastructure/file-service.js';
 import { GitService } from '../infrastructure/git-service.js';
 import { canonical } from '../infrastructure/tmp-extensions.js';
@@ -13,7 +13,13 @@ import { FileProblem } from './file/file-problem.js';
 import { RelativeFilePath } from './file/relativeFilePath.js';
 import { SdkGeneration } from './sdk/generation-record.js';
 import { destinationFor, SdkDestination, Unresolved } from './sdk/sdk-destination.js';
-import { InspectionProblem, RECORD_DIRECTORY, SdkRepositoryContext, SdkRepositoryProblem } from './sdk-repository-context.js';
+import {
+  gitFailed,
+  InspectionProblem,
+  RECORD_DIRECTORY,
+  SdkRepositoryContext,
+  SdkRepositoryProblem
+} from './sdk-repository-context.js';
 import { TempContext } from './temp-context.js';
 
 const GIT_DIRECTORY = '.git';
@@ -56,15 +62,25 @@ export class SdkContext {
    */
   public async destination(generation: SdkGeneration): Promise<Result<SdkDestination | Unresolved, InspectionProblem>> {
     const version = await this.git.version();
-    if (!version?.isSupported()) {
-      return ok({ kind: 'overwrite', found: version });
+    if (version.isErr()) {
+      return err(gitFailed(version.error));
+    }
+    if (!version.value?.isSupported()) {
+      return ok({ kind: 'overwrite', found: version.value });
     }
     const repository = await this.repository();
-    if (repository === undefined) {
-      return ok({ kind: 'record', repository, because: { kind: 'noRepository' } });
+    if (repository.isErr()) {
+      return err(repository.error);
     }
-    const state = await repository.inspect(generation, await repository.remote());
-    return state.map((found) => destinationFor(repository, found));
+    if (repository.value === undefined) {
+      return ok({ kind: 'record', repository: undefined, because: { kind: 'noRepository' } });
+    }
+    const remote = await repository.value.remote();
+    if (remote.isErr()) {
+      return err(remote.error);
+    }
+    const found = repository.value;
+    return (await found.inspect(generation, remote.value)).map((state) => destinationFor(found, state));
   }
 
   /**
@@ -72,31 +88,38 @@ export class SdkContext {
    * does. A repository whose ignore rules exclude the directory does not count: its index and
    * its remote are not meant to hold the SDK, so the directory gets a repository of its own.
    */
-  public async repository(): Promise<SdkRepositoryContext | undefined> {
+  public repository(): ResultAsync<SdkRepositoryContext | undefined, SdkRepositoryProblem> {
     const { real, existing } = realSpelling(this.sdkDirectory);
-    const found = await this.git.topLevel(existing);
-    if (found === undefined) {
-      return undefined;
-    }
-    const root = new DirectoryPath(canonical(found.toString()));
-    if (!root.isEqual(real) && (await this.git.isIgnored(root, real))) {
-      return undefined;
-    }
-    return SdkRepositoryContext.create(root, real);
+    return this.git
+      .topLevel(existing)
+      .andThen((found) => {
+        if (found === undefined) {
+          return okAsync(undefined);
+        }
+        const root = new DirectoryPath(canonical(found.toString()));
+        const enclosed = root.isEqual(real) ? okAsync(true) : this.git.isIgnored(root, real).map((ignored) => !ignored);
+        return enclosed.map((yes) => (yes ? SdkRepositoryContext.create(root, real) : undefined));
+      })
+      .mapErr(gitFailed);
   }
 
   /** Makes the SDK directory a repository of its own, creating it when it is not there yet. */
-  public async initRepository(): Promise<Result<SdkRepositoryContext, SdkRepositoryProblem>> {
-    try {
-      await this.fileService.createDirectoryIfNotExists(this.sdkDirectory);
-      await this.git.init(this.sdkDirectory);
-      const repository = SdkRepositoryContext.create(this.sdkDirectory, this.sdkDirectory);
-      return repository === undefined
-        ? err({ kind: 'gitFailed', reason: 'the repository could not be opened' })
-        : ok(repository);
-    } catch (error) {
-      return err({ kind: 'gitFailed', reason: errorMessage(error) });
-    }
+  public initRepository(): ResultAsync<SdkRepositoryContext, SdkRepositoryProblem> {
+    const sdk = this.sdkDirectory;
+    return ResultAsync.fromPromise(
+      this.fileService.createDirectoryIfNotExists(sdk),
+      (error): SdkRepositoryProblem => ({ kind: 'fileFailed', reason: errorMessage(error) })
+    )
+      .andThen(() => this.git.init(sdk).mapErr(gitFailed))
+      .andThen(() => {
+        const repository = SdkRepositoryContext.create(sdk, sdk);
+        return repository === undefined
+          ? err<SdkRepositoryContext, SdkRepositoryProblem>({
+              kind: 'gitFailed',
+              reason: 'the repository could not be opened'
+            })
+          : ok(repository);
+      });
   }
 
   /** Overwrites the directory; a `.git` in it is the developer's, or holds the snapshots, and stays. */
@@ -112,8 +135,14 @@ export class SdkContext {
    * Without a repository, every file but those.
    */
   public async archive(tempDirectory: DirectoryPath): Promise<Result<FilePath, FileProblem>> {
-    const repository = await this.repository();
-    const files = repository === undefined ? ok(await this.everyFile()) : await repository.filesToShare();
+    const files = await this.repository().andThen((repository) =>
+      repository === undefined
+        ? ResultAsync.fromPromise(
+            this.everyFile(),
+            (error): SdkRepositoryProblem => ({ kind: 'fileFailed', reason: errorMessage(error) })
+          )
+        : repository.filesToShare()
+    );
     if (files.isErr()) {
       return err({ kind: 'zipFailed', reason: files.error.reason });
     }

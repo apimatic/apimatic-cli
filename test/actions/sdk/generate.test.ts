@@ -4,7 +4,7 @@ import path from 'path';
 import { Buffer } from 'node:buffer';
 import { Readable } from 'node:stream';
 import { expect } from 'chai';
-import { err, ok } from 'neverthrow';
+import { err, ok, okAsync } from 'neverthrow';
 import sinon from 'sinon';
 import { GenerateAction } from '../../../src/actions/sdk/generate.js';
 import { GitService } from '../../../src/infrastructure/git-service.js';
@@ -97,19 +97,21 @@ describe('GenerateAction (sdk)', () => {
   });
 
   it('expands the generated SDK into its language directory and records it for the next run', async () => {
-    await new GitService().init(new DirectoryPath(root));
+    (await new GitService().init(new DirectoryPath(root)))._unsafeUnwrap();
     sinon.stub(SdkGeneratePrompts.prototype, 'shareHookInstalled');
 
     expect((await execute()).isSuccess()).to.be.true;
 
     expect(fs.readFileSync(at('README.md'), 'utf-8')).to.equal('# sdk');
     const record = GenerationRecord.parse(fs.readFileSync(at('.apimatic/generation.json'), 'utf-8'))!;
-    const pristine = await new GitService().resolveRef(new DirectoryPath(root), SnapshotRef.pristine('sdk/python'));
+    const pristine = (
+      await new GitService().resolveRef(new DirectoryPath(root), SnapshotRef.pristine('sdk/python'))
+    )._unsafeUnwrap();
     expect(record.pristineCommit().isEqual(pristine!)).to.be.true;
   });
 
   it('writes the SDK as it always has when git is not there', async () => {
-    sinon.stub(GitService.prototype, 'version').resolves(undefined);
+    sinon.stub(GitService.prototype, 'version').returns(okAsync(undefined));
     sinon.stub(SdkGeneratePrompts.prototype, 'gitUnavailable');
 
     expect((await execute()).isSuccess()).to.be.true;

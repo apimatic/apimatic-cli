@@ -457,7 +457,7 @@ flowchart TB
     RF["file/ · RelativeFilePath · FilePath · DirectoryPath"]
   end
   subgraph INF["Infrastructure — src/infrastructure/"]
-    GS["GitService (git-service.ts)<br/>version · topLevel · init · isIgnored · operationInProgress · filesToCommit · treeOf · commitTree · updateRef · resolveRef · hasCommit<br/>mergeTree · diffTrees · listTree · readBlobs · stageConflicts (update-index) · unmergedStages (ls-files -u) · unstage<br/>remoteOf · fetchRef (no prompts, 30 s) · hooksDirectory · hooksPathConfigured · hooksRunFrom"]
+    GS["GitService (git-service.ts), every method a ResultAsync carrying git's own words<br/>version · topLevel · init · isIgnored · operationInProgress · filesToCommit · treeOf · commitTree · updateRef · resolveRef · hasCommit<br/>mergeTree · diffTrees · listTree · readBlobs · stageConflicts (update-index) · unmergedStages (ls-files -u) · unstage<br/>remoteOf · fetchRef (no prompts, 30 s) · hooksDirectory · hooksPathConfigured · hooksRunFrom"]
     FS["FileService"]
     TU["utils/terminal-utils.ts · terminal.isInteractive"]
   end

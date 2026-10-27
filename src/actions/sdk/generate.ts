@@ -1,4 +1,4 @@
-import { err, ok, Result, ResultAsync } from 'neverthrow';
+import { err, ok, Result } from 'neverthrow';
 import { SdkGenerationService } from '../../infrastructure/services/sdk-generation-service.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { ActionResult } from '../action-result.js';
@@ -107,7 +107,12 @@ export class GenerateAction {
     } else if (destination.kind === 'record' && destination.because.kind === 'snapshotMissing') {
       this.prompts.snapshotMissing(destination.because.fetch);
     }
-    if (force && destination.kind === 'record' && destination.because.kind !== 'noRepository' && destination.because.kind !== 'noRecord') {
+    if (
+      force &&
+      destination.kind === 'record' &&
+      destination.because.kind !== 'noRepository' &&
+      destination.because.kind !== 'noRecord'
+    ) {
       this.prompts.recordedSdkNotReplaced(sdk);
       return ActionResult.failed();
     }
@@ -275,9 +280,7 @@ async function recordSnapshot(
   shareHookInstalled: (file: FilePath) => void,
   shareHookNeedsOneStep: (needed: Extract<ShareHookInstall, { kind: 'elsewhere' | 'notShell' }>) => void
 ): Promise<void> {
-  const recorded = await generated.asyncAndThen(
-    (tree) => new ResultAsync(repository.recordGeneration(tree, generation))
-  );
+  const recorded = await generated.asyncAndThen((tree) => repository.recordGeneration(tree, generation));
   if (recorded.isErr()) {
     return snapshotNotRecorded(recorded.error.reason);
   }

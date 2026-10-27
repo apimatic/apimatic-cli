@@ -30,16 +30,18 @@ describe('GitService', () => {
   const repository = async (name = 'repo'): Promise<DirectoryPath> => {
     const directory = new DirectoryPath(path.join(root, name));
     fs.mkdirSync(directory.toString(), { recursive: true });
-    await git.init(directory);
+    (await git.init(directory))._unsafeUnwrap();
     return directory;
   };
 
   const filesOf = async (repo: DirectoryPath, tree: Parameters<GitService['listTree']>[1]) => {
-    const entries = await git.listTree(repo, tree);
-    const blobs = await git.readBlobs(
-      repo,
-      entries.map((entry) => entry.oid)
-    );
+    const entries = (await git.listTree(repo, tree))._unsafeUnwrap();
+    const blobs = (
+      await git.readBlobs(
+        repo,
+        entries.map((entry) => entry.oid)
+      )
+    )._unsafeUnwrap();
     return new Map(entries.map((entry) => [entry.path.toString(), text(blobs.get(entry.oid))]));
   };
 
@@ -53,9 +55,39 @@ describe('GitService', () => {
   });
 
   it('reports the git on PATH, which this suite needs at 2.38 or newer', async () => {
-    const version = await git.version();
+    const version = (await git.version())._unsafeUnwrap();
 
     expect(version?.isSupported()).to.be.true;
+  });
+
+  it('answers with no version when there is no git on PATH, which is not a failure', async () => {
+    const previous = process.env.PATH;
+    process.env.PATH = root;
+    try {
+      expect((await git.version())._unsafeUnwrap()).to.be.undefined;
+    } finally {
+      process.env.PATH = previous;
+    }
+  });
+
+  it('reports a git that cannot run in its own words, instead of taking it for absent', async () => {
+    const repo = await repository();
+    const broken = path.join(root, 'gitconfig');
+    fs.writeFileSync(broken, '[core' + String.fromCharCode(10));
+    const previous = process.env.GIT_CONFIG_GLOBAL;
+    process.env.GIT_CONFIG_GLOBAL = broken;
+    try {
+      const found = await git.topLevel(repo);
+
+      expect(found.isErr()).to.be.true;
+      expect(found._unsafeUnwrapErr().reason).to.match(/^git rev-parse failed: .*bad config/);
+    } finally {
+      if (previous === undefined) {
+        delete process.env.GIT_CONFIG_GLOBAL;
+      } else {
+        process.env.GIT_CONFIG_GLOBAL = previous;
+      }
+    }
   });
 
   it('finds the repository enclosing a directory, and none outside one', async () => {
@@ -65,14 +97,14 @@ describe('GitService', () => {
     const outside = new DirectoryPath(path.join(root, 'elsewhere'));
     fs.mkdirSync(outside.toString());
 
-    expect((await git.topLevel(nested))?.isEqual(repo)).to.be.true;
-    expect(await git.topLevel(outside)).to.be.undefined;
+    expect((await git.topLevel(nested))._unsafeUnwrap()?.isEqual(repo)).to.be.true;
+    expect((await git.topLevel(outside))._unsafeUnwrap()).to.be.undefined;
     // A hook runs the CLI with its own repository in the environment, which must not stand in for the one asked about.
     const other = await repository('other');
     process.env.GIT_DIR = other.join('.git').toString();
     try {
-      expect((await git.topLevel(nested))?.isEqual(repo)).to.be.true;
-      expect(await git.topLevel(outside)).to.be.undefined;
+      expect((await git.topLevel(nested))._unsafeUnwrap()?.isEqual(repo)).to.be.true;
+      expect((await git.topLevel(outside))._unsafeUnwrap()).to.be.undefined;
     } finally {
       delete process.env.GIT_DIR;
     }
@@ -93,7 +125,7 @@ describe('GitService', () => {
     write(sdk, 'dist/built.py', 'built');
     write(repo, 'outside.py', 'outside');
 
-    const files = await git.filesToCommit(sdk);
+    const files = (await git.filesToCommit(sdk))._unsafeUnwrap();
 
     expect(files.map(String)).to.have.members(['.gitignore', 'tracked.py', 'untracked.py']);
   });
@@ -108,7 +140,10 @@ describe('GitService', () => {
       write(sdk, 'dist/generated.js', 'generated\n');
       write(sdk, 'debug.log', 'noise\n');
 
-      const files = await filesOf(repo, await git.treeOf(repo, sdk, ['dist/generated.js', 'missing.txt'].map(rel)));
+      const files = await filesOf(
+        repo,
+        (await git.treeOf(repo, sdk, ['dist/generated.js', 'missing.txt'].map(rel)))._unsafeUnwrap()
+      );
 
       expect([...files.keys()]).to.have.members(['.gitignore', 'src/index.ts', 'dist/generated.js']);
     });
@@ -119,7 +154,7 @@ describe('GitService', () => {
       write(repo, 'dist/index.js', 'built\n');
       write(repo, 'README.md', '# sdk\n');
 
-      const files = await filesOf(repo, await git.treeOf(repo, repo, 'all'));
+      const files = await filesOf(repo, (await git.treeOf(repo, repo, 'all'))._unsafeUnwrap());
 
       expect([...files.keys()]).to.have.members(['.gitignore', 'dist/index.js', 'README.md']);
     });
@@ -129,7 +164,7 @@ describe('GitService', () => {
       write(repo, 'crlf.txt', 'one\r\ntwo\r\n');
       write(repo, 'lf.txt', 'one\ntwo\n');
 
-      const files = await filesOf(repo, await git.treeOf(repo, repo, 'all'));
+      const files = await filesOf(repo, (await git.treeOf(repo, repo, 'all'))._unsafeUnwrap());
 
       expect(files.get('crlf.txt')).to.equal('one\ntwo\n');
       expect(files.get('lf.txt')).to.equal('one\ntwo\n');
@@ -140,10 +175,12 @@ describe('GitService', () => {
       write(repo, 'crlf.txt', 'one\r\ntwo\r\n');
       write(repo, 'cr-at-end.bin', 'x\r');
 
-      const entries = await git.listTree(repo, await git.treeOf(repo, repo, 'all', 'asIs'));
+      const entries = (
+        await git.listTree(repo, (await git.treeOf(repo, repo, 'all', 'asIs'))._unsafeUnwrap())
+      )._unsafeUnwrap();
       const crlf = entries.find((entry) => entry.path.toString() === 'crlf.txt')!;
       const cr = entries.find((entry) => entry.path.toString() === 'cr-at-end.bin')!;
-      const blobs = await git.readBlobs(repo, [crlf.oid, cr.oid]);
+      const blobs = (await git.readBlobs(repo, [crlf.oid, cr.oid]))._unsafeUnwrap();
 
       expect(Buffer.from(blobs.get(crlf.oid)!).toString()).to.equal('one\r\ntwo\r\n');
       expect([...blobs.get(cr.oid)!]).to.deep.equal([0x78, 0x0d]);
@@ -153,24 +190,26 @@ describe('GitService', () => {
   it('commits a tree, moves a ref to it, and describes the commit', async () => {
     const repo = await repository();
     write(repo, 'a.txt', 'a\n');
-    const tree = await git.treeOf(repo, repo, 'all');
+    const tree = (await git.treeOf(repo, repo, 'all'))._unsafeUnwrap();
     const { SnapshotRef } = await import('../../src/types/sdk/snapshot-ref.js');
     const ref = SnapshotRef.pristine('sdk');
 
-    const first = await git.commitTree(repo, tree, [], 'first');
-    const second = await git.commitTree(repo, tree, [first], 'second');
-    await git.updateRef(repo, ref, second);
+    const first = (await git.commitTree(repo, tree, [], 'first'))._unsafeUnwrap();
+    const second = (await git.commitTree(repo, tree, [first], 'second'))._unsafeUnwrap();
+    (await git.updateRef(repo, ref, second))._unsafeUnwrap();
 
-    expect((await git.resolveRef(repo, ref))?.isEqual(second)).to.be.true;
-    expect(await git.resolveRef(repo, SnapshotRef.pristine('other'))).to.be.undefined;
-    expect(await git.listRefs(repo, 'refs/apimatic/pristine')).to.deep.equal(['refs/apimatic/pristine/sdk']);
-    expect(await git.describe(repo, second)).to.deep.equal({
+    expect((await git.resolveRef(repo, ref))._unsafeUnwrap()?.isEqual(second)).to.be.true;
+    expect((await git.resolveRef(repo, SnapshotRef.pristine('other')))._unsafeUnwrap()).to.be.undefined;
+    expect((await git.listRefs(repo, 'refs/apimatic/pristine'))._unsafeUnwrap()).to.deep.equal([
+      'refs/apimatic/pristine/sdk'
+    ]);
+    expect((await git.describe(repo, second))._unsafeUnwrap()).to.deep.equal({
       parents: [first],
       authorName: 'APIMatic CLI',
       subject: 'second'
     });
-    expect(await git.hasCommit(repo, first)).to.be.true;
-    expect((await git.treeOfCommit(repo, first)).isEqual(tree)).to.be.true;
+    expect((await git.hasCommit(repo, first))._unsafeUnwrap()).to.be.true;
+    expect((await git.treeOfCommit(repo, first))._unsafeUnwrap().isEqual(tree)).to.be.true;
   });
 
   it('diffs two trees, pairing a moved file only when asked to', async () => {
@@ -182,11 +221,11 @@ describe('GitService', () => {
     write(after, 'moved/a.txt', 'one\ntwo\nthree\n');
     write(after, 'b.txt', 'B\n');
     write(after, 'c.txt', 'c\n');
-    const from = await git.treeOf(repo, before, 'all');
-    const to = await git.treeOf(repo, after, 'all');
+    const from = (await git.treeOf(repo, before, 'all'))._unsafeUnwrap();
+    const to = (await git.treeOf(repo, after, 'all'))._unsafeUnwrap();
 
-    const paired = await git.diffTrees(repo, from, to, true);
-    const plain = await git.diffTrees(repo, from, to, false);
+    const paired = (await git.diffTrees(repo, from, to, true))._unsafeUnwrap();
+    const plain = (await git.diffTrees(repo, from, to, false))._unsafeUnwrap();
 
     expect(
       paired.map(({ status, path: changed, from: origin }) => [status, changed.toString(), origin?.toString()])
@@ -216,7 +255,9 @@ describe('GitService', () => {
       for (const [relative, contents] of Object.entries(files)) {
         write(work, relative, contents);
       }
-      return git.commitTree(repo, await git.treeOf(repo, work, 'all'), parents, name);
+      return (
+        await git.commitTree(repo, (await git.treeOf(repo, work, 'all'))._unsafeUnwrap(), parents, name)
+      )._unsafeUnwrap();
     };
 
     it('reads the merged tree, the stages of each conflicted path and the messages', async () => {
@@ -225,7 +266,7 @@ describe('GitService', () => {
       const ours = await commit(repo, 'ours', { 'same.txt': 'ours\n', 'gone.txt': 'kept\n' }, [base]);
       const theirs = await commit(repo, 'theirs', { 'same.txt': 'theirs\n' }, [base]);
 
-      const merged = await git.mergeTree(repo, ours, theirs);
+      const merged = (await git.mergeTree(repo, ours, theirs))._unsafeUnwrap();
 
       expect(merged.stages.map(({ stage, path: staged }) => [staged.toString(), stage])).to.have.deep.members([
         ['same.txt', 1],
@@ -252,9 +293,9 @@ describe('GitService', () => {
       const theirs = await commit(repo, 'theirs', { 'a.txt': 'a\n', 'b.txt': 'B\n' }, [base]);
       const both = await commit(repo, 'both', { 'a.txt': 'A\n', 'b.txt': 'B\n' }, []);
 
-      const merged = await git.mergeTree(repo, ours, theirs);
+      const merged = (await git.mergeTree(repo, ours, theirs))._unsafeUnwrap();
 
-      expect(merged.tree.isEqual(await git.treeOfCommit(repo, both))).to.be.true;
+      expect(merged.tree.isEqual((await git.treeOfCommit(repo, both))._unsafeUnwrap())).to.be.true;
       expect(merged.stages).to.deep.equal([]);
       expect(merged.messages).to.deep.equal([]);
     });
@@ -278,7 +319,9 @@ describe('GitService', () => {
       });
 
       const listed = async (directory: string) =>
-        (await git.unmergedStages(repo, directory)).map((entry) => `${entry.path}:${entry.stage}:${entry.oid === oid}`);
+        (await git.unmergedStages(repo, directory))
+          ._unsafeUnwrap()
+          .map((entry) => `${entry.path}:${entry.stage}:${entry.oid === oid}`);
 
       expect(await listed('sdk/ts')).to.deep.equal([
         'sdk/ts/a.ts:1:true',
@@ -288,7 +331,7 @@ describe('GitService', () => {
         'sdk/ts/b.ts:3:true'
       ]);
       expect(await listed('.')).to.include.members(['sdk/py/a.py:1:true', 'sdk/py/a.py:2:true']);
-      expect(await git.unmergedStages(repo, 'docs')).to.deep.equal([]);
+      expect((await git.unmergedStages(repo, 'docs'))._unsafeUnwrap()).to.deep.equal([]);
     });
   });
 
@@ -311,23 +354,25 @@ describe('GitService', () => {
     const snapshot = async (repo: DirectoryPath, content: string) => {
       const work = new DirectoryPath(path.join(root, `work-${content}`));
       write(work, 'a.txt', content);
-      const tree = await git.treeOf(repo, work, 'all');
-      const parent = await git.resolveRef(repo, ref);
-      const commit = await git.commitTree(repo, tree, parent === undefined ? [] : [parent], 'snapshot');
-      await git.updateRef(repo, ref, commit);
+      const tree = (await git.treeOf(repo, work, 'all'))._unsafeUnwrap();
+      const parent = (await git.resolveRef(repo, ref))._unsafeUnwrap();
+      const commit = (
+        await git.commitTree(repo, tree, parent === undefined ? [] : [parent], 'snapshot')
+      )._unsafeUnwrap();
+      (await git.updateRef(repo, ref, commit))._unsafeUnwrap();
       return commit;
     };
 
     it('names the remote the current branch pushes to, else origin, else none', async () => {
       const repo = await repository();
-      expect(await git.remoteOf(repo)).to.be.undefined;
+      expect((await git.remoteOf(repo))._unsafeUnwrap()).to.be.undefined;
 
       await execa('git', ['remote', 'add', 'origin', (await bare()).toString()], { cwd: repo.toString() });
-      expect(await git.remoteOf(repo)).to.equal('origin');
+      expect((await git.remoteOf(repo))._unsafeUnwrap()).to.equal('origin');
 
       await execa('git', ['remote', 'add', 'fork', (await bare('fork.git')).toString()], { cwd: repo.toString() });
       await execa('git', ['config', 'branch.main.remote', 'fork'], { cwd: repo.toString() });
-      expect(await git.remoteOf(repo)).to.equal('fork');
+      expect((await git.remoteOf(repo))._unsafeUnwrap()).to.equal('fork');
     });
 
     it('fetches a ref with its objects, and answers with nothing for a ref the remote lacks', async () => {
@@ -337,26 +382,26 @@ describe('GitService', () => {
       const first = await snapshot(a, 'one');
       await execa('git', ['push', '-q', 'origin', ref.refspec()], { cwd: a.toString() });
 
-      expect(await git.fetchRef(b, 'origin', SnapshotRef.pristine('elsewhere'))).to.be.undefined;
-      const tip = await git.fetchRef(b, 'origin', ref);
+      expect((await git.fetchRef(b, 'origin', SnapshotRef.pristine('elsewhere')))._unsafeUnwrap()).to.be.undefined;
+      const tip = (await git.fetchRef(b, 'origin', ref))._unsafeUnwrap();
 
       expect(tip?.isEqual(first)).to.be.true;
-      expect(await git.hasCommit(b, first)).to.be.true;
+      expect((await git.hasCommit(b, first))._unsafeUnwrap()).to.be.true;
     });
 
     it('names git’s own hooks directory, and whether core.hooksPath moved the hooks elsewhere', async () => {
       const repo = await repository();
       const own = path.join(repo.toString(), '.git', 'hooks');
 
-      expect((await git.hooksDirectory(repo)).toString()).to.equal(own);
-      expect(await git.hooksPathConfigured(repo)).to.be.undefined;
-      expect((await git.hooksRunFrom(repo)).toString()).to.equal(own);
+      expect((await git.hooksDirectory(repo))._unsafeUnwrap().toString()).to.equal(own);
+      expect((await git.hooksPathConfigured(repo))._unsafeUnwrap()).to.be.undefined;
+      expect((await git.hooksRunFrom(repo))._unsafeUnwrap().toString()).to.equal(own);
 
       await execa('git', ['config', 'core.hooksPath', '.husky'], { cwd: repo.toString() });
 
-      expect(await git.hooksPathConfigured(repo)).to.equal('.husky');
-      expect((await git.hooksDirectory(repo)).toString()).to.equal(own);
-      expect((await git.hooksRunFrom(repo)).toString()).to.equal(path.join(repo.toString(), '.husky'));
+      expect((await git.hooksPathConfigured(repo))._unsafeUnwrap()).to.equal('.husky');
+      expect((await git.hooksDirectory(repo))._unsafeUnwrap().toString()).to.equal(own);
+      expect((await git.hooksRunFrom(repo))._unsafeUnwrap().toString()).to.equal(path.join(repo.toString(), '.husky'));
     });
 
     it('resolves a hooks path under the home directory as git does, not under the repository', async () => {
@@ -366,7 +411,7 @@ describe('GitService', () => {
       const previous = process.env.HOME;
       process.env.HOME = home;
       try {
-        expect((await git.hooksRunFrom(repo)).toString()).to.equal(path.join(home, '.githooks'));
+        expect((await git.hooksRunFrom(repo))._unsafeUnwrap().toString()).to.equal(path.join(home, '.githooks'));
       } finally {
         if (previous === undefined) {
           delete process.env.HOME;
@@ -383,14 +428,9 @@ describe('GitService', () => {
       fs.writeFileSync(script, `printf x > "${marker}"\nexit 1\n`);
       await execa('git', ['config', 'core.sshCommand', `sh "${script}"`], { cwd: repo.toString() });
 
-      let failure: unknown;
-      try {
-        await git.fetchRef(repo, 'ssh://example.invalid/sdk.git', ref);
-      } catch (error) {
-        failure = error;
-      }
+      const fetched = await git.fetchRef(repo, 'ssh://example.invalid/sdk.git', ref);
 
-      expect(failure).to.not.be.undefined;
+      expect(fetched.isErr()).to.be.true;
       expect(fs.existsSync(marker)).to.be.true;
     });
 
@@ -399,8 +439,8 @@ describe('GitService', () => {
       const first = await snapshot(repo, 'one');
       const second = await snapshot(repo, 'two');
 
-      expect(await git.isAncestor(repo, first, second)).to.be.true;
-      expect(await git.isAncestor(repo, second, first)).to.be.false;
+      expect((await git.isAncestor(repo, first, second))._unsafeUnwrap()).to.be.true;
+      expect((await git.isAncestor(repo, second, first))._unsafeUnwrap()).to.be.false;
     });
   });
 });

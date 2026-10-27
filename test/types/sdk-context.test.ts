@@ -28,23 +28,23 @@ describe('SdkContext', () => {
     const git = new GitService();
 
     it('finds the repository enclosing the SDK directory, which need not exist yet', async () => {
-      await git.init(new DirectoryPath(root));
+      (await git.init(new DirectoryPath(root)))._unsafeUnwrap();
 
-      const repository = await context.repository();
+      const repository = (await context.repository())._unsafeUnwrap();
 
       expect(repository?.root().isEqual(new DirectoryPath(canonical(root)))).to.be.true;
       expect(repository?.sdkDirectory().isEqual(new DirectoryPath(canonical(root), 'sdk', 'python'))).to.be.true;
     });
 
     it('finds none when that repository ignores the SDK directory, until the directory is a repository of its own', async () => {
-      await git.init(new DirectoryPath(root));
+      (await git.init(new DirectoryPath(root)))._unsafeUnwrap();
       fs.writeFileSync(inRoot('.gitignore'), '/sdk/\n');
 
-      expect(await context.repository()).to.be.undefined;
+      expect((await context.repository())._unsafeUnwrap()).to.be.undefined;
 
       fs.mkdirSync(inRoot('sdk', 'python'), { recursive: true });
-      await git.init(new DirectoryPath(inRoot('sdk', 'python')));
-      const own = await context.repository();
+      (await git.init(new DirectoryPath(inRoot('sdk', 'python'))))._unsafeUnwrap();
+      const own = (await context.repository())._unsafeUnwrap();
       expect(own?.root().isEqual(new DirectoryPath(canonical(root), 'sdk', 'python'))).to.be.true;
     });
   });
@@ -54,7 +54,7 @@ describe('SdkContext', () => {
     const entries = (archive: string) => new AdmZip(archive).getEntries().map((entry) => entry.entryName);
 
     it('zips the files git would commit: not .git, the record, or what the SDK’s .gitignore excludes', async () => {
-      await git.init(new DirectoryPath(root));
+      (await git.init(new DirectoryPath(root)))._unsafeUnwrap();
       fs.mkdirSync(inRoot('sdk', 'python', 'models'), { recursive: true });
       fs.writeFileSync(inRoot('sdk', 'python', 'models', 'book.py'), 'class Book: ...');
       await execa('git', ['add', '.'], { cwd: root });
