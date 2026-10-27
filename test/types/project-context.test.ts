@@ -101,27 +101,18 @@ describe('ProjectContext', () => {
       expect(entries).to.have.members(['spec/openapi.json', 'content/index.md', 'package-settings/package.json']);
     });
 
-    it('keeps a spec folder named static: only a build upload leaves static/ out', async () => {
-      write('src/spec/openapi.yaml', 'openapi: 3.0.3');
-      write('src/spec/static/pet.yaml', 'type: object');
-      fs.mkdirSync(inProject('temp'));
-
-      const zip = (await project().specZip(new DirectoryPath(inProject('temp'))))._unsafeUnwrap();
-
-      const entries = new AdmZip(zip.toString()).getEntries().map((entry) => entry.entryName);
-      expect(entries).to.have.members(['openapi.yaml', 'static/pet.yaml']);
-    });
-
+    // A folder named static is kept too: only a build upload leaves static/ out.
     it('zips all of spec/ for validation, so a spec split across files keeps the ones it references', async () => {
       write('src/spec/openapi.yaml', 'openapi: 3.0.3');
       write('src/spec/schemas/pet.yaml', 'type: object');
+      write('src/spec/static/owner.yaml', 'type: object');
       write('src/APIMATIC-BUILD.json', '{}');
       fs.mkdirSync(inProject('temp'));
 
       const zip = (await project().specZip(new DirectoryPath(inProject('temp'))))._unsafeUnwrap();
 
       const entries = new AdmZip(zip.toString()).getEntries().map((entry) => entry.entryName);
-      expect(entries).to.have.members(['openapi.yaml', 'schemas/pet.yaml']);
+      expect(entries).to.have.members(['openapi.yaml', 'schemas/pet.yaml', 'static/owner.yaml']);
     });
 
     it('zips nothing when spec/ is empty, and names the directory it looked in', async () => {
