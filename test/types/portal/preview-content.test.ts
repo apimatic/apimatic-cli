@@ -14,6 +14,7 @@ describe('PreviewContent', () => {
   const folder = (name: string) => content.join(name);
 
   const NONE: ContentNotices = {
+    droppedTags: [],
     hiddenPages: [],
     ignoredNavigationFiles: [],
     sharedTabNames: [],
@@ -112,6 +113,25 @@ describe('PreviewContent', () => {
 
     expect(noticesAfter(titled, NONE).unseenHomeTitle).to.deep.equal(titled.unseenHomeTitle);
     expect(noticesAfter(titled, titled).unseenHomeTitle).to.be.undefined;
+  });
+
+  // By page and name, or every edit above a tag would give the notice again.
+  it('gives the dropped tags again for a tag a page did not have, not for one on another line', () => {
+    const index = new FilePath(content, new FileName('index.md'));
+    const intro = new FilePath(folder('guides'), new FileName('intro.md'));
+    const before = notices({ droppedTags: [{ page: index, line: 5, name: 'br' }] });
+    const moved = notices({
+      droppedTags: [
+        { page: index, line: 9, name: 'br' },
+        { page: index, line: 12, name: 'br' }
+      ]
+    });
+    const newName = notices({ droppedTags: [...moved.droppedTags, { page: index, line: 14, name: 'details' }] });
+    const newPage = notices({ droppedTags: [...moved.droppedTags, { page: intro, line: 3, name: 'br' }] });
+
+    expect(noticesAfter(moved, before).droppedTags).to.deep.equal([]);
+    expect(noticesAfter(newName, before).droppedTags).to.deep.equal(newName.droppedTags);
+    expect(noticesAfter(newPage, before).droppedTags).to.deep.equal(newPage.droppedTags);
   });
 
   it('gives a name shared by another tab than before', () => {

@@ -1,6 +1,12 @@
 import { FilePath } from '../file/filePath.js';
+import { PageTag } from './page.js';
 import { TabEntry } from './portal-navigation.js';
 import { SharedTabName } from './portal-tabs.js';
+
+/** HTML the build leaves out of a `.md` page, which is Markdown without HTML or components. */
+export interface DroppedTag extends PageTag {
+  page: FilePath;
+}
 
 /** The root `nav.json` has no `tabs`, or there is no such file, while nothing positions these root nodes. */
 export interface NoTabsListed {
@@ -11,6 +17,8 @@ export interface NoTabsListed {
 
 /** What a build accepts in `content/`, but the user should hear of. */
 export interface ContentNotices {
+  /** Warned of rather than refused: the rest of the page builds, and one stray `<br>` should not stop a build. */
+  droppedTags: DroppedTag[];
   /**
    * Pages below `content/api/<slug>/` for a specification `<slug>`. The section's generated
    * metadata lists only the reference pages, so these never appear in the sidebar.

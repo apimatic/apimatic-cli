@@ -2,7 +2,7 @@ import { log } from '@clack/prompts';
 import { APIMATIC_CONFIG_FILE_NAME } from '../../types/apimatic-config/document.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { listedInProse } from '../../utils/string-utils.js';
-import { ContentNotices, NoTabsListed } from '../../types/portal/content-notices.js';
+import { ContentNotices, DroppedTag, NoTabsListed } from '../../types/portal/content-notices.js';
 import { API_REFERENCE_TOKEN, NAVIGATION_FILE_NAME, TabEntry } from '../../types/portal/portal-navigation.js';
 import {
   ContentProblem,
@@ -443,6 +443,7 @@ export function reportIgnoredNavigationFiles(files: FilePath[], sourceDirectory:
 }
 
 export function reportContentNotices(notices: ContentNotices, sourceDirectory: DirectoryPath): void {
+  reportDroppedTags(notices.droppedTags, sourceDirectory);
   reportHiddenPages(notices.hiddenPages, sourceDirectory);
   reportIgnoredNavigationFiles(notices.ignoredNavigationFiles, sourceDirectory);
   reportSharedTabNames(notices.sharedTabNames, sourceDirectory);
@@ -523,6 +524,26 @@ export function reportSharedTabNames(shared: SharedTabName[], sourceDirectory: D
     `Rename all but one tab of each name with a ${f.var('title')} in its folder's ` +
       `${f.var(NAVIGATION_FILE_NAME)}, or in ${f.var(ROOT_NAVIGATION_FILE)} for the Home tab; the SDKs and ` +
       `Context Plugin sections keep their names.`
+  );
+}
+
+export function reportDroppedTags(tags: DroppedTag[], sourceDirectory: DirectoryPath): void {
+  if (tags.length === 0) {
+    return;
+  }
+  const onePage = tags.every(({ page }) => page.isEqual(tags[0].page));
+  const pages = onePage
+    ? `A ${f.var('.md')} page in ${f.path(sourceDirectory)} has`
+    : `Some ${f.var('.md')} pages in ${f.path(sourceDirectory)} have`;
+  log.warn(`${pages} HTML or components, which the portal leaves out:`);
+  log.message(
+    tags
+      .map(({ page, line, name }) => `  • ${relative(page, sourceDirectory)}, line ${line}: ${f.var(`<${name}>`)}`)
+      .join('\n')
+  );
+  log.message(
+    `Rename ${onePage ? 'the page' : 'each page'} to ${f.var('.mdx')} to keep them, and close empty tags such as ` +
+      `${f.var('<br />')}.`
   );
 }
 

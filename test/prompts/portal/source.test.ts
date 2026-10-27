@@ -4,6 +4,7 @@ import sinon from 'sinon';
 import { log } from '@clack/prompts';
 import { PortalServePrompts } from '../../../src/prompts/portal/serve.js';
 import {
+  reportDroppedTags,
   reportLeftOutSpecs,
   reportNoTabsListed,
   reportShadowedFiles,
@@ -853,6 +854,65 @@ describe('reportLeftOutSpecs', () => {
         'merges only the folders beside it. To include them, move each into a folder of its own, adding the ' +
         "folders to 'MergeOrderOfDirectories' when the file lists folders."
     ]);
+  });
+});
+
+describe('reportDroppedTags', () => {
+  const source = new DirectoryPath('project').join('src');
+  const index = new FilePath(source.join('content'), new FileName('index.md'));
+  const intro = new FilePath(source.join('content', 'guides'), new FileName('intro.md'));
+  let lines: string[];
+
+  beforeEach(() => {
+    lines = [];
+    const record = (text?: string | string[]) => {
+      lines.push(stripVTControlCharacters(String(text)));
+    };
+    sinon.stub(log, 'warn').callsFake(record);
+    sinon.stub(log, 'message').callsFake(record);
+  });
+
+  afterEach(() => {
+    sinon.restore();
+  });
+
+  it('says nothing when no .md page has a tag', () => {
+    reportDroppedTags([], source);
+
+    expect(lines).to.deep.equal([]);
+  });
+
+  it('names each tag of a page with its line, and how to keep them', () => {
+    reportDroppedTags(
+      [
+        { page: index, line: 5, name: 'br' },
+        { page: index, line: 9, name: 'details' }
+      ],
+      source
+    );
+
+    expect(lines.join('\n').split('\n')).to.deep.equal([
+      `A '.md' page in '${source.toString()}' has HTML or components, which the portal leaves out:`,
+      "  • 'content/index.md', line 5: '<br>'",
+      "  • 'content/index.md', line 9: '<details>'",
+      "Rename the page to '.mdx' to keep them, and close empty tags such as '<br />'."
+    ]);
+  });
+
+  it('speaks of each page when there are several', () => {
+    reportDroppedTags(
+      [
+        { page: index, line: 5, name: 'br' },
+        { page: intro, line: 3, name: 'Cards' }
+      ],
+      source
+    );
+
+    expect(lines[0]).to.equal(
+      `Some '.md' pages in '${source.toString()}' have HTML or components, which the portal leaves out:`
+    );
+    expect(lines[1]).to.contain("'content/guides/intro.md', line 3: '<Cards>'");
+    expect(lines[2]).to.match(/^Rename each page to '\.mdx'/);
   });
 });
 

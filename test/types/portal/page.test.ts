@@ -180,4 +180,47 @@ describe('parsePage', () => {
       expect(await images('<img src="./a.png">\n\nInline <img src="./b.png"> here.\n')).to.deep.equal([]);
     });
   });
+
+  // The build leaves out every piece of HTML in a `.md` page, and the reader loses what it says.
+  describe('the tags of a .md page', () => {
+    const tags = async (markdown: string, name?: string) => (await page(markdown, name)).droppedTags;
+
+    it('names each piece of HTML by the first tag it opens, at its line', async () => {
+      const markdown =
+        '---\ntitle: Tags\n---\n\nLine one<br>line two.\n\n<details>\n<summary>More</summary>\n\nHidden.\n\n' +
+        '</details>\n\n<Cards>\n  <Card title="A" href="/a" />\n</Cards>\n';
+
+      expect(await tags(markdown)).to.deep.equal([
+        { name: 'br', line: 5 },
+        { name: 'details', line: 7 },
+        { name: 'Cards', line: 14 }
+      ]);
+    });
+
+    it('names a tag opened after one is closed at the line it is opened on', async () => {
+      const markdown = '<details>\n<summary>A</summary>\n\nText.\n\n</details>\n<details>\n<summary>B</summary>\n';
+
+      expect(await tags(markdown)).to.deep.equal([
+        { name: 'details', line: 1 },
+        { name: 'details', line: 7 }
+      ]);
+    });
+
+    // A comment shows on no page either way.
+    it('leaves out a comment and a tag inside one, but not a tag after one', async () => {
+      const markdown = '<!-- <b>Draft</b> -->\n\nText <!-- note --> here.\n\n<!--\nA note.\n--> <span>Kept?</span>\n';
+
+      expect(await tags(markdown)).to.deep.equal([{ name: 'span', line: 7 }]);
+    });
+
+    it('reads code, inline code and an autolink as the text they are', async () => {
+      const markdown = '```html\n<div>\n```\n\nWrite `<br>` for a break, or see <https://example.com>.\n';
+
+      expect(await tags(markdown)).to.deep.equal([]);
+    });
+
+    it('names none in an .mdx page, which renders its tags', async () => {
+      expect(await tags('Line one<br />line two.\n\n<details>\n\nText.\n\n</details>\n', 'page.mdx')).to.deep.equal([]);
+    });
+  });
 });

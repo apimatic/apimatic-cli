@@ -200,6 +200,7 @@ describe('PortalServePrompts', () => {
 
   describe('a save the preview accepts', () => {
     const NO_NOTICES: ContentNotices = {
+      droppedTags: [],
       hiddenPages: [],
       ignoredNavigationFiles: [],
       sharedTabNames: [],

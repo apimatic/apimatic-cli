@@ -1,5 +1,5 @@
 import { FilePath } from '../file/filePath.js';
-import { ContentNotices, NoTabsListed } from './content-notices.js';
+import { ContentNotices, DroppedTag, NoTabsListed } from './content-notices.js';
 import { isSameTabEntry } from './portal-navigation.js';
 import { SharedTabName, TabOwner } from './portal-tabs.js';
 import { PreviewRefusal } from './preview-refusal.js';
@@ -33,6 +33,7 @@ export class PreviewContent {
 
   private static since(current: ContentNotices, previous: ContentNotices): ContentNotices {
     return {
+      droppedTags: whenAnyNew(current.droppedTags, previous.droppedTags, isSameDroppedTag),
       hiddenPages: whenAnyNew(current.hiddenPages, previous.hiddenPages, (left, right) => left.isEqual(right)),
       ignoredNavigationFiles: whenAnyNew(
         current.ignoredNavigationFiles,
@@ -60,6 +61,11 @@ function whenNew<T>(
 
 function isSameFile(left: FilePath | undefined, right: FilePath | undefined): boolean {
   return left === undefined || right === undefined ? left === right : left.isEqual(right);
+}
+
+// Not by line, or every edit above a tag would give the notice again.
+function isSameDroppedTag(left: DroppedTag, right: DroppedTag): boolean {
+  return left.page.isEqual(right.page) && left.name === right.name;
 }
 
 function isSameNoTabs(left: NoTabsListed, right: NoTabsListed): boolean {
