@@ -1910,7 +1910,7 @@ describe('PortalSourceContext', () => {
     });
   });
 
-  // The build imports each Markdown image, and fails as a whole over one it cannot find.
+  // The build imports each image, and fails as a whole over one it cannot find.
   describe('the images the pages show', () => {
     beforeEach(() => {
       writeConfig({ site: { name: 'Calc' } });
@@ -1998,6 +1998,18 @@ describe('PortalSourceContext', () => {
 
       expect(await missingImages()).to.deep.equal([
         ['content/index.mdx:6', '/images/missing.png', 'static/images/missing.png', null]
+      ]);
+    });
+
+    it('names an <img> in an .mdx page whose file the build would not find', async () => {
+      write(
+        'content/guides/index.mdx',
+        page('Guides') +
+          '<img src="/images/logo.png" width="200" />\n\n<img src="./diagram.png" />\n\n<img src="./missing.png" />\n'
+      );
+
+      expect(await missingImages()).to.deep.equal([
+        ['content/guides/index.mdx:8', './missing.png', 'content/guides/missing.png', null]
       ]);
     });
 

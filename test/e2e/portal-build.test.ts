@@ -212,6 +212,11 @@ const stylesheetOf = (output: DirectoryPath) => {
     expect(exists('images/logo.png')).to.be.true;
   });
 
+  // Hosted at the root too, an `<img>` is bundled (remark-jsx-images.ts); a file this small is inlined.
+  it("bundles an <img>'s file", () => {
+    expect(read('authentication/index.html')).to.match(/<img[^>]* src="data:image\/svg\+xml,[^"]+"[^>]* width="48"/);
+  });
+
   it('writes the not-found page static hosts serve for unknown paths', () => {
     expect(exists('404.html')).to.be.true;
   });
@@ -814,6 +819,7 @@ const stylesheetOf = (output: DirectoryPath) => {
     for (const page of [
       'index.html',
       'authentication/index.html',
+      'figures/index.html',
       'api/apimatic-calculator/simple-calculator/Calculate/index.html',
       'sdks/index.html',
       'sdks/typescript/index.html',
@@ -844,6 +850,14 @@ const stylesheetOf = (output: DirectoryPath) => {
     expect(read('authentication/index.html')).to.match(/<img[^>]* src="\/api\/assets\/diagram[^"]*\.png"/);
   });
 
+  // `remarkImage` bundles Markdown images alone; the template bundles these (remark-jsx-images.ts).
+  it('bundles an <img> in an .mdx page, from the static directory or beside its page', () => {
+    const page = read('figures/index.html');
+
+    expect(page).to.match(/<img[^>]* src="\/api\/assets\/diagram[^"]*\.png"[^>]* width="320"/);
+    expect(page).to.match(/<img[^>]* src="\/api\/assets\/flow[^"]*\.png"/);
+  });
+
   // Fumadocs swapped a bundled image for its import's name, `<img src="__img0" />` (fuma-nama/fumadocs#3662).
   it('keeps the images as written in the Markdown twins and llms-full.txt', () => {
     const full = read('llms-full.txt');
@@ -851,8 +865,11 @@ const stylesheetOf = (output: DirectoryPath) => {
     expect(read('index.md')).to.contain('![How a calculation flows](/images/diagram.png)');
     expect(read('authentication.md')).to.contain('![The flow, by reference][flow]');
     expect(read('authentication.md')).to.contain('[flow]: /images/diagram.png');
+    expect(read('figures.md')).to.contain('<img src="/images/diagram.png" width="320"');
+    expect(read('figures.md')).to.contain('<img src="./flow.png" alt="The steps" />');
     expect(full).to.contain('![How a calculation flows](/images/diagram.png)');
     expect(full).to.not.contain('__img');
+    expect(full).to.not.contain('__jsxImg');
   });
 
   // Fumadocs' own renderer fails the whole page over an image in a description; `ApiMarkdown` stands in for it.
