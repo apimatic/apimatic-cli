@@ -39,11 +39,7 @@ With git ${GitVersion.required()} or newer installed, your edits to the generate
     }),
     destination: Flags.string({
       char: 'd',
-      description:
-        '[default: <input>/sdk/<language> | <input>/sdk/<api-version>/<language>] directory the SDK is generated into'
-    }),
-    'api-version': Flags.string({
-      description: 'Version of the API to use for SDK generation (if multiple versions exist)'
+      description: '[default: <input>/sdk/<language>] directory the SDK is generated into'
     }),
     'codegen-version': Flags.string({
       description: 'Version of the code generator to use',
@@ -67,7 +63,7 @@ With git ${GitVersion.required()} or newer installed, your edits to the generate
 
   async run() {
     const {
-      flags: { language, input, destination, force, stability, 'auth-key': authKey, 'api-version': apiVersion }
+      flags: { language, input, destination, force, stability, 'auth-key': authKey }
     } = await this.parse(SdkGenerate);
 
     const project = ProjectContext.at(input);
@@ -84,8 +80,7 @@ With git ${GitVersion.required()} or newer installed, your edits to the generate
       destination ? new DirectoryPath(destination) : undefined,
       language as Language,
       StabilityChoice.for(language as Language, stability).stabilityLevel(),
-      force,
-      apiVersion
+      force
     );
     outro(result);
   }

@@ -6,7 +6,6 @@ import { Result } from 'neverthrow';
 import { noteWrapped, withSpinner } from '../prompt.js';
 import { ServiceError } from '../../infrastructure/service-error.js';
 import { AVAILABLE_LANGUAGES, Language, languageLabel, UPCOMING_LANGUAGES } from '../../types/sdk/generate.js';
-import { VersionProblem } from '../../types/project-context.js';
 import { RelativeFilePath } from '../../types/file/relativeFilePath.js';
 import { GitVersion } from '../../types/git/git-version.js';
 import { describeApart, SdkGeneration } from '../../types/sdk/generation-record.js';
@@ -58,7 +57,7 @@ const plural = (count: number, noun: string) => `${count} ${noun}${count === 1 ?
 const listed = (sdk: DirectoryPath, paths: readonly RelativeFilePath[]) =>
   paths.map((relative) => `  ${f.relativePath(relative.in(sdk))}`);
 
-/** No method uses `this`, so each can be handed to a step as it is, the way `selectVersion` is. */
+/** No method uses `this`, so each can be handed to a step as it is, the way `conflictChoice` is. */
 export class SdkGeneratePrompts {
   /**
    * Named rather than listed as flag values: a user whose language is on its way back reads
@@ -105,31 +104,6 @@ export class SdkGeneratePrompts {
 
   public sdkNotUnzipped(problem: FileProblem) {
     log.error(`${ServiceError.InvalidResponse.errorMessage}\n${problem.reason}`);
-  }
-
-  public noVersionToBuild(problem: VersionProblem, sourceDirectory: DirectoryPath) {
-    const messages: Record<VersionProblem, string> = {
-      noVersions: `The ${f.var('versioned_docs')} directory is either empty or invalid: ${f.path(sourceDirectory)}`,
-      versionNotFound: 'The selected API version is invalid.'
-    };
-    log.error(messages[problem]);
-  }
-
-  public apiVersionOnlyApplicableWithVersionedBuild() {
-    log.warn(`The ${f.flag('api-version')} is only applicable with a versioned build.`);
-  }
-
-  public async selectVersion(versions: string[]): Promise<string | undefined> {
-    const version = await select({
-      message: 'Select an API version for SDK generation:',
-      options: versions.map((v) => ({ label: v, value: v }))
-    });
-
-    if (isCancel(version)) {
-      return undefined;
-    }
-
-    return version;
   }
 
   public async overwriteSdk(directory: DirectoryPath): Promise<boolean> {

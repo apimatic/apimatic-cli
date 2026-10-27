@@ -40,7 +40,6 @@ export class GenerateAction {
     language: Language,
     stability: Stability,
     force: boolean,
-    apiVersion?: string,
     packageSettingsDirectory?: DirectoryPath
   ): Promise<ActionResult> => {
     if (!isAvailableLanguage(language)) {
@@ -57,21 +56,12 @@ export class GenerateAction {
       this.prompts.sourceDirectoryEmpty(sourceDirectory);
       return ActionResult.failed();
     }
-    if (apiVersion && !(await project.isVersioned())) {
-      this.prompts.apiVersionOnlyApplicableWithVersionedBuild();
-    }
-    const toBuild = await project.versionToBuild(apiVersion, this.prompts.selectVersion);
-    if (toBuild.isErr()) {
-      this.prompts.noVersionToBuild(toBuild.error, sourceDirectory);
-      return ActionResult.failed();
-    }
-    const buildFrom = toBuild.value;
-    if (!(await buildFrom.specsExist())) {
+    if (!(await project.specsExist())) {
       this.prompts.specDirectoryEmpty(sourceDirectory);
       return ActionResult.failed();
     }
 
-    const sdkContext = buildFrom.sdk(language, sdkDirectory);
+    const sdkContext = project.sdk(language, sdkDirectory);
     const sdk = sdkContext.directory();
     const generation: SdkGeneration = { language, codegenVersion: codegenVersionFor(language, stability), stability };
     const canAsk = !force && terminal.isInteractive();
@@ -126,7 +116,7 @@ export class GenerateAction {
 
     return await withDirPath(async (tempDirectory) => {
       const tempSdk = await download(
-        buildFrom,
+        project,
         sdkContext,
         tempDirectory,
         packageSettingsDirectory,
@@ -316,7 +306,7 @@ async function closeMerge(
 }
 
 async function download(
-  buildFrom: ProjectContext,
+  project: ProjectContext,
   sdkContext: SdkContext,
   tempDirectory: DirectoryPath,
   packageSettingsDirectory: DirectoryPath | undefined,
@@ -324,9 +314,9 @@ async function download(
   shown: SdkGeneratePrompts['generateSdk'],
   said: Pick<SdkGeneratePrompts, 'srcDirNotZipped' | 'sdkGenerationServiceError' | 'sdkNotUnzipped'>
 ): Promise<Result<DirectoryPath, ActionResult>> {
-  const srcDirZip = await buildFrom.srcDirZip(tempDirectory, packageSettingsDirectory);
+  const srcDirZip = await project.srcDirZip(tempDirectory, packageSettingsDirectory);
   if (srcDirZip.isErr()) {
-    said.srcDirNotZipped(buildFrom.sourceDirectory(), srcDirZip.error);
+    said.srcDirNotZipped(project.sourceDirectory(), srcDirZip.error);
     return err(ActionResult.failed());
   }
   const response = await shown(generate(srcDirZip.value));

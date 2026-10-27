@@ -56,7 +56,6 @@ export class SdkPublishAction {
         language,
         stability,
         force,
-        undefined,
         packageSettingsDirectory
       );
       if (sdkGenerationResult.isFailed()) {

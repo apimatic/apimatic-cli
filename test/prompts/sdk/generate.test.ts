@@ -1,4 +1,3 @@
-import path from 'node:path';
 import { stripVTControlCharacters } from 'node:util';
 import { expect } from 'chai';
 import sinon from 'sinon';
@@ -6,7 +5,6 @@ import { log } from '@clack/prompts';
 import { ServiceError } from '../../../src/infrastructure/service-error.js';
 import { SdkGeneratePrompts } from '../../../src/prompts/sdk/generate.js';
 import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
-import { VersionProblem } from '../../../src/types/project-context.js';
 import { Language } from '../../../src/types/sdk/generate.js';
 import { RelativeFilePath } from '../../../src/types/file/relativeFilePath.js';
 import { ConflictKind, MergePlan } from '../../../src/types/sdk/merge-plan.js';
@@ -54,35 +52,6 @@ describe('SdkGeneratePrompts.languageNotAvailable', () => {
 
     expect(message).to.not.contain('v3');
     expect(message).to.not.contain('codegen-version');
-  });
-});
-
-describe('SdkGeneratePrompts.noVersionToBuild', () => {
-  const prompts = new SdkGeneratePrompts();
-  const sourceDirectory = new DirectoryPath(path.resolve('project', 'src'));
-  let error: sinon.SinonStub;
-
-  beforeEach(() => {
-    error = sinon.stub(log, 'error');
-  });
-
-  afterEach(() => {
-    error.restore();
-  });
-
-  const messageFor = (problem: VersionProblem): string => {
-    prompts.noVersionToBuild(problem, sourceDirectory);
-    return stripVTControlCharacters(error.firstCall.args[0] as string);
-  };
-
-  it('names the source directory when it holds no versions', () => {
-    expect(messageFor('noVersions')).to.equal(
-      `The 'versioned_docs' directory is either empty or invalid: '${sourceDirectory}'`
-    );
-  });
-
-  it('says the chosen version is not one of them', () => {
-    expect(messageFor('versionNotFound')).to.equal('The selected API version is invalid.');
   });
 });
 

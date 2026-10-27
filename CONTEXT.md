@@ -59,7 +59,7 @@ _Avoid_: Orphan sample, missing operation
 ### SDK regeneration
 
 **SDK directory**:
-The directory `sdk generate` writes an SDK into, and reads back on every later run: the `--destination` itself when one is named, else `<input>/sdk/<language>`, or `<input>/sdk/<api-version>/<language>`.
+The directory `sdk generate` writes an SDK into, and reads back on every later run: the `--destination` itself when one is named, else `<input>/sdk/<language>`.
 _Avoid_: Destination, output directory, language directory
 
 **Pristine snapshot**:
