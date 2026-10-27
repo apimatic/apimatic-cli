@@ -150,11 +150,8 @@ function addressOf(node: MarkdownNode, definitions: Map<string, string>): string
     // An `<img>` in an `.mdx` page, which the template imports too (remark-jsx-images.ts).
     case 'mdxJsxFlowElement':
     case 'mdxJsxTextElement': {
-      const src =
-        node.name === 'img'
-          ? node.attributes?.find(({ type, name }) => type === 'mdxJsxAttribute' && name === 'src')?.value
-          : undefined;
-      return typeof src === 'string' ? src : undefined;
+      const src = node.attributes?.find(({ type, name }) => type === 'mdxJsxAttribute' && name === 'src')?.value;
+      return node.name === 'img' && typeof src === 'string' ? src : undefined;
     }
     default:
       return undefined;

@@ -26,40 +26,44 @@ export function remarkJsxImages({ publicDir }: { publicDir: string | false }) {
   return (tree: MarkdownNode, { dirname }: { dirname?: string }) => {
     if (dirname === undefined) return;
     const imports: MarkdownNode[] = [];
-    const visit = (node: MarkdownNode) => {
-      const isImage = (node.type === 'mdxJsxFlowElement' || node.type === 'mdxJsxTextElement') && node.name === 'img';
-      const src = isImage ? node.attributes?.find(({ type, name }) => type === 'mdxJsxAttribute' && name === 'src') : undefined;
-      const file = typeof src?.value === 'string' ? fileOf(src.value, publicDir, dirname) : null;
-      if (src !== undefined && file !== null) {
-        const name = `__jsxImg${imports.length}`;
-        // As `remarkImage` writes it, so a file on another drive is `./C:/…`, which static-images.ts resolves.
-        const relative = path.relative(dirname, file).replaceAll(path.sep, '/');
-        const source = relative.startsWith('../') ? relative : `./${relative}`;
-        imports.push({
-          type: 'mdxjsEsm',
-          value: `import ${name} from ${JSON.stringify(source)}`,
-          data: {
-            estree: program({
-              type: 'ImportDeclaration',
-              source: { type: 'Literal', value: source },
-              specifiers: [{ type: 'ImportDefaultSpecifier', local: { type: 'Identifier', name } }]
-            })
-          }
-        });
-        src.value = {
-          type: 'mdxJsxAttributeValueExpression',
-          value: name,
-          data: { estree: program({ type: 'ExpressionStatement', expression: { type: 'Identifier', name } }) }
-        };
-      }
-      node.children?.forEach(visit);
-    };
-    visit(tree);
+    for (const [src, address] of imageSources(tree)) {
+      const file = fileOf(address, publicDir, dirname);
+      if (file === null) continue;
+      const name = `__jsxImg${imports.length}`;
+      // As `remarkImage` writes it, so a file on another drive is `./C:/…`, which static-images.ts resolves.
+      const relative = path.relative(dirname, file).replaceAll(path.sep, '/');
+      const source = relative.startsWith('../') ? relative : `./${relative}`;
+      imports.push({
+        type: 'mdxjsEsm',
+        value: `import ${name} from ${JSON.stringify(source)}`,
+        data: {
+          estree: program({
+            type: 'ImportDeclaration',
+            source: { type: 'Literal', value: source },
+            specifiers: [{ type: 'ImportDefaultSpecifier', local: { type: 'Identifier', name } }]
+          })
+        }
+      });
+      src.value = {
+        type: 'mdxJsxAttributeValueExpression',
+        value: name,
+        data: { estree: program({ type: 'ExpressionStatement', expression: { type: 'Identifier', name } }) }
+      };
+    }
     tree.children?.unshift(...imports);
   };
 }
 
-/** Read without its query or fragment and decoded, `/…` from the static directory and any other from beside the page. */
+/** The `src` attribute of each `<img>` in the tree whose value is a string, with that value. */
+function* imageSources(node: MarkdownNode): Generator<[JsxAttribute, string]> {
+  if ((node.type === 'mdxJsxFlowElement' || node.type === 'mdxJsxTextElement') && node.name === 'img') {
+    const src = node.attributes?.find(({ type, name }) => type === 'mdxJsxAttribute' && name === 'src');
+    if (typeof src?.value === 'string') yield [src, src.value];
+  }
+  for (const child of node.children ?? []) yield* imageSources(child);
+}
+
+/** Without its query or fragment and decoded: `/…` from the static directory, any other from beside the page. */
 function fileOf(address: string, publicDir: string | false, dirname: string): string | null {
   const written = address.split(/[?#]/, 1)[0];
   if (written.length === 0 || written.endsWith('/') || NOT_A_FILE.test(written)) return null;
