@@ -18,7 +18,21 @@ import { settledContent } from './sdk/unresolved-file.js';
 import { SHARE_HOOK_SCRIPT, SHARE_HOOK_SCRIPT_NAME, ShareHook } from './sdk/share-hook.js';
 import { SnapshotRef } from './sdk/snapshot-ref.js';
 
-export type SdkRepositoryProblem = { kind: 'gitFailed' | 'recordNotWritten' | 'hookNotWritten'; reason: string };
+/**
+ * A file the run could not write or remove. What it had changed before was put back from the
+ * previous snapshot, unless that failed too; then the snapshot is there to restore from by hand.
+ */
+export type NotApplied = {
+  kind: 'notApplied';
+  file: FilePath;
+  operation: 'write' | 'remove';
+  reason: string;
+  undo: { kind: 'done' } | { kind: 'failed'; reason: string; previous: SnapshotRef };
+};
+
+export type SdkRepositoryProblem =
+  | { kind: 'gitFailed' | 'recordNotWritten' | 'hookNotWritten'; reason: string }
+  | NotApplied;
 
 /**
  * Two SDK directories, one inside the other: refs are files, so only one of them can have
@@ -188,8 +202,6 @@ export class SdkRepositoryContext {
     }
   }
 
-  // The script a hooks directory elsewhere runs: husky v9's `.husky/_` runs `.husky/pre-push`; any other
-  // `core.hooksPath` runs its own `pre-push`.
   private hookRunFrom(hooksPath: string): FilePath {
     const directory = this.rootDirectory.resolve(hooksPath);
     const scripts = path.basename(directory.toString()) === '_' ? directory.join('..') : directory;
@@ -391,31 +403,88 @@ export class SdkRepositoryContext {
   }
 
   /**
-   * Applies the plan once the directory as it is has been kept under the previous ref. The CLI
-   * offers no way back through it; it is there for a developer to restore by hand, for instance
-   * after a run that could not ask left markers.
+   * Keeps the directory as it is under the previous ref, then applies the plan, removals before
+   * writes so a path renamed only in case lands on a filesystem that ignores case. A write or
+   * removal that fails ends the run and puts back, from that ref, every path it had changed, so
+   * the directory is as it was; the ref stays for a developer to restore from by hand.
    */
   public async write(base: CommitId, plan: MergePlan): Promise<Result<void, SdkRepositoryProblem>> {
     const previous = await this.savePrevious(base);
-    return previous.isErr() ? err(previous.error) : this.apply(plan);
+    return previous.isErr() ? err(previous.error) : this.apply(plan, previous.value);
   }
 
-  /** Writes and removes what the plan says, in the SDK directory, with the CLI's labels on any markers. */
-  public async apply(plan: MergePlan): Promise<Result<void, SdkRepositoryProblem>> {
+  private async apply(plan: MergePlan, previous: CommitId): Promise<Result<void, SdkRepositoryProblem>> {
+    let blobs: Map<string, Uint8Array>;
     try {
-      const blobs = await this.git.readBlobs(this.rootDirectory, [...new Set(plan.writes.map((write) => write.blob))]);
-      for (const write of plan.writes) {
-        const content = blobs.get(write.blob)!;
-        const target = write.path.in(this.sdk).toString();
-        await fs.promises.mkdir(path.dirname(target), { recursive: true });
-        await fs.promises.writeFile(target, plan.hasMarkers(write.path) ? relabelMarkers(content) : content);
-      }
-      for (const relative of plan.deletes) {
-        await fs.promises.rm(relative.in(this.sdk).toString(), { force: true });
-      }
-      return ok(undefined);
+      blobs = await this.git.readBlobs(this.rootDirectory, [...new Set(plan.writes.map((write) => write.blob))]);
     } catch (error) {
       return err(gitFailed(errorMessage(error)));
+    }
+    const steps: { path: RelativeFilePath; operation: NotApplied['operation']; run: () => Promise<void> }[] = [
+      ...plan.deletes.map((path) => ({ path, operation: 'remove' as const, run: () => this.remove(path.in(this.sdk)) })),
+      ...plan.writes.map((write) => ({
+        path: write.path,
+        operation: 'write' as const,
+        run: () => {
+          const content = blobs.get(write.blob)!;
+          return this.put(write.path.in(this.sdk), plan.hasMarkers(write.path) ? relabelMarkers(content) : content);
+        }
+      }))
+    ];
+    const touched: RelativeFilePath[] = [];
+    for (const step of steps) {
+      touched.push(step.path);
+      try {
+        await step.run();
+      } catch (error) {
+        return err({
+          kind: 'notApplied',
+          file: step.path.in(this.sdk),
+          operation: step.operation,
+          reason: errorMessage(error),
+          undo: await this.undo(previous, touched)
+        });
+      }
+    }
+    return ok(undefined);
+  }
+
+  private async undo(previous: CommitId, touched: readonly RelativeFilePath[]): Promise<NotApplied['undo']> {
+    try {
+      const kept = new Map(
+        (await this.git.listTree(this.rootDirectory, previous)).map((entry) => [entry.path.toString(), entry.oid])
+      );
+      const oids = touched.flatMap((relative) => kept.get(relative.toString()) ?? []);
+      const blobs = await this.git.readBlobs(this.rootDirectory, [...new Set(oids)]);
+      for (const relative of touched) {
+        const oid = kept.get(relative.toString());
+        await (oid === undefined
+          ? this.remove(relative.in(this.sdk))
+          : this.put(relative.in(this.sdk), blobs.get(oid)!));
+      }
+      return { kind: 'done' };
+    } catch (error) {
+      return { kind: 'failed', reason: errorMessage(error), previous: this.previousRef() };
+    }
+  }
+
+  private async put(file: FilePath, content: Uint8Array): Promise<void> {
+    const target = file.toString();
+    if ((await this.fileService.fileExists(file)) && (await fs.promises.readFile(target)).equals(content)) {
+      return;
+    }
+    await fs.promises.mkdir(file.directory().toString(), { recursive: true });
+    await fs.promises.writeFile(target, content);
+  }
+
+  private async remove(file: FilePath): Promise<void> {
+    await fs.promises.rm(file.toString(), { force: true });
+    for (let directory = file.directory(); this.sdk.isAncestorOf(directory); directory = directory.join('..')) {
+      try {
+        await fs.promises.rmdir(directory.toString());
+      } catch {
+        return;
+      }
     }
   }
 
@@ -432,9 +501,6 @@ export class SdkRepositoryContext {
     }
   }
 
-  // Brings the remote's chain in and makes the local ref reach it: moved onto it when the local
-  // one is behind, left alone when ahead, and joined with a two-parent commit when the two have
-  // diverged, so a later push is a fast-forward that keeps every machine's snapshots.
   private async fetchSnapshots(remote: string): Promise<Result<void, SdkRepositoryProblem>> {
     try {
       const ref = this.pristineRef();
@@ -461,7 +527,6 @@ export class SdkRepositoryContext {
     }
   }
 
-  // The ref name is the SDK directory's path, so one SDK directory inside another cannot have its own.
   private async verifyNotNested(): Promise<Result<void, SdkRepositoryProblem | NestedSdkDirectory>> {
     const ref = this.pristineRef();
     try {
@@ -490,8 +555,6 @@ export class SdkRepositoryContext {
     }
   }
 
-  // The files git still holds as unmerged below the SDK directory, by path below it, so a run
-  // never merges over a conflict the developer has not marked resolved the way git expects.
   private async unresolvedConflicts(): Promise<RelativeFilePath[]> {
     const prefix = this.sdkPath();
     const stages = await this.git.unmergedStages(this.rootDirectory, this.sdkPathspec());
@@ -499,7 +562,6 @@ export class SdkRepositoryContext {
     return [...paths.values()].flatMap((path) => path.inside(prefix) ?? []);
   }
 
-  // The SDK directory as a pathspec from the repository root, which names the root itself `.`.
   private sdkPathspec(): string {
     const prefix = this.sdkPath();
     return prefix === '' ? '.' : prefix;

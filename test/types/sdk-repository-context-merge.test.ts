@@ -4,12 +4,15 @@ import os from 'os';
 import path from 'path';
 import { Buffer } from 'node:buffer';
 import { expect } from 'chai';
+import { Result } from 'neverthrow';
+import sinon from 'sinon';
 import { GitService } from '../../src/infrastructure/git-service.js';
 import { SdkContext } from '../../src/types/sdk-context.js';
 import { DirectoryPath } from '../../src/types/file/directoryPath.js';
 import { CodeGenerationVersion, Language, Stability } from '../../src/types/sdk/generate.js';
 import { SdkGeneration } from '../../src/types/sdk/generation-record.js';
 import { MergePlan } from '../../src/types/sdk/merge-plan.js';
+import { SdkRepositoryContext, SdkRepositoryProblem } from '../../src/types/sdk-repository-context.js';
 
 const TYPESCRIPT: SdkGeneration = {
   language: Language.TYPESCRIPT,
@@ -52,6 +55,8 @@ const MODEL_V1_WITH_HELPER = MODEL_V1 + HELPER;
 /** A run over real repositories: `base` was generated last time, `disk` is the SDK directory now, `generated` is the fresh output. */
 type Run = {
   plan: MergePlan;
+  written: Result<void, SdkRepositoryProblem>;
+  repository: SdkRepositoryContext;
   read: (relative: string) => string | undefined;
   bytes: (relative: string) => Buffer;
   exists: (relative: string) => boolean;
@@ -76,7 +81,8 @@ describe('SdkRepositoryContext: the merge', () => {
     }
   };
 
-  const run = async (base: Files, disk: Files, generated: Files): Promise<Run> => {
+  /** `beforeWrite` runs once the plan is made and before it lands, for a test that breaks the write; the write must succeed without it. */
+  const run = async (base: Files, disk: Files, generated: Files, beforeWrite?: () => void): Promise<Run> => {
     const project = new DirectoryPath(path.join(root, `project-${counter++}`));
     const sdk = project.join('sdk', 'typescript');
     fs.mkdirSync(sdk.toString(), { recursive: true });
@@ -96,7 +102,11 @@ describe('SdkRepositoryContext: the merge', () => {
     expect(regeneration.generated.isEqual((await repository.snapshotGenerated(generatedDirectory))._unsafeUnwrap())).to
       .be.true;
     const { plan } = regeneration.merge;
-    (await repository.write(baseCommit, plan))._unsafeUnwrap();
+    beforeWrite?.();
+    const written = await repository.write(baseCommit, plan);
+    if (beforeWrite === undefined) {
+      written._unsafeUnwrap();
+    }
     expect(await git.resolveRef(project, repository.previousRef())).to.not.be.undefined;
 
     const at = (relative: string) => path.join(sdk.toString(), relative);
@@ -110,6 +120,8 @@ describe('SdkRepositoryContext: the merge', () => {
         );
     return {
       plan,
+      written,
+      repository,
       read: (relative) => (fs.existsSync(at(relative)) ? fs.readFileSync(at(relative), 'utf-8') : undefined),
       bytes: (relative) => fs.readFileSync(at(relative)),
       exists: (relative) => fs.existsSync(at(relative)),
@@ -125,6 +137,7 @@ describe('SdkRepositoryContext: the merge', () => {
   });
 
   afterEach(() => {
+    sinon.restore();
     fs.rmSync(root, { recursive: true, force: true });
   });
 
@@ -301,6 +314,100 @@ describe('SdkRepositoryContext: the merge', () => {
         { from: rel('models/book.ts'), to: rel('models/book-model.ts'), by: 'generator' }
       ]);
       expect(plan.hasConflicts()).to.be.false;
+    });
+  });
+
+  describe('how the plan lands on disk', () => {
+    it('renames a file whose name changed only in case, on a filesystem that ignores case too', async () => {
+      const { paths, read } = await run(
+        { 'models/user.ts': 'user\n', 'b.ts': 'b\n' },
+        { 'models/user.ts': 'user\n', 'b.ts': 'b\n' },
+        { 'models/User.ts': 'user\n', 'b.ts': 'b\n' }
+      );
+
+      expect(paths()).to.deep.equal(['b.ts', 'models/User.ts']);
+      expect(read('models/User.ts')).to.equal('user\n');
+    });
+
+    it('renames a directory whose name changed only in case', async () => {
+      const { paths } = await run(
+        { 'Models/a.ts': 'a\n', 'Models/b.ts': 'b\n', 'c.ts': 'c\n' },
+        { 'Models/a.ts': 'a\n', 'Models/b.ts': 'b\n', 'c.ts': 'c\n' },
+        { 'models/a.ts': 'a\n', 'models/b.ts': 'b\n', 'c.ts': 'c\n' }
+      );
+
+      expect(paths()).to.deep.equal(['c.ts', 'models/a.ts', 'models/b.ts']);
+    });
+
+    it('lets a file become a directory and a directory become a file', async () => {
+      const { paths, read } = await run(
+        { docs: 'docs\n', 'api/index.md': 'api\n' },
+        { docs: 'docs\n', 'api/index.md': 'api\n' },
+        { 'docs/index.md': 'docs\n', api: 'api\n' }
+      );
+
+      expect(paths()).to.deep.equal(['api', 'docs/index.md']);
+      expect(read('docs/index.md')).to.equal('docs\n');
+      expect(read('api')).to.equal('api\n');
+    });
+
+    it('removes the directories a removed file leaves empty, and no other', async () => {
+      const { exists } = await run(
+        { 'models/old/deep/a.ts': 'a\n', 'models/keep.ts': 'k\n' },
+        { 'models/old/deep/a.ts': 'a\n', 'models/keep.ts': 'k\n' },
+        { 'models/keep.ts': 'k\n' }
+      );
+
+      expect(exists('models/old')).to.be.false;
+      expect(exists('models/keep.ts')).to.be.true;
+    });
+  });
+
+  describe('a write that fails partway', () => {
+    const BEFORE: Files = { 'a.ts': '1\n', 'b.ts': '1\n', 'c.ts': '1\n' };
+    const AFTER: Files = { 'a.ts': '2\n', 'b.ts': '2\n', 'd.ts': 'new\n' };
+
+    /** Makes every write of a file named `name` fail, and of `a.ts` too when it is being put back to `1`. */
+    const breaking = (name: string, andRestoringA = false) => () => {
+      const real = fs.promises.writeFile;
+      sinon.stub(fs.promises, 'writeFile').callsFake((file, data, ...rest) => {
+        const target = String(file);
+        const text = typeof data === 'string' ? data : Buffer.from(data as Uint8Array).toString();
+        const restoringA = andRestoringA && target.endsWith('a.ts') && text === '1\n';
+        return target.endsWith(name) || restoringA
+          ? Promise.reject(new Error(`EACCES: permission denied, open '${target}'`))
+          : real.call(fs.promises, file, data, ...rest);
+      });
+    };
+
+    it('names the file, puts back what it had changed, and leaves the directory as it was', async () => {
+      const { written, read, paths } = await run(BEFORE, BEFORE, AFTER, breaking('b.ts'));
+
+      const problem = written._unsafeUnwrapErr();
+      expect(problem.kind).to.equal('notApplied');
+      if (problem.kind !== 'notApplied') {
+        return;
+      }
+      expect(problem.file.name().toString()).to.equal('b.ts');
+      expect(problem.operation).to.equal('write');
+      expect(problem.reason).to.contain('EACCES');
+      expect(problem.undo).to.deep.equal({ kind: 'done' });
+      expect(paths()).to.deep.equal(['a.ts', 'b.ts', 'c.ts']);
+      expect([read('a.ts'), read('b.ts'), read('c.ts')]).to.deep.equal(['1\n', '1\n', '1\n']);
+    });
+
+    it('says what could not be put back, and which snapshot to restore from', async () => {
+      const { written, read, repository } = await run(BEFORE, BEFORE, AFTER, breaking('b.ts', true));
+
+      const problem = written._unsafeUnwrapErr();
+      expect(problem.kind).to.equal('notApplied');
+      if (problem.kind !== 'notApplied' || problem.undo.kind !== 'failed') {
+        expect.fail('the undo should have failed');
+      }
+      expect(problem.undo.reason).to.contain('a.ts');
+      expect(problem.undo.previous.isEqual(repository.previousRef())).to.be.true;
+      expect(read('a.ts')).to.equal('2\n');
+      expect(read('c.ts')).to.equal('1\n');
     });
   });
 

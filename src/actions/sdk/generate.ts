@@ -200,7 +200,11 @@ export class GenerateAction {
       }
       const written = await repository.write(base, settled.value.plan);
       if (written.isErr()) {
-        this.prompts.customCodeFailed(written.error.reason);
+        if (written.error.kind === 'notApplied') {
+          this.prompts.sdkNotWritten(sdk, written.error);
+        } else {
+          this.prompts.customCodeFailed(written.error.reason);
+        }
         return ActionResult.failed();
       }
       await recordSnapshot(repository, ok(settled.value.regeneration.generated), generation, {

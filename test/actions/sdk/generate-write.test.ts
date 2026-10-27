@@ -232,6 +232,28 @@ describe('GenerateAction (sdk) — writing the SDK', () => {
       expect(read('models/book.py')).to.contain(YOURS_MARKER);
     });
 
+    it('puts the directory back and names the file when a write fails partway', async () => {
+      const { base } = await recorded({ 'README.md': '# sdk', 'models/book.py': MODEL_V1 });
+      writeFiles(sdk().toString(), { 'README.md': '# edited' });
+      const real = fs.promises.writeFile;
+      sinon.stub(fs.promises, 'writeFile').callsFake((file, ...rest) =>
+        String(file).endsWith('book.py')
+          ? Promise.reject(new Error('EACCES: permission denied'))
+          : real.call(fs.promises, file, ...rest)
+      );
+      const sdkNotWritten = sinon.stub(SdkGeneratePrompts.prototype, 'sdkNotWritten');
+
+      expect((await execute({ 'README.md': '# sdk v2', 'models/book.py': MODEL_V2 })).isFailed()).to.be.true;
+
+      expect(read('README.md')).to.equal('# edited');
+      expect(read('models/book.py')).to.equal(MODEL_V1);
+      expect(record().pristineCommit().isEqual(base)).to.be.true;
+      const [where, problem] = sdkNotWritten.firstCall.args;
+      expect(where.isEqual(sdk())).to.be.true;
+      expect(problem.file.name().toString()).to.equal('book.py');
+      expect(problem.undo).to.deep.equal({ kind: 'done' });
+    });
+
     it('leaves the directory alone when the pre-run state cannot be kept', async () => {
       const { base } = await recorded({ 'README.md': '# sdk' });
       writeFiles(sdk().toString(), { 'README.md': '# edited' });

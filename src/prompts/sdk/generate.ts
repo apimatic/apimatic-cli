@@ -20,7 +20,12 @@ import {
   YOUR_FILES
 } from '../../types/sdk/merge-plan.js';
 import { SHARE_HOOK_CALL } from '../../types/sdk/share-hook.js';
-import { NestedSdkDirectory, ShareHookInstall, SnapshotFetch } from '../../types/sdk-repository-context.js';
+import {
+  NestedSdkDirectory,
+  NotApplied,
+  ShareHookInstall,
+  SnapshotFetch
+} from '../../types/sdk-repository-context.js';
 import { listedInProse } from '../../utils/string-utils.js';
 
 /** The closing line of a run that left conflicts. */
@@ -243,6 +248,22 @@ export class SdkGeneratePrompts {
 
   public customCodeFailed(reason: string) {
     log.error(`Your customizations could not be merged into the regenerated SDK: ${reason}`);
+  }
+
+  /** A file the merge could not write or remove, and whether the directory is back as it was. */
+  public sdkNotWritten(sdk: DirectoryPath, problem: NotApplied) {
+    const what = problem.operation === 'write' ? 'written' : 'removed';
+    const lines = [`${f.relativePath(problem.file)} could not be ${what}: ${problem.reason}`];
+    if (problem.undo.kind === 'done') {
+      lines.push(`Nothing else was changed; ${f.relativePath(sdk)} is as it was.`);
+    } else {
+      lines.push(
+        `The files written before it could not be put back either: ${problem.undo.reason}`,
+        `To restore ${f.relativePath(sdk)} as it was before this run:`,
+        `  git --work-tree=${f.relativePath(sdk)} restore --source=${problem.undo.previous} --worktree -- .`
+      );
+    }
+    log.error(lines.join('\n'));
   }
 
   public snapshotNotRecorded(reason: string) {
