@@ -34,8 +34,8 @@ const TITLE_EXAMPLE = ['---', 'title: Getting started', '---'].join('\n');
 
 const ROOT_NAVIGATION_FILE = `${CONTENT_DIRECTORY_NAME}/${NAVIGATION_FILE_NAME}`;
 
-// Renaming the page keeps every tag in it, so its first few say enough.
-const TAGS_SHOWN_PER_PAGE = 3;
+// Renaming the page keeps every tag in it, so a few of its tag names say enough.
+const TAG_NAMES_SHOWN_PER_PAGE = 3;
 
 const mergeTheFolders = (): string =>
   `set ${f.var(`${MERGE_SETTINGS.configuration}.${MERGE_SETTINGS.mergeApis}`)} to true in an ` +
@@ -536,11 +536,14 @@ export function reportTaggedPages(pages: TaggedPage[], sourceDirectory: Director
   }
   const one = pages.length === 1;
   const lines = pages.flatMap(({ page, tags }) => {
-    const more = tags.length - TAGS_SHOWN_PER_PAGE;
+    // Each name once, where the page first has it, or forty `<br>`s would hide the `<details>` after them.
+    const named = tags.filter((tag, index) => tags.findIndex(({ name }) => name === tag.name) === index);
+    const more = named.length - TAG_NAMES_SHOWN_PER_PAGE;
     return [
-      ...tags
-        .slice(0, TAGS_SHOWN_PER_PAGE)
-        .map(({ line, name }) => `  • ${relative(page, sourceDirectory)}, line ${line}: ${f.var(`<${name}>`)}`),
+      ...named.slice(0, TAG_NAMES_SHOWN_PER_PAGE).map(({ name, closing, line }) => {
+        const written = `<${closing ? '/' : ''}${name}>`;
+        return `  • ${relative(page, sourceDirectory)}, line ${line}: ${f.var(written)}`;
+      }),
       ...(more > 0 ? [`    and ${more} more on this page`] : [])
     ];
   });
@@ -550,8 +553,8 @@ export function reportTaggedPages(pages: TaggedPage[], sourceDirectory: Director
   log.warn(`${holding} HTML or components, which the portal leaves out:`);
   log.message(lines.join('\n'));
   log.message(
-    `Rename ${one ? 'the page' : 'each page'} to ${f.var('.mdx')} to keep them, and close empty tags such as ` +
-      `${f.var('<br />')}.`
+    `Rename ${one ? 'the page' : 'each page'} to ${f.var('.mdx')} to keep them. MDX needs empty tags closed, ` +
+      `such as ${f.var('<br />')}, and comments written as ${f.var('{/* … */}')}.`
   );
 }
 

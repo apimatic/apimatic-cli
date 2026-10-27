@@ -119,22 +119,11 @@ describe('PreviewContent', () => {
   it('gives the tagged pages again for a page or a tag not there before, not for a tag on another line', () => {
     const index = new FilePath(content, new FileName('index.md'));
     const intro = new FilePath(folder('guides'), new FileName('intro.md'));
-    const before = notices({ taggedPages: [{ page: index, tags: [{ name: 'br', line: 5 }] }] });
-    const moved = notices({
-      taggedPages: [
-        {
-          page: index,
-          tags: [
-            { name: 'br', line: 9 },
-            { name: 'br', line: 12 }
-          ]
-        }
-      ]
-    });
-    const newName = notices({
-      taggedPages: [{ page: index, tags: [...moved.taggedPages[0].tags, { name: 'details', line: 14 }] }]
-    });
-    const newPage = notices({ taggedPages: [...moved.taggedPages, { page: intro, tags: [{ name: 'br', line: 3 }] }] });
+    const tag = (name: string, line: number) => ({ name, closing: false, line });
+    const before = notices({ taggedPages: [{ page: index, tags: [tag('br', 5)] }] });
+    const moved = notices({ taggedPages: [{ page: index, tags: [tag('br', 9), tag('br', 12)] }] });
+    const newName = notices({ taggedPages: [{ page: index, tags: [tag('br', 9), tag('details', 14)] }] });
+    const newPage = notices({ taggedPages: [...moved.taggedPages, { page: intro, tags: [tag('br', 3)] }] });
 
     expect(noticesAfter(moved, before).taggedPages).to.deep.equal([]);
     expect(noticesAfter(newName, before).taggedPages).to.deep.equal(newName.taggedPages);

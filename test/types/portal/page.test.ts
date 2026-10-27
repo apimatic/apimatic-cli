@@ -185,15 +185,16 @@ describe('parsePage', () => {
   describe('the tags of a .md page', () => {
     const tags = async (markdown: string, name?: string) => (await page(markdown, name)).droppedTags;
 
-    it('names each piece of HTML by the first tag it opens, at its line', async () => {
+    it('names each piece of HTML by the first tag it opens, or else the first it closes, at its line', async () => {
       const markdown =
         '---\ntitle: Tags\n---\n\nLine one<br>line two.\n\n<details>\n<summary>More</summary>\n\nHidden.\n\n' +
         '</details>\n\n<Cards>\n  <Card title="A" href="/a" />\n</Cards>\n';
 
       expect(await tags(markdown)).to.deep.equal([
-        { name: 'br', line: 5 },
-        { name: 'details', line: 7 },
-        { name: 'Cards', line: 14 }
+        { name: 'br', closing: false, line: 5 },
+        { name: 'details', closing: false, line: 7 },
+        { name: 'details', closing: true, line: 12 },
+        { name: 'Cards', closing: false, line: 14 }
       ]);
     });
 
@@ -201,16 +202,31 @@ describe('parsePage', () => {
       const markdown = '<details>\n<summary>A</summary>\n\nText.\n\n</details>\n<details>\n<summary>B</summary>\n';
 
       expect(await tags(markdown)).to.deep.equal([
-        { name: 'details', line: 1 },
-        { name: 'details', line: 7 }
+        { name: 'details', closing: false, line: 1 },
+        { name: 'details', closing: false, line: 7 }
+      ]);
+    });
+
+    // Markdown shows the opening tag of a component with a `{…}` attribute as text, and leaves out its end.
+    it('names a piece that only closes a tag, such as the end of a component or text after a closing tag', async () => {
+      const markdown = "<Tabs items={['npm', 'pnpm']}>\n\nnpm i\n\n</Tabs>\n\n</div>\nThis line is left out too.\n";
+
+      expect(await tags(markdown)).to.deep.equal([
+        { name: 'Tabs', closing: true, line: 5 },
+        { name: 'div', closing: true, line: 7 }
       ]);
     });
 
     // A comment shows on no page either way.
     it('leaves out a comment and a tag inside one, but not a tag after one', async () => {
-      const markdown = '<!-- <b>Draft</b> -->\n\nText <!-- note --> here.\n\n<!--\nA note.\n--> <span>Kept?</span>\n';
+      const markdown =
+        '<!-- <b>Draft</b> -->\n\nText <!-- note --> here.\n\n<!--\nA note.\n--> <span>Kept?</span>\n\n' +
+        '<!---> <i>After an empty comment</i>\n';
 
-      expect(await tags(markdown)).to.deep.equal([{ name: 'span', line: 7 }]);
+      expect(await tags(markdown)).to.deep.equal([
+        { name: 'span', closing: false, line: 7 },
+        { name: 'i', closing: false, line: 9 }
+      ]);
     });
 
     it('reads code, inline code and an autolink as the text they are', async () => {

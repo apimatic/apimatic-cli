@@ -22,14 +22,16 @@ export interface PageImage {
   path: string;
 }
 
-/** A piece of HTML in a `.md` page, by the first tag it opens. */
+/** A piece of HTML in a `.md` page, by the first tag it opens, or else the first it closes. */
 export interface PageTag {
   /** As written: `br`, `details` or `Cards`. */
   name: string;
+  /** A piece that opens none, such as the `</Tabs>` of a component Markdown shows as text. */
+  closing: boolean;
   line: number;
 }
 
-/** A page as the build reads it: front matter held to the build's schema, the images it imports, the tags it drops. */
+/** A page as the build reads it, as far as the checks go. */
 export interface ParsedPage {
   frontMatter: Result<PageFrontMatter, string[]>;
   images: PageImage[];
@@ -55,10 +57,12 @@ interface MarkdownNode {
 // A scheme, a drive letter or a network path: none of them names a file the build imports.
 const NOT_A_FILE = /^(?:[a-z][a-z\d+.-]*:|\/\/)/i;
 
-const COMMENT = /<!--[\s\S]*?(?:-->|$)/g;
+// As CommonMark reads one, where `<!-->` and `<!--->` are whole comments.
+const COMMENT = /<!--(?:-?>|[\s\S]*?(?:-->|$))/g;
 
-// A tag name as CommonMark reads one; a closing tag, such as `</Cards>`, opens nothing.
+// A tag name as CommonMark reads one.
 const OPENING_TAG = /<([a-z][a-z\d-]*)/i;
+const CLOSING_TAG = /<\/([a-z][a-z\d-]*)/i;
 
 /** Parsed once, as the build parses it, `.mdx` as MDX; a body that does not parse is the build's to report. */
 export async function parsePage(contents: string, fileName: FileName, label: string): Promise<ParsedPage> {
@@ -77,10 +81,11 @@ export async function parsePage(contents: string, fileName: FileName, label: str
   const body = '\n'.repeat(parsed.matter.split('\n').length - 1) + contents.slice(parsed.matter.length);
   const isMdx = fileName.hasExactExtension('.mdx');
   const tree = await parsedBody(body, isMdx);
+  const nodes = tree === null ? [] : nodesOf(tree);
   return {
     frontMatter: await checkedFrontMatter(parsed, label),
-    images: tree === null ? [] : imagesIn(tree),
-    droppedTags: tree === null || isMdx ? [] : tagsIn(tree)
+    images: imagesIn(nodes),
+    droppedTags: isMdx ? [] : tagsIn(nodes)
   };
 }
 
@@ -139,47 +144,42 @@ async function parsedBody(body: string, isMdx: boolean): Promise<MarkdownNode | 
   }
 }
 
-function imagesIn(tree: MarkdownNode): PageImage[] {
+/** Each node before its children, in the order the page has them. */
+function nodesOf(node: MarkdownNode): MarkdownNode[] {
+  return [node, ...(node.children ?? []).flatMap(nodesOf)];
+}
+
+function imagesIn(nodes: MarkdownNode[]): PageImage[] {
   // The template writes `![a][ref]` as `![a](url)` before the build imports it (remark-image-references.ts).
   const definitions = new Map<string, string>();
-  const define = (node: MarkdownNode) => {
+  for (const node of nodes) {
     // The first definition of a label wins, as CommonMark reads them.
     if (node.type === 'definition' && node.identifier !== undefined && !definitions.has(node.identifier)) {
       definitions.set(node.identifier, node.url ?? '');
     }
-    node.children?.forEach(define);
-  };
-  define(tree);
-
-  const images: PageImage[] = [];
-  const visit = (node: MarkdownNode) => {
+  }
+  return nodes.flatMap((node) => {
     const url = addressOf(node, definitions);
     const image = url !== undefined ? located(url) : null;
-    if (image !== null) {
-      images.push({ ...image, line: node.position?.start.line ?? 0 });
-    }
-    node.children?.forEach(visit);
-  };
-  visit(tree);
-  return images;
+    return image === null ? [] : [{ ...image, line: node.position?.start.line ?? 0 }];
+  });
 }
 
-function tagsIn(tree: MarkdownNode): PageTag[] {
-  const tags: PageTag[] = [];
-  const visit = (node: MarkdownNode) => {
-    // A comment shows on no page either way, and a tag in one is text; blanked, so the lines still count.
-    const html =
-      node.type === 'html' ? (node.value ?? '').replace(COMMENT, (comment) => comment.replace(/./g, ' ')) : '';
-    const tag = OPENING_TAG.exec(html);
-    if (tag !== null) {
-      // One piece can close a tag before it opens another: `</details>`, then `<details>` on the next line.
-      const line = (node.position?.start.line ?? 0) + html.slice(0, tag.index).split('\n').length - 1;
-      tags.push({ name: tag[1], line });
-    }
-    node.children?.forEach(visit);
-  };
-  visit(tree);
-  return tags;
+function tagsIn(nodes: MarkdownNode[]): PageTag[] {
+  return nodes
+    .filter(({ type }) => type === 'html')
+    .flatMap(({ value, position }) => {
+      // A comment shows on no page either way, and a tag in one is text; blanked, so the lines still count.
+      const html = (value ?? '').replace(COMMENT, (comment) => comment.replace(/./g, ' '));
+      const opening = OPENING_TAG.exec(html);
+      const tag = opening ?? CLOSING_TAG.exec(html);
+      if (tag === null) {
+        return [];
+      }
+      // The tag's own line: a piece can close one tag before it opens another, `</details>` then `<details>`.
+      const line = (position?.start.line ?? 0) + html.slice(0, tag.index).split('\n').length - 1;
+      return [{ name: tag[1], closing: opening === null, line }];
+    });
 }
 
 function addressOf(node: MarkdownNode, definitions: Map<string, string>): string | undefined {

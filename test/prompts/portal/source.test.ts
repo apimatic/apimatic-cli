@@ -22,6 +22,17 @@ import { FilePath } from '../../../src/types/file/filePath.js';
 import { PLUGIN_SECTION, SDK_SECTION } from '../../../src/types/portal/generated-pages.js';
 import { OAUTH_CALLBACK } from '../../../src/types/portal/content-tree.js';
 
+/** What `log.warn` and `log.message` print from here on, without colours, until `sinon.restore`. */
+function recordedLines(): string[] {
+  const lines: string[] = [];
+  const record = (text?: string | string[]) => {
+    lines.push(stripVTControlCharacters(String(text)));
+  };
+  sinon.stub(log, 'warn').callsFake(record);
+  sinon.stub(log, 'message').callsFake(record);
+  return lines;
+}
+
 describe('reportSourceProblem', () => {
   const source = new DirectoryPath('project').join('src');
   let error: sinon.SinonStub;
@@ -595,12 +606,7 @@ describe('reportSharedTabNames', () => {
   const printed = () => lines.join('\n');
 
   beforeEach(() => {
-    lines = [];
-    const record = (text?: string | string[]) => {
-      lines.push(stripVTControlCharacters(String(text)));
-    };
-    sinon.stub(log, 'warn').callsFake(record);
-    sinon.stub(log, 'message').callsFake(record);
+    lines = recordedLines();
   });
 
   afterEach(() => {
@@ -861,15 +867,11 @@ describe('reportTaggedPages', () => {
   const source = new DirectoryPath('project').join('src');
   const index = new FilePath(source.join('content'), new FileName('index.md'));
   const intro = new FilePath(source.join('content', 'guides'), new FileName('intro.md'));
+  const tag = (name: string, line: number, closing = false) => ({ name, closing, line });
   let lines: string[];
 
   beforeEach(() => {
-    lines = [];
-    const record = (text?: string | string[]) => {
-      lines.push(stripVTControlCharacters(String(text)));
-    };
-    sinon.stub(log, 'warn').callsFake(record);
-    sinon.stub(log, 'message').callsFake(record);
+    lines = recordedLines();
   });
 
   afterEach(() => {
@@ -883,45 +885,41 @@ describe('reportTaggedPages', () => {
   });
 
   it('names each tag of a page with its line, and how to keep them', () => {
-    reportTaggedPages(
-      [
-        {
-          page: index,
-          tags: [
-            { name: 'br', line: 5 },
-            { name: 'details', line: 9 }
-          ]
-        }
-      ],
-      source
-    );
+    reportTaggedPages([{ page: index, tags: [tag('br', 5), tag('details', 9)] }], source);
 
     expect(lines.join('\n').split('\n')).to.deep.equal([
       `A '.md' page in '${source.toString()}' has HTML or components, which the portal leaves out:`,
       "  • 'content/index.md', line 5: '<br>'",
       "  • 'content/index.md', line 9: '<details>'",
-      "Rename the page to '.mdx' to keep them, and close empty tags such as '<br />'."
+      "Rename the page to '.mdx' to keep them. MDX needs empty tags closed, such as '<br />', and comments written " +
+        "as '{/* … */}'."
     ]);
   });
 
-  it('names the first three tags of a page, and counts the rest', () => {
-    const tags = [5, 9, 12, 14, 20].map((line) => ({ name: 'br', line }));
+  it('names each tag of a page once, where it first has it, up to three, and counts the rest', () => {
+    const tags = [tag('br', 5), tag('br', 9), tag('details', 12), tag('details', 20, true), tag('span', 24)];
 
-    reportTaggedPages([{ page: index, tags }], source);
+    reportTaggedPages([{ page: index, tags: [...tags, tag('Tabs', 30, true), tag('i', 33)] }], source);
 
     expect(lines[1].split('\n')).to.deep.equal([
       "  • 'content/index.md', line 5: '<br>'",
-      "  • 'content/index.md', line 9: '<br>'",
-      "  • 'content/index.md', line 12: '<br>'",
+      "  • 'content/index.md', line 12: '<details>'",
+      "  • 'content/index.md', line 24: '<span>'",
       '    and 2 more on this page'
     ]);
+  });
+
+  it('writes a tag the page only closes as it closes it', () => {
+    reportTaggedPages([{ page: index, tags: [tag('Tabs', 30, true)] }], source);
+
+    expect(lines[1]).to.equal("  • 'content/index.md', line 30: '</Tabs>'");
   });
 
   it('speaks of each page when there are several', () => {
     reportTaggedPages(
       [
-        { page: index, tags: [{ name: 'br', line: 5 }] },
-        { page: intro, tags: [{ name: 'Cards', line: 3 }] }
+        { page: index, tags: [tag('br', 5)] },
+        { page: intro, tags: [tag('Cards', 3)] }
       ],
       source
     );
@@ -941,12 +939,7 @@ describe('reportSharedEndpoints', () => {
   let lines: string[];
 
   beforeEach(() => {
-    lines = [];
-    const record = (text?: string | string[]) => {
-      lines.push(stripVTControlCharacters(String(text)));
-    };
-    sinon.stub(log, 'warn').callsFake(record);
-    sinon.stub(log, 'message').callsFake(record);
+    lines = recordedLines();
   });
 
   afterEach(() => {

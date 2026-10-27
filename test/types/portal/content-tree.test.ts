@@ -111,7 +111,9 @@ describe('ContentTree', () => {
 
     const notices = tree.check({ pages: tagged, navigationFiles, missingImages: [] }, [], GENERATED)._unsafeUnwrap();
 
-    expect(notices.taggedPages).to.deep.equal([{ page: inContent('index.md'), tags: [{ name: 'br', line: 5 }] }]);
+    expect(notices.taggedPages).to.deep.equal([
+      { page: inContent('index.md'), tags: [{ name: 'br', closing: false, line: 5 }] }
+    ]);
   });
 
   it('names the tabs from what it is handed', () => {
