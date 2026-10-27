@@ -11,9 +11,9 @@ export interface PageFrontMatter {
   title: string;
 }
 
-/** A Markdown image the build imports, where it looks for the file, and the path it looks up there. */
+/** An image the build imports, where it looks for the file, and the path it looks up there. */
 export interface PageImage {
-  /** As the page writes it. */
+  /** As the page writes it: a Markdown image's address, or the `src` of an `<img>` in an `.mdx` page. */
   url: string;
   line: number;
   /** An image written as `/…` is read from the static directory, any other from beside its page. */
@@ -36,6 +36,8 @@ interface MarkdownNode {
   type: string;
   url?: string;
   identifier?: string;
+  name?: string | null;
+  attributes?: { type: string; name?: string; value?: unknown }[];
   position?: { start: { line: number } };
   children?: MarkdownNode[];
 }
@@ -128,12 +130,7 @@ async function imagesIn(body: string, isMdx: boolean): Promise<PageImage[]> {
 
   const images: PageImage[] = [];
   const visit = (node: MarkdownNode) => {
-    const url =
-      node.type === 'image'
-        ? node.url
-        : node.type === 'imageReference'
-        ? definitions.get(node.identifier ?? '')
-        : undefined;
+    const url = addressOf(node, definitions);
     const image = url !== undefined ? located(url) : null;
     if (image !== null) {
       images.push({ ...image, line: node.position?.start.line ?? 0 });
@@ -142,6 +139,26 @@ async function imagesIn(body: string, isMdx: boolean): Promise<PageImage[]> {
   };
   visit(tree);
   return images;
+}
+
+function addressOf(node: MarkdownNode, definitions: Map<string, string>): string | undefined {
+  switch (node.type) {
+    case 'image':
+      return node.url;
+    case 'imageReference':
+      return definitions.get(node.identifier ?? '');
+    // An `<img>` in an `.mdx` page, which the template imports too (remark-jsx-images.ts).
+    case 'mdxJsxFlowElement':
+    case 'mdxJsxTextElement': {
+      const src =
+        node.name === 'img'
+          ? node.attributes?.find(({ type, name }) => type === 'mdxJsxAttribute' && name === 'src')?.value
+          : undefined;
+      return typeof src === 'string' ? src : undefined;
+    }
+    default:
+      return undefined;
+  }
 }
 
 function located(url: string): Omit<PageImage, 'line'> | null {

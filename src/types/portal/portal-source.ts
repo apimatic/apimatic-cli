@@ -92,7 +92,7 @@ export interface ReservedAddressPage {
 /** Pages of the user's that would be served at one address, which only one of them can have. */
 export type SharedAddress = Shared<string>;
 
-/** A page's Markdown image that the build would import and not find, which fails the whole build. */
+/** A page's image that the build would import and not find, which fails the whole build. */
 export interface MissingImage {
   page: FilePath;
   line: number;

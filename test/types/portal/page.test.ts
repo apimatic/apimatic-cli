@@ -148,5 +148,30 @@ describe('parsePage', () => {
 
       expect(found.map(({ path, line }) => [path, line])).to.deep.equal([['a.png', 3]]);
     });
+
+    it('reads the src of an <img> in an .mdx page, in a line of text or a component too', async () => {
+      const mdx =
+        '<img src="/images/a%20b.png?v=1" width="200" />\n\nInline <img src="./b.png" /> here.\n\n' +
+        '<Card>\n  <img alt="C" src="../c.png" />\n</Card>\n';
+
+      expect(await images(mdx, 'page.mdx')).to.deep.equal([
+        { url: '/images/a%20b.png?v=1', line: 1, from: 'static', path: 'images/a b.png' },
+        { url: './b.png', line: 3, from: 'page', path: './b.png' },
+        { url: '../c.png', line: 6, from: 'page', path: '../c.png' }
+      ]);
+    });
+
+    it('leaves out an <img> whose src names no file or is code, and other tags', async () => {
+      const mdx =
+        '<img src="https://example.com/a.png" />\n\n<img src={logo} />\n\n<img alt="None" />\n\n' +
+        '<Img src="./a.png" />\n\n<video src="./a.mp4" />\n';
+
+      expect(await images(mdx, 'page.mdx')).to.deep.equal([]);
+    });
+
+    // The build leaves out a `.md` page's HTML, an `<img>` with the rest.
+    it('leaves out an <img> in a .md page', async () => {
+      expect(await images('<img src="./a.png">\n\nInline <img src="./b.png"> here.\n')).to.deep.equal([]);
+    });
   });
 });
