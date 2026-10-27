@@ -80,9 +80,15 @@ export class PreparePortalProjectAction {
     // The artifacts live in this directory for as long as the caller needs them, so it wraps
     // everything that reads them rather than being opened and closed around the call.
     return await withDirPath(async (artifactsDirectory) => {
+      const build = await project.buildZip(artifactsDirectory);
+      if (build.isErr()) {
+        this.prompts.sourceNotZipped(build.error, sourceDirectory);
+        return ActionResult.failed();
+      }
+
       const artifacts = await this.prompts.generateArtifacts(
         this.artifactsService.generate(
-          sourceDirectory,
+          build.value,
           artifactsDirectory,
           this.configDir,
           this.commandMetadata,

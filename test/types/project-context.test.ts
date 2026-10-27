@@ -87,17 +87,32 @@ describe('ProjectContext', () => {
       expect(await project().specsExist()).to.be.true;
     });
 
-    it('zips the source directory for the generators, with the package settings when given', async () => {
+    it('zips src/ for the generators with the package settings and content/, leaving out static/', async () => {
       write('src/spec/openapi.json', '{}');
+      write('src/content/index.md', '# Home');
+      write('src/static/images/logo.png', 'png');
       const temp = new DirectoryPath(inProject('temp'));
       const settings = new DirectoryPath(inProject('settings'));
       write('settings/package.json', '{}');
 
-      const zip = (await project().srcDirZip(temp, settings))._unsafeUnwrap();
+      const zip = (await project().buildZip(temp, settings))._unsafeUnwrap();
 
-      expect(fs.existsSync(zip.toString())).to.be.true;
-      expect(fs.existsSync(inProject('temp', 'src', 'spec', 'openapi.json'))).to.be.true;
-      expect(fs.existsSync(inProject('temp', 'src', 'package-settings', 'package.json'))).to.be.true;
+      const entries = new AdmZip(zip.toString()).getEntries().map((entry) => entry.entryName);
+      expect(entries).to.have.members(['spec/openapi.json', 'content/index.md', 'package-settings/package.json']);
+    });
+
+    it('reports a source it could not copy for the generators as one it could not zip', async () => {
+      write('src/spec/openapi.json', '{}');
+      fs.symlinkSync(
+        inProject('missing'),
+        inProject('src', 'broken'),
+        process.platform === 'win32' ? 'junction' : 'dir'
+      );
+
+      const problem = (await project().buildZip(new DirectoryPath(inProject('temp'))))._unsafeUnwrapErr();
+
+      expect(problem.kind).to.equal('zipFailed');
+      expect(problem.reason).to.contain('ENOENT');
     });
 
     it('zips all of spec/ for validation, so a spec split across files keeps the ones it references', async () => {

@@ -5,7 +5,7 @@ import { PublishingProfileItem } from '../../types/publish-api/publishing-profil
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { FilePath } from '../../types/file/filePath.js';
 import { format as f } from '../format.js';
-import { withSpinner } from '../prompt.js';
+import { notZippedForUpload, withSpinner } from '../prompt.js';
 import { APIMATIC_CONFIG_FILE_NAME } from '../../types/apimatic-config/document.js';
 import { PluginConfig } from '../../types/plugin-config-context.js';
 import { PluginGenerationProblem } from '../../types/plugin/generation-problem.js';
@@ -24,7 +24,7 @@ function describeGenerationProblem(problem: PluginGenerationProblem, sourceDirec
     case 'generationFailed':
       return problem.error.errorMessage;
     case 'zipFailed':
-      return `${f.path(sourceDirectory)} could not be zipped for upload: ${problem.reason}`;
+      return notZippedForUpload(sourceDirectory, problem.reason);
     case 'unzipFailed':
       return `${ServiceError.InvalidResponse.errorMessage}\n${problem.reason}`;
   }
