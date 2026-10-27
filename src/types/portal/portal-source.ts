@@ -18,9 +18,6 @@ export interface PortalSpec {
   endpoints: Endpoint[];
 }
 
-/** An operation more than one specification declares, which one code sample per method and path cannot serve. */
-export type SharedEndpoint = Shared<Endpoint>;
-
 /** A part of the source directory that `portal serve` watches, and checks on each save. */
 export type WatchedSource = 'config' | 'content' | 'spec';
 
@@ -44,8 +41,6 @@ export interface PortalSource extends PortalSettings {
   unmergedSpecs: FilePath[];
   /** API definitions at the top of `spec/` while its folders are merged, which the portal and the SDKs leave out. */
   leftOutSpecs: FilePath[];
-  /** Shown with no SDK sample, since the samples hold one per method and path. */
-  sharedEndpoints: SharedEndpoint[];
   contentDirectory: DirectoryPath | null;
   staticDirectory: DirectoryPath | null;
   shadowedFiles: FileName[];
