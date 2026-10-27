@@ -212,6 +212,11 @@ const stylesheetOf = (output: DirectoryPath) => {
     expect(exists('images/logo.png')).to.be.true;
   });
 
+  // Hosted at the root too, an `<img>` is bundled (remark-jsx-images.ts); a file this small is inlined.
+  it("bundles an <img>'s file", () => {
+    expect(read('authentication/index.html')).to.match(/<img[^>]* src="data:image\/svg\+xml,[^"]+"[^>]* width="48"/);
+  });
+
   it('writes the not-found page static hosts serve for unknown paths', () => {
     expect(exists('404.html')).to.be.true;
   });

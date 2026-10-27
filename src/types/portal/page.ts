@@ -13,12 +13,12 @@ export interface PageFrontMatter {
 
 /** An image the build imports, where it looks for the file, and the path it looks up there. */
 export interface PageImage {
-  /** As the page writes it: a Markdown image's address, or the `src` of an `<img>` in an `.mdx` page. */
+  /** As the page writes it: a Markdown image's address, or the `src` of an `<img>` in an `.mdx` page, trimmed. */
   url: string;
   line: number;
   /** An image written as `/…` is read from the static directory, any other from beside its page. */
   from: 'static' | 'page';
-  /** Decoded, without the spaces around it or its query or fragment, with `/` between segments. */
+  /** Decoded, without its query or fragment, with `/` between segments. */
   path: string;
 }
 
@@ -172,11 +172,12 @@ function addressOf(node: MarkdownNode, definitions: Map<string, string>): string
       return node.url;
     case 'imageReference':
       return definitions.get(node.identifier ?? '');
-    // An `<img>` in an `.mdx` page, which the template imports too (remark-jsx-images.ts).
+    // remark-jsx-images.ts imports these too.
     case 'mdxJsxFlowElement':
     case 'mdxJsxTextElement': {
       const src = node.attributes?.find(({ type, name }) => type === 'mdxJsxAttribute' && name === 'src')?.value;
-      return node.name === 'img' && typeof src === 'string' ? src : undefined;
+      // A browser drops the spaces around an `<img>`'s address; `remarkImage` keeps a Markdown image's.
+      return node.name === 'img' && typeof src === 'string' ? src.trim() : undefined;
     }
     default:
       return undefined;
@@ -184,13 +185,14 @@ function addressOf(node: MarkdownNode, definitions: Map<string, string>): string
 }
 
 function located(url: string): Omit<PageImage, 'line'> | null {
-  // A browser drops the spaces around an `<img>`'s address.
-  const address = url.trim().split(/[?#]/, 1)[0];
+  const address = url.split(/[?#]/, 1)[0];
   if (address.length === 0 || address.endsWith('/') || NOT_A_FILE.test(address)) {
     return null;
   }
-  const path = decodedAddress(address);
-  return path.startsWith('/') ? { url, from: 'static', path: path.replace(/^\/+/, '') } : { url, from: 'page', path };
+  const decoded = decodedAddress(address);
+  return decoded.startsWith('/')
+    ? { url, from: 'static', path: decoded.replace(/^\/+/, '') }
+    : { url, from: 'page', path: decoded };
 }
 
 function decodedAddress(address: string): string {
