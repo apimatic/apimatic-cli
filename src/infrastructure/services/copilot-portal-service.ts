@@ -7,7 +7,7 @@ import { envInfo } from '../env-info.js';
 import { ServiceError } from '../service-error.js';
 import { copilotFailureOf, copilotTransportFailure, duration } from './copilot-responses.js';
 
-export const COPILOT_PORTAL_TIMEOUT_MS = 30_000;
+const COPILOT_PORTAL_TIMEOUT_MS = 30_000;
 
 /** `created` for a key the service did not know; `updated` when it already held it for this account. */
 export type RegistrationOutcome = 'created' | 'updated';

@@ -3,7 +3,7 @@ import { PortalAuthorizationFailure } from '../../infrastructure/services/portal
 import { SubscriptionFeature } from '../../types/api/account-entitlements.js';
 import { format as f } from '../format.js';
 
-export const PRICING_URL = 'https://www.apimatic.io/pricing';
+const PRICING_URL = 'https://www.apimatic.io/pricing';
 
 const FEATURE_NAMES: Record<SubscriptionFeature, string> = {
   portalGeneration: 'portal generation',
