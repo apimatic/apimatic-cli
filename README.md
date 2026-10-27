@@ -82,7 +82,7 @@ EXAMPLES
   apimatic api transform --format=raml --url="https://petstore.swagger.io/v2/swagger.json" --destination=./
 ```
 
-_See code: [src/commands/api/transform.ts](https://github.com/apimatic/apimatic-cli/blob/main/src/commands/api/transform.ts)_
+_See code: [src/commands/api/transform.ts](https://github.com/apimatic/apimatic-cli/blob/dev/src/commands/api/transform.ts)_
 
 ## `apimatic api validate`
 
@@ -115,7 +115,7 @@ EXAMPLES
   apimatic api validate --url="https://petstore.swagger.io/v2/swagger.json"
 ```
 
-_See code: [src/commands/api/validate.ts](https://github.com/apimatic/apimatic-cli/blob/main/src/commands/api/validate.ts)_
+_See code: [src/commands/api/validate.ts](https://github.com/apimatic/apimatic-cli/blob/dev/src/commands/api/validate.ts)_
 
 ## `apimatic auth login`
 
@@ -139,7 +139,7 @@ EXAMPLES
   apimatic auth login --auth-key={api-key}
 ```
 
-_See code: [src/commands/auth/login.ts](https://github.com/apimatic/apimatic-cli/blob/main/src/commands/auth/login.ts)_
+_See code: [src/commands/auth/login.ts](https://github.com/apimatic/apimatic-cli/blob/dev/src/commands/auth/login.ts)_
 
 ## `apimatic auth logout`
 
@@ -158,7 +158,7 @@ EXAMPLES
   apimatic auth logout
 ```
 
-_See code: [src/commands/auth/logout.ts](https://github.com/apimatic/apimatic-cli/blob/main/src/commands/auth/logout.ts)_
+_See code: [src/commands/auth/logout.ts](https://github.com/apimatic/apimatic-cli/blob/dev/src/commands/auth/logout.ts)_
 
 ## `apimatic auth status`
 
@@ -175,7 +175,7 @@ EXAMPLES
   apimatic auth status
 ```
 
-_See code: [src/commands/auth/status.ts](https://github.com/apimatic/apimatic-cli/blob/main/src/commands/auth/status.ts)_
+_See code: [src/commands/auth/status.ts](https://github.com/apimatic/apimatic-cli/blob/dev/src/commands/auth/status.ts)_
 
 ## `apimatic autocomplete [SHELL]`
 
@@ -257,7 +257,7 @@ EXAMPLES
   apimatic plugin generate --input="./" --destination="./plugin"
 ```
 
-_See code: [src/commands/plugin/generate.ts](https://github.com/apimatic/apimatic-cli/blob/main/src/commands/plugin/generate.ts)_
+_See code: [src/commands/plugin/generate.ts](https://github.com/apimatic/apimatic-cli/blob/dev/src/commands/plugin/generate.ts)_
 
 ## `apimatic plugin publish`
 
@@ -284,7 +284,7 @@ EXAMPLES
   apimatic plugin publish --input="./" --destination="./plugin"
 ```
 
-_See code: [src/commands/plugin/publish.ts](https://github.com/apimatic/apimatic-cli/blob/main/src/commands/plugin/publish.ts)_
+_See code: [src/commands/plugin/publish.ts](https://github.com/apimatic/apimatic-cli/blob/dev/src/commands/plugin/publish.ts)_
 
 ## `apimatic portal generate`
 
@@ -324,7 +324,7 @@ EXAMPLES
   apimatic portal generate --zip
 ```
 
-_See code: [src/commands/portal/generate.ts](https://github.com/apimatic/apimatic-cli/blob/main/src/commands/portal/generate.ts)_
+_See code: [src/commands/portal/generate.ts](https://github.com/apimatic/apimatic-cli/blob/dev/src/commands/portal/generate.ts)_
 
 ## `apimatic portal serve`
 
@@ -360,7 +360,7 @@ EXAMPLES
   apimatic portal serve --input=./ --port=23513 --open
 ```
 
-_See code: [src/commands/portal/serve.ts](https://github.com/apimatic/apimatic-cli/blob/main/src/commands/portal/serve.ts)_
+_See code: [src/commands/portal/serve.ts](https://github.com/apimatic/apimatic-cli/blob/dev/src/commands/portal/serve.ts)_
 
 ## `apimatic publishing profile list`
 
@@ -379,7 +379,7 @@ EXAMPLES
   apimatic publishing profile list
 ```
 
-_See code: [src/commands/publishing/profile/list.ts](https://github.com/apimatic/apimatic-cli/blob/main/src/commands/publishing/profile/list.ts)_
+_See code: [src/commands/publishing/profile/list.ts](https://github.com/apimatic/apimatic-cli/blob/dev/src/commands/publishing/profile/list.ts)_
 
 ## `apimatic quickstart`
 
@@ -399,7 +399,7 @@ EXAMPLES
   apimatic quickstart
 ```
 
-_See code: [src/commands/quickstart.ts](https://github.com/apimatic/apimatic-cli/blob/main/src/commands/quickstart.ts)_
+_See code: [src/commands/quickstart.ts](https://github.com/apimatic/apimatic-cli/blob/dev/src/commands/quickstart.ts)_
 
 ## `apimatic sdk generate`
 
@@ -440,7 +440,7 @@ EXAMPLES
   apimatic sdk generate --language=python --destination=./sdk --zip
 ```
 
-_See code: [src/commands/sdk/generate.ts](https://github.com/apimatic/apimatic-cli/blob/main/src/commands/sdk/generate.ts)_
+_See code: [src/commands/sdk/generate.ts](https://github.com/apimatic/apimatic-cli/blob/dev/src/commands/sdk/generate.ts)_
 
 ## `apimatic sdk publish`
 
@@ -487,5 +487,5 @@ EXAMPLES
   apimatic sdk publish --profile-id=c3d4e5f6a1b2c3d4e5f6a1b2 --language=python --version=1.0.0 --publish-type=package --dry-run
 ```
 
-_See code: [src/commands/sdk/publish.ts](https://github.com/apimatic/apimatic-cli/blob/main/src/commands/sdk/publish.ts)_
+_See code: [src/commands/sdk/publish.ts](https://github.com/apimatic/apimatic-cli/blob/dev/src/commands/sdk/publish.ts)_
 <!-- commandsstop -->
