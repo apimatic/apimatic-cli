@@ -13,6 +13,7 @@ import { SdkRepositoryContext } from '../../src/types/sdk-repository-context.js'
 import { CodeGenerationVersion, Language, Stability } from '../../src/types/sdk/generate.js';
 import { GenerationRecord, RECORD_ATTRIBUTES, SdkGeneration } from '../../src/types/sdk/generation-record.js';
 import { SHARE_HOOK_BLOCK, SHARE_HOOK_CALL, SHARE_HOOK_SCRIPT } from '../../src/types/sdk/share-hook.js';
+import { SdkPath } from '../../src/types/sdk/sdk-path.js';
 import { SnapshotRef } from '../../src/types/sdk/snapshot-ref.js';
 import { snapshotFiles } from '../helpers/snapshots.js';
 
@@ -243,7 +244,7 @@ describe('SdkRepositoryContext', () => {
       fs.mkdirSync(sdk.toString(), { recursive: true });
       const repository = (await contextFor(sdk).initRepository())._unsafeUnwrap();
       (await record(repository, { 'README.md': '# root' }))._unsafeUnwrap();
-      expect((await git.resolveRef(sdk, SnapshotRef.pristine('')))._unsafeUnwrap()).to.not.be.undefined;
+      expect((await git.resolveRef(sdk, SnapshotRef.pristine(SdkPath.fromGit(''))))._unsafeUnwrap()).to.not.be.undefined;
       fs.mkdirSync(sdk.join('typescript').toString());
       const below = (await contextFor(sdk.join('typescript')).repository())._unsafeUnwrap()!;
 

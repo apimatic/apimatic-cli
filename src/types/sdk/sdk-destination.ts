@@ -1,7 +1,8 @@
 import { RelativeFilePath } from '../file/relativeFilePath.js';
 import { CommitId } from '../git/commit-id.js';
 import { GitVersion } from '../git/git-version.js';
-import { SdkRepositoryContext, SdkRepositoryState } from '../sdk-repository-context.js';
+import { SdkRepositoryContext } from '../sdk-repository-context.js';
+import { SdkRepositoryState } from './repository-state.js';
 
 /** Why a run records a fresh snapshot instead of merging: there is no base, or not one for this generation. */
 export type RecordReason = { kind: 'noRepository' } | Exclude<SdkRepositoryState, { kind: 'ready' | 'unresolved' }>;

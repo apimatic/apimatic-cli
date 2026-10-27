@@ -71,7 +71,7 @@ export class SdkPublishAction {
         return ActionResult.success();
       }
 
-      const sdkFile = await project.sdk(language, sdkDirectory).archive(tempDirectory);
+      const sdkFile = await project.sdk(sdkDirectory).archive(tempDirectory);
       if (sdkFile.isErr()) {
         this.prompts.sdkNotZipped(sdkDirectory, sdkFile.error);
         return ActionResult.failed();

@@ -134,7 +134,7 @@ export default class SdkPublish extends Command {
         )
       : await new SdkPublishNonInteractiveAction(configDir, commandMetadata).execute(
           project,
-          destination ? new DirectoryPath(destination) : undefined,
+          destination,
           language as Language,
           publishTypes,
           force,

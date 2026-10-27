@@ -19,6 +19,7 @@ import { SdkContext } from '../../../src/types/sdk-context.js';
 import { GENERATED_MARKER, YOURS_MARKER } from '../../../src/types/sdk/conflict-markers.js';
 import { CodeGenerationVersion, Language, Stability } from '../../../src/types/sdk/generate.js';
 import { GenerationRecord, SdkGeneration } from '../../../src/types/sdk/generation-record.js';
+import { SdkPath } from '../../../src/types/sdk/sdk-path.js';
 import { SnapshotRef } from '../../../src/types/sdk/snapshot-ref.js';
 import { SdkRepositoryContext } from '../../../src/types/sdk-repository-context.js';
 import { terminal } from '../../../src/utils/terminal-utils.js';
@@ -64,7 +65,7 @@ describe('GenerateAction (sdk) — writing the SDK', () => {
     await generates(files);
     return new GenerateAction(new DirectoryPath(root), COMMAND_METADATA, 'auth-key').execute(
       ProjectContext.in(new DirectoryPath(root)),
-      undefined,
+      sdk(),
       Language.PYTHON,
       Stability.STABLE,
       force
@@ -119,7 +120,7 @@ describe('GenerateAction (sdk) — writing the SDK', () => {
       expect(result.isSuccess()).to.be.true;
       expect(repositoryInitialised.firstCall.args[0].isEqual(sdk())).to.be.true;
       expect(fs.readFileSync(at('.git/HEAD'), 'utf-8').trim()).to.equal('ref: refs/heads/main');
-      const pristine = (await git.resolveRef(sdk(), SnapshotRef.pristine('')))._unsafeUnwrap()!;
+      const pristine = (await git.resolveRef(sdk(), SnapshotRef.pristine(SdkPath.fromGit(''))))._unsafeUnwrap()!;
       expect(record().pristineCommit().isEqual(pristine)).to.be.true;
       expect(record().isFor(STABLE)).to.be.true;
       const repository = (await sdkContext().repository())._unsafeUnwrap()!;
@@ -137,7 +138,7 @@ describe('GenerateAction (sdk) — writing the SDK', () => {
       expect(repositoryInitialised.called).to.be.false;
       expect(fs.existsSync(at('.git'))).to.be.false;
       expect(fs.existsSync(at('old.py'))).to.be.false;
-      const ref = SnapshotRef.pristine('sdk/python');
+      const ref = SnapshotRef.pristine(SdkPath.fromGit('sdk/python'));
       expect((await git.resolveRef(new DirectoryPath(root), ref))._unsafeUnwrap()?.isEqual(record().pristineCommit()))
         .to.be.true;
     });

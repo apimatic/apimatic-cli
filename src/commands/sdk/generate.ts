@@ -77,7 +77,7 @@ With git ${GitVersion.required()} or newer installed, your edits to the generate
     const action = new GenerateAction(this.getConfigDir(), commandMetadata, authKey);
     const result = await action.execute(
       project,
-      destination ? new DirectoryPath(destination) : undefined,
+      project.sdkDirectory(language as Language, destination),
       language as Language,
       StabilityChoice.for(language as Language, stability).stabilityLevel(),
       force

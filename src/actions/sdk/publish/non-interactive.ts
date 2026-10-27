@@ -22,7 +22,7 @@ export class SdkPublishNonInteractiveAction {
 
   public readonly execute = async (
     project: ProjectContext,
-    sdkDirectory: DirectoryPath | undefined,
+    destination: string | undefined,
     language: Language,
     publishTypes: PublishType[],
     force: boolean,
@@ -32,11 +32,6 @@ export class SdkPublishNonInteractiveAction {
     profileId?: string,
     version?: string
   ): Promise<ActionResult> => {
-    if (sdkDirectory !== undefined && project.isSourceWithin(sdkDirectory)) {
-      this.prompts.destinationContainsSource(project.sourceDirectory(), sdkDirectory);
-      return ActionResult.failed();
-    }
-
     if (!(await project.sourceExists())) {
       this.prompts.sourceDirectoryDoesNotExist(project.sourceDirectory());
       return ActionResult.failed();
@@ -50,6 +45,12 @@ export class SdkPublishNonInteractiveAction {
     if (missing.length > 0) {
       this.prompts.missingRequiredFlags(missing);
       this.prompts.interactiveModeNotice();
+      return ActionResult.failed();
+    }
+
+    const sdkDirectory = project.sdkDirectory(language, destination);
+    if (project.isSourceWithin(sdkDirectory)) {
+      this.prompts.destinationContainsSource(project.sourceDirectory(), sdkDirectory);
       return ActionResult.failed();
     }
 
@@ -112,7 +113,7 @@ export class SdkPublishNonInteractiveAction {
     });
     const publishResult = await new SdkPublishAction(this.configDir, this.commandMetadata).execute(
       project,
-      sdkDirectory ?? project.sdkDirectory(language),
+      sdkDirectory,
       language,
       publishTypes,
       force,

@@ -416,12 +416,14 @@ PR into `dev`, squash-merged, title `feat(sdk): keep your edits when regeneratin
 | File | Role |
 |---|---|
 | `src/infrastructure/git-service.ts` | the system git behind every snapshot, the merge (its output read into stages and messages) and the index staging |
-| `src/types/sdk-repository-context.ts` | the SDK directory with its repository: snapshots, the record, `inspect`, `regenerate` (the merge as a `Regeneration`), `write` (the previous ref, then the plan to disk), the staging |
+| `src/types/sdk-repository-context.ts` | the SDK directory with its repository: `inspect`, `regenerate` (the merge as a `Regeneration`), `write` (the previous ref, then the plan to disk), settling, the index; composed of the four below |
+| `src/types/sdk/{snapshot-store,sdk-files,share-hook-installer,generation-record-file}.ts` | one concept each: the refs and snapshots (fetched and joined), the files on disk (a plan landed, undone, a file settled), the pre-push hook, the record file |
+| `src/types/sdk/{repository-state,sdk-path}.ts` | the repository's states and problems as types, with no context behind them; the SDK directory's path below the root as a value |
 | `src/types/sdk/{merge-plan,conflict-markers,unresolved-file}.ts` | pure: `MergePlan` built from git's merge and diffs, `taking(side)`, conflict kinds, the choices, markers and their resolution for either side, and how an unresolved file is settled from its stages |
 | `src/types/sdk/{sdk-destination,settlement}.ts` | the functional core of the run: how it writes and why, what a settled merge is — data and pure functions, no I/O |
 | `src/types/sdk/{snapshot-ref,generation-record,share-hook}.ts`, `src/types/git/{commit-id,tree-id,git-version,merge-tree}.ts`, `src/types/file/relativeFilePath.ts` | value objects, the hook script and block, git's output as types |
 | `src/actions/sdk/generate.ts`, `src/prompts/sdk/generate.ts` | the run, its questions and its wording |
-| `src/types/sdk-context.ts` | `directory()`, `destination(generation)` (what git and the repository say, as an `SdkDestination` or `unresolved`), `repository()`, `initRepository()`, save keeps `.git` |
+| `src/types/sdk-context.ts` | `destination(generation)` (what git and the repository say, as an `SdkDestination` or `unresolved`), `repository()`, `initRepository()`, save keeps `.git`, `archive` for upload |
 | `src/utils/terminal-utils.ts` | whether a question can be asked at all |
 | `src/commands/sdk/generate.ts` | flags, the git requirement in the description, intro/outro |
 | `test/…` | mirrors each file above |
@@ -444,12 +446,12 @@ flowchart TB
     GP["SdkGeneratePrompts (wording only, no branching)<br/>gitUnavailable · overwriteSdk · recordNotForThisGeneration · snapshotMissing · directoryNotInspected<br/>conflictsUnresolved · unresolvedChoice · resolveLater · conflictsResolved · conflictsNotSettled<br/>sdkGenerated · repositoryInitialised · sdkMerged · conflictChoice · runCancelled<br/>conflicts · conflictSteps · conflictsNotStaged · snapshotNotRecorded · customCodeFailed · sdkNotWritten<br/>shareHookNeedsOneStep · shareHookNotInstalled"]
   end
   subgraph TY["Types — src/types/"]
-    SC["SdkContext<br/>directory · exists · destination(generation) → SdkDestination | Unresolved · repository() · initRepository · save · archive · loadSdkInTempDirectory"]
-    RC["SdkRepositoryContext (sdk-repository-context.ts)<br/>remote · inspect → SdkRepositoryState · regenerate → Regeneration{generated, merge} · write(base, plan)<br/>snapshotGenerated · snapshotDisk · savePrevious · merge → MergeOutcome · apply · stageConflicts<br/>recordPristine/recordGeneration · readRecord · installShareHook → ShareHookInstall · settleUnresolved(side, paths) · filesToShare"]
+    SC["SdkContext<br/>exists · destination(generation) → SdkDestination | Unresolved · repository() · initRepository · save · archive · loadSdkInTempDirectory"]
+    RC["SdkRepositoryContext (sdk-repository-context.ts)<br/>remote · inspect → SdkRepositoryState · regenerate → Regeneration{generated, merge} · merge → MergeOutcome · write(base, plan)<br/>recordGeneration · settleUnresolved(side, paths) · stageConflicts · filesToShare · installShareHook<br/>composed of: SnapshotStore (sdk/snapshot-store.ts: refs, snapshotGenerated/Disk, recordPristine, savePrevious, fetch and join, verifyNotNested) · SdkFiles (sdk/sdk-files.ts: apply with undo, contentOf, settle) · ShareHookInstaller (sdk/share-hook-installer.ts) · GenerationRecordFile (sdk/generation-record-file.ts) · SdkPath (sdk/sdk-path.ts: the directory below the root; pathspec, fromRoot, below, nests)<br/>repository-state.ts: SdkRepositoryState · SdkRepositoryProblem · InspectionProblem · ShareHookInstall · MergeOutcome · Regeneration"]
     MP["MergePlan (sdk/merge-plan.ts)<br/>from(inputs) · writes/deletes/conflicts/renames/files · taking(side) → FileWrite.settle<br/>ConflictKind · ConflictSide · ConflictChoice · UnresolvedChoice"]
     CMK["conflict-markers.ts<br/>relabelMarkers · resolveMarkers(content, side) · settleMarkers · unresolved-file.ts: settledContent"]
     GR["GenerationRecord (sdk/generation-record.ts)<br/>generation.json: language, codegen, stability, pristine commit · describeApart"]
-    SR["SnapshotRef (sdk/snapshot-ref.ts)<br/>refs/apimatic/pristine|previous/‹path›, segments percent-encoded · fromGit · sdkPath · collidesWith"]
+    SR["SnapshotRef (sdk/snapshot-ref.ts)<br/>refs/apimatic/pristine|previous/‹SdkPath›, segments percent-encoded · fromGit · sdkPath → SdkPath"]
     SH["ShareHook (sdk/share-hook.ts)<br/>SHARE_HOOK_SCRIPT · SHARE_HOOK_CALL · SHARE_HOOK_BLOCK · installInto · calls"]
     SD["SdkDestination (sdk/sdk-destination.ts)<br/>overwrite{found} | record{repository?, because} | merge{repository, base} · Unresolved{repository, paths}<br/>destinationFor(repository, SdkRepositoryState) · replacesDirectory"]
     ST["Settlement (sdk/settlement.ts)<br/>{regeneration, plan, settled?: {side, paths}}<br/>resolving(regeneration) · favouring(side, regeneration)"]
@@ -511,10 +513,7 @@ What each layer owns:
   asks on the first run, and `--force` or no terminal writes without a repository and warns.
   The silent init left a commit-less repository inside `sdk/<language>` that broke `git add .`
   once the project became a repository, and CI got a repository nobody asked for.
-- **`SdkContext.directory()`.** The context skill marks a public directory accessor as the
-  pattern to avoid; this one falls under its exception (a layout context answering with a
-  derived directory for a prompt that names it and a service that works on it). The
-  alternative is a method handing back the store's findings, so no caller holds the path.
+- **`SdkContext.directory()`.** Removed on review (2026-10-27): `ProjectContext.sdkDirectory(language, destination)` is the one place a `--destination` becomes a path, for both SDK commands, and the action names the directory by what it was given, never by a second spelling.
 - **The record merges as binary.** Decided 2026-10-23 after testing with two clones: both
   regenerated, so both changed `generatedAt`, and the second pull hit a text conflict in the
   record. `.apimatic/.gitattributes` sets `merge=binary`: git writes no markers, leaves the

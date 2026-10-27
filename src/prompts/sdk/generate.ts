@@ -19,12 +19,7 @@ import {
   YOUR_FILES
 } from '../../types/sdk/merge-plan.js';
 import { SHARE_HOOK_CALL } from '../../types/sdk/share-hook.js';
-import {
-  InspectionProblem,
-  NotApplied,
-  ShareHookInstall,
-  SnapshotFetch
-} from '../../types/sdk-repository-context.js';
+import { InspectionProblem, NotApplied, ShareHookInstall, SnapshotFetch } from '../../types/sdk/repository-state.js';
 import { listedInProse } from '../../utils/string-utils.js';
 
 /** The closing line of a run that left conflicts. */
@@ -259,9 +254,7 @@ export class SdkGeneratePrompts {
   }
 
   public shareHookInstalled(file: FilePath) {
-    log.info(
-      `Added a pre-push hook at ${f.relativePath(file)}, so every git push also shares the SDK's snapshots.`
-    );
+    log.info(`Added a pre-push hook at ${f.relativePath(file)}, so every git push also shares the SDK's snapshots.`);
   }
 
   public repositoryInitialised(sdk: DirectoryPath) {

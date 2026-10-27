@@ -1,4 +1,5 @@
 import { Buffer } from 'node:buffer';
+import { SdkPath } from './sdk-path.js';
 
 const PRISTINE = 'refs/apimatic/pristine';
 const PREVIOUS = 'refs/apimatic/previous';
@@ -16,7 +17,7 @@ function encodeSegment(segment: string): string {
     .join('');
 }
 
-const encodePath = (sdkPath: string): string => sdkPath.split('/').map(encodeSegment).join('/');
+const encodePath = (sdkPath: SdkPath): string => sdkPath.toString().split('/').map(encodeSegment).join('/');
 
 /**
  * A hidden ref holding one SDK directory's snapshots: never a branch, never checked out, and
@@ -29,13 +30,12 @@ export class SnapshotRef {
     this.name = name;
   }
 
-  /** `sdkPath` is the SDK directory below the repository root with `/` between its segments, or '' for the root itself. */
-  public static pristine(sdkPath: string): SnapshotRef {
-    return new SnapshotRef(sdkPath === '' ? PRISTINE : `${PRISTINE}/${encodePath(sdkPath)}`);
+  public static pristine(sdkPath: SdkPath): SnapshotRef {
+    return new SnapshotRef(sdkPath.isRoot() ? PRISTINE : `${PRISTINE}/${encodePath(sdkPath)}`);
   }
 
-  public static previous(sdkPath: string): SnapshotRef {
-    return new SnapshotRef(sdkPath === '' ? PREVIOUS : `${PREVIOUS}/${encodePath(sdkPath)}`);
+  public static previous(sdkPath: SdkPath): SnapshotRef {
+    return new SnapshotRef(sdkPath.isRoot() ? PREVIOUS : `${PREVIOUS}/${encodePath(sdkPath)}`);
   }
 
   /** A ref as git lists it, below one of the namespaces. */
@@ -48,10 +48,10 @@ export class SnapshotRef {
     return PRISTINE;
   }
 
-  /** The SDK directory's path below the repository root, which the ref is named after; '' for the root itself. */
-  public sdkPath(): string {
+  /** The SDK directory's path below the repository root, which the ref is named after. */
+  public sdkPath(): SdkPath {
     const namespace = this.name.startsWith(PREVIOUS) ? PREVIOUS : PRISTINE;
-    return decodeURIComponent(this.name.slice(namespace.length + 1));
+    return SdkPath.fromGit(decodeURIComponent(this.name.slice(namespace.length + 1)));
   }
 
   /** Git stores refs as files in directories, so a ref cannot sit on another ref's path. */

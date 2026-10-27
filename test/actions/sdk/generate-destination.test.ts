@@ -17,6 +17,7 @@ import { ProjectContext } from '../../../src/types/project-context.js';
 import { SdkContext } from '../../../src/types/sdk-context.js';
 import { CodeGenerationVersion, Language, Stability } from '../../../src/types/sdk/generate.js';
 import { GenerationRecord, SdkGeneration } from '../../../src/types/sdk/generation-record.js';
+import { SdkPath } from '../../../src/types/sdk/sdk-path.js';
 import { SnapshotRef } from '../../../src/types/sdk/snapshot-ref.js';
 import { SdkRepositoryContext } from '../../../src/types/sdk-repository-context.js';
 import { terminal } from '../../../src/utils/terminal-utils.js';
@@ -55,7 +56,7 @@ describe('GenerateAction (sdk) — the destination', () => {
     await generates(options.files ?? GENERATED);
     return new GenerateAction(new DirectoryPath(project), COMMAND_METADATA, 'auth-key').execute(
       ProjectContext.in(new DirectoryPath(project)),
-      options.destination,
+      options.destination ?? sdk(),
       Language.PYTHON,
       options.stability ?? Stability.STABLE,
       options.force ?? true
@@ -157,7 +158,7 @@ describe('GenerateAction (sdk) — the destination', () => {
     expect((await execute()).isSuccess()).to.be.true;
 
     expect(fs.existsSync(at('.git'))).to.be.false;
-    const ref = SnapshotRef.pristine('sdk/python');
+    const ref = SnapshotRef.pristine(SdkPath.fromGit('sdk/python'));
     expect((await git.resolveRef(new DirectoryPath(root), ref))._unsafeUnwrap()?.isEqual(record().pristineCommit())).to
       .be.true;
   });

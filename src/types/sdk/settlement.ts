@@ -1,5 +1,5 @@
 import { RelativeFilePath } from '../file/relativeFilePath.js';
-import { Regeneration } from '../sdk-repository-context.js';
+import { Regeneration } from './repository-state.js';
 import { ConflictSide, MergePlan } from './merge-plan.js';
 
 /**

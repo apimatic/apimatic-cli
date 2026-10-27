@@ -10,6 +10,7 @@ import { execa } from 'execa';
 import { GitService } from '../../src/infrastructure/git-service.js';
 import { DirectoryPath } from '../../src/types/file/directoryPath.js';
 import { CommitId } from '../../src/types/git/commit-id.js';
+import { SdkPath } from '../../src/types/sdk/sdk-path.js';
 import { SnapshotRef } from '../../src/types/sdk/snapshot-ref.js';
 
 const text = (content: Uint8Array | undefined) =>
@@ -192,14 +193,14 @@ describe('GitService', () => {
     write(repo, 'a.txt', 'a\n');
     const tree = (await git.treeOf(repo, repo, 'all'))._unsafeUnwrap();
     const { SnapshotRef } = await import('../../src/types/sdk/snapshot-ref.js');
-    const ref = SnapshotRef.pristine('sdk');
+    const ref = SnapshotRef.pristine(SdkPath.fromGit('sdk'));
 
     const first = (await git.commitTree(repo, tree, [], 'first'))._unsafeUnwrap();
     const second = (await git.commitTree(repo, tree, [first], 'second'))._unsafeUnwrap();
     (await git.updateRef(repo, ref, second))._unsafeUnwrap();
 
     expect((await git.resolveRef(repo, ref))._unsafeUnwrap()?.isEqual(second)).to.be.true;
-    expect((await git.resolveRef(repo, SnapshotRef.pristine('other')))._unsafeUnwrap()).to.be.undefined;
+    expect((await git.resolveRef(repo, SnapshotRef.pristine(SdkPath.fromGit('other'))))._unsafeUnwrap()).to.be.undefined;
     expect((await git.listRefs(repo, 'refs/apimatic/pristine'))._unsafeUnwrap()).to.deep.equal([
       'refs/apimatic/pristine/sdk'
     ]);
@@ -336,7 +337,7 @@ describe('GitService', () => {
   });
 
   describe('remotes', () => {
-    const ref = SnapshotRef.pristine('sdk/typescript');
+    const ref = SnapshotRef.pristine(SdkPath.fromGit('sdk/typescript'));
 
     const bare = async (name = 'origin.git'): Promise<DirectoryPath> => {
       const directory = new DirectoryPath(path.join(root, name));
@@ -382,7 +383,7 @@ describe('GitService', () => {
       const first = await snapshot(a, 'one');
       await execa('git', ['push', '-q', 'origin', ref.refspec()], { cwd: a.toString() });
 
-      expect((await git.fetchRef(b, 'origin', SnapshotRef.pristine('elsewhere')))._unsafeUnwrap()).to.be.undefined;
+      expect((await git.fetchRef(b, 'origin', SnapshotRef.pristine(SdkPath.fromGit('elsewhere'))))._unsafeUnwrap()).to.be.undefined;
       const tip = (await git.fetchRef(b, 'origin', ref))._unsafeUnwrap();
 
       expect(tip?.isEqual(first)).to.be.true;

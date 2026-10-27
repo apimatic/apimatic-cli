@@ -60,8 +60,11 @@ export class ProjectContext {
     return directory.contains(this.source);
   }
 
-  public sdkDirectory(language: Language): DirectoryPath {
-    return this.projectDirectory.join(OUTPUT_DIRECTORY_NAMES.sdk, language);
+  /** The SDK directory itself: the `--destination` when one is named, else `sdk/<language>` beside the source. */
+  public sdkDirectory(language: Language, destination?: string): DirectoryPath {
+    return destination
+      ? new DirectoryPath(destination)
+      : this.projectDirectory.join(OUTPUT_DIRECTORY_NAMES.sdk, language);
   }
 
   public portalDirectory(destination?: string): DirectoryPath {
@@ -114,8 +117,8 @@ export class ProjectContext {
     return await new TempContext(tempDirectory).zip(staged);
   }
 
-  public sdk(language: Language, destination?: DirectoryPath): SdkContext {
-    return new SdkContext(destination ?? this.sdkDirectory(language));
+  public sdk(directory: DirectoryPath): SdkContext {
+    return new SdkContext(directory);
   }
 
   public portalSource(): PortalSourceContext {

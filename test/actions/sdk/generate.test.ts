@@ -19,6 +19,7 @@ import { FileProblem } from '../../../src/types/file/file-problem.js';
 import { ProjectContext } from '../../../src/types/project-context.js';
 import { Language, Stability } from '../../../src/types/sdk/generate.js';
 import { GenerationRecord } from '../../../src/types/sdk/generation-record.js';
+import { SdkPath } from '../../../src/types/sdk/sdk-path.js';
 import { SnapshotRef } from '../../../src/types/sdk/snapshot-ref.js';
 import { TempContext } from '../../../src/types/temp-context.js';
 
@@ -32,7 +33,7 @@ describe('GenerateAction (sdk)', () => {
   const execute = (options: { force?: boolean; destination?: DirectoryPath } = {}) =>
     new GenerateAction(new DirectoryPath(root), COMMAND_METADATA, 'auth-key').execute(
       ProjectContext.in(new DirectoryPath(root)),
-      options.destination,
+      options.destination ?? sdk(),
       Language.PYTHON,
       Stability.STABLE,
       options.force ?? true
@@ -105,7 +106,7 @@ describe('GenerateAction (sdk)', () => {
     expect(fs.readFileSync(at('README.md'), 'utf-8')).to.equal('# sdk');
     const record = GenerationRecord.parse(fs.readFileSync(at('.apimatic/generation.json'), 'utf-8'))!;
     const pristine = (
-      await new GitService().resolveRef(new DirectoryPath(root), SnapshotRef.pristine('sdk/python'))
+      await new GitService().resolveRef(new DirectoryPath(root), SnapshotRef.pristine(SdkPath.fromGit('sdk/python')))
     )._unsafeUnwrap();
     expect(record.pristineCommit().isEqual(pristine!)).to.be.true;
   });

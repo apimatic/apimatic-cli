@@ -13,13 +13,9 @@ import { FileProblem } from './file/file-problem.js';
 import { RelativeFilePath } from './file/relativeFilePath.js';
 import { SdkGeneration } from './sdk/generation-record.js';
 import { destinationFor, SdkDestination, Unresolved } from './sdk/sdk-destination.js';
-import {
-  gitFailed,
-  InspectionProblem,
-  RECORD_DIRECTORY,
-  SdkRepositoryContext,
-  SdkRepositoryProblem
-} from './sdk-repository-context.js';
+import { RECORD_DIRECTORY } from './sdk/generation-record-file.js';
+import { gitFailed, InspectionProblem, SdkRepositoryProblem } from './sdk/repository-state.js';
+import { SdkRepositoryContext } from './sdk-repository-context.js';
 import { TempContext } from './temp-context.js';
 
 const GIT_DIRECTORY = '.git';
@@ -46,11 +42,6 @@ export class SdkContext {
   private readonly git = new GitService();
 
   constructor(private readonly sdkDirectory: DirectoryPath) {}
-
-  /** The directory the SDK is written into, and read back from on the next run. */
-  public directory(): DirectoryPath {
-    return this.sdkDirectory;
-  }
 
   public async exists() {
     return !(await this.fileService.directoryEmpty(this.sdkDirectory));

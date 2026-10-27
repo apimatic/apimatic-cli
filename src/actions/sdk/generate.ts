@@ -13,12 +13,8 @@ import { RelativeFilePath } from '../../types/file/relativeFilePath.js';
 import { TreeId } from '../../types/git/tree-id.js';
 import { ServiceError } from '../../infrastructure/service-error.js';
 import { SdkContext } from '../../types/sdk-context.js';
-import {
-  Regeneration,
-  SdkRepositoryContext,
-  SdkRepositoryProblem,
-  ShareHookInstall
-} from '../../types/sdk-repository-context.js';
+import { SdkRepositoryContext } from '../../types/sdk-repository-context.js';
+import { Regeneration, SdkRepositoryProblem, ShareHookInstall } from '../../types/sdk/repository-state.js';
 import { SdkGeneration } from '../../types/sdk/generation-record.js';
 import { replacesDirectory } from '../../types/sdk/sdk-destination.js';
 import { favouring, resolving, Settlement } from '../../types/sdk/settlement.js';
@@ -41,7 +37,7 @@ export class GenerateAction {
 
   public readonly execute = async (
     project: ProjectContext,
-    sdkDirectory: DirectoryPath | undefined,
+    sdk: DirectoryPath,
     language: Language,
     stability: Stability,
     force: boolean,
@@ -53,8 +49,8 @@ export class GenerateAction {
     }
     const sourceDirectory = project.sourceDirectory();
     // The SDK directory is emptied before the SDK is written, so one holding the source would delete it.
-    if (sdkDirectory !== undefined && project.isSourceWithin(sdkDirectory)) {
-      this.prompts.destinationContainsSource(sourceDirectory, sdkDirectory);
+    if (project.isSourceWithin(sdk)) {
+      this.prompts.destinationContainsSource(sourceDirectory, sdk);
       return ActionResult.failed();
     }
     if (!(await project.sourceExists())) {
@@ -66,8 +62,7 @@ export class GenerateAction {
       return ActionResult.failed();
     }
 
-    const sdkContext = project.sdk(language, sdkDirectory);
-    const sdk = sdkContext.directory();
+    const sdkContext = project.sdk(sdk);
     const generation: SdkGeneration = { language, codegenVersion: codegenVersionFor(language, stability), stability };
     const canAsk = !force && terminal.isInteractive();
 
@@ -75,11 +70,12 @@ export class GenerateAction {
     if (looked.isOk() && looked.value.kind === 'unresolved') {
       const { repository, paths } = looked.value;
       if (!canAsk) {
-        this.prompts.conflictsUnresolved(paths, repository.sdkDirectory());
+        this.prompts.conflictsUnresolved(paths, sdk);
         return ActionResult.failed();
       }
       const settled = await settleUnresolvedConflicts(
         repository,
+        sdk,
         paths,
         this.prompts.unresolvedChoice,
         this.prompts.resolveLater,
@@ -96,7 +92,7 @@ export class GenerateAction {
       return ActionResult.failed();
     }
     if (looked.value.kind === 'unresolved') {
-      this.prompts.conflictsUnresolved(looked.value.paths, looked.value.repository.sdkDirectory());
+      this.prompts.conflictsUnresolved(looked.value.paths, sdk);
       return ActionResult.failed();
     }
     const destination = looked.value;
@@ -218,6 +214,7 @@ export class GenerateAction {
       );
       return closeMerge(
         repository,
+        sdk,
         settled,
         canAsk,
         this.prompts.conflictsResolved,
@@ -232,13 +229,13 @@ export class GenerateAction {
 
 async function settleUnresolvedConflicts(
   repository: SdkRepositoryContext,
+  sdk: DirectoryPath,
   paths: readonly RelativeFilePath[],
   ask: (paths: readonly RelativeFilePath[], sdk: DirectoryPath) => Promise<UnresolvedChoice | undefined>,
   resolveLater: () => void,
   conflictsNotSettled: (reason: string) => void,
   conflictsResolved: (side: ConflictSide, paths: readonly RelativeFilePath[], sdk: DirectoryPath) => void
 ): Promise<Result<void, ActionResult>> {
-  const sdk = repository.sdkDirectory();
   const choice = await ask(paths, sdk);
   if (choice === undefined || choice === 'resolve') {
     resolveLater();
@@ -297,6 +294,7 @@ async function recordSnapshot(
 
 async function closeMerge(
   repository: SdkRepositoryContext,
+  sdk: DirectoryPath,
   settlement: Settlement,
   canAsk: boolean,
   conflictsResolved: (side: ConflictSide, paths: readonly RelativeFilePath[], sdk: DirectoryPath) => void,
@@ -305,7 +303,6 @@ async function closeMerge(
   conflicts: (plan: MergePlan, sdk: DirectoryPath) => void,
   conflictSteps: (plan: MergePlan) => void
 ): Promise<ActionResult> {
-  const sdk = repository.sdkDirectory();
   const { plan, settled } = settlement;
   if (settled !== undefined) {
     conflictsResolved(settled.side, settled.paths, sdk);

@@ -40,9 +40,7 @@ describe('ProjectContext', () => {
     });
 
     it('writes where the destination flag says instead, when it says anywhere', () => {
-      expect(project().sdk(Language.PYTHON, new DirectoryPath('elsewhere')).directory().toString()).to.equal(
-        path.resolve('elsewhere')
-      );
+      expect(project().sdkDirectory(Language.PYTHON, 'elsewhere').toString()).to.equal(path.resolve('elsewhere'));
       expect(project().portalDirectory('').toString()).to.equal(inProject('portal'));
     });
 
@@ -169,7 +167,7 @@ describe('ProjectContext', () => {
       const empty = new DirectoryPath(inProject('empty'));
       fs.mkdirSync(empty.toString());
 
-      const saved = await project().sdk(Language.PYTHON).save(empty);
+      const saved = await project().sdk(project().sdkDirectory(Language.PYTHON)).save(empty);
 
       expect(saved.toString()).to.equal(inProject('sdk', 'python'));
     });
@@ -177,7 +175,7 @@ describe('ProjectContext', () => {
     it('writes into a named destination itself, adding no language', () => {
       const clone = new DirectoryPath(inProject('my-sdk'));
 
-      expect(project().sdk(Language.TYPESCRIPT, clone).directory().isEqual(clone)).to.be.true;
+      expect(project().sdkDirectory(Language.TYPESCRIPT, clone.toString()).isEqual(clone)).to.be.true;
     });
   });
 
