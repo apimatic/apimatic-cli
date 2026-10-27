@@ -1,4 +1,4 @@
-import { err, ok, Result } from 'neverthrow';
+import { ok, Result } from 'neverthrow';
 import { SdkGenerationService } from '../../infrastructure/services/sdk-generation-service.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { ActionResult } from '../action-result.js';
@@ -8,18 +8,14 @@ import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { TempContext } from '../../types/temp-context.js';
 import { codegenVersionFor, isAvailableLanguage, Language, Stability } from '../../types/sdk/generate.js';
 import { ProjectContext } from '../../types/project-context.js';
-import { FilePath } from '../../types/file/filePath.js';
 import { RelativeFilePath } from '../../types/file/relativeFilePath.js';
 import { TreeId } from '../../types/git/tree-id.js';
-import { ServiceError } from '../../infrastructure/service-error.js';
 import { SdkContext } from '../../types/sdk-context.js';
 import { SdkRepositoryContext } from '../../types/sdk-repository-context.js';
-import { Regeneration, SdkRepositoryProblem, ShareHookInstall } from '../../types/sdk/repository-state.js';
+import { Regeneration, SdkRepositoryProblem } from '../../types/sdk/repository-state.js';
 import { SdkGeneration } from '../../types/sdk/generation-record.js';
 import { replacesDirectory } from '../../types/sdk/sdk-destination.js';
 import { favouring, resolving, Settlement } from '../../types/sdk/settlement.js';
-import { ConflictChoice, ConflictSide, MergePlan, UnresolvedChoice } from '../../types/sdk/merge-plan.js';
-import { FileProblem } from '../../types/file/file-problem.js';
 import { terminal } from '../../utils/terminal-utils.js';
 
 export class GenerateAction {
@@ -67,23 +63,9 @@ export class GenerateAction {
     const canAsk = !force && terminal.isInteractive();
 
     let looked = await sdkContext.destination(generation);
-    if (looked.isOk() && looked.value.kind === 'unresolved') {
-      const { repository, paths } = looked.value;
-      if (!canAsk) {
-        this.prompts.conflictsUnresolved(paths, sdk);
+    if (looked.isOk() && looked.value.kind === 'unresolved' && canAsk) {
+      if (!(await this.settleUnresolved(looked.value.repository, sdk, looked.value.paths))) {
         return ActionResult.failed();
-      }
-      const settled = await settleUnresolvedConflicts(
-        repository,
-        sdk,
-        paths,
-        this.prompts.unresolvedChoice,
-        this.prompts.resolveLater,
-        this.prompts.conflictsNotSettled,
-        this.prompts.conflictsResolved
-      );
-      if (settled.isErr()) {
-        return settled.error;
       }
       looked = await sdkContext.destination(generation);
     }
@@ -91,6 +73,7 @@ export class GenerateAction {
       this.prompts.directoryNotInspected(sdk, looked.error);
       return ActionResult.failed();
     }
+    // Left unresolved by a run that could not ask, or by a settling that did not clear every file.
     if (looked.value.kind === 'unresolved') {
       this.prompts.conflictsUnresolved(looked.value.paths, sdk);
       return ActionResult.failed();
@@ -130,31 +113,20 @@ export class GenerateAction {
     }
 
     return await withDirPath(async (tempDirectory) => {
-      const tempSdk = await download(
+      const tempSdk = await this.download(
         project,
         sdkContext,
         tempDirectory,
-        packageSettingsDirectory,
-        (srcDirZip) =>
-          this.sdkGenerationService.generateSdk(
-            srcDirZip,
-            language,
-            stability,
-            this.configDir,
-            this.commandMetadata,
-            this.authKey
-          ),
-        this.prompts.generateSdk,
-        this.prompts.srcDirNotZipped,
-        this.prompts.sdkGenerationServiceError,
-        this.prompts.sdkNotUnzipped
+        language,
+        stability,
+        packageSettingsDirectory
       );
-      if (tempSdk.isErr()) {
-        return tempSdk.error;
+      if (tempSdk === undefined) {
+        return ActionResult.failed();
       }
 
       if (destination.kind === 'overwrite' || !withRepository) {
-        this.prompts.sdkGenerated(await sdkContext.save(tempSdk.value));
+        this.prompts.sdkGenerated(await sdkContext.save(tempSdk));
         return ActionResult.success();
       }
 
@@ -166,35 +138,32 @@ export class GenerateAction {
           return ActionResult.failed();
         }
         const repository = opened.value;
-        await sdkContext.save(tempSdk.value);
+        await sdkContext.save(tempSdk);
         if (destination.repository === undefined) {
           this.prompts.repositoryInitialised(sdk);
         }
-        await recordSnapshot(
+        await this.recordSnapshot(
           repository,
-          await repository.snapshotGenerated(tempSdk.value),
+          await repository.snapshotGenerated(tempSdk),
           generation,
-          this.prompts.snapshotNotRecorded,
-          this.prompts.shareHookNotInstalled,
-          this.prompts.shareHookInstalled,
-          this.prompts.shareHookNeedsOneStep
+          this.prompts.snapshotNotRecorded
         );
         this.prompts.sdkGenerated(sdk);
         return ActionResult.success();
       }
 
       const { repository, base } = destination;
-      const regenerated = await repository.regenerate(base, tempSdk.value);
+      const regenerated = await repository.regenerate(base, tempSdk);
       if (regenerated.isErr()) {
         this.prompts.customCodeFailed(regenerated.error.reason);
         return ActionResult.failed();
       }
-      const settled = await settleConflicts(regenerated.value, sdk, canAsk, this.prompts.conflictChoice);
+      const settled = await this.settleConflicts(regenerated.value, sdk, canAsk);
       if (settled === undefined) {
         this.prompts.runCancelled(sdk);
         return ActionResult.cancelled();
       }
-      const written = await repository.write(base, settled.plan, tempSdk.value);
+      const written = await repository.write(base, settled.plan, tempSdk);
       if (written.isErr()) {
         if (written.error.kind === 'notApplied') {
           this.prompts.sdkNotWritten(sdk, written.error);
@@ -203,154 +172,136 @@ export class GenerateAction {
         }
         return ActionResult.failed();
       }
-      await recordSnapshot(
+      await this.recordSnapshot(
         repository,
         ok(settled.regeneration.generated),
         generation,
-        this.prompts.snapshotNotRecordedAfterMerge,
-        this.prompts.shareHookNotInstalled,
-        this.prompts.shareHookInstalled,
-        this.prompts.shareHookNeedsOneStep
+        this.prompts.snapshotNotRecordedAfterMerge
       );
-      return closeMerge(
-        repository,
-        sdk,
-        settled,
-        canAsk,
-        this.prompts.conflictsResolved,
-        this.prompts.sdkMerged,
-        this.prompts.conflictsNotStaged,
-        this.prompts.conflicts,
-        this.prompts.conflictSteps
-      );
+      return this.closeMerge(repository, sdk, settled, canAsk);
     });
   };
-}
 
-async function settleUnresolvedConflicts(
-  repository: SdkRepositoryContext,
-  sdk: DirectoryPath,
-  paths: readonly RelativeFilePath[],
-  ask: (paths: readonly RelativeFilePath[], sdk: DirectoryPath) => Promise<UnresolvedChoice | undefined>,
-  resolveLater: () => void,
-  conflictsNotSettled: (reason: string) => void,
-  conflictsResolved: (side: ConflictSide, paths: readonly RelativeFilePath[], sdk: DirectoryPath) => void
-): Promise<Result<void, ActionResult>> {
-  const choice = await ask(paths, sdk);
-  if (choice === undefined || choice === 'resolve') {
-    resolveLater();
-    return err(ActionResult.failed());
+  /** Asks about the files the last run left unresolved and settles them; false when the run must stop. */
+  private async settleUnresolved(
+    repository: SdkRepositoryContext,
+    sdk: DirectoryPath,
+    paths: readonly RelativeFilePath[]
+  ): Promise<boolean> {
+    const choice = await this.prompts.unresolvedChoice(paths, sdk);
+    if (choice === undefined || choice === 'resolve') {
+      this.prompts.resolveLater();
+      return false;
+    }
+    const settled = await repository.settleUnresolved(choice, paths);
+    if (settled.isErr()) {
+      this.prompts.conflictsNotSettled(settled.error.reason);
+      return false;
+    }
+    this.prompts.conflictsResolved(choice, paths, sdk);
+    return true;
   }
-  const settled = await repository.settleUnresolved(choice, paths);
-  if (settled.isErr()) {
-    conflictsNotSettled(settled.error.reason);
-    return err(ActionResult.failed());
-  }
-  conflictsResolved(choice, paths, sdk);
-  return ok(undefined);
-}
 
-/** None when the developer cancelled the run, or backed out of the question. */
-async function settleConflicts(
-  regeneration: Regeneration,
-  sdk: DirectoryPath,
-  canAsk: boolean,
-  ask: (plan: MergePlan, sdk: DirectoryPath) => Promise<ConflictChoice | undefined>
-): Promise<Settlement | undefined> {
-  const { plan } = regeneration.merge;
-  if (!plan.hasConflicts()) {
-    return resolving(regeneration);
+  /** The fresh SDK unpacked in `tempDirectory`, or none when a step failed and was reported. */
+  private async download(
+    project: ProjectContext,
+    sdkContext: SdkContext,
+    tempDirectory: DirectoryPath,
+    language: Language,
+    stability: Stability,
+    packageSettingsDirectory: DirectoryPath | undefined
+  ): Promise<DirectoryPath | undefined> {
+    const srcDirZip = await project.srcDirZip(tempDirectory, packageSettingsDirectory);
+    if (srcDirZip.isErr()) {
+      this.prompts.srcDirNotZipped(project.sourceDirectory(), srcDirZip.error);
+      return undefined;
+    }
+    const response = await this.prompts.generateSdk(
+      this.sdkGenerationService.generateSdk(
+        srcDirZip.value,
+        language,
+        stability,
+        this.configDir,
+        this.commandMetadata,
+        this.authKey
+      )
+    );
+    if (response.isErr()) {
+      this.prompts.sdkGenerationServiceError(response.error);
+      return undefined;
+    }
+    const archive = await new TempContext(tempDirectory).save(response.value);
+    const tempSdk = await sdkContext.loadSdkInTempDirectory(tempDirectory, archive);
+    if (tempSdk.isErr()) {
+      this.prompts.sdkNotUnzipped(tempSdk.error);
+      return undefined;
+    }
+    return tempSdk.value;
   }
-  const choice = canAsk ? await ask(plan, sdk) : 'resolve';
-  if (choice === undefined || choice === 'cancel') {
-    return undefined;
-  }
-  return choice === 'resolve' ? resolving(regeneration) : favouring(choice, regeneration);
-}
 
-async function recordSnapshot(
-  repository: SdkRepositoryContext,
-  generated: Result<TreeId, SdkRepositoryProblem>,
-  generation: SdkGeneration,
-  snapshotNotRecorded: (reason: string) => void,
-  shareHookNotInstalled: (reason: string) => void,
-  shareHookInstalled: (file: FilePath) => void,
-  shareHookNeedsOneStep: (needed: Extract<ShareHookInstall, { kind: 'elsewhere' | 'notShell' }>) => void
-): Promise<void> {
-  const recorded = await generated.asyncAndThen((tree) => repository.recordGeneration(tree, generation));
-  if (recorded.isErr()) {
-    return snapshotNotRecorded(recorded.error.reason);
+  /** The merge as the developer settles it; none when they cancelled the run, or backed out of the question. */
+  private async settleConflicts(
+    regeneration: Regeneration,
+    sdk: DirectoryPath,
+    canAsk: boolean
+  ): Promise<Settlement | undefined> {
+    const { plan } = regeneration.merge;
+    if (!plan.hasConflicts()) {
+      return resolving(regeneration);
+    }
+    const choice = canAsk ? await this.prompts.conflictChoice(plan, sdk) : 'resolve';
+    if (choice === undefined || choice === 'cancel') {
+      return undefined;
+    }
+    return choice === 'resolve' ? resolving(regeneration) : favouring(choice, regeneration);
   }
-  const hook = await repository.installShareHook();
-  if (hook.isErr()) {
-    return shareHookNotInstalled(hook.error.reason);
-  }
-  if (hook.value.kind !== 'installed') {
-    shareHookNeedsOneStep(hook.value);
-  } else if (hook.value.written) {
-    shareHookInstalled(hook.value.file);
-  }
-}
 
-async function closeMerge(
-  repository: SdkRepositoryContext,
-  sdk: DirectoryPath,
-  settlement: Settlement,
-  canAsk: boolean,
-  conflictsResolved: (side: ConflictSide, paths: readonly RelativeFilePath[], sdk: DirectoryPath) => void,
-  sdkMerged: (sdk: DirectoryPath, plan: MergePlan) => void,
-  conflictsNotStaged: (reason: string) => void,
-  conflicts: (plan: MergePlan, sdk: DirectoryPath) => void,
-  conflictSteps: (plan: MergePlan) => void
-): Promise<ActionResult> {
-  const { plan, settled } = settlement;
-  if (settled !== undefined) {
-    conflictsResolved(settled.side, settled.paths, sdk);
+  /** Records the snapshot and installs the hook; a failure in either is a warning, since the SDK is already written. */
+  private async recordSnapshot(
+    repository: SdkRepositoryContext,
+    generated: Result<TreeId, SdkRepositoryProblem>,
+    generation: SdkGeneration,
+    snapshotNotRecorded: (reason: string) => void
+  ): Promise<void> {
+    const recorded = await generated.asyncAndThen((tree) => repository.recordGeneration(tree, generation));
+    if (recorded.isErr()) {
+      return snapshotNotRecorded(recorded.error.reason);
+    }
+    const hook = await repository.installShareHook();
+    if (hook.isErr()) {
+      return this.prompts.shareHookNotInstalled(hook.error.reason);
+    }
+    if (hook.value.kind !== 'installed') {
+      this.prompts.shareHookNeedsOneStep(hook.value);
+    } else if (hook.value.written) {
+      this.prompts.shareHookInstalled(hook.value.file);
+    }
   }
-  sdkMerged(sdk, plan);
-  if (!plan.hasConflicts()) {
-    return ActionResult.success();
-  }
-  const staged = await repository.stageConflicts(settlement.regeneration.merge);
-  if (staged.isErr()) {
-    conflictsNotStaged(staged.error.reason);
-  }
-  if (canAsk) {
-    conflictSteps(plan);
-  } else {
-    conflicts(plan, sdk);
-  }
-  return ActionResult.failed(MERGE_NEEDS_RESOLVING);
-}
 
-async function download(
-  project: ProjectContext,
-  sdkContext: SdkContext,
-  tempDirectory: DirectoryPath,
-  packageSettingsDirectory: DirectoryPath | undefined,
-  generate: (srcDirZip: FilePath) => Promise<Result<NodeJS.ReadableStream, ServiceError>>,
-  shown: (
-    generating: Promise<Result<NodeJS.ReadableStream, ServiceError>>
-  ) => Promise<Result<NodeJS.ReadableStream, ServiceError>>,
-  srcDirNotZipped: (source: DirectoryPath, problem: FileProblem) => void,
-  sdkGenerationServiceError: (error: ServiceError) => void,
-  sdkNotUnzipped: (problem: FileProblem) => void
-): Promise<Result<DirectoryPath, ActionResult>> {
-  const srcDirZip = await project.srcDirZip(tempDirectory, packageSettingsDirectory);
-  if (srcDirZip.isErr()) {
-    srcDirNotZipped(project.sourceDirectory(), srcDirZip.error);
-    return err(ActionResult.failed());
+  /** Reports the merge, and stages what is left in conflict for the developer's own tools. */
+  private async closeMerge(
+    repository: SdkRepositoryContext,
+    sdk: DirectoryPath,
+    settlement: Settlement,
+    canAsk: boolean
+  ): Promise<ActionResult> {
+    const { plan, settled } = settlement;
+    if (settled !== undefined) {
+      this.prompts.conflictsResolved(settled.side, settled.paths, sdk);
+    }
+    this.prompts.sdkMerged(sdk, plan);
+    if (!plan.hasConflicts()) {
+      return ActionResult.success();
+    }
+    const staged = await repository.stageConflicts(settlement.regeneration.merge);
+    if (staged.isErr()) {
+      this.prompts.conflictsNotStaged(staged.error.reason);
+    }
+    if (canAsk) {
+      this.prompts.conflictSteps(plan);
+    } else {
+      this.prompts.conflicts(plan, sdk);
+    }
+    return ActionResult.failed(MERGE_NEEDS_RESOLVING);
   }
-  const response = await shown(generate(srcDirZip.value));
-  if (response.isErr()) {
-    sdkGenerationServiceError(response.error);
-    return err(ActionResult.failed());
-  }
-  const archive = await new TempContext(tempDirectory).save(response.value);
-  const tempSdk = await sdkContext.loadSdkInTempDirectory(tempDirectory, archive);
-  if (tempSdk.isErr()) {
-    sdkNotUnzipped(tempSdk.error);
-    return err(ActionResult.failed());
-  }
-  return ok(tempSdk.value);
 }
