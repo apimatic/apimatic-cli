@@ -69,7 +69,7 @@ describe('GenerateAction (sdk)', () => {
 
   it('reports a source directory it could not zip, without generating', async () => {
     const problem: FileProblem = { kind: 'zipFailed', reason: 'EACCES: permission denied' };
-    sinon.stub(TempContext.prototype, 'zipBuild').resolves(err(problem));
+    sinon.stub(TempContext.prototype, 'zip').resolves(err(problem));
     const srcDirNotZipped = sinon.stub(SdkGeneratePrompts.prototype, 'srcDirNotZipped');
 
     expect((await execute()).isFailed()).to.be.true;

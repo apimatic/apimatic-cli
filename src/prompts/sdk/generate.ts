@@ -1,10 +1,9 @@
 import { isCancel, confirm, log, select } from '@clack/prompts';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { FileProblem } from '../../types/file/file-problem.js';
-import { notZippedForUpload } from '../upload.js';
 import { format as f } from '../format.js';
 import { Result } from 'neverthrow';
-import { withSpinner } from '../prompt.js';
+import { notZippedForUpload, withSpinner } from '../prompt.js';
 import { ServiceError } from '../../infrastructure/service-error.js';
 import { AVAILABLE_LANGUAGES, Language, languageLabel, UPCOMING_LANGUAGES } from '../../types/sdk/generate.js';
 import { VersionProblem } from '../../types/project-context.js';

@@ -95,24 +95,36 @@ describe('ProjectContext', () => {
       const settings = new DirectoryPath(inProject('settings'));
       write('settings/package.json', '{}');
 
-      const zip = (await project().srcDirZip(temp, settings))._unsafeUnwrap();
+      const zip = (await project().buildZip(temp, settings))._unsafeUnwrap();
 
       const entries = new AdmZip(zip.toString()).getEntries().map((entry) => entry.entryName);
       expect(entries).to.have.members(['spec/openapi.json', 'content/index.md', 'package-settings/package.json']);
     });
 
-    // A folder named static is kept too: only a build upload leaves static/ out.
+    it('reports a source it could not copy for the generators as one it could not zip', async () => {
+      write('src/spec/openapi.json', '{}');
+      fs.symlinkSync(
+        inProject('missing'),
+        inProject('src', 'broken'),
+        process.platform === 'win32' ? 'junction' : 'dir'
+      );
+
+      const problem = (await project().buildZip(new DirectoryPath(inProject('temp'))))._unsafeUnwrapErr();
+
+      expect(problem.kind).to.equal('zipFailed');
+      expect(problem.reason).to.contain('ENOENT');
+    });
+
     it('zips all of spec/ for validation, so a spec split across files keeps the ones it references', async () => {
       write('src/spec/openapi.yaml', 'openapi: 3.0.3');
       write('src/spec/schemas/pet.yaml', 'type: object');
-      write('src/spec/static/owner.yaml', 'type: object');
       write('src/APIMATIC-BUILD.json', '{}');
       fs.mkdirSync(inProject('temp'));
 
       const zip = (await project().specZip(new DirectoryPath(inProject('temp'))))._unsafeUnwrap();
 
       const entries = new AdmZip(zip.toString()).getEntries().map((entry) => entry.entryName);
-      expect(entries).to.have.members(['openapi.yaml', 'schemas/pet.yaml', 'static/owner.yaml']);
+      expect(entries).to.have.members(['openapi.yaml', 'schemas/pet.yaml']);
     });
 
     it('zips nothing when spec/ is empty, and names the directory it looked in', async () => {

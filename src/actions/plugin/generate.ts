@@ -100,9 +100,8 @@ export class PluginGenerateAction {
       const tempContext = new TempContext(tempDirectory);
       const written = await configContext.recordLanguages(selection);
       return await written
-        .asyncAndThen(() => new ResultAsync(configContext.stageUpload(tempDirectory, selection)))
         .mapErr((failure): PluginGenerationProblem => ({ kind: 'configNotPrepared', failure }))
-        .andThen((staged) => new ResultAsync(tempContext.zipBuild(staged)))
+        .asyncAndThen(() => new ResultAsync(project.pluginBuildZip(tempDirectory, selection)))
         .andThen((upload) =>
           new ResultAsync(
             this.prompts.generatePlugin(

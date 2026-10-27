@@ -8,7 +8,6 @@ import { PublishType } from '../../types/publish-api/publishing-profile-item.js'
 import { SemVersion } from '../../types/publish/version.js';
 import { Language, Stability } from '../../types/sdk/generate.js';
 import { noteWrapped, withSpinner } from '../prompt.js';
-import { notZippedForUpload } from '../upload.js';
 import { format as f } from '../format.js';
 import { PublishingProfile } from '../../types/publish/publishing-profile.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
@@ -26,7 +25,7 @@ export class SdkPublishPrompts {
   }
 
   public sdkNotZipped(sdkDirectory: DirectoryPath, problem: FileProblem) {
-    log.error(`The SDK in ${notZippedForUpload(sdkDirectory, problem.reason)}`);
+    log.error(`The SDK in ${f.path(sdkDirectory)} could not be zipped for upload: ${problem.reason}`);
   }
 
   public dryRunNotice(publishingSummary: string): void {

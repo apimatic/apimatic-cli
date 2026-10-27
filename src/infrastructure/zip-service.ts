@@ -10,14 +10,9 @@ import { errorMessage } from '../utils/error-utils.js';
 type ZipEntry = { file: FilePath; metadataPath: string };
 
 export class ZipService {
-  /** `excluding` names top-level entries of `sourceDir` to leave out of the archive. */
-  public async archive(
-    sourceDir: DirectoryPath,
-    outputZipPath: FilePath,
-    excluding: readonly string[] = []
-  ): Promise<Result<void, string>> {
+  public async archive(sourceDir: DirectoryPath, outputZipPath: FilePath): Promise<Result<void, string>> {
     try {
-      await this.write(sourceDir, outputZipPath, excluding);
+      await this.write(sourceDir, outputZipPath);
       return ok(undefined);
     } catch (error) {
       await fs.promises.rm(outputZipPath.toString(), { force: true }).catch(() => undefined);
@@ -34,8 +29,8 @@ export class ZipService {
     }
   }
 
-  private async write(sourceDir: DirectoryPath, outputZipPath: FilePath, excluding: readonly string[]): Promise<void> {
-    const entries = this.entriesUnder(sourceDir, '', excluding);
+  private async write(sourceDir: DirectoryPath, outputZipPath: FilePath): Promise<void> {
+    const entries = this.entriesUnder(sourceDir, '');
     const zipfile = new yazl.ZipFile();
 
     return new Promise((resolve, reject) => {
@@ -51,15 +46,12 @@ export class ZipService {
     });
   }
 
-  private entriesUnder(dir: DirectoryPath, relativePrefix: string, excluding: readonly string[]): ZipEntry[] {
+  private entriesUnder(dir: DirectoryPath, relativePrefix: string): ZipEntry[] {
     return fs.readdirSync(dir.toString(), { withFileTypes: true }).flatMap((entry) => {
       // Always use forward slashes as metadataPath — zip format requires it
       const metadataPath = relativePrefix ? `${relativePrefix}/${entry.name}` : entry.name;
-      if (excluding.includes(metadataPath)) {
-        return [];
-      }
       return entry.isDirectory()
-        ? this.entriesUnder(dir.join(entry.name), metadataPath, excluding)
+        ? this.entriesUnder(dir.join(entry.name), metadataPath)
         : [{ file: new FilePath(dir, new FileName(entry.name)), metadataPath }];
     });
   }

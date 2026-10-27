@@ -73,7 +73,7 @@ describe('PreparePortalProjectAction', () => {
 
     it('reports a source it could not zip, without asking for the artifacts', async () => {
       const problem: FileProblem = { kind: 'zipFailed', reason: 'EBUSY: resource busy or locked' };
-      sinon.stub(TempContext.prototype, 'zipBuild').resolves(err(problem));
+      sinon.stub(TempContext.prototype, 'zip').resolves(err(problem));
 
       const result = await execute();
 

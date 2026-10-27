@@ -242,6 +242,20 @@ export class FileService {
     await this.forEachEntry(source, destination, (from, to) => fsExtra.copy(from, to));
   }
 
+  /** Copies what links point to, so relative ones still resolve. `excluding` ignores case, as Windows and macOS do. */
+  public async copyDirectoryContentsFollowingLinks(
+    source: DirectoryPath,
+    destination: DirectoryPath,
+    excluding: readonly FileName[] = []
+  ) {
+    await this.forEachEntry(
+      source,
+      destination,
+      (from, to) => fsExtra.copy(from, to, { dereference: true }),
+      excluding
+    );
+  }
+
   public async moveDirectoryContents(source: DirectoryPath, destination: DirectoryPath) {
     await this.forEachEntry(source, destination, (from, to) => fsExtra.move(from, to, { overwrite: true }));
   }
@@ -249,12 +263,20 @@ export class FileService {
   private async forEachEntry(
     source: DirectoryPath,
     destination: DirectoryPath,
-    operation: (from: string, to: string) => Promise<void>
+    operation: (from: string, to: string) => Promise<void>,
+    excluding: readonly FileName[] = []
   ) {
     const entries = await fsExtra.readdir(source.toString());
-    await Promise.all(
-      entries.map((entry) => operation(path.join(source.toString(), entry), path.join(destination.toString(), entry)))
+    // Settled rather than raced, so no entry is still being written when the caller cleans up after a failure.
+    const outcomes = await Promise.allSettled(
+      entries
+        .filter((entry) => !excluding.some((name) => name.is(entry)))
+        .map((entry) => operation(path.join(source.toString(), entry), path.join(destination.toString(), entry)))
     );
+    const failure = outcomes.find((outcome): outcome is PromiseRejectedResult => outcome.status === 'rejected');
+    if (failure) {
+      throw failure.reason;
+    }
   }
 
   public async deleteFile(filePath: FilePath): Promise<void> {

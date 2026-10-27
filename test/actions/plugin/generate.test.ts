@@ -655,7 +655,7 @@ describe('PluginGenerateAction', () => {
     it('reports a source directory it could not zip, without generating', async () => {
       const generatePlugin = sinon.stub(PluginService.prototype, 'generatePlugin');
       const problem: FileProblem = { kind: 'zipFailed', reason: 'EACCES: permission denied' };
-      sinon.stub(TempContext.prototype, 'zipBuild').resolves(err(problem));
+      sinon.stub(TempContext.prototype, 'zip').resolves(err(problem));
       const pluginNotGenerated = sinon.stub(PluginGeneratePrompts.prototype, 'pluginNotGenerated');
 
       expect((await execute()).isFailed()).to.be.true;

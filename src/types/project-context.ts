@@ -1,5 +1,6 @@
 import { err, ok, Result } from 'neverthrow';
 import { FileService } from '../infrastructure/file-service.js';
+import { errorMessage } from '../utils/error-utils.js';
 import { ApimaticConfigContext } from './apimatic-config-context.js';
 import { BuildConfig } from './build/build.js';
 import { DirectoryPath } from './file/directoryPath.js';
@@ -7,8 +8,14 @@ import { FileName } from './file/fileName.js';
 import { FilePath } from './file/filePath.js';
 import { FileProblem } from './file/file-problem.js';
 import { PluginConfigContext } from './plugin-config-context.js';
+import { PluginBuildProblem } from './plugin/generation-problem.js';
 import { PortalSourceContext } from './portal-source-context.js';
-import { OUTPUT_DIRECTORY_NAMES, SOURCE_DIRECTORY_NAME, SPEC_DIRECTORY_NAME } from './project-layout.js';
+import {
+  LOCAL_ONLY_DIRECTORY_NAMES,
+  OUTPUT_DIRECTORY_NAMES,
+  SOURCE_DIRECTORY_NAME,
+  SPEC_DIRECTORY_NAME
+} from './project-layout.js';
 import { Language } from './sdk/generate.js';
 import { SdkContext } from './sdk-context.js';
 import { SpecContext } from './spec-context.js';
@@ -113,16 +120,30 @@ export class ProjectContext {
     );
   }
 
-  public async srcDirZip(
+  public async buildZip(
     tempDirectory: DirectoryPath,
     packageSettingsDirectory?: DirectoryPath
   ): Promise<Result<FilePath, FileProblem>> {
-    const staged = tempDirectory.join(SOURCE_DIRECTORY_NAME);
-    await this.fileService.copyDirectoryContents(this.source, staged);
-    if (packageSettingsDirectory) {
-      await this.fileService.copyDirectoryContents(packageSettingsDirectory, staged.join('package-settings'));
+    const staged = await this.stagedBuild(tempDirectory, packageSettingsDirectory);
+    if (staged.isErr()) {
+      return err(staged.error);
     }
-    return await new TempContext(tempDirectory).zipBuild(staged);
+    return await new TempContext(tempDirectory).zip(staged.value);
+  }
+
+  public async pluginBuildZip(
+    tempDirectory: DirectoryPath,
+    languages: readonly Language[]
+  ): Promise<Result<FilePath, PluginBuildProblem>> {
+    const staged = await this.stagedBuild(tempDirectory);
+    if (staged.isErr()) {
+      return err(staged.error);
+    }
+    const covered = await new PluginConfigContext(staged.value).coverOnly(languages);
+    if (covered.isErr()) {
+      return err({ kind: 'configNotPrepared', failure: covered.error });
+    }
+    return await new TempContext(tempDirectory).zip(staged.value);
   }
 
   public async isVersioned(): Promise<boolean> {
@@ -198,6 +219,25 @@ export class ProjectContext {
       return err('unwritable');
     }
     return ok(undefined);
+  }
+
+  // A copy that fails is reported as a zip that fails: either way, the build could not be packed.
+  private async stagedBuild(
+    tempDirectory: DirectoryPath,
+    packageSettingsDirectory?: DirectoryPath
+  ): Promise<Result<DirectoryPath, FileProblem>> {
+    const staged = tempDirectory.join(SOURCE_DIRECTORY_NAME);
+    const localOnly = LOCAL_ONLY_DIRECTORY_NAMES.map((name) => new FileName(name));
+    try {
+      await this.fileService.copyDirectoryContentsFollowingLinks(this.source, staged, localOnly);
+      if (packageSettingsDirectory) {
+        const packageSettings = staged.join('package-settings');
+        await this.fileService.copyDirectoryContentsFollowingLinks(packageSettingsDirectory, packageSettings);
+      }
+      return ok(staged);
+    } catch (error) {
+      return err({ kind: 'zipFailed', reason: errorMessage(error) });
+    }
   }
 
   private reading(versionDirectory: DirectoryPath): ProjectContext {

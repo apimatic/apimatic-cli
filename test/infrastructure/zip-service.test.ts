@@ -43,27 +43,6 @@ describe('ZipService', () => {
       expect(entries).to.have.members(['openapi.json', 'paths/pets.json']);
     });
 
-    it('leaves nothing out unless told to', async () => {
-      write('index.html', '<html></html>');
-      write(path.join('static', 'logo.png'), 'png');
-
-      expect((await new ZipService().archive(source, archive)).isOk()).to.be.true;
-
-      const entries = new AdmZip(archive.toString()).getEntries().map((entry) => entry.entryName);
-      expect(entries).to.have.members(['index.html', 'static/logo.png']);
-    });
-
-    it('leaves out an entry it is told to, and keeps a nested folder with the same name', async () => {
-      write(path.join('spec', 'openapi.json'), '{}');
-      write(path.join('static', 'images', 'logo.png'), 'png');
-      write(path.join('content', 'static', 'page.md'), '# Page');
-
-      expect((await new ZipService().archive(source, archive, ['static'])).isOk()).to.be.true;
-
-      const entries = new AdmZip(archive.toString()).getEntries().map((entry) => entry.entryName);
-      expect(entries).to.have.members(['spec/openapi.json', 'content/static/page.md']);
-    });
-
     it('reports a source directory that is not there', async () => {
       const archived = await new ZipService().archive(source.join('missing'), archive);
 
