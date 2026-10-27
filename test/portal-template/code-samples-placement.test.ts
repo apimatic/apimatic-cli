@@ -11,6 +11,7 @@ import { bundleSpec } from '../../portal-template/src/lib/openapi-bundle.server'
 const EXTENSION = 'x-apimatic-codeSamples';
 
 const typescript = (id: string) => ({ lang: 'typescript', label: 'TypeScript', sources: { [id]: `ts ${id}` } });
+const csharp = (id: string) => ({ lang: 'csharp', label: 'C#', sources: { [id]: `cs ${id}` } });
 
 const operation = (summary: string) => ({ summary, responses: { '200': { description: 'ok' } } });
 
@@ -130,8 +131,6 @@ describe('placeCodeSamples', () => {
 
 describe('readCodeSamples', () => {
   let root: string;
-
-  const csharp = (id: string) => ({ lang: 'csharp', label: 'C#', sources: { [id]: `cs ${id}` } });
 
   /** The samples file the CLI writes: samples filed under `orders`, and `paths` for every section. */
   const samplesFile = (paths: object) => {

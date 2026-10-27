@@ -31,7 +31,7 @@ export interface EndpointSample {
 /** An operation more than one spec declares, which one code sample per method and path cannot serve. */
 export type SharedEndpoint = Shared<Endpoint>;
 
-/** Samples no operation in `where` takes: the file they are filed under, a spec or not, or `spec/`, for the rest. */
+/** Samples no operation in `where` takes: the file they are filed under, read as a spec or not, else `spec/`. */
 export interface UnplacedSamples {
   where: FilePath | DirectoryPath;
   endpoints: Endpoint[];
