@@ -4,8 +4,17 @@ import { useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from 'r
 import { createPortal } from 'react-dom';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport, type UIMessage } from 'ai';
-import { AIChatPanel, AIChatProvider, AIChatSearch, AIChatSources, AIChatTrigger, useAIChat } from '@fumadocs/ai-chat';
-import { CopilotClient, questionMessage } from '@/lib/copilot-client';
+import {
+  AIChatHeader,
+  AIChatPanel,
+  AIChatProvider,
+  AIChatSearch,
+  AIChatSources,
+  AIChatTrigger,
+  useAIChat
+} from '@fumadocs/ai-chat';
+import { buttonVariants } from 'fumadocs-ui/components/ui/button';
+import { CopilotClient, questionMessage, type LapsedPlan } from '@/lib/copilot-client';
 import type { PortalCopilot } from '@/lib/portal-types';
 
 /** One part of a chat message: text, a tool call, a data part, and so on. */
@@ -13,6 +22,8 @@ type Part = UIMessage['parts'][number];
 // Taken from the components themselves, so they cannot drift.
 type SearchPart = Parameters<typeof AIChatSearch>[0]['part'];
 type Sources = Parameters<typeof AIChatSources>[0]['sources'];
+/** Whether the service lets this portal offer Ask AI: hidden when turned away, explained when the plan lapsed. */
+type Availability = 'available' | 'hidden' | LapsedPlan;
 
 /** What the layout hands the chat: whether its panel is open, and where the layout keeps a place for it. */
 export type CopilotChatProps = Readonly<{
@@ -25,11 +36,33 @@ export type CopilotChatProps = Readonly<{
 
 /** The module's one export, so the layout can load it on its own, and only for a portal that offers the chat. */
 export default function CopilotChat({ copilot, open, onOpenChange, panel }: CopilotChatProps) {
+  const [availability, setAvailability] = useState<Availability>('available');
   return (
-    <CopilotProvider copilot={copilot}>
+    <CopilotProvider copilot={copilot} available={availability !== 'hidden'} onTurnedAway={setAvailability}>
       <FollowLayout open={open} onOpenChange={onOpenChange} />
-      {panel !== null && createPortal(<AIChatPanel />, panel)}
+      {panel !== null &&
+        createPortal(typeof availability === 'object' ? <LapsedPanel lapsed={availability} /> : <AIChatPanel />, panel)}
     </CopilotProvider>
+  );
+}
+
+/** In place of the chat once the portal's plan lapsed: why Ask AI is unavailable, and the way to turn it back on. */
+function LapsedPanel({ lapsed }: Readonly<{ lapsed: LapsedPlan }>) {
+  return (
+    <div className="flex size-full flex-col">
+      <AIChatHeader />
+      <div className="mt-auto flex flex-col items-start gap-3 p-3">
+        <p className="text-sm text-fd-muted-foreground">{lapsed.message}</p>
+        <a
+          href={lapsed.upgradeUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={buttonVariants({ color: 'primary' })}
+        >
+          Upgrade
+        </a>
+      </div>
+    </div>
   );
 }
 
@@ -43,11 +76,21 @@ function FollowLayout({ open, onOpenChange }: Readonly<{ open: boolean; onOpenCh
   return null;
 }
 
+type ProviderProps = Readonly<{
+  copilot: PortalCopilot;
+  available: boolean;
+  onTurnedAway: (availability: Availability) => void;
+  children: ReactNode;
+}>;
+
 /** The chat state and the "Ask AI" button; beside the layout, so a conversation survives navigation. */
-function CopilotProvider({ copilot, children }: Readonly<{ copilot: PortalCopilot; children: ReactNode }>) {
-  // Turned away by the service (disabled, unknown key, another website): the portal shows no Ask AI at all.
-  const [available, setAvailable] = useState(true);
-  const client = useMemo(() => new CopilotClient(copilot, () => setAvailable(false)), [copilot]);
+function CopilotProvider({ copilot, available, onTurnedAway, children }: ProviderProps) {
+  // Turned away by the service (turned off, unknown key, another website): the portal shows no Ask AI at all,
+  // unless the portal's plan lapsed, which the panel explains instead.
+  const client = useMemo(
+    () => new CopilotClient(copilot, (lapsed) => onTurnedAway(lapsed ?? 'hidden')),
+    [copilot, onTurnedAway]
+  );
   const transport = useMemo(() => chatTransport(client), [client]);
   const chat = useChat({ transport, onData: client.noteData });
   const suggestions = copilot.suggestions.length > 0 ? copilot.suggestions : undefined;
