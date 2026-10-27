@@ -131,15 +131,14 @@ describe('placeCodeSamples', () => {
 describe('readCodeSamples', () => {
   let root: string;
 
-  /** The samples file the CLI writes: `orders` filed apart, every other section reading `paths`. */
-  const samplesFile = () => {
+  const csharp = (id: string) => ({ lang: 'csharp', label: 'C#', sources: { [id]: `cs ${id}` } });
+
+  /** The samples file the CLI writes: samples filed under `orders`, and `paths` for every section. */
+  const samplesFile = (paths: object) => {
     const file = path.join(root, 'code-samples.json');
     fs.writeFileSync(
       file,
-      JSON.stringify({
-        paths: { '/status': { GET: [typescript('shared')] } },
-        specs: { orders: { '/status': { GET: [typescript('orders')] } } }
-      })
+      JSON.stringify({ paths, specs: { orders: { '/status': { GET: [typescript('orders')] } } } })
     );
     return file;
   };
@@ -152,16 +151,27 @@ describe('readCodeSamples', () => {
     fs.rmSync(root, { recursive: true, force: true });
   });
 
-  it("gives a section filed apart its own samples, and any other section's the rest", async () => {
-    const file = samplesFile();
+  it('gives a section paths plus the samples filed under its slug, and any other section paths alone', async () => {
+    const file = samplesFile({ '/health': { GET: [typescript('health')] } });
 
-    expect(await readCodeSamples(file, 'orders')).to.deep.equal({ '/status': { GET: [typescript('orders')] } });
-    expect(await readCodeSamples(file, 'inventory')).to.deep.equal({ '/status': { GET: [typescript('shared')] } });
+    expect(await readCodeSamples(file, 'orders')).to.deep.equal({
+      '/health': { GET: [typescript('health')] },
+      '/status': { GET: [typescript('orders')] }
+    });
+    expect(await readCodeSamples(file, 'inventory')).to.deep.equal({ '/health': { GET: [typescript('health')] } });
   });
 
-  it("gives a section named after one of an object's own members the rest", async () => {
-    expect(await readCodeSamples(samplesFile(), 'constructor')).to.deep.equal({
-      '/status': { GET: [typescript('shared')] }
+  it("puts a section's own samples after those in paths on one operation", async () => {
+    const file = samplesFile({ '/status': { GET: [csharp('status')] } });
+
+    expect(await readCodeSamples(file, 'orders')).to.deep.equal({
+      '/status': { GET: [csharp('status'), typescript('orders')] }
     });
+  });
+
+  it("gives a section named after one of an object's own members the samples in paths alone", async () => {
+    const file = samplesFile({ '/status': { GET: [typescript('shared')] } });
+
+    expect(await readCodeSamples(file, 'constructor')).to.deep.equal({ '/status': { GET: [typescript('shared')] } });
   });
 });
