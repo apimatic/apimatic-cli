@@ -102,7 +102,7 @@ export class PluginGenerateAction {
       return await written
         .asyncAndThen(() => new ResultAsync(configContext.stageUpload(tempDirectory, selection)))
         .mapErr((failure): PluginGenerationProblem => ({ kind: 'configNotPrepared', failure }))
-        .andThen((staged) => new ResultAsync(tempContext.zip(staged)))
+        .andThen((staged) => new ResultAsync(tempContext.zipBuild(staged)))
         .andThen((upload) =>
           new ResultAsync(
             this.prompts.generatePlugin(

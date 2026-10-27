@@ -1,6 +1,7 @@
 import { isCancel, confirm, log, select } from '@clack/prompts';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { FileProblem } from '../../types/file/file-problem.js';
+import { notZippedForUpload } from '../upload.js';
 import { format as f } from '../format.js';
 import { Result } from 'neverthrow';
 import { withSpinner } from '../prompt.js';
@@ -68,7 +69,7 @@ export class SdkGeneratePrompts {
   }
 
   public srcDirNotZipped(sourceDirectory: DirectoryPath, problem: FileProblem) {
-    log.error(`${f.path(sourceDirectory)} could not be zipped for upload: ${problem.reason}`);
+    log.error(notZippedForUpload(sourceDirectory, problem.reason));
   }
 
   public sdkNotUnzipped(problem: FileProblem) {

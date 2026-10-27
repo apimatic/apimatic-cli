@@ -87,17 +87,29 @@ describe('ProjectContext', () => {
       expect(await project().specsExist()).to.be.true;
     });
 
-    it('zips the source directory for the generators, with the package settings when given', async () => {
+    it('zips src/ for the generators with the package settings and content/, leaving out static/', async () => {
       write('src/spec/openapi.json', '{}');
+      write('src/content/index.md', '# Home');
+      write('src/static/images/logo.png', 'png');
       const temp = new DirectoryPath(inProject('temp'));
       const settings = new DirectoryPath(inProject('settings'));
       write('settings/package.json', '{}');
 
       const zip = (await project().srcDirZip(temp, settings))._unsafeUnwrap();
 
-      expect(fs.existsSync(zip.toString())).to.be.true;
-      expect(fs.existsSync(inProject('temp', 'src', 'spec', 'openapi.json'))).to.be.true;
-      expect(fs.existsSync(inProject('temp', 'src', 'package-settings', 'package.json'))).to.be.true;
+      const entries = new AdmZip(zip.toString()).getEntries().map((entry) => entry.entryName);
+      expect(entries).to.have.members(['spec/openapi.json', 'content/index.md', 'package-settings/package.json']);
+    });
+
+    it('keeps a spec folder named static: only a build upload leaves static/ out', async () => {
+      write('src/spec/openapi.yaml', 'openapi: 3.0.3');
+      write('src/spec/static/pet.yaml', 'type: object');
+      fs.mkdirSync(inProject('temp'));
+
+      const zip = (await project().specZip(new DirectoryPath(inProject('temp'))))._unsafeUnwrap();
+
+      const entries = new AdmZip(zip.toString()).getEntries().map((entry) => entry.entryName);
+      expect(entries).to.have.members(['openapi.yaml', 'static/pet.yaml']);
     });
 
     it('zips all of spec/ for validation, so a spec split across files keeps the ones it references', async () => {

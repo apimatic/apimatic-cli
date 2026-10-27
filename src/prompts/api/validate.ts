@@ -6,6 +6,7 @@ import { Result } from 'neverthrow';
 import { ValidateApiResult, ValidationEntry, ValidationSummary } from '@apimatic/sdk';
 import { FilePath } from '../../types/file/filePath.js';
 import { ResolveProblem } from '../../types/resource-context.js';
+import { notZippedForUpload } from '../upload.js';
 import { format as f } from '../format.js';
 import { withSpinner } from '../prompt.js';
 
@@ -106,7 +107,7 @@ export class ApiValidatePrompts {
         return;
       }
       case 'zipFailed': {
-        log.error(`${f.path(problem.specDirectory)} could not be zipped for upload: ${problem.reason}`);
+        log.error(notZippedForUpload(problem.specDirectory, problem.reason));
         return;
       }
       case 'symlinks': {

@@ -122,7 +122,7 @@ export class ProjectContext {
     if (packageSettingsDirectory) {
       await this.fileService.copyDirectoryContents(packageSettingsDirectory, staged.join('package-settings'));
     }
-    return await new TempContext(tempDirectory).zip(staged);
+    return await new TempContext(tempDirectory).zipBuild(staged);
   }
 
   public async isVersioned(): Promise<boolean> {

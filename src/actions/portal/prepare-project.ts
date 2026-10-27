@@ -8,6 +8,7 @@ import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { PortalArtifacts } from '../../types/portal/portal-artifacts.js';
 import { PortalSource } from '../../types/portal/portal-source.js';
 import { ProjectContext } from '../../types/project-context.js';
+import { TempContext } from '../../types/temp-context.js';
 import { ActionResult } from '../action-result.js';
 
 /** What the caller does within the shared run, in the order the run does it. */
@@ -81,9 +82,15 @@ export class PreparePortalProjectAction {
     // The artifacts live in this directory for as long as the caller needs them, so it wraps
     // everything that reads them rather than being opened and closed around the call.
     return await withDirPath(async (artifactsDirectory) => {
+      const build = await new TempContext(artifactsDirectory).zipBuild(sourceDirectory);
+      if (build.isErr()) {
+        this.prompts.sourceNotZipped(build.error, sourceDirectory);
+        return ActionResult.failed();
+      }
+
       const artifacts = await this.prompts.generateArtifacts(
         this.artifactsService.generate(
-          sourceDirectory,
+          build.value,
           artifactsDirectory,
           this.configDir,
           this.commandMetadata,
