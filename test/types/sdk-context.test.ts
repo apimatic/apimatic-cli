@@ -8,9 +8,8 @@ import { GitService } from '../../src/infrastructure/git-service.js';
 import { DirectoryPath } from '../../src/types/file/directoryPath.js';
 import { FileName } from '../../src/types/file/fileName.js';
 import { FilePath } from '../../src/types/file/filePath.js';
-import { SdkContext } from '../../src/types/sdk-context.js';
+import { Found, SdkContext } from '../../src/types/sdk-context.js';
 import { SdkRepositoryContext } from '../../src/types/sdk-repository-context.js';
-import { SdkDestination, Unresolved } from '../../src/types/sdk/sdk-destination.js';
 import { CodeGenerationVersion, Language, Stability } from '../../src/types/sdk/generate.js';
 import { SdkGeneration } from '../../src/types/sdk/generation-record.js';
 import { SdkPath } from '../../src/types/sdk/sdk-path.js';
@@ -29,7 +28,7 @@ describe('SdkContext', () => {
   const inRoot = (...segments: string[]) => path.join(root, ...segments);
 
   /** The repository a destination writes through, which the test expects it to have found. */
-  const repositoryIn = (destination: SdkDestination | Unresolved): SdkRepositoryContext => {
+  const repositoryIn = (destination: Found): SdkRepositoryContext => {
     if (!('repository' in destination)) {
       expect.fail(`no repository behind a ${destination.kind} destination`);
     }

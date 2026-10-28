@@ -45,7 +45,7 @@ describe('SnapshotStore', () => {
   const store = async (project: DirectoryPath, sdk: DirectoryPath): Promise<SnapshotStore> => {
     fs.mkdirSync(sdk.toString(), { recursive: true });
     (await git.init(project))._unsafeUnwrap();
-    return new SnapshotStore(project, sdk, SdkPath.of(project, sdk));
+    return new SnapshotStore(project, SdkPath.of(project, sdk)!);
   };
 
   describe('savePrevious', () => {

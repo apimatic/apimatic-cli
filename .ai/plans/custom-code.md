@@ -420,7 +420,7 @@ PR into `dev`, squash-merged, title `feat(sdk): keep your edits when regeneratin
 | `src/types/sdk-repository/{snapshot-store,sdk-files,share-hook-installer,generation-record-file,merge-engine}.ts` | the effectful parts of `SdkRepositoryContext`, one concept each: the refs and snapshots (fetched and joined), the files on disk (a plan landed, undone, a file settled), the pre-push hook, the record file, git's three-way merge; `on-disk.ts` turns a file failure into a `RepositoryProblem`, which a `GitProblem` already is |
 | `src/types/sdk/{repository-state,sdk-path}.ts` | the repository's states and problems as types, with no context behind them; the SDK directory's path below the root as a value. `src/types/sdk/` holds only data and pure functions, which ESLint enforces: no infrastructure, no `fs`, no store |
 | `src/types/sdk/{merge-plan,conflict-markers,unresolved-file}.ts` | pure: `MergePlan` built from git's merge and diffs, `taking(side)`, conflict kinds, the choices, markers and their resolution for either side, and how an unresolved file is settled from its stages |
-| `src/types/sdk/{sdk-destination,settlement}.ts` | the functional core of the run: how it writes and why, what a settled merge is — data and pure functions, no I/O |
+| `src/types/sdk/{sdk-destination,repository-facts,pristine-chain,settlement}.ts` | the functional core of the run: how it writes and why (`destinationFor`, all five variants), what the repository's facts mean and in what order (`classify`, `afterFetch`), how two pristine chains meet (`reconcile`), what a settled merge is — data and pure functions, no I/O |
 | `src/types/sdk/{snapshot-ref,generation-record,share-hook}.ts`, `src/types/git/{commit-id,tree-id,git-version,merge-tree,tree-entry,git-problem,git-operation,git-directory}.ts`, `src/types/file/relativeFilePath.ts` | value objects, the hook script and block, git's output as types |
 | `src/actions/sdk/generate.ts`, `src/prompts/sdk/generate.ts` | the run, its questions and its wording |
 | `src/types/sdk-context.ts` | `destination(generation)` (what git and the repository say, as an `SdkDestination` or `unresolved`, finding the enclosing repository itself), `initRepository()`, save keeps `.git`, `archive` for upload |
@@ -453,7 +453,7 @@ flowchart TB
     GR["GenerationRecord (sdk/generation-record.ts)<br/>generation.json: language, codegen, stability, pristine commit · describeApart"]
     SR["SnapshotRef (sdk/snapshot-ref.ts)<br/>refs/apimatic/pristine|previous/‹SdkPath›, segments percent-encoded · fromGit · sdkPath → SdkPath"]
     SH["ShareHook (sdk/share-hook.ts)<br/>SHARE_HOOK_SCRIPT · SHARE_HOOK_CALL · SHARE_HOOK_BLOCK · installInto · calls"]
-    SD["SdkDestination (sdk/sdk-destination.ts)<br/>overwrite{found} | record{repository?, because} | merge{repository, base} · Unresolved{repository, paths}<br/>destinationFor(repository, SdkRepositoryState) · replacesDirectory"]
+    SD["SdkDestination (sdk/sdk-destination.ts)<br/>overwrite{found} | record{repository?, because} | merge{repository, base} · Unresolved{repository, paths}<br/>destinationFor({git, repository?: {handle, state}}) · replacesDirectory"]
     ST["Settlement (sdk/settlement.ts)<br/>{regeneration, plan, settled?: {side, paths}}<br/>resolving(regeneration) · favouring(side, regeneration)"]
     GT["git/ · CommitId · TreeId · GitVersion · merge-tree (Change, StageEntry, MergeTreeOutput)"]
     RF["file/ · RelativeFilePath · FilePath · DirectoryPath"]

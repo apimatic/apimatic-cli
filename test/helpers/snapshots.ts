@@ -27,7 +27,7 @@ export async function recordPristine(
   generated: DirectoryPath,
   generation: SdkGeneration
 ): Promise<Result<CommitId, RepositoryProblem>> {
-  const snapshots = new SnapshotStore(root, sdk, SdkPath.of(root, sdk));
+  const snapshots = new SnapshotStore(root, SdkPath.of(root, sdk)!);
   const tree = await snapshots.snapshotGenerated(generated);
   if (tree.isErr()) {
     return err(tree.error);

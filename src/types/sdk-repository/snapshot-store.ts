@@ -6,6 +6,7 @@ import { CommitId } from '../git/commit-id.js';
 import { RemoteName } from '../git/remote-name.js';
 import { TreeId } from '../git/tree-id.js';
 import { describeGeneration, SdkGeneration } from '../sdk/generation-record.js';
+import { ChainFacts, reconcile } from '../sdk/pristine-chain.js';
 import { NestedSdkDirectory, RepositoryProblem } from '../sdk/repository-state.js';
 import { SdkPath } from '../sdk/sdk-path.js';
 import { SnapshotRef } from '../sdk/snapshot-ref.js';
@@ -13,12 +14,11 @@ import { SnapshotRef } from '../sdk/snapshot-ref.js';
 /** One SDK directory's snapshots: the pristine chain, the base of the next merge, and the previous state; fetched and joined with a remote's. */
 export class SnapshotStore {
   private readonly git = new GitService();
+  private readonly sdk: DirectoryPath;
 
-  constructor(
-    private readonly root: DirectoryPath,
-    private readonly sdk: DirectoryPath,
-    private readonly path: SdkPath
-  ) {}
+  constructor(private readonly root: DirectoryPath, private readonly path: SdkPath) {
+    this.sdk = path.in(root);
+  }
 
   public pristineRef(): SnapshotRef {
     return SnapshotRef.pristine(this.path);
@@ -103,7 +103,7 @@ export class SnapshotStore {
     return this.git.hasCommit(this.root, commit);
   }
 
-  /** A chain that continues the local one moves the ref; two that diverged are joined with a two-parent commit, so neither machine's generations are lost. */
+  /** The remote's pristine chain brought over and met with the local one, as `reconcile` decides. */
   public async fetch(remote: RemoteName): Promise<Result<void, RepositoryProblem>> {
     const ref = this.pristineRef();
     const remoteTip = await this.git.fetchRef(this.root, remote, ref);
@@ -113,25 +113,39 @@ export class SnapshotStore {
     if (remoteTip.value === undefined) {
       return ok(undefined);
     }
-    const localTip = await this.git.resolveRef(this.root, ref);
-    if (localTip.isErr()) {
-      return err(localTip.error);
+    const chains = await this.chains(ref, remoteTip.value);
+    if (chains.isErr()) {
+      return err(chains.error);
     }
-    if (localTip.value === undefined) {
-      return this.git.updateRef(this.root, ref, remoteTip.value);
+    const decided = reconcile(chains.value);
+    switch (decided.kind) {
+      case 'adopt':
+        return this.git.updateRef(this.root, ref, remoteTip.value);
+      case 'keep':
+        return ok(undefined);
+      case 'join':
+        return this.join(decided.local, decided.remote);
     }
-    const continued = await this.git.isAncestor(this.root, localTip.value, remoteTip.value);
-    if (continued.isErr()) {
-      return err(continued.error);
+  }
+
+  /** Both tips and how they relate, read before anything is decided about them. */
+  private async chains(ref: SnapshotRef, remote: CommitId): Promise<Result<ChainFacts, RepositoryProblem>> {
+    const local = await this.git.resolveRef(this.root, ref);
+    if (local.isErr()) {
+      return err(local.error);
     }
-    if (continued.value) {
-      return this.git.updateRef(this.root, ref, remoteTip.value);
+    if (local.value === undefined) {
+      return ok({ local: undefined, remote, localContinuesToRemote: false, remoteBehindLocal: false });
     }
-    const behind = await this.git.isAncestor(this.root, remoteTip.value, localTip.value);
+    const continues = await this.git.isAncestor(this.root, local.value, remote);
+    if (continues.isErr()) {
+      return err(continues.error);
+    }
+    const behind = await this.git.isAncestor(this.root, remote, local.value);
     if (behind.isErr()) {
       return err(behind.error);
     }
-    return behind.value ? ok(undefined) : this.join(localTip.value, remoteTip.value);
+    return ok({ local: local.value, remote, localContinuesToRemote: continues.value, remoteBehindLocal: behind.value });
   }
 
   private async join(localTip: CommitId, remoteTip: CommitId): Promise<Result<void, RepositoryProblem>> {
@@ -151,8 +165,8 @@ export class SnapshotStore {
     return this.git.updateRef(this.root, this.pristineRef(), joined.value);
   }
 
-  /** Refs are files, so another SDK directory's snapshots above or below this one would be in the way. */
-  public async verifyNotNested(): Promise<Result<void, RepositoryProblem | NestedSdkDirectory>> {
+  /** Another SDK directory with snapshots above or below this one, if any: refs are files, so only one of the two can have them. */
+  public async nested(): Promise<Result<NestedSdkDirectory | undefined, RepositoryProblem>> {
     const refs = await this.git.listRefs(this.root, SnapshotRef.allPristine());
     if (refs.isErr()) {
       return err(refs.error);
@@ -162,6 +176,6 @@ export class SnapshotStore {
       return ok(undefined);
     }
     const other = nested.in(this.root);
-    return err({ kind: 'nestedSdkDirectory', other, encloses: other.contains(this.sdk) });
+    return ok({ kind: 'nestedSdkDirectory', other, encloses: other.contains(this.sdk) });
   }
 }

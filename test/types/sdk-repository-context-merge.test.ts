@@ -103,7 +103,7 @@ describe('SdkRepositoryContext: the merge', () => {
     const sdk = project.join('sdk', 'typescript');
     fs.mkdirSync(sdk.toString(), { recursive: true });
     (await git.init(project))._unsafeUnwrap();
-    const repository = SdkRepositoryContext.create(project, sdk)!;
+    const repository = SdkRepositoryContext.create(project, SdkPath.of(project, sdk)!);
     const baseDirectory = new DirectoryPath(path.join(root, `base-${counter}`));
     const generatedDirectory = new DirectoryPath(path.join(root, `generated-${counter}`));
     fs.mkdirSync(baseDirectory.toString());

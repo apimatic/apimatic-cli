@@ -31,8 +31,11 @@ export type NestedSdkDirectory = { kind: 'nestedSdkDirectory'; other: DirectoryP
 /** The repository is in the middle of a git operation of the developer's own, which a run must not merge over. */
 export type OperationInProgress = { kind: 'operationInProgress'; operation: GitOperation; root: DirectoryPath };
 
+/** A state of the repository a run will not write over, named so the developer can clear it. */
+export type InspectionRefusal = NestedSdkDirectory | OperationInProgress;
+
 /** Why a run could not find out how to write the SDK directory: a refusal it can name, or git's own words. */
-export type InspectionProblem = NestedSdkDirectory | OperationInProgress | RepositoryProblem;
+export type InspectionProblem = InspectionRefusal | RepositoryProblem;
 
 /** Why a recorded snapshot is still absent after the one place it could have come from was tried. */
 export type SnapshotFetch =

@@ -9,8 +9,9 @@ import { FileProblem } from './file/file-problem.js';
 import { RelativeDirectoryPath } from './file/relativeDirectoryPath.js';
 import { NO_PATHS, RelativePaths } from './file/relative-paths.js';
 import { GIT_DIRECTORY } from './git/git-directory.js';
+import { GitVersion } from './git/git-version.js';
 import { RECORD_DIRECTORY, SdkGeneration } from './sdk/generation-record.js';
-import { destinationFor, SdkDestination, Unresolved } from './sdk/sdk-destination.js';
+import { destinationFor, Inspected, SdkDestination, Unresolved } from './sdk/sdk-destination.js';
 import { SdkPath } from './sdk/sdk-path.js';
 import { InspectionProblem, RepositoryProblem } from './sdk/repository-state.js';
 import { fileFailed } from './sdk-repository/on-disk.js';
@@ -18,6 +19,9 @@ import { SdkRepositoryContext } from './sdk-repository-context.js';
 import { TempContext } from './temp-context.js';
 
 const KEPT_OUT_OF_ARCHIVE = [RelativeDirectoryPath.fromGit(GIT_DIRECTORY.toString())!, RECORD_DIRECTORY];
+
+/** How the run will write the SDK directory, carrying the repository it writes through where there is one. */
+export type Found = SdkDestination<SdkRepositoryContext> | Unresolved<SdkRepositoryContext>;
 
 export class SdkContext {
   private readonly fileService = new FileService();
@@ -31,27 +35,37 @@ export class SdkContext {
   }
 
   /** How a run will write the directory, from git and the enclosing repository; nothing is asked here. */
-  public async destination(generation: SdkGeneration): Promise<Result<SdkDestination | Unresolved, InspectionProblem>> {
-    const version = await this.git.version();
-    if (version.isErr()) {
-      return err(version.error);
+  public async destination(generation: SdkGeneration): Promise<Result<Found, InspectionProblem>> {
+    const git = await this.git.version();
+    if (git.isErr()) {
+      return err(git.error);
     }
-    if (!version.value?.isSupported()) {
-      return ok({ kind: 'overwrite', found: version.value });
+    const repository = await this.repositoryState(git.value, generation);
+    return repository.map((found) => destinationFor({ git: git.value, repository: found }));
+  }
+
+  /** The enclosing repository with its state; none without one, and none asked of a git that cannot merge anyway. */
+  private async repositoryState(
+    git: GitVersion | undefined,
+    generation: SdkGeneration
+  ): Promise<Result<Inspected<SdkRepositoryContext>['repository'], InspectionProblem>> {
+    if (!git?.isSupported()) {
+      return ok(undefined);
     }
     const repository = await this.repository();
     if (repository.isErr()) {
       return err(repository.error);
     }
     if (repository.value === undefined) {
-      return ok({ kind: 'noRepository' });
+      return ok(undefined);
     }
-    const remote = await repository.value.remote();
+    const handle = repository.value;
+    const remote = await handle.remote();
     if (remote.isErr()) {
       return err(remote.error);
     }
-    const found = repository.value;
-    return (await found.inspect(generation, remote.value)).map((state) => destinationFor(found, state));
+    const state = await handle.inspect(generation, remote.value);
+    return state.map((found) => ({ handle, state: found }));
   }
 
   /** Makes the SDK directory a repository of its own, creating it when it is not there yet. */
@@ -105,14 +119,18 @@ export class SdkContext {
       return ok(undefined);
     }
     const root = found.value;
-    if (root.isEqual(real)) {
-      return ok(SdkRepositoryContext.create(root, real));
+    const path = SdkPath.of(root, real);
+    if (path === undefined) {
+      return err({ reason: `git named ${root} as the repository root, which does not hold ${real}` });
     }
-    const ignored = await this.git.isIgnored(root, SdkPath.of(root, real));
+    if (path.isRoot()) {
+      return ok(SdkRepositoryContext.create(root, path));
+    }
+    const ignored = await this.git.isIgnored(root, path);
     if (ignored.isErr()) {
       return err(ignored.error);
     }
-    return ok(ignored.value ? undefined : SdkRepositoryContext.create(root, real));
+    return ok(ignored.value ? undefined : SdkRepositoryContext.create(root, path));
   }
 
   /**

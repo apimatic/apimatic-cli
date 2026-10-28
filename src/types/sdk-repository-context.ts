@@ -10,6 +10,7 @@ import { STAGE, StageEntry } from './git/merge-tree.js';
 import { RemoteName } from './git/remote-name.js';
 import { TreeId } from './git/tree-id.js';
 import { GenerationRecord, SdkGeneration } from './sdk/generation-record.js';
+import { afterFetch, classify, RepositoryFacts } from './sdk/repository-facts.js';
 import { ConflictSide, MergePlan } from './sdk/merge-plan.js';
 import {
   InspectionProblem,
@@ -33,29 +34,31 @@ import { SnapshotStore } from './sdk-repository/snapshot-store.js';
 /** An SDK directory with the repository enclosing it: snapshots, record, files, hook and index, and the merge of a regeneration against the recorded base. */
 export class SdkRepositoryContext {
   private readonly git = new GitService();
-  private readonly path: SdkPath;
   private readonly snapshots: SnapshotStore;
   private readonly recordFile: GenerationRecordFile;
   private readonly files: SdkFiles;
   private readonly hook: ShareHookInstaller;
   private readonly merger: MergeEngine;
 
-  private constructor(private readonly rootDirectory: DirectoryPath, private readonly sdk: DirectoryPath) {
-    this.path = SdkPath.of(rootDirectory, sdk);
-    this.snapshots = new SnapshotStore(rootDirectory, sdk, this.path);
-    this.recordFile = new GenerationRecordFile(sdk);
-    this.files = new SdkFiles(rootDirectory, sdk);
+  private readonly sdk: DirectoryPath;
+
+  private constructor(private readonly rootDirectory: DirectoryPath, private readonly path: SdkPath) {
+    this.sdk = path.in(rootDirectory);
+    this.snapshots = new SnapshotStore(rootDirectory, path);
+    this.recordFile = new GenerationRecordFile(this.sdk);
+    this.files = new SdkFiles(rootDirectory, this.sdk);
     this.hook = new ShareHookInstaller(rootDirectory);
     this.merger = new MergeEngine(rootDirectory);
   }
 
-  public static create(root: DirectoryPath, sdkDirectory: DirectoryPath): SdkRepositoryContext | undefined {
-    return root.contains(sdkDirectory) ? new SdkRepositoryContext(root, sdkDirectory) : undefined;
+  /** The SDK directory at `path` in the repository rooted at `root`. */
+  public static create(root: DirectoryPath, path: SdkPath): SdkRepositoryContext {
+    return new SdkRepositoryContext(root, path);
   }
 
   /** An SDK directory that is a repository of its own. */
   public static own(directory: DirectoryPath): SdkRepositoryContext {
-    return new SdkRepositoryContext(directory, directory);
+    return new SdkRepositoryContext(directory, SdkPath.root());
   }
 
   /** The remote the SDK's snapshots are shared through: where the current branch pushes, else `origin`. */
@@ -63,40 +66,66 @@ export class SdkRepositoryContext {
     return this.git.remoteOf(this.rootDirectory);
   }
 
-  /** What a run needs before it decides how to write: an operation in progress or a nested SDK is refused, unmerged files come first, a missing snapshot is fetched. */
+  /** What a run needs before it decides how to write: the local facts, read then classified, and one fetch when the recorded base is elsewhere. */
   public async inspect(
     generation: SdkGeneration,
     remote: RemoteName | undefined
   ): Promise<Result<SdkRepositoryState, InspectionProblem>> {
+    const facts = await this.facts(remote);
+    if (facts.isErr()) {
+      return err(facts.error);
+    }
+    const classified = classify(facts.value, generation);
+    if (classified.isErr()) {
+      return err(classified.error);
+    }
+    if (classified.value.kind !== 'fetchNeeded') {
+      return ok(classified.value);
+    }
+    const needed = classified.value;
+    const fetched = await this.snapshots.fetch(needed.remote);
+    if (fetched.isErr()) {
+      return ok(afterFetch(needed, { kind: 'failed', reason: fetched.error.reason }));
+    }
+    const brought = await this.snapshots.hasCommit(needed.base);
+    if (brought.isErr()) {
+      return err(brought.error);
+    }
+    return ok(afterFetch(needed, { kind: 'fetched', baseHere: brought.value }));
+  }
+
+  /** Every local fact the state is decided from, read before any of them is weighed. */
+  private async facts(remote: RemoteName | undefined): Promise<Result<RepositoryFacts, RepositoryProblem>> {
     const operation = await this.git.operationInProgress(this.rootDirectory);
     if (operation.isErr()) {
       return err(operation.error);
     }
-    if (operation.value !== undefined) {
-      return err({ kind: 'operationInProgress', operation: operation.value, root: this.rootDirectory });
+    const nested = await this.snapshots.nested();
+    if (nested.isErr()) {
+      return err(nested.error);
     }
-    const notNested = await this.snapshots.verifyNotNested();
-    if (notNested.isErr()) {
-      return err(notNested.error);
-    }
-    const paths = await this.unresolvedConflicts();
-    if (paths.isErr()) {
-      return err(paths.error);
-    }
-    if (paths.value.length > 0) {
-      return ok({ kind: 'unresolved', paths: paths.value });
+    const unresolved = await this.unresolvedConflicts();
+    if (unresolved.isErr()) {
+      return err(unresolved.error);
     }
     const record = await onDisk(this.recordFile.read());
     if (record.isErr()) {
       return err(record.error);
     }
-    if (record.value === undefined) {
-      return ok({ kind: 'noRecord' });
+    const baseHere =
+      record.value === undefined ? ok(false) : await this.snapshots.hasCommit(record.value.pristineCommit());
+    if (baseHere.isErr()) {
+      return err(baseHere.error);
     }
-    if (!record.value.isFor(generation)) {
-      return ok({ kind: 'otherGeneration', recorded: record.value.generatedAs() });
-    }
-    return this.readiness(record.value.pristineCommit(), remote);
+    return ok({
+      root: this.rootDirectory,
+      operation: operation.value,
+      nested: nested.value,
+      unresolved: unresolved.value,
+      record: record.value,
+      baseHere: baseHere.value,
+      remote
+    });
   }
 
   /** Settles the remaining conflicts in `paths` for `side` from the index's two sides and the files as they are, and takes them out of the unmerged state. */
@@ -192,32 +221,6 @@ export class SdkRepositoryContext {
       const paths = new ValueSet(found.map((entry) => entry.path));
       return paths.values().flatMap((path) => this.path.within(path) ?? []);
     });
-  }
-
-  /** Ready when the recorded base is here; else fetched from `remote` once, and the reason it is still missing otherwise. */
-  private async readiness(
-    base: CommitId,
-    remote: RemoteName | undefined
-  ): Promise<Result<SdkRepositoryState, RepositoryProblem>> {
-    const present = await this.snapshots.hasCommit(base);
-    if (present.isErr()) {
-      return err(present.error);
-    }
-    if (present.value) {
-      return ok({ kind: 'ready', base });
-    }
-    if (remote === undefined) {
-      return ok({ kind: 'snapshotMissing', fetch: { kind: 'noRemote' } });
-    }
-    const fetched = await this.snapshots.fetch(remote);
-    if (fetched.isErr()) {
-      return ok({ kind: 'snapshotMissing', fetch: { kind: 'failed', remote, reason: fetched.error.reason } });
-    }
-    const brought = await this.snapshots.hasCommit(base);
-    if (brought.isErr()) {
-      return err(brought.error);
-    }
-    return ok(brought.value ? { kind: 'ready', base } : { kind: 'snapshotMissing', fetch: { kind: 'absent', remote } });
   }
 
   private async settleOne(

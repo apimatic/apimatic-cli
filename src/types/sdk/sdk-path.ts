@@ -12,8 +12,9 @@ export class SdkPath {
     this.directory = directory;
   }
 
-  public static of(root: DirectoryPath, sdk: DirectoryPath): SdkPath {
-    return SdkPath.fromGit(posix(path.relative(root.toString(), sdk.toString())))!;
+  /** Where `sdk` sits below `root`; none when it is not below it. */
+  public static of(root: DirectoryPath, sdk: DirectoryPath): SdkPath | undefined {
+    return SdkPath.fromGit(posix(path.relative(root.toString(), sdk.toString())));
   }
 
   /** The repository root as an SDK directory. */

@@ -59,10 +59,10 @@ describe('SdkRepositoryContext', () => {
 
   /** The SDK at `directory` in the repository at `repositoryRoot`, as `SdkContext` finds it. */
   const sdkAt = async (repositoryRoot: DirectoryPath, directory: DirectoryPath): Promise<Sdk> => ({
-    repository: SdkRepositoryContext.create(repositoryRoot, directory)!,
+    repository: SdkRepositoryContext.create(repositoryRoot, SdkPath.of(repositoryRoot, directory)!),
     root: repositoryRoot,
     directory,
-    pristine: SnapshotRef.pristine(SdkPath.of(repositoryRoot, directory))
+    pristine: SnapshotRef.pristine(SdkPath.of(repositoryRoot, directory)!)
   });
 
   const project = async (sdk = path.join('sdk', 'typescript')): Promise<Sdk> => {
@@ -287,7 +287,8 @@ describe('SdkRepositoryContext', () => {
       /** Records a generation of `files` in the project at `project` and commits it; the record file as written. */
       const regenerate = async (project: string, files: Record<string, string>, message: string) => {
         const sdk = path.join(project, 'sdk', 'typescript');
-        const repository = SdkRepositoryContext.create(new DirectoryPath(project), new DirectoryPath(sdk))!;
+        const projectRoot = new DirectoryPath(project);
+        const repository = SdkRepositoryContext.create(projectRoot, SdkPath.of(projectRoot, new DirectoryPath(sdk))!);
         const tree = (await repository.snapshotGenerated(generated(files)))._unsafeUnwrap();
         (await repository.record(tree, TYPESCRIPT))._unsafeUnwrap();
         await sh(project, 'add', '-A');
@@ -539,7 +540,7 @@ describe('SdkRepositoryContext', () => {
       const unreachable = (await clone.repository.inspect(TYPESCRIPT, RemoteName.origin()))._unsafeUnwrap();
       const none = (await clone.repository.inspect(TYPESCRIPT, undefined))._unsafeUnwrap();
 
-      expect(unreachable.kind === 'snapshotMissing' && unreachable.fetch).to.include({
+      expect(unreachable.kind === 'snapshotMissing' && unreachable.fetch).to.deep.include({
         kind: 'failed',
         remote: RemoteName.origin()
       });

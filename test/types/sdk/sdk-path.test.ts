@@ -8,8 +8,10 @@ describe('SdkPath', () => {
   const root = new DirectoryPath(path.resolve('project'));
 
   it('spells the SDK directory below the root as git does, and finds it again under the root', () => {
-    const nested = SdkPath.of(root, root.join('sdk', 'My API'));
-    const own = SdkPath.of(root, root);
+    const nested = SdkPath.of(root, root.join('sdk', 'My API'))!;
+    const own = SdkPath.of(root, root)!;
+
+    expect(SdkPath.of(root, root.join('..'))).to.be.undefined;
 
     expect(nested.toString()).to.equal('sdk/My API');
     expect(nested.isRoot()).to.be.false;
