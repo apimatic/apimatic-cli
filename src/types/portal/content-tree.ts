@@ -20,6 +20,7 @@ import {
 } from './portal-navigation.js';
 import {
   ContentProblem,
+  InvalidPage,
   MissingImage,
   PortalSpec,
   ReservedAddress,
@@ -170,6 +171,11 @@ export class ContentTree {
     if (read.missingImages.length > 0) {
       problems.push({ kind: 'missingImages', images: read.missingImages });
     }
+    // Refused here too, so a preview hears of them, and a build of every page at once rather than the first.
+    const invalidPages = ContentTree.invalidPages(read.pages);
+    if (invalidPages.length > 0) {
+      problems.push({ kind: 'invalidMdx', pages: invalidPages });
+    }
 
     // The walk takes each page to be served where it sits, so it would misjudge an entry naming one of these.
     if (addressProblems.length > 0) {
@@ -225,6 +231,10 @@ export class ContentTree {
       titled: read.flatMap((page) => (page.isOk() ? [page.value] : [])),
       errors: read.flatMap((page) => (page.isErr() ? page.error : []))
     };
+  }
+
+  private static invalidPages(pages: ReadPage[]): InvalidPage[] {
+    return pages.flatMap(({ file, parsed }) => (parsed?.syntaxError ? [{ page: file, ...parsed.syntaxError }] : []));
   }
 
   /**
