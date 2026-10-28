@@ -7,14 +7,12 @@ import { ValueMap, ValueSet } from './common/value-map.js';
 import { BlobId } from './git/blob-id.js';
 import { CommitId } from './git/commit-id.js';
 import { STAGE, StageEntry } from './git/merge-tree.js';
-import { RemoteName } from './git/remote-name.js';
 import { TreeId } from './git/tree-id.js';
 import { GenerationRecord, SdkGeneration } from './sdk/generation-record.js';
 import { afterFetch, classify, RepositoryFacts } from './sdk/repository-facts.js';
-import { ConflictSide, MergePlan } from './sdk/merge-plan.js';
+import { ConflictSide } from './sdk/merge-plan.js';
 import {
   InspectionProblem,
-  MergeOutcome,
   RecordProblem,
   Regeneration,
   RepositoryProblem,
@@ -23,6 +21,7 @@ import {
   WriteProblem
 } from './sdk/repository-state.js';
 import { SdkPath } from './sdk/sdk-path.js';
+import { Settlement } from './sdk/settlement.js';
 import { settledContent } from './sdk/unresolved-file.js';
 import { GenerationRecordFile } from './sdk-repository/generation-record-file.js';
 import { MergeEngine } from './sdk-repository/merge-engine.js';
@@ -61,17 +60,9 @@ export class SdkRepositoryContext {
     return new SdkRepositoryContext(directory, SdkPath.root());
   }
 
-  /** The remote the SDK's snapshots are shared through: where the current branch pushes, else `origin`. */
-  public async remote(): Promise<Result<RemoteName | undefined, RepositoryProblem>> {
-    return this.git.remoteOf(this.rootDirectory);
-  }
-
   /** What a run needs before it decides how to write: the local facts, read then classified, and one fetch when the recorded base is elsewhere. */
-  public async inspect(
-    generation: SdkGeneration,
-    remote: RemoteName | undefined
-  ): Promise<Result<SdkRepositoryState, InspectionProblem>> {
-    const facts = await this.facts(remote);
+  public async inspect(generation: SdkGeneration): Promise<Result<SdkRepositoryState, InspectionProblem>> {
+    const facts = await this.facts();
     if (facts.isErr()) {
       return err(facts.error);
     }
@@ -94,8 +85,12 @@ export class SdkRepositoryContext {
     return ok(afterFetch(needed, { kind: 'fetched', baseHere: brought.value }));
   }
 
-  /** Every local fact the state is decided from, read before any of them is weighed. */
-  private async facts(remote: RemoteName | undefined): Promise<Result<RepositoryFacts, RepositoryProblem>> {
+  /** Every local fact the state is decided from, read before any of them is weighed; the remote is where the branch pushes, else `origin`. */
+  private async facts(): Promise<Result<RepositoryFacts, RepositoryProblem>> {
+    const remote = await this.git.remoteOf(this.rootDirectory);
+    if (remote.isErr()) {
+      return err(remote.error);
+    }
     const operation = await this.git.operationInProgress(this.rootDirectory);
     if (operation.isErr()) {
       return err(operation.error);
@@ -124,7 +119,7 @@ export class SdkRepositoryContext {
       unresolved: unresolved.value,
       record: record.value,
       baseHere: baseHere.value,
-      remote
+      remote: remote.value
     });
   }
 
@@ -192,13 +187,17 @@ export class SdkRepositoryContext {
     return merge.map((outcome) => ({ generated: generatedTree.value, merge: outcome }));
   }
 
-  /** The previous ref first, then the plan; a step that fails is undone from that ref, which stays for a restore by hand. */
-  public async write(base: CommitId, plan: MergePlan, generated: DirectoryPath): Promise<Result<void, WriteProblem>> {
+  /** The previous ref first, then the settled plan; a step that fails is undone from that ref, which stays for a restore by hand. */
+  public async write(
+    base: CommitId,
+    settlement: Settlement,
+    generated: DirectoryPath
+  ): Promise<Result<void, WriteProblem>> {
     const commit = await this.snapshots.savePrevious(base);
     if (commit.isErr()) {
       return err(commit.error);
     }
-    return this.files.apply(plan, { commit: commit.value, ref: this.snapshots.previousRef() }, generated);
+    return this.files.apply(settlement.plan, { commit: commit.value, ref: this.snapshots.previousRef() }, generated);
   }
 
   /** What the repository's ignore rules keep out of the SDK directory, so an upload leaves it out as a commit would. */
@@ -206,11 +205,11 @@ export class SdkRepositoryContext {
     return this.git.ignoredBelow(this.sdk);
   }
 
-  /** Marks the conflicted paths in the repository's index the way a merge would, so git's own tools take over. */
-  public async stageConflicts(outcome: MergeOutcome): Promise<Result<void, RepositoryProblem>> {
+  /** Marks the regeneration's conflicted paths in the repository's index the way a merge would, so git's own tools take over. */
+  public async stageConflicts(regeneration: Regeneration): Promise<Result<void, RepositoryProblem>> {
     return this.git.stageConflicts(
       this.rootDirectory,
-      outcome.stages.map((entry) => ({ ...entry, path: this.path.fromRoot(entry.path) }))
+      regeneration.merge.stages.map((entry) => ({ ...entry, path: this.path.fromRoot(entry.path) }))
     );
   }
 

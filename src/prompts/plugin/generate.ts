@@ -1,5 +1,4 @@
 import { confirm, isCancel, log, multiselect } from '@clack/prompts';
-import { terminal } from '../../infrastructure/terminal.js';
 import { Result } from 'neverthrow';
 import { ServiceError } from '../../infrastructure/service-error.js';
 import { PublishingProfileItem } from '../../types/publish-api/publishing-profile-item.js';
@@ -84,11 +83,6 @@ export class PluginGeneratePrompts {
     const message =
       `${f.var(APIMATIC_CONFIG_FILE_NAME)} cannot be used: ${reason}. ` + `Fix it at ${f.path(path)} and try again.`;
     log.error(message);
-  }
-
-  // Without a terminal a prompt never answers, and Node exits with nothing said.
-  public canAsk(): boolean {
-    return terminal.isInteractive();
   }
 
   public setupNeedsTerminal(sourceDirectory: DirectoryPath, config: PluginConfig) {

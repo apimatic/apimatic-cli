@@ -22,6 +22,8 @@ import { GenerationRecord } from '../../../src/types/sdk/generation-record.js';
 import { SdkPath } from '../../../src/types/sdk/sdk-path.js';
 import { SnapshotRef } from '../../../src/types/sdk/snapshot-ref.js';
 import { TempContext } from '../../../src/types/temp-context.js';
+import { terminal } from '../../../src/infrastructure/terminal.js';
+import { runMode } from '../../helpers/sdk-generation.js';
 
 const COMMAND_METADATA: CommandMetadata = { commandName: 'sdk generate', shell: 'test' };
 
@@ -36,7 +38,7 @@ describe('GenerateAction (sdk)', () => {
       options.destination ?? sdk(),
       Language.PYTHON,
       Stability.STABLE,
-      options.force ?? true
+      runMode(options.force ?? true)
     );
 
   const sdk = () => new DirectoryPath(path.join(root, 'sdk', 'python'));
@@ -88,6 +90,7 @@ describe('GenerateAction (sdk)', () => {
   it('stops before generating when the developer declines to overwrite', async () => {
     fs.mkdirSync(sdk().toString(), { recursive: true });
     fs.writeFileSync(at('README.md'), '# mine');
+    sinon.stub(terminal, 'isInteractive').returns(true);
     sinon.stub(SdkGeneratePrompts.prototype, 'overwriteSdk').resolves(false);
     sinon.stub(SdkGeneratePrompts.prototype, 'destinationDirNotEmpty');
 

@@ -1,3 +1,5 @@
+import { terminal } from '../../src/infrastructure/terminal.js';
+import { RunMode } from '../../src/types/sdk/write-mode.js';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -48,3 +50,9 @@ export function stubSdkGeneration(root: string): {
     }
   };
 }
+
+/** How the `sdk generate` command starts a run: asks only in a terminal, and never under --force. */
+export const runMode = (force: boolean): RunMode => ({
+  force,
+  interaction: !force && terminal.isInteractive() ? 'ask' : 'never'
+});

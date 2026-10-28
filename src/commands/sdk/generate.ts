@@ -2,6 +2,8 @@ import { Command, Flags } from '@oclif/core';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { FlagsProvider } from '../../types/flags-provider.js';
 import { GenerateAction } from '../../actions/sdk/generate.js';
+import { terminal } from '../../infrastructure/terminal.js';
+import { RunMode } from '../../types/sdk/write-mode.js';
 import {
   AVAILABLE_LANGUAGES,
   CodeGenerationVersion,
@@ -74,13 +76,14 @@ With git ${GitVersion.required()} or newer installed, your edits to the generate
     };
 
     intro('Generate SDK');
+    const run: RunMode = { force, interaction: !force && terminal.isInteractive() ? 'ask' : 'never' };
     const action = new GenerateAction(this.getConfigDir(), commandMetadata, authKey);
     const result = await action.execute(
       project,
       project.sdkDirectory(language as Language, destination),
       language as Language,
       StabilityChoice.for(language as Language, stability).stabilityLevel(),
-      force
+      run
     );
     outro(result);
   }

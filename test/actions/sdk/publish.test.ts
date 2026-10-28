@@ -48,7 +48,7 @@ describe('SdkPublishAction', () => {
       sdk(),
       Language.PYTHON,
       [PublishType.PackagePublishing],
-      true,
+      { force: true, interaction: 'never' },
       ProfileId.tryCreate('profile')._unsafeUnwrap(),
       SemVersion.tryCreate('1.0.0')._unsafeUnwrap(),
       withoutPackageSettings,

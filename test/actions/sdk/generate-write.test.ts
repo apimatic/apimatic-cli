@@ -8,7 +8,7 @@ import sinon from 'sinon';
 import { GenerateAction } from '../../../src/actions/sdk/generate.js';
 import { FileService } from '../../../src/infrastructure/file-service.js';
 import { GitService } from '../../../src/infrastructure/git-service.js';
-import { MERGE_NEEDS_RESOLVING, SdkGeneratePrompts } from '../../../src/prompts/sdk/generate.js';
+import { SdkGeneratePrompts } from '../../../src/prompts/sdk/generate.js';
 import { CommandMetadata } from '../../../src/types/common/command-metadata.js';
 import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
 import { FileName } from '../../../src/types/file/fileName.js';
@@ -25,7 +25,7 @@ import { SnapshotRef } from '../../../src/types/sdk/snapshot-ref.js';
 import { SnapshotStore } from '../../../src/types/sdk-repository/snapshot-store.js';
 import { SdkRepositoryContext } from '../../../src/types/sdk-repository-context.js';
 import { terminal } from '../../../src/infrastructure/terminal.js';
-import { Files, stubSdkGeneration, writeFiles } from '../../helpers/sdk-generation.js';
+import { Files, runMode, stubSdkGeneration, writeFiles } from '../../helpers/sdk-generation.js';
 import { describeCommit, repositoryOf, snapshotFiles } from '../../helpers/snapshots.js';
 
 const COMMAND_METADATA: CommandMetadata = { commandName: 'sdk generate', shell: 'test' };
@@ -72,7 +72,7 @@ describe('GenerateAction (sdk) — writing the SDK', () => {
       sdk(),
       Language.PYTHON,
       Stability.STABLE,
-      force
+      runMode(force)
     );
   };
 
@@ -212,12 +212,13 @@ describe('GenerateAction (sdk) — writing the SDK', () => {
       writeFiles(sdk().toString(), { 'models/book.py': MODEL_V1_EDITED });
       sinon.stub(SdkGeneratePrompts.prototype, 'sdkMerged');
       const conflicts = sinon.stub(SdkGeneratePrompts.prototype, 'conflicts');
+      const mergeNeedsResolving = sinon.stub(SdkGeneratePrompts.prototype, 'mergeNeedsResolving');
 
       const result = await execute({ 'README.md': '# sdk v2', 'models/book.py': MODEL_V2 });
 
       expect(result.isFailed()).to.be.true;
       expect(result.getExitCode()).to.equal(1);
-      expect(result.getMessage()).to.equal(MERGE_NEEDS_RESOLVING);
+      expect(mergeNeedsResolving.calledOnce).to.be.true;
       expect(conflicts.firstCall.args[0].conflicts).to.deep.equal([
         { path: rel('models/book.py'), kind: 'bothChanged' }
       ]);
@@ -241,11 +242,12 @@ describe('GenerateAction (sdk) — writing the SDK', () => {
       sinon.stub(SdkGeneratePrompts.prototype, 'sdkMerged');
       const conflictsNotStaged = sinon.stub(SdkGeneratePrompts.prototype, 'conflictsNotStaged');
       const conflicts = sinon.stub(SdkGeneratePrompts.prototype, 'conflicts');
+      const mergeNeedsResolving = sinon.stub(SdkGeneratePrompts.prototype, 'mergeNeedsResolving');
 
       const result = await execute({ 'models/book.py': MODEL_V2 });
 
       expect(result.isFailed()).to.be.true;
-      expect(result.getMessage()).to.equal(MERGE_NEEDS_RESOLVING);
+      expect(mergeNeedsResolving.calledOnce).to.be.true;
       expect(conflictsNotStaged.firstCall.args[0]).to.equal('index locked');
       expect(conflicts.called).to.be.true;
       expect(read('models/book.py')).to.contain(YOURS_MARKER);
@@ -383,24 +385,34 @@ describe('GenerateAction (sdk) — writing the SDK', () => {
       expect(conflicts.called).to.be.false;
     });
 
-    for (const [how, tty, force] of [
-      ['without a terminal', false, false],
-      ['with --force', true, true]
-    ] as const) {
-      it(`does not ask ${how}: markers, the list and the steps`, async () => {
-        await conflicting();
-        (terminal.isInteractive as sinon.SinonStub).returns(tty);
-        const conflictChoice = sinon.stub(SdkGeneratePrompts.prototype, 'conflictChoice');
-        const conflicts = sinon.stub(SdkGeneratePrompts.prototype, 'conflicts');
+    it('does not ask with --force: markers, the list and the steps', async () => {
+      await conflicting();
+      const conflictChoice = sinon.stub(SdkGeneratePrompts.prototype, 'conflictChoice');
+      const conflicts = sinon.stub(SdkGeneratePrompts.prototype, 'conflicts');
 
-        const result = await execute(NEXT, force);
+      const result = await execute(NEXT, true);
 
-        expect(result.isFailed()).to.be.true;
-        expect(conflictChoice.called).to.be.false;
-        expect(conflicts.calledOnce).to.be.true;
-        expect(read('models/book.py')).to.contain(YOURS_MARKER);
-      });
-    }
+      expect(result.isFailed()).to.be.true;
+      expect(conflictChoice.called).to.be.false;
+      expect(conflicts.calledOnce).to.be.true;
+      expect(read('models/book.py')).to.contain(YOURS_MARKER);
+    });
+
+    it('refuses without a terminal, naming the conflicts, and writes nothing', async () => {
+      await conflicting();
+      (terminal.isInteractive as sinon.SinonStub).returns(false);
+      const conflictChoice = sinon.stub(SdkGeneratePrompts.prototype, 'conflictChoice');
+      const conflictsNotAsked = sinon.stub(SdkGeneratePrompts.prototype, 'conflictsNotAsked');
+
+      const result = await execute(NEXT, false);
+
+      expect(result.isFailed()).to.be.true;
+      expect(conflictChoice.called).to.be.false;
+      expect(conflictsNotAsked.firstCall.args[0].conflicts.map((conflict) => String(conflict.path))).to.deep.equal([
+        'models/book.py'
+      ]);
+      expect(read('models/book.py')).to.not.contain(YOURS_MARKER);
+    });
   });
 
   describe('the hook that shares snapshots', () => {

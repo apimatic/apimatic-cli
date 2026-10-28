@@ -21,7 +21,7 @@ import { SdkPath } from '../../../src/types/sdk/sdk-path.js';
 import { SnapshotRef } from '../../../src/types/sdk/snapshot-ref.js';
 import { SdkRepositoryContext } from '../../../src/types/sdk-repository-context.js';
 import { terminal } from '../../../src/infrastructure/terminal.js';
-import { Files, stubSdkGeneration, writeFiles } from '../../helpers/sdk-generation.js';
+import { Files, runMode, stubSdkGeneration, writeFiles } from '../../helpers/sdk-generation.js';
 import { repositoryOf } from '../../helpers/snapshots.js';
 
 /** A ref onto itself, as `git push` and `git fetch` take it. */
@@ -62,7 +62,7 @@ describe('GenerateAction (sdk) — the destination', () => {
       options.destination ?? sdk(),
       Language.PYTHON,
       options.stability ?? Stability.STABLE,
-      options.force ?? true
+      runMode(options.force ?? true)
     );
   };
 
@@ -143,22 +143,29 @@ describe('GenerateAction (sdk) — the destination', () => {
       expect(fs.readdirSync(sdk().toString())).to.deep.equal(['README.md']);
     });
 
-    for (const [how, tty, force] of [
-      ['with --force', true, true],
-      ['without a terminal', false, false]
-    ] as const) {
-      it(`does not ask ${how}: no repository, the warning, exit 0`, async () => {
-        sinon.stub(terminal, 'isInteractive').returns(tty);
-        const createRepository = sinon.stub(SdkGeneratePrompts.prototype, 'createRepository');
-        const notCreated = SdkGeneratePrompts.prototype.repositoryNotCreated as sinon.SinonStub;
+    it('does not ask with --force: no repository, the warning, exit 0', async () => {
+      interactive();
+      const createRepository = sinon.stub(SdkGeneratePrompts.prototype, 'createRepository');
+      const notCreated = SdkGeneratePrompts.prototype.repositoryNotCreated as sinon.SinonStub;
 
-        expect((await execute({ force })).isSuccess()).to.be.true;
+      expect((await execute({ force: true })).isSuccess()).to.be.true;
 
-        expect(createRepository.called).to.be.false;
-        expect(notCreated.calledOnce).to.be.true;
-        expect(fs.readdirSync(sdk().toString())).to.deep.equal(['README.md']);
-      });
-    }
+      expect(createRepository.called).to.be.false;
+      expect(notCreated.calledOnce).to.be.true;
+      expect(fs.readdirSync(sdk().toString())).to.deep.equal(['README.md']);
+    });
+
+    it('refuses without a terminal, where it would have had to ask, and writes nothing', async () => {
+      sinon.stub(terminal, 'isInteractive').returns(false);
+      const createRepository = sinon.stub(SdkGeneratePrompts.prototype, 'createRepository');
+      const refused = sinon.stub(SdkGeneratePrompts.prototype, 'refused');
+
+      expect((await execute({ force: false })).isFailed()).to.be.true;
+
+      expect(createRepository.called).to.be.false;
+      expect(refused.firstCall.args[0]).to.deep.equal({ kind: 'cannotAsk', question: 'createRepository' });
+      expect(generateSdk.called).to.be.false;
+    });
   });
 
   it('records into the enclosing repository when the directory has no record', async () => {
@@ -245,6 +252,7 @@ describe('GenerateAction (sdk) — the destination', () => {
       await sh(root, 'clone', '-q', '--no-local', remote, clone);
       project = clone;
       const snapshotMissing = sinon.stub(SdkGeneratePrompts.prototype, 'snapshotMissing');
+      interactive();
       sinon.stub(SdkGeneratePrompts.prototype, 'overwriteSdk').resolves(false);
       sinon.stub(SdkGeneratePrompts.prototype, 'destinationDirNotEmpty');
 
@@ -416,6 +424,7 @@ describe('GenerateAction (sdk) — the destination', () => {
     beforeEach(() => write('README.md', '# mine'));
 
     it('is asked when the directory holds files and there is nothing to merge, and no cancels', async () => {
+      interactive();
       const overwriteSdk = sinon.stub(SdkGeneratePrompts.prototype, 'overwriteSdk').resolves(false);
       sinon.stub(SdkGeneratePrompts.prototype, 'destinationDirNotEmpty');
 
@@ -440,6 +449,7 @@ describe('GenerateAction (sdk) — the destination', () => {
     it('follows the warning about another generation, and no cancels there too', async () => {
       await recorded({ 'README.md': '# sdk' });
       const notForThis = sinon.stub(SdkGeneratePrompts.prototype, 'recordNotForThisGeneration');
+      interactive();
       const overwriteSdk = sinon.stub(SdkGeneratePrompts.prototype, 'overwriteSdk').resolves(false);
       sinon.stub(SdkGeneratePrompts.prototype, 'destinationDirNotEmpty');
 

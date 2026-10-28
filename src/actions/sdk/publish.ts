@@ -9,6 +9,7 @@ import { PublishingInfo } from '../../types/publish-api/publishing-info.js';
 import { ProfileId } from '../../types/publish/profile-id.js';
 import { SemVersion } from '../../types/publish/version.js';
 import { Language, Stability } from '../../types/sdk/generate.js';
+import { RunMode } from '../../types/sdk/write-mode.js';
 import { PublishingProfile } from '../../types/publish/publishing-profile.js';
 import { PackageSettingsContext } from '../../types/package-settings-context.js';
 import { ProjectContext } from '../../types/project-context.js';
@@ -30,7 +31,7 @@ export class SdkPublishAction {
     sdkDirectory: DirectoryPath,
     language: Language,
     publishType: PublishType[],
-    force: boolean,
+    run: RunMode,
     profileId: ProfileId,
     semVersion: SemVersion,
     publishingProfile: PublishingProfile,
@@ -55,7 +56,7 @@ export class SdkPublishAction {
         sdkDirectory,
         language,
         stability,
-        force,
+        run,
         packageSettingsDirectory
       );
       if (sdkGenerationResult.isFailed()) {

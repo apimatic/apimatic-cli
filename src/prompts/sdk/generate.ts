@@ -20,10 +20,8 @@ import {
 } from '../../types/sdk/merge-plan.js';
 import { SHARE_HOOK_CALL } from '../../types/sdk/share-hook.js';
 import { InspectionProblem, NotApplied, ShareHookInstall, SnapshotFetch } from '../../types/sdk/repository-state.js';
+import { DestinationNotice, WriteRefusal } from '../../types/sdk/write-mode.js';
 import { listedInProse } from '../../utils/string-utils.js';
-
-/** The closing line of a run that left conflicts. */
-export const MERGE_NEEDS_RESOLVING = 'Resolve the conflicts and rerun';
 
 const CONFLICT_LABELS: Record<ConflictKind, string> = {
   bothChanged: 'changed by you and by the generator; markers in the file',
@@ -403,6 +401,57 @@ export class SdkGeneratePrompts {
   /** What to do about the conflicts the developer chose to resolve, listed just before. */
   public conflictSteps(plan: MergePlan) {
     noteWrapped(steps(plan, true).join('\n'), 'Next steps');
+  }
+
+  /** The conflicted files, for a run that may neither ask about them nor leave markers. */
+  public conflictsNotAsked(plan: MergePlan, sdk: DirectoryPath) {
+    noteWrapped(
+      [
+        ...conflictLines(plan, sdk),
+        '',
+        `Nothing was written. Rerun in a terminal to choose how ${
+          plan.conflicts.length === 1 ? 'it is' : 'they are'
+        } resolved, or with ${f.flag('force')} to write the markers and resolve them yourself.`
+      ].join('\n'),
+      attentionTitle(plan)
+    );
+  }
+
+  public mergeNeedsResolving() {
+    log.error('Resolve the conflicts and rerun.');
+  }
+
+  /** What the destination means for the developer, said before anything is uploaded. */
+  public destinationNotice(notice: DestinationNotice, requested: SdkGeneration, sdk: DirectoryPath) {
+    switch (notice.kind) {
+      case 'gitUnavailable':
+        return this.gitUnavailable(notice.found);
+      case 'otherGeneration':
+        return this.recordNotForThisGeneration(notice.recorded, requested, sdk);
+      case 'snapshotMissing':
+        return this.snapshotMissing(notice.fetch);
+    }
+  }
+
+  /** Why the run stops before generating. */
+  public refused(because: WriteRefusal, sdk: DirectoryPath) {
+    if (because.kind === 'recordedNotReplaced') {
+      return this.recordedSdkNotReplaced(sdk);
+    }
+    const rerun = `Rerun in a terminal to be asked, or with ${f.flag('force')}`;
+    switch (because.question) {
+      case 'overwrite':
+        return log.error(
+          `The destination ${f.path(
+            sdk
+          )} is not empty, and this run cannot ask whether to overwrite it. ${rerun} to overwrite.`
+        );
+      case 'createRepository':
+        return log.error(
+          `No git repository encloses ${f.path(sdk)}, and this run cannot ask whether to create one. ` +
+            `${rerun} to generate without keeping your edits across regenerations.`
+        );
+    }
   }
 }
 

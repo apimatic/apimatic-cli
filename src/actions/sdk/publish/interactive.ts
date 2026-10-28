@@ -128,7 +128,7 @@ export class SdkPublishInteractiveAction {
       sdkDirectory,
       language,
       publishTypes,
-      false,
+      { force: false, interaction: 'ask' },
       publishingProfileId,
       version,
       publishingProfile,

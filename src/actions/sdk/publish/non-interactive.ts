@@ -116,7 +116,7 @@ export class SdkPublishNonInteractiveAction {
       sdkDirectory,
       language,
       publishTypes,
-      force,
+      { force, interaction: 'never' },
       publishingProfileId,
       semVersion,
       publishingProfile,

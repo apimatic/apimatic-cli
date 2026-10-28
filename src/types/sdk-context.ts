@@ -60,11 +60,7 @@ export class SdkContext {
       return ok(undefined);
     }
     const handle = repository.value;
-    const remote = await handle.remote();
-    if (remote.isErr()) {
-      return err(remote.error);
-    }
-    const state = await handle.inspect(generation, remote.value);
+    const state = await handle.inspect(generation);
     return state.map((found) => ({ handle, state: found }));
   }
 
