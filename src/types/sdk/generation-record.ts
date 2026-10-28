@@ -94,5 +94,4 @@ export class GenerationRecord {
   }
 }
 
-export const RECORD_ATTRIBUTES =
-  '# Written by the APIMatic CLI.\ngeneration.json merge=binary linguist-generated=true\n';
+export const RECORD_ATTRIBUTES = `# Written by the APIMatic CLI.\n${RECORD_FILE} merge=binary linguist-generated=true\n`;

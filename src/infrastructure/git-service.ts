@@ -17,7 +17,8 @@ import { CommitId } from '../types/git/commit-id.js';
 import { GitOperation, OPERATIONS } from '../types/git/git-operation.js';
 import { GitProblem } from '../types/git/git-problem.js';
 import { GitVersion } from '../types/git/git-version.js';
-import { Change, MergeMessage, MergeTreeOutput, parseStageEntry, StageEntry } from '../types/git/merge-tree.js';
+import { Change, MergeTreeOutput, parseMergeTree, parseStageEntry, StageEntry } from '../types/git/merge-tree.js';
+import { CONFLICT_STYLE } from '../types/sdk/conflict-markers.js';
 import { RemoteName } from '../types/git/remote-name.js';
 import { TreeEntry } from '../types/git/tree-entry.js';
 import { TreeId } from '../types/git/tree-id.js';
@@ -48,20 +49,24 @@ const SETTINGS: readonly (readonly [string, string])[] = [
   ['core.autocrlf', 'false'],
   ['core.safecrlf', 'false'],
   ['core.quotePath', 'false'],
-  ['merge.conflictStyle', 'merge'],
+  ['merge.conflictStyle', CONFLICT_STYLE],
   ['merge.renormalize', 'true'],
   ['merge.renameLimit', '10000'],
   ['diff.renameLimit', '10000'],
   ['gc.auto', '0']
 ];
 
+const REMOTE_SETTINGS: readonly (readonly [string, string])[] = [['credential.interactive', 'false']];
+
 type RunOptions = {
   env?: Record<string, string>;
   /** Where to put the attributes file that normalises line endings; none leaves the repository's own rules. */
   attributesIn?: DirectoryPath;
   input?: string;
-  /** Exit codes that are an answer rather than a failure. */
-  exitCodes?: readonly number[];
+  /** Exit codes that are an answer rather than a failure; `any` when the caller reads the code itself. */
+  exitCodes?: readonly number[] | 'any';
+  /** A command that reaches a remote: no prompts, a batch-mode ssh and a timeout. */
+  remote?: boolean;
 };
 
 type Ran<Out> = { stdout: Out; stderr: string; exitCode: number };
@@ -182,15 +187,33 @@ export class GitService {
     });
   }
 
-  /**
-   * `directory` as a tree through a temporary index: every file with `include: 'all'`, else the
-   * ignore rules honoured except for the listed paths; line endings normalised unless `asIs`.
-   */
-  public async treeOf(
+  /** `directory` as a tree: every file, whatever any ignore rule says, with line endings normalised. */
+  public treeOfEveryFile(root: DirectoryPath, directory: DirectoryPath): Promise<Result<TreeId, GitProblem>> {
+    return this.tree(root, directory, { include: 'all', lineEndings: 'normalized' });
+  }
+
+  /** `directory` as a tree: the ignore rules honoured except for the paths `including`, with line endings normalised. */
+  public treeOfDirectory(
     root: DirectoryPath,
     directory: DirectoryPath,
-    include: 'all' | readonly RelativeFilePath[],
-    lineEndings: 'normalized' | 'asIs' = 'normalized'
+    including: readonly RelativeFilePath[]
+  ): Promise<Result<TreeId, GitProblem>> {
+    return this.tree(root, directory, { include: including, lineEndings: 'normalized' });
+  }
+
+  /** As `treeOfDirectory`, with every byte as it is on disk. */
+  public treeOfDirectoryAsIs(
+    root: DirectoryPath,
+    directory: DirectoryPath,
+    including: readonly RelativeFilePath[]
+  ): Promise<Result<TreeId, GitProblem>> {
+    return this.tree(root, directory, { include: including, lineEndings: 'asIs' });
+  }
+
+  private async tree(
+    root: DirectoryPath,
+    directory: DirectoryPath,
+    { include, lineEndings }: { include: 'all' | readonly RelativeFilePath[]; lineEndings: 'normalized' | 'asIs' }
   ): Promise<Result<TreeId, GitProblem>> {
     // A directory inside the repository is added from the root, so the root's ignore rules count.
     const inside = root.contains(directory) ? SdkPath.of(root, directory) : undefined;
@@ -199,7 +222,7 @@ export class GitService {
     if (gitDir.isErr()) {
       return err(gitDir.error);
     }
-    return this.inTemporaryDirectory(async (temporary) => {
+    return withDirPath(async (temporary) => {
       const env = { GIT_INDEX_FILE: new FilePath(temporary, new FileName('index')).toString() };
       const attributesIn = lineEndings === 'normalized' ? temporary : undefined;
       const inWorkTree = (args: string[], input?: string) =>
@@ -362,13 +385,13 @@ export class GitService {
     return ok(blobs);
   }
 
-  /** `merge-tree --write-tree -z`: the merged tree, a stage entry per conflicted path, then git's messages as count, paths, type and text. */
+  /** `merge-tree --write-tree -z` of `ours` and `theirs`, read into the merged tree, the stages of every conflicted path and git's messages. */
   public async mergeTree(
     root: DirectoryPath,
     ours: CommitId,
     theirs: CommitId
   ): Promise<Result<MergeTreeOutput, GitProblem>> {
-    return this.inTemporaryDirectory(async (temporary) => {
+    return withDirPath(async (temporary) => {
       const ran = await this.run(root, ['merge-tree', '--write-tree', '-z', ours.toString(), theirs.toString()], {
         attributesIn: temporary,
         encoding: 'buffer',
@@ -377,52 +400,36 @@ export class GitService {
       if (ran.isErr()) {
         return err(ran.error);
       }
-      const fields = new TextDecoder().decode(new Uint8Array(ran.value.stdout)).split('\0');
-      const tree = read('merge-tree', fields[0].trim(), TreeId.fromGit);
-      if (tree.isErr()) {
-        return err(tree.error);
-      }
-      const stagesEnd = fields.indexOf('', 1);
-      const stages = readAll('merge-tree', fields.slice(1, stagesEnd === -1 ? undefined : stagesEnd), parseStageEntry);
-      if (stages.isErr()) {
-        return err(stages.error);
-      }
-      const messages: MergeMessage[] = [];
-      for (
-        let index = stagesEnd === -1 ? fields.length : stagesEnd + 1;
-        index < fields.length && fields[index] !== '';
-
-      ) {
-        const count = Number(fields[index]);
-        const paths = readAll('merge-tree', fields.slice(index + 1, index + 1 + count), RelativeFilePath.fromGit);
-        if (paths.isErr()) {
-          return err(paths.error);
-        }
-        const type = fields[index + 1 + count];
-        const message = fields[index + 2 + count];
-        messages.push({ paths: paths.value, type, message: message.trim() });
-        index += 3 + count;
-      }
-      return ok({ tree: tree.value, stages: stages.value, messages });
+      const parsed = parseMergeTree(new TextDecoder().decode(new Uint8Array(ran.value.stdout)).split('\0'));
+      return parsed === undefined ? err(problem('git merge-tree printed what could not be read')) : ok(parsed);
     });
   }
 
-  /** How `to` differs from `from`, file by file; with `renames`, a moved file is one entry rather than a deletion and an addition. */
-  public async diffTrees(
+  /** How `to` differs from `from`, file by file; a moved file is a deletion and an addition. */
+  public diffTrees(
+    root: DirectoryPath,
+    from: TreeId | CommitId,
+    to: TreeId | CommitId
+  ): Promise<Result<Change[], GitProblem>> {
+    return this.diff(root, from, to, '--no-renames');
+  }
+
+  /** As `diffTrees`, with a moved file as one entry naming both paths. */
+  public diffTreesPairingRenames(
+    root: DirectoryPath,
+    from: TreeId | CommitId,
+    to: TreeId | CommitId
+  ): Promise<Result<Change[], GitProblem>> {
+    return this.diff(root, from, to, '--find-renames');
+  }
+
+  private async diff(
     root: DirectoryPath,
     from: TreeId | CommitId,
     to: TreeId | CommitId,
-    renames: boolean
+    renames: '--find-renames' | '--no-renames'
   ): Promise<Result<Change[], GitProblem>> {
-    const ran = await this.run(root, [
-      'diff-tree',
-      '-r',
-      '-z',
-      '--raw',
-      renames ? '--find-renames' : '--no-renames',
-      from.toString(),
-      to.toString()
-    ]);
+    const ran = await this.run(root, ['diff-tree', '-r', '-z', '--raw', renames, from.toString(), to.toString()]);
     if (ran.isErr()) {
       return err(ran.error);
     }
@@ -507,7 +514,10 @@ export class GitService {
     remote: RemoteName,
     ref: SnapshotRef
   ): Promise<Result<CommitId | undefined, GitProblem>> {
-    const fetched = await this.runRemote(root, ['fetch', '--quiet', '--no-tags', remote.toString(), ref.toString()]);
+    const fetched = await this.run(root, ['fetch', '--quiet', '--no-tags', remote.toString(), ref.toString()], {
+      remote: true,
+      exitCodes: 'any'
+    });
     if (fetched.isErr()) {
       return err(fetched.error);
     }
@@ -563,46 +573,13 @@ export class GitService {
     return ran.map((result) => result.exitCode === 0);
   }
 
-  /** `work` with a directory that is removed once it settles, whichever way. */
-  private inTemporaryDirectory<T>(
-    work: (temporary: DirectoryPath) => Promise<Result<T, GitProblem>>
-  ): Promise<Result<T, GitProblem>> {
-    return withDirPath(work);
-  }
-
   /** A config value, or none when it is not set. */
   private async configured(root: DirectoryPath, key: string): Promise<Result<string | undefined, GitProblem>> {
     const ran = await this.run(root, ['config', '--get', key], { exitCodes: [0, 1] });
     return ran.map((result) => (result.exitCode === 0 ? result.stdout.trim() : undefined));
   }
 
-  // No prompt, no credential dialogue, no passphrase, and a timeout, so a dead remote is reported rather than waited on.
-  private async runRemote(cwd: DirectoryPath, args: string[]): Promise<Result<Ran<string>, GitProblem>> {
-    const ssh = await this.batchSsh(cwd);
-    if (ssh.isErr()) {
-      return err(ssh.error);
-    }
-    try {
-      const result = await execa('git', ['-c', 'credential.interactive=false', ...args], {
-        cwd: cwd.toString(),
-        env: { ...OWN_REPOSITORY, GIT_TERMINAL_PROMPT: '0', LC_ALL: 'C', ...ssh.value },
-        timeout: REMOTE_TIMEOUT_MS,
-        reject: false
-      });
-      return ok({ stdout: result.stdout, stderr: result.stderr, exitCode: result.exitCode ?? -1 });
-    } catch (error) {
-      return err(
-        problem(
-          error instanceof ExecaError && error.timedOut
-            ? `the remote did not answer within ${REMOTE_TIMEOUT_MS / 1000} seconds`
-            : errorMessage(error)
-        )
-      );
-    }
-  }
-
-  // The developer's own SSH client, set by GIT_SSH_COMMAND, core.sshCommand or GIT_SSH, is
-  // left alone; only the default ssh is told not to ask for a passphrase.
+  // The developer's own SSH client (GIT_SSH_COMMAND, core.sshCommand, GIT_SSH) is left alone; only the default ssh is told not to ask for a passphrase.
   private async batchSsh(cwd: DirectoryPath): Promise<Result<{ GIT_SSH_COMMAND?: string }, GitProblem>> {
     if (process.env.GIT_SSH_COMMAND !== undefined || process.env.GIT_SSH !== undefined) {
       return ok({});
@@ -630,7 +607,7 @@ export class GitService {
     args: string[],
     options: RunOptions & { encoding?: 'utf8' | 'buffer' } = {}
   ): Promise<Result<Ran<string | Uint8Array>, GitProblem>> {
-    const { env = {}, attributesIn, input, encoding = 'utf8', exitCodes = [0] } = options;
+    const { env = {}, attributesIn, input, encoding = 'utf8', exitCodes = [0], remote = false } = options;
     const settings: Result<readonly (readonly [string, string])[], GitProblem> =
       attributesIn === undefined
         ? ok(SETTINGS)
@@ -638,22 +615,37 @@ export class GitService {
     if (settings.isErr()) {
       return err(settings.error);
     }
+    // A remote is given no prompt, no credential dialogue, no passphrase, and a timeout, so a dead one is reported rather than waited on.
+    const ssh = remote ? await this.batchSsh(cwd) : ok({});
+    if (ssh.isErr()) {
+      return err(ssh.error);
+    }
     try {
       const result = await execa(
         'git',
-        [...settings.value.flatMap(([key, value]) => ['-c', `${key}=${value}`]), ...args],
+        [
+          ...[...settings.value, ...(remote ? REMOTE_SETTINGS : [])].flatMap(([key, value]) => [
+            '-c',
+            `${key}=${value}`
+          ]),
+          ...args
+        ],
         {
           cwd: cwd.toString(),
-          env: { ...OWN_REPOSITORY, ...env, GIT_TERMINAL_PROMPT: '0', LC_ALL: 'C' },
+          env: { ...OWN_REPOSITORY, ...env, ...ssh.value, GIT_TERMINAL_PROMPT: '0', LC_ALL: 'C' },
           input,
           encoding: encoding as 'utf8',
           // Bytes are read by length, and stripping would take a final CR with the newline.
           stripFinalNewline: encoding === 'utf8',
+          timeout: remote ? REMOTE_TIMEOUT_MS : undefined,
           reject: false
         }
       );
+      if (result.timedOut) {
+        return err(problem(`the remote did not answer within ${REMOTE_TIMEOUT_MS / 1000} seconds`));
+      }
       const stderr = String(result.stderr);
-      if (!exitCodes.includes(result.exitCode ?? -1)) {
+      if (exitCodes !== 'any' && !exitCodes.includes(result.exitCode ?? -1)) {
         // With no exit code git never ran (or was killed), so execa's own message says why.
         const reason =
           result.exitCode === undefined
@@ -663,13 +655,15 @@ export class GitService {
       }
       return ok({ stdout: result.stdout as string | Uint8Array, stderr, exitCode: result.exitCode ?? -1 });
     } catch (error) {
+      if (error instanceof ExecaError && error.timedOut) {
+        return err(problem(`the remote did not answer within ${REMOTE_TIMEOUT_MS / 1000} seconds`));
+      }
       return err(failed(args[0], error instanceof ExecaError ? error.shortMessage : errorMessage(error)));
     }
   }
 }
 
-// Trees are stored with line endings normalised, so a CRLF file and its LF twin compare equal
-// and merge line by line; the attributes live in a temporary file, never in the repository.
+// Trees are stored with line endings normalised, so a CRLF file and its LF twin merge line by line; the attributes never enter the repository.
 async function attributesFile(temporary: DirectoryPath): Promise<Result<string, GitProblem>> {
   const file = new FilePath(temporary, new FileName('attributes'));
   try {

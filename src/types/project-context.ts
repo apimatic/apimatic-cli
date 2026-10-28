@@ -67,10 +67,8 @@ export class ProjectContext {
   }
 
   /** The SDK directory itself: the `--destination` when one is named, else `sdk/<language>` beside the source. */
-  public sdkDirectory(language: Language, destination?: string): DirectoryPath {
-    return destination
-      ? new DirectoryPath(destination)
-      : this.projectDirectory.join(OUTPUT_DIRECTORY_NAMES.sdk, language);
+  public sdkDirectory(language: Language, destination?: DirectoryPath): DirectoryPath {
+    return destination ?? this.projectDirectory.join(OUTPUT_DIRECTORY_NAMES.sdk, language);
   }
 
   public portalDirectory(destination?: string): DirectoryPath {

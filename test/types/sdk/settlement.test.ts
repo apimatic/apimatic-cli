@@ -4,7 +4,7 @@ import { RelativeFilePath } from '../../../src/types/file/relativeFilePath.js';
 import { BlobId } from '../../../src/types/git/blob-id.js';
 import { TreeId } from '../../../src/types/git/tree-id.js';
 import { Conflict, ConflictSides, MergeFiles, MergePlan } from '../../../src/types/sdk/merge-plan.js';
-import { favouring, resolving } from '../../../src/types/sdk/settlement.js';
+import { settle } from '../../../src/types/sdk/settlement.js';
 import { Regeneration } from '../../../src/types/sdk/repository-state.js';
 
 const rel = (value: string) => RelativeFilePath.fromGit(value)!;
@@ -30,13 +30,12 @@ const regeneration = (conflicts: Conflict[]): Regeneration => {
   return { generated: TreeId.fromGit('a'.repeat(40))!, merge: { plan, stages: [] } };
 };
 
-describe('Settlement', () => {
+describe('settle', () => {
   it('writes the merge as git made it when the developer resolves, markers and all', () => {
     const original = regeneration([{ path: rel('a.py'), kind: 'bothChanged' }]);
 
-    const settlement = resolving(original);
+    const settlement = settle(original, 'resolve');
 
-    expect(settlement.regeneration).to.equal(original);
     expect(settlement.plan).to.equal(original.merge.plan);
     expect(settlement.plan.hasConflicts()).to.be.true;
     expect(settlement.settled).to.be.undefined;
@@ -48,9 +47,8 @@ describe('Settlement', () => {
       { path: rel('b.py'), kind: 'deletedByYou' }
     ]);
 
-    const settlement = favouring('generated', original);
+    const settlement = settle(original, 'generated');
 
-    expect(settlement.regeneration).to.equal(original);
     expect(settlement.plan.hasConflicts()).to.be.false;
     expect(settlement.plan.writes).to.deep.equal([
       { path: rel('a.py'), blob: WITH_MARKERS, settle: 'generated' },
@@ -66,9 +64,8 @@ describe('Settlement', () => {
       { path: rel('b.py'), kind: 'noLongerGenerated' }
     ]);
 
-    const settlement = favouring('yours', original);
+    const settlement = settle(original, 'yours');
 
-    expect(settlement.regeneration).to.equal(original);
     expect(settlement.plan.hasConflicts()).to.be.false;
     expect(settlement.plan.writes).to.deep.equal([{ path: rel('a.py'), blob: WITH_MARKERS, settle: 'yours' }]);
     expect(settlement.plan.files.merged.map(String)).to.deep.equal(['a.py']);

@@ -40,18 +40,14 @@ export class ShareHookInstaller {
     if (existing.isErr()) {
       return err(existing.error);
     }
-    const hook = ShareHook.installInto(existing.value);
-    switch (hook.kind) {
-      case 'present':
+    const update = ShareHook.update(existing.value);
+    switch (update.kind) {
+      case 'unchanged':
         return ok({ kind: 'installed', file, written: false });
       case 'notShell':
-        return ok(
-          ShareHook.calls(existing.value)
-            ? { kind: 'installed', file, written: false }
-            : { kind: 'notShell', file, shebang: hook.shebang, script, steps: shareHookSteps(hook) }
-        );
-      case 'installed': {
-        const written = await onDisk(this.writeExecutable(file, hook.content));
+        return ok({ kind: 'notShell', file, shebang: update.shebang, script, steps: shareHookSteps(update) });
+      case 'write': {
+        const written = await onDisk(this.writeExecutable(file, update.content));
         return written.map((): ShareHookInstall => ({ kind: 'installed', file, written: true }));
       }
     }

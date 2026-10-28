@@ -30,19 +30,25 @@ export class SnapshotStore {
 
   /** A freshly generated SDK as a tree: every file, whatever its own `.gitignore` says. */
   public async snapshotGenerated(generated: DirectoryPath): Promise<Result<TreeId, RepositoryProblem>> {
-    return this.git.treeOf(this.root, generated, 'all');
+    return this.git.treeOfEveryFile(this.root, generated);
   }
 
   /** The SDK directory as it is on disk; every path `base` holds goes in, so a generated file an ignore rule matches is never taken for deleted. */
-  public async snapshotDisk(
-    base: CommitId | undefined,
-    lineEndings: 'normalized' | 'asIs' = 'normalized'
-  ): Promise<Result<TreeId, RepositoryProblem>> {
+  public async snapshotDisk(base: CommitId | undefined): Promise<Result<TreeId, RepositoryProblem>> {
     const include = await this.pathsHeldBy(base);
     if (include.isErr()) {
       return err(include.error);
     }
-    return this.git.treeOf(this.root, this.sdk, include.value, lineEndings);
+    return this.git.treeOfDirectory(this.root, this.sdk, include.value);
+  }
+
+  /** As `snapshotDisk`, byte for byte, for a snapshot a restore must reproduce exactly. */
+  private async snapshotDiskAsIs(base: CommitId | undefined): Promise<Result<TreeId, RepositoryProblem>> {
+    const include = await this.pathsHeldBy(base);
+    if (include.isErr()) {
+      return err(include.error);
+    }
+    return this.git.treeOfDirectoryAsIs(this.root, this.sdk, include.value);
   }
 
   private async pathsHeldBy(base: CommitId | undefined): Promise<Result<RelativeFilePath[], RepositoryProblem>> {
@@ -87,7 +93,7 @@ export class SnapshotStore {
 
   /** Keeps the SDK directory as it is on disk, byte for byte, replacing what the last run kept, so a merge can be undone. */
   public async savePrevious(base: CommitId | undefined): Promise<Result<CommitId, RepositoryProblem>> {
-    const disk = await this.snapshotDisk(base, 'asIs');
+    const disk = await this.snapshotDiskAsIs(base);
     if (disk.isErr()) {
       return err(disk.error);
     }

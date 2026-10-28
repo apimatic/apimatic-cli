@@ -19,10 +19,16 @@ export class TempContext {
     return new FilePath(this.tempDirectory, new FileName(`${uuid}`));
   }
 
-  /** A zip of `directory`, leaving out what `excluding` names below it. */
-  public async zip(directory: DirectoryPath, excluding?: RelativePaths): Promise<Result<FilePath, FileProblem>> {
+  public async zip(directory: DirectoryPath): Promise<Result<FilePath, FileProblem>> {
     const tempFile = this.getTempFileName;
-    const archived = await this.zipService.archive(directory, tempFile, excluding);
+    const archived = await this.zipService.archive(directory, tempFile);
+    return archived.map(() => tempFile).mapErr((reason): FileProblem => ({ kind: 'zipFailed', reason }));
+  }
+
+  /** A zip of `directory`, leaving out what `excluding` names below it. */
+  public async zipWithout(directory: DirectoryPath, excluding: RelativePaths): Promise<Result<FilePath, FileProblem>> {
+    const tempFile = this.getTempFileName;
+    const archived = await this.zipService.archiveWithout(directory, tempFile, excluding);
     return archived.map(() => tempFile).mapErr((reason): FileProblem => ({ kind: 'zipFailed', reason }));
   }
 

@@ -80,7 +80,10 @@ With git ${GitVersion.required()} or newer installed, your edits to the generate
     const action = new GenerateAction(this.getConfigDir(), commandMetadata, authKey);
     const result = await action.execute(
       project,
-      project.sdkDirectory(language as Language, destination),
+      project.sdkDirectory(
+        language as Language,
+        destination === undefined ? undefined : DirectoryPath.fromUserInput(destination)
+      ),
       {
         language: language as Language,
         codegenVersion: codegenVersion as CodeGenerationVersion,

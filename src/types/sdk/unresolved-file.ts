@@ -1,19 +1,9 @@
 import { settleMarkers } from './conflict-markers.js';
-import { chosen, ConflictSide } from './merge-plan.js';
+import { isBinary } from './file-content.js';
+import { chosen, ConflictSide, Sides } from './merge-plan.js';
 
-/** A file git still holds as unmerged: as it is now, and the two sides git kept in the index. */
-export type UnresolvedFile = {
-  /** The file on disk; none when it is not there. */
-  disk: Uint8Array | undefined;
-  /** Your version when the run merged; none when you had deleted the file. */
-  yours: Uint8Array | undefined;
-  /** The generator's version; none when the generator no longer produces the file. */
-  generated: Uint8Array | undefined;
-};
-
-// Git's own test: a NUL in the first 8000 bytes makes a file binary, and a binary file is never merged line by line.
-const isBinary = (content: Uint8Array | undefined): boolean =>
-  content !== undefined && content.subarray(0, 8000).includes(0);
+/** A file git still holds as unmerged: as it is on disk now, and the two sides git kept in the index; none where a side has no file. */
+export type UnresolvedFile = Sides<Uint8Array> & { disk: Uint8Array | undefined };
 
 /**
  * Markers still in the file settle in place; a file git could not merge line by line settles
@@ -29,9 +19,9 @@ export function settledContent(side: ConflictSide, file: UnresolvedFile): Uint8A
   if (!whole) {
     return file.disk;
   }
-  const content = chosen(side, file);
-  if (content === undefined) {
+  const picked = chosen(side, file);
+  if (picked === undefined) {
     return undefined;
   }
-  return content === file.yours ? file.disk : content;
+  return picked.side === 'yours' ? file.disk : picked.content;
 }

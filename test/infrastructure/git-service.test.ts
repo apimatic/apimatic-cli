@@ -148,7 +148,7 @@ describe('GitService', () => {
       write(repo, 'sdk/python/keep.py', 'kept');
       write(repo, 'other.py', 'outside');
 
-      const tree = (await git.treeOf(repo, repo.join('sdk', 'python'), []))._unsafeUnwrap();
+      const tree = (await git.treeOfDirectory(repo, repo.join('sdk', 'python'), []))._unsafeUnwrap();
 
       expect([...(await filesOf(repo, tree)).keys()]).to.deep.equal(['keep.py']);
     });
@@ -164,7 +164,7 @@ describe('GitService', () => {
 
       const files = await filesOf(
         repo,
-        (await git.treeOf(repo, sdk, ['dist/generated.js', 'missing.txt'].map(rel)))._unsafeUnwrap()
+        (await git.treeOfDirectory(repo, sdk, ['dist/generated.js', 'missing.txt'].map(rel)))._unsafeUnwrap()
       );
 
       expect([...files.keys()]).to.have.members(['.gitignore', 'src/index.ts', 'dist/generated.js']);
@@ -176,7 +176,7 @@ describe('GitService', () => {
       write(repo, 'dist/index.js', 'built\n');
       write(repo, 'README.md', '# sdk\n');
 
-      const files = await filesOf(repo, (await git.treeOf(repo, repo, 'all'))._unsafeUnwrap());
+      const files = await filesOf(repo, (await git.treeOfEveryFile(repo, repo))._unsafeUnwrap());
 
       expect([...files.keys()]).to.have.members(['.gitignore', 'dist/index.js', 'README.md']);
     });
@@ -186,7 +186,7 @@ describe('GitService', () => {
       write(repo, 'crlf.txt', 'one\r\ntwo\r\n');
       write(repo, 'lf.txt', 'one\ntwo\n');
 
-      const files = await filesOf(repo, (await git.treeOf(repo, repo, 'all'))._unsafeUnwrap());
+      const files = await filesOf(repo, (await git.treeOfEveryFile(repo, repo))._unsafeUnwrap());
 
       expect(files.get('crlf.txt')).to.equal('one\ntwo\n');
       expect(files.get('lf.txt')).to.equal('one\ntwo\n');
@@ -198,7 +198,7 @@ describe('GitService', () => {
       write(repo, 'cr-at-end.bin', 'x\r');
 
       const entries = (
-        await git.listTree(repo, (await git.treeOf(repo, repo, 'all', 'asIs'))._unsafeUnwrap())
+        await git.listTree(repo, (await git.treeOfDirectoryAsIs(repo, repo, []))._unsafeUnwrap())
       )._unsafeUnwrap();
       const crlf = entries.find((entry) => entry.path.toString() === 'crlf.txt')!;
       const cr = entries.find((entry) => entry.path.toString() === 'cr-at-end.bin')!;
@@ -212,7 +212,7 @@ describe('GitService', () => {
   it('commits a tree, moves a ref to it, and describes the commit', async () => {
     const repo = await repository();
     write(repo, 'a.txt', 'a\n');
-    const tree = (await git.treeOf(repo, repo, 'all'))._unsafeUnwrap();
+    const tree = (await git.treeOfEveryFile(repo, repo))._unsafeUnwrap();
     const { SnapshotRef } = await import('../../src/types/sdk/snapshot-ref.js');
     const ref = SnapshotRef.pristine(SdkPath.fromGit('sdk')!);
 
@@ -244,11 +244,11 @@ describe('GitService', () => {
     write(after, 'moved/a.txt', 'one\ntwo\nthree\n');
     write(after, 'b.txt', 'B\n');
     write(after, 'c.txt', 'c\n');
-    const from = (await git.treeOf(repo, before, 'all'))._unsafeUnwrap();
-    const to = (await git.treeOf(repo, after, 'all'))._unsafeUnwrap();
+    const from = (await git.treeOfEveryFile(repo, before))._unsafeUnwrap();
+    const to = (await git.treeOfEveryFile(repo, after))._unsafeUnwrap();
 
-    const paired = (await git.diffTrees(repo, from, to, true))._unsafeUnwrap();
-    const plain = (await git.diffTrees(repo, from, to, false))._unsafeUnwrap();
+    const paired = (await git.diffTreesPairingRenames(repo, from, to))._unsafeUnwrap();
+    const plain = (await git.diffTrees(repo, from, to))._unsafeUnwrap();
 
     expect(
       paired.map((change) => [
@@ -284,7 +284,7 @@ describe('GitService', () => {
         write(work, relative, contents);
       }
       return (
-        await git.commitTree(repo, (await git.treeOf(repo, work, 'all'))._unsafeUnwrap(), parents, name)
+        await git.commitTree(repo, (await git.treeOfEveryFile(repo, work))._unsafeUnwrap(), parents, name)
       )._unsafeUnwrap();
     };
 
@@ -303,12 +303,12 @@ describe('GitService', () => {
         ['gone.txt', 1],
         ['gone.txt', 2]
       ]);
-      expect(merged.messages.map(({ paths, type }) => [paths.map(String), type])).to.have.deep.members([
-        [['same.txt'], 'Auto-merging'],
-        [['same.txt'], 'CONFLICT (contents)'],
-        [['gone.txt'], 'CONFLICT (modify/delete)']
+      expect(merged.messages.map(({ paths, kind }) => [paths.map(String), kind])).to.have.deep.members([
+        [['same.txt'], 'informational'],
+        [['same.txt'], 'contents'],
+        [['gone.txt'], 'modifyDelete']
       ]);
-      expect(merged.messages.find(({ type }) => type === 'CONFLICT (modify/delete)')?.message).to.match(
+      expect(merged.messages.find(({ kind }) => kind === 'modifyDelete')?.message).to.match(
         /^CONFLICT \(modify\/delete\): gone\.txt deleted in .+ left in tree\.$/
       );
       expect((await filesOf(repo, merged.tree)).get('gone.txt')).to.equal('kept\n');
@@ -382,7 +382,7 @@ describe('GitService', () => {
     const snapshot = async (repo: DirectoryPath, content: string) => {
       const work = new DirectoryPath(path.join(root, `work-${content}`));
       write(work, 'a.txt', content);
-      const tree = (await git.treeOf(repo, work, 'all'))._unsafeUnwrap();
+      const tree = (await git.treeOfEveryFile(repo, work))._unsafeUnwrap();
       const parent = (await git.resolveRef(repo, ref))._unsafeUnwrap();
       const commit = (
         await git.commitTree(repo, tree, parent === undefined ? [] : [parent], 'snapshot')

@@ -15,16 +15,9 @@ import {
 } from '../../types/sdk/generate.js';
 import { RelativeFilePath } from '../../types/file/relativeFilePath.js';
 import { GitVersion } from '../../types/git/git-version.js';
-import {
-  ConflictChoice,
-  ConflictKind,
-  ConflictSide,
-  MergePlan,
-  NextStep,
-  UnresolvedChoice,
-  YOUR_FILES
-} from '../../types/sdk/merge-plan.js';
+import { ConflictKind, ConflictSide, MergePlan, NextStep, YOUR_FILES } from '../../types/sdk/merge-plan.js';
 import { RecordingNotice } from '../../types/sdk/recording-notice.js';
+import { ConflictChoice, UnresolvedChoice } from '../../types/sdk/settlement.js';
 import { GenerationDifference, GenerationRequest, SdkGeneration } from '../../types/sdk/sdk-generation.js';
 import { SHARE_HOOK_CALL } from '../../types/sdk/share-hook.js';
 import {
@@ -73,15 +66,6 @@ const numbered = (steps: readonly string[]) => steps.map((step, index) => `${ind
 const stillUnresolved = (paths: readonly RelativeFilePath[]): string =>
   `${plural(paths.length, 'file')} from the last run ${paths.length === 1 ? 'is' : 'are'} still unresolved`;
 
-/** The one rule both SDK commands refuse a destination by, worded once. */
-export function destinationContainsSource(sourceDirectory: DirectoryPath, sdkDirectory: DirectoryPath): string {
-  return (
-    `The destination ${f.path(sdkDirectory)} contains your source directory ` +
-    `${f.path(sourceDirectory)}, and everything in the destination is replaced by the ` +
-    `generated SDK. Choose a destination outside it, such as ${f.flag('destination', './sdk')}.`
-  );
-}
-
 const RESOLVED_HEADINGS: Record<ConflictSide, string> = {
   generated: "Resolved using the generator's changes:",
   yours: 'Resolved using your changes:'
@@ -102,7 +86,6 @@ const plural = (count: number, noun: string) => `${count} ${noun}${count === 1 ?
 const listed = (sdk: DirectoryPath, paths: readonly RelativeFilePath[]) =>
   paths.map((relative) => `  ${f.relativePath(relative.in(sdk))}`);
 
-/** No method uses `this`, so each can be handed to a step as it is, the way `conflictChoice` is. */
 export class SdkGeneratePrompts {
   /** Named rather than listed: a language on its way back reads differently from a typo, and no one is sent to a generator version that no longer exists. */
   public languageNotAvailable(language: Language) {
@@ -114,8 +97,11 @@ export class SdkGeneratePrompts {
   }
 
   public destinationContainsSource(sourceDirectory: DirectoryPath, sdkDirectory: DirectoryPath) {
-    const message = destinationContainsSource(sourceDirectory, sdkDirectory);
-    log.error(message);
+    log.error(
+      `The destination ${f.path(sdkDirectory)} contains your source directory ` +
+        `${f.path(sourceDirectory)}, and everything in the destination is replaced by the ` +
+        `generated SDK. Choose a destination outside it, such as ${f.flag('destination', './sdk')}.`
+    );
   }
 
   public sourceDirectoryEmpty(directory: DirectoryPath) {
@@ -223,11 +209,8 @@ export class SdkGeneratePrompts {
     log.error(`${stillUnresolved(paths)}. Resolve and stage ${them}, then rerun:\n${files}`);
   }
 
-  /** The files still unresolved and the question, before anything is generated; none when the developer backs out. */
-  public async unresolvedChoice(
-    paths: readonly RelativeFilePath[],
-    sdk: DirectoryPath
-  ): Promise<UnresolvedChoice | undefined> {
+  /** The files still unresolved and the question, before anything is generated; backing out is finishing by hand. */
+  public async unresolvedChoice(paths: readonly RelativeFilePath[], sdk: DirectoryPath): Promise<UnresolvedChoice> {
     const one = paths.length === 1;
     log.warn(`${stillUnresolved(paths)}:\n${listed(sdk, paths).join('\n')}`);
     const choice = await select<UnresolvedChoice>({
@@ -250,7 +233,7 @@ export class SdkGeneratePrompts {
         }
       ]
     });
-    return isCancel(choice) ? undefined : choice;
+    return isCancel(choice) ? 'resolve' : choice;
   }
 
   public resolveLater() {
@@ -412,8 +395,8 @@ export class SdkGeneratePrompts {
     log.info(lines.join('\n'));
   }
 
-  /** The conflicted files and the question, before anything is written; none when the developer backs out. */
-  public async conflictChoice(plan: MergePlan, sdk: DirectoryPath): Promise<ConflictChoice | undefined> {
+  /** The conflicted files and the question, before anything is written; backing out cancels the run. */
+  public async conflictChoice(plan: MergePlan, sdk: DirectoryPath): Promise<ConflictChoice> {
     const one = plan.conflicts.length === 1;
     noteWrapped(conflictLines(plan, sdk).join('\n'), attentionTitle(plan));
     const choice = await select<ConflictChoice>({
@@ -437,7 +420,7 @@ export class SdkGeneratePrompts {
         { value: 'cancel', label: 'Cancel this run', hint: 'nothing is written; the SDK stays as it is' }
       ]
     });
-    return isCancel(choice) ? undefined : choice;
+    return isCancel(choice) ? 'cancel' : choice;
   }
 
   public runCancelled(sdk: DirectoryPath) {

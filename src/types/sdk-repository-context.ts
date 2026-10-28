@@ -6,12 +6,12 @@ import { RelativePaths } from './file/relative-paths.js';
 import { ValueMap, ValueSet } from './common/value-map.js';
 import { BlobId } from './git/blob-id.js';
 import { CommitId } from './git/commit-id.js';
-import { STAGE, StageEntry } from './git/merge-tree.js';
+import { StageEntry } from './git/merge-tree.js';
 import { TreeId } from './git/tree-id.js';
 import { GenerationRecord } from './sdk/generation-record.js';
 import { SdkGeneration } from './sdk/sdk-generation.js';
 import { afterFetch, classify, RepositoryFacts } from './sdk/repository-facts.js';
-import { ConflictSide } from './sdk/merge-plan.js';
+import { ConflictSide, SIDE_STAGE } from './sdk/merge-plan.js';
 import {
   InspectionProblem,
   RecordProblem,
@@ -247,8 +247,8 @@ export class SdkRepositoryContext {
     }
     const settled = settledContent(side, {
       disk: disk.value,
-      yours: stage(STAGE.yours),
-      generated: stage(STAGE.generated)
+      yours: stage(SIDE_STAGE.yours),
+      generated: stage(SIDE_STAGE.generated)
     });
     return settled === disk.value ? ok(undefined) : this.files.settle(path, settled);
   }

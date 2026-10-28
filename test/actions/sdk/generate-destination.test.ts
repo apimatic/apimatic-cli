@@ -355,7 +355,7 @@ describe('GenerateAction (sdk) — the destination', () => {
 
     it('stops, touching nothing, when the developer will finish resolving or backs out', async () => {
       await marked();
-      sinon.stub(SdkGeneratePrompts.prototype, 'unresolvedChoice').resolves(undefined);
+      sinon.stub(SdkGeneratePrompts.prototype, 'unresolvedChoice').resolves('resolve');
       const resolveLater = sinon.stub(SdkGeneratePrompts.prototype, 'resolveLater');
 
       expect((await execute({ force: false, files: FILES })).isFailed()).to.be.true;

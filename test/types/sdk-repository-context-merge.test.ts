@@ -123,7 +123,7 @@ describe('SdkRepositoryContext: the merge', () => {
     ).to.be.true;
     const plan = favour === undefined ? regeneration.merge.plan : regeneration.merge.plan.taking(favour);
     beforeWrite?.();
-    const written = await repository.write(baseCommit, { regeneration, plan }, generatedDirectory);
+    const written = await repository.write(baseCommit, { plan }, generatedDirectory);
     if (beforeWrite === undefined) {
       written._unsafeUnwrap();
     }

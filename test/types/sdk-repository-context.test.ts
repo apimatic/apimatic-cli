@@ -14,7 +14,7 @@ import { SdkRepositoryContext } from '../../src/types/sdk-repository-context.js'
 import { CodeGenerationVersion, Language, Stability } from '../../src/types/sdk/generate.js';
 import { GenerationRecord, RECORD_ATTRIBUTES } from '../../src/types/sdk/generation-record.js';
 import { SdkGeneration } from '../../src/types/sdk/sdk-generation.js';
-import { SHARE_HOOK_BLOCK, SHARE_HOOK_CALL, SHARE_HOOK_SCRIPT } from '../../src/types/sdk/share-hook.js';
+import { SHARE_HOOK_CALL, SHARE_HOOK_SCRIPT } from '../../src/types/sdk/share-hook.js';
 import { SdkPath } from '../../src/types/sdk/sdk-path.js';
 import { SnapshotRef } from '../../src/types/sdk/snapshot-ref.js';
 import { describeCommit, recordPristine, snapshotFiles } from '../helpers/snapshots.js';
@@ -635,7 +635,7 @@ describe('SdkRepositoryContext', () => {
       expect(second).to.deep.equal({ ...first, written: false });
       expect(fs.readFileSync(hookFile(sdk, 'apimatic-pre-push'), 'utf8')).to.equal(SHARE_HOOK_SCRIPT);
       const hook = fs.readFileSync(hookFile(sdk), 'utf8');
-      expect(hook.split(SHARE_HOOK_BLOCK)).to.have.length(2);
+      expect(hook.split(SHARE_HOOK_CALL)).to.have.length(2);
       if (process.platform !== 'win32') {
         expect(fs.statSync(hookFile(sdk)).mode & 0o111).to.not.equal(0);
         expect(fs.statSync(hookFile(sdk, 'apimatic-pre-push')).mode & 0o111).to.not.equal(0);
@@ -717,7 +717,7 @@ describe('SdkRepositoryContext', () => {
       const result = await install(sdk);
 
       expect(result.kind === 'notShell' && result.shebang).to.equal('#!/usr/bin/env node');
-      expect(fs.readFileSync(hookFile(sdk), 'utf8')).to.not.contain(SHARE_HOOK_BLOCK);
+      expect(fs.readFileSync(hookFile(sdk), 'utf8')).to.not.contain(SHARE_HOOK_CALL);
 
       fs.writeFileSync(
         hookFile(sdk),

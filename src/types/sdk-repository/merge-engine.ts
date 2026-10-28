@@ -30,20 +30,21 @@ export class MergeEngine {
     if (theirs.isErr()) {
       return err(theirs.error);
     }
+    // Yours is git's "ours" and the generation its "theirs", which is what `SIDE_STAGE` reads the stages by.
     const merged = await this.git.mergeTree(this.root, yours.value, theirs.value);
     if (merged.isErr()) {
       return err(merged.error);
     }
     const merge = merged.value;
-    const yourChanges = await this.git.diffTrees(this.root, baseTree.value, disk, true);
+    const yourChanges = await this.git.diffTreesPairingRenames(this.root, baseTree.value, disk);
     if (yourChanges.isErr()) {
       return err(yourChanges.error);
     }
-    const generatedChanges = await this.git.diffTrees(this.root, baseTree.value, generated, true);
+    const generatedChanges = await this.git.diffTreesPairingRenames(this.root, baseTree.value, generated);
     if (generatedChanges.isErr()) {
       return err(generatedChanges.error);
     }
-    const applied = await this.git.diffTrees(this.root, disk, merge.tree, false);
+    const applied = await this.git.diffTrees(this.root, disk, merge.tree);
     if (applied.isErr()) {
       return err(applied.error);
     }

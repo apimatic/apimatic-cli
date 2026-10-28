@@ -75,40 +75,40 @@ describe('MergePlan.from', () => {
             { mode: '100644', oid: blob('2'), stage: 2, path: rel('dropped.ts') }
           ],
           messages: [
-            { paths: ['same.ts'].map(rel), type: 'Auto-merging', message: 'Auto-merging same.ts' },
+            { paths: ['same.ts'].map(rel), kind: 'informational', message: 'Auto-merging same.ts' },
             {
               paths: ['same.ts'].map(rel),
-              type: 'CONFLICT (contents)',
+              kind: 'contents',
               message: 'CONFLICT (content): Merge conflict in same.ts'
             },
             {
               paths: ['added.ts'].map(rel),
-              type: 'CONFLICT (contents)',
+              kind: 'addAdd',
               message: 'CONFLICT (add/add): Merge conflict in added.ts'
             },
             {
               paths: ['logo.png'].map(rel),
-              type: 'CONFLICT (binary)',
+              kind: 'binary',
               message: 'warning: Cannot merge binary files: logo.png'
             },
             {
               paths: ['logo.png'].map(rel),
-              type: 'CONFLICT (contents)',
+              kind: 'contents',
               message: 'CONFLICT (content): Merge conflict in logo.png'
             },
             {
               paths: ['deleted-by-you.ts'].map(rel),
-              type: 'CONFLICT (modify/delete)',
+              kind: 'modifyDelete',
               message: 'CONFLICT (modify/delete): …'
             },
             {
               paths: ['dropped.ts'].map(rel),
-              type: 'CONFLICT (modify/delete)',
+              kind: 'modifyDelete',
               message: 'CONFLICT (modify/delete): …'
             },
             {
               paths: ['x.ts', 'y.ts'].map(rel),
-              type: 'CONFLICT (rename/rename)',
+              kind: 'otherConflict',
               message: 'CONFLICT (rename/rename): a.ts renamed to x.ts and y.ts'
             }
           ]
@@ -186,25 +186,25 @@ describe('MergePlan.from', () => {
           messages: [
             {
               paths: ['same.ts'].map(rel),
-              type: 'CONFLICT (contents)',
+              kind: 'contents',
               message: 'CONFLICT (content): Merge conflict in same.ts'
             },
             {
               paths: ['added.ts'].map(rel),
-              type: 'CONFLICT (contents)',
+              kind: 'addAdd',
               message: 'CONFLICT (add/add): Merge conflict in added.ts'
             },
             {
               paths: ['logo.png'].map(rel),
-              type: 'CONFLICT (binary)',
+              kind: 'binary',
               message: 'warning: Cannot merge binary files: logo.png'
             },
             {
               paths: ['deleted-by-you.ts'].map(rel),
-              type: 'CONFLICT (modify/delete)',
+              kind: 'modifyDelete',
               message: 'CONFLICT (modify/delete): …'
             },
-            { paths: ['dropped.ts'].map(rel), type: 'CONFLICT (modify/delete)', message: 'CONFLICT (modify/delete): …' }
+            { paths: ['dropped.ts'].map(rel), kind: 'modifyDelete', message: 'CONFLICT (modify/delete): …' }
           ]
         })
       })
@@ -247,7 +247,7 @@ describe('MergePlan.from', () => {
           messages: [
             {
               paths: ['model/custom.ts'].map(rel),
-              type: 'CONFLICT (file location)',
+              kind: 'otherConflict',
               message: 'CONFLICT (file location): models/custom.ts added inside a directory that was renamed'
             }
           ]
@@ -294,9 +294,7 @@ describe('MergePlan.from', () => {
             { mode: '100644', oid: blob('1'), stage: 1, path: rel('old.ts') },
             { mode: '100644', oid: blob('3'), stage: 3, path: rel('old.ts') }
           ],
-          messages: [
-            { paths: ['old.ts'].map(rel), type: 'CONFLICT (rename/delete)', message: 'CONFLICT (rename/delete): …' }
-          ]
+          messages: [{ paths: ['old.ts'].map(rel), kind: 'renameDelete', message: 'CONFLICT (rename/delete): …' }]
         })
       })
     );

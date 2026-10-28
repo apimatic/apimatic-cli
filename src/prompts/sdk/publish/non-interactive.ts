@@ -2,7 +2,6 @@ import { log } from '@clack/prompts';
 import { Result } from 'neverthrow';
 import { PublishType } from '../../../types/publish-api/publishing-profile-item.js';
 import { format as f } from '../../../prompts/format.js';
-import { destinationContainsSource as destinationContainsSourceMessage } from '../generate.js';
 import { DirectoryPath } from '../../../types/file/directoryPath.js';
 import { ServiceError } from '../../../infrastructure/service-error.js';
 import { withSpinner } from '../../prompt.js';
@@ -13,10 +12,6 @@ import { SDK_PUBLISHING_OVERVIEW_URL } from '../../publishing/links.js';
 import { APIMATIC_CONFIG_FILE_NAME } from '../../../types/apimatic-config/document.js';
 
 export class SdkPublishNonInteractivePrompts {
-  public destinationContainsSource(sourceDirectory: DirectoryPath, sdkDirectory: DirectoryPath) {
-    log.error(destinationContainsSourceMessage(sourceDirectory, sdkDirectory));
-  }
-
   public sourceDirectoryDoesNotExist(directory: DirectoryPath) {
     log.error(`The ${f.var('src')} does not exist at the provided location: ${f.path(directory)}`);
   }

@@ -48,7 +48,7 @@ describe('ZipService', () => {
         files: ['debug.log', 'models/draft.py'].map((value) => RelativeFilePath.fromGit(value)!),
         directories: [RelativeDirectoryPath.fromGit('dist/')!]
       };
-      (await new ZipService().archive(source, archive, excluding))._unsafeUnwrap();
+      (await new ZipService().archiveWithout(source, archive, excluding))._unsafeUnwrap();
 
       const names = new AdmZip(archive.toString()).getEntries().map((entry) => entry.entryName);
       expect(names).to.have.members(['README.md', 'models/book.py', 'dist-notes/keep.md']);

@@ -1,6 +1,5 @@
 import { expect } from 'chai';
 import {
-  SHARE_HOOK_BLOCK,
   SHARE_HOOK_CALL,
   SHARE_HOOK_SCRIPT,
   SHARE_HOOK_SCRIPT_NAME,
@@ -9,9 +8,9 @@ import {
 
 describe('ShareHook', () => {
   const installed = (existing: string | undefined): string => {
-    const result = ShareHook.installInto(existing);
-    expect(result.kind).to.equal('installed');
-    return result.kind === 'installed' ? result.content : '';
+    const result = ShareHook.update(existing);
+    expect(result.kind).to.equal('write');
+    return result.kind === 'write' ? result.content : '';
   };
 
   it('keeps the script apart from the hook, which only calls it through git', () => {
@@ -21,15 +20,13 @@ describe('ShareHook', () => {
     expect(SHARE_HOOK_SCRIPT).to.not.contain('\r');
     expect(SHARE_HOOK_CALL).to.contain(`git rev-parse --git-common-dir)/hooks/${SHARE_HOOK_SCRIPT_NAME}`);
     expect(SHARE_HOOK_CALL.endsWith('|| true')).to.be.true;
-    expect(SHARE_HOOK_BLOCK.split('\n')).to.have.length(3);
-    expect(SHARE_HOOK_BLOCK).to.contain(SHARE_HOOK_CALL);
   });
 
   it('is a whole shell hook when there was none', () => {
     const content = installed(undefined);
 
     expect(content.startsWith('#!/bin/sh\n')).to.be.true;
-    expect(content).to.contain(SHARE_HOOK_BLOCK);
+    expect(content).to.equal(`#!/bin/sh\n\n# >>> apimatic snapshots\n${SHARE_HOOK_CALL}\n# <<< apimatic snapshots\n`);
     expect(content.endsWith('\n')).to.be.true;
   });
 
@@ -37,12 +34,12 @@ describe('ShareHook', () => {
     const content = installed('#!/usr/bin/env bash\nset -e\necho mine\nexit 0\n');
 
     expect(content.split('\n')[0]).to.equal('#!/usr/bin/env bash');
-    expect(content.indexOf(SHARE_HOOK_BLOCK)).to.be.lessThan(content.indexOf('set -e'));
+    expect(content.indexOf(SHARE_HOOK_CALL)).to.be.lessThan(content.indexOf('set -e'));
     expect(content.endsWith('set -e\necho mine\nexit 0\n')).to.be.true;
   });
 
   it('leaves a hook with no shebang alone, since it may be a binary, unless it runs the script already', () => {
-    const result = ShareHook.installInto('echo mine\n');
+    const result = ShareHook.update('echo mine\n');
 
     expect(result).to.deep.equal({ kind: 'notShell', shebang: '' });
   });
@@ -55,21 +52,21 @@ describe('ShareHook', () => {
   });
 
   it('leaves a hook that already holds the current block alone', () => {
-    expect(ShareHook.installInto(installed(undefined))).to.deep.equal({ kind: 'present' });
-    expect(ShareHook.installInto(installed('#!/bin/sh\necho mine\n'))).to.deep.equal({ kind: 'present' });
+    expect(ShareHook.update(installed(undefined))).to.deep.equal({ kind: 'unchanged' });
+    expect(ShareHook.update(installed('#!/bin/sh\necho mine\n'))).to.deep.equal({ kind: 'unchanged' });
   });
 
   it('refuses a hook in another language, naming its shebang', () => {
-    expect(ShareHook.installInto('#!/usr/bin/env node\nconsole.log(1);\n')).to.deep.equal({
+    expect(ShareHook.update('#!/usr/bin/env node\nconsole.log(1);\n')).to.deep.equal({
       kind: 'notShell',
       shebang: '#!/usr/bin/env node'
     });
-    expect(ShareHook.installInto('#!/usr/bin/python3\nprint(1)\n').kind).to.equal('notShell');
+    expect(ShareHook.update('#!/usr/bin/python3\nprint(1)\n').kind).to.equal('notShell');
   });
 
   it('accepts the shells git runs hooks with', () => {
     for (const shebang of ['#!/bin/sh', '#!/bin/bash', '#!/usr/bin/env sh', '#!/usr/bin/env bash', '#!/bin/dash']) {
-      expect(ShareHook.installInto(`${shebang}\necho mine\n`).kind, shebang).to.equal('installed');
+      expect(ShareHook.update(`${shebang}\necho mine\n`).kind, shebang).to.equal('write');
     }
   });
 

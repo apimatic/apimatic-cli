@@ -11,7 +11,7 @@ import { ProjectContext } from '../../types/project-context.js';
 import { SdkContext } from '../../types/sdk-context.js';
 import { recordingNotice } from '../../types/sdk/recording-notice.js';
 import { GenerationRequest, SdkGeneration } from '../../types/sdk/sdk-generation.js';
-import { favouring, resolving } from '../../types/sdk/settlement.js';
+import { settle } from '../../types/sdk/settlement.js';
 import { creating, noticeFor, RunMode, writeModeFor } from '../../types/sdk/write-mode.js';
 
 export class GenerateAction {
@@ -66,7 +66,7 @@ export class GenerateAction {
         : undefined;
     if (unresolved !== undefined) {
       const choice = await this.prompts.unresolvedChoice(unresolved.paths, sdk);
-      if (choice === undefined || choice === 'resolve') {
+      if (choice === 'resolve') {
         this.prompts.resolveLater();
         return ActionResult.failed();
       }
@@ -171,11 +171,11 @@ export class GenerateAction {
           }
           const choice =
             plan.hasConflicts() && mode.onConflict === 'ask' ? await this.prompts.conflictChoice(plan, sdk) : 'resolve';
-          if (choice === undefined || choice === 'cancel') {
+          if (choice === 'cancel') {
             this.prompts.runCancelled(sdk);
             return ActionResult.cancelled();
           }
-          const settlement = choice === 'resolve' ? resolving(regeneration) : favouring(choice, regeneration);
+          const settlement = settle(regeneration, choice);
           const written = await repository.write(base, settlement, tempSdk);
           if (written.isErr()) {
             if ('kind' in written.error) {

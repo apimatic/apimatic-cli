@@ -352,7 +352,7 @@ describe('GenerateAction (sdk) — writing the SDK', () => {
 
     for (const [answer, how] of [
       ['cancel', 'cancels the run'],
-      [undefined, 'backs out of the question']
+      ['cancel', 'backs out of the question']
     ] as const) {
       it(`writes nothing at all when the developer ${how}`, async () => {
         const { base } = await conflicting();

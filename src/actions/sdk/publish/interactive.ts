@@ -10,7 +10,6 @@ import { formatPublishingDetails } from '../../../prompts/sdk/publish.js';
 import { ActionResult } from '../../action-result.js';
 import { RecordPublishedSdkAction } from '../record-published-sdk.js';
 import { SdkPublishAction } from '../publish.js';
-import { destinationContainsSource } from '../../../prompts/sdk/generate.js';
 import { ProjectContext } from '../../../types/project-context.js';
 import { ProfileId } from '../../../types/publish/profile-id.js';
 
@@ -80,7 +79,7 @@ export class SdkPublishInteractiveAction {
 
     const sdkDirectory = await this.prompts.inputSdkDirectory(
       project.sdkDirectory(language),
-      SdkPublishInteractiveAction.sdkDirectoryValidator(project)
+      this.sdkDirectoryValidator(project)
     );
     if (!sdkDirectory) {
       await this.prompts.noSdkDirectoryProvided();
@@ -158,11 +157,13 @@ export class SdkPublishInteractiveAction {
     };
   }
 
-  public static sdkDirectoryValidator(project: ProjectContext): (value: string | undefined) => string | undefined {
+  private sdkDirectoryValidator(project: ProjectContext): (value: string | undefined) => string | undefined {
     return (value) => {
       if (!value) return;
       const directory = DirectoryPath.fromUserInput(value);
-      if (project.isSourceWithin(directory)) return destinationContainsSource(project.sourceDirectory(), directory);
+      if (project.isSourceWithin(directory)) {
+        return this.prompts.destinationContainsSource(project.sourceDirectory(), directory);
+      }
     };
   }
 }

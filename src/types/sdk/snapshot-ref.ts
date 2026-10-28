@@ -1,8 +1,13 @@
 import { Buffer } from 'node:buffer';
 import { SdkPath } from './sdk-path.js';
 
-const PRISTINE = 'refs/apimatic/pristine';
-const PREVIOUS = 'refs/apimatic/previous';
+/** Where every ref of the CLI's lives, so a tool can list or exclude them all at once. */
+export const SNAPSHOT_REFS = 'refs/apimatic';
+/** Where the pristine chains live, one ref per SDK directory; the hook pushes everything below it. */
+export const PRISTINE_REFS = `${SNAPSHOT_REFS}/pristine`;
+
+const PRISTINE = PRISTINE_REFS;
+const PREVIOUS = `${SNAPSHOT_REFS}/previous`;
 
 // A ref name may not hold a space, `~ ^ : ? * [ \`, `..`, `@{`, a control character, or a component
 // that starts with `.` or ends in `.lock`; every byte outside this set goes in as `%XX`, and comes back.

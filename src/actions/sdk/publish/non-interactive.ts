@@ -22,7 +22,7 @@ export class SdkPublishNonInteractiveAction {
 
   public readonly execute = async (
     project: ProjectContext,
-    destination: string | undefined,
+    destination: DirectoryPath | undefined,
     language: Language,
     publishTypes: PublishType[],
     force: boolean,
@@ -50,10 +50,6 @@ export class SdkPublishNonInteractiveAction {
     }
 
     const sdkDirectory = project.sdkDirectory(language, destination);
-    if (project.isSourceWithin(sdkDirectory)) {
-      this.prompts.destinationContainsSource(project.sourceDirectory(), sdkDirectory);
-      return ActionResult.failed();
-    }
 
     const semVersionResult = SemVersion.tryCreate(version!);
     if (semVersionResult.isErr()) {

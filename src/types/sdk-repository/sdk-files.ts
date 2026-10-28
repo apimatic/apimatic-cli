@@ -9,6 +9,7 @@ import { RelativeFilePath } from '../file/relativeFilePath.js';
 import { BlobId } from '../git/blob-id.js';
 import { CommitId } from '../git/commit-id.js';
 import { relabelMarkers, settleMarkers } from '../sdk/conflict-markers.js';
+import { keepsLineEndings, lineEndingFor } from '../sdk/file-content.js';
 import { FileWrite, MergePlan } from '../sdk/merge-plan.js';
 import { NotApplied, RepositoryProblem, WriteProblem } from '../sdk/repository-state.js';
 import { SnapshotRef } from '../sdk/snapshot-ref.js';
@@ -126,16 +127,15 @@ export class SdkFiles {
     return (await this.fileService.fileExists(file)) ? this.fileService.getBytes(file) : undefined;
   }
 
-  private async withLineEnding(content: Uint8Array, file: FilePath, ...samples: FilePath[]): Promise<Uint8Array> {
-    if (content.includes(0x0d) || content.subarray(0, 8000).includes(0)) {
+  /** `content` ending its lines as the first of `samples` on disk does: the file itself, else the generator's copy. */
+  private async withLineEnding(content: Uint8Array, ...samples: FilePath[]): Promise<Uint8Array> {
+    if (keepsLineEndings(content)) {
       return content;
     }
-    for (const sample of [file, ...samples]) {
+    for (const sample of samples) {
       const bytes = await this.read(sample);
       if (bytes !== undefined) {
-        const crlf = Buffer.from(bytes).includes('\r\n');
-        const text = Buffer.from(content).toString('latin1');
-        return crlf ? new Uint8Array(Buffer.from(text.replace(/\n/g, '\r\n'), 'latin1')) : content;
+        return lineEndingFor(content, bytes);
       }
     }
     return content;

@@ -1,7 +1,10 @@
 import { ValueMap, ValueSet } from '../common/value-map.js';
 import { RelativeFilePath } from '../file/relativeFilePath.js';
 import { BlobId } from '../git/blob-id.js';
-import { Change, MergeTreeOutput, STAGE } from '../git/merge-tree.js';
+import { Change, MergeMessageKind, MergeTreeOutput, STAGE } from '../git/merge-tree.js';
+
+/** The merge runs with your tree as git's "ours" and the generation as its "theirs". */
+export const SIDE_STAGE = { yours: STAGE.ours, generated: STAGE.theirs } as const;
 
 export type MergeInputs = {
   merge: MergeTreeOutput;
@@ -35,12 +38,6 @@ export type FileWrite = { path: RelativeFilePath; blob: BlobId; settle?: Conflic
 /** Whose lines win where you and the generator changed the same ones. */
 export type ConflictSide = 'generated' | 'yours';
 
-/** What the developer chose when a regeneration conflicted, asked before anything is written. */
-export type ConflictChoice = 'resolve' | ConflictSide | 'cancel';
-
-/** What the developer chose when the last run's conflicts are still unresolved, asked before generating. */
-export type UnresolvedChoice = 'resolve' | ConflictSide;
-
 export type Conflict = { path: RelativeFilePath; kind: ConflictKind };
 
 /** Each side's version of a file git could not merge line by line; none where that side has no file. */
@@ -50,11 +47,14 @@ export type Sides<T> = { yours: T | undefined; generated: T | undefined };
 export type ConflictSides = ValueMap<RelativeFilePath, Sides<BlobId>>;
 
 /**
- * The whole-file settlement for `side`: the generator's side falls back to yours where it no
- * longer produces the file, so an edit of yours is never thrown away by a choice that keeps the rest.
+ * The whole-file settlement for `side`, and which side it came from: the generator's side falls back
+ * to yours where it no longer produces the file, so an edit of yours is never thrown away by a choice that keeps the rest.
  */
-export function chosen<T>(side: ConflictSide, sides: Sides<T>): T | undefined {
-  return side === 'generated' ? sides.generated ?? sides.yours : sides.yours;
+export function chosen<T>(side: ConflictSide, sides: Sides<T>): { side: ConflictSide; content: T } | undefined {
+  if (side === 'generated' && sides.generated !== undefined) {
+    return { side: 'generated', content: sides.generated };
+  }
+  return sides.yours === undefined ? undefined : { side: 'yours', content: sides.yours };
 }
 
 /** Every path the run touched or left alone, by what happened to it; conflicted paths are listed under `conflicts` instead. */
@@ -74,8 +74,6 @@ export type MergeFiles = {
 /** The `MergeFiles` holding files you edited. */
 export const YOUR_FILES = ['merged', 'kept'] as const;
 
-const CONFLICT_PREFIX = 'CONFLICT (';
-
 /** The stronger of two accounts of one path, when git reports it more than once. */
 const RANK: Record<ConflictKind, number> = {
   binary: 5,
@@ -86,20 +84,21 @@ const RANK: Record<ConflictKind, number> = {
   other: 1
 };
 
-function kindOf(type: string, message: string, stages: ReadonlySet<number>): ConflictKind {
-  if (type === 'CONFLICT (binary)') {
-    return 'binary';
+/** What a conflict git reported means here; a deletion is yours or the generator's by which side still has the file. */
+function kindOf(reported: Exclude<MergeMessageKind, 'informational'>, stages: ReadonlySet<number>): ConflictKind {
+  switch (reported) {
+    case 'binary':
+      return 'binary';
+    case 'addAdd':
+      return 'bothAdded';
+    case 'modifyDelete':
+    case 'renameDelete':
+      return stages.has(SIDE_STAGE.yours) ? 'noLongerGenerated' : 'deletedByYou';
+    case 'contents':
+      return 'bothChanged';
+    case 'otherConflict':
+      return 'other';
   }
-  if (message.startsWith('CONFLICT (add/add)')) {
-    return 'bothAdded';
-  }
-  if (type === 'CONFLICT (modify/delete)' || type === 'CONFLICT (rename/delete)') {
-    return stages.has(STAGE.yours) ? 'noLongerGenerated' : 'deletedByYou';
-  }
-  if (type === 'CONFLICT (contents)') {
-    return 'bothChanged';
-  }
-  return 'other';
 }
 
 function conflictsOf(merge: MergeTreeOutput): Conflict[] {
@@ -108,12 +107,12 @@ function conflictsOf(merge: MergeTreeOutput): Conflict[] {
     stagesByPath.set(entry.path, (stagesByPath.get(entry.path) ?? new Set()).add(entry.stage));
   }
   const byPath = new ValueMap<RelativeFilePath, Conflict>();
-  for (const { paths, type, message } of merge.messages) {
-    if (!type.startsWith(CONFLICT_PREFIX)) {
+  for (const { paths, kind: reported } of merge.messages) {
+    if (reported === 'informational') {
       continue;
     }
     for (const path of paths) {
-      const kind = kindOf(type, message, stagesByPath.get(path) ?? new Set());
+      const kind = kindOf(reported, stagesByPath.get(path) ?? new Set());
       const known = byPath.get(path);
       if (known === undefined || RANK[kind] > RANK[known.kind]) {
         byPath.set(path, { path, kind });
@@ -247,16 +246,15 @@ export class MergePlan {
         merged.push(path);
         continue;
       }
-      const sides = this.sides.get(path) ?? { yours: undefined, generated: undefined };
-      const blob = chosen(side, sides);
+      const picked = chosen(side, this.sides.get(path) ?? { yours: undefined, generated: undefined });
       deletes.delete(path);
-      if (blob === undefined) {
+      if (picked === undefined) {
         writes.delete(path);
-      } else if (sides.yours !== undefined && blob.isEqual(sides.yours)) {
+      } else if (picked.side === 'yours') {
         writes.delete(path);
         kept.push(path);
       } else {
-        writes.set(path, { path, blob });
+        writes.set(path, { path, blob: picked.content });
         updated.push(path);
       }
     }

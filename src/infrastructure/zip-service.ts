@@ -12,11 +12,16 @@ type ZipEntry = { file: FilePath; metadataPath: string };
 type Excluded = { files: ReadonlySet<string>; directories: ReadonlySet<string> };
 
 export class ZipService {
+  /** Zips everything under `sourceDir`. */
+  public archive(sourceDir: DirectoryPath, outputZipPath: FilePath): Promise<Result<void, string>> {
+    return this.archiveWithout(sourceDir, outputZipPath, NO_PATHS);
+  }
+
   /** Zips everything under `sourceDir` but the files and directories `excluding` names below it. */
-  public async archive(
+  public async archiveWithout(
     sourceDir: DirectoryPath,
     outputZipPath: FilePath,
-    excluding: RelativePaths = NO_PATHS
+    excluding: RelativePaths
   ): Promise<Result<void, string>> {
     try {
       const excluded: Excluded = {

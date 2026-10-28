@@ -89,7 +89,7 @@ export class SdkContext {
     if (ignored.isErr()) {
       return err(ignored.error);
     }
-    return new TempContext(tempDirectory).zip(this.sdkDirectory, {
+    return new TempContext(tempDirectory).zipWithout(this.sdkDirectory, {
       files: ignored.value.files,
       directories: [...KEPT_OUT_OF_ARCHIVE, ...ignored.value.directories]
     });
