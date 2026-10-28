@@ -34,7 +34,6 @@ describe('PortalServeAction', () => {
   let root: string;
   let prompts: sinon.SinonStubbedInstance<PortalServePrompts>;
   let shared: ReturnType<typeof stubPreparePortalProject>;
-  let authorize: sinon.SinonStub;
   let getServerPort: sinon.SinonStub;
   let openUrlInBrowser: sinon.SinonStub;
   let start: sinon.SinonStub;
@@ -99,7 +98,7 @@ describe('PortalServeAction', () => {
     getServerPort = sinon.stub(NetworkService.prototype, 'getServerPort').resolves(PORT);
     openUrlInBrowser = sinon.stub(LauncherService.prototype, 'openUrlInBrowser').resolves();
 
-    authorize = sinon.stub(PortalAuthorizationService.prototype, 'authorize').resolves(ok(entitlementsWith('portalGeneration')));
+    sinon.stub(PortalAuthorizationService.prototype, 'authorize').resolves(ok(entitlementsWith('portalGeneration')));
     // Never a real watch: most tests serve the shared fixture, which nothing may edit.
     watch = sinon
       .stub(FileWatchService.prototype, 'watch')
@@ -112,31 +111,6 @@ describe('PortalServeAction', () => {
   afterEach(() => {
     sinon.restore();
     fs.rmSync(root, { recursive: true, force: true });
-  });
-
-  it('stops before anything else when the installation cannot build a portal', async () => {
-    shared.runtimeProblem.returns("The portal build dependency 'vite' is missing from this installation.");
-
-    const result = await execute();
-
-    expect(result.isFailed()).to.be.true;
-    expect(
-      shared.prompts.runtimeUnsupported.calledOnceWith(
-        "The portal build dependency 'vite' is missing from this installation."
-      )
-    ).to.be.true;
-    expect(authorize.called).to.be.false;
-  });
-
-  it('fails when the account may not build a portal, without starting the preview', async () => {
-    authorize.resolves(err({ kind: 'notEntitled' as const, feature: 'portalGeneration' as const }));
-
-    const result = await execute();
-
-    expect(result.isFailed()).to.be.true;
-    expect(shared.prompts.authorizationFailed.calledOnceWith({ kind: 'notEntitled', feature: 'portalGeneration' })).to.be.true;
-    expect(getServerPort.called).to.be.false;
-    expect(start.called).to.be.false;
   });
 
   it('reports a source directory it cannot serve, without asking for the artifacts', async () => {

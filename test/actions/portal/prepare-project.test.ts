@@ -1,7 +1,7 @@
 import os from 'os';
 import sinon from 'sinon';
 import { expect } from 'chai';
-import { ok } from 'neverthrow';
+import { err, ok } from 'neverthrow';
 import { PreparePortalProjectAction } from '../../../src/actions/portal/prepare-project';
 import { PortalAuthorizationService } from '../../../src/infrastructure/services/portal-authorization-service';
 import { DirectoryPath } from '../../../src/types/file/directoryPath';
@@ -11,11 +11,52 @@ import { stubPreparePortalProject } from './prepare-project-stubs';
 import { entitlementsWith } from '../../helpers/account';
 
 const COMMAND_METADATA: CommandMetadata = { commandName: 'portal generate', shell: 'test' };
+const FIXTURE = new DirectoryPath(process.cwd()).join('test/resources/portal-inputs/default');
 
 // What `portal generate` and `portal serve` both run before either does its own part.
 describe('PreparePortalProjectAction', () => {
   afterEach(() => {
     sinon.restore();
+  });
+
+  // `onPrepared` is the build for `generate` and the preview for `serve`.
+  const execute = (onPrepared: sinon.SinonStub) =>
+    new PreparePortalProjectAction(new DirectoryPath(os.tmpdir()), COMMAND_METADATA, 'auth-key').execute(
+      ProjectContext.in(FIXTURE),
+      { onPrepared }
+    );
+
+  it('stops before anything else when the installation cannot build a portal', async () => {
+    const shared = stubPreparePortalProject();
+    shared.runtimeProblem.returns("The portal build dependency 'vite' is missing from this installation.");
+    const authorize = sinon.stub(PortalAuthorizationService.prototype, 'authorize');
+    const onPrepared = sinon.stub();
+
+    const result = await execute(onPrepared);
+
+    expect(result.isFailed()).to.be.true;
+    expect(
+      shared.prompts.runtimeUnsupported.calledOnceWith(
+        "The portal build dependency 'vite' is missing from this installation."
+      )
+    ).to.be.true;
+    expect(authorize.called).to.be.false;
+    expect(onPrepared.called).to.be.false;
+  });
+
+  it('fails when the account may not build a portal, without going on to build or preview it', async () => {
+    const shared = stubPreparePortalProject();
+    sinon
+      .stub(PortalAuthorizationService.prototype, 'authorize')
+      .resolves(err({ kind: 'notEntitled' as const, feature: 'portalGeneration' as const }));
+    const onPrepared = sinon.stub();
+
+    const result = await execute(onPrepared);
+
+    expect(result.isFailed()).to.be.true;
+    expect(shared.prompts.authorizationFailed.calledOnceWith({ kind: 'notEntitled', feature: 'portalGeneration' })).to.be.true;
+    expect(shared.artifacts.called).to.be.false;
+    expect(onPrepared.called).to.be.false;
   });
 
   it('stops before signing in when the source is on a network share', async function () {

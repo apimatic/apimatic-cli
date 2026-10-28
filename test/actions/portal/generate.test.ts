@@ -141,30 +141,6 @@ describe('GenerateAction', () => {
     expect(build.called).to.be.false;
   });
 
-  it('stops before anything else when the installation cannot build a portal', async () => {
-    shared.runtimeProblem.returns("The portal build dependency 'vite' is missing from this installation.");
-
-    const result = await execute();
-
-    expect(result.isFailed()).to.be.true;
-    expect(
-      shared.prompts.runtimeUnsupported.calledOnceWith(
-        "The portal build dependency 'vite' is missing from this installation."
-      )
-    ).to.be.true;
-    expect(authorize.called).to.be.false;
-  });
-
-  it('fails when the account may not build a portal, without starting a build', async () => {
-    authorize.resolves(err({ kind: 'notEntitled' as const, feature: 'portalGeneration' as const }));
-
-    const result = await execute();
-
-    expect(result.isFailed()).to.be.true;
-    expect(shared.prompts.authorizationFailed.calledOnceWith({ kind: 'notEntitled', feature: 'portalGeneration' })).to.be.true;
-    expect(build.called).to.be.false;
-  });
-
   // A source the build would refuse should not cost the artifacts run, which can take minutes.
   it('reports a source directory it cannot build from, without asking for the artifacts', async () => {
     const empty = new DirectoryPath(root).join('empty');
