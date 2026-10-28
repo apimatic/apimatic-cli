@@ -8,6 +8,7 @@ Services live at `src/infrastructure/services/` and are the only layer that make
 
 - **DO** use named export: `export class {PascalName}Service`.
 - **DO** return `Promise<Result<T, ServiceError>>` from all public methods — use `ok()` and `err()` from neverthrow.
+- **DO** write the body as `async`/`await`: wrap the call in `try`/`catch`, `await` each step, and return `err(...)` early when a step `isErr()`.
 - **DO** catch `ProblemDetailsError` first (for 400/403 with structured error messages), then fall back to `handleServiceError(error)`.
 - **DO** close file streams in `finally` blocks when using `FileWrapper` or `getStream()`.
 - **DO** resolve auth as: `getAuthInfo(configDir.toString())` → `createAuthorizationHeader()` → `apiClientFactory.createApiClient()`.
@@ -23,6 +24,7 @@ Services live at `src/infrastructure/services/` and are the only layer that make
 ### DON'T
 
 - **DON'T** throw — always return `err(...)` wrapped in `ServiceError`.
+- **DON'T** return or chain `ResultAsync` — no `ResultAsync`, `safeTry`, `okAsync` or `errAsync`; the return type is `Promise<Result<T, E>>` and a step is checked with `isErr()`, not composed with `andThen`.
 - **DON'T** use `console.log` — services are silent; errors communicated via `Result`.
 - **DON'T** use raw string paths — use `DirectoryPath`, `FilePath`, `UrlPath`, `FileName`.
 - **DON'T** use `axios.create()` as a class field — create a fresh instance per call in `axiosInstance()` method.
@@ -58,6 +60,7 @@ Services live at `src/infrastructure/services/` and are the only layer that make
 - [ ] File placed at `src/infrastructure/services/{name}-service.ts`
 - [ ] Named export (not default): `export class {PascalName}Service`
 - [ ] All public methods return `Promise<Result<T, ServiceError>>` using neverthrow
+- [ ] No `ResultAsync`, `safeTry`, `okAsync` or `errAsync` — bodies `await` and return early on `isErr()`
 - [ ] Uses `ok()` and `err()` from neverthrow — never throws
 - [ ] Catch blocks use `handleServiceError(error)` as fallback
 - [ ] Auth uses `getAuthInfo(configDir.toString())` — note `.toString()` on DirectoryPath

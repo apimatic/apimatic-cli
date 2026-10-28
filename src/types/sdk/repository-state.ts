@@ -1,4 +1,4 @@
-import { ResultAsync } from 'neverthrow';
+import { err, ok, Result } from 'neverthrow';
 import { GitOperation, GitProblem } from '../../infrastructure/git-service.js';
 import { errorMessage } from '../../utils/error-utils.js';
 import { DirectoryPath } from '../file/directoryPath.js';
@@ -68,6 +68,11 @@ export const fileFailed = (error: unknown): SdkRepositoryProblem => ({
   reason: errorMessage(error)
 });
 
-/** A file operation as a `Result`, so a failing one stops a chain with the file system's own words. */
-export const onDisk = <T>(work: Promise<T>): ResultAsync<T, SdkRepositoryProblem> =>
-  ResultAsync.fromPromise(work, fileFailed);
+/** A file operation as a `Result`, so a failing one answers with the file system's own words. */
+export const onDisk = async <T>(work: Promise<T>): Promise<Result<T, SdkRepositoryProblem>> => {
+  try {
+    return ok(await work);
+  } catch (error) {
+    return err(fileFailed(error));
+  }
+};

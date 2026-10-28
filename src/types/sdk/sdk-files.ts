@@ -1,6 +1,6 @@
 import { Buffer } from 'node:buffer';
 import fs from 'node:fs';
-import { err, Err, ok, Result, ResultAsync, safeTry } from 'neverthrow';
+import { err, ok, Result } from 'neverthrow';
 import { FileService } from '../../infrastructure/file-service.js';
 import { GitService } from '../../infrastructure/git-service.js';
 import { DirectoryPath } from '../file/directoryPath.js';
@@ -12,8 +12,6 @@ import { FileWrite, MergePlan } from './merge-plan.js';
 import { gitFailed, NotApplied, onDisk, SdkRepositoryProblem } from './repository-state.js';
 import { SnapshotRef } from './snapshot-ref.js';
 
-type Steps<T> = AsyncGenerator<Err<never, SdkRepositoryProblem>, Result<T, SdkRepositoryProblem>>;
-
 /** The files on disk below an SDK directory: a plan landed, undone from a snapshot when a step fails, a file read or settled. */
 export class SdkFiles {
   private readonly fileService = new FileService();
@@ -22,23 +20,15 @@ export class SdkFiles {
   constructor(private readonly root: DirectoryPath, private readonly sdk: DirectoryPath) {}
 
   /** Removals before writes, so a case-only rename lands on a filesystem that ignores case; a failed step puts back what came before it. */
-  public apply(
+  public async apply(
     plan: MergePlan,
     previous: { commit: CommitId; ref: SnapshotRef },
     generated: DirectoryPath
-  ): ResultAsync<void, SdkRepositoryProblem> {
-    return this.git
-      .readBlobs(this.root, [...new Set(plan.writes.map((write) => write.blob))])
-      .mapErr(gitFailed)
-      .andThen((blobs) => new ResultAsync(this.applying(plan, previous, generated, blobs)));
-  }
-
-  private async applying(
-    plan: MergePlan,
-    previous: { commit: CommitId; ref: SnapshotRef },
-    generated: DirectoryPath,
-    blobs: Map<string, Uint8Array>
   ): Promise<Result<void, SdkRepositoryProblem>> {
+    const blobs = await this.git.readBlobs(this.root, [...new Set(plan.writes.map((write) => write.blob))]);
+    if (blobs.isErr()) {
+      return err(gitFailed(blobs.error));
+    }
     const steps: { path: RelativeFilePath; operation: NotApplied['operation']; run: () => Promise<void> }[] = [
       ...plan.deletes.map((path) => ({
         path,
@@ -49,7 +39,7 @@ export class SdkFiles {
         path: write.path,
         operation: 'write' as const,
         run: async () => {
-          const content = markersOf(plan, write, blobs.get(write.blob)!);
+          const content = markersOf(plan, write, blobs.value.get(write.blob)!);
           const file = write.path.in(this.sdk);
           return this.put(file, await this.withLineEnding(content, file, write.path.in(generated)));
         }
@@ -77,33 +67,41 @@ export class SdkFiles {
     previous: { commit: CommitId; ref: SnapshotRef },
     touched: readonly RelativeFilePath[]
   ): Promise<NotApplied['undo']> {
-    const restored = await safeTry(this.restoring.bind(this, previous.commit, touched));
+    const restored = await this.restore(previous.commit, touched);
     return restored.match(
       () => ({ kind: 'done' }),
       (problem) => ({ kind: 'failed', reason: problem.reason, previous: previous.ref })
     );
   }
 
-  private async *restoring(previous: CommitId, touched: readonly RelativeFilePath[]): Steps<void> {
-    const kept = new Map(
-      (yield* this.git.listTree(this.root, previous).mapErr(gitFailed)).map((entry) => [
-        entry.path.toString(),
-        entry.oid
-      ])
-    );
+  private async restore(
+    previous: CommitId,
+    touched: readonly RelativeFilePath[]
+  ): Promise<Result<void, SdkRepositoryProblem>> {
+    const entries = await this.git.listTree(this.root, previous);
+    if (entries.isErr()) {
+      return err(gitFailed(entries.error));
+    }
+    const kept = new Map(entries.value.map((entry) => [entry.path.toString(), entry.oid]));
     const oids = touched.flatMap((relative) => kept.get(relative.toString()) ?? []);
-    const blobs = yield* this.git.readBlobs(this.root, [...new Set(oids)]).mapErr(gitFailed);
+    const blobs = await this.git.readBlobs(this.root, [...new Set(oids)]);
+    if (blobs.isErr()) {
+      return err(gitFailed(blobs.error));
+    }
     for (const relative of touched) {
       const oid = kept.get(relative.toString());
-      yield* onDisk(
-        oid === undefined ? this.remove(relative.in(this.sdk)) : this.put(relative.in(this.sdk), blobs.get(oid)!)
+      const restored = await onDisk(
+        oid === undefined ? this.remove(relative.in(this.sdk)) : this.put(relative.in(this.sdk), blobs.value.get(oid)!)
       );
+      if (restored.isErr()) {
+        return err(restored.error);
+      }
     }
     return ok(undefined);
   }
 
   /** The file as it is, or none when it is not there. */
-  public contentOf(relative: RelativeFilePath): ResultAsync<Uint8Array | undefined, SdkRepositoryProblem> {
+  public contentOf(relative: RelativeFilePath): Promise<Result<Uint8Array | undefined, SdkRepositoryProblem>> {
     const file = relative.in(this.sdk);
     return onDisk(
       (async () =>
@@ -114,7 +112,10 @@ export class SdkFiles {
   }
 
   /** Writes the file with its own line ending, or removes it when there is nothing to settle it to. */
-  public settle(relative: RelativeFilePath, content: Uint8Array | undefined): ResultAsync<void, SdkRepositoryProblem> {
+  public settle(
+    relative: RelativeFilePath,
+    content: Uint8Array | undefined
+  ): Promise<Result<void, SdkRepositoryProblem>> {
     const file = relative.in(this.sdk);
     return onDisk(
       content === undefined

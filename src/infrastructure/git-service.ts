@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { TextDecoder } from 'node:util';
 import { execa, ExecaError } from 'execa';
-import { err, Err, errAsync, ok, okAsync, Result, ResultAsync, safeTry } from 'neverthrow';
+import { err, ok, Result } from 'neverthrow';
 import { RelativeFilePath } from '../types/file/relativeFilePath.js';
 import { DirectoryPath, posix } from '../types/file/directoryPath.js';
 import { SdkPath } from '../types/sdk/sdk-path.js';
@@ -73,9 +73,6 @@ type RunOptions = {
 
 type Ran<Out> = { stdout: Out; stderr: string; exitCode: number };
 
-/** Steps a `yield*` can stop on: the first problem is the method's answer. */
-type Steps<T> = AsyncGenerator<Err<never, GitProblem>, Result<T, GitProblem>>;
-
 const problem = (reason: string): GitProblem => ({ reason });
 
 const failed = (command: string, reason: string): GitProblem => problem(`git ${command} failed: ${reason.trim()}`);
@@ -93,16 +90,20 @@ const isNotFound = (error: unknown): boolean =>
  */
 export class GitService {
   /** The git on PATH; none when there is no such command, a problem when it is there but does not answer. */
-  public version(): ResultAsync<GitVersion | undefined, GitProblem> {
-    return ResultAsync.fromPromise(execa('git', ['--version']), (error) => error)
-      .map((ran) => GitVersion.parse(ran.stdout) ?? problem(`git --version answered "${ran.stdout.trim()}"`))
-      .orElse((error) => (isNotFound(error) ? okAsync(undefined) : errAsync(problem(errorMessage(error)))))
-      .andThen((found) => (found instanceof GitVersion || found === undefined ? ok(found) : err(found)));
+  public async version(): Promise<Result<GitVersion | undefined, GitProblem>> {
+    try {
+      const { stdout } = await execa('git', ['--version']);
+      const version = GitVersion.parse(stdout);
+      return version === undefined ? err(problem(`git --version answered "${stdout.trim()}"`)) : ok(version);
+    } catch (error) {
+      return isNotFound(error) ? ok(undefined) : err(problem(errorMessage(error)));
+    }
   }
 
   /** The root of the repository enclosing `directory`, or none when nothing does. */
-  public topLevel(directory: DirectoryPath): ResultAsync<DirectoryPath | undefined, GitProblem> {
-    return this.run(directory, ['rev-parse', '--show-toplevel'], { exitCodes: [0, 128] }).andThen((result) => {
+  public async topLevel(directory: DirectoryPath): Promise<Result<DirectoryPath | undefined, GitProblem>> {
+    const ran = await this.run(directory, ['rev-parse', '--show-toplevel'], { exitCodes: [0, 128] });
+    return ran.andThen((result) => {
       if (result.exitCode === 0) {
         return ok(new DirectoryPath(result.stdout.trim()));
       }
@@ -110,34 +111,34 @@ export class GitService {
     });
   }
 
-  public init(directory: DirectoryPath): ResultAsync<void, GitProblem> {
-    return this.run(directory, ['init', '--quiet', '--initial-branch=main', '.']).map(() => undefined);
+  public async init(directory: DirectoryPath): Promise<Result<void, GitProblem>> {
+    return (await this.run(directory, ['init', '--quiet', '--initial-branch=main', '.'])).map(() => undefined);
   }
 
   /** Whether the repository's ignore rules exclude `directory`, which need not exist. */
-  public isIgnored(root: DirectoryPath, directory: DirectoryPath): ResultAsync<boolean, GitProblem> {
+  public async isIgnored(root: DirectoryPath, directory: DirectoryPath): Promise<Result<boolean, GitProblem>> {
     const relative = posix(path.relative(root.toString(), directory.toString()));
-    return this.run(root, ['check-ignore', '-q', '--', relative], { exitCodes: [0, 1] }).map(
-      ({ exitCode }) => exitCode === 0
-    );
+    const ran = await this.run(root, ['check-ignore', '-q', '--', relative], { exitCodes: [0, 1] });
+    return ran.map(({ exitCode }) => exitCode === 0);
   }
 
   /** Every file below `directory` git tracks or would add, so its ignore rules keep `node_modules` out; a tracked file deleted from disk is not listed. */
-  public filesToCommit(directory: DirectoryPath): ResultAsync<RelativeFilePath[], GitProblem> {
-    return this.run(directory, ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', '.']).map(
-      ({ stdout }) =>
-        stdout
-          .split('\0')
-          .filter((entry) => entry !== '')
-          .map((entry) => RelativeFilePath.fromGit(entry))
-          .filter((file) => fs.existsSync(file.in(directory).toString()))
+  public async filesToCommit(directory: DirectoryPath): Promise<Result<RelativeFilePath[], GitProblem>> {
+    const ran = await this.run(directory, ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', '.']);
+    return ran.map(({ stdout }) =>
+      stdout
+        .split('\0')
+        .filter((entry) => entry !== '')
+        .map((entry) => RelativeFilePath.fromGit(entry))
+        .filter((file) => fs.existsSync(file.in(directory).toString()))
     );
   }
 
   /** The operation the repository is in the middle of, if any, such as a `git merge` with conflicts left to resolve. */
-  public operationInProgress(root: DirectoryPath): ResultAsync<GitOperation | undefined, GitProblem> {
+  public async operationInProgress(root: DirectoryPath): Promise<Result<GitOperation | undefined, GitProblem>> {
     const files = Object.keys(OPERATIONS);
-    return this.run(root, ['rev-parse', ...files.flatMap((file) => ['--git-path', file])]).map(({ stdout }) => {
+    const ran = await this.run(root, ['rev-parse', ...files.flatMap((file) => ['--git-path', file])]);
+    return ran.map(({ stdout }) => {
       const paths = stdout.trim().split('\n');
       const found = files.find((_, index) => fs.existsSync(root.resolve(paths[index]).toString()));
       return found === undefined ? undefined : OPERATIONS[found as keyof typeof OPERATIONS];
@@ -148,107 +149,115 @@ export class GitService {
    * `directory` as a tree through a temporary index: every file with `include: 'all'`, else the
    * ignore rules honoured except for the listed paths; line endings normalised unless `asIs`.
    */
-  public treeOf(
+  public async treeOf(
     root: DirectoryPath,
     directory: DirectoryPath,
     include: 'all' | readonly RelativeFilePath[],
     lineEndings: 'normalized' | 'asIs' = 'normalized'
-  ): ResultAsync<TreeId, GitProblem> {
+  ): Promise<Result<TreeId, GitProblem>> {
     // A directory inside the repository is added from the root, so the root's ignore rules count.
     const inside = root.contains(directory) ? SdkPath.of(root, directory) : undefined;
     const workTree = inside === undefined ? directory : root;
-    return this.gitDir(root).andThen((gitDir) =>
-      this.inTemporaryDirectory((temporary) => {
-        const env = { GIT_INDEX_FILE: new FilePath(temporary, new FileName('index')).toString() };
-        const attributesIn = lineEndings === 'normalized' ? temporary : undefined;
-        const inWorkTree = (args: string[], input?: string) =>
-          this.run(workTree, ['--git-dir', gitDir, '--work-tree', workTree.toString(), ...args], {
-            env,
-            attributesIn,
-            input
-          });
-        const forced =
-          include === 'all' ? [] : include.filter((relative) => fs.existsSync(relative.in(directory).toString()));
-        const fromRoot = (relative: RelativeFilePath) => (inside === undefined ? relative : inside.fromRoot(relative));
-        return safeTry(async function* () {
-          // `--sparse` reaches paths a sparse checkout leaves out of the cone.
-          yield* inWorkTree([
-            'add',
-            '--all',
-            '--sparse',
-            ...(include === 'all' ? ['--force'] : []),
-            '--',
-            inside === undefined ? '.' : inside.pathspec()
-          ]);
-          if (forced.length > 0) {
-            yield* inWorkTree(
-              ['add', '--force', '--sparse', '--pathspec-from-file=-', '--pathspec-file-nul'],
-              forced.map((relative) => fromRoot(relative).toString()).join('\0')
-            );
-          }
-          const written = yield* inWorkTree(['write-tree']);
-          const whole = TreeId.fromGit(written.stdout.trim());
-          if (inside === undefined || inside.isRoot()) {
-            return ok(whole);
-          }
-          const subtree = yield* inWorkTree(['rev-parse', `${whole}:${inside}`]);
-          return ok(TreeId.fromGit(subtree.stdout.trim()));
+    const gitDir = await this.gitDir(root);
+    if (gitDir.isErr()) {
+      return err(gitDir.error);
+    }
+    return this.inTemporaryDirectory(async (temporary) => {
+      const env = { GIT_INDEX_FILE: new FilePath(temporary, new FileName('index')).toString() };
+      const attributesIn = lineEndings === 'normalized' ? temporary : undefined;
+      const inWorkTree = (args: string[], input?: string) =>
+        this.run(workTree, ['--git-dir', gitDir.value, '--work-tree', workTree.toString(), ...args], {
+          env,
+          attributesIn,
+          input
         });
-      })
-    );
+      const forced =
+        include === 'all' ? [] : include.filter((relative) => fs.existsSync(relative.in(directory).toString()));
+      const fromRoot = (relative: RelativeFilePath) => (inside === undefined ? relative : inside.fromRoot(relative));
+      // `--sparse` reaches paths a sparse checkout leaves out of the cone.
+      const added = await inWorkTree([
+        'add',
+        '--all',
+        '--sparse',
+        ...(include === 'all' ? ['--force'] : []),
+        '--',
+        inside === undefined ? '.' : inside.pathspec()
+      ]);
+      if (added.isErr()) {
+        return err(added.error);
+      }
+      if (forced.length > 0) {
+        const forcedAdded = await inWorkTree(
+          ['add', '--force', '--sparse', '--pathspec-from-file=-', '--pathspec-file-nul'],
+          forced.map((relative) => fromRoot(relative).toString()).join('\0')
+        );
+        if (forcedAdded.isErr()) {
+          return err(forcedAdded.error);
+        }
+      }
+      const written = await inWorkTree(['write-tree']);
+      if (written.isErr()) {
+        return err(written.error);
+      }
+      const whole = TreeId.fromGit(written.value.stdout.trim());
+      if (inside === undefined || inside.isRoot()) {
+        return ok(whole);
+      }
+      const subtree = await inWorkTree(['rev-parse', `${whole}:${inside}`]);
+      return subtree.map(({ stdout }) => TreeId.fromGit(stdout.trim()));
+    });
   }
 
-  public commitTree(
+  public async commitTree(
     root: DirectoryPath,
     tree: TreeId,
     parents: readonly CommitId[],
     message: string
-  ): ResultAsync<CommitId, GitProblem> {
+  ): Promise<Result<CommitId, GitProblem>> {
     const env = {
       GIT_AUTHOR_NAME: AUTHOR.name,
       GIT_AUTHOR_EMAIL: AUTHOR.email,
       GIT_COMMITTER_NAME: AUTHOR.name,
       GIT_COMMITTER_EMAIL: AUTHOR.email
     };
-    return this.run(
+    const ran = await this.run(
       root,
       ['commit-tree', tree.toString(), ...parents.flatMap((parent) => ['-p', parent.toString()]), '-m', message],
       { env }
-    ).map(({ stdout }) => CommitId.fromGit(stdout.trim()));
+    );
+    return ran.map(({ stdout }) => CommitId.fromGit(stdout.trim()));
   }
 
-  public updateRef(root: DirectoryPath, ref: SnapshotRef, commit: CommitId): ResultAsync<void, GitProblem> {
-    return this.run(root, ['update-ref', ref.toString(), commit.toString()]).map(() => undefined);
+  public async updateRef(root: DirectoryPath, ref: SnapshotRef, commit: CommitId): Promise<Result<void, GitProblem>> {
+    return (await this.run(root, ['update-ref', ref.toString(), commit.toString()])).map(() => undefined);
   }
 
   /** The commit `ref` points at, or none when there is no such ref. */
-  public resolveRef(root: DirectoryPath, ref: SnapshotRef): ResultAsync<CommitId | undefined, GitProblem> {
-    return this.run(root, ['rev-parse', '--verify', '--quiet', `${ref}^{commit}`], { exitCodes: [0, 1] }).map(
-      (result) => (result.exitCode === 0 ? CommitId.fromGit(result.stdout.trim()) : undefined)
-    );
+  public async resolveRef(root: DirectoryPath, ref: SnapshotRef): Promise<Result<CommitId | undefined, GitProblem>> {
+    const ran = await this.run(root, ['rev-parse', '--verify', '--quiet', `${ref}^{commit}`], { exitCodes: [0, 1] });
+    return ran.map((result) => (result.exitCode === 0 ? CommitId.fromGit(result.stdout.trim()) : undefined));
   }
 
   /** The full names of the refs below `prefix`. */
-  public listRefs(root: DirectoryPath, prefix: string): ResultAsync<string[], GitProblem> {
-    return this.run(root, ['for-each-ref', '--format=%(refname)', prefix]).map(({ stdout }) =>
-      stdout.split('\n').filter((line) => line !== '')
-    );
+  public async listRefs(root: DirectoryPath, prefix: string): Promise<Result<string[], GitProblem>> {
+    const ran = await this.run(root, ['for-each-ref', '--format=%(refname)', prefix]);
+    return ran.map(({ stdout }) => stdout.split('\n').filter((line) => line !== ''));
   }
 
-  public hasCommit(root: DirectoryPath, commit: CommitId): ResultAsync<boolean, GitProblem> {
+  public async hasCommit(root: DirectoryPath, commit: CommitId): Promise<Result<boolean, GitProblem>> {
     // `--verify --quiet` is exit 1 for an object the repository lacks, where `cat-file -e` would be a fatal 128.
-    return this.run(root, ['rev-parse', '--verify', '--quiet', `${commit}^{commit}`], { exitCodes: [0, 1] }).map(
-      (result) => result.exitCode === 0
-    );
+    const ran = await this.run(root, ['rev-parse', '--verify', '--quiet', `${commit}^{commit}`], { exitCodes: [0, 1] });
+    return ran.map((result) => result.exitCode === 0);
   }
 
-  public treeOfCommit(root: DirectoryPath, commit: CommitId): ResultAsync<TreeId, GitProblem> {
-    return this.run(root, ['rev-parse', `${commit}^{tree}`]).map(({ stdout }) => TreeId.fromGit(stdout.trim()));
+  public async treeOfCommit(root: DirectoryPath, commit: CommitId): Promise<Result<TreeId, GitProblem>> {
+    return (await this.run(root, ['rev-parse', `${commit}^{tree}`])).map(({ stdout }) => TreeId.fromGit(stdout.trim()));
   }
 
   /** Every file below `tree`, with `/` between path segments. */
-  public listTree(root: DirectoryPath, tree: TreeId | CommitId): ResultAsync<TreeEntry[], GitProblem> {
-    return this.run(root, ['ls-tree', '-r', '-z', tree.toString()]).map(({ stdout }) =>
+  public async listTree(root: DirectoryPath, tree: TreeId | CommitId): Promise<Result<TreeEntry[], GitProblem>> {
+    const ran = await this.run(root, ['ls-tree', '-r', '-z', tree.toString()]);
+    return ran.map(({ stdout }) =>
       stdout
         .split('\0')
         .filter((entry) => entry !== '')
@@ -261,11 +270,15 @@ export class GitService {
   }
 
   /** The contents of the given blobs, by id. */
-  public readBlobs(root: DirectoryPath, oids: readonly string[]): ResultAsync<Map<string, Uint8Array>, GitProblem> {
+  public async readBlobs(
+    root: DirectoryPath,
+    oids: readonly string[]
+  ): Promise<Result<Map<string, Uint8Array>, GitProblem>> {
     if (oids.length === 0) {
-      return okAsync(new Map());
+      return ok(new Map());
     }
-    return this.run(root, ['cat-file', '--batch'], { input: oids.join('\n'), encoding: 'buffer' }).andThen((result) => {
+    const ran = await this.run(root, ['cat-file', '--batch'], { input: oids.join('\n'), encoding: 'buffer' });
+    return ran.andThen((result) => {
       const blobs = new Map<string, Uint8Array>();
       // execa hands a buffer-encoded stdout over as a bare Uint8Array, which cannot read its own text.
       const stdout = Buffer.from(result.stdout);
@@ -286,13 +299,18 @@ export class GitService {
   }
 
   /** `merge-tree --write-tree -z`: the merged tree, a stage entry per conflicted path, then git's messages as count, paths, type and text. */
-  public mergeTree(root: DirectoryPath, ours: CommitId, theirs: CommitId): ResultAsync<MergeTreeOutput, GitProblem> {
-    return this.inTemporaryDirectory((temporary) =>
-      this.run(root, ['merge-tree', '--write-tree', '-z', ours.toString(), theirs.toString()], {
+  public async mergeTree(
+    root: DirectoryPath,
+    ours: CommitId,
+    theirs: CommitId
+  ): Promise<Result<MergeTreeOutput, GitProblem>> {
+    return this.inTemporaryDirectory(async (temporary) => {
+      const ran = await this.run(root, ['merge-tree', '--write-tree', '-z', ours.toString(), theirs.toString()], {
         attributesIn: temporary,
         encoding: 'buffer',
         exitCodes: [0, 1]
-      }).map((result) => {
+      });
+      return ran.map((result) => {
         const fields = new TextDecoder().decode(new Uint8Array(result.stdout)).split('\0');
         const stages: StageEntry[] = [];
         let index = 1;
@@ -309,18 +327,18 @@ export class GitService {
           index += 3 + count;
         }
         return { tree: TreeId.fromGit(fields[0].trim()), stages, messages };
-      })
-    );
+      });
+    });
   }
 
   /** How `to` differs from `from`, file by file; with `renames`, a moved file is one entry rather than a deletion and an addition. */
-  public diffTrees(
+  public async diffTrees(
     root: DirectoryPath,
     from: TreeId | CommitId,
     to: TreeId | CommitId,
     renames: boolean
-  ): ResultAsync<Change[], GitProblem> {
-    return this.run(root, [
+  ): Promise<Result<Change[], GitProblem>> {
+    const ran = await this.run(root, [
       'diff-tree',
       '-r',
       '-z',
@@ -328,7 +346,8 @@ export class GitService {
       renames ? '--find-renames' : '--no-renames',
       from.toString(),
       to.toString()
-    ]).map(({ stdout }) => {
+    ]);
+    return ran.map(({ stdout }) => {
       const fields = stdout.split('\0');
       const entries: Change[] = [];
       for (let index = 0; index < fields.length && fields[index] !== ''; ) {
@@ -351,18 +370,20 @@ export class GitService {
    * Puts the conflicted paths into the index as a merge would, so `git status` and `git mergetool`
    * see them; a stage-0 entry is dropped first, or git keeps it beside the others.
    */
-  public stageConflicts(root: DirectoryPath, entries: readonly StageEntry[]): ResultAsync<void, GitProblem> {
+  public async stageConflicts(root: DirectoryPath, entries: readonly StageEntry[]): Promise<Result<void, GitProblem>> {
     const zero = '0'.repeat(entries[0]?.oid.length ?? 40);
     const removals = [...new Set(entries.map((entry) => entry.path.toString()))].map((path) => `0 ${zero} 0\t${path}`);
     const stages = entries.map((entry) => `${entry.mode} ${entry.oid} ${entry.stage}\t${entry.path}`);
-    return this.run(root, ['update-index', '-z', '--index-info'], {
+    const ran = await this.run(root, ['update-index', '-z', '--index-info'], {
       input: `${[...removals, ...stages].join('\0')}\0`
-    }).map(() => undefined);
+    });
+    return ran.map(() => undefined);
   }
 
   /** The index entries below `directory` git holds as unmerged, paths from the root: what a merge left and `git add` has not marked resolved. */
-  public unmergedStages(root: DirectoryPath, directory: string): ResultAsync<StageEntry[], GitProblem> {
-    return this.run(root, ['ls-files', '-u', '-z', '--', directory]).map(({ stdout }) =>
+  public async unmergedStages(root: DirectoryPath, directory: string): Promise<Result<StageEntry[], GitProblem>> {
+    const ran = await this.run(root, ['ls-files', '-u', '-z', '--', directory]);
+    return ran.map(({ stdout }) =>
       stdout
         .split('\0')
         .filter((entry) => entry !== '')
@@ -371,182 +392,197 @@ export class GitService {
   }
 
   /** The remote the current branch is set to push to, else `origin` when there is one, else none. */
-  public remoteOf(root: DirectoryPath): ResultAsync<string | undefined, GitProblem> {
-    return this.guarded<string | undefined>(async function* () {
-      // No branch yet, or a detached HEAD, is exit 128 here and means no configured remote.
-      const head = yield* this.run(root, ['symbolic-ref', '--short', 'HEAD'], { exitCodes: [0, 128] });
-      const configured =
-        head.exitCode === 0 ? yield* this.configured(root, `branch.${head.stdout.trim()}.remote`) : undefined;
-      if (configured !== undefined && configured !== '.') {
-        return ok(configured);
+  public async remoteOf(root: DirectoryPath): Promise<Result<string | undefined, GitProblem>> {
+    // No branch yet, or a detached HEAD, is exit 128 here and means no configured remote.
+    const head = await this.run(root, ['symbolic-ref', '--short', 'HEAD'], { exitCodes: [0, 128] });
+    if (head.isErr()) {
+      return err(head.error);
+    }
+    if (head.value.exitCode === 0) {
+      const configured = await this.configured(root, `branch.${head.value.stdout.trim()}.remote`);
+      if (configured.isErr()) {
+        return err(configured.error);
       }
-      const { stdout } = yield* this.run(root, ['remote']);
-      return ok(stdout.split('\n').includes('origin') ? 'origin' : undefined);
-    });
+      if (configured.value !== undefined && configured.value !== '.') {
+        return ok(configured.value);
+      }
+    }
+    const remotes = await this.run(root, ['remote']);
+    return remotes.map(({ stdout }) => (stdout.split('\n').includes('origin') ? 'origin' : undefined));
   }
 
   /** Brings `ref` and its objects over from `remote` and answers with its tip, or none when the remote has no such ref. */
-  public fetchRef(
+  public async fetchRef(
     root: DirectoryPath,
     remote: string,
     ref: SnapshotRef
-  ): ResultAsync<CommitId | undefined, GitProblem> {
-    return this.guarded<CommitId | undefined>(async function* () {
-      const result = yield* this.runRemote(root, ['fetch', '--quiet', '--no-tags', remote, ref.toString()]);
-      if (result.exitCode !== 0) {
-        return /couldn't find remote ref|no such ref/i.test(result.stderr)
-          ? ok(undefined)
-          : err(problem(remoteSaid(result.stderr) || `exit code ${result.exitCode}`));
-      }
-      const { stdout } = yield* this.run(root, ['rev-parse', '--verify', '--quiet', 'FETCH_HEAD']);
-      return ok(CommitId.fromGit(stdout.trim()));
-    });
+  ): Promise<Result<CommitId | undefined, GitProblem>> {
+    const fetched = await this.runRemote(root, ['fetch', '--quiet', '--no-tags', remote, ref.toString()]);
+    if (fetched.isErr()) {
+      return err(fetched.error);
+    }
+    const result = fetched.value;
+    if (result.exitCode !== 0) {
+      return /couldn't find remote ref|no such ref/i.test(result.stderr)
+        ? ok(undefined)
+        : err(problem(remoteSaid(result.stderr) || `exit code ${result.exitCode}`));
+    }
+    const head = await this.run(root, ['rev-parse', '--verify', '--quiet', 'FETCH_HEAD']);
+    return head.map(({ stdout }) => CommitId.fromGit(stdout.trim()));
   }
 
   /** Git's own hooks directory, `.git/hooks` (shared by every worktree), whatever `core.hooksPath` says. */
-  public hooksDirectory(root: DirectoryPath): ResultAsync<DirectoryPath, GitProblem> {
-    return this.run(root, ['rev-parse', '--git-common-dir']).map(
-      ({ stdout }) => new DirectoryPath(path.resolve(root.toString(), stdout.trim(), 'hooks'))
-    );
+  public async hooksDirectory(root: DirectoryPath): Promise<Result<DirectoryPath, GitProblem>> {
+    const ran = await this.run(root, ['rev-parse', '--git-common-dir']);
+    return ran.map(({ stdout }) => new DirectoryPath(path.resolve(root.toString(), stdout.trim(), 'hooks')));
   }
 
   /** `core.hooksPath` when the hooks live elsewhere than `.git/hooks`, as husky and its kin set it. */
-  public hooksPathConfigured(root: DirectoryPath): ResultAsync<string | undefined, GitProblem> {
+  public hooksPathConfigured(root: DirectoryPath): Promise<Result<string | undefined, GitProblem>> {
     return this.configured(root, 'core.hooksPath');
   }
 
   /** The directory git runs hooks from, as git resolves it: `core.hooksPath` with `~` expanded, else `.git/hooks`. */
-  public hooksRunFrom(root: DirectoryPath): ResultAsync<DirectoryPath, GitProblem> {
-    return this.run(root, ['rev-parse', '--git-path', 'hooks']).map(
-      ({ stdout }) => new DirectoryPath(path.resolve(root.toString(), stdout.trim()))
-    );
+  public async hooksRunFrom(root: DirectoryPath): Promise<Result<DirectoryPath, GitProblem>> {
+    const ran = await this.run(root, ['rev-parse', '--git-path', 'hooks']);
+    return ran.map(({ stdout }) => new DirectoryPath(path.resolve(root.toString(), stdout.trim())));
   }
 
   /** Takes settled `paths` out of the unmerged state, back to HEAD or forgotten where there is no HEAD yet; files on disk are not touched. */
-  public unstage(root: DirectoryPath, paths: readonly RelativeFilePath[]): ResultAsync<void, GitProblem> {
+  public async unstage(root: DirectoryPath, paths: readonly RelativeFilePath[]): Promise<Result<void, GitProblem>> {
     if (paths.length === 0) {
-      return okAsync(undefined);
+      return ok(undefined);
     }
-    return this.run(root, ['reset', '-q', '--pathspec-from-file=-', '--pathspec-file-nul'], {
+    const ran = await this.run(root, ['reset', '-q', '--pathspec-from-file=-', '--pathspec-file-nul'], {
       input: paths.map(String).join('\0')
-    }).map(() => undefined);
+    });
+    return ran.map(() => undefined);
   }
 
-  public isAncestor(root: DirectoryPath, ancestor: CommitId, descendant: CommitId): ResultAsync<boolean, GitProblem> {
-    return this.run(root, ['merge-base', '--is-ancestor', ancestor.toString(), descendant.toString()], {
+  public async isAncestor(
+    root: DirectoryPath,
+    ancestor: CommitId,
+    descendant: CommitId
+  ): Promise<Result<boolean, GitProblem>> {
+    const ran = await this.run(root, ['merge-base', '--is-ancestor', ancestor.toString(), descendant.toString()], {
       exitCodes: [0, 1]
-    }).map((result) => result.exitCode === 0);
-  }
-
-  /** `steps` as one `Result`: the first `yield*` that fails answers with its problem, and nothing after it runs. */
-  private guarded<T>(steps: (this: GitService) => Steps<T>): ResultAsync<T, GitProblem> {
-    return safeTry(steps.bind(this));
+    });
+    return ran.map((result) => result.exitCode === 0);
   }
 
   /** `work` with a directory that is removed once it settles, whichever way. */
   private inTemporaryDirectory<T>(
-    work: (temporary: DirectoryPath) => ResultAsync<T, GitProblem>
-  ): ResultAsync<T, GitProblem> {
-    return new ResultAsync(withDirPath(async (temporary) => work(temporary)));
+    work: (temporary: DirectoryPath) => Promise<Result<T, GitProblem>>
+  ): Promise<Result<T, GitProblem>> {
+    return withDirPath(work);
   }
 
   /** A config value, or none when it is not set. */
-  private configured(root: DirectoryPath, key: string): ResultAsync<string | undefined, GitProblem> {
-    return this.run(root, ['config', '--get', key], { exitCodes: [0, 1] }).map((result) =>
-      result.exitCode === 0 ? result.stdout.trim() : undefined
-    );
+  private async configured(root: DirectoryPath, key: string): Promise<Result<string | undefined, GitProblem>> {
+    const ran = await this.run(root, ['config', '--get', key], { exitCodes: [0, 1] });
+    return ran.map((result) => (result.exitCode === 0 ? result.stdout.trim() : undefined));
   }
 
   // No prompt, no credential dialogue, no passphrase, and a timeout, so a dead remote is reported rather than waited on.
-  private runRemote(cwd: DirectoryPath, args: string[]): ResultAsync<Ran<string>, GitProblem> {
-    return this.batchSsh(cwd).andThen((ssh) =>
-      ResultAsync.fromPromise(
-        execa('git', ['-c', 'credential.interactive=false', ...args], {
-          cwd: cwd.toString(),
-          env: { ...OWN_REPOSITORY, GIT_TERMINAL_PROMPT: '0', LC_ALL: 'C', ...ssh },
-          timeout: REMOTE_TIMEOUT_MS,
-          reject: false
-        }),
-        (error) =>
-          problem(
-            error instanceof ExecaError && error.timedOut
-              ? `the remote did not answer within ${REMOTE_TIMEOUT_MS / 1000} seconds`
-              : errorMessage(error)
-          )
-      ).map((result) => ({ stdout: result.stdout, stderr: result.stderr, exitCode: result.exitCode ?? -1 }))
-    );
+  private async runRemote(cwd: DirectoryPath, args: string[]): Promise<Result<Ran<string>, GitProblem>> {
+    const ssh = await this.batchSsh(cwd);
+    if (ssh.isErr()) {
+      return err(ssh.error);
+    }
+    try {
+      const result = await execa('git', ['-c', 'credential.interactive=false', ...args], {
+        cwd: cwd.toString(),
+        env: { ...OWN_REPOSITORY, GIT_TERMINAL_PROMPT: '0', LC_ALL: 'C', ...ssh.value },
+        timeout: REMOTE_TIMEOUT_MS,
+        reject: false
+      });
+      return ok({ stdout: result.stdout, stderr: result.stderr, exitCode: result.exitCode ?? -1 });
+    } catch (error) {
+      return err(
+        problem(
+          error instanceof ExecaError && error.timedOut
+            ? `the remote did not answer within ${REMOTE_TIMEOUT_MS / 1000} seconds`
+            : errorMessage(error)
+        )
+      );
+    }
   }
 
   // The developer's own SSH client, set by GIT_SSH_COMMAND, core.sshCommand or GIT_SSH, is
   // left alone; only the default ssh is told not to ask for a passphrase.
-  private batchSsh(cwd: DirectoryPath): ResultAsync<{ GIT_SSH_COMMAND?: string }, GitProblem> {
+  private async batchSsh(cwd: DirectoryPath): Promise<Result<{ GIT_SSH_COMMAND?: string }, GitProblem>> {
     if (process.env.GIT_SSH_COMMAND !== undefined || process.env.GIT_SSH !== undefined) {
-      return okAsync({});
+      return ok({});
     }
-    return this.configured(cwd, 'core.sshCommand').map((command) =>
-      command === undefined ? { GIT_SSH_COMMAND: 'ssh -o BatchMode=yes' } : {}
-    );
+    const command = await this.configured(cwd, 'core.sshCommand');
+    return command.map((value) => (value === undefined ? { GIT_SSH_COMMAND: 'ssh -o BatchMode=yes' } : {}));
   }
 
-  private gitDir(root: DirectoryPath): ResultAsync<string, GitProblem> {
-    return this.run(root, ['rev-parse', '--absolute-git-dir']).map(({ stdout }) => stdout.trim());
+  private async gitDir(root: DirectoryPath): Promise<Result<string, GitProblem>> {
+    return (await this.run(root, ['rev-parse', '--absolute-git-dir'])).map(({ stdout }) => stdout.trim());
   }
 
   private run(
     cwd: DirectoryPath,
     args: string[],
     options: RunOptions & { encoding: 'buffer' }
-  ): ResultAsync<Ran<Uint8Array>, GitProblem>;
+  ): Promise<Result<Ran<Uint8Array>, GitProblem>>;
   private run(
     cwd: DirectoryPath,
     args: string[],
     options?: RunOptions & { encoding?: 'utf8' }
-  ): ResultAsync<Ran<string>, GitProblem>;
-  private run(
+  ): Promise<Result<Ran<string>, GitProblem>>;
+  private async run(
     cwd: DirectoryPath,
     args: string[],
     options: RunOptions & { encoding?: 'utf8' | 'buffer' } = {}
-  ): ResultAsync<Ran<string | Uint8Array>, GitProblem> {
+  ): Promise<Result<Ran<string | Uint8Array>, GitProblem>> {
     const { env = {}, attributesIn, input, encoding = 'utf8', exitCodes = [0] } = options;
-    const settings =
+    const settings: Result<readonly (readonly [string, string])[], GitProblem> =
       attributesIn === undefined
-        ? okAsync<readonly (readonly [string, string])[], GitProblem>(SETTINGS)
-        : attributesFile(attributesIn).map((file) => [...SETTINGS, ['core.attributesFile', file] as const]);
-    return settings
-      .andThen((pairs) =>
-        ResultAsync.fromPromise(
-          execa('git', [...pairs.flatMap(([key, value]) => ['-c', `${key}=${value}`]), ...args], {
-            cwd: cwd.toString(),
-            env: { ...OWN_REPOSITORY, ...env, GIT_TERMINAL_PROMPT: '0', LC_ALL: 'C' },
-            input,
-            encoding: encoding as 'utf8',
-            // Bytes are read by length, and stripping would take a final CR with the newline.
-            stripFinalNewline: encoding === 'utf8',
-            reject: false
-          }),
-          (error) => failed(args[0], error instanceof ExecaError ? error.shortMessage : errorMessage(error))
-        )
-      )
-      .andThen((result) => {
-        const stderr = String(result.stderr);
-        if (!exitCodes.includes(result.exitCode ?? -1)) {
-          // With no exit code git never ran (or was killed), so execa's own message says why.
-          const reason =
-            result.exitCode === undefined
-              ? result.shortMessage ?? 'git did not run'
-              : stderr.trim() || `exit code ${result.exitCode}`;
-          return err(failed(args[0], reason));
+        ? ok(SETTINGS)
+        : (await attributesFile(attributesIn)).map((file) => [...SETTINGS, ['core.attributesFile', file] as const]);
+    if (settings.isErr()) {
+      return err(settings.error);
+    }
+    try {
+      const result = await execa(
+        'git',
+        [...settings.value.flatMap(([key, value]) => ['-c', `${key}=${value}`]), ...args],
+        {
+          cwd: cwd.toString(),
+          env: { ...OWN_REPOSITORY, ...env, GIT_TERMINAL_PROMPT: '0', LC_ALL: 'C' },
+          input,
+          encoding: encoding as 'utf8',
+          // Bytes are read by length, and stripping would take a final CR with the newline.
+          stripFinalNewline: encoding === 'utf8',
+          reject: false
         }
-        return ok({ stdout: result.stdout as string | Uint8Array, stderr, exitCode: result.exitCode ?? -1 });
-      });
+      );
+      const stderr = String(result.stderr);
+      if (!exitCodes.includes(result.exitCode ?? -1)) {
+        // With no exit code git never ran (or was killed), so execa's own message says why.
+        const reason =
+          result.exitCode === undefined
+            ? result.shortMessage ?? 'git did not run'
+            : stderr.trim() || `exit code ${result.exitCode}`;
+        return err(failed(args[0], reason));
+      }
+      return ok({ stdout: result.stdout as string | Uint8Array, stderr, exitCode: result.exitCode ?? -1 });
+    } catch (error) {
+      return err(failed(args[0], error instanceof ExecaError ? error.shortMessage : errorMessage(error)));
+    }
   }
 }
 
 // Trees are stored with line endings normalised, so a CRLF file and its LF twin compare equal
 // and merge line by line; the attributes live in a temporary file, never in the repository.
-function attributesFile(temporary: DirectoryPath): ResultAsync<string, GitProblem> {
+async function attributesFile(temporary: DirectoryPath): Promise<Result<string, GitProblem>> {
   const file = new FilePath(temporary, new FileName('attributes'));
-  return ResultAsync.fromPromise(fs.promises.writeFile(file.toString(), '* text=auto\n'), (error) =>
-    problem(errorMessage(error))
-  ).map(() => file.toString());
+  try {
+    await fs.promises.writeFile(file.toString(), '* text=auto\n');
+    return ok(file.toString());
+  } catch (error) {
+    return err(problem(errorMessage(error)));
+  }
 }

@@ -4,7 +4,7 @@ import path from 'path';
 import { expect } from 'chai';
 import { canonical } from '../../../src/infrastructure/tmp-extensions.js';
 import { execa } from 'execa';
-import { errAsync, okAsync } from 'neverthrow';
+import { err, ok } from 'neverthrow';
 import sinon from 'sinon';
 import { GenerateAction } from '../../../src/actions/sdk/generate.js';
 import { GitService } from '../../../src/infrastructure/git-service.js';
@@ -110,7 +110,7 @@ describe('GenerateAction (sdk) — the destination', () => {
     it(`with ${found}, warns that customizations will not persist and overwrites`, async () => {
       sinon
         .stub(GitService.prototype, 'version')
-        .returns(okAsync(output === undefined ? undefined : GitVersion.parse(output)));
+        .resolves(ok(output === undefined ? undefined : GitVersion.parse(output)));
       const gitUnavailable = sinon.stub(SdkGeneratePrompts.prototype, 'gitUnavailable');
 
       expect((await execute()).isSuccess()).to.be.true;
@@ -401,7 +401,7 @@ describe('GenerateAction (sdk) — the destination', () => {
 
   it('reports a directory git could not inspect', async () => {
     (await git.init(new DirectoryPath(root)))._unsafeUnwrap();
-    sinon.stub(SdkRepositoryContext.prototype, 'inspect').returns(errAsync({ kind: 'gitFailed', reason: 'git broke' }));
+    sinon.stub(SdkRepositoryContext.prototype, 'inspect').resolves(err({ kind: 'gitFailed', reason: 'git broke' }));
     const notInspected = sinon.stub(SdkGeneratePrompts.prototype, 'directoryNotInspected');
 
     expect((await execute()).isFailed()).to.be.true;

@@ -85,6 +85,7 @@ Supporting: **Types** (`src/types/`) for value objects, context objects, and dom
 - **No raw string paths** — use `DirectoryPath`, `FilePath`, `FileName`, `UrlPath` value objects from `src/types/file/`
 - **No `console.log`** — all output through `@clack/prompts` via Prompts classes only
 - **Error handling**: Services return `Result<T, ServiceError>` (neverthrow); Actions return `ActionResult<T>` (success/failed/cancelled). No uncaught throws above infrastructure.
+- **Async `Result`s are `Promise<Result<T, E>>`** — an `async` method body that `await`s each step and returns early on `isErr()`. `ResultAsync`, `safeTry`, `okAsync` and `errAsync` are not used: a signature never names `ResultAsync`, and a caller `await`s a `Result` rather than chaining `andThen` on a promise. A throwing promise becomes a `Result` through `try`/`catch` around the `await`.
 - **Prompts delegation** — Actions never call `log.*` directly; every message goes through `this.prompts.*`
 - **Temp directories** — always use `withDirPath()` wrapper, never `tmp-promise` directly
 - **`authKey` typed as `string | null = null`**, not `undefined`

@@ -4,7 +4,7 @@ import path from 'path';
 import { Buffer } from 'node:buffer';
 import { Readable } from 'node:stream';
 import { expect } from 'chai';
-import { err, ok, okAsync } from 'neverthrow';
+import { err, ok } from 'neverthrow';
 import sinon from 'sinon';
 import { GenerateAction } from '../../../src/actions/sdk/generate.js';
 import { GitService } from '../../../src/infrastructure/git-service.js';
@@ -112,7 +112,7 @@ describe('GenerateAction (sdk)', () => {
   });
 
   it('writes the SDK as it always has when git is not there', async () => {
-    sinon.stub(GitService.prototype, 'version').returns(okAsync(undefined));
+    sinon.stub(GitService.prototype, 'version').resolves(ok(undefined));
     sinon.stub(SdkGeneratePrompts.prototype, 'gitUnavailable');
 
     expect((await execute()).isSuccess()).to.be.true;

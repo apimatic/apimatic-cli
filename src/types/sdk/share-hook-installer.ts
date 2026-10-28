@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { Err, ok, Result, ResultAsync, safeTry } from 'neverthrow';
+import { err, ok, Result } from 'neverthrow';
 import { FileService } from '../../infrastructure/file-service.js';
 import { GitService } from '../../infrastructure/git-service.js';
 import { DirectoryPath } from '../file/directoryPath.js';
@@ -9,8 +9,6 @@ import { FilePath } from '../file/filePath.js';
 import { gitFailed, onDisk, SdkRepositoryProblem, ShareHookInstall } from './repository-state.js';
 import { SHARE_HOOK_SCRIPT, SHARE_HOOK_SCRIPT_NAME, ShareHook } from './share-hook.js';
 
-type Steps<T> = AsyncGenerator<Err<never, SdkRepositoryProblem>, Result<T, SdkRepositoryProblem>>;
-
 /** The script goes into git's own hooks directory, so the one line a hook elsewhere needs is the same everywhere; the block goes into the hook git runs. */
 export class ShareHookInstaller {
   private readonly fileService = new FileService();
@@ -18,41 +16,65 @@ export class ShareHookInstaller {
 
   constructor(private readonly root: DirectoryPath) {}
 
-  public install(): ResultAsync<ShareHookInstall, SdkRepositoryProblem> {
-    return safeTry(this.installing.bind(this));
-  }
-
-  private async *installing(): Steps<ShareHookInstall> {
-    const hooks = yield* this.git.hooksDirectory(this.root).mapErr(gitFailed);
-    const script = new FilePath(hooks, new FileName(SHARE_HOOK_SCRIPT_NAME));
-    yield* onDisk(this.writeExecutable(script, SHARE_HOOK_SCRIPT));
-    const hooksPath = yield* this.git.hooksPathConfigured(this.root).mapErr(gitFailed);
-    if (hooksPath !== undefined) {
-      const file = hookRunFrom(yield* this.git.hooksRunFrom(this.root).mapErr(gitFailed));
-      const inRepository = this.root.contains(file.directory());
-      const calls = ShareHook.calls(yield* onDisk(this.read(file)));
-      return ok(
-        calls
-          ? { kind: 'installed', file, written: false }
-          : { kind: 'elsewhere', file, hooksPath, inRepository, script }
-      );
+  public async install(): Promise<Result<ShareHookInstall, SdkRepositoryProblem>> {
+    const hooks = await this.git.hooksDirectory(this.root);
+    if (hooks.isErr()) {
+      return err(gitFailed(hooks.error));
     }
-    const file = new FilePath(hooks, new FileName('pre-push'));
-    const existing = yield* onDisk(this.read(file));
-    const hook = ShareHook.installInto(existing);
+    const script = new FilePath(hooks.value, new FileName(SHARE_HOOK_SCRIPT_NAME));
+    const scriptWritten = await onDisk(this.writeExecutable(script, SHARE_HOOK_SCRIPT));
+    if (scriptWritten.isErr()) {
+      return err(scriptWritten.error);
+    }
+    const hooksPath = await this.git.hooksPathConfigured(this.root);
+    if (hooksPath.isErr()) {
+      return err(gitFailed(hooksPath.error));
+    }
+    if (hooksPath.value !== undefined) {
+      return this.installElsewhere(hooksPath.value, script);
+    }
+    const file = new FilePath(hooks.value, new FileName('pre-push'));
+    const existing = await onDisk(this.read(file));
+    if (existing.isErr()) {
+      return err(existing.error);
+    }
+    const hook = ShareHook.installInto(existing.value);
     switch (hook.kind) {
       case 'present':
         return ok({ kind: 'installed', file, written: false });
       case 'notShell':
         return ok(
-          ShareHook.calls(existing)
+          ShareHook.calls(existing.value)
             ? { kind: 'installed', file, written: false }
             : { kind: 'notShell', file, shebang: hook.shebang, script }
         );
-      case 'installed':
-        yield* onDisk(this.writeExecutable(file, hook.content));
-        return ok({ kind: 'installed', file, written: true });
+      case 'installed': {
+        const written = await onDisk(this.writeExecutable(file, hook.content));
+        return written.map((): ShareHookInstall => ({ kind: 'installed', file, written: true }));
+      }
     }
+  }
+
+  /** With `core.hooksPath` set, git runs the hook from there, so that is the file that must call the script. */
+  private async installElsewhere(
+    hooksPath: string,
+    script: FilePath
+  ): Promise<Result<ShareHookInstall, SdkRepositoryProblem>> {
+    const runFrom = await this.git.hooksRunFrom(this.root);
+    if (runFrom.isErr()) {
+      return err(gitFailed(runFrom.error));
+    }
+    const file = hookRunFrom(runFrom.value);
+    const content = await onDisk(this.read(file));
+    if (content.isErr()) {
+      return err(content.error);
+    }
+    const inRepository = this.root.contains(file.directory());
+    return ok(
+      ShareHook.calls(content.value)
+        ? { kind: 'installed', file, written: false }
+        : { kind: 'elsewhere', file, hooksPath, inRepository, script }
+    );
   }
 
   private async read(file: FilePath): Promise<string | undefined> {

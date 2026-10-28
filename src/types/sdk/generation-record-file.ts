@@ -1,4 +1,4 @@
-import { ResultAsync } from 'neverthrow';
+import { err, Result } from 'neverthrow';
 import { FileService } from '../../infrastructure/file-service.js';
 import { DirectoryPath } from '../file/directoryPath.js';
 import { FileName } from '../file/fileName.js';
@@ -33,9 +33,12 @@ export class GenerationRecordFile {
   }
 
   /** Both files, each only when its content changed, so a regeneration that changed nothing touches neither. */
-  public write(record: GenerationRecord): ResultAsync<FilePath, SdkRepositoryProblem> {
-    return onDisk(this.fileService.replaceContentsIfChanged(this.attributes, RECORD_ATTRIBUTES))
-      .andThen(() => onDisk(this.fileService.replaceContentsIfChanged(this.file, record.toJson())))
-      .map(() => this.file);
+  public async write(record: GenerationRecord): Promise<Result<FilePath, SdkRepositoryProblem>> {
+    const attributes = await onDisk(this.fileService.replaceContentsIfChanged(this.attributes, RECORD_ATTRIBUTES));
+    if (attributes.isErr()) {
+      return err(attributes.error);
+    }
+    const written = await onDisk(this.fileService.replaceContentsIfChanged(this.file, record.toJson()));
+    return written.map(() => this.file);
   }
 }

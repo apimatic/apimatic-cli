@@ -256,7 +256,10 @@ export class GenerateAction {
     generation: SdkGeneration,
     snapshotNotRecorded: (reason: string) => void
   ): Promise<void> {
-    const recorded = await generated.asyncAndThen((tree) => repository.recordGeneration(tree, generation));
+    if (generated.isErr()) {
+      return snapshotNotRecorded(generated.error.reason);
+    }
+    const recorded = await repository.recordGeneration(generated.value, generation);
     if (recorded.isErr()) {
       return snapshotNotRecorded(recorded.error.reason);
     }
