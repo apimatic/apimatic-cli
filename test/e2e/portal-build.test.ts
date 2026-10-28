@@ -1083,13 +1083,14 @@ const stylesheetOf = (output: DirectoryPath) => {
     expect(pages.map(({ title }) => title)).to.include('Unlisted');
   });
 
-  // As `llms-full.txt` renders them: each operation's slice of the specification would repeat the schemas it shares.
-  it('renders each page without its specification', () => {
+  // As their Markdown companions render them: the service reads an operation's schemas and code samples from its
+  // slice of the specification, and without it indexes only the page's summary.
+  it('renders each operation page with its specification', () => {
     const operations = builtPages().filter(({ path: page }) => page.startsWith('/api/'));
 
     expect(operations, 'the specification has operations').to.not.be.empty;
     for (const { path: page, markdown } of operations) {
-      expect(markdown, page).to.contain(`(${page})`).and.not.contain('```yaml');
+      expect(markdown, page).to.contain(`(${page})`).and.match(/```yaml\nopenapi: 3/);
     }
   });
 
