@@ -416,7 +416,8 @@ USAGE
 
 FLAGS
   -d, --destination=<value>       [default: <input>/sdk/<language>] directory the SDK is generated into
-  -f, --force                     overwrite changes without asking for user consent.
+  -f, --force                     never ask: an SDK with no record is replaced, conflicts are left marked in the files,
+                                  and a recorded SDK that cannot be merged is not touched.
   -i, --input=<value>             [default: ./] path to the parent directory containing the 'src' directory, which
                                   includes API specifications and configuration files.
   -k, --auth-key=<value>          override current authentication state with an authentication key.
@@ -456,7 +457,8 @@ USAGE
 
 FLAGS
   -d, --destination=<value>       [default: <input>/sdk/<language>] path where the sdk will be generated.
-  -f, --force                     overwrite changes without asking for user consent.
+  -f, --force                     never ask: an SDK with no record is replaced, conflicts are left marked in the files,
+                                  and a recorded SDK that cannot be merged is not touched.
   -i, --input=<value>             [default: ./] path to the parent directory containing the 'src' directory, which
                                   includes API specifications and configuration files.
   -l, --language=<option>         Language of the SDK to generate and publish.
