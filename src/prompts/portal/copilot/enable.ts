@@ -114,12 +114,7 @@ export class PortalCopilotEnablePrompts {
 
   public enabled(outcome: RegistrationOutcome, key: CopilotKey, origins: readonly string[], rotated: boolean) {
     const sites = origins.length === 0 ? 'this machine' : origins.map((origin) => f.link(origin)).join(', ');
-    const what = rotated
-      ? 'Ask AI has a new key'
-      : outcome === 'created'
-        ? 'Ask AI is set up'
-        : "Ask AI's settings are up to date";
-    log.success(`${what}: ${f.var(key.toString())}, which works on ${sites}.`);
+    log.success(`${describeEnabled(outcome, rotated)}: ${f.var(key.toString())}, which works on ${sites}.`);
     if (key.kind() === 'dev') {
       log.warn(
         `This is a development key: it works on this machine and the sites listed, and answers a limited number ` +
@@ -142,6 +137,13 @@ export class PortalCopilotEnablePrompts {
           ].join('\n');
     noteWrapped(message, 'Next steps');
   }
+}
+
+function describeEnabled(outcome: RegistrationOutcome, rotated: boolean): string {
+  if (rotated) {
+    return 'Ask AI has a new key';
+  }
+  return outcome === 'created' ? 'Ask AI is set up' : "Ask AI's settings are up to date";
 }
 
 function describeUnsaved(problem: PortalScaffoldProblem): string {
