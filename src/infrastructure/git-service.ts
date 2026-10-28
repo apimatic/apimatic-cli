@@ -5,6 +5,8 @@ import { TextDecoder } from 'node:util';
 import { execa, ExecaError } from 'execa';
 import { err, ok, Result } from 'neverthrow';
 import { RelativeFilePath } from '../types/file/relativeFilePath.js';
+import { RelativeDirectoryPath } from '../types/file/relativeDirectoryPath.js';
+import { RelativePaths } from '../types/file/relative-paths.js';
 import { DirectoryPath, posix } from '../types/file/directoryPath.js';
 import { SdkPath } from '../types/sdk/sdk-path.js';
 import { FileName } from '../types/file/fileName.js';
@@ -122,16 +124,26 @@ export class GitService {
     return ran.map(({ exitCode }) => exitCode === 0);
   }
 
-  /** Every file below `directory` git tracks or would add, so its ignore rules keep `node_modules` out; a tracked file deleted from disk is not listed. */
-  public async filesToCommit(directory: DirectoryPath): Promise<Result<RelativeFilePath[], GitProblem>> {
-    const ran = await this.run(directory, ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', '.']);
-    return ran.map(({ stdout }) =>
-      stdout
-        .split('\0')
-        .filter((entry) => entry !== '')
-        .map((entry) => RelativeFilePath.fromGit(entry))
-        .filter((file) => fs.existsSync(file.in(directory).toString()))
-    );
+  /** Everything below `directory` its ignore rules keep out, such as `node_modules`: a directory ignored whole as one entry, a file beside something tracked on its own. */
+  public async ignoredBelow(directory: DirectoryPath): Promise<Result<RelativePaths, GitProblem>> {
+    const ran = await this.run(directory, [
+      'ls-files',
+      '-z',
+      '--others',
+      '--ignored',
+      '--exclude-standard',
+      '--directory',
+      '--',
+      '.'
+    ]);
+    return ran.map(({ stdout }) => {
+      const entries = stdout.split('\0').filter((entry) => entry !== '');
+      const isDirectory = (entry: string) => entry.endsWith('/');
+      return {
+        files: entries.filter((entry) => !isDirectory(entry)).map((entry) => RelativeFilePath.fromGit(entry)),
+        directories: entries.filter(isDirectory).map((entry) => RelativeDirectoryPath.fromGit(entry))
+      };
+    });
   }
 
   /** The operation the repository is in the middle of, if any, such as a `git merge` with conflicts left to resolve. */

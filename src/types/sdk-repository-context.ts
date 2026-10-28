@@ -2,6 +2,7 @@ import { err, ok, Result } from 'neverthrow';
 import { GitService } from '../infrastructure/git-service.js';
 import { DirectoryPath } from './file/directoryPath.js';
 import { RelativeFilePath } from './file/relativeFilePath.js';
+import { RelativePaths } from './file/relative-paths.js';
 import { CommitId } from './git/commit-id.js';
 import { STAGE, StageEntry } from './git/merge-tree.js';
 import { TreeId } from './git/tree-id.js';
@@ -186,10 +187,10 @@ export class SdkRepositoryContext {
     return this.files.apply(plan, { commit: commit.value, ref: this.previousRef() }, generated);
   }
 
-  /** The files the SDK directory shares: those git tracks or would add, never the CLI's own record. */
-  public async filesToShare(): Promise<Result<RelativeFilePath[], SdkRepositoryProblem>> {
-    const files = await this.git.filesToCommit(this.sdk);
-    return files.mapErr(gitFailed).map((found) => found.filter((file) => file.inside(RECORD_DIRECTORY) === undefined));
+  /** What the repository's ignore rules keep out of the SDK directory, so an upload leaves it out as a commit would. */
+  public async ignored(): Promise<Result<RelativePaths, SdkRepositoryProblem>> {
+    const ignored = await this.git.ignoredBelow(this.sdk);
+    return ignored.mapErr(gitFailed);
   }
 
   /** Marks the conflicted paths in the repository's index the way a merge would, so git's own tools take over. */

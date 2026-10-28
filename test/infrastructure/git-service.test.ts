@@ -118,21 +118,25 @@ describe('GitService', () => {
     );
   });
 
-  it('lists the files git tracks or would add below a directory, leaving out ignored and deleted ones', async () => {
+  it('lists what the ignore rules keep out below a directory: a directory whole unless something in it is tracked', async () => {
     const repo = await repository();
     const sdk = repo.join('sdk');
+    write(sdk, '.gitignore', 'dist/\nbuild/\n*.log\n');
     write(sdk, 'tracked.py', 'tracked');
-    write(sdk, 'gone.py', 'gone');
+    write(sdk, 'build/keep.py', 'kept');
     await execa('git', ['add', '.'], { cwd: repo.toString() });
-    fs.rmSync(path.join(sdk.toString(), 'gone.py'));
+    await execa('git', ['add', '-f', 'sdk/build/keep.py'], { cwd: repo.toString() });
     write(sdk, 'untracked.py', 'untracked');
-    write(sdk, '.gitignore', 'dist/\n');
+    write(sdk, 'debug.log', 'noise');
+    write(sdk, 'build/out.py', 'built');
     write(sdk, 'dist/built.py', 'built');
-    write(repo, 'outside.py', 'outside');
+    write(sdk, 'dist/nested/deep.py', 'built');
+    write(repo, 'outside.log', 'outside');
 
-    const files = (await git.filesToCommit(sdk))._unsafeUnwrap();
+    const ignored = (await git.ignoredBelow(sdk))._unsafeUnwrap();
 
-    expect(files.map(String)).to.have.members(['.gitignore', 'tracked.py', 'untracked.py']);
+    expect(ignored.files.map(String)).to.have.members(['build/out.py', 'debug.log']);
+    expect(ignored.directories.map(String)).to.deep.equal(['dist']);
   });
 
   describe('treeOf', () => {

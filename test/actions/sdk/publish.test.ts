@@ -66,6 +66,9 @@ describe('SdkPublishAction', () => {
     const generated = path.join(root, 'generated');
     fs.mkdirSync(generated);
     fs.writeFileSync(path.join(generated, 'README.md'), '# sdk');
+    fs.writeFileSync(path.join(generated, '.gitignore'), 'node_modules/\n');
+    fs.mkdirSync(path.join(generated, 'node_modules'));
+    fs.writeFileSync(path.join(generated, 'node_modules', 'dep.js'), 'module.exports = {};');
     const archive = new FilePath(new DirectoryPath(root), new FileName('sdk.zip'));
     (await new ZipService().archive(new DirectoryPath(generated), archive))._unsafeUnwrap();
     const sdkArchive = fs.readFileSync(archive.toString());
@@ -80,7 +83,7 @@ describe('SdkPublishAction', () => {
     fs.rmSync(root, { recursive: true, force: true });
   });
 
-  it('uploads the files git would commit, without the CLI’s record', async () => {
+  it('uploads the SDK without the CLI’s record, the repository or what its ignore rules keep out', async () => {
     await new GitService().init(new DirectoryPath(root));
     sinon.stub(SdkGeneratePrompts.prototype, 'sdkGenerated');
     sinon.stub(SdkGeneratePrompts.prototype, 'shareHookInstalled');
@@ -100,7 +103,7 @@ describe('SdkPublishAction', () => {
     expect(publishSdkPackage.calledOnce).to.be.true;
     expect(fs.existsSync(path.join(sdk().toString(), '.apimatic', 'generation.json'))).to.be.true;
     const uploaded = (await publishSdkPackage.firstCall.returnValue)._unsafeUnwrap().publishingLogUrl;
-    expect(uploaded).to.equal('https://logs.test/README.md');
+    expect(uploaded).to.equal('https://logs.test/.gitignore,README.md');
   });
 
   it('generates into the SDK directory on a dry run and opens it, uploading nothing', async () => {

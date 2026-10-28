@@ -8,6 +8,7 @@ import { ZipService } from '../../src/infrastructure/zip-service.js';
 import { DirectoryPath } from '../../src/types/file/directoryPath.js';
 import { FileName } from '../../src/types/file/fileName.js';
 import { FilePath } from '../../src/types/file/filePath.js';
+import { RelativeDirectoryPath } from '../../src/types/file/relativeDirectoryPath.js';
 import { RelativeFilePath } from '../../src/types/file/relativeFilePath.js';
 
 describe('ZipService', () => {
@@ -34,16 +35,23 @@ describe('ZipService', () => {
   });
 
   describe('archive', () => {
-    it('zips only the listed files when given them', async () => {
+    it('leaves out the excluded files and directories, named below the source as git names them', async () => {
       write('README.md', '# sdk');
+      write('debug.log', 'noise');
       write(path.join('models', 'book.py'), 'class Book: ...');
+      write(path.join('models', 'draft.py'), 'draft');
       write(path.join('dist', 'built.js'), 'built');
+      write(path.join('dist', 'nested', 'deep.js'), 'deep');
+      write(path.join('dist-notes', 'keep.md'), 'kept');
 
-      const files = ['README.md', 'models/book.py'].map((value) => RelativeFilePath.fromGit(value));
-      (await new ZipService().archive(source, archive, files))._unsafeUnwrap();
+      const excluding = {
+        files: ['debug.log', 'models/draft.py'].map((value) => RelativeFilePath.fromGit(value)),
+        directories: [RelativeDirectoryPath.fromGit('dist/')]
+      };
+      (await new ZipService().archive(source, archive, excluding))._unsafeUnwrap();
 
       const names = new AdmZip(archive.toString()).getEntries().map((entry) => entry.entryName);
-      expect(names).to.have.members(['README.md', 'models/book.py']);
+      expect(names).to.have.members(['README.md', 'models/book.py', 'dist-notes/keep.md']);
     });
 
     it('names every entry with forward slashes, whatever the platform separator', async () => {

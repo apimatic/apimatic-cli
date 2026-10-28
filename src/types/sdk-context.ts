@@ -9,7 +9,8 @@ import { DirectoryPath } from './file/directoryPath.js';
 import { FilePath } from './file/filePath.js';
 import { FileName } from './file/fileName.js';
 import { FileProblem } from './file/file-problem.js';
-import { RelativeFilePath } from './file/relativeFilePath.js';
+import { RelativeDirectoryPath } from './file/relativeDirectoryPath.js';
+import { NO_PATHS, RelativePaths } from './file/relative-paths.js';
 import { SdkGeneration } from './sdk/generation-record.js';
 import { destinationFor, SdkDestination, Unresolved } from './sdk/sdk-destination.js';
 import { RECORD_DIRECTORY } from './sdk/generation-record-file.js';
@@ -18,6 +19,7 @@ import { SdkRepositoryContext } from './sdk-repository-context.js';
 import { TempContext } from './temp-context.js';
 
 const GIT_DIRECTORY = '.git';
+const KEPT_OUT_OF_ARCHIVE = [GIT_DIRECTORY, RECORD_DIRECTORY].map((name) => RelativeDirectoryPath.fromGit(name));
 
 /**
  * The directory as git spells it (an 8.3 alias expands on Windows), and its nearest existing
@@ -88,13 +90,16 @@ export class SdkContext {
     return this.sdkDirectory;
   }
 
-  /** The SDK zipped for upload: the files git would commit, never `.git` or the CLI's record; without a repository, every file but those. */
+  /** The SDK zipped for upload: everything but `.git`, the CLI's record and, inside a repository, what its ignore rules keep out. */
   public async archive(tempDirectory: DirectoryPath): Promise<Result<FilePath, FileProblem>> {
-    const files = await this.filesToArchive();
-    if (files.isErr()) {
-      return err({ kind: 'zipFailed', reason: files.error.reason });
+    const ignored = await this.ignored();
+    if (ignored.isErr()) {
+      return err({ kind: 'zipFailed', reason: ignored.error.reason });
     }
-    return new TempContext(tempDirectory).zip(this.sdkDirectory, files.value);
+    return new TempContext(tempDirectory).zip(this.sdkDirectory, {
+      files: ignored.value.files,
+      directories: [...KEPT_OUT_OF_ARCHIVE, ...ignored.value.directories]
+    });
   }
 
   public async loadSdkInTempDirectory(
@@ -128,33 +133,12 @@ export class SdkContext {
     return ok(ignored.value ? undefined : SdkRepositoryContext.create(root, real));
   }
 
-  private async filesToArchive(): Promise<Result<RelativeFilePath[], SdkRepositoryProblem>> {
+  /** What the enclosing repository's ignore rules keep out; nothing without a repository. */
+  private async ignored(): Promise<Result<RelativePaths, SdkRepositoryProblem>> {
     const repository = await this.repository();
     if (repository.isErr()) {
       return err(repository.error);
     }
-    if (repository.value !== undefined) {
-      return repository.value.filesToShare();
-    }
-    try {
-      return ok(await this.everyFile());
-    } catch (error) {
-      return err(fileFailed(error));
-    }
-  }
-
-  private async everyFile(below = ''): Promise<RelativeFilePath[]> {
-    const directory = this.sdkDirectory.resolve(below);
-    const entries = await fs.promises.readdir(directory.toString(), { withFileTypes: true });
-    const files = await Promise.all(
-      entries.map(async (entry): Promise<RelativeFilePath[]> => {
-        const relative = below === '' ? entry.name : `${below}/${entry.name}`;
-        if (below === '' && (entry.name === GIT_DIRECTORY || entry.name === RECORD_DIRECTORY)) {
-          return [];
-        }
-        return entry.isDirectory() ? this.everyFile(relative) : [RelativeFilePath.fromGit(relative)];
-      })
-    );
-    return files.flat();
+    return repository.value === undefined ? ok(NO_PATHS) : repository.value.ignored();
   }
 }

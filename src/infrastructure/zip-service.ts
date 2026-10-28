@@ -5,20 +5,25 @@ import { err, ok, Result } from 'neverthrow';
 import { DirectoryPath } from '../types/file/directoryPath.js';
 import { FileName } from '../types/file/fileName.js';
 import { FilePath } from '../types/file/filePath.js';
-import { RelativeFilePath } from '../types/file/relativeFilePath.js';
+import { NO_PATHS, RelativePaths } from '../types/file/relative-paths.js';
 import { errorMessage } from '../utils/error-utils.js';
 
 type ZipEntry = { file: FilePath; metadataPath: string };
+type Excluded = { files: ReadonlySet<string>; directories: ReadonlySet<string> };
 
 export class ZipService {
-  /** Zips everything under `sourceDir`, or only `files` when given. */
+  /** Zips everything under `sourceDir` but the files and directories `excluding` names below it. */
   public async archive(
     sourceDir: DirectoryPath,
     outputZipPath: FilePath,
-    files?: readonly RelativeFilePath[]
+    excluding: RelativePaths = NO_PATHS
   ): Promise<Result<void, string>> {
     try {
-      await this.write(sourceDir, outputZipPath, files);
+      const excluded: Excluded = {
+        files: new Set(excluding.files.map(String)),
+        directories: new Set(excluding.directories.map(String))
+      };
+      await this.write(outputZipPath, this.entriesUnder(sourceDir, '', excluded));
       return ok(undefined);
     } catch (error) {
       await fs.promises.rm(outputZipPath.toString(), { force: true }).catch(() => undefined);
@@ -35,11 +40,7 @@ export class ZipService {
     }
   }
 
-  private async write(sourceDir: DirectoryPath, outputZipPath: FilePath, files?: readonly RelativeFilePath[]): Promise<void> {
-    const entries =
-      files === undefined
-        ? this.entriesUnder(sourceDir, '')
-        : files.map((file) => ({ file: file.in(sourceDir), metadataPath: file.toString() }));
+  private async write(outputZipPath: FilePath, entries: readonly ZipEntry[]): Promise<void> {
     const zipfile = new yazl.ZipFile();
 
     return new Promise((resolve, reject) => {
@@ -55,12 +56,15 @@ export class ZipService {
     });
   }
 
-  private entriesUnder(dir: DirectoryPath, relativePrefix: string): ZipEntry[] {
+  private entriesUnder(dir: DirectoryPath, relativePrefix: string, excluded: Excluded): ZipEntry[] {
     return fs.readdirSync(dir.toString(), { withFileTypes: true }).flatMap((entry) => {
       // Always use forward slashes as metadataPath — zip format requires it
       const metadataPath = relativePrefix ? `${relativePrefix}/${entry.name}` : entry.name;
+      if ((entry.isDirectory() ? excluded.directories : excluded.files).has(metadataPath)) {
+        return [];
+      }
       return entry.isDirectory()
-        ? this.entriesUnder(dir.join(entry.name), metadataPath)
+        ? this.entriesUnder(dir.join(entry.name), metadataPath, excluded)
         : [{ file: new FilePath(dir, new FileName(entry.name)), metadataPath }];
     });
   }
