@@ -93,15 +93,10 @@ export class PortalCopilotEnablePrompts {
 
   public keyNotSaved(problem: PortalScaffoldProblem, key: CopilotKey, sourceDirectory: DirectoryPath) {
     const config = new FilePath(sourceDirectory, new FileName(APIMATIC_CONFIG_FILE_NAME));
-    const reason =
-      problem.kind === 'sourceUnwritable'
-        ? problem.reason
-        : problem.kind === 'configUnreadable'
-          ? 'it could not be read'
-          : 'it could not be written';
+    const setting = `"ai": { "copilot": { "key": "${key.toString()}" } }`;
     log.error(
-      `The portal is registered with Ask AI, but its key could not be saved to ${f.path(config)} (${reason}). ` +
-        `Set ${f.var(`"ai": { "copilot": { "key": "${key.toString()}" } }`)} in its ${f.var('portal')} block by hand.`
+      `The portal is registered with Ask AI, but its key could not be saved to ${f.path(config)} ` +
+        `(${describeUnsaved(problem)}). Set ${f.var(setting)} in its ${f.var('portal')} block by hand.`
     );
   }
 
@@ -146,6 +141,17 @@ export class PortalCopilotEnablePrompts {
             `3. Give Ask AI its pages: ${f.cmdAlt('apimatic', 'portal', 'copilot', 'sync')}.`
           ].join('\n');
     noteWrapped(message, 'Next steps');
+  }
+}
+
+function describeUnsaved(problem: PortalScaffoldProblem): string {
+  switch (problem.kind) {
+    case 'sourceUnwritable':
+      return problem.reason;
+    case 'configUnreadable':
+      return 'it could not be read';
+    case 'configUnwritable':
+      return 'it could not be written';
   }
 }
 
