@@ -20,29 +20,29 @@ describe('SdkPath', () => {
   });
 
   it('names a pathspec for a git command run at the root, `.` for the root itself', () => {
-    expect(SdkPath.fromGit('sdk/python').pathspec()).to.equal('sdk/python');
-    expect(SdkPath.fromGit('').pathspec()).to.equal('.');
+    expect(SdkPath.fromGit('sdk/python')!.pathspec()).to.equal('sdk/python');
+    expect(SdkPath.fromGit('')!.pathspec()).to.equal('.');
   });
 
   it('turns a path below the SDK directory into one from the root, and back', () => {
-    const sdk = SdkPath.fromGit('sdk/python');
-    const file = RelativeFilePath.fromGit('models/book.py');
+    const sdk = SdkPath.fromGit('sdk/python')!;
+    const file = RelativeFilePath.fromGit('models/book.py')!;
 
     expect(sdk.fromRoot(file).toString()).to.equal('sdk/python/models/book.py');
-    expect(sdk.below(RelativeFilePath.fromGit('sdk/python/models/book.py'))?.toString()).to.equal('models/book.py');
-    expect(sdk.below(RelativeFilePath.fromGit('docs/index.md'))).to.be.undefined;
-    expect(SdkPath.fromGit('').fromRoot(file).isEqual(file)).to.be.true;
+    expect(sdk.below(RelativeFilePath.fromGit('sdk/python/models/book.py')!)?.toString()).to.equal('models/book.py');
+    expect(sdk.below(RelativeFilePath.fromGit('docs/index.md')!)).to.be.undefined;
+    expect(SdkPath.fromGit('')!.fromRoot(file).isEqual(file)).to.be.true;
   });
 
   it('knows when two SDK directories nest, which refs as files cannot allow', () => {
-    const sdk = SdkPath.fromGit('sdk');
-    const inner = SdkPath.fromGit('sdk/python');
+    const sdk = SdkPath.fromGit('sdk')!;
+    const inner = SdkPath.fromGit('sdk/python')!;
 
     expect(sdk.nests(inner)).to.be.true;
     expect(inner.nests(sdk)).to.be.true;
-    expect(SdkPath.fromGit('').nests(inner)).to.be.true;
-    expect(inner.nests(SdkPath.fromGit('sdk/typescript'))).to.be.false;
+    expect(SdkPath.fromGit('')!.nests(inner)).to.be.true;
+    expect(inner.nests(SdkPath.fromGit('sdk/typescript')!)).to.be.false;
     expect(inner.nests(inner)).to.be.false;
-    expect(SdkPath.fromGit('sdk').nests(SdkPath.fromGit('sdk2'))).to.be.false;
+    expect(SdkPath.fromGit('sdk')!.nests(SdkPath.fromGit('sdk2')!)).to.be.false;
   });
 });

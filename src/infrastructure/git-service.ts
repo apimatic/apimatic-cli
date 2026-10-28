@@ -67,6 +67,30 @@ const problem = (reason: string): GitProblem => ({ reason });
 
 const failed = (command: string, reason: string): GitProblem => problem(`git ${command} failed: ${reason.trim()}`);
 
+/** `text` as the value git's `command` prints there; none means a damaged repository, or a git this code does not know. */
+const read = <T>(command: string, text: string, parse: (text: string) => T | undefined): Result<T, GitProblem> => {
+  const value = parse(text);
+  return value === undefined
+    ? err(problem(`git ${command} printed what could not be read: ${text.trim()}`))
+    : ok(value);
+};
+
+const readAll = <T>(
+  command: string,
+  texts: readonly string[],
+  parse: (text: string) => T | undefined
+): Result<T[], GitProblem> => {
+  const values: T[] = [];
+  for (const text of texts) {
+    const value = read(command, text, parse);
+    if (value.isErr()) {
+      return err(value.error);
+    }
+    values.push(value.value);
+  }
+  return ok(values);
+};
+
 // Windows runs an unknown command through the shell instead, which says so on stderr and exits 1.
 const isNotFound = (error: unknown): boolean =>
   (error as { code?: string }).code === 'ENOENT' ||
@@ -93,12 +117,13 @@ export class GitService {
   /** The root of the repository enclosing `directory`, or none when nothing does. */
   public async topLevel(directory: DirectoryPath): Promise<Result<DirectoryPath | undefined, GitProblem>> {
     const ran = await this.run(directory, ['rev-parse', '--show-toplevel'], { exitCodes: [0, 128] });
-    return ran.andThen((result) => {
-      if (result.exitCode === 0) {
-        return ok(new DirectoryPath(result.stdout.trim()));
-      }
-      return /not a git repository/i.test(result.stderr) ? ok(undefined) : err(failed('rev-parse', result.stderr));
-    });
+    if (ran.isErr()) {
+      return err(ran.error);
+    }
+    if (ran.value.exitCode === 0) {
+      return ok(new DirectoryPath(ran.value.stdout.trim()));
+    }
+    return /not a git repository/i.test(ran.value.stderr) ? ok(undefined) : err(failed('rev-parse', ran.value.stderr));
   }
 
   public async init(directory: DirectoryPath): Promise<Result<void, GitProblem>> {
@@ -124,14 +149,24 @@ export class GitService {
       '--',
       '.'
     ]);
-    return ran.map(({ stdout }) => {
-      const entries = stdout.split('\0').filter((entry) => entry !== '');
-      const isDirectory = (entry: string) => entry.endsWith('/');
-      return {
-        files: entries.filter((entry) => !isDirectory(entry)).map((entry) => RelativeFilePath.fromGit(entry)),
-        directories: entries.filter(isDirectory).map((entry) => RelativeDirectoryPath.fromGit(entry))
-      };
-    });
+    if (ran.isErr()) {
+      return err(ran.error);
+    }
+    const entries = ran.value.stdout.split('\0').filter((entry) => entry !== '');
+    const isDirectory = (entry: string) => entry.endsWith('/');
+    const files = readAll(
+      'ls-files',
+      entries.filter((entry) => !isDirectory(entry)),
+      RelativeFilePath.fromGit
+    );
+    if (files.isErr()) {
+      return err(files.error);
+    }
+    const directories = readAll('ls-files', entries.filter(isDirectory), RelativeDirectoryPath.fromGit);
+    if (directories.isErr()) {
+      return err(directories.error);
+    }
+    return ok({ files: files.value, directories: directories.value });
   }
 
   /** The operation the repository is in the middle of, if any, such as a `git merge` with conflicts left to resolve. */
@@ -199,12 +234,18 @@ export class GitService {
       if (written.isErr()) {
         return err(written.error);
       }
-      const whole = TreeId.fromGit(written.value.stdout.trim());
-      if (inside === undefined || inside.isRoot()) {
-        return ok(whole);
+      const whole = read('write-tree', written.value.stdout.trim(), TreeId.fromGit);
+      if (whole.isErr()) {
+        return err(whole.error);
       }
-      const subtree = await inWorkTree(['rev-parse', `${whole}:${inside}`]);
-      return subtree.map(({ stdout }) => TreeId.fromGit(stdout.trim()));
+      if (inside === undefined || inside.isRoot()) {
+        return ok(whole.value);
+      }
+      const subtree = await inWorkTree(['rev-parse', `${whole.value}:${inside}`]);
+      if (subtree.isErr()) {
+        return err(subtree.error);
+      }
+      return read('rev-parse', subtree.value.stdout.trim(), TreeId.fromGit);
     });
   }
 
@@ -225,7 +266,10 @@ export class GitService {
       ['commit-tree', tree.toString(), ...parents.flatMap((parent) => ['-p', parent.toString()]), '-m', message],
       { env }
     );
-    return ran.map(({ stdout }) => CommitId.fromGit(stdout.trim()));
+    if (ran.isErr()) {
+      return err(ran.error);
+    }
+    return read('commit-tree', ran.value.stdout.trim(), CommitId.fromGit);
   }
 
   public async updateRef(root: DirectoryPath, ref: SnapshotRef, commit: CommitId): Promise<Result<void, GitProblem>> {
@@ -235,7 +279,10 @@ export class GitService {
   /** The commit `ref` points at, or none when there is no such ref. */
   public async resolveRef(root: DirectoryPath, ref: SnapshotRef): Promise<Result<CommitId | undefined, GitProblem>> {
     const ran = await this.run(root, ['rev-parse', '--verify', '--quiet', `${ref}^{commit}`], { exitCodes: [0, 1] });
-    return ran.map((result) => (result.exitCode === 0 ? CommitId.fromGit(result.stdout.trim()) : undefined));
+    if (ran.isErr()) {
+      return err(ran.error);
+    }
+    return ran.value.exitCode === 0 ? read('rev-parse', ran.value.stdout.trim(), CommitId.fromGit) : ok(undefined);
   }
 
   /** The full names of the refs below `prefix`. */
@@ -251,22 +298,26 @@ export class GitService {
   }
 
   public async treeOfCommit(root: DirectoryPath, commit: CommitId): Promise<Result<TreeId, GitProblem>> {
-    return (await this.run(root, ['rev-parse', `${commit}^{tree}`])).map(({ stdout }) => TreeId.fromGit(stdout.trim()));
+    const ran = await this.run(root, ['rev-parse', `${commit}^{tree}`]);
+    if (ran.isErr()) {
+      return err(ran.error);
+    }
+    return read('rev-parse', ran.value.stdout.trim(), TreeId.fromGit);
   }
 
   /** Every file below `tree`, with `/` between path segments. */
   public async listTree(root: DirectoryPath, tree: TreeId | CommitId): Promise<Result<TreeEntry[], GitProblem>> {
     const ran = await this.run(root, ['ls-tree', '-r', '-z', tree.toString()]);
-    return ran.map(({ stdout }) =>
-      stdout
-        .split('\0')
-        .filter((entry) => entry !== '')
-        .map((entry) => {
-          const [meta, filePath] = entry.split('\t');
-          const [mode, type, oid] = meta.split(' ');
-          return { mode, type: type as TreeEntry['type'], oid, path: RelativeFilePath.fromGit(filePath) };
-        })
-    );
+    if (ran.isErr()) {
+      return err(ran.error);
+    }
+    const entries = ran.value.stdout.split('\0').filter((entry) => entry !== '');
+    return readAll('ls-tree', entries, (entry): TreeEntry | undefined => {
+      const [meta, filePath] = entry.split('\t');
+      const [mode, type, oid] = meta.split(' ');
+      const path = RelativeFilePath.fromGit(filePath);
+      return path === undefined ? undefined : { mode, type: type as TreeEntry['type'], oid, path };
+    });
   }
 
   /** The contents of the given blobs, by id. */
@@ -278,24 +329,25 @@ export class GitService {
       return ok(new Map());
     }
     const ran = await this.run(root, ['cat-file', '--batch'], { input: oids.join('\n'), encoding: 'buffer' });
-    return ran.andThen((result) => {
-      const blobs = new Map<string, Uint8Array>();
-      // execa hands a buffer-encoded stdout over as a bare Uint8Array, which cannot read its own text.
-      const stdout = Buffer.from(result.stdout);
-      let offset = 0;
-      while (offset < stdout.length) {
-        const headerEnd = stdout.indexOf(0x0a, offset);
-        const [oid, type, size] = stdout.subarray(offset, headerEnd).toString('utf-8').split(' ');
-        offset = headerEnd + 1;
-        if (type === 'missing') {
-          return err(problem(`object ${oid} is not in the repository`));
-        }
-        const length = Number(size);
-        blobs.set(oid, new Uint8Array(stdout.subarray(offset, offset + length)));
-        offset += length + 1;
+    if (ran.isErr()) {
+      return err(ran.error);
+    }
+    const blobs = new Map<string, Uint8Array>();
+    // execa hands a buffer-encoded stdout over as a bare Uint8Array, which cannot read its own text.
+    const stdout = Buffer.from(ran.value.stdout);
+    let offset = 0;
+    while (offset < stdout.length) {
+      const headerEnd = stdout.indexOf(0x0a, offset);
+      const [oid, type, size] = stdout.subarray(offset, headerEnd).toString('utf-8').split(' ');
+      offset = headerEnd + 1;
+      if (type === 'missing') {
+        return err(problem(`object ${oid} is not in the repository`));
       }
-      return ok(blobs);
-    });
+      const length = Number(size);
+      blobs.set(oid, new Uint8Array(stdout.subarray(offset, offset + length)));
+      offset += length + 1;
+    }
+    return ok(blobs);
   }
 
   /** `merge-tree --write-tree -z`: the merged tree, a stage entry per conflicted path, then git's messages as count, paths, type and text. */
@@ -310,24 +362,36 @@ export class GitService {
         encoding: 'buffer',
         exitCodes: [0, 1]
       });
-      return ran.map((result) => {
-        const fields = new TextDecoder().decode(new Uint8Array(result.stdout)).split('\0');
-        const stages: StageEntry[] = [];
-        let index = 1;
-        for (; index < fields.length && fields[index] !== ''; index += 1) {
-          stages.push(parseStageEntry(fields[index]));
+      if (ran.isErr()) {
+        return err(ran.error);
+      }
+      const fields = new TextDecoder().decode(new Uint8Array(ran.value.stdout)).split('\0');
+      const tree = read('merge-tree', fields[0].trim(), TreeId.fromGit);
+      if (tree.isErr()) {
+        return err(tree.error);
+      }
+      const stagesEnd = fields.indexOf('', 1);
+      const stages = readAll('merge-tree', fields.slice(1, stagesEnd === -1 ? undefined : stagesEnd), parseStageEntry);
+      if (stages.isErr()) {
+        return err(stages.error);
+      }
+      const messages: MergeMessage[] = [];
+      for (
+        let index = stagesEnd === -1 ? fields.length : stagesEnd + 1;
+        index < fields.length && fields[index] !== '';
+
+      ) {
+        const count = Number(fields[index]);
+        const paths = readAll('merge-tree', fields.slice(index + 1, index + 1 + count), RelativeFilePath.fromGit);
+        if (paths.isErr()) {
+          return err(paths.error);
         }
-        const messages: MergeMessage[] = [];
-        for (index += 1; index < fields.length && fields[index] !== ''; ) {
-          const count = Number(fields[index]);
-          const paths = fields.slice(index + 1, index + 1 + count).map((field) => RelativeFilePath.fromGit(field));
-          const type = fields[index + 1 + count];
-          const message = fields[index + 2 + count];
-          messages.push({ paths, type, message: message.trim() });
-          index += 3 + count;
-        }
-        return { tree: TreeId.fromGit(fields[0].trim()), stages, messages };
-      });
+        const type = fields[index + 1 + count];
+        const message = fields[index + 2 + count];
+        messages.push({ paths: paths.value, type, message: message.trim() });
+        index += 3 + count;
+      }
+      return ok({ tree: tree.value, stages: stages.value, messages });
     });
   }
 
@@ -347,23 +411,28 @@ export class GitService {
       from.toString(),
       to.toString()
     ]);
-    return ran.map(({ stdout }) => {
-      const fields = stdout.split('\0');
-      const entries: Change[] = [];
-      for (let index = 0; index < fields.length && fields[index] !== ''; ) {
-        const [, , , dstBlob, statusWithScore] = fields[index].slice(1).split(' ');
-        const status = statusWithScore[0] as Change['status'];
-        const first = RelativeFilePath.fromGit(fields[index + 1]);
-        if (status === 'R' || status === 'C') {
-          entries.push({ status, from: first, path: RelativeFilePath.fromGit(fields[index + 2]), blob: dstBlob });
-          index += 3;
-        } else {
-          entries.push(status === 'D' ? { status, path: first } : { status, path: first, blob: dstBlob });
-          index += 2;
-        }
+    if (ran.isErr()) {
+      return err(ran.error);
+    }
+    const fields = ran.value.stdout.split('\0');
+    const entries: Change[] = [];
+    for (let index = 0; index < fields.length && fields[index] !== ''; ) {
+      const [, , , dstBlob, statusWithScore] = fields[index].slice(1).split(' ');
+      const status = statusWithScore[0] as Change['status'];
+      const renamed = status === 'R' || status === 'C';
+      const paths = readAll('diff-tree', fields.slice(index + 1, index + (renamed ? 3 : 2)), RelativeFilePath.fromGit);
+      if (paths.isErr()) {
+        return err(paths.error);
       }
-      return entries;
-    });
+      const [first, second] = paths.value;
+      if (status === 'R' || status === 'C') {
+        entries.push({ status, from: first, path: second, blob: dstBlob });
+      } else {
+        entries.push(status === 'D' ? { status, path: first } : { status, path: first, blob: dstBlob });
+      }
+      index += paths.value.length + 1;
+    }
+    return ok(entries);
   }
 
   /**
@@ -383,12 +452,11 @@ export class GitService {
   /** The index entries below `directory` git holds as unmerged, paths from the root: what a merge left and `git add` has not marked resolved. */
   public async unmergedStages(root: DirectoryPath, directory: string): Promise<Result<StageEntry[], GitProblem>> {
     const ran = await this.run(root, ['ls-files', '-u', '-z', '--', directory]);
-    return ran.map(({ stdout }) =>
-      stdout
-        .split('\0')
-        .filter((entry) => entry !== '')
-        .map((entry) => parseStageEntry(entry))
-    );
+    if (ran.isErr()) {
+      return err(ran.error);
+    }
+    const entries = ran.value.stdout.split('\0').filter((entry) => entry !== '');
+    return readAll('ls-files', entries, parseStageEntry);
   }
 
   /** The remote the current branch is set to push to, else `origin` when there is one, else none. */
@@ -428,7 +496,10 @@ export class GitService {
         : err(problem(remoteSaid(result.stderr) || `exit code ${result.exitCode}`));
     }
     const head = await this.run(root, ['rev-parse', '--verify', '--quiet', 'FETCH_HEAD']);
-    return head.map(({ stdout }) => CommitId.fromGit(stdout.trim()));
+    if (head.isErr()) {
+      return err(head.error);
+    }
+    return read('rev-parse', head.value.stdout.trim(), CommitId.fromGit);
   }
 
   /** Git's own hooks directory, `.git/hooks` (shared by every worktree), whatever `core.hooksPath` says. */

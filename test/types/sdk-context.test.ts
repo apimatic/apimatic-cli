@@ -49,7 +49,7 @@ describe('SdkContext', () => {
     (
       await new GitService().resolveRef(
         new DirectoryPath(repositoryRoot),
-        SnapshotRef.pristine(SdkPath.fromGit(sdkPath))
+        SnapshotRef.pristine(SdkPath.fromGit(sdkPath)!)
       )
     )._unsafeUnwrap();
 

@@ -3,30 +3,30 @@ import { RelativeDirectoryPath } from '../../../src/types/file/relativeDirectory
 
 describe('RelativeDirectoryPath', () => {
   it('accepts a directory as git names it inside a tree', () => {
-    expect(RelativeDirectoryPath.create('src/models')?.toString()).to.equal('src/models');
-    expect(RelativeDirectoryPath.create('node_modules')?.toString()).to.equal('node_modules');
+    expect(RelativeDirectoryPath.fromGit('src/models')?.toString()).to.equal('src/models');
+    expect(RelativeDirectoryPath.fromGit('node_modules')?.toString()).to.equal('node_modules');
   });
 
-  for (const value of ['', '/', '/src', 'src\\models', 'src//models', './src', '../src', 'src/..', 'C:/src', 'dist/']) {
+  for (const value of ['', '/', '/src', 'src\\models', 'src//models', './src', '../src', 'src/..', 'C:/src']) {
     it(`refuses ${JSON.stringify(value)}`, () => {
-      expect(RelativeDirectoryPath.create(value)).to.be.undefined;
+      expect(RelativeDirectoryPath.fromGit(value)).to.be.undefined;
     });
   }
 
   it('takes the trailing slash git marks a directory with, and spells the directory without it', () => {
-    expect(RelativeDirectoryPath.fromGit('dist/').toString()).to.equal('dist');
-    expect(RelativeDirectoryPath.fromGit('build/out/').toString()).to.equal('build/out');
-    expect(RelativeDirectoryPath.fromGit('dist').toString()).to.equal('dist');
+    expect(RelativeDirectoryPath.fromGit('dist/')!.toString()).to.equal('dist');
+    expect(RelativeDirectoryPath.fromGit('build/out/')!.toString()).to.equal('build/out');
+    expect(RelativeDirectoryPath.fromGit('dist')!.toString()).to.equal('dist');
   });
 
   it('compares by value', () => {
-    const directory = RelativeDirectoryPath.fromGit('dist/');
+    const directory = RelativeDirectoryPath.fromGit('dist/')!;
 
-    expect(directory.isEqual(RelativeDirectoryPath.fromGit('dist'))).to.be.true;
-    expect(directory.isEqual(RelativeDirectoryPath.fromGit('build'))).to.be.false;
+    expect(directory.isEqual(RelativeDirectoryPath.fromGit('dist')!)).to.be.true;
+    expect(directory.isEqual(RelativeDirectoryPath.fromGit('build')!)).to.be.false;
   });
 
-  it('throws on what git would never print, so a parser bug is found rather than carried', () => {
-    expect(() => RelativeDirectoryPath.fromGit('/absolute/')).to.throw('not a relative directory');
+  it('refuses what git would never print, so a parser slip is reported rather than carried', () => {
+    expect(RelativeDirectoryPath.fromGit('/absolute/')).to.be.undefined;
   });
 });

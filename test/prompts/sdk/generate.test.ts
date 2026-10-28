@@ -73,7 +73,7 @@ describe('SdkGeneratePrompts.sdkNotUnzipped', () => {
   });
 });
 
-const rel = (value: string) => RelativeFilePath.fromGit(value);
+const rel = (value: string) => RelativeFilePath.fromGit(value)!;
 
 const plan = (
   files: Partial<Record<keyof MergePlan['files'], string[]>>,
@@ -270,7 +270,6 @@ describe('SdkGeneratePrompts.directoryNotInspected', () => {
       root: new DirectoryPath(process.cwd())
     });
     new SdkGeneratePrompts().directoryNotInspected(sdk, {
-      kind: 'gitFailed',
       reason: 'git rev-parse failed: bad config'
     });
 

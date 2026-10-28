@@ -45,8 +45,8 @@ describe('ZipService', () => {
       write(path.join('dist-notes', 'keep.md'), 'kept');
 
       const excluding = {
-        files: ['debug.log', 'models/draft.py'].map((value) => RelativeFilePath.fromGit(value)),
-        directories: [RelativeDirectoryPath.fromGit('dist/')]
+        files: ['debug.log', 'models/draft.py'].map((value) => RelativeFilePath.fromGit(value)!),
+        directories: [RelativeDirectoryPath.fromGit('dist/')!]
       };
       (await new ZipService().archive(source, archive, excluding))._unsafeUnwrap();
 

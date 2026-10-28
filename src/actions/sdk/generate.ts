@@ -189,7 +189,7 @@ export class GenerateAction {
       const settlement = choice === 'resolve' ? resolving(regeneration) : favouring(choice, regeneration);
       const written = await repository.write(base, settlement.plan, tempSdk);
       if (written.isErr()) {
-        if (written.error.kind === 'notApplied') {
+        if ('kind' in written.error) {
           this.prompts.sdkNotWritten(sdk, written.error);
         } else {
           this.prompts.customCodeFailed(written.error.reason);

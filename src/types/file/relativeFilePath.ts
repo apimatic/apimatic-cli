@@ -15,7 +15,8 @@ export class RelativeFilePath {
     this.value = value;
   }
 
-  public static create(value: string): RelativeFilePath | undefined {
+  /** From git, or a record of what it printed, which spell a path no other way; none for what git would never print. */
+  public static fromGit(value: string): RelativeFilePath | undefined {
     const segments = value.split('/');
     const wellFormed =
       !value.includes('\\') &&
@@ -23,15 +24,6 @@ export class RelativeFilePath {
       !path.posix.isAbsolute(value) &&
       segments.every((segment) => segment !== '' && segment !== '.' && segment !== '..');
     return wellFormed ? new RelativeFilePath(value) : undefined;
-  }
-
-  /** From git's own output, which names a path no other way. */
-  public static fromGit(value: string): RelativeFilePath {
-    const created = RelativeFilePath.create(value);
-    if (created === undefined) {
-      throw new Error(`git named a path that is not relative: ${value}`);
-    }
-    return created;
   }
 
   public in(directory: DirectoryPath): FilePath {

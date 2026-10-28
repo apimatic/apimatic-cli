@@ -8,9 +8,9 @@ import { RelativeFilePath } from '../file/relativeFilePath.js';
 import { CommitId } from '../git/commit-id.js';
 import { relabelMarkers, settleMarkers } from '../sdk/conflict-markers.js';
 import { FileWrite, MergePlan } from '../sdk/merge-plan.js';
-import { NotApplied, SdkRepositoryProblem } from '../sdk/repository-state.js';
+import { NotApplied, RepositoryProblem, WriteProblem } from '../sdk/repository-state.js';
 import { SnapshotRef } from '../sdk/snapshot-ref.js';
-import { gitFailed, onDisk } from './on-disk.js';
+import { onDisk } from './on-disk.js';
 
 /** The files on disk below an SDK directory: a plan landed, undone from a snapshot when a step fails, a file read or settled. */
 export class SdkFiles {
@@ -24,10 +24,10 @@ export class SdkFiles {
     plan: MergePlan,
     previous: { commit: CommitId; ref: SnapshotRef },
     generated: DirectoryPath
-  ): Promise<Result<void, SdkRepositoryProblem>> {
+  ): Promise<Result<void, WriteProblem>> {
     const blobs = await this.git.readBlobs(this.root, [...new Set(plan.writes.map((write) => write.blob))]);
     if (blobs.isErr()) {
-      return err(gitFailed(blobs.error));
+      return err(blobs.error);
     }
     const steps: { path: RelativeFilePath; operation: NotApplied['operation']; run: () => Promise<void> }[] = [
       ...plan.deletes.map((path) => ({
@@ -77,16 +77,16 @@ export class SdkFiles {
   private async restore(
     previous: CommitId,
     touched: readonly RelativeFilePath[]
-  ): Promise<Result<void, SdkRepositoryProblem>> {
+  ): Promise<Result<void, RepositoryProblem>> {
     const entries = await this.git.listTree(this.root, previous);
     if (entries.isErr()) {
-      return err(gitFailed(entries.error));
+      return err(entries.error);
     }
     const kept = new Map(entries.value.map((entry) => [entry.path.toString(), entry.oid]));
     const oids = touched.flatMap((relative) => kept.get(relative.toString()) ?? []);
     const blobs = await this.git.readBlobs(this.root, [...new Set(oids)]);
     if (blobs.isErr()) {
-      return err(gitFailed(blobs.error));
+      return err(blobs.error);
     }
     for (const relative of touched) {
       const oid = kept.get(relative.toString());
@@ -101,15 +101,12 @@ export class SdkFiles {
   }
 
   /** The file as it is, or none when it is not there. */
-  public contentOf(relative: RelativeFilePath): Promise<Result<Uint8Array | undefined, SdkRepositoryProblem>> {
+  public contentOf(relative: RelativeFilePath): Promise<Result<Uint8Array | undefined, RepositoryProblem>> {
     return onDisk(this.read(relative.in(this.sdk)));
   }
 
   /** Writes the file with its own line ending, or removes it when there is nothing to settle it to. */
-  public settle(
-    relative: RelativeFilePath,
-    content: Uint8Array | undefined
-  ): Promise<Result<void, SdkRepositoryProblem>> {
+  public settle(relative: RelativeFilePath, content: Uint8Array | undefined): Promise<Result<void, RepositoryProblem>> {
     const file = relative.in(this.sdk);
     return onDisk(
       content === undefined

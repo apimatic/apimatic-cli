@@ -18,8 +18,11 @@ export type NotApplied = {
   undo: { kind: 'done' } | { kind: 'failed'; reason: string; previous: SnapshotRef };
 };
 
-/** `gitFailed` is git's own words; `fileFailed` the file system's; `notApplied` names the file a write stopped at. */
-export type SdkRepositoryProblem = { kind: 'gitFailed' | 'fileFailed'; reason: string } | NotApplied;
+/** Why a git or file operation did not happen, in git's or the file system's own words. */
+export type RepositoryProblem = { reason: string };
+
+/** A write that stopped at a file, or one that did not start. */
+export type WriteProblem = NotApplied | RepositoryProblem;
 
 /** Two SDK directories, one inside the other: refs are files, so only one can have snapshots; `encloses` says the other is the outer one. */
 export type NestedSdkDirectory = { kind: 'nestedSdkDirectory'; other: DirectoryPath; encloses: boolean };
@@ -27,8 +30,8 @@ export type NestedSdkDirectory = { kind: 'nestedSdkDirectory'; other: DirectoryP
 /** The repository is in the middle of a git operation of the developer's own, which a run must not merge over. */
 export type OperationInProgress = { kind: 'operationInProgress'; operation: GitOperation; root: DirectoryPath };
 
-/** Why a run could not find out how to write the SDK directory. */
-export type InspectionProblem = SdkRepositoryProblem | NestedSdkDirectory | OperationInProgress;
+/** Why a run could not find out how to write the SDK directory: a refusal it can name, or git's own words. */
+export type InspectionProblem = NestedSdkDirectory | OperationInProgress | RepositoryProblem;
 
 /** Why a recorded snapshot is still absent after the one place it could have come from was tried. */
 export type SnapshotFetch =

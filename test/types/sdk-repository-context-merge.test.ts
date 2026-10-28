@@ -14,13 +14,13 @@ import { SdkGeneration } from '../../src/types/sdk/generation-record.js';
 import { GENERATED_MARKER, YOURS_MARKER } from '../../src/types/sdk/conflict-markers.js';
 import { ConflictSide, MergePlan } from '../../src/types/sdk/merge-plan.js';
 import { SdkRepositoryContext } from '../../src/types/sdk-repository-context.js';
-import { SdkRepositoryProblem } from '../../src/types/sdk/repository-state.js';
+import { WriteProblem } from '../../src/types/sdk/repository-state.js';
 import { SdkPath } from '../../src/types/sdk/sdk-path.js';
 import { SnapshotRef } from '../../src/types/sdk/snapshot-ref.js';
 import { recordPristine } from '../helpers/snapshots.js';
 
 /** The ref a run keeps the directory under before writing, for the SDK every test here generates. */
-const PREVIOUS_REF = SnapshotRef.previous(SdkPath.fromGit('sdk/typescript'));
+const PREVIOUS_REF = SnapshotRef.previous(SdkPath.fromGit('sdk/typescript')!);
 
 const TYPESCRIPT: SdkGeneration = {
   language: Language.TYPESCRIPT,
@@ -63,7 +63,7 @@ const MODEL_V1_WITH_HELPER = MODEL_V1 + HELPER;
 /** A run over real repositories: `base` was generated last time, `disk` is the SDK directory now, `generated` is the fresh output. */
 type Run = {
   plan: MergePlan;
-  written: Result<void, SdkRepositoryProblem>;
+  written: Result<void, WriteProblem>;
   repository: SdkRepositoryContext;
   read: (relative: string) => string | undefined;
   bytes: (relative: string) => Buffer;
@@ -74,7 +74,7 @@ type Run = {
 const counts = (plan: MergePlan) =>
   Object.fromEntries(Object.entries(plan.files).map(([kind, paths]) => [kind, paths.length]));
 
-const rel = (value: string) => RelativeFilePath.fromGit(value);
+const rel = (value: string) => RelativeFilePath.fromGit(value)!;
 
 describe('SdkRepositoryContext: the merge', () => {
   let root: string;
@@ -383,9 +383,8 @@ describe('SdkRepositoryContext: the merge', () => {
       const { written, read, paths } = await run(BEFORE, BEFORE, AFTER, { beforeWrite: breaking('b.ts') });
 
       const problem = written._unsafeUnwrapErr();
-      expect(problem.kind).to.equal('notApplied');
-      if (problem.kind !== 'notApplied') {
-        return;
+      if (!('kind' in problem)) {
+        return expect.fail('the write should have stopped at a file');
       }
       expect(problem.file.name().toString()).to.equal('b.ts');
       expect(problem.operation).to.equal('write');
@@ -399,9 +398,8 @@ describe('SdkRepositoryContext: the merge', () => {
       const { written, read } = await run(BEFORE, BEFORE, AFTER, { beforeWrite: breaking('b.ts', true) });
 
       const problem = written._unsafeUnwrapErr();
-      expect(problem.kind).to.equal('notApplied');
-      if (problem.kind !== 'notApplied' || problem.undo.kind !== 'failed') {
-        expect.fail('the undo should have failed');
+      if (!('kind' in problem) || problem.undo.kind !== 'failed') {
+        return expect.fail('the undo should have failed');
       }
       expect(problem.undo.reason).to.contain('a.ts');
       expect(problem.undo.previous.toString()).to.equal(PREVIOUS_REF.toString());

@@ -143,6 +143,9 @@ export class SdkGeneratePrompts {
 
   /** Why the run stopped before generating: what the SDK directory and its repository are in the way of. */
   public directoryNotInspected(sdk: DirectoryPath, problem: InspectionProblem) {
+    if (!('kind' in problem)) {
+      return log.error(`The SDK directory could not be inspected for your customizations: ${problem.reason}`);
+    }
     switch (problem.kind) {
       case 'nestedSdkDirectory': {
         const where = problem.encloses
@@ -155,8 +158,6 @@ export class SdkGeneratePrompts {
           `The repository at ${f.relativePath(problem.root)} is in the middle of a ${problem.operation}. ` +
             `Finish it, or abort it with ${f.var(`git ${problem.operation} --abort`)}, then rerun.`
         );
-      default:
-        return log.error(`The SDK directory could not be inspected for your customizations: ${problem.reason}`);
     }
   }
 

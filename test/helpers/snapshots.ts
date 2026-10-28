@@ -6,7 +6,7 @@ import { DirectoryPath } from '../../src/types/file/directoryPath.js';
 import { CommitId } from '../../src/types/git/commit-id.js';
 import { SdkContext } from '../../src/types/sdk-context.js';
 import { SdkRepositoryContext } from '../../src/types/sdk-repository-context.js';
-import { SdkRepositoryProblem } from '../../src/types/sdk/repository-state.js';
+import { RepositoryProblem } from '../../src/types/sdk/repository-state.js';
 import { SdkGeneration } from '../../src/types/sdk/generation-record.js';
 import { SdkPath } from '../../src/types/sdk/sdk-path.js';
 import { SnapshotStore } from '../../src/types/sdk-repository/snapshot-store.js';
@@ -26,7 +26,7 @@ export async function recordPristine(
   sdk: DirectoryPath,
   generated: DirectoryPath,
   generation: SdkGeneration
-): Promise<Result<CommitId, SdkRepositoryProblem>> {
+): Promise<Result<CommitId, RepositoryProblem>> {
   const snapshots = new SnapshotStore(root, sdk, SdkPath.of(root, sdk));
   const tree = await snapshots.snapshotGenerated(generated);
   if (tree.isErr()) {
@@ -45,7 +45,7 @@ export async function describeCommit(
   });
   const [parents, authorName, subject] = stdout.split('\n');
   return {
-    parents: parents === '' ? [] : parents.split(' ').map((sha) => CommitId.fromGit(sha)),
+    parents: parents === '' ? [] : parents.split(' ').map((sha) => CommitId.fromGit(sha)!),
     authorName,
     subject
   };

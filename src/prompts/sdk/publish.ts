@@ -12,6 +12,7 @@ import { format as f } from '../format.js';
 import { PublishingProfile } from '../../types/publish/publishing-profile.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { FileProblem } from '../../types/file/file-problem.js';
+import { RepositoryProblem } from '../../types/sdk/repository-state.js';
 
 export type PublishingOutcome = 'succeeded' | 'failed' | 'cancelled';
 
@@ -24,7 +25,7 @@ export class SdkPublishPrompts {
     log.error(serviceError.errorMessage);
   }
 
-  public sdkNotZipped(sdkDirectory: DirectoryPath, problem: FileProblem) {
+  public sdkNotZipped(sdkDirectory: DirectoryPath, problem: FileProblem | RepositoryProblem) {
     log.error(`The SDK in ${f.path(sdkDirectory)} could not be zipped for upload: ${problem.reason}`);
   }
 

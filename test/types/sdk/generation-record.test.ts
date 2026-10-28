@@ -19,7 +19,7 @@ describe('GenerationRecord', () => {
   it('round-trips through its file form', () => {
     const record = GenerationRecord.written(
       { language: Language.PYTHON, codegenVersion: CodeGenerationVersion.V4, stability: Stability.BETA },
-      CommitId.create(SHA)!
+      CommitId.fromGit(SHA)!
     );
 
     const parsed = GenerationRecord.parse(record.toJson())!;

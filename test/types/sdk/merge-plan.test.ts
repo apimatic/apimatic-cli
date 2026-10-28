@@ -4,7 +4,7 @@ import { MergeTreeOutput } from '../../../src/types/git/merge-tree.js';
 import { TreeId } from '../../../src/types/git/tree-id.js';
 import { ConflictKind, MergeInputs, MergePlan } from '../../../src/types/sdk/merge-plan.js';
 
-const TREE = TreeId.fromGit('t'.repeat(40));
+const TREE = TreeId.fromGit('c'.repeat(40))!;
 const blob = (name: string) => name.padEnd(40, '0');
 
 const merge = (overrides: Partial<MergeTreeOutput> = {}): MergeTreeOutput => ({
@@ -26,7 +26,7 @@ const inputs = (overrides: Partial<MergeInputs>): MergeInputs => ({
 const counts = (plan: MergePlan) =>
   Object.fromEntries(Object.entries(plan.files).map(([kind, paths]) => [kind, paths.length]));
 
-const rel = (value: string) => RelativeFilePath.fromGit(value);
+const rel = (value: string) => RelativeFilePath.fromGit(value)!;
 
 describe('MergePlan.from', () => {
   it('turns the diff from the disk to the merged tree into writes and deletions, counted by who changed what', () => {

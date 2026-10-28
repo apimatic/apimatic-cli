@@ -19,25 +19,38 @@ function encodeSegment(segment: string): string {
 
 const encodePath = (sdkPath: SdkPath): string => sdkPath.toString().split('/').map(encodeSegment).join('/');
 
+/** The path a ref below `namespace` names, or none when it does not decode to one. */
+function decodePath(name: string, namespace: string): SdkPath | undefined {
+  try {
+    return SdkPath.fromGit(decodeURIComponent(name.slice(namespace.length + 1)));
+  } catch {
+    return undefined;
+  }
+}
+
 /** A hidden ref holding one SDK directory's snapshots, named after the directory's path so each has its own. */
 export class SnapshotRef {
   private readonly name: string;
+  private readonly path: SdkPath;
 
-  private constructor(name: string) {
+  private constructor(name: string, path: SdkPath) {
     this.name = name;
+    this.path = path;
   }
 
   public static pristine(sdkPath: SdkPath): SnapshotRef {
-    return new SnapshotRef(sdkPath.isRoot() ? PRISTINE : `${PRISTINE}/${encodePath(sdkPath)}`);
+    return new SnapshotRef(sdkPath.isRoot() ? PRISTINE : `${PRISTINE}/${encodePath(sdkPath)}`, sdkPath);
   }
 
   public static previous(sdkPath: SdkPath): SnapshotRef {
-    return new SnapshotRef(sdkPath.isRoot() ? PREVIOUS : `${PREVIOUS}/${encodePath(sdkPath)}`);
+    return new SnapshotRef(sdkPath.isRoot() ? PREVIOUS : `${PREVIOUS}/${encodePath(sdkPath)}`, sdkPath);
   }
 
-  /** A ref as git lists it, below one of the namespaces. */
-  public static fromGit(name: string): SnapshotRef {
-    return new SnapshotRef(name);
+  /** A ref as git lists it: below one of the namespaces, naming an SDK path; none for any other ref. */
+  public static fromGit(name: string): SnapshotRef | undefined {
+    const namespace = [PRISTINE, PREVIOUS].find((each) => name === each || name.startsWith(`${each}/`));
+    const path = namespace === undefined ? undefined : decodePath(name, namespace);
+    return path === undefined ? undefined : new SnapshotRef(name, path);
   }
 
   /** Where git keeps every pristine ref, for listing them. */
@@ -47,8 +60,7 @@ export class SnapshotRef {
 
   /** The SDK directory's path below the repository root, which the ref is named after. */
   public sdkPath(): SdkPath {
-    const namespace = this.name.startsWith(PREVIOUS) ? PREVIOUS : PRISTINE;
-    return SdkPath.fromGit(decodeURIComponent(this.name.slice(namespace.length + 1)));
+    return this.path;
   }
 
   public toString(): string {

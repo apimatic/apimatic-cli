@@ -7,14 +7,9 @@ export class CommitId {
     this.sha = sha;
   }
 
-  /** From a record or user input, which may hold anything. */
-  public static create(sha: string): CommitId | undefined {
+  /** From git, or from a record of what it printed: 40 or 64 hex digits, else none. */
+  public static fromGit(sha: string): CommitId | undefined {
     return isObjectId(sha) ? new CommitId(sha) : undefined;
-  }
-
-  /** From git itself, whose ids need no check. */
-  public static fromGit(sha: string): CommitId {
-    return new CommitId(sha);
   }
 
   public isEqual(other: CommitId): boolean {

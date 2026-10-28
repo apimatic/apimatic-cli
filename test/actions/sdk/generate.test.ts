@@ -106,7 +106,7 @@ describe('GenerateAction (sdk)', () => {
     expect(fs.readFileSync(at('README.md'), 'utf-8')).to.equal('# sdk');
     const record = GenerationRecord.parse(fs.readFileSync(at('.apimatic/generation.json'), 'utf-8'))!;
     const pristine = (
-      await new GitService().resolveRef(new DirectoryPath(root), SnapshotRef.pristine(SdkPath.fromGit('sdk/python')))
+      await new GitService().resolveRef(new DirectoryPath(root), SnapshotRef.pristine(SdkPath.fromGit('sdk/python')!))
     )._unsafeUnwrap();
     expect(record.pristineCommit().isEqual(pristine!)).to.be.true;
   });

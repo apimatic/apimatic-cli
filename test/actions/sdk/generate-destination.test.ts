@@ -166,7 +166,7 @@ describe('GenerateAction (sdk) — the destination', () => {
     expect((await execute()).isSuccess()).to.be.true;
 
     expect(fs.existsSync(at('.git'))).to.be.false;
-    const ref = SnapshotRef.pristine(SdkPath.fromGit('sdk/python'));
+    const ref = SnapshotRef.pristine(SdkPath.fromGit('sdk/python')!);
     expect((await git.resolveRef(new DirectoryPath(root), ref))._unsafeUnwrap()?.isEqual(record().pristineCommit())).to
       .be.true;
   });
@@ -186,7 +186,7 @@ describe('GenerateAction (sdk) — the destination', () => {
 
   it('records over an SDK whose snapshot the repository does not hold, after saying so and asking', async () => {
     await recorded({ 'README.md': '# sdk' });
-    const missing = CommitId.create('f'.repeat(40))!;
+    const missing = CommitId.fromGit('f'.repeat(40))!;
     write('.apimatic/generation.json', GenerationRecord.written(STABLE, missing).toJson());
     interactive();
     const snapshotMissing = sinon.stub(SdkGeneratePrompts.prototype, 'snapshotMissing');
@@ -203,7 +203,10 @@ describe('GenerateAction (sdk) — the destination', () => {
     [
       'a snapshot the repository does not hold',
       async () => {
-        write('.apimatic/generation.json', GenerationRecord.written(STABLE, CommitId.create('f'.repeat(40))!).toJson());
+        write(
+          '.apimatic/generation.json',
+          GenerationRecord.written(STABLE, CommitId.fromGit('f'.repeat(40))!).toJson()
+        );
         return {};
       }
     ]
@@ -376,9 +379,9 @@ describe('GenerateAction (sdk) — the destination', () => {
 
     const [where, problem] = notInspected.firstCall.args;
     expect(where.isEqual(sdk().join('python'))).to.be.true;
-    expect(problem.kind).to.equal('nestedSdkDirectory');
-    expect(problem.kind === 'nestedSdkDirectory' && problem.other.isEqual(sdk())).to.be.true;
-    expect(problem.kind === 'nestedSdkDirectory' && problem.encloses).to.be.true;
+    const refused = 'kind' in problem && problem.kind === 'nestedSdkDirectory' ? problem : undefined;
+    expect(refused?.other.isEqual(sdk())).to.be.true;
+    expect(refused?.encloses).to.be.true;
     expect(generateSdk.called).to.be.false;
   });
 
@@ -399,13 +402,13 @@ describe('GenerateAction (sdk) — the destination', () => {
 
   it('reports a directory git could not inspect', async () => {
     (await git.init(new DirectoryPath(root)))._unsafeUnwrap();
-    sinon.stub(SdkRepositoryContext.prototype, 'inspect').resolves(err({ kind: 'gitFailed', reason: 'git broke' }));
+    sinon.stub(SdkRepositoryContext.prototype, 'inspect').resolves(err({ reason: 'git broke' }));
     const notInspected = sinon.stub(SdkGeneratePrompts.prototype, 'directoryNotInspected');
 
     expect((await execute()).isFailed()).to.be.true;
 
     expect(notInspected.firstCall.args[0].isEqual(sdk())).to.be.true;
-    expect(notInspected.firstCall.args[1]).to.deep.equal({ kind: 'gitFailed', reason: 'git broke' });
+    expect(notInspected.firstCall.args[1]).to.deep.equal({ reason: 'git broke' });
   });
 
   describe('the overwrite question', () => {
@@ -469,7 +472,7 @@ describe('GenerateAction (sdk) — the destination', () => {
       await sh(root, 'init', '-q', '--bare', '--initial-branch=main', origin);
       await sh(root, 'remote', 'add', 'origin', origin);
       await sh(root, 'push', '-q', 'origin', 'main');
-      await sh(root, 'push', '-q', 'origin', refspec(SnapshotRef.pristine(SdkPath.fromGit('sdk/python'))));
+      await sh(root, 'push', '-q', 'origin', refspec(SnapshotRef.pristine(SdkPath.fromGit('sdk/python')!)));
       await sh(root, 'clone', '-q', '--no-local', origin, clone);
       project = clone;
       return { clone, origin, base };
@@ -505,7 +508,7 @@ describe('GenerateAction (sdk) — the destination', () => {
         await sh(published, 'init', '-q', '--bare', '--initial-branch=main', origin);
         await sh(published, 'remote', 'add', 'origin', origin);
         await sh(published, 'push', '-q', 'origin', 'main');
-        await sh(published, 'push', '-q', 'origin', refspec(SnapshotRef.pristine(SdkPath.fromGit(''))));
+        await sh(published, 'push', '-q', 'origin', refspec(SnapshotRef.pristine(SdkPath.fromGit('')!)));
         await sh(published, 'clone', '-q', '--no-local', origin, clone);
         writeFiles(clone, { 'README.md': '# edited' });
 

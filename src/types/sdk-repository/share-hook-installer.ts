@@ -4,9 +4,9 @@ import { GitService } from '../../infrastructure/git-service.js';
 import { DirectoryPath } from '../file/directoryPath.js';
 import { FileName } from '../file/fileName.js';
 import { FilePath } from '../file/filePath.js';
-import { SdkRepositoryProblem, ShareHookInstall } from '../sdk/repository-state.js';
+import { RepositoryProblem, ShareHookInstall } from '../sdk/repository-state.js';
 import { SHARE_HOOK_SCRIPT, SHARE_HOOK_SCRIPT_NAME, ShareHook } from '../sdk/share-hook.js';
-import { gitFailed, onDisk } from './on-disk.js';
+import { onDisk } from './on-disk.js';
 
 // Owner-only, as git's own sample hooks are; git runs a hook only when it is executable.
 const HOOK_MODE = 0o700;
@@ -18,10 +18,10 @@ export class ShareHookInstaller {
 
   constructor(private readonly root: DirectoryPath) {}
 
-  public async install(): Promise<Result<ShareHookInstall, SdkRepositoryProblem>> {
+  public async install(): Promise<Result<ShareHookInstall, RepositoryProblem>> {
     const hooks = await this.git.hooksDirectory(this.root);
     if (hooks.isErr()) {
-      return err(gitFailed(hooks.error));
+      return err(hooks.error);
     }
     const script = new FilePath(hooks.value, new FileName(SHARE_HOOK_SCRIPT_NAME));
     const scriptWritten = await onDisk(this.writeExecutable(script, SHARE_HOOK_SCRIPT));
@@ -30,7 +30,7 @@ export class ShareHookInstaller {
     }
     const hooksPath = await this.git.hooksPathConfigured(this.root);
     if (hooksPath.isErr()) {
-      return err(gitFailed(hooksPath.error));
+      return err(hooksPath.error);
     }
     if (hooksPath.value !== undefined) {
       return this.installElsewhere(hooksPath.value, script);
@@ -61,10 +61,10 @@ export class ShareHookInstaller {
   private async installElsewhere(
     hooksPath: string,
     script: FilePath
-  ): Promise<Result<ShareHookInstall, SdkRepositoryProblem>> {
+  ): Promise<Result<ShareHookInstall, RepositoryProblem>> {
     const runFrom = await this.git.hooksRunFrom(this.root);
     if (runFrom.isErr()) {
-      return err(gitFailed(runFrom.error));
+      return err(runFrom.error);
     }
     const file = hookRunFrom(runFrom.value);
     const content = await onDisk(this.read(file));

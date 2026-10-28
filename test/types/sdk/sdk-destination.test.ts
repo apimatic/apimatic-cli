@@ -9,7 +9,7 @@ import { SdkRepositoryContext } from '../../../src/types/sdk-repository-context.
 describe('SdkDestination', () => {
   const root = new DirectoryPath(process.cwd());
   const repository = SdkRepositoryContext.create(root, root.join('sdk', 'python'))!;
-  const base = CommitId.fromGit('a'.repeat(40));
+  const base = CommitId.fromGit('a'.repeat(40))!;
 
   it('merges against the recorded base when the repository is ready, and asks nothing', () => {
     const destination = destinationFor(repository, { kind: 'ready', base });
@@ -35,7 +35,7 @@ describe('SdkDestination', () => {
   });
 
   it('decides nothing while the last run’s markers are still in the files, naming them for the question', () => {
-    const paths = [RelativeFilePath.fromGit('a.py')];
+    const paths = [RelativeFilePath.fromGit('a.py')!];
 
     expect(destinationFor(repository, { kind: 'unresolved', paths })).to.deep.equal({
       kind: 'unresolved',

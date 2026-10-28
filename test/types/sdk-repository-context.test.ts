@@ -26,7 +26,7 @@ const TYPESCRIPT: SdkGeneration = {
   stability: Stability.STABLE
 };
 
-const rel = (value: string) => RelativeFilePath.fromGit(value);
+const rel = (value: string) => RelativeFilePath.fromGit(value)!;
 
 /** An SDK directory as a test laid it out: the context under test, and what it was built from, for reaching git and the disk. */
 interface Sdk {
@@ -147,7 +147,7 @@ describe('SdkRepositoryContext', () => {
       const commit = (await record(sdk, { 'README.md': '# v1' }))._unsafeUnwrap();
       await writeRecord(sdk, GenerationRecord.written(TYPESCRIPT, commit));
 
-      const ref = SnapshotRef.fromGit('refs/apimatic/pristine/My%20API/sdk/%2Etypescript');
+      const ref = SnapshotRef.fromGit('refs/apimatic/pristine/My%20API/sdk/%2Etypescript')!;
       expect((await git.resolveRef(sdk.root, ref))._unsafeUnwrap()?.isEqual(commit)).to.be.true;
       expect((await sdk.repository.inspect(TYPESCRIPT, undefined))._unsafeUnwrap()).to.deep.equal({
         kind: 'ready',
@@ -361,7 +361,7 @@ describe('SdkRepositoryContext', () => {
 
     it('finds a record whose snapshot the repository does not hold', async () => {
       const sdk = await project();
-      const missing = CommitId.create('f'.repeat(40))!;
+      const missing = CommitId.fromGit('f'.repeat(40))!;
       await writeRecord(sdk, GenerationRecord.written(TYPESCRIPT, missing));
 
       const state = (await sdk.repository.inspect(TYPESCRIPT, undefined))._unsafeUnwrap();
@@ -441,7 +441,7 @@ describe('SdkRepositoryContext', () => {
         repository: (await contextFor(directory).initRepository())._unsafeUnwrap(),
         root: directory,
         directory,
-        pristine: SnapshotRef.pristine(SdkPath.fromGit(''))
+        pristine: SnapshotRef.pristine(SdkPath.fromGit('')!)
       };
       (await record(own, { 'README.md': '# root' }))._unsafeUnwrap();
       expect(await pristineOf(own)).to.not.be.undefined;
@@ -460,9 +460,8 @@ describe('SdkRepositoryContext', () => {
       (await record(outer, { 'README.md': '# outer' }))._unsafeUnwrap();
       const inner = await sdkAt(outer.root, outer.directory.join('typescript'));
 
-      expect((await inner.repository.inspect(TYPESCRIPT, undefined))._unsafeUnwrapErr().kind).to.equal(
-        'nestedSdkDirectory'
-      );
+      const problem = (await inner.repository.inspect(TYPESCRIPT, undefined))._unsafeUnwrapErr();
+      expect('kind' in problem && problem.kind).to.equal('nestedSdkDirectory');
     });
   });
 
@@ -734,7 +733,7 @@ describe('SdkRepositoryContext', () => {
 
       await sh(sdk.root, 'push', '-q', 'origin', 'main');
 
-      const ref = SnapshotRef.fromGit('refs/apimatic/pristine');
+      const ref = SnapshotRef.fromGit('refs/apimatic/pristine')!;
       expect((await git.resolveRef(origin, ref))._unsafeUnwrap()?.isEqual(commit)).to.be.true;
     });
 

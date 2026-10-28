@@ -11,13 +11,13 @@ import { NO_PATHS, RelativePaths } from './file/relative-paths.js';
 import { GIT_DIRECTORY } from './git/git-directory.js';
 import { RECORD_DIRECTORY, SdkGeneration } from './sdk/generation-record.js';
 import { destinationFor, SdkDestination, Unresolved } from './sdk/sdk-destination.js';
-import { InspectionProblem, SdkRepositoryProblem } from './sdk/repository-state.js';
-import { fileFailed, gitFailed } from './sdk-repository/on-disk.js';
+import { InspectionProblem, RepositoryProblem } from './sdk/repository-state.js';
+import { fileFailed } from './sdk-repository/on-disk.js';
 import { SdkRepositoryContext } from './sdk-repository-context.js';
 import { TempContext } from './temp-context.js';
 
-const KEPT_OUT_OF_ARCHIVE = [GIT_DIRECTORY.toString(), RECORD_DIRECTORY].map((name) =>
-  RelativeDirectoryPath.fromGit(name)
+const KEPT_OUT_OF_ARCHIVE = [GIT_DIRECTORY.toString(), RECORD_DIRECTORY].map(
+  (name) => RelativeDirectoryPath.fromGit(name)!
 );
 
 export class SdkContext {
@@ -35,7 +35,7 @@ export class SdkContext {
   public async destination(generation: SdkGeneration): Promise<Result<SdkDestination | Unresolved, InspectionProblem>> {
     const version = await this.git.version();
     if (version.isErr()) {
-      return err(gitFailed(version.error));
+      return err(version.error);
     }
     if (!version.value?.isSupported()) {
       return ok({ kind: 'overwrite', found: version.value });
@@ -56,7 +56,7 @@ export class SdkContext {
   }
 
   /** Makes the SDK directory a repository of its own, creating it when it is not there yet. */
-  public async initRepository(): Promise<Result<SdkRepositoryContext, SdkRepositoryProblem>> {
+  public async initRepository(): Promise<Result<SdkRepositoryContext, RepositoryProblem>> {
     const sdk = this.sdkDirectory;
     try {
       await this.fileService.createDirectoryIfNotExists(sdk);
@@ -64,7 +64,7 @@ export class SdkContext {
       return err(fileFailed(error));
     }
     const initialised = await this.git.init(sdk);
-    return initialised.map(() => SdkRepositoryContext.own(sdk)).mapErr(gitFailed);
+    return initialised.map(() => SdkRepositoryContext.own(sdk));
   }
 
   /** Overwrites the directory; a `.git` in it is the developer's, or holds the snapshots, and stays. */
@@ -75,10 +75,10 @@ export class SdkContext {
   }
 
   /** The SDK zipped for upload: everything but `.git`, the CLI's record and, inside a repository, what its ignore rules keep out. */
-  public async archive(tempDirectory: DirectoryPath): Promise<Result<FilePath, FileProblem>> {
+  public async archive(tempDirectory: DirectoryPath): Promise<Result<FilePath, FileProblem | RepositoryProblem>> {
     const ignored = await this.ignored();
     if (ignored.isErr()) {
-      return err({ kind: 'zipFailed', reason: ignored.error.reason });
+      return err(ignored.error);
     }
     return new TempContext(tempDirectory).zip(this.sdkDirectory, {
       files: ignored.value.files,
@@ -97,11 +97,11 @@ export class SdkContext {
   }
 
   /** The repository enclosing the SDK directory; one whose ignore rules exclude it does not count, since its index and remote are not meant to hold the SDK. */
-  private async repository(): Promise<Result<SdkRepositoryContext | undefined, SdkRepositoryProblem>> {
+  private async repository(): Promise<Result<SdkRepositoryContext | undefined, RepositoryProblem>> {
     const { real, existing } = this.realSpelling();
     const found = await this.git.topLevel(existing);
     if (found.isErr()) {
-      return err(gitFailed(found.error));
+      return err(found.error);
     }
     if (found.value === undefined) {
       return ok(undefined);
@@ -112,7 +112,7 @@ export class SdkContext {
     }
     const ignored = await this.git.isIgnored(root, real);
     if (ignored.isErr()) {
-      return err(gitFailed(ignored.error));
+      return err(ignored.error);
     }
     return ok(ignored.value ? undefined : SdkRepositoryContext.create(root, real));
   }
@@ -133,7 +133,7 @@ export class SdkContext {
   }
 
   /** What the enclosing repository's ignore rules keep out; nothing without a repository. */
-  private async ignored(): Promise<Result<RelativePaths, SdkRepositoryProblem>> {
+  private async ignored(): Promise<Result<RelativePaths, RepositoryProblem>> {
     const repository = await this.repository();
     if (repository.isErr()) {
       return err(repository.error);

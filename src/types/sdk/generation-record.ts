@@ -51,7 +51,7 @@ export class GenerationRecord {
       return undefined;
     }
     const record = parsed;
-    const pristine = typeof record.pristine === 'string' ? CommitId.create(record.pristine) : undefined;
+    const pristine = typeof record.pristine === 'string' ? CommitId.fromGit(record.pristine) : undefined;
     if (
       record.schemaVersion !== SCHEMA_VERSION ||
       !isOneOf(Object.values(Language), record.language) ||

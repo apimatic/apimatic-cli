@@ -5,7 +5,7 @@ import { Conflict, MergeFiles, MergePlan, Sides } from '../../../src/types/sdk/m
 import { favouring, resolving } from '../../../src/types/sdk/settlement.js';
 import { Regeneration } from '../../../src/types/sdk/repository-state.js';
 
-const rel = (value: string) => RelativeFilePath.fromGit(value);
+const rel = (value: string) => RelativeFilePath.fromGit(value)!;
 
 const NO_FILES: MergeFiles = { added: [], updated: [], merged: [], removed: [], kept: [] };
 
@@ -21,7 +21,7 @@ const regeneration = (conflicts: Conflict[]): Regeneration => {
     .filter((conflict) => conflict.kind === 'bothChanged' || conflict.kind === 'bothAdded')
     .map((conflict) => ({ path: conflict.path, blob: 'blob-with-markers' }));
   const plan = new MergePlan(writes, [], conflicts, NO_FILES, sides);
-  return { generated: TreeId.fromGit('a'.repeat(40)), merge: { plan, stages: [] } };
+  return { generated: TreeId.fromGit('a'.repeat(40))!, merge: { plan, stages: [] } };
 };
 
 describe('Settlement', () => {

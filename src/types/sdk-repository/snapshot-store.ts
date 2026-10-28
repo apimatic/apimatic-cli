@@ -5,10 +5,9 @@ import { RelativeFilePath } from '../file/relativeFilePath.js';
 import { CommitId } from '../git/commit-id.js';
 import { TreeId } from '../git/tree-id.js';
 import { describeGeneration, SdkGeneration } from '../sdk/generation-record.js';
-import { NestedSdkDirectory, SdkRepositoryProblem } from '../sdk/repository-state.js';
+import { NestedSdkDirectory, RepositoryProblem } from '../sdk/repository-state.js';
 import { SdkPath } from '../sdk/sdk-path.js';
 import { SnapshotRef } from '../sdk/snapshot-ref.js';
-import { gitFailed } from './on-disk.js';
 
 /** One SDK directory's snapshots: the pristine chain, the base of the next merge, and the previous state; fetched and joined with a remote's. */
 export class SnapshotStore {
@@ -29,44 +28,44 @@ export class SnapshotStore {
   }
 
   /** A freshly generated SDK as a tree: every file, whatever its own `.gitignore` says. */
-  public async snapshotGenerated(generated: DirectoryPath): Promise<Result<TreeId, SdkRepositoryProblem>> {
-    return (await this.git.treeOf(this.root, generated, 'all')).mapErr(gitFailed);
+  public async snapshotGenerated(generated: DirectoryPath): Promise<Result<TreeId, RepositoryProblem>> {
+    return this.git.treeOf(this.root, generated, 'all');
   }
 
   /** The SDK directory as it is on disk; every path `base` holds goes in, so a generated file an ignore rule matches is never taken for deleted. */
   public async snapshotDisk(
     base: CommitId | undefined,
     lineEndings: 'normalized' | 'asIs' = 'normalized'
-  ): Promise<Result<TreeId, SdkRepositoryProblem>> {
+  ): Promise<Result<TreeId, RepositoryProblem>> {
     const include = await this.pathsHeldBy(base);
     if (include.isErr()) {
       return err(include.error);
     }
-    return (await this.git.treeOf(this.root, this.sdk, include.value, lineEndings)).mapErr(gitFailed);
+    return this.git.treeOf(this.root, this.sdk, include.value, lineEndings);
   }
 
-  private async pathsHeldBy(base: CommitId | undefined): Promise<Result<RelativeFilePath[], SdkRepositoryProblem>> {
+  private async pathsHeldBy(base: CommitId | undefined): Promise<Result<RelativeFilePath[], RepositoryProblem>> {
     if (base === undefined) {
       return ok([]);
     }
     const entries = await this.git.listTree(this.root, base);
-    return entries.map((found) => found.map((entry) => entry.path)).mapErr(gitFailed);
+    return entries.map((found) => found.map((entry) => entry.path));
   }
 
   /** Records `generated` as the next pristine snapshot, chained on the last one; an identical generation keeps the last. */
   public async recordPristine(
     generated: TreeId,
     generation: SdkGeneration
-  ): Promise<Result<CommitId, SdkRepositoryProblem>> {
+  ): Promise<Result<CommitId, RepositoryProblem>> {
     const ref = this.pristineRef();
     const parent = await this.git.resolveRef(this.root, ref);
     if (parent.isErr()) {
-      return err(gitFailed(parent.error));
+      return err(parent.error);
     }
     if (parent.value !== undefined) {
       const tree = await this.git.treeOfCommit(this.root, parent.value);
       if (tree.isErr()) {
-        return err(gitFailed(tree.error));
+        return err(tree.error);
       }
       if (tree.value.isEqual(generated)) {
         return ok(parent.value);
@@ -79,65 +78,65 @@ export class SnapshotStore {
       `apimatic: pristine ${describeGeneration(generation)}`
     );
     if (commit.isErr()) {
-      return err(gitFailed(commit.error));
+      return err(commit.error);
     }
     const updated = await this.git.updateRef(this.root, ref, commit.value);
-    return updated.map(() => commit.value).mapErr(gitFailed);
+    return updated.map(() => commit.value);
   }
 
   /** Keeps the SDK directory as it is on disk, byte for byte, replacing what the last run kept, so a merge can be undone. */
-  public async savePrevious(base: CommitId | undefined): Promise<Result<CommitId, SdkRepositoryProblem>> {
+  public async savePrevious(base: CommitId | undefined): Promise<Result<CommitId, RepositoryProblem>> {
     const disk = await this.snapshotDisk(base, 'asIs');
     if (disk.isErr()) {
       return err(disk.error);
     }
     const commit = await this.git.commitTree(this.root, disk.value, [], 'apimatic: before regeneration');
     if (commit.isErr()) {
-      return err(gitFailed(commit.error));
+      return err(commit.error);
     }
     const updated = await this.git.updateRef(this.root, this.previousRef(), commit.value);
-    return updated.map(() => commit.value).mapErr(gitFailed);
+    return updated.map(() => commit.value);
   }
 
-  public async hasCommit(commit: CommitId): Promise<Result<boolean, SdkRepositoryProblem>> {
-    return (await this.git.hasCommit(this.root, commit)).mapErr(gitFailed);
+  public async hasCommit(commit: CommitId): Promise<Result<boolean, RepositoryProblem>> {
+    return this.git.hasCommit(this.root, commit);
   }
 
   /** A chain that continues the local one moves the ref; two that diverged are joined with a two-parent commit, so neither machine's generations are lost. */
-  public async fetch(remote: string): Promise<Result<void, SdkRepositoryProblem>> {
+  public async fetch(remote: string): Promise<Result<void, RepositoryProblem>> {
     const ref = this.pristineRef();
     const remoteTip = await this.git.fetchRef(this.root, remote, ref);
     if (remoteTip.isErr()) {
-      return err(gitFailed(remoteTip.error));
+      return err(remoteTip.error);
     }
     if (remoteTip.value === undefined) {
       return ok(undefined);
     }
     const localTip = await this.git.resolveRef(this.root, ref);
     if (localTip.isErr()) {
-      return err(gitFailed(localTip.error));
+      return err(localTip.error);
     }
     if (localTip.value === undefined) {
-      return (await this.git.updateRef(this.root, ref, remoteTip.value)).mapErr(gitFailed);
+      return this.git.updateRef(this.root, ref, remoteTip.value);
     }
     const continued = await this.git.isAncestor(this.root, localTip.value, remoteTip.value);
     if (continued.isErr()) {
-      return err(gitFailed(continued.error));
+      return err(continued.error);
     }
     if (continued.value) {
-      return (await this.git.updateRef(this.root, ref, remoteTip.value)).mapErr(gitFailed);
+      return this.git.updateRef(this.root, ref, remoteTip.value);
     }
     const behind = await this.git.isAncestor(this.root, remoteTip.value, localTip.value);
     if (behind.isErr()) {
-      return err(gitFailed(behind.error));
+      return err(behind.error);
     }
     return behind.value ? ok(undefined) : this.join(localTip.value, remoteTip.value);
   }
 
-  private async join(localTip: CommitId, remoteTip: CommitId): Promise<Result<void, SdkRepositoryProblem>> {
+  private async join(localTip: CommitId, remoteTip: CommitId): Promise<Result<void, RepositoryProblem>> {
     const tree = await this.git.treeOfCommit(this.root, localTip);
     if (tree.isErr()) {
-      return err(gitFailed(tree.error));
+      return err(tree.error);
     }
     const joined = await this.git.commitTree(
       this.root,
@@ -146,19 +145,19 @@ export class SnapshotStore {
       'apimatic: pristine chains joined'
     );
     if (joined.isErr()) {
-      return err(gitFailed(joined.error));
+      return err(joined.error);
     }
-    return (await this.git.updateRef(this.root, this.pristineRef(), joined.value)).mapErr(gitFailed);
+    return this.git.updateRef(this.root, this.pristineRef(), joined.value);
   }
 
   /** Refs are files, so another SDK directory's snapshots above or below this one would be in the way. */
-  public async verifyNotNested(): Promise<Result<void, SdkRepositoryProblem | NestedSdkDirectory>> {
+  public async verifyNotNested(): Promise<Result<void, RepositoryProblem | NestedSdkDirectory>> {
     const names = await this.git.listRefs(this.root, SnapshotRef.pristineNamespace());
     if (names.isErr()) {
-      return err(gitFailed(names.error));
+      return err(names.error);
     }
     const nested = names.value
-      .map((name) => SnapshotRef.fromGit(name).sdkPath())
+      .flatMap((name) => SnapshotRef.fromGit(name)?.sdkPath() ?? [])
       .find((other) => other.nests(this.path));
     if (nested === undefined) {
       return ok(undefined);

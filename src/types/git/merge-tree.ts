@@ -13,11 +13,12 @@ export const STAGE = { base: 1, yours: 2, generated: 3 } as const;
 /** One conflicted path's version on one side. */
 export type StageEntry = { mode: string; oid: string; stage: 1 | 2 | 3; path: RelativeFilePath };
 
-/** `mode oid stage<TAB>path`, as `ls-files -u` and `merge-tree -z` both print a stage entry. */
-export function parseStageEntry(entry: string): StageEntry {
+/** `mode oid stage<TAB>path`, as `ls-files -u` and `merge-tree -z` both print a stage entry; none for a path git would never print. */
+export function parseStageEntry(entry: string): StageEntry | undefined {
   const tab = entry.indexOf('\t');
   const [mode, oid, stage] = entry.slice(0, tab).split(' ');
-  return { mode, oid, stage: Number(stage) as StageEntry['stage'], path: RelativeFilePath.fromGit(entry.slice(tab + 1)) };
+  const path = RelativeFilePath.fromGit(entry.slice(tab + 1));
+  return path === undefined ? undefined : { mode, oid, stage: Number(stage) as StageEntry['stage'], path };
 }
 
 /** One of git's informational messages, such as `CONFLICT (modify/delete)` for a path. */

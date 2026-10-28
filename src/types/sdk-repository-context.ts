@@ -13,15 +13,16 @@ import {
   MergeOutcome,
   RecordProblem,
   Regeneration,
-  SdkRepositoryProblem,
+  RepositoryProblem,
   SdkRepositoryState,
-  ShareHookInstall
+  ShareHookInstall,
+  WriteProblem
 } from './sdk/repository-state.js';
 import { SdkPath } from './sdk/sdk-path.js';
 import { settledContent } from './sdk/unresolved-file.js';
 import { GenerationRecordFile } from './sdk-repository/generation-record-file.js';
 import { MergeEngine } from './sdk-repository/merge-engine.js';
-import { gitFailed, onDisk } from './sdk-repository/on-disk.js';
+import { onDisk } from './sdk-repository/on-disk.js';
 import { SdkFiles } from './sdk-repository/sdk-files.js';
 import { ShareHookInstaller } from './sdk-repository/share-hook-installer.js';
 import { SnapshotStore } from './sdk-repository/snapshot-store.js';
@@ -55,8 +56,8 @@ export class SdkRepositoryContext {
   }
 
   /** The remote the SDK's snapshots are shared through: where the current branch pushes, else `origin`. */
-  public async remote(): Promise<Result<string | undefined, SdkRepositoryProblem>> {
-    return (await this.git.remoteOf(this.rootDirectory)).mapErr(gitFailed);
+  public async remote(): Promise<Result<string | undefined, RepositoryProblem>> {
+    return this.git.remoteOf(this.rootDirectory);
   }
 
   /** What a run needs before it decides how to write: an operation in progress or a nested SDK is refused, unmerged files come first, a missing snapshot is fetched. */
@@ -67,7 +68,7 @@ export class SdkRepositoryContext {
     const root = this.rootDirectory;
     const operation = await this.git.operationInProgress(root);
     if (operation.isErr()) {
-      return err(gitFailed(operation.error));
+      return err(operation.error);
     }
     if (operation.value !== undefined) {
       return err({ kind: 'operationInProgress', operation: operation.value, root });
@@ -100,15 +101,15 @@ export class SdkRepositoryContext {
   public async settleUnresolved(
     side: ConflictSide,
     paths: readonly RelativeFilePath[]
-  ): Promise<Result<void, SdkRepositoryProblem>> {
+  ): Promise<Result<void, RepositoryProblem>> {
     const root = this.rootDirectory;
     const stages = await this.git.unmergedStages(root, this.path.pathspec());
     if (stages.isErr()) {
-      return err(gitFailed(stages.error));
+      return err(stages.error);
     }
     const blobs = await this.git.readBlobs(root, [...new Set(stages.value.map((entry) => entry.oid))]);
     if (blobs.isErr()) {
-      return err(gitFailed(blobs.error));
+      return err(blobs.error);
     }
     for (const path of paths) {
       const settled = await this.settleOne(side, path, stages.value, blobs.value);
@@ -120,11 +121,11 @@ export class SdkRepositoryContext {
       root,
       paths.map((path) => this.path.fromRoot(path))
     );
-    return unstaged.mapErr(gitFailed);
+    return unstaged;
   }
 
   /** A freshly generated SDK as a tree: every file, whatever its own `.gitignore` says. */
-  public snapshotGenerated(generated: DirectoryPath): Promise<Result<TreeId, SdkRepositoryProblem>> {
+  public snapshotGenerated(generated: DirectoryPath): Promise<Result<TreeId, RepositoryProblem>> {
     return this.snapshots.snapshotGenerated(generated);
   }
 
@@ -137,7 +138,7 @@ export class SdkRepositoryContext {
     if (pristine.isErr()) {
       return err({ step: 'snapshot', reason: pristine.error.reason });
     }
-    const written = await this.recordFile.write(GenerationRecord.written(generation, pristine.value));
+    const written = await onDisk(this.recordFile.write(GenerationRecord.written(generation, pristine.value)));
     if (written.isErr()) {
       return err({ step: 'snapshot', reason: written.error.reason });
     }
@@ -146,10 +147,7 @@ export class SdkRepositoryContext {
   }
 
   /** Both trees snapshotted, then merged against `base`. */
-  public async regenerate(
-    base: CommitId,
-    generated: DirectoryPath
-  ): Promise<Result<Regeneration, SdkRepositoryProblem>> {
+  public async regenerate(base: CommitId, generated: DirectoryPath): Promise<Result<Regeneration, RepositoryProblem>> {
     const generatedTree = await this.snapshots.snapshotGenerated(generated);
     if (generatedTree.isErr()) {
       return err(generatedTree.error);
@@ -163,11 +161,7 @@ export class SdkRepositoryContext {
   }
 
   /** The previous ref first, then the plan; a step that fails is undone from that ref, which stays for a restore by hand. */
-  public async write(
-    base: CommitId,
-    plan: MergePlan,
-    generated: DirectoryPath
-  ): Promise<Result<void, SdkRepositoryProblem>> {
+  public async write(base: CommitId, plan: MergePlan, generated: DirectoryPath): Promise<Result<void, WriteProblem>> {
     const commit = await this.snapshots.savePrevious(base);
     if (commit.isErr()) {
       return err(commit.error);
@@ -176,24 +170,24 @@ export class SdkRepositoryContext {
   }
 
   /** What the repository's ignore rules keep out of the SDK directory, so an upload leaves it out as a commit would. */
-  public async ignored(): Promise<Result<RelativePaths, SdkRepositoryProblem>> {
+  public async ignored(): Promise<Result<RelativePaths, RepositoryProblem>> {
     const ignored = await this.git.ignoredBelow(this.sdk);
-    return ignored.mapErr(gitFailed);
+    return ignored;
   }
 
   /** Marks the conflicted paths in the repository's index the way a merge would, so git's own tools take over. */
-  public async stageConflicts(outcome: MergeOutcome): Promise<Result<void, SdkRepositoryProblem>> {
+  public async stageConflicts(outcome: MergeOutcome): Promise<Result<void, RepositoryProblem>> {
     const staged = await this.git.stageConflicts(
       this.rootDirectory,
       outcome.stages.map((entry) => ({ ...entry, path: this.path.fromRoot(entry.path) }))
     );
-    return staged.mapErr(gitFailed);
+    return staged;
   }
 
   /** The paths below the SDK directory that git holds as unmerged: what a run left, and `git add` has not marked resolved. */
-  private async unresolvedConflicts(): Promise<Result<RelativeFilePath[], SdkRepositoryProblem>> {
+  private async unresolvedConflicts(): Promise<Result<RelativeFilePath[], RepositoryProblem>> {
     const stages = await this.git.unmergedStages(this.rootDirectory, this.path.pathspec());
-    return stages.mapErr(gitFailed).map((found) => {
+    return stages.map((found) => {
       const paths = new Map(found.map((entry) => [entry.path.toString(), entry.path]));
       return [...paths.values()].flatMap((path) => this.path.below(path) ?? []);
     });
@@ -203,7 +197,7 @@ export class SdkRepositoryContext {
   private async readiness(
     base: CommitId,
     remote: string | undefined
-  ): Promise<Result<SdkRepositoryState, SdkRepositoryProblem>> {
+  ): Promise<Result<SdkRepositoryState, RepositoryProblem>> {
     const present = await this.snapshots.hasCommit(base);
     if (present.isErr()) {
       return err(present.error);
@@ -230,7 +224,7 @@ export class SdkRepositoryContext {
     path: RelativeFilePath,
     stages: readonly StageEntry[],
     blobs: Map<string, Uint8Array>
-  ): Promise<Result<void, SdkRepositoryProblem>> {
+  ): Promise<Result<void, RepositoryProblem>> {
     const fromRoot = this.path.fromRoot(path);
     const stage = (number: StageEntry['stage']) => {
       const entry = stages.find((candidate) => candidate.stage === number && candidate.path.isEqual(fromRoot));

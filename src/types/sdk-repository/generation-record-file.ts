@@ -1,11 +1,8 @@
-import { err, Result } from 'neverthrow';
 import { FileService } from '../../infrastructure/file-service.js';
 import { DirectoryPath } from '../file/directoryPath.js';
 import { FileName } from '../file/fileName.js';
 import { FilePath } from '../file/filePath.js';
 import { GenerationRecord, RECORD_ATTRIBUTES, RECORD_DIRECTORY, RECORD_FILE } from '../sdk/generation-record.js';
-import { SdkRepositoryProblem } from '../sdk/repository-state.js';
-import { onDisk } from './on-disk.js';
 
 const RECORD_ATTRIBUTES_FILE = '.gitattributes';
 
@@ -32,12 +29,8 @@ export class GenerationRecordFile {
   }
 
   /** Both files, each only when its content changed, so a regeneration that changed nothing touches neither. */
-  public async write(record: GenerationRecord): Promise<Result<FilePath, SdkRepositoryProblem>> {
-    const attributes = await onDisk(this.fileService.replaceContentsIfChanged(this.attributes, RECORD_ATTRIBUTES));
-    if (attributes.isErr()) {
-      return err(attributes.error);
-    }
-    const written = await onDisk(this.fileService.replaceContentsIfChanged(this.file, record.toJson()));
-    return written.map(() => this.file);
+  public async write(record: GenerationRecord): Promise<void> {
+    await this.fileService.replaceContentsIfChanged(this.attributes, RECORD_ATTRIBUTES);
+    await this.fileService.replaceContentsIfChanged(this.file, record.toJson());
   }
 }

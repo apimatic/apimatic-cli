@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { DirectoryPath, posix } from '../file/directoryPath.js';
+import { RelativeDirectoryPath } from '../file/relativeDirectoryPath.js';
 import { RelativeFilePath } from '../file/relativeFilePath.js';
 
 /** Where an SDK directory sits below its repository's root, as git spells paths; empty for an SDK that is the repository. */
@@ -10,9 +11,10 @@ export class SdkPath {
     return new SdkPath(posix(path.relative(root.toString(), sdk.toString())));
   }
 
-  /** As a ref or a record spells it: `/` between segments, '' for the root. */
-  public static fromGit(value: string): SdkPath {
-    return new SdkPath(value);
+  /** As a ref or a record spells it: `/` between segments, '' for the root; none for any other spelling. */
+  public static fromGit(value: string): SdkPath | undefined {
+    const wellFormed = value === '' || RelativeDirectoryPath.fromGit(value)?.toString() === value;
+    return wellFormed ? new SdkPath(value) : undefined;
   }
 
   public isRoot(): boolean {

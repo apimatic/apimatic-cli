@@ -5,8 +5,7 @@ import { CommitId } from '../git/commit-id.js';
 import { TreeId } from '../git/tree-id.js';
 import { isRecordPath } from '../sdk/generation-record.js';
 import { MergePlan } from '../sdk/merge-plan.js';
-import { MergeOutcome, SdkRepositoryProblem } from '../sdk/repository-state.js';
-import { gitFailed } from './on-disk.js';
+import { MergeOutcome, RepositoryProblem } from '../sdk/repository-state.js';
 
 /** git's three-way merge: disk and generation as temporary commits on the pristine base, merged by `merge-tree`. */
 export class MergeEngine {
@@ -18,41 +17,41 @@ export class MergeEngine {
     base: CommitId,
     disk: TreeId,
     generated: TreeId
-  ): Promise<Result<MergeOutcome, SdkRepositoryProblem>> {
+  ): Promise<Result<MergeOutcome, RepositoryProblem>> {
     const git = this.git;
     const root = this.root;
     const baseTree = await git.treeOfCommit(root, base);
     if (baseTree.isErr()) {
-      return err(gitFailed(baseTree.error));
+      return err(baseTree.error);
     }
     const yours = await git.commitTree(root, disk, [base], 'apimatic: your changes');
     if (yours.isErr()) {
-      return err(gitFailed(yours.error));
+      return err(yours.error);
     }
     const theirs = await git.commitTree(root, generated, [base], 'apimatic: generated');
     if (theirs.isErr()) {
-      return err(gitFailed(theirs.error));
+      return err(theirs.error);
     }
     const merged = await git.mergeTree(root, yours.value, theirs.value);
     if (merged.isErr()) {
-      return err(gitFailed(merged.error));
+      return err(merged.error);
     }
     const merge = merged.value;
     const yourChanges = await git.diffTrees(root, baseTree.value, disk, true);
     if (yourChanges.isErr()) {
-      return err(gitFailed(yourChanges.error));
+      return err(yourChanges.error);
     }
     const generatedChanges = await git.diffTrees(root, baseTree.value, generated, true);
     if (generatedChanges.isErr()) {
-      return err(gitFailed(generatedChanges.error));
+      return err(generatedChanges.error);
     }
     const applied = await git.diffTrees(root, disk, merge.tree, false);
     if (applied.isErr()) {
-      return err(gitFailed(applied.error));
+      return err(applied.error);
     }
     const baseEntries = await git.listTree(root, baseTree.value);
     if (baseEntries.isErr()) {
-      return err(gitFailed(baseEntries.error));
+      return err(baseEntries.error);
     }
     const plan = MergePlan.from({
       merge,

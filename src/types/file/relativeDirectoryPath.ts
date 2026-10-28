@@ -12,23 +12,16 @@ export class RelativeDirectoryPath {
     this.value = value;
   }
 
-  public static create(value: string): RelativeDirectoryPath | undefined {
-    const segments = value.split('/');
+  /** From git's own output, which marks a directory with a trailing `/`; none for what git would never print. */
+  public static fromGit(value: string): RelativeDirectoryPath | undefined {
+    const spelled = value.endsWith('/') ? value.slice(0, -1) : value;
+    const segments = spelled.split('/');
     const wellFormed =
-      !value.includes('\\') &&
-      !path.win32.isAbsolute(value) &&
-      !path.posix.isAbsolute(value) &&
+      !spelled.includes('\\') &&
+      !path.win32.isAbsolute(spelled) &&
+      !path.posix.isAbsolute(spelled) &&
       segments.every((segment) => segment !== '' && segment !== '.' && segment !== '..');
-    return wellFormed ? new RelativeDirectoryPath(value) : undefined;
-  }
-
-  /** From git's own output, which marks a directory with a trailing `/`. */
-  public static fromGit(value: string): RelativeDirectoryPath {
-    const created = RelativeDirectoryPath.create(value.endsWith('/') ? value.slice(0, -1) : value);
-    if (created === undefined) {
-      throw new Error(`git named a path that is not a relative directory: ${value}`);
-    }
-    return created;
+    return wellFormed ? new RelativeDirectoryPath(spelled) : undefined;
   }
 
   public isEqual(other: RelativeDirectoryPath): boolean {
