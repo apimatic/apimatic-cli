@@ -97,16 +97,19 @@ export class PortalCopilotEnableAction {
 
     // Revoked only once the new key is saved, so a failure on the way never leaves the portal without one.
     if (replaced !== null) {
-      const revoked = await this.prompts.revokePrevious(
-        this.portalService.revoke(address.value, replaced, shell, authKey)
-      );
-      if (revoked.isErr()) {
-        this.prompts.previousKeyNotRevoked(revoked.error);
-      }
+      await this.revokePrevious(address.value, replaced, shell, authKey);
     }
 
     this.prompts.enabled(registered.value, key.value, registration.value.origins(), replaced !== null);
     this.prompts.nextSteps(key.value.kind());
     return ActionResult.success();
   };
+
+  /** A key that is not revoked keeps working, but the new one is saved, so this only warns. */
+  private async revokePrevious(address: ServiceAddress, previous: string, shell: string, authKey: string) {
+    const revoked = await this.prompts.revokePrevious(this.portalService.revoke(address, previous, shell, authKey));
+    if (revoked.isErr()) {
+      this.prompts.previousKeyNotRevoked(revoked.error);
+    }
+  }
 }
