@@ -5,7 +5,7 @@ import { DirectoryPath } from '../file/directoryPath.js';
 import { FileName } from '../file/fileName.js';
 import { FilePath } from '../file/filePath.js';
 import { RepositoryProblem, ShareHookInstall } from '../sdk/repository-state.js';
-import { SHARE_HOOK_SCRIPT, SHARE_HOOK_SCRIPT_NAME, ShareHook } from '../sdk/share-hook.js';
+import { SHARE_HOOK_SCRIPT, SHARE_HOOK_SCRIPT_NAME, ShareHook, shareHookSteps } from '../sdk/share-hook.js';
 import { onDisk } from './on-disk.js';
 
 // Owner-only, as git's own sample hooks are; git runs a hook only when it is executable.
@@ -33,7 +33,7 @@ export class ShareHookInstaller {
       return err(hooksPath.error);
     }
     if (hooksPath.value !== undefined) {
-      return this.installElsewhere(hooksPath.value, script);
+      return this.installElsewhere(script);
     }
     const file = new FilePath(hooks.value, new FileName('pre-push'));
     const existing = await onDisk(this.read(file));
@@ -48,7 +48,7 @@ export class ShareHookInstaller {
         return ok(
           ShareHook.calls(existing.value)
             ? { kind: 'installed', file, written: false }
-            : { kind: 'notShell', file, shebang: hook.shebang, script }
+            : { kind: 'notShell', file, shebang: hook.shebang, script, steps: shareHookSteps(hook) }
         );
       case 'installed': {
         const written = await onDisk(this.writeExecutable(file, hook.content));
@@ -58,10 +58,7 @@ export class ShareHookInstaller {
   }
 
   /** With `core.hooksPath` set, git runs the hook from there, so that is the file that must call the script. */
-  private async installElsewhere(
-    hooksPath: string,
-    script: FilePath
-  ): Promise<Result<ShareHookInstall, RepositoryProblem>> {
+  private async installElsewhere(script: FilePath): Promise<Result<ShareHookInstall, RepositoryProblem>> {
     const runFrom = await this.git.hooksRunFrom(this.root);
     if (runFrom.isErr()) {
       return err(runFrom.error);
@@ -71,12 +68,11 @@ export class ShareHookInstaller {
     if (content.isErr()) {
       return err(content.error);
     }
-    const inRepository = this.root.contains(file.directory());
-    return ok(
-      ShareHook.calls(content.value)
-        ? { kind: 'installed', file, written: false }
-        : { kind: 'elsewhere', file, hooksPath, inRepository, script }
-    );
+    if (ShareHook.calls(content.value)) {
+      return ok({ kind: 'installed', file, written: false });
+    }
+    const steps = shareHookSteps({ kind: 'elsewhere', inRepository: this.root.contains(file.directory()) });
+    return ok({ kind: 'elsewhere', file, runFrom: runFrom.value, script, steps });
   }
 
   private async read(file: FilePath): Promise<string | undefined> {

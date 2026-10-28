@@ -65,7 +65,7 @@ With git ${GitVersion.required()} or newer installed, your edits to the generate
 
   async run() {
     const {
-      flags: { language, input, destination, force, stability, 'auth-key': authKey }
+      flags: { language, input, destination, force, stability, 'codegen-version': codegenVersion, 'auth-key': authKey }
     } = await this.parse(SdkGenerate);
 
     const project = ProjectContext.at(input);
@@ -81,8 +81,11 @@ With git ${GitVersion.required()} or newer installed, your edits to the generate
     const result = await action.execute(
       project,
       project.sdkDirectory(language as Language, destination),
-      language as Language,
-      StabilityChoice.for(language as Language, stability).stabilityLevel(),
+      {
+        language: language as Language,
+        codegenVersion: codegenVersion as CodeGenerationVersion,
+        stability: StabilityChoice.for(language as Language, stability).stabilityLevel()
+      },
       run
     );
     outro(result);

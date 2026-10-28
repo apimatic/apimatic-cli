@@ -3,13 +3,7 @@ import { RelativeDirectoryPath } from '../file/relativeDirectoryPath.js';
 import { RelativeFilePath } from '../file/relativeFilePath.js';
 import { CommitId } from '../git/commit-id.js';
 import { CodeGenerationVersion, Language, Stability } from './generate.js';
-
-/** What was generated: a snapshot is a base only for the same generator output. */
-export type SdkGeneration = {
-  language: Language;
-  codegenVersion: CodeGenerationVersion;
-  stability: Stability;
-};
+import { SdkGeneration } from './sdk-generation.js';
 
 /** Where the CLI keeps its record inside the SDK directory, and the file holding it. */
 export const RECORD_DIRECTORY = RelativeDirectoryPath.fromGit('.apimatic')!;
@@ -63,7 +57,11 @@ export class GenerationRecord {
       return undefined;
     }
     return new GenerationRecord(
-      { language: record.language, codegenVersion: record.codegenVersion, stability: record.stability },
+      SdkGeneration.recorded({
+        language: record.language,
+        codegenVersion: record.codegenVersion,
+        stability: record.stability
+      }),
       pristine
     );
   }
@@ -78,11 +76,7 @@ export class GenerationRecord {
 
   /** Whether `generation` would produce the same kind of output the recorded snapshot holds. */
   public isFor(generation: SdkGeneration): boolean {
-    return (
-      this.generation.language === generation.language &&
-      this.generation.codegenVersion === generation.codegenVersion &&
-      this.generation.stability === generation.stability
-    );
+    return this.generation.isSameAs(generation);
   }
 
   public toJson(): string {
@@ -102,8 +96,3 @@ export class GenerationRecord {
 
 export const RECORD_ATTRIBUTES =
   '# Written by the APIMatic CLI.\ngeneration.json merge=binary linguist-generated=true\n';
-
-/** How a snapshot's commit message names its generation. */
-export function describeGeneration(generation: SdkGeneration): string {
-  return `${generation.language} ${generation.codegenVersion} ${generation.stability}`;
-}

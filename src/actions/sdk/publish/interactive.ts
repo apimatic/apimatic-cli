@@ -5,7 +5,7 @@ import { DirectoryPath } from '../../../types/file/directoryPath.js';
 import { PublishType } from '../../../types/publish-api/publishing-profile-item.js';
 import { PublishingProfile } from '../../../types/publish/publishing-profile.js';
 import { PublishingProfiles } from '../../../types/publish/publishing-profiles.js';
-import { AVAILABLE_LANGUAGES, stabilityLevelsFor } from '../../../types/sdk/generate.js';
+import { AVAILABLE_LANGUAGES, CodeGenerationVersion, stabilityLevelsFor } from '../../../types/sdk/generate.js';
 import { formatPublishingDetails } from '../../../prompts/sdk/publish.js';
 import { ActionResult } from '../../action-result.js';
 import { RecordPublishedSdkAction } from '../record-published-sdk.js';
@@ -126,14 +126,13 @@ export class SdkPublishInteractiveAction {
     const publishResult = await new SdkPublishAction(this.configDir, this.commandMetadata).execute(
       project,
       sdkDirectory,
-      language,
+      { language, codegenVersion: CodeGenerationVersion.V4, stability },
       publishTypes,
       { force: false, interaction: 'ask' },
       publishingProfileId,
       version,
       publishingProfile,
       false,
-      stability,
       publishingSummary,
       onPublishSdkError
     );

@@ -5,7 +5,7 @@ import { RelativeFilePath } from '../file/relativeFilePath.js';
 import { CommitId } from '../git/commit-id.js';
 import { RemoteName } from '../git/remote-name.js';
 import { TreeId } from '../git/tree-id.js';
-import { describeGeneration, SdkGeneration } from '../sdk/generation-record.js';
+import { SdkGeneration } from '../sdk/sdk-generation.js';
 import { ChainFacts, reconcile } from '../sdk/pristine-chain.js';
 import { NestedSdkDirectory, RepositoryProblem } from '../sdk/repository-state.js';
 import { SdkPath } from '../sdk/sdk-path.js';
@@ -76,7 +76,7 @@ export class SnapshotStore {
       this.root,
       generated,
       parent.value === undefined ? [] : [parent.value],
-      `apimatic: pristine ${describeGeneration(generation)}`
+      `apimatic: pristine ${generation}`
     );
     if (commit.isErr()) {
       return err(commit.error);

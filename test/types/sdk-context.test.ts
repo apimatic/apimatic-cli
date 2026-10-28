@@ -11,15 +11,15 @@ import { FilePath } from '../../src/types/file/filePath.js';
 import { Found, SdkContext } from '../../src/types/sdk-context.js';
 import { SdkRepositoryContext } from '../../src/types/sdk-repository-context.js';
 import { CodeGenerationVersion, Language, Stability } from '../../src/types/sdk/generate.js';
-import { SdkGeneration } from '../../src/types/sdk/generation-record.js';
+import { SdkGeneration } from '../../src/types/sdk/sdk-generation.js';
 import { SdkPath } from '../../src/types/sdk/sdk-path.js';
 import { SnapshotRef } from '../../src/types/sdk/snapshot-ref.js';
 
-const PYTHON: SdkGeneration = {
+const PYTHON = SdkGeneration.create({
   language: Language.PYTHON,
   codegenVersion: CodeGenerationVersion.V4,
   stability: Stability.STABLE
-};
+})!;
 
 describe('SdkContext', () => {
   let root: string;
@@ -39,8 +39,7 @@ describe('SdkContext', () => {
   const recordOne = async (repository: SdkRepositoryContext) => {
     const generated = fs.mkdtempSync(path.join(root, 'generated-'));
     fs.writeFileSync(path.join(generated, 'README.md'), '# sdk');
-    const tree = (await repository.snapshotGenerated(new DirectoryPath(generated)))._unsafeUnwrap();
-    (await repository.record(tree, PYTHON))._unsafeUnwrap();
+    (await repository.recordFresh(new DirectoryPath(generated), PYTHON))._unsafeUnwrap();
   };
 
   /** The pristine commit for the SDK at `sdkPath` in the repository at `repositoryRoot`, or none. */

@@ -8,7 +8,8 @@ import { BlobId } from './git/blob-id.js';
 import { CommitId } from './git/commit-id.js';
 import { STAGE, StageEntry } from './git/merge-tree.js';
 import { TreeId } from './git/tree-id.js';
-import { GenerationRecord, SdkGeneration } from './sdk/generation-record.js';
+import { GenerationRecord } from './sdk/generation-record.js';
+import { SdkGeneration } from './sdk/sdk-generation.js';
 import { afterFetch, classify, RepositoryFacts } from './sdk/repository-facts.js';
 import { ConflictSide } from './sdk/merge-plan.js';
 import {
@@ -151,9 +152,16 @@ export class SdkRepositoryContext {
     );
   }
 
-  /** A freshly generated SDK as a tree: every file, whatever its own `.gitignore` says. */
-  public snapshotGenerated(generated: DirectoryPath): Promise<Result<TreeId, RepositoryProblem>> {
-    return this.snapshots.snapshotGenerated(generated);
+  /** A freshly written SDK recorded as the next base: snapshotted whole, then recorded as `record` does. */
+  public async recordFresh(
+    generated: DirectoryPath,
+    generation: SdkGeneration
+  ): Promise<Result<ShareHookInstall, RecordProblem>> {
+    const tree = await this.snapshots.snapshotGenerated(generated);
+    if (tree.isErr()) {
+      return err({ step: 'snapshot', reason: tree.error.reason });
+    }
+    return this.record(tree.value, generation);
   }
 
   /**

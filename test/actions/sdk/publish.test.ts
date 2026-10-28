@@ -26,7 +26,7 @@ import { PublishingProfileItem, PublishType } from '../../../src/types/publish-a
 import { ProfileId } from '../../../src/types/publish/profile-id.js';
 import { PublishingProfile } from '../../../src/types/publish/publishing-profile.js';
 import { SemVersion } from '../../../src/types/publish/version.js';
-import { Language, Stability } from '../../../src/types/sdk/generate.js';
+import { CodeGenerationVersion, Language, Stability } from '../../../src/types/sdk/generate.js';
 import { StabilityChoice } from '../../../src/types/sdk/stability-choice.js';
 import { TempContext } from '../../../src/types/temp-context.js';
 
@@ -46,14 +46,13 @@ describe('SdkPublishAction', () => {
     new SdkPublishAction(new DirectoryPath(root), COMMAND_METADATA).execute(
       ProjectContext.in(new DirectoryPath(root)),
       sdk(),
-      Language.PYTHON,
+      { language: Language.PYTHON, codegenVersion: CodeGenerationVersion.V4, stability: Stability.STABLE },
       [PublishType.PackagePublishing],
       { force: true, interaction: 'never' },
       ProfileId.tryCreate('profile')._unsafeUnwrap(),
       SemVersion.tryCreate('1.0.0')._unsafeUnwrap(),
       withoutPackageSettings,
       dryRun,
-      Stability.STABLE,
       'summary',
       onPublishSdkError
     );
@@ -159,6 +158,7 @@ describe('SdkPublishAction', () => {
       true,
       true,
       StabilityChoice.for(Language.PYTHON, undefined),
+      CodeGenerationVersion.V4,
       onPublishSdkError,
       profile.id,
       '1.0.0'

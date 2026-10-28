@@ -4,7 +4,8 @@ import { RelativeFilePath } from '../file/relativeFilePath.js';
 import { CommitId } from '../git/commit-id.js';
 import { GitOperation } from '../git/git-operation.js';
 import { RemoteName } from '../git/remote-name.js';
-import { GenerationRecord, SdkGeneration } from './generation-record.js';
+import { GenerationRecord } from './generation-record.js';
+import { SdkGeneration } from './sdk-generation.js';
 import { InspectionRefusal, NestedSdkDirectory, SdkRepositoryState } from './repository-state.js';
 
 /** What the repository says about its SDK directory, every fact read before any of them is weighed. */

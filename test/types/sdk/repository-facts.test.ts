@@ -4,15 +4,20 @@ import { RelativeFilePath } from '../../../src/types/file/relativeFilePath.js';
 import { CommitId } from '../../../src/types/git/commit-id.js';
 import { RemoteName } from '../../../src/types/git/remote-name.js';
 import { CodeGenerationVersion, Language, Stability } from '../../../src/types/sdk/generate.js';
-import { GenerationRecord, SdkGeneration } from '../../../src/types/sdk/generation-record.js';
+import { GenerationRecord } from '../../../src/types/sdk/generation-record.js';
+import { SdkGeneration } from '../../../src/types/sdk/sdk-generation.js';
 import { afterFetch, classify, RepositoryFacts } from '../../../src/types/sdk/repository-facts.js';
 
-const PYTHON: SdkGeneration = {
+const PYTHON = SdkGeneration.create({
   language: Language.PYTHON,
   codegenVersion: CodeGenerationVersion.V4,
   stability: Stability.STABLE
-};
-const TYPESCRIPT: SdkGeneration = { ...PYTHON, language: Language.TYPESCRIPT };
+})!;
+const TYPESCRIPT = SdkGeneration.create({
+  language: Language.TYPESCRIPT,
+  codegenVersion: CodeGenerationVersion.V4,
+  stability: Stability.STABLE
+})!;
 
 const base = CommitId.fromGit('a'.repeat(40))!;
 const root = new DirectoryPath(process.cwd());

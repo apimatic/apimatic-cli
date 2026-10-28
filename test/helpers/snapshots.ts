@@ -7,7 +7,7 @@ import { CommitId } from '../../src/types/git/commit-id.js';
 import { SdkContext } from '../../src/types/sdk-context.js';
 import { SdkRepositoryContext } from '../../src/types/sdk-repository-context.js';
 import { RepositoryProblem } from '../../src/types/sdk/repository-state.js';
-import { SdkGeneration } from '../../src/types/sdk/generation-record.js';
+import { SdkGeneration } from '../../src/types/sdk/sdk-generation.js';
 import { SdkPath } from '../../src/types/sdk/sdk-path.js';
 import { SnapshotStore } from '../../src/types/sdk-repository/snapshot-store.js';
 

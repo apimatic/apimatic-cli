@@ -2,6 +2,7 @@ import { expect } from 'chai';
 import { CommitId } from '../../../src/types/git/commit-id.js';
 import { CodeGenerationVersion, Language, Stability } from '../../../src/types/sdk/generate.js';
 import { GenerationRecord } from '../../../src/types/sdk/generation-record.js';
+import { SdkGeneration } from '../../../src/types/sdk/sdk-generation.js';
 
 const SHA = 'a'.repeat(40);
 
@@ -18,7 +19,11 @@ const json = (overrides: Record<string, unknown> = {}) =>
 describe('GenerationRecord', () => {
   it('round-trips through its file form', () => {
     const record = GenerationRecord.written(
-      { language: Language.PYTHON, codegenVersion: CodeGenerationVersion.V4, stability: Stability.BETA },
+      SdkGeneration.create({
+        language: Language.PYTHON,
+        codegenVersion: CodeGenerationVersion.V4,
+        stability: Stability.BETA
+      })!,
       CommitId.fromGit(SHA)!
     );
 
@@ -26,10 +31,22 @@ describe('GenerationRecord', () => {
 
     expect(parsed.toJson()).to.equal(record.toJson());
     expect(
-      parsed.isFor({ language: Language.PYTHON, codegenVersion: CodeGenerationVersion.V4, stability: Stability.BETA })
+      parsed.isFor(
+        SdkGeneration.create({
+          language: Language.PYTHON,
+          codegenVersion: CodeGenerationVersion.V4,
+          stability: Stability.BETA
+        })!
+      )
     ).to.be.true;
     expect(
-      parsed.isFor({ language: Language.PYTHON, codegenVersion: CodeGenerationVersion.V4, stability: Stability.STABLE })
+      parsed.isFor(
+        SdkGeneration.create({
+          language: Language.PYTHON,
+          codegenVersion: CodeGenerationVersion.V4,
+          stability: Stability.STABLE
+        })!
+      )
     ).to.be.false;
   });
 
@@ -65,11 +82,13 @@ describe('GenerationRecord', () => {
     )!;
 
     expect(
-      record.isFor({
-        language: Language.TYPESCRIPT,
-        codegenVersion: CodeGenerationVersion.V4,
-        stability: Stability.STABLE
-      })
+      record.isFor(
+        SdkGeneration.create({
+          language: Language.TYPESCRIPT,
+          codegenVersion: CodeGenerationVersion.V4,
+          stability: Stability.STABLE
+        })!
+      )
     ).to.be.true;
     expect(record.toJson()).to.not.contain('conflicts');
     expect(record.toJson()).to.not.contain('generatedAt');

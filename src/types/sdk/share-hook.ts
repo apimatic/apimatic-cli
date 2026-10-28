@@ -1,3 +1,5 @@
+import { ShareHookStep } from './repository-state.js';
+
 const BEGIN = '# >>> apimatic snapshots';
 const END = '# <<< apimatic snapshots';
 const DEFAULT_SHEBANG = '#!/bin/sh';
@@ -49,6 +51,13 @@ export const SHARE_HOOK_SCRIPT = [
 
 /** The marked block a `pre-push` hook carries: the call, and nothing the CLI will ever need to update; the markers find it again. */
 export const SHARE_HOOK_BLOCK = [BEGIN, SHARE_HOOK_CALL, END].join('\n');
+
+/** What is left for the developer when the CLI could not put the call into the hook git runs: committing it only where that hook is in the repository. */
+export function shareHookSteps(
+  hook: { kind: 'elsewhere'; inRepository: boolean } | { kind: 'notShell' }
+): ShareHookStep[] {
+  return hook.kind === 'elsewhere' && hook.inRepository ? ['addCall', 'commit'] : ['addCall'];
+}
 
 /** The hook file as it should be, or why the block cannot be added to the one that is there. */
 export type ShareHookFile =

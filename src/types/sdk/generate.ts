@@ -123,17 +123,6 @@ export function defaultStability(language: Language): Stability {
 }
 
 /**
- * The generator that produces `language` at `stability`, which a snapshot records so it is only
- * ever a base for the same output. A level the language does not offer falls back to the
- * generator it does have, as `defaultStability` does for the level.
- */
-export function codegenVersionFor(language: Language, stability: Stability): CodeGenerationVersion {
-  const options = codegenOptionsFor(language);
-  const option = options.find((candidate) => candidate.stabilityLevel() === stability) ?? options[0];
-  return option?.codegenVersion() ?? CodeGenerationVersion.V4;
-}
-
-/**
  * The name a language is shown under everywhere, so one reads the same in every message.
  * Takes a string because a config file names its own languages, and may name anything.
  */

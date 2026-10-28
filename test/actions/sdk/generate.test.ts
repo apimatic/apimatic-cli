@@ -17,7 +17,7 @@ import { FileName } from '../../../src/types/file/fileName.js';
 import { FilePath } from '../../../src/types/file/filePath.js';
 import { FileProblem } from '../../../src/types/file/file-problem.js';
 import { ProjectContext } from '../../../src/types/project-context.js';
-import { Language, Stability } from '../../../src/types/sdk/generate.js';
+import { CodeGenerationVersion, Language, Stability } from '../../../src/types/sdk/generate.js';
 import { GenerationRecord } from '../../../src/types/sdk/generation-record.js';
 import { SdkPath } from '../../../src/types/sdk/sdk-path.js';
 import { SnapshotRef } from '../../../src/types/sdk/snapshot-ref.js';
@@ -36,8 +36,7 @@ describe('GenerateAction (sdk)', () => {
     new GenerateAction(new DirectoryPath(root), COMMAND_METADATA, 'auth-key').execute(
       ProjectContext.in(new DirectoryPath(root)),
       options.destination ?? sdk(),
-      Language.PYTHON,
-      Stability.STABLE,
+      { language: Language.PYTHON, codegenVersion: CodeGenerationVersion.V4, stability: Stability.STABLE },
       runMode(options.force ?? true)
     );
 

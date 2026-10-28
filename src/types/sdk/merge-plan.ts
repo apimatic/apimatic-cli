@@ -285,4 +285,17 @@ export class MergePlan {
   public hasMarkers(path: RelativeFilePath): boolean {
     return this.conflicts.some((conflict) => conflict.path.isEqual(path) && leavesMarkers(conflict));
   }
+
+  /** What the developer does about the conflicts left in the files; `canAskLater` when a rerun could settle them instead. */
+  public nextSteps(canAskLater: boolean): NextStep[] {
+    return [
+      ...(this.hasMarkedConflicts() ? ['resolveMarked' as const] : []),
+      ...(this.hasUnmarkedConflicts() ? ['decideUnmarked' as const] : []),
+      'rerun',
+      ...(canAskLater ? ['orLetCliResolve' as const] : [])
+    ];
+  }
 }
+
+/** A step towards a clean rerun: resolve the marked files, decide each unmarked one, rerun, or let the CLI settle what is left. */
+export type NextStep = 'resolveMarked' | 'decideUnmarked' | 'rerun' | 'orLetCliResolve';

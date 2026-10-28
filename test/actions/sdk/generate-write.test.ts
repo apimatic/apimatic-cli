@@ -19,7 +19,8 @@ import { ProjectContext } from '../../../src/types/project-context.js';
 import { SdkContext } from '../../../src/types/sdk-context.js';
 import { GENERATED_MARKER, YOURS_MARKER } from '../../../src/types/sdk/conflict-markers.js';
 import { CodeGenerationVersion, Language, Stability } from '../../../src/types/sdk/generate.js';
-import { GenerationRecord, SdkGeneration } from '../../../src/types/sdk/generation-record.js';
+import { GenerationRecord } from '../../../src/types/sdk/generation-record.js';
+import { SdkGeneration } from '../../../src/types/sdk/sdk-generation.js';
 import { SdkPath } from '../../../src/types/sdk/sdk-path.js';
 import { SnapshotRef } from '../../../src/types/sdk/snapshot-ref.js';
 import { SnapshotStore } from '../../../src/types/sdk-repository/snapshot-store.js';
@@ -29,11 +30,11 @@ import { Files, runMode, stubSdkGeneration, writeFiles } from '../../helpers/sdk
 import { describeCommit, repositoryOf, snapshotFiles } from '../../helpers/snapshots.js';
 
 const COMMAND_METADATA: CommandMetadata = { commandName: 'sdk generate', shell: 'test' };
-const STABLE: SdkGeneration = {
+const STABLE = SdkGeneration.create({
   language: Language.PYTHON,
   codegenVersion: CodeGenerationVersion.V4,
   stability: Stability.STABLE
-};
+})!;
 
 const MODEL_V1 = [
   'class Book:',
@@ -70,8 +71,7 @@ describe('GenerateAction (sdk) — writing the SDK', () => {
     return new GenerateAction(new DirectoryPath(root), COMMAND_METADATA, 'auth-key').execute(
       ProjectContext.in(new DirectoryPath(root)),
       sdk(),
-      Language.PYTHON,
-      Stability.STABLE,
+      { language: Language.PYTHON, codegenVersion: CodeGenerationVersion.V4, stability: Stability.STABLE },
       runMode(force)
     );
   };
@@ -81,8 +81,7 @@ describe('GenerateAction (sdk) — writing the SDK', () => {
     writeFiles(sdk().toString(), files);
     (await git.init(new DirectoryPath(root)))._unsafeUnwrap();
     const repository = (await repositoryOf(sdk(), STABLE))!;
-    const tree = (await repository.snapshotGenerated(sdk()))._unsafeUnwrap();
-    (await repository.record(tree, STABLE))._unsafeUnwrap();
+    (await repository.recordFresh(sdk(), STABLE))._unsafeUnwrap();
     return { repository, base: (await git.resolveRef(rootDirectory(), pristineRef))._unsafeUnwrap()! };
   };
 
@@ -154,7 +153,7 @@ describe('GenerateAction (sdk) — writing the SDK', () => {
       expect((await execute({ 'README.md': '# sdk' })).isSuccess()).to.be.true;
 
       expect(read('README.md')).to.equal('# sdk');
-      expect(snapshotNotRecorded.firstCall.args).to.deep.equal(['git broke']);
+      expect(snapshotNotRecorded.firstCall.args).to.deep.equal([{ reason: 'git broke' }]);
     });
 
     it('fails with its own message, writing nothing, when the SDK directory cannot be made a repository', async () => {
@@ -168,7 +167,7 @@ describe('GenerateAction (sdk) — writing the SDK', () => {
 
       expect(fs.existsSync(path.join(sdk().toString(), 'README.md'))).to.be.false;
       expect(notInitialised.firstCall.args[0].isEqual(sdk())).to.be.true;
-      expect(notInitialised.firstCall.args[1]).to.equal('git broke');
+      expect(notInitialised.firstCall.args[1]).to.deep.equal({ reason: 'git broke' });
       expect(customCodeFailed.called).to.be.false;
     });
   });
@@ -248,7 +247,7 @@ describe('GenerateAction (sdk) — writing the SDK', () => {
 
       expect(result.isFailed()).to.be.true;
       expect(mergeNeedsResolving.calledOnce).to.be.true;
-      expect(conflictsNotStaged.firstCall.args[0]).to.equal('index locked');
+      expect(conflictsNotStaged.firstCall.args[0]).to.deep.equal({ reason: 'index locked' });
       expect(conflicts.called).to.be.true;
       expect(read('models/book.py')).to.contain(YOURS_MARKER);
     });
@@ -285,7 +284,7 @@ describe('GenerateAction (sdk) — writing the SDK', () => {
 
       expect(read('README.md')).to.equal('# edited');
       expect(record().pristineCommit().isEqual(base)).to.be.true;
-      expect(customCodeFailed.firstCall.args[0]).to.equal('git broke');
+      expect(customCodeFailed.firstCall.args[0]).to.deep.equal({ reason: 'git broke' });
     });
   });
 
@@ -444,7 +443,13 @@ describe('GenerateAction (sdk) — writing the SDK', () => {
     it('shows the one step when git runs hooks from elsewhere, and still succeeds', async () => {
       const file = new FilePath(new DirectoryPath(root), new FileName('pre-push'));
       const script = new FilePath(new DirectoryPath(root), new FileName('apimatic-pre-push'));
-      const needed = { kind: 'elsewhere' as const, file, hooksPath: '.husky/_', inRepository: true, script };
+      const needed = {
+        kind: 'elsewhere' as const,
+        file,
+        runFrom: new DirectoryPath(root).join('.husky', '_'),
+        script,
+        steps: ['addCall' as const, 'commit' as const]
+      };
       sinon.stub(SdkRepositoryContext.prototype, 'record').resolves(ok(needed));
       const shareHookNeedsOneStep = sinon.stub(SdkGeneratePrompts.prototype, 'shareHookNeedsOneStep');
 
@@ -461,7 +466,7 @@ describe('GenerateAction (sdk) — writing the SDK', () => {
 
       expect((await recordOne()).isSuccess()).to.be.true;
 
-      expect(shareHookNotInstalled.firstCall.args[0]).to.equal('EACCES: permission denied');
+      expect(shareHookNotInstalled.firstCall.args[0]).to.deep.equal({ reason: 'EACCES: permission denied' });
     });
   });
 });

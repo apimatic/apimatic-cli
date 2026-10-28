@@ -10,7 +10,7 @@ import { RelativeFilePath } from '../../../src/types/file/relativeFilePath.js';
 import { ConflictKind, MergePlan } from '../../../src/types/sdk/merge-plan.js';
 import { CodeGenerationVersion, Stability } from '../../../src/types/sdk/generate.js';
 import { RemoteName } from '../../../src/types/git/remote-name.js';
-import { SdkGeneration } from '../../../src/types/sdk/generation-record.js';
+import { SdkGeneration } from '../../../src/types/sdk/sdk-generation.js';
 
 describe('SdkGeneratePrompts.languageNotAvailable', () => {
   const prompts = new SdkGeneratePrompts();
@@ -171,11 +171,11 @@ describe('SdkGeneratePrompts.sdkMerged', () => {
 
 describe('SdkGeneratePrompts.recordNotForThisGeneration', () => {
   const sdk = new DirectoryPath(process.cwd()).join('sdk', 'python');
-  const stable: SdkGeneration = {
+  const stable = SdkGeneration.create({
     language: Language.PYTHON,
     codegenVersion: CodeGenerationVersion.V4,
     stability: Stability.STABLE
-  };
+  })!;
 
   afterEach(() => {
     sinon.restore();
@@ -184,7 +184,15 @@ describe('SdkGeneratePrompts.recordNotForThisGeneration', () => {
   it('advises the recorded stability when that is what sets the two apart', () => {
     const warn = sinon.stub(log, 'warn');
 
-    new SdkGeneratePrompts().recordNotForThisGeneration(stable, { ...stable, stability: Stability.BETA }, sdk);
+    new SdkGeneratePrompts().recordNotForThisGeneration(
+      stable,
+      SdkGeneration.create({
+        language: Language.PYTHON,
+        codegenVersion: CodeGenerationVersion.V4,
+        stability: Stability.BETA
+      })!,
+      sdk
+    );
 
     expect(stripVTControlCharacters(warn.firstCall.args[0])).to.equal(
       "'./sdk/python' holds a stable python SDK; a beta python SDK cannot be merged into it. " +
@@ -195,7 +203,15 @@ describe('SdkGeneratePrompts.recordNotForThisGeneration', () => {
   it('advises another directory for another language', () => {
     const warn = sinon.stub(log, 'warn');
 
-    new SdkGeneratePrompts().recordNotForThisGeneration(stable, { ...stable, language: Language.TYPESCRIPT }, sdk);
+    new SdkGeneratePrompts().recordNotForThisGeneration(
+      stable,
+      SdkGeneration.create({
+        language: Language.TYPESCRIPT,
+        codegenVersion: CodeGenerationVersion.V4,
+        stability: Stability.STABLE
+      })!,
+      sdk
+    );
 
     expect(stripVTControlCharacters(warn.firstCall.args[0])).to.equal(
       "'./sdk/python' holds a stable python SDK; a stable typescript SDK cannot be merged into it. " +
@@ -212,8 +228,8 @@ describe('SdkGeneratePrompts.snapshotNotRecorded', () => {
   it('says what the next run does without the record: replace, or merge against the one before', () => {
     const warn = sinon.stub(log, 'warn');
 
-    new SdkGeneratePrompts().snapshotNotRecorded('git broke');
-    new SdkGeneratePrompts().snapshotNotRecordedAfterMerge('git broke');
+    new SdkGeneratePrompts().snapshotNotRecorded({ reason: 'git broke' });
+    new SdkGeneratePrompts().snapshotNotRecordedAfterMerge({ reason: 'git broke' });
 
     expect(stripVTControlCharacters(warn.firstCall.args[0])).to.equal(
       'The SDK was written, but its snapshot could not be recorded: git broke\n' +

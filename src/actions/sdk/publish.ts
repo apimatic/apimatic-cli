@@ -8,7 +8,7 @@ import { PublishType } from '../../types/publish-api/publishing-profile-item.js'
 import { PublishingInfo } from '../../types/publish-api/publishing-info.js';
 import { ProfileId } from '../../types/publish/profile-id.js';
 import { SemVersion } from '../../types/publish/version.js';
-import { Language, Stability } from '../../types/sdk/generate.js';
+import { GenerationRequest } from '../../types/sdk/sdk-generation.js';
 import { RunMode } from '../../types/sdk/write-mode.js';
 import { PublishingProfile } from '../../types/publish/publishing-profile.js';
 import { PackageSettingsContext } from '../../types/package-settings-context.js';
@@ -29,17 +29,17 @@ export class SdkPublishAction {
   public readonly execute = async (
     project: ProjectContext,
     sdkDirectory: DirectoryPath,
-    language: Language,
+    requested: GenerationRequest,
     publishType: PublishType[],
     run: RunMode,
     profileId: ProfileId,
     semVersion: SemVersion,
     publishingProfile: PublishingProfile,
     dryRun: boolean,
-    stability: Stability,
     publishingSummary: string,
     onPublishSdkError: (errorMessage: string) => void
   ): Promise<ActionResult> => {
+    const { language } = requested;
     const publishResult = await withDirPath(async (tempDirectory): Promise<ActionResult<PublishingInfo>> => {
       const packageConfigurationData = publishingProfile.getPackageConfigurationDataForLanguage(language);
       let packageSettingsDirectory: DirectoryPath | undefined;
@@ -54,8 +54,7 @@ export class SdkPublishAction {
       const sdkGenerationResult = await sdkGenerateAction.execute(
         project,
         sdkDirectory,
-        language,
-        stability,
+        requested,
         run,
         packageSettingsDirectory
       );

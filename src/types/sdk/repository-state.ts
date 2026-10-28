@@ -6,8 +6,8 @@ import { GitOperation } from '../git/git-operation.js';
 import { StageEntry } from '../git/merge-tree.js';
 import { RemoteName } from '../git/remote-name.js';
 import { TreeId } from '../git/tree-id.js';
-import { SdkGeneration } from './generation-record.js';
 import { MergePlan } from './merge-plan.js';
+import { SdkGeneration } from './sdk-generation.js';
 import { SnapshotRef } from './snapshot-ref.js';
 
 /** A file the run could not write or remove; what it had changed is put back from the previous snapshot, else that snapshot is named. */
@@ -51,14 +51,23 @@ export type SdkRepositoryState =
   | { kind: 'unresolved'; paths: RelativeFilePath[] }
   | { kind: 'ready'; base: CommitId };
 
+/** What the developer does so the hook shares snapshots: add the call to the hook file, and commit it where it is in the repository. */
+export type ShareHookStep = 'addCall' | 'commit';
+
 /**
  * The hook runs the script (`written` when this run put the call there), or the one line to add
- * to `file`: because git runs hooks from `hooksPath`, or because the hook there is not a shell script.
+ * to `file`: because git runs hooks from `runFrom`, or because the hook there is not a shell script.
  */
 export type ShareHookInstall =
   | { kind: 'installed'; file: FilePath; written: boolean }
-  | { kind: 'elsewhere'; file: FilePath; hooksPath: string; inRepository: boolean; script: FilePath }
-  | { kind: 'notShell'; file: FilePath; shebang: string; script: FilePath };
+  | { kind: 'elsewhere'; file: FilePath; runFrom: DirectoryPath; script: FilePath; steps: readonly ShareHookStep[] }
+  | { kind: 'notShell'; file: FilePath; shebang: string; script: FilePath; steps: readonly ShareHookStep[] };
+
+export type ShareHookNeedsOneStep = Exclude<ShareHookInstall, { kind: 'installed' }>;
+
+/** The git command that puts the SDK directory back as the previous snapshot has it; `workTree` spelt as the developer will type it. */
+export const restoreCommand = (workTree: string, previous: SnapshotRef): string =>
+  `git --work-tree=${workTree} restore --source=${previous} --worktree -- .`;
 
 /** Which step of recording a generation did not happen, in git's or the file system's words: the snapshot with its record, or the hook that shares them. */
 export type RecordProblem = { step: 'snapshot' | 'hook'; reason: string };

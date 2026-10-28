@@ -140,6 +140,7 @@ export default class SdkPublish extends Command {
           force,
           dryRun,
           StabilityChoice.for(language as Language, stability),
+          codegenVersion as CodeGenerationVersion,
           onPublishSdkError,
           profileId,
           version

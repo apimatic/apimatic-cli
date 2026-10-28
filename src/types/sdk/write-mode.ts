@@ -1,6 +1,6 @@
 import { CommitId } from '../git/commit-id.js';
 import { GitVersion } from '../git/git-version.js';
-import { SdkGeneration } from './generation-record.js';
+import { SdkGeneration } from './sdk-generation.js';
 import { SnapshotFetch } from './repository-state.js';
 import { replacesDirectory, SdkDestination, Unresolved } from './sdk-destination.js';
 

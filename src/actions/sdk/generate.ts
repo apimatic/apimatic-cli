@@ -6,10 +6,11 @@ import { withDirPath } from '../../infrastructure/tmp-extensions.js';
 import { SdkGeneratePrompts } from '../../prompts/sdk/generate.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { TempContext } from '../../types/temp-context.js';
-import { codegenVersionFor, isAvailableLanguage, Language, Stability } from '../../types/sdk/generate.js';
+import { isAvailableLanguage } from '../../types/sdk/generate.js';
 import { ProjectContext } from '../../types/project-context.js';
 import { SdkContext } from '../../types/sdk-context.js';
-import { SdkGeneration } from '../../types/sdk/generation-record.js';
+import { recordingNotice } from '../../types/sdk/recording-notice.js';
+import { GenerationRequest, SdkGeneration } from '../../types/sdk/sdk-generation.js';
 import { favouring, resolving } from '../../types/sdk/settlement.js';
 import { creating, noticeFor, RunMode, writeModeFor } from '../../types/sdk/write-mode.js';
 
@@ -29,13 +30,17 @@ export class GenerateAction {
   public readonly execute = async (
     project: ProjectContext,
     sdk: DirectoryPath,
-    language: Language,
-    stability: Stability,
+    requested: GenerationRequest,
     run: RunMode,
     packageSettingsDirectory?: DirectoryPath
   ): Promise<ActionResult> => {
-    if (!isAvailableLanguage(language)) {
-      this.prompts.languageNotAvailable(language);
+    if (!isAvailableLanguage(requested.language)) {
+      this.prompts.languageNotAvailable(requested.language);
+      return ActionResult.failed();
+    }
+    const generation = SdkGeneration.create(requested);
+    if (generation === undefined) {
+      this.prompts.generationNotOffered(requested);
       return ActionResult.failed();
     }
     const sourceDirectory = project.sourceDirectory();
@@ -54,8 +59,6 @@ export class GenerateAction {
     }
 
     const sdkContext = new SdkContext(sdk);
-    const generation: SdkGeneration = { language, codegenVersion: codegenVersionFor(language, stability), stability };
-
     const inspected = await sdkContext.destination(generation);
     const unresolved =
       inspected.isOk() && inspected.value.kind === 'unresolved' && run.interaction === 'ask'
@@ -69,7 +72,7 @@ export class GenerateAction {
       }
       const settled = await unresolved.repository.settleUnresolved(choice, unresolved.paths);
       if (settled.isErr()) {
-        this.prompts.conflictsNotSettled(settled.error.reason);
+        this.prompts.conflictsNotSettled(settled.error);
         return ActionResult.failed();
       }
       this.prompts.conflictsResolved(choice, unresolved.paths, sdk);
@@ -112,8 +115,8 @@ export class GenerateAction {
       const response = await this.prompts.generateSdk(
         this.sdkGenerationService.generateSdk(
           build.value,
-          language,
-          stability,
+          generation.language,
+          generation.stability,
           this.configDir,
           this.commandMetadata,
           this.authKey
@@ -141,30 +144,15 @@ export class GenerateAction {
         case 'record': {
           const opened = mode.kind === 'init' ? await sdkContext.initRepository() : ok(mode.repository);
           if (opened.isErr()) {
-            this.prompts.repositoryNotInitialised(sdk, opened.error.reason);
+            this.prompts.repositoryNotInitialised(sdk, opened.error);
             return ActionResult.failed();
           }
-          const repository = opened.value;
           await sdkContext.save(tempSdk);
           if (mode.kind === 'init') {
             this.prompts.repositoryInitialised(sdk);
           }
-          const generated = await repository.snapshotGenerated(tempSdk);
-          if (generated.isErr()) {
-            this.prompts.snapshotNotRecorded(generated.error.reason);
-            this.prompts.sdkGenerated(sdk);
-            return ActionResult.success();
-          }
-          const recorded = await repository.record(generated.value, generation);
-          if (recorded.isErr() && recorded.error.step === 'snapshot') {
-            this.prompts.snapshotNotRecorded(recorded.error.reason);
-          } else if (recorded.isErr()) {
-            this.prompts.shareHookNotInstalled(recorded.error.reason);
-          } else if (recorded.value.kind !== 'installed') {
-            this.prompts.shareHookNeedsOneStep(recorded.value);
-          } else if (recorded.value.written) {
-            this.prompts.shareHookInstalled(recorded.value.file);
-          }
+          const recorded = await opened.value.recordFresh(tempSdk, generation);
+          this.prompts.recorded(recordingNotice(recorded, 'fresh'));
           this.prompts.sdkGenerated(sdk);
           return ActionResult.success();
         }
@@ -172,7 +160,7 @@ export class GenerateAction {
           const { repository, base } = mode;
           const regenerated = await repository.regenerate(base, tempSdk);
           if (regenerated.isErr()) {
-            this.prompts.customCodeFailed(regenerated.error.reason);
+            this.prompts.customCodeFailed(regenerated.error);
             return ActionResult.failed();
           }
           const regeneration = regenerated.value;
@@ -193,20 +181,12 @@ export class GenerateAction {
             if ('kind' in written.error) {
               this.prompts.sdkNotWritten(sdk, written.error);
             } else {
-              this.prompts.customCodeFailed(written.error.reason);
+              this.prompts.customCodeFailed(written.error);
             }
             return ActionResult.failed();
           }
           const recorded = await repository.record(regeneration.generated, generation);
-          if (recorded.isErr() && recorded.error.step === 'snapshot') {
-            this.prompts.snapshotNotRecordedAfterMerge(recorded.error.reason);
-          } else if (recorded.isErr()) {
-            this.prompts.shareHookNotInstalled(recorded.error.reason);
-          } else if (recorded.value.kind !== 'installed') {
-            this.prompts.shareHookNeedsOneStep(recorded.value);
-          } else if (recorded.value.written) {
-            this.prompts.shareHookInstalled(recorded.value.file);
-          }
+          this.prompts.recorded(recordingNotice(recorded, 'merge'));
           if (settlement.settled !== undefined) {
             this.prompts.conflictsResolved(settlement.settled.side, settlement.settled.paths, sdk);
           }
@@ -216,12 +196,13 @@ export class GenerateAction {
           }
           const staged = await repository.stageConflicts(regeneration);
           if (staged.isErr()) {
-            this.prompts.conflictsNotStaged(staged.error.reason);
+            this.prompts.conflictsNotStaged(staged.error);
           }
+          const steps = settlement.plan.nextSteps(mode.onConflict === 'ask');
           if (mode.onConflict === 'ask') {
-            this.prompts.conflictSteps(settlement.plan);
+            this.prompts.conflictSteps(steps);
           } else {
-            this.prompts.conflicts(settlement.plan, sdk);
+            this.prompts.conflicts(settlement.plan, sdk, steps);
           }
           this.prompts.mergeNeedsResolving();
           return ActionResult.failed();

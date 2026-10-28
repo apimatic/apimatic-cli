@@ -12,7 +12,8 @@ import { RemoteName } from '../../src/types/git/remote-name.js';
 import { SdkContext } from '../../src/types/sdk-context.js';
 import { SdkRepositoryContext } from '../../src/types/sdk-repository-context.js';
 import { CodeGenerationVersion, Language, Stability } from '../../src/types/sdk/generate.js';
-import { GenerationRecord, RECORD_ATTRIBUTES, SdkGeneration } from '../../src/types/sdk/generation-record.js';
+import { GenerationRecord, RECORD_ATTRIBUTES } from '../../src/types/sdk/generation-record.js';
+import { SdkGeneration } from '../../src/types/sdk/sdk-generation.js';
 import { SHARE_HOOK_BLOCK, SHARE_HOOK_CALL, SHARE_HOOK_SCRIPT } from '../../src/types/sdk/share-hook.js';
 import { SdkPath } from '../../src/types/sdk/sdk-path.js';
 import { SnapshotRef } from '../../src/types/sdk/snapshot-ref.js';
@@ -21,11 +22,11 @@ import { describeCommit, recordPristine, snapshotFiles } from '../helpers/snapsh
 /** A ref onto itself, as `git push` and `git fetch` take it. */
 const refspec = (ref: SnapshotRef): string => `${ref}:${ref}`;
 
-const TYPESCRIPT: SdkGeneration = {
+const TYPESCRIPT = SdkGeneration.create({
   language: Language.TYPESCRIPT,
   codegenVersion: CodeGenerationVersion.V4,
   stability: Stability.STABLE
-};
+})!;
 
 const rel = (value: string) => RelativeFilePath.fromGit(value)!;
 
@@ -237,9 +238,8 @@ describe('SdkRepositoryContext', () => {
   describe('the generation record', () => {
     it('is written beside the snapshot, naming it, and found by the next inspection', async () => {
       const sdk = await project();
-      const tree = (await sdk.repository.snapshotGenerated(generated({ 'README.md': '# v1' })))._unsafeUnwrap();
 
-      (await sdk.repository.record(tree, TYPESCRIPT))._unsafeUnwrap();
+      (await sdk.repository.recordFresh(generated({ 'README.md': '# v1' }), TYPESCRIPT))._unsafeUnwrap();
 
       const written = GenerationRecord.parse(fs.readFileSync(recordFile(sdk), 'utf8'))!;
       expect(written.isFor(TYPESCRIPT)).to.be.true;
@@ -259,9 +259,8 @@ describe('SdkRepositoryContext', () => {
 
     it('is written with attributes that merge it as binary and mark it generated', async () => {
       const sdk = await project();
-      const tree = (await sdk.repository.snapshotGenerated(generated({ 'README.md': '# v1' })))._unsafeUnwrap();
 
-      (await sdk.repository.record(tree, TYPESCRIPT))._unsafeUnwrap();
+      (await sdk.repository.recordFresh(generated({ 'README.md': '# v1' }), TYPESCRIPT))._unsafeUnwrap();
 
       const attributes = path.join(sdk.directory.toString(), '.apimatic', '.gitattributes');
       expect(fs.readFileSync(attributes, 'utf8')).to.equal(RECORD_ATTRIBUTES);
@@ -289,8 +288,7 @@ describe('SdkRepositoryContext', () => {
         const sdk = path.join(project, 'sdk', 'typescript');
         const projectRoot = new DirectoryPath(project);
         const repository = SdkRepositoryContext.create(projectRoot, SdkPath.of(projectRoot, new DirectoryPath(sdk))!);
-        const tree = (await repository.snapshotGenerated(generated(files)))._unsafeUnwrap();
-        (await repository.record(tree, TYPESCRIPT))._unsafeUnwrap();
+        (await repository.recordFresh(generated(files), TYPESCRIPT))._unsafeUnwrap();
         await sh(project, 'add', '-A');
         await sh(project, 'commit', '-qm', message);
         return fs.readFileSync(path.join(sdk, '.apimatic', 'generation.json'), 'utf8');
@@ -353,7 +351,10 @@ describe('SdkRepositoryContext', () => {
     it('finds a record for another generation', async () => {
       const sdk = await project();
       const pristine = (await record(sdk, { 'README.md': '# v1' }))._unsafeUnwrap();
-      await writeRecord(sdk, GenerationRecord.written({ ...TYPESCRIPT, stability: Stability.BETA }, pristine));
+      await writeRecord(
+        sdk,
+        GenerationRecord.written(SdkGeneration.create({ ...TYPESCRIPT, stability: Stability.BETA })!, pristine)
+      );
 
       const state = (await sdk.repository.inspect(TYPESCRIPT))._unsafeUnwrap();
 
@@ -481,8 +482,7 @@ describe('SdkRepositoryContext', () => {
 
     /** A recorded generation, committed and pushed on `main`, as a developer leaves a project for a teammate. */
     const published = async (sdk: Sdk): Promise<CommitId> => {
-      const tree = (await sdk.repository.snapshotGenerated(generated({ 'README.md': '# v1' })))._unsafeUnwrap();
-      (await sdk.repository.record(tree, TYPESCRIPT))._unsafeUnwrap();
+      (await sdk.repository.recordFresh(generated({ 'README.md': '# v1' }), TYPESCRIPT))._unsafeUnwrap();
       await sh(sdk.root, 'add', '.');
       await sh(sdk.root, 'commit', '-qm', 'sdk');
       // Hooks skipped, as a tool that bypasses them pushes, so the snapshots are not shared.
@@ -595,8 +595,7 @@ describe('SdkRepositoryContext', () => {
 
     /** Records a generation of `files`, which puts the hook in place; what became of the hook. */
     const install = async (sdk: Sdk, files = { 'README.md': '# v1' }) => {
-      const tree = (await sdk.repository.snapshotGenerated(generated(files)))._unsafeUnwrap();
-      return (await sdk.repository.record(tree, TYPESCRIPT))._unsafeUnwrap();
+      return (await sdk.repository.recordFresh(generated(files), TYPESCRIPT))._unsafeUnwrap();
     };
 
     /**
@@ -650,8 +649,10 @@ describe('SdkRepositoryContext', () => {
 
       const plain = await install(sdk);
 
-      expect(plain.kind === 'elsewhere' && plain.hooksPath).to.equal('.githooks');
-      expect(plain.kind === 'elsewhere' && plain.inRepository).to.be.true;
+      expect(plain.kind === 'elsewhere' && plain.runFrom.toString()).to.equal(
+        path.join(sdk.root.toString(), '.githooks')
+      );
+      expect(plain.kind === 'elsewhere' && plain.steps).to.deep.equal(['addCall', 'commit']);
       expect(plain.kind === 'elsewhere' && plain.file.toString()).to.equal(
         path.join(sdk.root.toString(), '.githooks', 'pre-push')
       );
@@ -679,7 +680,7 @@ describe('SdkRepositoryContext', () => {
         expect(needed.kind === 'elsewhere' && needed.file.toString()).to.equal(
           path.join(home, '.githooks', 'pre-push')
         );
-        expect(needed.kind === 'elsewhere' && needed.inRepository).to.be.false;
+        expect(needed.kind === 'elsewhere' && needed.steps).to.deep.equal(['addCall']);
         expect(fs.existsSync(path.join(sdk.root.toString(), '~'))).to.be.false;
 
         write(new DirectoryPath(home), path.join('.githooks', 'pre-push'), `#!/bin/sh\n${SHARE_HOOK_CALL}\n`);

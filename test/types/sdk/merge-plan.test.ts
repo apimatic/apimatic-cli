@@ -320,3 +320,24 @@ describe('MergePlan.from', () => {
     expect(marks()).to.deep.equal([false, false]);
   });
 });
+
+describe('MergePlan.nextSteps', () => {
+  const planWith = (kinds: ConflictKind[]) =>
+    new MergePlan(
+      [],
+      [],
+      kinds.map((kind, index) => ({ path: rel(`${index}.ts`), kind })),
+      MergePlan.from(inputs({})).files
+    );
+
+  it('names a step for the marked files, one for the unmarked, the rerun, and the offer only when a rerun could ask', () => {
+    expect(planWith(['bothChanged', 'deletedByYou']).nextSteps(true)).to.deep.equal([
+      'resolveMarked',
+      'decideUnmarked',
+      'rerun',
+      'orLetCliResolve'
+    ]);
+    expect(planWith(['bothChanged']).nextSteps(false)).to.deep.equal(['resolveMarked', 'rerun']);
+    expect(planWith(['noLongerGenerated']).nextSteps(false)).to.deep.equal(['decideUnmarked', 'rerun']);
+  });
+});

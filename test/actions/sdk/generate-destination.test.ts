@@ -16,7 +16,8 @@ import { GitVersion } from '../../../src/types/git/git-version.js';
 import { RemoteName } from '../../../src/types/git/remote-name.js';
 import { ProjectContext } from '../../../src/types/project-context.js';
 import { CodeGenerationVersion, Language, Stability } from '../../../src/types/sdk/generate.js';
-import { GenerationRecord, SdkGeneration } from '../../../src/types/sdk/generation-record.js';
+import { GenerationRecord } from '../../../src/types/sdk/generation-record.js';
+import { SdkGeneration } from '../../../src/types/sdk/sdk-generation.js';
 import { SdkPath } from '../../../src/types/sdk/sdk-path.js';
 import { SnapshotRef } from '../../../src/types/sdk/snapshot-ref.js';
 import { SdkRepositoryContext } from '../../../src/types/sdk-repository-context.js';
@@ -28,11 +29,11 @@ import { repositoryOf } from '../../helpers/snapshots.js';
 const refspec = (ref: SnapshotRef): string => `${ref}:${ref}`;
 
 const COMMAND_METADATA: CommandMetadata = { commandName: 'sdk generate', shell: 'test' };
-const STABLE: SdkGeneration = {
+const STABLE = SdkGeneration.create({
   language: Language.PYTHON,
   codegenVersion: CodeGenerationVersion.V4,
   stability: Stability.STABLE
-};
+})!;
 const GENERATED: Files = { 'README.md': '# sdk' };
 
 /** How the SDK directory is written: decided before the upload, from git and what the directory holds. */
@@ -60,8 +61,11 @@ describe('GenerateAction (sdk) — the destination', () => {
     return new GenerateAction(new DirectoryPath(project), COMMAND_METADATA, 'auth-key').execute(
       ProjectContext.in(new DirectoryPath(project)),
       options.destination ?? sdk(),
-      Language.PYTHON,
-      options.stability ?? Stability.STABLE,
+      {
+        language: Language.PYTHON,
+        codegenVersion: CodeGenerationVersion.V4,
+        stability: options.stability ?? Stability.STABLE
+      },
       runMode(options.force ?? true)
     );
   };
@@ -71,8 +75,7 @@ describe('GenerateAction (sdk) — the destination', () => {
     writeFiles(sdk().toString(), files);
     (await git.init(new DirectoryPath(root)))._unsafeUnwrap();
     const repository = (await repositoryOf(sdk(), STABLE))!;
-    const tree = (await repository.snapshotGenerated(sdk()))._unsafeUnwrap();
-    (await repository.record(tree, STABLE))._unsafeUnwrap();
+    (await repository.recordFresh(sdk(), STABLE))._unsafeUnwrap();
     return repository;
   };
 
@@ -509,8 +512,7 @@ describe('GenerateAction (sdk) — the destination', () => {
         writeFiles(published, GENERATED);
         (await git.init(new DirectoryPath(published)))._unsafeUnwrap();
         const repository = (await repositoryOf(new DirectoryPath(published), STABLE))!;
-        const tree = (await repository.snapshotGenerated(new DirectoryPath(published)))._unsafeUnwrap();
-        (await repository.record(tree, STABLE))._unsafeUnwrap();
+        (await repository.recordFresh(new DirectoryPath(published), STABLE))._unsafeUnwrap();
         const base = GenerationRecord.parse(
           fs.readFileSync(path.join(published, '.apimatic/generation.json'), 'utf8')
         )!.pristineCommit();

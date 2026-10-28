@@ -5,7 +5,7 @@ import { CommandMetadata } from '../../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../../types/file/directoryPath.js';
 import { PublishingProfileItem, PublishType } from '../../../types/publish-api/publishing-profile-item.js';
 import { PublishingProfile } from '../../../types/publish/publishing-profile.js';
-import { Language } from '../../../types/sdk/generate.js';
+import { CodeGenerationVersion, Language } from '../../../types/sdk/generate.js';
 import { StabilityChoice } from '../../../types/sdk/stability-choice.js';
 import { ActionResult } from '../../action-result.js';
 import { SemVersion } from '../../../types/publish/version.js';
@@ -28,6 +28,7 @@ export class SdkPublishNonInteractiveAction {
     force: boolean,
     dryRun: boolean,
     stability: StabilityChoice,
+    codegenVersion: CodeGenerationVersion,
     onPublishSdkError: (errorMessage: string) => void,
     profileId?: string,
     version?: string
@@ -114,14 +115,13 @@ export class SdkPublishNonInteractiveAction {
     const publishResult = await new SdkPublishAction(this.configDir, this.commandMetadata).execute(
       project,
       sdkDirectory,
-      language,
+      { language, codegenVersion, stability: stability.stabilityLevel() },
       publishTypes,
       { force, interaction: 'never' },
       publishingProfileId,
       semVersion,
       publishingProfile,
       dryRun,
-      stability.stabilityLevel(),
       publishingSummary,
       onPublishSdkError
     );

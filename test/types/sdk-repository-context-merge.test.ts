@@ -10,10 +10,11 @@ import { FileService } from '../../src/infrastructure/file-service.js';
 import { GitService } from '../../src/infrastructure/git-service.js';
 import { DirectoryPath } from '../../src/types/file/directoryPath.js';
 import { CodeGenerationVersion, Language, Stability } from '../../src/types/sdk/generate.js';
-import { SdkGeneration } from '../../src/types/sdk/generation-record.js';
+import { SdkGeneration } from '../../src/types/sdk/sdk-generation.js';
 import { GENERATED_MARKER, YOURS_MARKER } from '../../src/types/sdk/conflict-markers.js';
 import { ConflictSide, MergePlan } from '../../src/types/sdk/merge-plan.js';
 import { SdkRepositoryContext } from '../../src/types/sdk-repository-context.js';
+import { SnapshotStore } from '../../src/types/sdk-repository/snapshot-store.js';
 import { WriteProblem } from '../../src/types/sdk/repository-state.js';
 import { SdkPath } from '../../src/types/sdk/sdk-path.js';
 import { SnapshotRef } from '../../src/types/sdk/snapshot-ref.js';
@@ -22,11 +23,11 @@ import { recordPristine } from '../helpers/snapshots.js';
 /** The ref a run keeps the directory under before writing, for the SDK every test here generates. */
 const PREVIOUS_REF = SnapshotRef.previous(SdkPath.fromGit('sdk/typescript')!);
 
-const TYPESCRIPT: SdkGeneration = {
+const TYPESCRIPT = SdkGeneration.create({
   language: Language.TYPESCRIPT,
   codegenVersion: CodeGenerationVersion.V4,
   stability: Stability.STABLE
-};
+})!;
 
 type Files = Record<string, string | Buffer>;
 
@@ -113,8 +114,13 @@ describe('SdkRepositoryContext: the merge', () => {
     write(generatedDirectory, generated);
     const baseCommit = (await recordPristine(project, sdk, baseDirectory, TYPESCRIPT))._unsafeUnwrap();
     const regeneration = (await repository.regenerate(baseCommit, generatedDirectory))._unsafeUnwrap();
-    expect(regeneration.generated.isEqual((await repository.snapshotGenerated(generatedDirectory))._unsafeUnwrap())).to
-      .be.true;
+    expect(
+      regeneration.generated.isEqual(
+        (
+          await new SnapshotStore(project, SdkPath.of(project, sdk)!).snapshotGenerated(generatedDirectory)
+        )._unsafeUnwrap()
+      )
+    ).to.be.true;
     const plan = favour === undefined ? regeneration.merge.plan : regeneration.merge.plan.taking(favour);
     beforeWrite?.();
     const written = await repository.write(baseCommit, { regeneration, plan }, generatedDirectory);

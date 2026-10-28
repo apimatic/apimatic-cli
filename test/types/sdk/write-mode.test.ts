@@ -3,11 +3,16 @@ import { CommitId } from '../../../src/types/git/commit-id.js';
 import { GitVersion } from '../../../src/types/git/git-version.js';
 import { CodeGenerationVersion, Language, Stability } from '../../../src/types/sdk/generate.js';
 import { SdkDestination } from '../../../src/types/sdk/sdk-destination.js';
+import { SdkGeneration } from '../../../src/types/sdk/sdk-generation.js';
 import { creating, noticeFor, RunMode, writeModeFor } from '../../../src/types/sdk/write-mode.js';
 
 const repository = 'the repository';
 const base = CommitId.fromGit('a'.repeat(40))!;
-const recorded = { language: Language.PYTHON, codegenVersion: CodeGenerationVersion.V4, stability: Stability.BETA };
+const recorded = SdkGeneration.create({
+  language: Language.PYTHON,
+  codegenVersion: CodeGenerationVersion.V4,
+  stability: Stability.BETA
+})!;
 
 const ASKING: RunMode = { force: false, interaction: 'ask' };
 const SILENT: RunMode = { force: false, interaction: 'never' };
