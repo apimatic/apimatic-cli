@@ -84,7 +84,7 @@ describe('the Ask AI client', () => {
       let failed = false;
       await client.fetch(client.chatAddress(), {}).catch(() => (failed = true));
       expect(failed, code).to.be.true;
-      expect(turnedAway, code).to.equal(null);
+      expect(turnedAway, code).to.be.null;
     }
   });
 
@@ -120,7 +120,7 @@ describe('the Ask AI client', () => {
       let turnedAway: LapsedPlan | null | undefined;
       const client = new CopilotClient(COPILOT, (lapsed) => (turnedAway = lapsed), service(json(body, 403)).send);
       await client.prepare();
-      expect(turnedAway, JSON.stringify(body)).to.equal(null);
+      expect(turnedAway, JSON.stringify(body)).to.be.null;
     }
   });
 
