@@ -69,5 +69,5 @@ export async function resolveAuthKey(configDir: DirectoryPath, passed: string | 
     return flagged;
   }
   const saved = (await getAuthInfo(configDir.toString()))?.authKey;
-  return saved ? saved : null;
+  return saved || null;
 }
