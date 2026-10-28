@@ -19,14 +19,12 @@ export function checkAskAiSubscription(fn: Promise<Result<AccountEntitlements, P
 
 /** Shared by the commands that call the service's portal routes. */
 export function reportServiceFailure(error: ServiceError, service: ServiceAddress) {
-  switch (error.code) {
-    case ServiceErrorCode.NetworkError:
-      log.error(
-        `The Ask AI service at ${f.link(service.toString())} could not be reached. Check your connection, or ` +
-          `${f.var(COPILOT_URL_VARIABLE)} if you set it, and try again.`
-      );
-      return;
-    default:
-      log.error(error.errorMessage);
+  if (error.code === ServiceErrorCode.NetworkError) {
+    log.error(
+      `The Ask AI service at ${f.link(service.toString())} could not be reached. Check your connection, or ` +
+        `${f.var(COPILOT_URL_VARIABLE)} if you set it, and try again.`
+    );
+    return;
   }
+  log.error(error.errorMessage);
 }
