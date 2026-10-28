@@ -12,33 +12,21 @@ import { SdkPath } from '../types/sdk/sdk-path.js';
 import { FileName } from '../types/file/fileName.js';
 import { FilePath } from '../types/file/filePath.js';
 import { CommitId } from '../types/git/commit-id.js';
+import { GitOperation, OPERATIONS } from '../types/git/git-operation.js';
+import { GitProblem } from '../types/git/git-problem.js';
 import { GitVersion } from '../types/git/git-version.js';
 import { Change, MergeMessage, MergeTreeOutput, parseStageEntry, StageEntry } from '../types/git/merge-tree.js';
+import { TreeEntry } from '../types/git/tree-entry.js';
 import { TreeId } from '../types/git/tree-id.js';
 import { SnapshotRef } from '../types/sdk/snapshot-ref.js';
 import { errorMessage } from '../utils/error-utils.js';
 import { withDirPath } from './tmp-extensions.js';
-
-export type TreeEntry = { mode: string; type: 'blob' | 'tree' | 'commit'; oid: string; path: RelativeFilePath };
-
-/** What went wrong with a git command: git's own words where it said any. */
-export type GitProblem = { reason: string };
 
 /** A remote that does not answer within this is reported, not waited for. */
 const REMOTE_TIMEOUT_MS = 30_000;
 
 // A git hook runs the CLI with its own repository in the environment; every command here is about the one it is given.
 const OWN_REPOSITORY = { GIT_DIR: undefined, GIT_WORK_TREE: undefined, GIT_INDEX_FILE: undefined };
-
-/** An operation git is in the middle of, by the file it leaves in the repository while it is. */
-const OPERATIONS = {
-  MERGE_HEAD: 'merge',
-  REBASE_HEAD: 'rebase',
-  CHERRY_PICK_HEAD: 'cherry-pick',
-  REVERT_HEAD: 'revert'
-} as const;
-
-export type GitOperation = (typeof OPERATIONS)[keyof typeof OPERATIONS];
 
 /** What the server itself said, which git relays as `remote:` lines; failing that, git's first line. */
 function remoteSaid(stderr: string): string {

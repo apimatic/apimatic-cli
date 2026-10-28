@@ -16,7 +16,6 @@ import {
   SPEC_DIRECTORY_NAME
 } from './project-layout.js';
 import { Language } from './sdk/generate.js';
-import { SdkContext } from './sdk-context.js';
 import { SpecContext } from './spec-context.js';
 import { TempContext } from './temp-context.js';
 
@@ -136,10 +135,6 @@ export class ProjectContext {
       return err({ kind: 'configNotPrepared', failure: covered.error });
     }
     return await new TempContext(tempDirectory).zip(staged.value);
-  }
-
-  public sdk(directory: DirectoryPath): SdkContext {
-    return new SdkContext(directory);
   }
 
   public portalSource(): PortalSourceContext {

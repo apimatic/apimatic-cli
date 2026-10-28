@@ -19,7 +19,7 @@ import { GenerationRecord, SdkGeneration } from '../../../src/types/sdk/generati
 import { SdkPath } from '../../../src/types/sdk/sdk-path.js';
 import { SnapshotRef } from '../../../src/types/sdk/snapshot-ref.js';
 import { SdkRepositoryContext } from '../../../src/types/sdk-repository-context.js';
-import { terminal } from '../../../src/utils/terminal-utils.js';
+import { terminal } from '../../../src/infrastructure/terminal.js';
 import { Files, stubSdkGeneration, writeFiles } from '../../helpers/sdk-generation.js';
 import { repositoryOf } from '../../helpers/snapshots.js';
 

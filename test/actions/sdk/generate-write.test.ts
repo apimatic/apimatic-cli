@@ -6,6 +6,7 @@ import { execa } from 'execa';
 import { err, ok } from 'neverthrow';
 import sinon from 'sinon';
 import { GenerateAction } from '../../../src/actions/sdk/generate.js';
+import { FileService } from '../../../src/infrastructure/file-service.js';
 import { GitService } from '../../../src/infrastructure/git-service.js';
 import { MERGE_NEEDS_RESOLVING, SdkGeneratePrompts } from '../../../src/prompts/sdk/generate.js';
 import { CommandMetadata } from '../../../src/types/common/command-metadata.js';
@@ -21,9 +22,9 @@ import { CodeGenerationVersion, Language, Stability } from '../../../src/types/s
 import { GenerationRecord, SdkGeneration } from '../../../src/types/sdk/generation-record.js';
 import { SdkPath } from '../../../src/types/sdk/sdk-path.js';
 import { SnapshotRef } from '../../../src/types/sdk/snapshot-ref.js';
-import { SnapshotStore } from '../../../src/types/sdk/snapshot-store.js';
+import { SnapshotStore } from '../../../src/types/sdk-repository/snapshot-store.js';
 import { SdkRepositoryContext } from '../../../src/types/sdk-repository-context.js';
-import { terminal } from '../../../src/utils/terminal-utils.js';
+import { terminal } from '../../../src/infrastructure/terminal.js';
 import { Files, stubSdkGeneration, writeFiles } from '../../helpers/sdk-generation.js';
 import { describeCommit, repositoryOf, snapshotFiles } from '../../helpers/snapshots.js';
 
@@ -255,14 +256,12 @@ describe('GenerateAction (sdk) — writing the SDK', () => {
     it('puts the directory back and names the file when a write fails partway', async () => {
       const { base } = await recorded({ 'README.md': '# sdk', 'models/book.py': MODEL_V1 });
       writeFiles(sdk().toString(), { 'README.md': '# edited' });
-      const real = fs.promises.writeFile;
-      sinon
-        .stub(fs.promises, 'writeFile')
-        .callsFake((file, ...rest) =>
-          String(file).endsWith('book.py')
-            ? Promise.reject(new Error('EACCES: permission denied'))
-            : real.call(fs.promises, file, ...rest)
-        );
+      const real = FileService.prototype.writeBytes;
+      sinon.stub(FileService.prototype, 'writeBytes').callsFake(function (this: FileService, file, content) {
+        return file.toString().endsWith('book.py')
+          ? Promise.reject(new Error('EACCES: permission denied'))
+          : real.call(this, file, content);
+      });
       const sdkNotWritten = sinon.stub(SdkGeneratePrompts.prototype, 'sdkNotWritten');
 
       expect((await execute({ 'README.md': '# sdk v2', 'models/book.py': MODEL_V2 })).isFailed()).to.be.true;

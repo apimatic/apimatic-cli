@@ -1,5 +1,4 @@
 import { Buffer } from 'node:buffer';
-import fs from 'node:fs';
 import { err, ok, Result } from 'neverthrow';
 import { FileService } from '../../infrastructure/file-service.js';
 import { GitService } from '../../infrastructure/git-service.js';
@@ -7,10 +6,11 @@ import { DirectoryPath } from '../file/directoryPath.js';
 import { FilePath } from '../file/filePath.js';
 import { RelativeFilePath } from '../file/relativeFilePath.js';
 import { CommitId } from '../git/commit-id.js';
-import { relabelMarkers, settleMarkers } from './conflict-markers.js';
-import { FileWrite, MergePlan } from './merge-plan.js';
-import { gitFailed, NotApplied, onDisk, SdkRepositoryProblem } from './repository-state.js';
-import { SnapshotRef } from './snapshot-ref.js';
+import { relabelMarkers, settleMarkers } from '../sdk/conflict-markers.js';
+import { FileWrite, MergePlan } from '../sdk/merge-plan.js';
+import { NotApplied, SdkRepositoryProblem } from '../sdk/repository-state.js';
+import { SnapshotRef } from '../sdk/snapshot-ref.js';
+import { gitFailed, onDisk } from './on-disk.js';
 
 /** The files on disk below an SDK directory: a plan landed, undone from a snapshot when a step fails, a file read or settled. */
 export class SdkFiles {
@@ -102,13 +102,7 @@ export class SdkFiles {
 
   /** The file as it is, or none when it is not there. */
   public contentOf(relative: RelativeFilePath): Promise<Result<Uint8Array | undefined, SdkRepositoryProblem>> {
-    const file = relative.in(this.sdk);
-    return onDisk(
-      (async () =>
-        (await this.fileService.fileExists(file))
-          ? new Uint8Array(await fs.promises.readFile(file.toString()))
-          : undefined)()
-    );
+    return onDisk(this.read(relative.in(this.sdk)));
   }
 
   /** Writes the file with its own line ending, or removes it when there is nothing to settle it to. */
@@ -119,9 +113,13 @@ export class SdkFiles {
     const file = relative.in(this.sdk);
     return onDisk(
       content === undefined
-        ? fs.promises.rm(file.toString(), { force: true })
+        ? this.fileService.deleteFile(file)
         : this.withLineEnding(content, file).then((bytes) => this.put(file, bytes))
     );
+  }
+
+  private async read(file: FilePath): Promise<Uint8Array | undefined> {
+    return (await this.fileService.fileExists(file)) ? this.fileService.getBytes(file) : undefined;
   }
 
   private async withLineEnding(content: Uint8Array, file: FilePath, ...samples: FilePath[]): Promise<Uint8Array> {
@@ -129,8 +127,9 @@ export class SdkFiles {
       return content;
     }
     for (const sample of [file, ...samples]) {
-      if (await this.fileService.fileExists(sample)) {
-        const crlf = (await fs.promises.readFile(sample.toString())).includes('\r\n');
+      const bytes = await this.read(sample);
+      if (bytes !== undefined) {
+        const crlf = Buffer.from(bytes).includes('\r\n');
         const text = Buffer.from(content).toString('latin1');
         return crlf ? new Uint8Array(Buffer.from(text.replace(/\n/g, '\r\n'), 'latin1')) : content;
       }
@@ -139,23 +138,16 @@ export class SdkFiles {
   }
 
   private async put(file: FilePath, content: Uint8Array): Promise<void> {
-    const target = file.toString();
-    if ((await this.fileService.fileExists(file)) && (await fs.promises.readFile(target)).equals(content)) {
+    const current = await this.read(file);
+    if (current !== undefined && Buffer.from(current).equals(content)) {
       return;
     }
-    await fs.promises.mkdir(file.directory().toString(), { recursive: true });
-    await fs.promises.writeFile(target, content);
+    await this.fileService.writeBytes(file, content);
   }
 
   private async remove(file: FilePath): Promise<void> {
-    await fs.promises.rm(file.toString(), { force: true });
-    for (let directory = file.directory(); this.sdk.isAncestorOf(directory); directory = directory.join('..')) {
-      try {
-        await fs.promises.rmdir(directory.toString());
-      } catch {
-        return;
-      }
-    }
+    await this.fileService.deleteFile(file);
+    await this.fileService.removeEmptyDirectories(file.directory(), this.sdk);
   }
 }
 

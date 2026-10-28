@@ -7,6 +7,7 @@ import sinon from 'sinon';
 import { DirectoryPath } from '../../src/types/file/directoryPath';
 import { GENERATED, ProjectContext } from '../../src/types/project-context';
 import { Language } from '../../src/types/sdk/generate';
+import { SdkContext } from '../../src/types/sdk-context';
 
 describe('ProjectContext', () => {
   let projectDirectory: string;
@@ -182,7 +183,7 @@ describe('ProjectContext', () => {
       const empty = new DirectoryPath(inProject('empty'));
       fs.mkdirSync(empty.toString());
 
-      const saved = await project().sdk(project().sdkDirectory(Language.PYTHON)).save(empty);
+      const saved = await new SdkContext(project().sdkDirectory(Language.PYTHON)).save(empty);
 
       expect(saved.toString()).to.equal(inProject('sdk', 'python'));
     });

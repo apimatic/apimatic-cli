@@ -84,7 +84,7 @@ Context objects live at `src/types/` and encapsulate path derivation, validation
 | Input context (validate + file ops) | `src/types/spec-context.ts` | Good — zip detection internal |
 | Temp context (zip + save stream) | `src/types/temp-context.ts` | Good — UUID naming internal |
 | Temp context (download + resolve) | `src/types/resource-context.ts` | Good — URL/file decision internal |
-| Composite (delegates to other contexts) | `src/types/project-context.ts` | Good — hands back `PortalSourceContext`, `PluginConfigContext` and `SdkContext`; knows the layout so no caller joins `src` |
+| Composite (delegates to other contexts) | `src/types/project-context.ts` | Good — hands back `PortalSourceContext` and `PluginConfigContext`, and derives the SDK directory; knows the layout so no caller joins `src` |
 | Output context (leaky — avoid pattern) | `src/types/sdk-context.ts` | Avoid — exposes `sdkLanguageDirectory`, has methods that only use infrastructure services without touching domain state |
 | Input context (validate + typed result) | `src/types/portal-source-context.ts` | Good — reports problems, exposes no paths |
 

@@ -3,11 +3,10 @@ import { FileService } from '../../infrastructure/file-service.js';
 import { DirectoryPath } from '../file/directoryPath.js';
 import { FileName } from '../file/fileName.js';
 import { FilePath } from '../file/filePath.js';
-import { GenerationRecord, RECORD_ATTRIBUTES } from './generation-record.js';
-import { onDisk, SdkRepositoryProblem } from './repository-state.js';
+import { GenerationRecord, RECORD_ATTRIBUTES, RECORD_DIRECTORY, RECORD_FILE } from '../sdk/generation-record.js';
+import { SdkRepositoryProblem } from '../sdk/repository-state.js';
+import { onDisk } from './on-disk.js';
 
-export const RECORD_DIRECTORY = '.apimatic';
-const RECORD_FILE = 'generation.json';
 const RECORD_ATTRIBUTES_FILE = '.gitattributes';
 
 /** `<sdk>/.apimatic/generation.json`, with the attributes file beside it that keeps git from writing markers into it. */

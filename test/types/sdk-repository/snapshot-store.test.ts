@@ -7,7 +7,7 @@ import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
 import { CodeGenerationVersion, Language, Stability } from '../../../src/types/sdk/generate.js';
 import { SdkGeneration } from '../../../src/types/sdk/generation-record.js';
 import { SdkPath } from '../../../src/types/sdk/sdk-path.js';
-import { SnapshotStore } from '../../../src/types/sdk/snapshot-store.js';
+import { SnapshotStore } from '../../../src/types/sdk-repository/snapshot-store.js';
 import { describeCommit, snapshotFiles } from '../../helpers/snapshots.js';
 
 const TYPESCRIPT: SdkGeneration = {

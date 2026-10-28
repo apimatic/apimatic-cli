@@ -3,7 +3,7 @@ import { RelativeFilePath } from '../../../src/types/file/relativeFilePath.js';
 import { TreeId } from '../../../src/types/git/tree-id.js';
 import { Conflict, MergeFiles, MergePlan, Sides } from '../../../src/types/sdk/merge-plan.js';
 import { favouring, resolving } from '../../../src/types/sdk/settlement.js';
-import { Regeneration } from '../../../src/types/sdk-repository-context.js';
+import { Regeneration } from '../../../src/types/sdk/repository-state.js';
 
 const rel = (value: string) => RelativeFilePath.fromGit(value);
 

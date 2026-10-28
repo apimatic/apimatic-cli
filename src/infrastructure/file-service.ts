@@ -314,6 +314,31 @@ export class FileService {
     await fsExtra.writeFile(filePath.toString(), contents, 'utf-8');
   }
 
+  public async getBytes(filePath: FilePath): Promise<Uint8Array> {
+    return new Uint8Array(await fsExtra.readFile(filePath.toString()));
+  }
+
+  /** The bytes as they are, with the directories above the file made as needed. */
+  public async writeBytes(filePath: FilePath, content: Uint8Array): Promise<void> {
+    await fsExtra.ensureDir(filePath.directory().toString());
+    await fsExtra.writeFile(filePath.toString(), content);
+  }
+
+  public async chmod(filePath: FilePath, mode: number): Promise<void> {
+    await fsExtra.chmod(filePath.toString(), mode);
+  }
+
+  /** Removes `directory` and then each parent while it is empty, stopping below `within`, which stays whatever it holds. */
+  public async removeEmptyDirectories(directory: DirectoryPath, within: DirectoryPath): Promise<void> {
+    for (let current = directory; within.isAncestorOf(current); current = current.join('..')) {
+      try {
+        await fsExtra.rmdir(current.toString());
+      } catch {
+        return;
+      }
+    }
+  }
+
   /**
    * Writes beside the target and renames over it, so a fault mid-write leaves the target as it
    * was rather than half-written. The temporary file goes on a failure for the same reason: a

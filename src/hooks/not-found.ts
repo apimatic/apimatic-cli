@@ -1,6 +1,6 @@
 // This code was originally forked from https://github.com/oclif/plugin-not-found/blob/main/src/index.ts
 import { Hook, toConfiguredId } from '@oclif/core';
-import { terminal } from '../utils/terminal-utils.js';
+import { terminal } from '../infrastructure/terminal.js';
 import { cyan, yellow } from 'ansis';
 
 import utils from './utils.js';

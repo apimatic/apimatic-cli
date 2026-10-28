@@ -8,11 +8,12 @@ import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { TempContext } from '../../types/temp-context.js';
 import { codegenVersionFor, isAvailableLanguage, Language, Stability } from '../../types/sdk/generate.js';
 import { ProjectContext } from '../../types/project-context.js';
+import { SdkContext } from '../../types/sdk-context.js';
 import { RecordProblem, ShareHookInstall } from '../../types/sdk/repository-state.js';
 import { SdkGeneration } from '../../types/sdk/generation-record.js';
 import { replacesDirectory } from '../../types/sdk/sdk-destination.js';
 import { favouring, resolving } from '../../types/sdk/settlement.js';
-import { terminal } from '../../utils/terminal-utils.js';
+import { terminal } from '../../infrastructure/terminal.js';
 
 export class GenerateAction {
   private readonly prompts: SdkGeneratePrompts = new SdkGeneratePrompts();
@@ -54,7 +55,7 @@ export class GenerateAction {
       return ActionResult.failed();
     }
 
-    const sdkContext = project.sdk(sdk);
+    const sdkContext = new SdkContext(sdk);
     const generation: SdkGeneration = { language, codegenVersion: codegenVersionFor(language, stability), stability };
     const canAsk = !force && terminal.isInteractive();
 

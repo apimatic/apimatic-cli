@@ -6,13 +6,15 @@ import { Buffer } from 'node:buffer';
 import { expect } from 'chai';
 import { Result } from 'neverthrow';
 import sinon from 'sinon';
+import { FileService } from '../../src/infrastructure/file-service.js';
 import { GitService } from '../../src/infrastructure/git-service.js';
 import { DirectoryPath } from '../../src/types/file/directoryPath.js';
 import { CodeGenerationVersion, Language, Stability } from '../../src/types/sdk/generate.js';
 import { SdkGeneration } from '../../src/types/sdk/generation-record.js';
 import { GENERATED_MARKER, YOURS_MARKER } from '../../src/types/sdk/conflict-markers.js';
 import { ConflictSide, MergePlan } from '../../src/types/sdk/merge-plan.js';
-import { SdkRepositoryContext, SdkRepositoryProblem } from '../../src/types/sdk-repository-context.js';
+import { SdkRepositoryContext } from '../../src/types/sdk-repository-context.js';
+import { SdkRepositoryProblem } from '../../src/types/sdk/repository-state.js';
 import { SdkPath } from '../../src/types/sdk/sdk-path.js';
 import { SnapshotRef } from '../../src/types/sdk/snapshot-ref.js';
 import { recordPristine } from '../helpers/snapshots.js';
@@ -367,14 +369,13 @@ describe('SdkRepositoryContext: the merge', () => {
     const breaking =
       (name: string, andRestoringA = false) =>
       () => {
-        const real = fs.promises.writeFile;
-        sinon.stub(fs.promises, 'writeFile').callsFake((file, data, ...rest) => {
-          const target = String(file);
-          const text = typeof data === 'string' ? data : Buffer.from(data as Uint8Array).toString();
-          const restoringA = andRestoringA && target.endsWith('a.ts') && text === '1\r\n';
+        const real = FileService.prototype.writeBytes;
+        sinon.stub(FileService.prototype, 'writeBytes').callsFake(function (this: FileService, file, content) {
+          const target = file.toString();
+          const restoringA = andRestoringA && target.endsWith('a.ts') && Buffer.from(content).toString() === '1\r\n';
           return target.endsWith(name) || restoringA
             ? Promise.reject(new Error(`EACCES: permission denied, open '${target}'`))
-            : real.call(fs.promises, file, data, ...rest);
+            : real.call(this, file, content);
         });
       };
 

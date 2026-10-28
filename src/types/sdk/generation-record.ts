@@ -1,4 +1,5 @@
 import { isJsonObject } from '../../utils/json-utils.js';
+import { RelativeFilePath } from '../file/relativeFilePath.js';
 import { CommitId } from '../git/commit-id.js';
 import { CodeGenerationVersion, Language, Stability } from './generate.js';
 
@@ -8,6 +9,13 @@ export type SdkGeneration = {
   codegenVersion: CodeGenerationVersion;
   stability: Stability;
 };
+
+/** Where the CLI keeps its record inside the SDK directory, and the file holding it. */
+export const RECORD_DIRECTORY = '.apimatic';
+export const RECORD_FILE = 'generation.json';
+
+/** Whether a path below the SDK directory is the CLI's own record rather than part of the SDK. */
+export const isRecordPath = (path: RelativeFilePath): boolean => path.inside(RECORD_DIRECTORY) !== undefined;
 
 const SCHEMA_VERSION = 1;
 

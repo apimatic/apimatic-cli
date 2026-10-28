@@ -4,10 +4,11 @@ import { DirectoryPath } from '../file/directoryPath.js';
 import { RelativeFilePath } from '../file/relativeFilePath.js';
 import { CommitId } from '../git/commit-id.js';
 import { TreeId } from '../git/tree-id.js';
-import { describeGeneration, SdkGeneration } from './generation-record.js';
-import { gitFailed, NestedSdkDirectory, SdkRepositoryProblem } from './repository-state.js';
-import { SdkPath } from './sdk-path.js';
-import { SnapshotRef } from './snapshot-ref.js';
+import { describeGeneration, SdkGeneration } from '../sdk/generation-record.js';
+import { NestedSdkDirectory, SdkRepositoryProblem } from '../sdk/repository-state.js';
+import { SdkPath } from '../sdk/sdk-path.js';
+import { SnapshotRef } from '../sdk/snapshot-ref.js';
+import { gitFailed } from './on-disk.js';
 
 /** One SDK directory's snapshots: the pristine chain, the base of the next merge, and the previous state; fetched and joined with a remote's. */
 export class SnapshotStore {

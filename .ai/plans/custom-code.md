@@ -356,7 +356,7 @@ inspected again, once; a file still unmerged after that is reported, never asked
 twice. The run then generates and merges from the settled state.
 
 Nothing is reported to telemetry (section 2). Whether a question can be asked is
-`terminal.isInteractive()` (`process.stdin.isTTY`, `src/utils/terminal-utils.ts`), stubbed
+`terminal.isInteractive()` (`process.stdin.isTTY`, `src/infrastructure/terminal.ts`), stubbed
 in tests.
 
 CI: with `--force` nothing is asked; conflicts fail the job with the same list. A CI checkout
@@ -417,14 +417,14 @@ PR into `dev`, squash-merged, title `feat(sdk): keep your edits when regeneratin
 |---|---|
 | `src/infrastructure/git-service.ts` | the system git behind every snapshot, the merge (its output read into stages and messages) and the index staging |
 | `src/types/sdk-repository-context.ts` | the SDK directory with its repository: `inspect`, `regenerate` (the merge as a `Regeneration`), `write` (the previous ref, then the plan to disk), settling, the index; composed of the four below |
-| `src/types/sdk/{snapshot-store,sdk-files,share-hook-installer,generation-record-file}.ts` | one concept each: the refs and snapshots (fetched and joined), the files on disk (a plan landed, undone, a file settled), the pre-push hook, the record file |
-| `src/types/sdk/{repository-state,sdk-path}.ts` | the repository's states and problems as types, with no context behind them; the SDK directory's path below the root as a value |
+| `src/types/sdk-repository/{snapshot-store,sdk-files,share-hook-installer,generation-record-file,merge-engine}.ts` | the effectful parts of `SdkRepositoryContext`, one concept each: the refs and snapshots (fetched and joined), the files on disk (a plan landed, undone, a file settled), the pre-push hook, the record file, git's three-way merge; `on-disk.ts` turns a git or file failure into an `SdkRepositoryProblem` |
+| `src/types/sdk/{repository-state,sdk-path}.ts` | the repository's states and problems as types, with no context behind them; the SDK directory's path below the root as a value. `src/types/sdk/` holds only data and pure functions, which ESLint enforces: no infrastructure, no `fs`, no store |
 | `src/types/sdk/{merge-plan,conflict-markers,unresolved-file}.ts` | pure: `MergePlan` built from git's merge and diffs, `taking(side)`, conflict kinds, the choices, markers and their resolution for either side, and how an unresolved file is settled from its stages |
 | `src/types/sdk/{sdk-destination,settlement}.ts` | the functional core of the run: how it writes and why, what a settled merge is — data and pure functions, no I/O |
-| `src/types/sdk/{snapshot-ref,generation-record,share-hook}.ts`, `src/types/git/{commit-id,tree-id,git-version,merge-tree}.ts`, `src/types/file/relativeFilePath.ts` | value objects, the hook script and block, git's output as types |
+| `src/types/sdk/{snapshot-ref,generation-record,share-hook}.ts`, `src/types/git/{commit-id,tree-id,git-version,merge-tree,tree-entry,git-problem,git-operation,git-directory}.ts`, `src/types/file/relativeFilePath.ts` | value objects, the hook script and block, git's output as types |
 | `src/actions/sdk/generate.ts`, `src/prompts/sdk/generate.ts` | the run, its questions and its wording |
 | `src/types/sdk-context.ts` | `destination(generation)` (what git and the repository say, as an `SdkDestination` or `unresolved`, finding the enclosing repository itself), `initRepository()`, save keeps `.git`, `archive` for upload |
-| `src/utils/terminal-utils.ts` | whether a question can be asked at all |
+| `src/infrastructure/terminal.ts` | whether a question can be asked at all |
 | `src/commands/sdk/generate.ts` | flags, the git requirement in the description, intro/outro |
 | `test/…` | mirrors each file above |
 
@@ -447,7 +447,7 @@ flowchart TB
   end
   subgraph TY["Types — src/types/"]
     SC["SdkContext<br/>exists · destination(generation) → SdkDestination | Unresolved · initRepository · save · archive · loadSdkInTempDirectory"]
-    RC["SdkRepositoryContext (sdk-repository-context.ts)<br/>remote · inspect → SdkRepositoryState · regenerate → Regeneration{generated, merge} · merge → MergeOutcome · write(base, plan)<br/>record(generated, generation) → ShareHookInstall | RecordProblem · settleUnresolved(side, paths) · stageConflicts · filesToShare<br/>composed of: SnapshotStore (sdk/snapshot-store.ts: refs, snapshotGenerated/Disk, recordPristine, savePrevious, fetch and join, verifyNotNested) · SdkFiles (sdk/sdk-files.ts: apply with undo, contentOf, settle) · ShareHookInstaller (sdk/share-hook-installer.ts) · GenerationRecordFile (sdk/generation-record-file.ts) · SdkPath (sdk/sdk-path.ts: the directory below the root; pathspec, fromRoot, below, nests)<br/>repository-state.ts: SdkRepositoryState · SdkRepositoryProblem · InspectionProblem · ShareHookInstall · MergeOutcome · Regeneration"]
+    RC["SdkRepositoryContext (sdk-repository-context.ts)<br/>remote · inspect → SdkRepositoryState · regenerate → Regeneration{generated, merge} · merge → MergeOutcome · write(base, plan)<br/>record(generated, generation) → ShareHookInstall | RecordProblem · settleUnresolved(side, paths) · stageConflicts · filesToShare<br/>composed of: SnapshotStore (sdk-repository/snapshot-store.ts: refs, snapshotGenerated/Disk, recordPristine, savePrevious, fetch and join, verifyNotNested) · SdkFiles (sdk-repository/sdk-files.ts: apply with undo, contentOf, settle) · ShareHookInstaller (sdk-repository/share-hook-installer.ts) · GenerationRecordFile (sdk-repository/generation-record-file.ts) · MergeEngine (sdk-repository/merge-engine.ts) · SdkPath (sdk/sdk-path.ts: the directory below the root; pathspec, fromRoot, below, nests)<br/>repository-state.ts: SdkRepositoryState · SdkRepositoryProblem · InspectionProblem · ShareHookInstall · MergeOutcome · Regeneration"]
     MP["MergePlan (sdk/merge-plan.ts)<br/>from(inputs) · writes/deletes/conflicts/renames/files · taking(side) → FileWrite.settle<br/>ConflictKind · ConflictSide · ConflictChoice · UnresolvedChoice"]
     CMK["conflict-markers.ts<br/>relabelMarkers · resolveMarkers(content, side) · settleMarkers · unresolved-file.ts: settledContent"]
     GR["GenerationRecord (sdk/generation-record.ts)<br/>generation.json: language, codegen, stability, pristine commit · describeApart"]
@@ -461,7 +461,7 @@ flowchart TB
   subgraph INF["Infrastructure — src/infrastructure/"]
     GS["GitService (git-service.ts), every method a Promise<Result> carrying git's own words<br/>version · topLevel · init · isIgnored · operationInProgress · filesToCommit · treeOf · commitTree · updateRef · resolveRef · hasCommit<br/>mergeTree · diffTrees · listTree · readBlobs · stageConflicts (update-index) · unmergedStages (ls-files -u) · unstage<br/>remoteOf · fetchRef (no prompts, 30 s) · hooksDirectory · hooksPathConfigured · hooksRunFrom"]
     FS["FileService"]
-    TU["utils/terminal-utils.ts · terminal.isInteractive"]
+    TU["infrastructure/terminal.ts · terminal.isInteractive"]
   end
   subgraph OUT["Outside the CLI (dashed)"]
     HK[".git/hooks/apimatic-pre-push (sh) called from .git/hooks/pre-push or .husky/pre-push<br/>push refs/apimatic/pristine and the refs below it · on rejection fetch into refs/apimatic/remotes/‹remote›/pristine…, join, push again"]

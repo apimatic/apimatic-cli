@@ -1,10 +1,8 @@
-import { err, ok, Result } from 'neverthrow';
-import { GitOperation, GitProblem } from '../../infrastructure/git-service.js';
-import { errorMessage } from '../../utils/error-utils.js';
 import { DirectoryPath } from '../file/directoryPath.js';
 import { FilePath } from '../file/filePath.js';
 import { RelativeFilePath } from '../file/relativeFilePath.js';
 import { CommitId } from '../git/commit-id.js';
+import { GitOperation } from '../git/git-operation.js';
 import { StageEntry } from '../git/merge-tree.js';
 import { TreeId } from '../git/tree-id.js';
 import { SdkGeneration } from './generation-record.js';
@@ -63,19 +61,3 @@ export type MergeOutcome = { plan: MergePlan; stages: StageEntry[] };
 
 /** A fresh generation merged over the directory as it is: the snapshot it will be recorded as, and the merge. */
 export type Regeneration = { generated: TreeId; merge: MergeOutcome };
-
-export const gitFailed = (problem: GitProblem): SdkRepositoryProblem => ({ kind: 'gitFailed', reason: problem.reason });
-
-export const fileFailed = (error: unknown): SdkRepositoryProblem => ({
-  kind: 'fileFailed',
-  reason: errorMessage(error)
-});
-
-/** A file operation as a `Result`, so a failing one answers with the file system's own words. */
-export const onDisk = async <T>(work: Promise<T>): Promise<Result<T, SdkRepositoryProblem>> => {
-  try {
-    return ok(await work);
-  } catch (error) {
-    return err(fileFailed(error));
-  }
-};

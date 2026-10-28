@@ -12,6 +12,7 @@ import { Language, Stability } from '../../types/sdk/generate.js';
 import { PublishingProfile } from '../../types/publish/publishing-profile.js';
 import { PackageSettingsContext } from '../../types/package-settings-context.js';
 import { ProjectContext } from '../../types/project-context.js';
+import { SdkContext } from '../../types/sdk-context.js';
 import { ActionResult } from '../action-result.js';
 import { GenerateAction } from './generate.js';
 import { FileName } from '../../types/file/fileName.js';
@@ -71,7 +72,7 @@ export class SdkPublishAction {
         return ActionResult.success();
       }
 
-      const sdkFile = await project.sdk(sdkDirectory).archive(tempDirectory);
+      const sdkFile = await new SdkContext(sdkDirectory).archive(tempDirectory);
       if (sdkFile.isErr()) {
         this.prompts.sdkNotZipped(sdkDirectory, sdkFile.error);
         return ActionResult.failed();

@@ -2,7 +2,7 @@
 import readline from 'node:readline';
 import { blueBright, reset } from 'ansis';
 import levenshtein from 'fast-levenshtein';
-import { terminal } from '../utils/terminal-utils.js';
+import { terminal } from '../infrastructure/terminal.js';
 
 const getConfirmation = async (suggestion: string): Promise<boolean> => {
   if (!terminal.isInteractive()) return false;

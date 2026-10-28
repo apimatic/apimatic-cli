@@ -5,10 +5,11 @@ import { GitService } from '../../src/infrastructure/git-service.js';
 import { DirectoryPath } from '../../src/types/file/directoryPath.js';
 import { CommitId } from '../../src/types/git/commit-id.js';
 import { SdkContext } from '../../src/types/sdk-context.js';
-import { SdkRepositoryContext, SdkRepositoryProblem } from '../../src/types/sdk-repository-context.js';
+import { SdkRepositoryContext } from '../../src/types/sdk-repository-context.js';
+import { SdkRepositoryProblem } from '../../src/types/sdk/repository-state.js';
 import { SdkGeneration } from '../../src/types/sdk/generation-record.js';
 import { SdkPath } from '../../src/types/sdk/sdk-path.js';
-import { SnapshotStore } from '../../src/types/sdk/snapshot-store.js';
+import { SnapshotStore } from '../../src/types/sdk-repository/snapshot-store.js';
 
 /** The repository a run would write the SDK at `sdk` through, as `destination` finds it; none when no repository encloses it. */
 export async function repositoryOf(

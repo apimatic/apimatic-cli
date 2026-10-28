@@ -1,13 +1,15 @@
-import fs from 'node:fs';
-import path from 'node:path';
 import { err, ok, Result } from 'neverthrow';
 import { FileService } from '../../infrastructure/file-service.js';
 import { GitService } from '../../infrastructure/git-service.js';
 import { DirectoryPath } from '../file/directoryPath.js';
 import { FileName } from '../file/fileName.js';
 import { FilePath } from '../file/filePath.js';
-import { gitFailed, onDisk, SdkRepositoryProblem, ShareHookInstall } from './repository-state.js';
-import { SHARE_HOOK_SCRIPT, SHARE_HOOK_SCRIPT_NAME, ShareHook } from './share-hook.js';
+import { SdkRepositoryProblem, ShareHookInstall } from '../sdk/repository-state.js';
+import { SHARE_HOOK_SCRIPT, SHARE_HOOK_SCRIPT_NAME, ShareHook } from '../sdk/share-hook.js';
+import { gitFailed, onDisk } from './on-disk.js';
+
+// Owner-only, as git's own sample hooks are; git runs a hook only when it is executable.
+const HOOK_MODE = 0o700;
 
 /** The script goes into git's own hooks directory, so the one line a hook elsewhere needs is the same everywhere; the block goes into the hook git runs. */
 export class ShareHookInstaller {
@@ -81,16 +83,15 @@ export class ShareHookInstaller {
     return (await this.fileService.fileExists(file)) ? this.fileService.getContents(file) : undefined;
   }
 
-  // Owner-only, as git's own sample hooks are; git runs a hook only when it is executable.
   private async writeExecutable(file: FilePath, content: string): Promise<void> {
     if (await this.fileService.replaceContentsIfChanged(file, content)) {
-      await fs.promises.chmod(file.toString(), 0o700);
+      await this.fileService.chmod(file, HOOK_MODE);
     }
   }
 }
 
 /** The `pre-push` hook git runs from `directory`; husky's `_` holds its own runners, the developer's hooks sit beside it. */
 function hookRunFrom(directory: DirectoryPath): FilePath {
-  const scripts = path.basename(directory.toString()) === '_' ? directory.join('..') : directory;
+  const scripts = directory.leafName() === '_' ? directory.join('..') : directory;
   return new FilePath(scripts, new FileName('pre-push'));
 }
