@@ -15,7 +15,7 @@ import { GenerationRecord, RECORD_ATTRIBUTES, SdkGeneration } from '../../src/ty
 import { SHARE_HOOK_BLOCK, SHARE_HOOK_CALL, SHARE_HOOK_SCRIPT } from '../../src/types/sdk/share-hook.js';
 import { SdkPath } from '../../src/types/sdk/sdk-path.js';
 import { SnapshotRef } from '../../src/types/sdk/snapshot-ref.js';
-import { describeCommit, snapshotFiles } from '../helpers/snapshots.js';
+import { describeCommit, recordPristine, snapshotFiles } from '../helpers/snapshots.js';
 
 /** A ref onto itself, as `git push` and `git fetch` take it. */
 const refspec = (ref: SnapshotRef): string => `${ref}:${ref}`;
@@ -27,6 +27,14 @@ const TYPESCRIPT: SdkGeneration = {
 };
 
 const rel = (value: string) => RelativeFilePath.fromGit(value);
+
+/** An SDK directory as a test laid it out: the context under test, and what it was built from, for reaching git and the disk. */
+interface Sdk {
+  repository: SdkRepositoryContext;
+  root: DirectoryPath;
+  directory: DirectoryPath;
+  pristine: SnapshotRef;
+}
 
 describe('SdkRepositoryContext', () => {
   let root: string;
@@ -46,22 +54,33 @@ describe('SdkRepositoryContext', () => {
     return directory;
   };
 
-  const record = async (repository: SdkRepositoryContext, files: Record<string, string>) => {
-    const tree = (await repository.snapshotGenerated(generated(files)))._unsafeUnwrap();
-    return repository.recordPristine(tree, TYPESCRIPT);
-  };
-
   const contextFor = (sdk: DirectoryPath) => new SdkContext(sdk);
 
-  const project = async (sdk = path.join('sdk', 'typescript')): Promise<SdkRepositoryContext> => {
+  /** The SDK at `directory` in the repository at `repositoryRoot`, as `SdkContext` finds it. */
+  const sdkAt = async (repositoryRoot: DirectoryPath, directory: DirectoryPath): Promise<Sdk> => ({
+    repository: SdkRepositoryContext.create(repositoryRoot, directory)!,
+    root: repositoryRoot,
+    directory,
+    pristine: SnapshotRef.pristine(SdkPath.of(repositoryRoot, directory))
+  });
+
+  const project = async (sdk = path.join('sdk', 'typescript')): Promise<Sdk> => {
     const projectDirectory = new DirectoryPath(path.join(root, 'project'));
     fs.mkdirSync(projectDirectory.join(sdk).toString(), { recursive: true });
     (await git.init(projectDirectory))._unsafeUnwrap();
-    return (await contextFor(projectDirectory.join(sdk)).repository())._unsafeUnwrap()!;
+    return sdkAt(projectDirectory, projectDirectory.join(sdk));
   };
 
-  const writeRecord = async (repository: SdkRepositoryContext, record: GenerationRecord) =>
-    write(repository.sdkDirectory(), path.join('.apimatic', 'generation.json'), record.toJson());
+  const record = (sdk: Sdk, files: Record<string, string>) =>
+    recordPristine(sdk.root, sdk.directory, generated(files), TYPESCRIPT);
+
+  /** The commit the SDK's pristine ref names, or none. */
+  const pristineOf = async (sdk: Sdk) => (await git.resolveRef(sdk.root, sdk.pristine))._unsafeUnwrap();
+
+  const recordFile = (sdk: Sdk) => path.join(sdk.directory.toString(), '.apimatic', 'generation.json');
+
+  const writeRecord = async (sdk: Sdk, record: GenerationRecord) =>
+    write(sdk.directory, path.join('.apimatic', 'generation.json'), record.toJson());
 
   const plumbing = (cwd: DirectoryPath, args: string[], input?: string) =>
     execa('git', args, { cwd: cwd.toString(), input });
@@ -71,11 +90,7 @@ describe('SdkRepositoryContext', () => {
    * your side at 2 and the generator's at 3, each left out when given as `null`, as for a file
    * that side deleted.
    */
-  const unmerged = async (
-    repository: SdkRepositoryContext,
-    path: string,
-    sides: { yours?: string | null; generated?: string | null } = {}
-  ) => {
+  const unmerged = async (sdk: Sdk, path: string, sides: { yours?: string | null; generated?: string | null } = {}) => {
     const stages: [number, string | null][] = [
       [1, 'x'],
       [2, sides.yours === undefined ? 'x' : sides.yours],
@@ -84,15 +99,15 @@ describe('SdkRepositoryContext', () => {
     const entries: string[] = [];
     for (const [stage, content] of stages) {
       if (content !== null) {
-        const oid = (await plumbing(repository.root(), ['hash-object', '-w', '--stdin'], content)).stdout.trim();
+        const oid = (await plumbing(sdk.root, ['hash-object', '-w', '--stdin'], content)).stdout.trim();
         entries.push(`100644 ${oid} ${stage}\t${path}`);
       }
     }
-    await plumbing(repository.root(), ['update-index', '-z', '--index-info'], entries.join('\0') + '\0');
+    await plumbing(sdk.root, ['update-index', '-z', '--index-info'], entries.join('\0') + '\0');
   };
 
-  const unmergedPaths = async (repository: SdkRepositoryContext) =>
-    (await plumbing(repository.root(), ['ls-files', '-u'])).stdout.split('\n').filter((line) => line !== '');
+  const unmergedPaths = async (sdk: Sdk) =>
+    (await plumbing(sdk.root, ['ls-files', '-u'])).stdout.split('\n').filter((line) => line !== '');
 
   beforeEach(() => {
     root = canonical(fs.mkdtempSync(path.join(os.tmpdir(), 'sdk-repository-')));
@@ -104,10 +119,10 @@ describe('SdkRepositoryContext', () => {
 
   describe('recordPristine', () => {
     it('records the first snapshot with no parent, under the SDK directory’s ref', async () => {
-      const repository = await project();
+      const sdk = await project();
 
       const commit = (
-        await record(repository, {
+        await record(sdk, {
           'README.md': '# v1',
           'src/index.ts': 'export {};',
           '.gitignore': 'dist/\n',
@@ -115,92 +130,51 @@ describe('SdkRepositoryContext', () => {
         })
       )._unsafeUnwrap();
 
-      expect((await git.resolveRef(repository.root(), repository.pristineRef()))._unsafeUnwrap()?.isEqual(commit)).to.be
-        .true;
-      expect(await describeCommit(repository.root(), commit)).to.deep.equal({
+      expect((await pristineOf(sdk))?.isEqual(commit)).to.be.true;
+      expect(await describeCommit(sdk.root, commit)).to.deep.equal({
         parents: [],
         authorName: 'APIMatic CLI',
         subject: 'apimatic: pristine typescript v4 stable'
       });
-      const files = await snapshotFiles(repository.root(), commit);
+      const files = await snapshotFiles(sdk.root, commit);
       expect([...files.keys()]).to.have.members(['README.md', 'src/index.ts', '.gitignore', 'dist/x.js']);
       expect(files.get('src/index.ts')).to.equal('export {};');
     });
 
     it('records an SDK whose path holds a space and a folder starting with a dot, and finds it again', async () => {
-      const repository = await project(path.join('My API', 'sdk', '.typescript'));
+      const sdk = await project(path.join('My API', 'sdk', '.typescript'));
 
-      const commit = (await record(repository, { 'README.md': '# v1' }))._unsafeUnwrap();
-      await writeRecord(repository, GenerationRecord.written(TYPESCRIPT, commit));
+      const commit = (await record(sdk, { 'README.md': '# v1' }))._unsafeUnwrap();
+      await writeRecord(sdk, GenerationRecord.written(TYPESCRIPT, commit));
 
-      expect(repository.pristineRef().toString()).to.equal('refs/apimatic/pristine/My%20API/sdk/%2Etypescript');
-      expect((await git.resolveRef(repository.root(), repository.pristineRef()))._unsafeUnwrap()?.isEqual(commit)).to.be
-        .true;
-      expect((await repository.inspect(TYPESCRIPT, undefined))._unsafeUnwrap()).to.deep.equal({
+      const ref = SnapshotRef.fromGit('refs/apimatic/pristine/My%20API/sdk/%2Etypescript');
+      expect((await git.resolveRef(sdk.root, ref))._unsafeUnwrap()?.isEqual(commit)).to.be.true;
+      expect((await sdk.repository.inspect(TYPESCRIPT, undefined))._unsafeUnwrap()).to.deep.equal({
         kind: 'ready',
         base: commit
       });
     });
 
     it('chains the next snapshot onto the last and moves the ref', async () => {
-      const repository = await project();
-      const first = (await record(repository, { 'README.md': '# v1' }))._unsafeUnwrap();
+      const sdk = await project();
+      const first = (await record(sdk, { 'README.md': '# v1' }))._unsafeUnwrap();
 
-      const second = (await record(repository, { 'README.md': '# v2' }))._unsafeUnwrap();
+      const second = (await record(sdk, { 'README.md': '# v2' }))._unsafeUnwrap();
 
-      expect((await describeCommit(repository.root(), second)).parents).to.deep.equal([first]);
-      expect((await git.resolveRef(repository.root(), repository.pristineRef()))._unsafeUnwrap()?.isEqual(second)).to.be
-        .true;
-      expect((await snapshotFiles(repository.root(), first)).get('README.md')).to.equal('# v1');
+      expect((await describeCommit(sdk.root, second)).parents).to.deep.equal([first]);
+      expect((await pristineOf(sdk))?.isEqual(second)).to.be.true;
+      expect((await snapshotFiles(sdk.root, first)).get('README.md')).to.equal('# v1');
     });
 
     it('keeps the last snapshot when the generation is identical, so the record names the same commit', async () => {
-      const repository = await project();
-      const first = (await record(repository, { 'README.md': '# v1' }))._unsafeUnwrap();
+      const sdk = await project();
+      const first = (await record(sdk, { 'README.md': '# v1' }))._unsafeUnwrap();
 
-      const again = (await record(repository, { 'README.md': '# v1' }))._unsafeUnwrap();
-      const changed = (await record(repository, { 'README.md': '# v2' }))._unsafeUnwrap();
+      const again = (await record(sdk, { 'README.md': '# v1' }))._unsafeUnwrap();
+      const changed = (await record(sdk, { 'README.md': '# v2' }))._unsafeUnwrap();
 
       expect(again.isEqual(first)).to.be.true;
-      expect((await describeCommit(repository.root(), changed)).parents).to.deep.equal([first]);
-    });
-  });
-
-  describe('savePrevious', () => {
-    it('keeps the directory as it is, without its own .git, and replaces the last one', async () => {
-      const sdk = new DirectoryPath(path.join(root, 'sdk', 'typescript'));
-      write(sdk, 'README.md', '# edited');
-      write(sdk, path.join('.apimatic', 'generation.json'), '{}');
-      const repository = (await contextFor(sdk).initRepository())._unsafeUnwrap();
-
-      const first = (await repository.savePrevious(undefined))._unsafeUnwrap();
-      write(sdk, 'README.md', '# edited again');
-      const second = (await repository.savePrevious(undefined))._unsafeUnwrap();
-
-      const kept = await snapshotFiles(sdk, second);
-      expect([...kept.keys()]).to.have.members(['README.md', '.apimatic/generation.json']);
-      expect(kept.get('README.md')).to.equal('# edited again');
-      expect((await git.resolveRef(sdk, repository.previousRef()))._unsafeUnwrap()?.isEqual(second)).to.be.true;
-      expect((await describeCommit(sdk, second)).parents).to.be.empty;
-      expect((await snapshotFiles(sdk, first)).get('README.md')).to.equal('# edited');
-    });
-
-    it('includes a generated file the SDK’s own .gitignore matches, and leaves other ignored files out', async () => {
-      const repository = await project();
-      const base = (
-        await record(repository, { '.gitignore': 'dist/\n', 'dist/generated.js': 'generated' })
-      )._unsafeUnwrap();
-      const sdk = repository.sdkDirectory();
-      write(sdk, '.gitignore', 'dist/\n');
-      write(sdk, 'dist/generated.js', 'generated');
-      write(sdk, 'dist/built.js', 'built');
-
-      const previous = (await repository.savePrevious(base))._unsafeUnwrap();
-
-      expect([...(await snapshotFiles(repository.root(), previous)).keys()]).to.have.members([
-        '.gitignore',
-        'dist/generated.js'
-      ]);
+      expect((await describeCommit(sdk.root, changed)).parents).to.deep.equal([first]);
     });
   });
 
@@ -208,99 +182,93 @@ describe('SdkRepositoryContext', () => {
     const MARKERS = '<<<<<<< Your changes\nmine\n=======\ntheirs\n>>>>>>> Generated by APIMatic\n';
     const ASKED = ['marked.ts', 'by-hand.ts', 'dropped.ts', 'deleted-by-you.ts', 'logo.png', 'gone.ts'].map(rel);
 
-    const read = (repository: SdkRepositoryContext, relative: string) =>
-      fs.readFileSync(repository.sdkDirectory().join(relative).toString(), 'utf8');
-    const exists = (repository: SdkRepositoryContext, relative: string) =>
-      fs.existsSync(repository.sdkDirectory().join(relative).toString());
+    const read = (sdk: Sdk, relative: string) => fs.readFileSync(sdk.directory.join(relative).toString(), 'utf8');
+    const exists = (sdk: Sdk, relative: string) => fs.existsSync(sdk.directory.join(relative).toString());
 
     /** One unresolved file of each shape, and a marked file that git does not hold as unmerged. */
     const leftUnresolved = async () => {
-      const repository = await project();
-      const sdk = repository.sdkDirectory();
-      write(sdk, 'marked.ts', 'top\n' + MARKERS + 'bottom\n');
-      write(sdk, 'by-hand.ts', 'resolved by hand, not staged');
-      write(sdk, 'dropped.ts', 'your edited file');
-      write(sdk, 'deleted-by-you.ts', 'generated version');
-      write(sdk, 'logo.png', 'yours\0binary');
-      write(sdk, 'not-asked.ts', 'still ' + MARKERS);
-      await unmerged(repository, 'sdk/typescript/marked.ts');
-      await unmerged(repository, 'sdk/typescript/by-hand.ts');
-      await unmerged(repository, 'sdk/typescript/dropped.ts', { yours: 'your edited file', generated: null });
-      await unmerged(repository, 'sdk/typescript/deleted-by-you.ts', { yours: null, generated: 'generated version' });
-      await unmerged(repository, 'sdk/typescript/logo.png', { yours: 'yours\0binary', generated: 'generated\0binary' });
-      await unmerged(repository, 'sdk/typescript/gone.ts');
-      return repository;
+      const sdk = await project();
+      write(sdk.directory, 'marked.ts', 'top\n' + MARKERS + 'bottom\n');
+      write(sdk.directory, 'by-hand.ts', 'resolved by hand, not staged');
+      write(sdk.directory, 'dropped.ts', 'your edited file');
+      write(sdk.directory, 'deleted-by-you.ts', 'generated version');
+      write(sdk.directory, 'logo.png', 'yours\0binary');
+      write(sdk.directory, 'not-asked.ts', 'still ' + MARKERS);
+      await unmerged(sdk, 'sdk/typescript/marked.ts');
+      await unmerged(sdk, 'sdk/typescript/by-hand.ts');
+      await unmerged(sdk, 'sdk/typescript/dropped.ts', { yours: 'your edited file', generated: null });
+      await unmerged(sdk, 'sdk/typescript/deleted-by-you.ts', { yours: null, generated: 'generated version' });
+      await unmerged(sdk, 'sdk/typescript/logo.png', { yours: 'yours\0binary', generated: 'generated\0binary' });
+      await unmerged(sdk, 'sdk/typescript/gone.ts');
+      return sdk;
     };
 
     it('settles each file for the generator, keeps what was resolved by hand, and leaves the unmerged state', async () => {
-      const repository = await leftUnresolved();
+      const sdk = await leftUnresolved();
 
-      (await repository.settleUnresolved('generated', ASKED))._unsafeUnwrap();
+      (await sdk.repository.settleUnresolved('generated', ASKED))._unsafeUnwrap();
 
-      expect(read(repository, 'marked.ts')).to.equal('top\ntheirs\nbottom\n');
-      expect(read(repository, 'by-hand.ts')).to.equal('resolved by hand, not staged');
-      expect(read(repository, 'dropped.ts')).to.equal('your edited file');
-      expect(read(repository, 'deleted-by-you.ts')).to.equal('generated version');
-      expect(read(repository, 'logo.png')).to.equal('generated\0binary');
-      expect(exists(repository, 'gone.ts')).to.be.false;
-      expect(read(repository, 'not-asked.ts')).to.equal('still ' + MARKERS);
-      expect(await unmergedPaths(repository)).to.deep.equal([]);
+      expect(read(sdk, 'marked.ts')).to.equal('top\ntheirs\nbottom\n');
+      expect(read(sdk, 'by-hand.ts')).to.equal('resolved by hand, not staged');
+      expect(read(sdk, 'dropped.ts')).to.equal('your edited file');
+      expect(read(sdk, 'deleted-by-you.ts')).to.equal('generated version');
+      expect(read(sdk, 'logo.png')).to.equal('generated\0binary');
+      expect(exists(sdk, 'gone.ts')).to.be.false;
+      expect(read(sdk, 'not-asked.ts')).to.equal('still ' + MARKERS);
+      expect(await unmergedPaths(sdk)).to.deep.equal([]);
     });
 
     it('settles each file for you, keeps what was resolved by hand, and leaves the unmerged state', async () => {
-      const repository = await leftUnresolved();
+      const sdk = await leftUnresolved();
 
-      (await repository.settleUnresolved('yours', ASKED))._unsafeUnwrap();
+      (await sdk.repository.settleUnresolved('yours', ASKED))._unsafeUnwrap();
 
-      expect(read(repository, 'marked.ts')).to.equal('top\nmine\nbottom\n');
-      expect(read(repository, 'by-hand.ts')).to.equal('resolved by hand, not staged');
-      expect(read(repository, 'dropped.ts')).to.equal('your edited file');
-      expect(exists(repository, 'deleted-by-you.ts')).to.be.false;
-      expect(read(repository, 'logo.png')).to.equal('yours\0binary');
-      expect(exists(repository, 'gone.ts')).to.be.false;
-      expect(await unmergedPaths(repository)).to.deep.equal([]);
+      expect(read(sdk, 'marked.ts')).to.equal('top\nmine\nbottom\n');
+      expect(read(sdk, 'by-hand.ts')).to.equal('resolved by hand, not staged');
+      expect(read(sdk, 'dropped.ts')).to.equal('your edited file');
+      expect(exists(sdk, 'deleted-by-you.ts')).to.be.false;
+      expect(read(sdk, 'logo.png')).to.equal('yours\0binary');
+      expect(exists(sdk, 'gone.ts')).to.be.false;
+      expect(await unmergedPaths(sdk)).to.deep.equal([]);
     });
   });
 
   describe('the generation record', () => {
-    it('is absent until written, then reads back what was written', async () => {
-      const repository = await project();
-      expect(await repository.readRecord()).to.be.undefined;
-      const tree = (await repository.snapshotGenerated(generated({ 'README.md': '# v1' })))._unsafeUnwrap();
+    it('is written beside the snapshot, naming it, and found by the next inspection', async () => {
+      const sdk = await project();
+      const tree = (await sdk.repository.snapshotGenerated(generated({ 'README.md': '# v1' })))._unsafeUnwrap();
 
-      const recorded = (await repository.recordGeneration(tree, TYPESCRIPT))._unsafeUnwrap();
+      (await sdk.repository.record(tree, TYPESCRIPT))._unsafeUnwrap();
 
-      expect(fs.existsSync(path.join(repository.sdkDirectory().toString(), '.apimatic', 'generation.json'))).to.be.true;
-      const read = (await repository.readRecord())!;
-      expect(read.toJson()).to.equal(recorded.toJson());
-      expect(read.isFor(TYPESCRIPT)).to.be.true;
-      expect(
-        (await git.resolveRef(repository.root(), repository.pristineRef()))
-          ._unsafeUnwrap()
-          ?.isEqual(read.pristineCommit())
-      ).to.be.true;
+      const written = GenerationRecord.parse(fs.readFileSync(recordFile(sdk), 'utf8'))!;
+      expect(written.isFor(TYPESCRIPT)).to.be.true;
+      expect((await pristineOf(sdk))?.isEqual(written.pristineCommit())).to.be.true;
+      expect((await sdk.repository.inspect(TYPESCRIPT, undefined))._unsafeUnwrap()).to.deep.equal({
+        kind: 'ready',
+        base: written.pristineCommit()
+      });
     });
 
-    it('reads as absent when the file cannot be understood', async () => {
-      const repository = await project();
-      write(repository.sdkDirectory(), path.join('.apimatic', 'generation.json'), '{"schemaVersion": 2}');
+    it('counts as absent when the file cannot be understood', async () => {
+      const sdk = await project();
+      write(sdk.directory, path.join('.apimatic', 'generation.json'), '{"schemaVersion": 2}');
 
-      expect(await repository.readRecord()).to.be.undefined;
+      expect((await sdk.repository.inspect(TYPESCRIPT, undefined))._unsafeUnwrap()).to.deep.equal({ kind: 'noRecord' });
     });
 
     it('is written with attributes that merge it as binary and mark it generated', async () => {
-      const repository = await project();
-      const tree = (await repository.snapshotGenerated(generated({ 'README.md': '# v1' })))._unsafeUnwrap();
+      const sdk = await project();
+      const tree = (await sdk.repository.snapshotGenerated(generated({ 'README.md': '# v1' })))._unsafeUnwrap();
 
-      (await repository.recordGeneration(tree, TYPESCRIPT))._unsafeUnwrap();
+      (await sdk.repository.record(tree, TYPESCRIPT))._unsafeUnwrap();
 
-      const attributes = path.join(repository.sdkDirectory().toString(), '.apimatic', '.gitattributes');
+      const attributes = path.join(sdk.directory.toString(), '.apimatic', '.gitattributes');
       expect(fs.readFileSync(attributes, 'utf8')).to.equal(RECORD_ATTRIBUTES);
       const checked = await execa(
         'git',
         ['check-attr', 'merge', 'linguist-generated', '--', 'sdk/typescript/.apimatic/generation.json'],
         {
-          cwd: repository.root().toString()
+          cwd: sdk.root.toString()
         }
       );
       expect(checked.stdout.split('\n')).to.deep.equal([
@@ -315,31 +283,33 @@ describe('SdkRepositoryContext', () => {
           cwd,
           reject: false
         });
-      const regenerate = async (sdk: string, files: Record<string, string>, message: string) => {
-        const repository = (await contextFor(new DirectoryPath(sdk)).repository())._unsafeUnwrap()!;
+      /** Records a generation of `files` in the project at `project` and commits it; the record file as written. */
+      const regenerate = async (project: string, files: Record<string, string>, message: string) => {
+        const sdk = path.join(project, 'sdk', 'typescript');
+        const repository = SdkRepositoryContext.create(new DirectoryPath(project), new DirectoryPath(sdk))!;
         const tree = (await repository.snapshotGenerated(generated(files)))._unsafeUnwrap();
-        const recorded = (await repository.recordGeneration(tree, TYPESCRIPT))._unsafeUnwrap();
-        await sh(repository.root().toString(), 'add', '-A');
-        await sh(repository.root().toString(), 'commit', '-qm', message);
-        return recorded;
+        (await repository.record(tree, TYPESCRIPT))._unsafeUnwrap();
+        await sh(project, 'add', '-A');
+        await sh(project, 'commit', '-qm', message);
+        return fs.readFileSync(path.join(sdk, '.apimatic', 'generation.json'), 'utf8');
       };
-      const mine = (await project()).root().toString();
+      const mine = (await project()).root.toString();
       const origin = path.join(root, 'origin.git');
       const teammate = path.join(root, 'teammate');
-      await regenerate(path.join(mine, 'sdk', 'typescript'), { 'README.md': '# v1' }, 'v1');
+      await regenerate(mine, { 'README.md': '# v1' }, 'v1');
       await sh(root, 'init', '-q', '--bare', '--initial-branch=main', origin);
       await sh(mine, 'remote', 'add', 'origin', origin);
       await sh(mine, 'push', '-q', 'origin', 'main');
       await sh(root, 'clone', '-q', origin, teammate);
-      await regenerate(path.join(teammate, 'sdk', 'typescript'), { 'README.md': '# v2 for them' }, 'theirs');
+      await regenerate(teammate, { 'README.md': '# v2 for them' }, 'theirs');
       await sh(teammate, 'push', '-q', 'origin', 'main');
-      const yours = await regenerate(path.join(mine, 'sdk', 'typescript'), { 'README.md': '# v2 for me' }, 'mine');
+      const yours = await regenerate(mine, { 'README.md': '# v2 for me' }, 'mine');
 
       const pulled = await sh(mine, '-c', 'pull.rebase=false', 'pull', '-q', 'origin', 'main');
 
       const record = fs.readFileSync(path.join(mine, 'sdk', 'typescript', '.apimatic', 'generation.json'), 'utf8');
       expect(pulled.exitCode).to.not.equal(0);
-      expect(record).to.equal(yours.toJson());
+      expect(record).to.equal(yours);
       expect(record).to.not.contain('<<<<<<<');
       expect((await sh(mine, 'status', '--porcelain', '--', 'sdk/typescript/.apimatic')).stdout).to.equal(
         'UU sdk/typescript/.apimatic/generation.json'
@@ -351,68 +321,75 @@ describe('SdkRepositoryContext', () => {
 
   describe('inspect', () => {
     it('refuses while the repository is in the middle of an operation of the developer’s own, before anything else', async () => {
-      const repository = await project();
-      fs.writeFileSync(path.join(repository.root().toString(), '.git', 'REBASE_HEAD'), `${'a'.repeat(40)}\n`);
-      await unmerged(repository, 'sdk/typescript/a.ts');
+      const sdk = await project();
+      fs.writeFileSync(path.join(sdk.root.toString(), '.git', 'REBASE_HEAD'), `${'a'.repeat(40)}\n`);
+      await unmerged(sdk, 'sdk/typescript/a.ts');
 
-      expect((await repository.inspect(TYPESCRIPT, undefined))._unsafeUnwrapErr()).to.deep.equal({
+      expect((await sdk.repository.inspect(TYPESCRIPT, undefined))._unsafeUnwrapErr()).to.deep.equal({
         kind: 'operationInProgress',
         operation: 'rebase',
-        root: repository.root()
+        root: sdk.root
       });
     });
 
     it('names the files git holds as unmerged before looking at the record, so there is one without it too', async () => {
-      const repository = await project();
-      await unmerged(repository, 'sdk/typescript/a.ts');
+      const sdk = await project();
+      await unmerged(sdk, 'sdk/typescript/a.ts');
 
-      expect((await repository.inspect(TYPESCRIPT, undefined))._unsafeUnwrap()).to.deep.equal({
+      expect((await sdk.repository.inspect(TYPESCRIPT, undefined))._unsafeUnwrap()).to.deep.equal({
         kind: 'unresolved',
         paths: [rel('a.ts')]
       });
     });
 
     it('finds no record', async () => {
-      const repository = await project();
+      const sdk = await project();
 
-      expect((await repository.inspect(TYPESCRIPT, undefined))._unsafeUnwrap()).to.deep.equal({ kind: 'noRecord' });
+      expect((await sdk.repository.inspect(TYPESCRIPT, undefined))._unsafeUnwrap()).to.deep.equal({ kind: 'noRecord' });
     });
 
     it('finds a record for another generation', async () => {
-      const repository = await project();
-      const pristine = (await record(repository, { 'README.md': '# v1' }))._unsafeUnwrap();
-      await writeRecord(repository, GenerationRecord.written({ ...TYPESCRIPT, stability: Stability.BETA }, pristine));
+      const sdk = await project();
+      const pristine = (await record(sdk, { 'README.md': '# v1' }))._unsafeUnwrap();
+      await writeRecord(sdk, GenerationRecord.written({ ...TYPESCRIPT, stability: Stability.BETA }, pristine));
 
-      const state = (await repository.inspect(TYPESCRIPT, undefined))._unsafeUnwrap();
+      const state = (await sdk.repository.inspect(TYPESCRIPT, undefined))._unsafeUnwrap();
 
       expect(state.kind).to.equal('otherGeneration');
       expect(state.kind === 'otherGeneration' && state.recorded.stability).to.equal(Stability.BETA);
     });
 
     it('finds a record whose snapshot the repository does not hold', async () => {
-      const repository = await project();
+      const sdk = await project();
       const missing = CommitId.create('f'.repeat(40))!;
-      await writeRecord(repository, GenerationRecord.written(TYPESCRIPT, missing));
+      await writeRecord(sdk, GenerationRecord.written(TYPESCRIPT, missing));
 
-      const state = (await repository.inspect(TYPESCRIPT, undefined))._unsafeUnwrap();
+      const state = (await sdk.repository.inspect(TYPESCRIPT, undefined))._unsafeUnwrap();
 
       expect(state.kind).to.equal('snapshotMissing');
     });
 
     it('names the files git holds as unmerged below the SDK directory, whatever they hold, and no other', async () => {
-      const repository = await project();
-      const sdk = repository.sdkDirectory();
-      const pristine = (await record(repository, { 'README.md': '# v1' }))._unsafeUnwrap();
-      await writeRecord(repository, GenerationRecord.written(TYPESCRIPT, pristine));
-      write(sdk, 'src/a.ts', 'one\n<<<<<<< Your changes\nmine\n=======\ntheirs\n>>>>>>> Generated by APIMatic\n');
-      write(sdk, 'src/b.ts', 'resolved but not staged\n');
-      write(sdk, 'src/c.ts', '<<<<<<< Your changes\nstaged with markers in it\n>>>>>>> Generated by APIMatic\n');
-      await unmerged(repository, 'sdk/typescript/src/a.ts');
-      await unmerged(repository, 'sdk/typescript/src/b.ts');
-      await unmerged(repository, 'sdk/typescript/src/gone.ts');
-      await unmerged(repository, 'elsewhere/x.ts');
+      const sdk = await project();
+      const pristine = (await record(sdk, { 'README.md': '# v1' }))._unsafeUnwrap();
+      await writeRecord(sdk, GenerationRecord.written(TYPESCRIPT, pristine));
+      write(
+        sdk.directory,
+        'src/a.ts',
+        'one\n<<<<<<< Your changes\nmine\n=======\ntheirs\n>>>>>>> Generated by APIMatic\n'
+      );
+      write(sdk.directory, 'src/b.ts', 'resolved but not staged\n');
+      write(
+        sdk.directory,
+        'src/c.ts',
+        '<<<<<<< Your changes\nstaged with markers in it\n>>>>>>> Generated by APIMatic\n'
+      );
+      await unmerged(sdk, 'sdk/typescript/src/a.ts');
+      await unmerged(sdk, 'sdk/typescript/src/b.ts');
+      await unmerged(sdk, 'sdk/typescript/src/gone.ts');
+      await unmerged(sdk, 'elsewhere/x.ts');
 
-      const state = (await repository.inspect(TYPESCRIPT, undefined))._unsafeUnwrap();
+      const state = (await sdk.repository.inspect(TYPESCRIPT, undefined))._unsafeUnwrap();
 
       expect(state).to.include({ kind: 'unresolved' });
       expect(state.kind === 'unresolved' && state.paths.map(String)).to.deep.equal([
@@ -423,17 +400,13 @@ describe('SdkRepositoryContext', () => {
     });
 
     it('is ready to merge against the recorded snapshot once every file is staged, markers or not', async () => {
-      const repository = await project();
-      const pristine = (await record(repository, { 'README.md': '# v1' }))._unsafeUnwrap();
-      await writeRecord(repository, GenerationRecord.written(TYPESCRIPT, pristine));
-      write(
-        repository.sdkDirectory(),
-        'src/a.ts',
-        '<<<<<<< Your changes\nstaged as is\n>>>>>>> Generated by APIMatic\n'
-      );
-      await plumbing(repository.root(), ['add', '--', 'sdk/typescript/src/a.ts']);
+      const sdk = await project();
+      const pristine = (await record(sdk, { 'README.md': '# v1' }))._unsafeUnwrap();
+      await writeRecord(sdk, GenerationRecord.written(TYPESCRIPT, pristine));
+      write(sdk.directory, 'src/a.ts', '<<<<<<< Your changes\nstaged as is\n>>>>>>> Generated by APIMatic\n');
+      await plumbing(sdk.root, ['add', '--', 'sdk/typescript/src/a.ts']);
 
-      const state = (await repository.inspect(TYPESCRIPT, undefined))._unsafeUnwrap();
+      const state = (await sdk.repository.inspect(TYPESCRIPT, undefined))._unsafeUnwrap();
 
       expect(state.kind).to.equal('ready');
       expect(state.kind === 'ready' && state.base.isEqual(pristine)).to.be.true;
@@ -442,40 +415,42 @@ describe('SdkRepositoryContext', () => {
     it('refuses an SDK directory inside one that already has snapshots, and the reverse', async () => {
       const outer = await project();
       (await record(outer, { 'README.md': '# outer' }))._unsafeUnwrap();
-      fs.mkdirSync(outer.sdkDirectory().join('typescript').toString());
-      const inner = (await contextFor(outer.sdkDirectory().join('typescript')).repository())._unsafeUnwrap()!;
+      fs.mkdirSync(outer.directory.join('typescript').toString());
+      const inner = await sdkAt(outer.root, outer.directory.join('typescript'));
 
-      expect((await inner.inspect(TYPESCRIPT, undefined))._unsafeUnwrapErr()).to.deep.include({
+      expect((await inner.repository.inspect(TYPESCRIPT, undefined))._unsafeUnwrapErr()).to.deep.include({
         kind: 'nestedSdkDirectory',
-        other: outer.sdkDirectory(),
+        other: outer.directory,
         encloses: true
       });
 
       const other = await project(path.join('other', 'typescript', 'nested'));
       (await record(other, { 'README.md': '# nested' }))._unsafeUnwrap();
-      const parent = (
-        await contextFor(new DirectoryPath(path.join(root, 'project', 'other', 'typescript'))).repository()
-      )._unsafeUnwrap()!;
-      expect((await parent.inspect(TYPESCRIPT, undefined))._unsafeUnwrapErr()).to.deep.include({
+      const parent = await sdkAt(other.root, new DirectoryPath(path.join(root, 'project', 'other', 'typescript')));
+      expect((await parent.repository.inspect(TYPESCRIPT, undefined))._unsafeUnwrapErr()).to.deep.include({
         kind: 'nestedSdkDirectory',
-        other: other.sdkDirectory(),
+        other: other.directory,
         encloses: false
       });
     });
 
     it('refuses any SDK directory below a repository whose root is one', async () => {
-      const sdk = new DirectoryPath(path.join(root, 'sdk'));
-      fs.mkdirSync(sdk.toString(), { recursive: true });
-      const repository = (await contextFor(sdk).initRepository())._unsafeUnwrap();
-      (await record(repository, { 'README.md': '# root' }))._unsafeUnwrap();
-      expect((await git.resolveRef(sdk, SnapshotRef.pristine(SdkPath.fromGit(''))))._unsafeUnwrap()).to.not.be
-        .undefined;
-      fs.mkdirSync(sdk.join('typescript').toString());
-      const below = (await contextFor(sdk.join('typescript')).repository())._unsafeUnwrap()!;
+      const directory = new DirectoryPath(path.join(root, 'sdk'));
+      fs.mkdirSync(directory.toString(), { recursive: true });
+      const own: Sdk = {
+        repository: (await contextFor(directory).initRepository())._unsafeUnwrap(),
+        root: directory,
+        directory,
+        pristine: SnapshotRef.pristine(SdkPath.fromGit(''))
+      };
+      (await record(own, { 'README.md': '# root' }))._unsafeUnwrap();
+      expect(await pristineOf(own)).to.not.be.undefined;
+      fs.mkdirSync(directory.join('typescript').toString());
+      const below = await sdkAt(directory, directory.join('typescript'));
 
-      expect((await below.inspect(TYPESCRIPT, undefined))._unsafeUnwrapErr()).to.deep.include({
+      expect((await below.repository.inspect(TYPESCRIPT, undefined))._unsafeUnwrapErr()).to.deep.include({
         kind: 'nestedSdkDirectory',
-        other: sdk,
+        other: directory,
         encloses: true
       });
     });
@@ -483,9 +458,11 @@ describe('SdkRepositoryContext', () => {
     it('refuses an SDK directory nested in one that has snapshots', async () => {
       const outer = await project();
       (await record(outer, { 'README.md': '# outer' }))._unsafeUnwrap();
-      const inner = (await contextFor(outer.sdkDirectory().join('typescript')).repository())._unsafeUnwrap()!;
+      const inner = await sdkAt(outer.root, outer.directory.join('typescript'));
 
-      expect((await inner.inspect(TYPESCRIPT, undefined))._unsafeUnwrapErr().kind).to.equal('nestedSdkDirectory');
+      expect((await inner.repository.inspect(TYPESCRIPT, undefined))._unsafeUnwrapErr().kind).to.equal(
+        'nestedSdkDirectory'
+      );
     });
   });
 
@@ -493,70 +470,71 @@ describe('SdkRepositoryContext', () => {
     const sh = (cwd: DirectoryPath | string, ...args: string[]) =>
       execa('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...args], { cwd: cwd.toString() });
 
-    const withOrigin = async (): Promise<{ repository: SdkRepositoryContext; origin: DirectoryPath }> => {
+    const withOrigin = async (): Promise<{ sdk: Sdk; origin: DirectoryPath }> => {
       const origin = new DirectoryPath(path.join(root, 'origin.git'));
       await sh(root, 'init', '-q', '--bare', '--initial-branch=main', origin.toString());
-      const repository = await project();
-      await sh(repository.root(), 'remote', 'add', 'origin', origin.toString());
-      return { repository, origin };
+      const sdk = await project();
+      await sh(sdk.root, 'remote', 'add', 'origin', origin.toString());
+      return { sdk, origin };
     };
 
     /** A recorded generation, committed and pushed on `main`, as a developer leaves a project for a teammate. */
-    const published = async (repository: SdkRepositoryContext) => {
-      const tree = (await repository.snapshotGenerated(generated({ 'README.md': '# v1' })))._unsafeUnwrap();
-      const record = (await repository.recordGeneration(tree, TYPESCRIPT))._unsafeUnwrap();
-      await sh(repository.root(), 'add', '.');
-      await sh(repository.root(), 'commit', '-qm', 'sdk');
-      await sh(repository.root(), 'push', '-q', 'origin', 'main');
-      return record.pristineCommit();
+    const published = async (sdk: Sdk): Promise<CommitId> => {
+      const tree = (await sdk.repository.snapshotGenerated(generated({ 'README.md': '# v1' })))._unsafeUnwrap();
+      (await sdk.repository.record(tree, TYPESCRIPT))._unsafeUnwrap();
+      await sh(sdk.root, 'add', '.');
+      await sh(sdk.root, 'commit', '-qm', 'sdk');
+      // Hooks skipped, as a tool that bypasses them pushes, so the snapshots are not shared.
+      await sh(sdk.root, 'push', '-q', '--no-verify', 'origin', 'main');
+      return (await pristineOf(sdk))!;
     };
 
-    const cloneOf = async (origin: DirectoryPath, name: string): Promise<SdkRepositoryContext> => {
+    const cloneOf = async (origin: DirectoryPath, name: string): Promise<Sdk> => {
       const clone = new DirectoryPath(path.join(root, name));
       await sh(root, 'clone', '-q', '--no-local', origin.toString(), clone.toString());
-      return (await contextFor(clone.join('sdk', 'typescript')).repository())._unsafeUnwrap()!;
+      return sdkAt(clone, clone.join('sdk', 'typescript'));
     };
 
     it('lets a clone merge against a snapshot it fetched', async () => {
-      const { repository, origin } = await withOrigin();
-      const base = await published(repository);
+      const { sdk, origin } = await withOrigin();
+      const base = await published(sdk);
       const clone = await cloneOf(origin, 'clone');
-      const before = (await clone.inspect(TYPESCRIPT, 'origin'))._unsafeUnwrap();
+      const before = (await clone.repository.inspect(TYPESCRIPT, 'origin'))._unsafeUnwrap();
       expect(before).to.deep.include({ kind: 'snapshotMissing', fetch: { kind: 'absent', remote: 'origin' } });
 
-      await sh(repository.root(), 'push', '-q', 'origin', refspec(repository.pristineRef()));
-      const after = (await clone.inspect(TYPESCRIPT, 'origin'))._unsafeUnwrap();
+      await sh(sdk.root, 'push', '-q', '--no-verify', 'origin', refspec(sdk.pristine));
+      const after = (await clone.repository.inspect(TYPESCRIPT, 'origin'))._unsafeUnwrap();
 
       expect(after.kind === 'ready' && after.base.isEqual(base)).to.be.true;
-      expect((await git.resolveRef(clone.root(), clone.pristineRef()))._unsafeUnwrap()?.isEqual(base)).to.be.true;
+      expect((await pristineOf(clone))?.isEqual(base)).to.be.true;
     });
 
     it('moves its ref forward to a chain the remote continued, without a join', async () => {
-      const { repository, origin } = await withOrigin();
-      const first = await published(repository);
-      await sh(repository.root(), 'push', '-q', 'origin', refspec(repository.pristineRef()));
+      const { sdk, origin } = await withOrigin();
+      const first = await published(sdk);
+      await sh(sdk.root, 'push', '-q', '--no-verify', 'origin', refspec(sdk.pristine));
       const clone = await cloneOf(origin, 'clone');
-      expect((await clone.inspect(TYPESCRIPT, 'origin'))._unsafeUnwrap().kind).to.equal('ready');
-      const second = (await record(repository, { 'README.md': '# v2' }))._unsafeUnwrap();
-      await sh(repository.root(), 'push', '-q', 'origin', refspec(repository.pristineRef()));
+      expect((await clone.repository.inspect(TYPESCRIPT, 'origin'))._unsafeUnwrap().kind).to.equal('ready');
+      const second = (await record(sdk, { 'README.md': '# v2' }))._unsafeUnwrap();
+      await sh(sdk.root, 'push', '-q', '--no-verify', 'origin', refspec(sdk.pristine));
       await writeRecord(clone, GenerationRecord.written(TYPESCRIPT, second));
 
-      const state = (await clone.inspect(TYPESCRIPT, 'origin'))._unsafeUnwrap();
+      const state = (await clone.repository.inspect(TYPESCRIPT, 'origin'))._unsafeUnwrap();
 
       expect(state.kind === 'ready' && state.base.isEqual(second)).to.be.true;
-      const tip = (await git.resolveRef(clone.root(), clone.pristineRef()))._unsafeUnwrap()!;
+      const tip = (await pristineOf(clone))!;
       expect(tip.isEqual(second)).to.be.true;
-      expect((await describeCommit(clone.root(), tip)).parents).to.deep.equal([first]);
+      expect((await describeCommit(clone.root, tip)).parents).to.deep.equal([first]);
     });
 
     it('reports a remote it cannot reach, and no remote at all', async () => {
-      const { repository, origin } = await withOrigin();
-      await published(repository);
+      const { sdk, origin } = await withOrigin();
+      await published(sdk);
       const clone = await cloneOf(origin, 'clone');
       fs.rmSync(origin.toString(), { recursive: true, force: true });
 
-      const unreachable = (await clone.inspect(TYPESCRIPT, 'origin'))._unsafeUnwrap();
-      const none = (await clone.inspect(TYPESCRIPT, undefined))._unsafeUnwrap();
+      const unreachable = (await clone.repository.inspect(TYPESCRIPT, 'origin'))._unsafeUnwrap();
+      const none = (await clone.repository.inspect(TYPESCRIPT, undefined))._unsafeUnwrap();
 
       expect(unreachable.kind === 'snapshotMissing' && unreachable.fetch).to.include({
         kind: 'failed',
@@ -566,21 +544,21 @@ describe('SdkRepositoryContext', () => {
     });
 
     it('joins its own chain with the remote’s while fetching a snapshot it lacks', async () => {
-      const { repository: a, origin } = await withOrigin();
+      const { sdk: a, origin } = await withOrigin();
       const first = (await record(a, { 'README.md': '# a' }))._unsafeUnwrap();
-      await sh(a.root(), 'push', '-q', 'origin', refspec(a.pristineRef()));
+      await sh(a.root, 'push', '-q', 'origin', refspec(a.pristine));
       const bRoot = new DirectoryPath(path.join(root, 'b'));
       fs.mkdirSync(bRoot.join('sdk', 'typescript').toString(), { recursive: true });
       (await git.init(bRoot))._unsafeUnwrap();
       await sh(bRoot, 'remote', 'add', 'origin', origin.toString());
-      const b = (await contextFor(bRoot.join('sdk', 'typescript')).repository())._unsafeUnwrap()!;
+      const b = await sdkAt(bRoot, bRoot.join('sdk', 'typescript'));
       const second = (await record(b, { 'README.md': '# b' }))._unsafeUnwrap();
       await writeRecord(b, GenerationRecord.written(TYPESCRIPT, first));
 
-      const state = (await b.inspect(TYPESCRIPT, 'origin'))._unsafeUnwrap();
+      const state = (await b.repository.inspect(TYPESCRIPT, 'origin'))._unsafeUnwrap();
 
       expect(state.kind === 'ready' && state.base.isEqual(first)).to.be.true;
-      const tip = (await git.resolveRef(bRoot, b.pristineRef()))._unsafeUnwrap()!;
+      const tip = (await pristineOf(b))!;
       expect((await describeCommit(bRoot, tip)).parents.map(String)).to.have.members([
         second.toString(),
         first.toString()
@@ -608,8 +586,13 @@ describe('SdkRepositoryContext', () => {
       }
     });
 
-    const hookFile = (repository: SdkRepositoryContext, name = 'pre-push') =>
-      path.join(repository.root().toString(), '.git', 'hooks', name);
+    const hookFile = (sdk: Sdk, name = 'pre-push') => path.join(sdk.root.toString(), '.git', 'hooks', name);
+
+    /** Records a generation of `files`, which puts the hook in place; what became of the hook. */
+    const install = async (sdk: Sdk, files = { 'README.md': '# v1' }) => {
+      const tree = (await sdk.repository.snapshotGenerated(generated(files)))._unsafeUnwrap();
+      return (await sdk.repository.record(tree, TYPESCRIPT))._unsafeUnwrap();
+    };
 
     /**
      * A project with a bare origin, one recorded snapshot, the hook installed, and `main` committed.
@@ -618,84 +601,84 @@ describe('SdkRepositoryContext', () => {
      */
     const ready = async (
       name = 'project',
-      { sdk = ['sdk', 'typescript'], origin: shared }: { sdk?: string[]; origin?: DirectoryPath } = {}
+      { sdk: below = ['sdk', 'typescript'], origin: shared }: { sdk?: string[]; origin?: DirectoryPath } = {}
     ) => {
       const origin = shared ?? new DirectoryPath(path.join(root, `${name}-origin.git`));
       if (shared === undefined) {
         await sh(root, 'init', '-q', '--bare', '--initial-branch=main', origin.toString());
       }
       const projectDirectory = new DirectoryPath(path.join(root, name));
-      fs.mkdirSync(projectDirectory.join(...sdk).toString(), { recursive: true });
+      fs.mkdirSync(projectDirectory.join(...below).toString(), { recursive: true });
       (await git.init(projectDirectory))._unsafeUnwrap();
       await sh(projectDirectory, 'remote', 'add', 'origin', origin.toString());
-      const repository = (await contextFor(projectDirectory.join(...sdk)).repository())._unsafeUnwrap()!;
-      const commit = (await record(repository, { 'README.md': `# ${name}` }))._unsafeUnwrap();
-      (await repository.installShareHook())._unsafeUnwrap();
+      const sdk = await sdkAt(projectDirectory, projectDirectory.join(...below));
+      await install(sdk, { 'README.md': `# ${name}` });
+      const commit = (await pristineOf(sdk))!;
       write(projectDirectory, 'README.md', `# ${name}`);
       await sh(projectDirectory, 'add', '.');
       await sh(projectDirectory, 'commit', '-qm', 'sdk');
-      return { repository, origin, commit };
+      return { sdk, origin, commit };
     };
 
     it('writes the script and a hook that calls it into .git/hooks, once', async () => {
-      const repository = await project();
+      const sdk = await project();
 
-      const first = (await repository.installShareHook())._unsafeUnwrap();
-      const second = (await repository.installShareHook())._unsafeUnwrap();
+      const first = await install(sdk);
+      const second = await install(sdk);
 
-      expect(first.kind === 'installed' && first.file.toString()).to.equal(hookFile(repository));
+      expect(first.kind === 'installed' && first.file.toString()).to.equal(hookFile(sdk));
       expect(first.kind === 'installed' && first.written).to.be.true;
       expect(second).to.deep.equal({ ...first, written: false });
-      expect(fs.readFileSync(hookFile(repository, 'apimatic-pre-push'), 'utf8')).to.equal(SHARE_HOOK_SCRIPT);
-      const hook = fs.readFileSync(hookFile(repository), 'utf8');
+      expect(fs.readFileSync(hookFile(sdk, 'apimatic-pre-push'), 'utf8')).to.equal(SHARE_HOOK_SCRIPT);
+      const hook = fs.readFileSync(hookFile(sdk), 'utf8');
       expect(hook.split(SHARE_HOOK_BLOCK)).to.have.length(2);
       if (process.platform !== 'win32') {
-        expect(fs.statSync(hookFile(repository)).mode & 0o111).to.not.equal(0);
-        expect(fs.statSync(hookFile(repository, 'apimatic-pre-push')).mode & 0o111).to.not.equal(0);
+        expect(fs.statSync(hookFile(sdk)).mode & 0o111).to.not.equal(0);
+        expect(fs.statSync(hookFile(sdk, 'apimatic-pre-push')).mode & 0o111).to.not.equal(0);
       }
     });
 
     it('names the one line to add where git runs hooks from elsewhere, husky’s layout included', async () => {
-      const repository = await project();
-      const script = hookFile(repository, 'apimatic-pre-push');
-      await sh(repository.root(), 'config', 'core.hooksPath', '.githooks');
+      const sdk = await project();
+      const script = hookFile(sdk, 'apimatic-pre-push');
+      await sh(sdk.root, 'config', 'core.hooksPath', '.githooks');
 
-      const plain = (await repository.installShareHook())._unsafeUnwrap();
+      const plain = await install(sdk);
 
       expect(plain.kind === 'elsewhere' && plain.hooksPath).to.equal('.githooks');
       expect(plain.kind === 'elsewhere' && plain.inRepository).to.be.true;
       expect(plain.kind === 'elsewhere' && plain.file.toString()).to.equal(
-        path.join(repository.root().toString(), '.githooks', 'pre-push')
+        path.join(sdk.root.toString(), '.githooks', 'pre-push')
       );
       expect(plain.kind === 'elsewhere' && plain.script.toString()).to.equal(script);
       expect(fs.existsSync(script)).to.be.true;
-      expect(fs.existsSync(hookFile(repository))).to.be.false;
+      expect(fs.existsSync(hookFile(sdk))).to.be.false;
 
-      await sh(repository.root(), 'config', 'core.hooksPath', '.husky/_');
-      const husky = (await repository.installShareHook())._unsafeUnwrap();
+      await sh(sdk.root, 'config', 'core.hooksPath', '.husky/_');
+      const husky = await install(sdk);
 
       expect(husky.kind === 'elsewhere' && husky.file.toString()).to.equal(
-        path.join(repository.root().toString(), '.husky', 'pre-push')
+        path.join(sdk.root.toString(), '.husky', 'pre-push')
       );
     });
 
     it('names the developer’s own hook file for a hooks path under the home directory, with no commit step', async () => {
-      const repository = await project();
+      const sdk = await project();
       const home = path.join(root, 'home');
-      await sh(repository.root(), 'config', 'core.hooksPath', '~/.githooks');
+      await sh(sdk.root, 'config', 'core.hooksPath', '~/.githooks');
       const previous = process.env.HOME;
       process.env.HOME = home;
       try {
-        const needed = (await repository.installShareHook())._unsafeUnwrap();
+        const needed = await install(sdk);
 
         expect(needed.kind === 'elsewhere' && needed.file.toString()).to.equal(
           path.join(home, '.githooks', 'pre-push')
         );
         expect(needed.kind === 'elsewhere' && needed.inRepository).to.be.false;
-        expect(fs.existsSync(path.join(repository.root().toString(), '~'))).to.be.false;
+        expect(fs.existsSync(path.join(sdk.root.toString(), '~'))).to.be.false;
 
         write(new DirectoryPath(home), path.join('.githooks', 'pre-push'), `#!/bin/sh\n${SHARE_HOOK_CALL}\n`);
-        const again = (await repository.installShareHook())._unsafeUnwrap();
+        const again = await install(sdk);
 
         expect(again.kind).to.equal('installed');
       } finally {
@@ -708,70 +691,70 @@ describe('SdkRepositoryContext', () => {
     });
 
     it('is quiet once the hook elsewhere runs the script', async () => {
-      const repository = await project();
-      await sh(repository.root(), 'config', 'core.hooksPath', '.husky/_');
-      write(repository.root(), path.join('.husky', 'pre-push'), `npm test\n${SHARE_HOOK_CALL}\n`);
+      const sdk = await project();
+      await sh(sdk.root, 'config', 'core.hooksPath', '.husky/_');
+      write(sdk.root, path.join('.husky', 'pre-push'), `npm test\n${SHARE_HOOK_CALL}\n`);
 
-      const result = (await repository.installShareHook())._unsafeUnwrap();
+      const result = await install(sdk);
 
       expect(result.kind).to.equal('installed');
       expect(result.kind === 'installed' && result.file.toString()).to.equal(
-        path.join(repository.root().toString(), '.husky', 'pre-push')
+        path.join(sdk.root.toString(), '.husky', 'pre-push')
       );
     });
 
     it('leaves a hook in another language alone, naming it, unless it runs the script already', async () => {
-      const repository = await project();
-      fs.mkdirSync(path.dirname(hookFile(repository)), { recursive: true });
-      fs.writeFileSync(hookFile(repository), '#!/usr/bin/env node\nconsole.log("hi");\n');
+      const sdk = await project();
+      fs.mkdirSync(path.dirname(hookFile(sdk)), { recursive: true });
+      fs.writeFileSync(hookFile(sdk), '#!/usr/bin/env node\nconsole.log("hi");\n');
 
-      const result = (await repository.installShareHook())._unsafeUnwrap();
+      const result = await install(sdk);
 
       expect(result.kind === 'notShell' && result.shebang).to.equal('#!/usr/bin/env node');
-      expect(fs.readFileSync(hookFile(repository), 'utf8')).to.not.contain(SHARE_HOOK_BLOCK);
+      expect(fs.readFileSync(hookFile(sdk), 'utf8')).to.not.contain(SHARE_HOOK_BLOCK);
 
       fs.writeFileSync(
-        hookFile(repository),
+        hookFile(sdk),
         '#!/usr/bin/env node\nrequire("child_process").execSync("sh .git/hooks/apimatic-pre-push");\n'
       );
-      expect((await repository.installShareHook())._unsafeUnwrap().kind).to.equal('installed');
+      expect((await install(sdk)).kind).to.equal('installed');
     });
 
     it('shares the chain when the developer pushes a branch, and is quiet about it', async () => {
-      const { repository, origin, commit } = await ready();
+      const { sdk, origin, commit } = await ready();
 
-      const pushed = await sh(repository.root(), 'push', '-q', 'origin', 'main');
+      const pushed = await sh(sdk.root, 'push', '-q', 'origin', 'main');
 
       expect(pushed.stderr).to.not.contain('apimatic');
-      expect((await git.resolveRef(origin, repository.pristineRef()))._unsafeUnwrap()?.isEqual(commit)).to.be.true;
+      expect((await git.resolveRef(origin, sdk.pristine))._unsafeUnwrap()?.isEqual(commit)).to.be.true;
     });
 
     it('shares the chain of an SDK at the repository root, whose ref has no directory of its own', async () => {
-      const { repository, origin, commit } = await ready('typescript', { sdk: [] });
+      const { sdk, origin, commit } = await ready('typescript', { sdk: [] });
 
-      await sh(repository.root(), 'push', '-q', 'origin', 'main');
+      await sh(sdk.root, 'push', '-q', 'origin', 'main');
 
-      expect(repository.pristineRef().toString()).to.equal('refs/apimatic/pristine');
-      expect((await git.resolveRef(origin, repository.pristineRef()))._unsafeUnwrap()?.isEqual(commit)).to.be.true;
+      const ref = SnapshotRef.fromGit('refs/apimatic/pristine');
+      expect((await git.resolveRef(origin, ref))._unsafeUnwrap()?.isEqual(commit)).to.be.true;
     });
 
     it('shares through husky’s hook too, once it has the line', async () => {
-      const { repository, origin, commit } = await ready();
-      fs.rmSync(hookFile(repository));
-      await sh(repository.root(), 'config', 'core.hooksPath', '.husky/_');
-      write(repository.root(), path.join('.husky', '_', 'pre-push'), '#!/bin/sh\n. "$(dirname "$0")/../pre-push"\n');
-      fs.chmodSync(path.join(repository.root().toString(), '.husky', '_', 'pre-push'), 0o755);
-      write(repository.root(), path.join('.husky', 'pre-push'), `set -e\n${SHARE_HOOK_CALL}\necho "husky ran" >&2\n`);
+      const { sdk, origin, commit } = await ready();
+      fs.rmSync(hookFile(sdk));
+      await sh(sdk.root, 'config', 'core.hooksPath', '.husky/_');
+      write(sdk.root, path.join('.husky', '_', 'pre-push'), '#!/bin/sh\n. "$(dirname "$0")/../pre-push"\n');
+      fs.chmodSync(path.join(sdk.root.toString(), '.husky', '_', 'pre-push'), 0o755);
+      write(sdk.root, path.join('.husky', 'pre-push'), `set -e\n${SHARE_HOOK_CALL}\necho "husky ran" >&2\n`);
 
-      const pushed = await sh(repository.root(), 'push', '-q', 'origin', 'main');
+      const pushed = await sh(sdk.root, 'push', '-q', 'origin', 'main');
 
       expect(pushed.stderr).to.contain('husky ran');
       expect(pushed.stderr).to.not.contain('apimatic');
-      expect((await git.resolveRef(origin, repository.pristineRef()))._unsafeUnwrap()?.isEqual(commit)).to.be.true;
+      expect((await git.resolveRef(origin, sdk.pristine))._unsafeUnwrap()?.isEqual(commit)).to.be.true;
     });
 
     it('does not fail a push from a clone that never ran the CLI', async () => {
-      const { repository, origin } = await ready();
+      const { origin } = await ready();
       const clone = new DirectoryPath(path.join(root, 'clone'));
       await sh(root, 'clone', '-q', '--no-local', origin.toString(), clone.toString());
       await sh(clone, 'config', 'core.hooksPath', '.husky/_');
@@ -785,18 +768,17 @@ describe('SdkRepositoryContext', () => {
       const pushed = await sh(clone, 'push', '-q', 'origin', 'HEAD:refs/heads/more');
 
       expect(pushed.exitCode).to.equal(0);
-      expect(repository).to.not.be.undefined;
     });
 
     it('joins a chain another machine pushed meanwhile, at push time', async () => {
       const a = await ready('a');
-      await sh(a.repository.root(), 'push', '-q', 'origin', 'main');
+      await sh(a.sdk.root, 'push', '-q', 'origin', 'main');
       const b = await ready('b', { origin: a.origin });
 
-      const pushed = await sh(b.repository.root(), 'push', '-q', 'origin', 'HEAD:refs/heads/b');
+      const pushed = await sh(b.sdk.root, 'push', '-q', 'origin', 'HEAD:refs/heads/b');
 
       expect(pushed.stderr).to.not.contain('apimatic');
-      const tip = (await git.resolveRef(a.origin, b.repository.pristineRef()))._unsafeUnwrap()!;
+      const tip = (await git.resolveRef(a.origin, b.sdk.pristine))._unsafeUnwrap()!;
       expect((await describeCommit(a.origin, tip)).subject).to.equal('apimatic: pristine chains joined');
       expect((await describeCommit(a.origin, tip)).parents.map(String)).to.have.members([
         b.commit.toString(),
@@ -806,12 +788,12 @@ describe('SdkRepositoryContext', () => {
 
     it('joins the chain of an SDK at the repository root too', async () => {
       const a = await ready('a', { sdk: [] });
-      await sh(a.repository.root(), 'push', '-q', 'origin', 'main');
+      await sh(a.sdk.root, 'push', '-q', 'origin', 'main');
       const b = await ready('b', { sdk: [], origin: a.origin });
 
-      await sh(b.repository.root(), 'push', '-q', 'origin', 'HEAD:refs/heads/b');
+      await sh(b.sdk.root, 'push', '-q', 'origin', 'HEAD:refs/heads/b');
 
-      const tip = (await git.resolveRef(a.origin, b.repository.pristineRef()))._unsafeUnwrap()!;
+      const tip = (await git.resolveRef(a.origin, b.sdk.pristine))._unsafeUnwrap()!;
       expect((await describeCommit(a.origin, tip)).parents.map(String)).to.have.members([
         b.commit.toString(),
         a.commit.toString()
@@ -819,31 +801,32 @@ describe('SdkRepositoryContext', () => {
     });
 
     it('warns in the server’s words when the remote refuses the ref, and the branch still lands', async () => {
-      const { repository, origin } = await ready();
+      const { sdk, origin } = await ready();
       fs.writeFileSync(
         path.join(origin.toString(), 'hooks', 'pre-receive'),
         '#!/bin/sh\nwhile read old new ref; do case "$ref" in refs/apimatic/*) echo "snapshots are not accepted here"; exit 1;; esac; done; exit 0\n',
         { mode: 0o755 }
       );
 
-      const pushed = await sh(repository.root(), 'push', '-q', 'origin', 'main');
+      const pushed = await sh(sdk.root, 'push', '-q', 'origin', 'main');
 
       expect(pushed.stderr).to.contain(
         'apimatic: the SDK snapshots could not be pushed to origin: snapshots are not accepted here'
       );
-      expect((await git.resolveRef(origin, repository.pristineRef()))._unsafeUnwrap()).to.be.undefined;
+      expect((await git.resolveRef(origin, sdk.pristine))._unsafeUnwrap()).to.be.undefined;
       expect((await sh(origin, 'rev-parse', '--verify', 'refs/heads/main')).exitCode).to.equal(0);
     });
 
     it('runs ahead of a hook that was already there, which still runs', async () => {
-      const { repository, origin, commit } = await ready();
-      fs.writeFileSync(hookFile(repository), '#!/bin/sh\necho "existing hook ran" >&2\nexit 0\n');
-      (await repository.installShareHook())._unsafeUnwrap();
+      const { sdk, origin } = await ready();
+      fs.writeFileSync(hookFile(sdk), '#!/bin/sh\necho "existing hook ran" >&2\nexit 0\n');
+      await install(sdk);
+      const tip = (await pristineOf(sdk))!;
 
-      const pushed = await sh(repository.root(), 'push', '-q', 'origin', 'main');
+      const pushed = await sh(sdk.root, 'push', '-q', 'origin', 'main');
 
       expect(pushed.stderr.match(/existing hook ran/g)).to.have.length(1);
-      expect((await git.resolveRef(origin, repository.pristineRef()))._unsafeUnwrap()?.isEqual(commit)).to.be.true;
+      expect((await git.resolveRef(origin, sdk.pristine))._unsafeUnwrap()?.isEqual(tip)).to.be.true;
     });
   });
 });

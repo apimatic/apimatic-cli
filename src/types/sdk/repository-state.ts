@@ -55,6 +55,9 @@ export type ShareHookInstall =
   | { kind: 'elsewhere'; file: FilePath; hooksPath: string; inRepository: boolean; script: FilePath }
   | { kind: 'notShell'; file: FilePath; shebang: string; script: FilePath };
 
+/** Which step of recording a generation did not happen, in git's or the file system's words: the snapshot with its record, or the hook that shares them. */
+export type RecordProblem = { step: 'snapshot' | 'hook'; reason: string };
+
 /** The plan, and git's versions of every conflicted path, below the SDK directory. */
 export type MergeOutcome = { plan: MergePlan; stages: StageEntry[] };
 

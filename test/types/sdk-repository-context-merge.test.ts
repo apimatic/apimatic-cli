@@ -7,13 +7,18 @@ import { expect } from 'chai';
 import { Result } from 'neverthrow';
 import sinon from 'sinon';
 import { GitService } from '../../src/infrastructure/git-service.js';
-import { SdkContext } from '../../src/types/sdk-context.js';
 import { DirectoryPath } from '../../src/types/file/directoryPath.js';
 import { CodeGenerationVersion, Language, Stability } from '../../src/types/sdk/generate.js';
 import { SdkGeneration } from '../../src/types/sdk/generation-record.js';
 import { GENERATED_MARKER, YOURS_MARKER } from '../../src/types/sdk/conflict-markers.js';
 import { ConflictSide, MergePlan } from '../../src/types/sdk/merge-plan.js';
 import { SdkRepositoryContext, SdkRepositoryProblem } from '../../src/types/sdk-repository-context.js';
+import { SdkPath } from '../../src/types/sdk/sdk-path.js';
+import { SnapshotRef } from '../../src/types/sdk/snapshot-ref.js';
+import { recordPristine } from '../helpers/snapshots.js';
+
+/** The ref a run keeps the directory under before writing, for the SDK every test here generates. */
+const PREVIOUS_REF = SnapshotRef.previous(SdkPath.fromGit('sdk/typescript'));
 
 const TYPESCRIPT: SdkGeneration = {
   language: Language.TYPESCRIPT,
@@ -96,7 +101,7 @@ describe('SdkRepositoryContext: the merge', () => {
     const sdk = project.join('sdk', 'typescript');
     fs.mkdirSync(sdk.toString(), { recursive: true });
     (await git.init(project))._unsafeUnwrap();
-    const repository = (await new SdkContext(sdk).repository())._unsafeUnwrap()!;
+    const repository = SdkRepositoryContext.create(project, sdk)!;
     const baseDirectory = new DirectoryPath(path.join(root, `base-${counter}`));
     const generatedDirectory = new DirectoryPath(path.join(root, `generated-${counter}`));
     fs.mkdirSync(baseDirectory.toString());
@@ -104,9 +109,7 @@ describe('SdkRepositoryContext: the merge', () => {
     write(baseDirectory, base);
     write(sdk, disk);
     write(generatedDirectory, generated);
-    const baseCommit = (
-      await repository.recordPristine((await repository.snapshotGenerated(baseDirectory))._unsafeUnwrap(), TYPESCRIPT)
-    )._unsafeUnwrap();
+    const baseCommit = (await recordPristine(project, sdk, baseDirectory, TYPESCRIPT))._unsafeUnwrap();
     const regeneration = (await repository.regenerate(baseCommit, generatedDirectory))._unsafeUnwrap();
     expect(regeneration.generated.isEqual((await repository.snapshotGenerated(generatedDirectory))._unsafeUnwrap())).to
       .be.true;
@@ -116,7 +119,7 @@ describe('SdkRepositoryContext: the merge', () => {
     if (beforeWrite === undefined) {
       written._unsafeUnwrap();
     }
-    expect((await git.resolveRef(project, repository.previousRef()))._unsafeUnwrap()).to.not.be.undefined;
+    expect((await git.resolveRef(project, PREVIOUS_REF))._unsafeUnwrap()).to.not.be.undefined;
 
     const at = (relative: string) => path.join(sdk.toString(), relative);
     const list = (directory: string): string[] =>
@@ -392,7 +395,7 @@ describe('SdkRepositoryContext: the merge', () => {
     });
 
     it('says what could not be put back, and which snapshot to restore from', async () => {
-      const { written, read, repository } = await run(BEFORE, BEFORE, AFTER, { beforeWrite: breaking('b.ts', true) });
+      const { written, read } = await run(BEFORE, BEFORE, AFTER, { beforeWrite: breaking('b.ts', true) });
 
       const problem = written._unsafeUnwrapErr();
       expect(problem.kind).to.equal('notApplied');
@@ -400,7 +403,7 @@ describe('SdkRepositoryContext: the merge', () => {
         expect.fail('the undo should have failed');
       }
       expect(problem.undo.reason).to.contain('a.ts');
-      expect(problem.undo.previous.toString()).to.equal(repository.previousRef().toString());
+      expect(problem.undo.previous.toString()).to.equal(PREVIOUS_REF.toString());
       expect(read('a.ts')).to.equal('2\r\n');
       expect(read('c.ts')).to.equal('1\n');
     });

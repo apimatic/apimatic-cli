@@ -51,13 +51,6 @@ export class SnapshotRef {
     return SdkPath.fromGit(decodeURIComponent(this.name.slice(namespace.length + 1)));
   }
 
-  /** Git stores refs as files in directories, so a ref cannot sit on another ref's path. */
-  public collidesWith(other: SnapshotRef): boolean {
-    return (
-      this.name !== other.name && (other.name.startsWith(`${this.name}/`) || this.name.startsWith(`${other.name}/`))
-    );
-  }
-
   public toString(): string {
     return this.name;
   }

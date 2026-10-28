@@ -69,27 +69,6 @@ export class SdkContext {
     return (await found.inspect(generation, remote.value)).map((state) => destinationFor(found, state));
   }
 
-  /** The repository enclosing the SDK directory; one whose ignore rules exclude it does not count, since its index and remote are not meant to hold the SDK. */
-  public async repository(): Promise<Result<SdkRepositoryContext | undefined, SdkRepositoryProblem>> {
-    const { real, existing } = realSpelling(this.sdkDirectory);
-    const found = await this.git.topLevel(existing);
-    if (found.isErr()) {
-      return err(gitFailed(found.error));
-    }
-    if (found.value === undefined) {
-      return ok(undefined);
-    }
-    const root = new DirectoryPath(canonical(found.value.toString()));
-    if (root.isEqual(real)) {
-      return ok(SdkRepositoryContext.create(root, real));
-    }
-    const ignored = await this.git.isIgnored(root, real);
-    if (ignored.isErr()) {
-      return err(gitFailed(ignored.error));
-    }
-    return ok(ignored.value ? undefined : SdkRepositoryContext.create(root, real));
-  }
-
   /** Makes the SDK directory a repository of its own, creating it when it is not there yet. */
   public async initRepository(): Promise<Result<SdkRepositoryContext, SdkRepositoryProblem>> {
     const sdk = this.sdkDirectory;
@@ -116,6 +95,37 @@ export class SdkContext {
       return err({ kind: 'zipFailed', reason: files.error.reason });
     }
     return new TempContext(tempDirectory).zip(this.sdkDirectory, files.value);
+  }
+
+  public async loadSdkInTempDirectory(
+    tempDirectory: DirectoryPath,
+    tempSdk: FilePath
+  ): Promise<Result<DirectoryPath, FileProblem>> {
+    const tempSdkDirectory = tempDirectory.join('sdk-original');
+    await this.fileService.createDirectoryIfNotExists(tempSdkDirectory);
+    const unpacked = await this.zipService.unArchive(tempSdk, tempSdkDirectory);
+    return unpacked.map(() => tempSdkDirectory).mapErr((reason): FileProblem => ({ kind: 'unzipFailed', reason }));
+  }
+
+  /** The repository enclosing the SDK directory; one whose ignore rules exclude it does not count, since its index and remote are not meant to hold the SDK. */
+  private async repository(): Promise<Result<SdkRepositoryContext | undefined, SdkRepositoryProblem>> {
+    const { real, existing } = realSpelling(this.sdkDirectory);
+    const found = await this.git.topLevel(existing);
+    if (found.isErr()) {
+      return err(gitFailed(found.error));
+    }
+    if (found.value === undefined) {
+      return ok(undefined);
+    }
+    const root = new DirectoryPath(canonical(found.value.toString()));
+    if (root.isEqual(real)) {
+      return ok(SdkRepositoryContext.create(root, real));
+    }
+    const ignored = await this.git.isIgnored(root, real);
+    if (ignored.isErr()) {
+      return err(gitFailed(ignored.error));
+    }
+    return ok(ignored.value ? undefined : SdkRepositoryContext.create(root, real));
   }
 
   private async filesToArchive(): Promise<Result<RelativeFilePath[], SdkRepositoryProblem>> {
@@ -146,15 +156,5 @@ export class SdkContext {
       })
     );
     return files.flat();
-  }
-
-  public async loadSdkInTempDirectory(
-    tempDirectory: DirectoryPath,
-    tempSdk: FilePath
-  ): Promise<Result<DirectoryPath, FileProblem>> {
-    const tempSdkDirectory = tempDirectory.join('sdk-original');
-    await this.fileService.createDirectoryIfNotExists(tempSdkDirectory);
-    const unpacked = await this.zipService.unArchive(tempSdk, tempSdkDirectory);
-    return unpacked.map(() => tempSdkDirectory).mapErr((reason): FileProblem => ({ kind: 'unzipFailed', reason }));
   }
 }

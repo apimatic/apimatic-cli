@@ -14,7 +14,6 @@ import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
 import { CommitId } from '../../../src/types/git/commit-id.js';
 import { GitVersion } from '../../../src/types/git/git-version.js';
 import { ProjectContext } from '../../../src/types/project-context.js';
-import { SdkContext } from '../../../src/types/sdk-context.js';
 import { CodeGenerationVersion, Language, Stability } from '../../../src/types/sdk/generate.js';
 import { GenerationRecord, SdkGeneration } from '../../../src/types/sdk/generation-record.js';
 import { SdkPath } from '../../../src/types/sdk/sdk-path.js';
@@ -22,6 +21,7 @@ import { SnapshotRef } from '../../../src/types/sdk/snapshot-ref.js';
 import { SdkRepositoryContext } from '../../../src/types/sdk-repository-context.js';
 import { terminal } from '../../../src/utils/terminal-utils.js';
 import { Files, stubSdkGeneration, writeFiles } from '../../helpers/sdk-generation.js';
+import { repositoryOf } from '../../helpers/snapshots.js';
 
 /** A ref onto itself, as `git push` and `git fetch` take it. */
 const refspec = (ref: SnapshotRef): string => `${ref}:${ref}`;
@@ -43,7 +43,6 @@ describe('GenerateAction (sdk) — the destination', () => {
   const git = new GitService();
 
   const sdk = () => new DirectoryPath(path.join(project, 'sdk', 'python'));
-  const sdkContext = () => new SdkContext(sdk());
   const at = (relative: string) => path.join(sdk().toString(), relative);
   const read = (relative: string) => fs.readFileSync(at(relative), 'utf8');
   const write = (relative: string, contents: string) => writeFiles(sdk().toString(), { [relative]: contents });
@@ -70,9 +69,9 @@ describe('GenerateAction (sdk) — the destination', () => {
   const recorded = async (files: Files): Promise<SdkRepositoryContext> => {
     writeFiles(sdk().toString(), files);
     (await git.init(new DirectoryPath(root)))._unsafeUnwrap();
-    const repository = (await sdkContext().repository())._unsafeUnwrap()!;
+    const repository = (await repositoryOf(sdk(), STABLE))!;
     const tree = (await repository.snapshotGenerated(sdk()))._unsafeUnwrap();
-    (await repository.recordGeneration(tree, STABLE))._unsafeUnwrap();
+    (await repository.record(tree, STABLE))._unsafeUnwrap();
     return repository;
   };
 
@@ -237,7 +236,8 @@ describe('GenerateAction (sdk) — the destination', () => {
       await sh(root, 'commit', '-qm', 'sdk');
       await sh(root, 'init', '-q', '--bare', '--initial-branch=main', remote);
       await sh(root, 'remote', 'add', 'origin', remote);
-      await sh(root, 'push', '-q', 'origin', 'main');
+      // Hooks skipped, as a tool that bypasses them pushes, so the clone starts without the snapshots.
+      await sh(root, 'push', '-q', '--no-verify', 'origin', 'main');
       await sh(root, 'clone', '-q', '--no-local', remote, clone);
       project = clone;
       const snapshotMissing = sinon.stub(SdkGeneratePrompts.prototype, 'snapshotMissing');
@@ -248,7 +248,7 @@ describe('GenerateAction (sdk) — the destination', () => {
       expect(snapshotMissing.firstCall.args[0]).to.deep.equal({ kind: 'absent', remote: 'origin' });
       expect(generateSdk.called).to.be.false;
 
-      await sh(root, 'push', '-q', 'origin', 'refs/apimatic/pristine/*:refs/apimatic/pristine/*');
+      await sh(root, 'push', '-q', '--no-verify', 'origin', 'refs/apimatic/pristine/*:refs/apimatic/pristine/*');
       await sh(clone, 'fetch', '-q', 'origin', '+refs/apimatic/pristine/*:refs/apimatic/pristine/*');
 
       expect((await execute({ force: false, files: V2 })).isSuccess()).to.be.true;
@@ -304,13 +304,11 @@ describe('GenerateAction (sdk) — the destination', () => {
 
     /** A recorded generation whose `a.py` the developer left unmerged with markers. */
     const marked = async () => {
-      const repository = await recorded(FILES);
-      const base = (await repository.readRecord())!.pristineCommit();
+      await recorded(FILES);
       write('a.py', 'kept above\n' + MARKED + 'kept below\n');
       write('b.py', 'resolved by hand');
       await unmerged('a.py');
       sinon.stub(terminal, 'isInteractive').returns(true);
-      return { repository, base };
     };
 
     it('settles the markers still there for the generator, keeping the rest of the file, then merges', async () => {
@@ -464,14 +462,14 @@ describe('GenerateAction (sdk) — the destination', () => {
     const shared = async (): Promise<{ clone: string; origin: string; base: CommitId }> => {
       const origin = fs.mkdtempSync(path.join(os.tmpdir(), 'sdk-destination-origin-'));
       const clone = fs.mkdtempSync(path.join(os.tmpdir(), 'sdk-destination-clone-'));
-      const repository = await recorded({ 'README.md': '# sdk' });
-      const base = (await repository.readRecord())!.pristineCommit();
+      await recorded({ 'README.md': '# sdk' });
+      const base = record().pristineCommit();
       await sh(root, 'add', '.');
       await sh(root, 'commit', '-qm', 'sdk');
       await sh(root, 'init', '-q', '--bare', '--initial-branch=main', origin);
       await sh(root, 'remote', 'add', 'origin', origin);
       await sh(root, 'push', '-q', 'origin', 'main');
-      await sh(root, 'push', '-q', 'origin', refspec(repository.pristineRef()));
+      await sh(root, 'push', '-q', 'origin', refspec(SnapshotRef.pristine(SdkPath.fromGit('sdk/python'))));
       await sh(root, 'clone', '-q', '--no-local', origin, clone);
       project = clone;
       return { clone, origin, base };
@@ -496,15 +494,18 @@ describe('GenerateAction (sdk) — the destination', () => {
       try {
         writeFiles(published, GENERATED);
         (await git.init(new DirectoryPath(published)))._unsafeUnwrap();
-        const repository = (await new SdkContext(new DirectoryPath(published)).repository())._unsafeUnwrap()!;
+        const repository = (await repositoryOf(new DirectoryPath(published), STABLE))!;
         const tree = (await repository.snapshotGenerated(new DirectoryPath(published)))._unsafeUnwrap();
-        const base = (await repository.recordGeneration(tree, STABLE))._unsafeUnwrap().pristineCommit();
+        (await repository.record(tree, STABLE))._unsafeUnwrap();
+        const base = GenerationRecord.parse(
+          fs.readFileSync(path.join(published, '.apimatic/generation.json'), 'utf8')
+        )!.pristineCommit();
         await sh(published, 'add', '.');
         await sh(published, 'commit', '-qm', 'sdk');
         await sh(published, 'init', '-q', '--bare', '--initial-branch=main', origin);
         await sh(published, 'remote', 'add', 'origin', origin);
         await sh(published, 'push', '-q', 'origin', 'main');
-        await sh(published, 'push', '-q', 'origin', refspec(repository.pristineRef()));
+        await sh(published, 'push', '-q', 'origin', refspec(SnapshotRef.pristine(SdkPath.fromGit(''))));
         await sh(published, 'clone', '-q', '--no-local', origin, clone);
         writeFiles(clone, { 'README.md': '# edited' });
 

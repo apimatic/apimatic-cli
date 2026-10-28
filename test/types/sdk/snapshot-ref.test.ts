@@ -22,15 +22,4 @@ describe('SnapshotRef', () => {
     expect(SnapshotRef.fromGit('refs/apimatic/pristine').sdkPath().toString()).to.equal('');
     expect(SnapshotRef.previous(SdkPath.fromGit('sdk/typescript')).sdkPath().toString()).to.equal('sdk/typescript');
   });
-
-  it('collides only with a ref on its own path, in either direction', () => {
-    const typescript = SnapshotRef.pristine(SdkPath.fromGit('sdk/typescript'));
-
-    expect(typescript.collidesWith(SnapshotRef.pristine(SdkPath.fromGit('sdk/typescript/typescript')))).to.be.true;
-    expect(typescript.collidesWith(SnapshotRef.pristine(SdkPath.fromGit('sdk')))).to.be.true;
-    expect(typescript.collidesWith(SnapshotRef.pristine(SdkPath.fromGit('')))).to.be.true;
-    expect(typescript.collidesWith(SnapshotRef.pristine(SdkPath.fromGit('sdk/typescript')))).to.be.false;
-    expect(typescript.collidesWith(SnapshotRef.pristine(SdkPath.fromGit('sdk/typescript-v2')))).to.be.false;
-    expect(typescript.collidesWith(SnapshotRef.pristine(SdkPath.fromGit('sdk/python')))).to.be.false;
-  });
 });

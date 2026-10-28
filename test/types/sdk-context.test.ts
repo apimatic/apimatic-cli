@@ -5,17 +5,53 @@ import AdmZip from 'adm-zip';
 import { expect } from 'chai';
 import { execa } from 'execa';
 import { GitService } from '../../src/infrastructure/git-service.js';
-import { canonical } from '../../src/infrastructure/tmp-extensions.js';
 import { DirectoryPath } from '../../src/types/file/directoryPath.js';
 import { FileName } from '../../src/types/file/fileName.js';
 import { FilePath } from '../../src/types/file/filePath.js';
 import { SdkContext } from '../../src/types/sdk-context.js';
+import { SdkRepositoryContext } from '../../src/types/sdk-repository-context.js';
+import { SdkDestination, Unresolved } from '../../src/types/sdk/sdk-destination.js';
+import { CodeGenerationVersion, Language, Stability } from '../../src/types/sdk/generate.js';
+import { SdkGeneration } from '../../src/types/sdk/generation-record.js';
+import { SdkPath } from '../../src/types/sdk/sdk-path.js';
+import { SnapshotRef } from '../../src/types/sdk/snapshot-ref.js';
+
+const PYTHON: SdkGeneration = {
+  language: Language.PYTHON,
+  codegenVersion: CodeGenerationVersion.V4,
+  stability: Stability.STABLE
+};
 
 describe('SdkContext', () => {
   let root: string;
   let context: SdkContext;
 
   const inRoot = (...segments: string[]) => path.join(root, ...segments);
+
+  /** The repository a destination writes through, which the test expects it to have found. */
+  const repositoryIn = (destination: SdkDestination | Unresolved): SdkRepositoryContext => {
+    if (!('repository' in destination)) {
+      expect.fail(`no repository behind a ${destination.kind} destination`);
+    }
+    return destination.repository;
+  };
+
+  /** Records one generation through `repository`, so the test can see which repository and path it landed in. */
+  const recordOne = async (repository: SdkRepositoryContext) => {
+    const generated = fs.mkdtempSync(path.join(root, 'generated-'));
+    fs.writeFileSync(path.join(generated, 'README.md'), '# sdk');
+    const tree = (await repository.snapshotGenerated(new DirectoryPath(generated)))._unsafeUnwrap();
+    (await repository.record(tree, PYTHON))._unsafeUnwrap();
+  };
+
+  /** The pristine commit for the SDK at `sdkPath` in the repository at `repositoryRoot`, or none. */
+  const pristineAt = async (repositoryRoot: string, sdkPath: string) =>
+    (
+      await new GitService().resolveRef(
+        new DirectoryPath(repositoryRoot),
+        SnapshotRef.pristine(SdkPath.fromGit(sdkPath))
+      )
+    )._unsafeUnwrap();
 
   beforeEach(() => {
     root = fs.mkdtempSync(path.join(os.tmpdir(), 'sdk-context-'));
@@ -24,48 +60,49 @@ describe('SdkContext', () => {
 
   afterEach(() => fs.rmSync(root, { recursive: true, force: true }));
 
-  describe('repository', () => {
+  describe('destination, by the enclosing repository', () => {
     const git = new GitService();
 
-    it('finds the repository enclosing the SDK directory, which need not exist yet', async () => {
+    it('writes through the repository enclosing the SDK directory, which need not exist yet', async () => {
       (await git.init(new DirectoryPath(root)))._unsafeUnwrap();
 
-      const repository = (await context.repository())._unsafeUnwrap();
+      const repository = repositoryIn((await context.destination(PYTHON))._unsafeUnwrap());
 
-      expect(repository?.root().isEqual(new DirectoryPath(canonical(root)))).to.be.true;
-      expect(repository?.sdkDirectory().isEqual(new DirectoryPath(canonical(root), 'sdk', 'python'))).to.be.true;
+      await recordOne(repository);
+      expect(await pristineAt(root, 'sdk/python')).to.not.be.undefined;
     });
 
     it('finds none when that repository ignores the SDK directory, until the directory is a repository of its own', async () => {
       (await git.init(new DirectoryPath(root)))._unsafeUnwrap();
       fs.writeFileSync(inRoot('.gitignore'), '/sdk/\n');
 
-      expect((await context.repository())._unsafeUnwrap()).to.be.undefined;
+      expect((await context.destination(PYTHON))._unsafeUnwrap().kind).to.equal('noRepository');
 
       fs.mkdirSync(inRoot('sdk', 'python'), { recursive: true });
       (await git.init(new DirectoryPath(inRoot('sdk', 'python'))))._unsafeUnwrap();
-      const own = (await context.repository())._unsafeUnwrap();
-      expect(own?.root().isEqual(new DirectoryPath(canonical(root), 'sdk', 'python'))).to.be.true;
+      const own = repositoryIn((await context.destination(PYTHON))._unsafeUnwrap());
+      await recordOne(own);
+      expect(await pristineAt(inRoot('sdk', 'python'), '')).to.not.be.undefined;
     });
   });
 
-  describe('repository, as the SDK directory sits', () => {
+  describe('destination, as the SDK directory sits', () => {
     const git = new GitService();
 
-    it('finds nothing outside a repository', async () => {
+    it('finds no repository outside one', async () => {
       fs.mkdirSync(inRoot('sdk', 'python'), { recursive: true });
 
-      expect((await context.repository())._unsafeUnwrap()).to.be.undefined;
+      expect((await context.destination(PYTHON))._unsafeUnwrap().kind).to.equal('noRepository');
     });
 
-    it('answers with the enclosing repository, however deep the SDK directory sits', async () => {
+    it('writes through the enclosing repository, however deep the SDK directory sits', async () => {
       (await git.init(new DirectoryPath(root)))._unsafeUnwrap();
       const deep = new SdkContext(new DirectoryPath(inRoot('packages', 'sdk', 'python')));
 
-      const repository = (await deep.repository())._unsafeUnwrap()!;
+      const repository = repositoryIn((await deep.destination(PYTHON))._unsafeUnwrap());
 
-      expect(repository.root().isEqual(new DirectoryPath(canonical(root)))).to.be.true;
-      expect(repository.pristineRef().toString()).to.equal('refs/apimatic/pristine/packages/sdk/python');
+      await recordOne(repository);
+      expect(await pristineAt(root, 'packages/sdk/python')).to.not.be.undefined;
     });
   });
 
@@ -74,8 +111,8 @@ describe('SdkContext', () => {
       const repository = (await context.initRepository())._unsafeUnwrap();
 
       expect(fs.existsSync(inRoot('sdk', 'python', '.git'))).to.be.true;
-      expect(repository.root().isEqual(new DirectoryPath(inRoot('sdk', 'python')))).to.be.true;
-      expect(repository.pristineRef().toString()).to.equal('refs/apimatic/pristine');
+      await recordOne(repository);
+      expect(await pristineAt(inRoot('sdk', 'python'), '')).to.not.be.undefined;
     });
 
     it('makes the SDK directory its own repository, on main, leaving its files alone', async () => {
