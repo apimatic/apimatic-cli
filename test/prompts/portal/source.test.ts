@@ -7,14 +7,12 @@ import {
   reportLeftOutSpecs,
   reportNoTabsListed,
   reportShadowedFiles,
-  reportSharedEndpoints,
   reportSharedTabNames,
   reportSourceProblem,
   reportUnmergedSpecs,
   reportUnseenHomeTitle
 } from '../../../src/prompts/portal/source.js';
-import { Endpoint } from '../../../src/types/portal/endpoint.js';
-import { ContentProblem } from '../../../src/types/portal/portal-source.js';
+import { ContentProblem, UnreadableSpecReason } from '../../../src/types/portal/portal-source.js';
 import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
 import { FileName } from '../../../src/types/file/fileName.js';
 import { FilePath } from '../../../src/types/file/filePath.js';
@@ -219,9 +217,9 @@ describe('reportSourceProblem', () => {
 
     it('names a document it cannot read by its folder', () => {
       const file = new FilePath(spec.join('orders'), new FileName('openapi.yaml'));
-      reportSourceProblem({ kind: 'unreadableSpec', file }, source);
+      reportSourceProblem({ kind: 'unreadableSpec', file, referencedBy: null, reason: { kind: 'empty' } }, source);
 
-      expect(printed()).to.equal("'spec/orders/openapi.yaml' could not be read as JSON or YAML.");
+      expect(printed()).to.equal("'spec/orders/openapi.yaml' could not be read: it is empty.");
     });
 
     it('names a metadata file it cannot read, which is JSON only', () => {
@@ -311,6 +309,97 @@ describe('reportSourceProblem', () => {
         `'spec/APIMATIC-META.json' merges the folders of '${spec}', which has none.`,
         "Put each API definition in a folder of its own there, or turn off 'MergeApis' in the file."
       ]);
+    });
+  });
+
+  describe('a file a specification is read from', () => {
+    const spec = source.join('spec');
+    const api = new FilePath(spec, new FileName('api.yaml'));
+    const pet = new FilePath(spec.join('schemas'), new FileName('Pet.json'));
+
+    it('names a document it cannot read, and why, in the words of the parser that refused it', () => {
+      const message =
+        'Flow sequence in block collection must be sufficiently indented and end with a ] at line 3, column 1';
+
+      reportSourceProblem(
+        { kind: 'unreadableSpec', file: api, referencedBy: null, reason: { kind: 'invalid', message } },
+        source
+      );
+
+      expect(printed()).to.equal(`'spec/api.yaml' could not be read: ${message}.`);
+    });
+
+    it('names the file that refers to one it cannot read', () => {
+      const message = "Expected ',' or '}' after property value in JSON at position 13 (line 3 column 3)";
+
+      reportSourceProblem(
+        { kind: 'unreadableSpec', file: pet, referencedBy: api, reason: { kind: 'invalid', message } },
+        source
+      );
+
+      expect(printed()).to.equal(
+        `'spec/schemas/Pet.json', which 'spec/api.yaml' refers to, could not be read: ${message}.`
+      );
+    });
+
+    const reasons: [UnreadableSpecReason, string][] = [
+      [{ kind: 'empty' }, 'it is empty'],
+      [{ kind: 'noValue' }, 'it holds no value'],
+      [{ kind: 'noKey' }, 'it is not JSON, and the portal reads YAML only when it holds a key'],
+      [{ kind: 'gone' }, 'it is no longer there'],
+      [{ kind: 'folder' }, 'it is a folder'],
+      [{ kind: 'unopened', message: 'EACCES: permission denied' }, 'EACCES: permission denied']
+    ];
+
+    reasons.forEach(([reason, said]) => {
+      it(`says why a file could not be read, when it is ${reason.kind}`, () => {
+        reportSourceProblem({ kind: 'unreadableSpec', file: api, referencedBy: null, reason }, source);
+
+        expect(printed()).to.equal(`'spec/api.yaml' could not be read: ${said}.`);
+      });
+    });
+
+    it('names a file referred to that is not there, and where a reference is resolved from', () => {
+      reportSourceProblem(
+        { kind: 'missingSpecReference', missing: { file: pet, foundAs: null }, referencedBy: api },
+        source
+      );
+
+      expect(printed()).to.equal(
+        "'spec/api.yaml' refers to 'spec/schemas/Pet.json', but there is no such file.\n" +
+          "A '$ref' names a file from the folder of the file it is written in."
+      );
+    });
+
+    it('names a file referred to that is there in another case, as it is spelt', () => {
+      const lowerCase = new FilePath(spec.join('schemas'), new FileName('pet.json'));
+
+      reportSourceProblem(
+        { kind: 'missingSpecReference', missing: { file: lowerCase, foundAs: pet }, referencedBy: api },
+        source
+      );
+
+      expect(printed()).to.equal(
+        "'spec/api.yaml' refers to 'spec/schemas/pet.json', but the file is spelt 'spec/schemas/Pet.json' on disk."
+      );
+    });
+
+    const PART_NAMED =
+      "A '$ref' names a part of the file it is in as '#/components/schemas/Pet', and a part of another as " +
+      "'./pets.yaml#/Pet'.";
+
+    it('names the file a $ref the build cannot resolve is in, and how to name a part of a file', () => {
+      reportSourceProblem({ kind: 'unresolvableSpecReference', reference: { file: api, ref: '#pet' } }, source);
+
+      expect(printed()).to.equal(
+        `'spec/api.yaml' has the '$ref' '#pet', which the portal cannot resolve.\n${PART_NAMED}`
+      );
+    });
+
+    it('says a $ref is empty rather than quoting it', () => {
+      reportSourceProblem({ kind: 'unresolvableSpecReference', reference: { file: pet, ref: '' } }, source);
+
+      expect(printed()).to.equal(`'spec/schemas/Pet.json' has an empty '$ref'.\n${PART_NAMED}`);
     });
   });
 
@@ -762,54 +851,5 @@ describe('reportLeftOutSpecs', () => {
         'merges only the folders beside it. To include them, move each into a folder of its own, adding the ' +
         "folders to 'MergeOrderOfDirectories' when the file lists folders."
     ]);
-  });
-});
-
-describe('reportSharedEndpoints', () => {
-  const source = new DirectoryPath('project').join('src');
-  const spec = source.join('spec');
-  const files = ['alpha', 'beta'].map((folder) => new FilePath(spec.join(folder), new FileName('openapi.json')));
-  let lines: string[];
-
-  beforeEach(() => {
-    lines = [];
-    const record = (text?: string | string[]) => {
-      lines.push(stripVTControlCharacters(String(text)));
-    };
-    sinon.stub(log, 'warn').callsFake(record);
-    sinon.stub(log, 'message').callsFake(record);
-  });
-
-  afterEach(() => {
-    sinon.restore();
-  });
-
-  it('says nothing when no two specs declare the same operation', () => {
-    reportSharedEndpoints([], source);
-
-    expect(lines).to.deep.equal([]);
-  });
-
-  it('names each operation and the specs declaring it, and why it shows no SDK sample', () => {
-    reportSharedEndpoints(
-      [
-        { key: new Endpoint('get', '/status'), files },
-        { key: new Endpoint('post', '/status'), files }
-      ],
-      source
-    );
-
-    expect(lines.join('\n').split('\n')).to.deep.equal([
-      'More than one API definition declares these operations, so the portal shows no SDK sample on them:',
-      "  • 'GET /status': 'spec/alpha/openapi.json' and 'spec/beta/openapi.json'",
-      "  • 'POST /status': 'spec/alpha/openapi.json' and 'spec/beta/openapi.json'"
-    ]);
-  });
-
-  it('speaks of one operation when there is one', () => {
-    reportSharedEndpoints([{ key: new Endpoint('get', '/status'), files }], source);
-
-    expect(lines[0]).to.contain('declares this operation,');
-    expect(lines[0]).to.contain('no SDK sample on it:');
   });
 });

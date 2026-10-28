@@ -2,7 +2,7 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 import fsExtra from 'fs-extra';
 import { err, ok, Result } from 'neverthrow';
-import { DirectoryPath } from '../types/file/directoryPath.js';
+import { DirectoryPath, posix } from '../types/file/directoryPath.js';
 import { FileName } from '../types/file/fileName.js';
 import { FilePath } from '../types/file/filePath.js';
 import { CodeSampleCatalogs } from '../types/portal/code-samples.js';
@@ -128,10 +128,7 @@ export class PortalProjectService {
       projectDirectory,
       source,
       await this.contentDirectory(projectDirectory, source),
-      await this.writeCodeSamples(
-        projectDirectory,
-        artifacts.codeSampleCatalogs.without(source.sharedEndpoints.map(({ key }) => key))
-      ),
+      await this.writeCodeSamples(projectDirectory, source, artifacts.codeSampleCatalogs),
       await this.writeDownloads(projectDirectory, artifacts)
     );
 
@@ -192,13 +189,15 @@ export class PortalProjectService {
   // The template places the samples on the specs as it bundles them, so the specs are read where they are.
   private async writeCodeSamples(
     projectDirectory: DirectoryPath,
+    source: PortalSource,
     codeSampleCatalogs: CodeSampleCatalogs
   ): Promise<FilePath | null> {
     if (codeSampleCatalogs.isEmpty()) {
       return null;
     }
     const file = new FilePath(projectDirectory, new FileName('code-samples.json'));
-    await this.fileService.writeContents(file, JSON.stringify(codeSampleCatalogs.toJson()));
+    const placed = codeSampleCatalogs.placedOn(source.specs, source.specDirectory);
+    await this.fileService.writeContents(file, JSON.stringify(placed.toJson()));
     return file;
   }
 
@@ -289,7 +288,8 @@ export class PortalProjectService {
       codeSamples: codeSamples === null ? null : codeSamples.toPosix(),
       contentDir: contentDirectory.toPosix(),
       generatedDir: projectDirectory.join(GENERATED_DIRECTORY_NAME).toPosix(),
-      staticDir: source.staticDirectory === null ? null : source.staticDirectory.toPosix(),
+      // The dev server's allow list names it, and Vite resolves a symlink before comparing.
+      staticDir: source.staticDirectory === null ? null : posix(canonical(source.staticDirectory.toString())),
       downloadsDir: downloads === null ? null : downloads.toPosix()
     };
 

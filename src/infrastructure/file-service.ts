@@ -17,6 +17,14 @@ function isDanglingLink(error: unknown): boolean {
   return code === 'ENOENT' || code === 'ENOTDIR';
 }
 
+interface DirectoryEntries {
+  fileNames: FileName[];
+  subDirectories: DirectoryPath[];
+}
+
+/** Each folder's entries by its path, read once for the files of one call. */
+type Listings = Map<string, Promise<DirectoryEntries>>;
+
 function spelling<T>(name: string, entries: T[], nameOf: (entry: T) => string): T | undefined {
   return (
     entries.find((entry) => nameOf(entry) === name) ??
@@ -155,21 +163,43 @@ export class FileService {
 
   // By code point first: Windows and macOS open `logo.png` for `Logo.PNG`, where a web server would not.
   public async spelledOnDisk(root: DirectoryPath, file: FilePath): Promise<FilePath | null> {
-    const directory = await this.directorySpelledOnDisk(root, file.directory());
-    if (directory === null) {
-      return null;
-    }
-    const { fileNames } = await this.listEntries(directory);
-    const match = spelling(file.name().toString(), fileNames, (candidate) => candidate.toString());
-    return match === undefined ? null : new FilePath(directory, match);
+    const [found] = await this.spellingsOnDisk(root, [file]);
+    return found;
   }
 
-  /** `directory`, at or below `root`, as each folder below `root` is spelt on disk; null when one is not there. */
+  /** As `spelledOnDisk` for each of `files`, listing each folder once: a split specification runs to thousands. */
+  public async spellingsOnDisk(root: DirectoryPath, files: FilePath[]): Promise<(FilePath | null)[]> {
+    const listings: Listings = new Map();
+    return await Promise.all(
+      files.map(async (file) => {
+        const directory = await this.spelledDirectory(root, file.directory(), listings);
+        if (directory === null) {
+          return null;
+        }
+        const { fileNames } = await this.listOnce(directory, listings);
+        const match = spelling(file.name().toString(), fileNames, (candidate) => candidate.toString());
+        return match === undefined ? null : new FilePath(directory, match);
+      })
+    );
+  }
+
+  /** `directory` as each folder below `root` is spelt on disk; null when one is not there, or it is not below `root`. */
   public async directorySpelledOnDisk(root: DirectoryPath, directory: DirectoryPath): Promise<DirectoryPath | null> {
+    return await this.spelledDirectory(root, directory, new Map());
+  }
+
+  private async spelledDirectory(
+    root: DirectoryPath,
+    directory: DirectoryPath,
+    listings: Listings
+  ): Promise<DirectoryPath | null> {
+    if (!root.contains(directory)) {
+      return null;
+    }
     const relative = path.relative(root.toString(), directory.toString());
     let found = root;
     for (const name of relative === '' ? [] : relative.split(path.sep)) {
-      const { subDirectories } = await this.listEntries(found);
+      const { subDirectories } = await this.listOnce(found, listings);
       const match = spelling(name, subDirectories, (subDirectory) => path.basename(subDirectory.toString()));
       if (match === undefined) {
         return null;
@@ -179,10 +209,16 @@ export class FileService {
     return found;
   }
 
+  private listOnce(dir: DirectoryPath, listings: Listings): Promise<DirectoryEntries> {
+    const listing = listings.get(dir.toString()) ?? this.listEntries(dir);
+    listings.set(dir.toString(), listing);
+    return listing;
+  }
+
   // The direct children of `dir`, split into files and directories; both empty when it cannot
   // be read. A symlink counts as what it points at: skipping it silently drops an entry the
   // user did put there.
-  private async listEntries(dir: DirectoryPath): Promise<{ fileNames: FileName[]; subDirectories: DirectoryPath[] }> {
+  private async listEntries(dir: DirectoryPath): Promise<DirectoryEntries> {
     const fileNames: FileName[] = [];
     const subDirectories: DirectoryPath[] = [];
     try {
@@ -206,6 +242,20 @@ export class FileService {
     await this.forEachEntry(source, destination, (from, to) => fsExtra.copy(from, to));
   }
 
+  /** Copies what links point to, so relative ones still resolve. `excluding` ignores case, as Windows and macOS do. */
+  public async copyDirectoryContentsFollowingLinks(
+    source: DirectoryPath,
+    destination: DirectoryPath,
+    excluding: readonly FileName[] = []
+  ) {
+    await this.forEachEntry(
+      source,
+      destination,
+      (from, to) => fsExtra.copy(from, to, { dereference: true }),
+      excluding
+    );
+  }
+
   public async moveDirectoryContents(source: DirectoryPath, destination: DirectoryPath) {
     await this.forEachEntry(source, destination, (from, to) => fsExtra.move(from, to, { overwrite: true }));
   }
@@ -213,12 +263,20 @@ export class FileService {
   private async forEachEntry(
     source: DirectoryPath,
     destination: DirectoryPath,
-    operation: (from: string, to: string) => Promise<void>
+    operation: (from: string, to: string) => Promise<void>,
+    excluding: readonly FileName[] = []
   ) {
     const entries = await fsExtra.readdir(source.toString());
-    await Promise.all(
-      entries.map((entry) => operation(path.join(source.toString(), entry), path.join(destination.toString(), entry)))
+    // Settled rather than raced, so no entry is still being written when the caller cleans up after a failure.
+    const outcomes = await Promise.allSettled(
+      entries
+        .filter((entry) => !excluding.some((name) => name.is(entry)))
+        .map((entry) => operation(path.join(source.toString(), entry), path.join(destination.toString(), entry)))
     );
+    const failure = outcomes.find((outcome): outcome is PromiseRejectedResult => outcome.status === 'rejected');
+    if (failure) {
+      throw failure.reason;
+    }
   }
 
   public async deleteFile(filePath: FilePath): Promise<void> {

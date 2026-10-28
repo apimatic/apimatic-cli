@@ -1,5 +1,4 @@
 import { ok, Result, ResultAsync } from 'neverthrow';
-import { FileService } from '../infrastructure/file-service.js';
 import { ApimaticConfigContext, ApimaticConfigWriteFailure } from './apimatic-config-context.js';
 import { ApimaticConfigDocument, ConfigBlockName, findingClause } from './apimatic-config/document.js';
 import { isPublished, languagesOf, PluginLanguageEntry, PluginLanguages } from './apimatic-config/languages-block.js';
@@ -13,7 +12,6 @@ import {
   PluginMetadata
 } from './plugin/plugin-config.js';
 import { PortalLanguages } from './portal/portal-languages.js';
-import { SOURCE_DIRECTORY_NAME } from './project-layout.js';
 import { SemVersion } from './publish/version.js';
 import { isAvailableLanguage, Language } from './sdk/generate.js';
 
@@ -147,7 +145,6 @@ const withMetadata = (
 
 export class PluginConfigContext {
   private readonly configContext: ApimaticConfigContext;
-  private readonly fileService = new FileService();
 
   constructor(private readonly sourceDirectory: DirectoryPath) {
     this.configContext = new ApimaticConfigContext(this.sourceDirectory);
@@ -206,25 +203,15 @@ export class PluginConfigContext {
     return await this.merge((document) => document.with('languages', recorded(document, languages, keepsRecord)));
   }
 
-  /**
-   * The `src/` to upload: a copy whose `languages` names exactly what the plugin covers. The
-   * user's file keeps the published entries this run leaves out; the service reads the copy.
-   */
-  public async stageUpload(
-    into: DirectoryPath,
-    languages: readonly Language[]
-  ): Promise<Result<DirectoryPath, PluginConfigWriteFailure>> {
-    const staged = into.join(SOURCE_DIRECTORY_NAME);
-    await this.fileService.copyDirectoryContents(this.sourceDirectory, staged);
-
-    const config = new ApimaticConfigContext(staged);
-    const covered = await config.merge(OWNED_BLOCKS, (document) =>
+  /** Only for the build's copy: `languages` comes to name just what the plugin covers, dropping published entries. */
+  public async coverOnly(languages: readonly Language[]): Promise<Result<void, PluginConfigWriteFailure>> {
+    const covered = await this.configContext.merge(OWNED_BLOCKS, (document) =>
       document.with('languages', recorded(document, languages, isUnavailableLanguage))
     );
 
     // The merge writes nothing when it changes nothing, so a mark on the copy can outlive it —
     // and the service reads this file with a parser that will not look past one.
-    return await covered.asyncAndThen(() => new ResultAsync(config.removeByteOrderMark())).map(() => staged);
+    return await covered.asyncAndThen(() => new ResultAsync(this.configContext.removeByteOrderMark()));
   }
 
   private async merge(

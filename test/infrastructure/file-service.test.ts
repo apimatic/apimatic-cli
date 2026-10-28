@@ -116,6 +116,7 @@ describe('FileService', () => {
     });
 
     afterEach(() => {
+      sinon.restore();
       fs.rmSync(root.toString(), { recursive: true, force: true });
     });
 
@@ -150,6 +151,28 @@ describe('FileService', () => {
       expect((await fileService.directorySpelledOnDisk(root, images))?.isEqual(images)).to.be.true;
       expect((await fileService.directorySpelledOnDisk(root, root))?.isEqual(root)).to.be.true;
       expect(await fileService.directorySpelledOnDisk(root, root.join('static', 'logos'))).to.be.null;
+    });
+
+    it('answers null for a directory that is not below the root', async () => {
+      expect(await fileService.directorySpelledOnDisk(root.join('static'), root)).to.be.null;
+    });
+
+    it('answers for several files, reading each folder once', async () => {
+      fs.writeFileSync(path.join(root.toString(), 'static', 'images', 'icon.png'), '');
+      const readdir = sinon.spy(fsExtra, 'readdir');
+
+      const found = await fileService.spellingsOnDisk(root, [
+        fileAt('static', 'images', 'Logo.png'),
+        fileAt('static', 'images', 'icon.png'),
+        fileAt('static', 'images', 'banner.png')
+      ]);
+
+      expect(found.map((file) => file?.relativeTo(root) ?? null)).to.deep.equal([
+        'static/images/logo.png',
+        'static/images/icon.png',
+        null
+      ]);
+      expect(readdir.callCount).to.equal(3);
     });
   });
 
@@ -195,6 +218,80 @@ describe('FileService', () => {
       const missing = await fileService.findSymlinks(root.join('missing'));
 
       expect(missing._unsafeUnwrapErr()).to.contain('ENOENT');
+    });
+  });
+
+  describe('copyDirectoryContentsFollowingLinks', () => {
+    const fileService = new FileService();
+    let root: DirectoryPath;
+    const inRoot = (...parts: string[]) => path.join(root.toString(), ...parts);
+    // Copied one level deeper than the source, so a relative link kept as a link would point at nothing.
+    const copy = () => root.join('elsewhere', 'copy');
+    const folderLink = process.platform === 'win32' ? 'junction' : 'dir';
+
+    beforeEach(() => {
+      root = new DirectoryPath(fs.mkdtempSync(path.join(os.tmpdir(), 'file-service-')));
+      fsExtra.outputFileSync(inRoot('shared', 'notes.md'), '# notes');
+      fs.mkdirSync(inRoot('source'));
+    });
+
+    afterEach(() => {
+      fs.rmSync(root.toString(), { recursive: true, force: true });
+    });
+
+    it('copies a linked folder as the folder it points to', async () => {
+      fs.symlinkSync(inRoot('shared'), inRoot('source', 'linked'), folderLink);
+
+      await fileService.copyDirectoryContentsFollowingLinks(root.join('source'), copy());
+
+      expect(fs.lstatSync(copy().join('linked').toString()).isSymbolicLink()).to.be.false;
+      expect(fs.readFileSync(path.join(copy().toString(), 'linked', 'notes.md'), 'utf-8')).to.equal('# notes');
+    });
+
+    it('copies a relative file link as the file it points to', async function () {
+      try {
+        fs.symlinkSync(path.join('..', 'shared', 'notes.md'), inRoot('source', 'notes.md'), 'file');
+      } catch {
+        this.skip(); // Windows makes a file link only in Developer Mode or for an administrator.
+      }
+
+      await fileService.copyDirectoryContentsFollowingLinks(root.join('source'), copy());
+
+      expect(fs.readFileSync(path.join(copy().toString(), 'notes.md'), 'utf-8')).to.equal('# notes');
+    });
+
+    it('fails on a link to nothing only once every other entry is copied', async () => {
+      for (let file = 0; file < 400; file++) {
+        fsExtra.outputFileSync(inRoot('source', 'content', `${file}.md`), '');
+      }
+      fs.symlinkSync(inRoot('missing'), inRoot('source', 'broken'), folderLink);
+
+      let thrown: unknown;
+      try {
+        await fileService.copyDirectoryContentsFollowingLinks(root.join('source'), copy());
+      } catch (error) {
+        thrown = error;
+      }
+
+      expect(thrown).to.be.an('error');
+      expect(fs.readdirSync(path.join(copy().toString(), 'content'))).to.have.length(400);
+    });
+
+    it('leaves out a top-level entry it is told to, in any case, and keeps a nested one of that name', async () => {
+      for (const file of ['Static/logo.png', 'content/static/page.md', 'spec/openapi.json']) {
+        fsExtra.outputFileSync(inRoot('source', file), '');
+      }
+
+      await fileService.copyDirectoryContentsFollowingLinks(root.join('source'), copy(), [new FileName('static')]);
+
+      const copied = fs.readdirSync(copy().toString(), { recursive: true, encoding: 'utf-8' });
+      expect(copied.map((entry) => entry.split(path.sep).join('/'))).to.have.members([
+        'content',
+        'content/static',
+        'content/static/page.md',
+        'spec',
+        'spec/openapi.json'
+      ]);
     });
   });
 });

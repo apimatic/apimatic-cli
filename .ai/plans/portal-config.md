@@ -153,7 +153,7 @@ Rejected, with reasons:
 
 ```json
 {
-  "$schema": "https://cdn.jsdelivr.net/npm/@apimatic/cli@beta/apimatic.schema.json",
+  "$schema": "https://cdn.jsdelivr.net/npm/@apimatic/cli@2/apimatic.schema.json",
   "schemaVersion": 1,
   "portal": {
     "site": {
@@ -730,6 +730,7 @@ Following `.ai/instructions.md` and the skills in `.ai/skills/`.
   and never to a prerelease, so `@2` leads nowhere until 2.0.0 ships. The
   `beta` dist-tag reaches the newest prerelease, so every scaffold names it
   (decided 2026-09-29, replacing the per-version `schemaUrlFor` of 2026-09-23).
+  *(Superseded 2026-10-26: the 2.0.0 release candidate moved both to `@2`.)*
 - **Prompts.** New source problems: a missing dark logo or favicon named with
   its key; `site.name` required for several specs; the languages errors; the
   serve watcher's re-applied and rejected messages.

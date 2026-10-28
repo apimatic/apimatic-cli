@@ -5,8 +5,10 @@ import { Endpoint } from './endpoint.js';
 import { SuggestedSite } from './config/site-config.js';
 import { ContentNotices } from './content-notices.js';
 import { GeneratedPages } from './generated-pages.js';
+import { ParseFailure } from './openapi-document.js';
 import { PortalConfig } from './portal-config.js';
 import { Shared } from './shared.js';
+import { UnresolvableReference } from './spec-bundle.js';
 
 /** An OpenAPI document found in `src/spec/` or in a folder merged there, with the slug its section is mounted at. */
 export interface PortalSpec {
@@ -16,8 +18,8 @@ export interface PortalSpec {
   endpoints: Endpoint[];
 }
 
-/** An operation more than one specification declares, which one code sample per method and path cannot serve. */
-export type SharedEndpoint = Shared<Endpoint>;
+/** A part of the source directory that `portal serve` watches, and checks on each save. */
+export type WatchedSource = 'config' | 'content' | 'spec';
 
 /** What `apimatic.json` decides about a portal, which `portal serve` reads again on every edit. */
 export interface PortalSettings {
@@ -39,8 +41,6 @@ export interface PortalSource extends PortalSettings {
   unmergedSpecs: FilePath[];
   /** API definitions at the top of `spec/` while its folders are merged, which the portal and the SDKs leave out. */
   leftOutSpecs: FilePath[];
-  /** Shown with no SDK sample, since the samples hold one per method and path. */
-  sharedEndpoints: SharedEndpoint[];
   contentDirectory: DirectoryPath | null;
   staticDirectory: DirectoryPath | null;
   shadowedFiles: FileName[];
@@ -87,7 +87,7 @@ export interface ReservedAddressPage {
 /** Pages of the user's that would be served at one address, which only one of them can have. */
 export type SharedAddress = Shared<string>;
 
-/** A page's Markdown image that the build would import and not find, which fails the whole build. */
+/** A page's image that the build would import and not find, which fails the whole build. */
 export interface MissingImage {
   page: FilePath;
   line: number;
@@ -116,6 +116,13 @@ export interface SpecConversion {
   others: number;
 }
 
+/** Why a file a specification is read from could not be read; `unopened` carries what the file system said. */
+export type UnreadableSpecReason =
+  | ParseFailure
+  | { kind: 'gone' }
+  | { kind: 'folder' }
+  | { kind: 'unopened'; message: string };
+
 /** Why a source directory cannot be built; each variant maps to its own message. */
 export type PortalSourceProblem =
   | { kind: 'missingConfig' }
@@ -123,7 +130,9 @@ export type PortalSourceProblem =
   | { kind: 'invalidConfig'; errors: string[]; missingPortal: boolean }
   // Every problem found in `content/`, so that one run lists all that a build would refuse.
   | { kind: 'invalidContent'; problems: ContentProblem[] }
-  | { kind: 'unreadableSpec'; file: FilePath }
+  | { kind: 'unreadableSpec'; file: FilePath; referencedBy: FilePath | null; reason: UnreadableSpecReason }
+  | { kind: 'missingSpecReference'; missing: MissingFile; referencedBy: FilePath }
+  | { kind: 'unresolvableSpecReference'; reference: UnresolvableReference }
   | { kind: 'unreadableMetadata'; file: FilePath }
   // Its `folders` are not read unless a metadata file merges them, and `api transform` writes into one of its own.
   | { kind: 'emptySpecDirectory'; folders: DirectoryPath[] }

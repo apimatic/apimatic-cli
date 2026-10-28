@@ -19,6 +19,9 @@ pnpm lint:fix          # ESLint with --fix --quiet
 # Format
 pnpm format            # Prettier write on src/**/*.{js,ts}
 
+# README
+pnpm readme            # after pnpm build; needs colour on (FORCE_COLOR=1 without a TTY, NO_COLOR unset) and COLUMNS unset
+
 # Test (all)
 pnpm test              # tsx + mocha, runs test/**/*.test.ts
 

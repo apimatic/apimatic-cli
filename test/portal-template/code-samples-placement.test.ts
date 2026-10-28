@@ -11,6 +11,7 @@ import { bundleSpec } from '../../portal-template/src/lib/openapi-bundle.server'
 const EXTENSION = 'x-apimatic-codeSamples';
 
 const typescript = (id: string) => ({ lang: 'typescript', label: 'TypeScript', sources: { [id]: `ts ${id}` } });
+const csharp = (id: string) => ({ lang: 'csharp', label: 'C#', sources: { [id]: `cs ${id}` } });
 
 const operation = (summary: string) => ({ summary, responses: { '200': { description: 'ok' } } });
 
@@ -70,7 +71,7 @@ describe('placeCodeSamples', () => {
   it('drops the samples an operation carries when the build has no samples file', async () => {
     const written = { paths: { '/pets': { get: { ...operation('List'), [EXTENSION]: [typescript('own')] } } } };
 
-    expect(placed(written, await readCodeSamples(null)).paths['/pets'].get).to.not.have.property(EXTENSION);
+    expect(placed(written, await readCodeSamples(null, 'pets')).paths['/pets'].get).to.not.have.property(EXTENSION);
   });
 
   it('gives two paths that share one operation object their own samples', () => {
@@ -112,11 +113,11 @@ describe('placeCodeSamples', () => {
         components: { pathItems: { Owners: { get: operation('List owners') } } }
       });
       const samplesFile = write('code-samples.json', {
-        '/pets': { GET: [typescript('pets')] },
-        '/owners': { GET: [typescript('owners')] }
+        paths: { '/pets': { GET: [typescript('pets')] }, '/owners': { GET: [typescript('owners')] } },
+        specs: {}
       });
 
-      const samples = await readCodeSamples(samplesFile);
+      const samples = await readCodeSamples(samplesFile, 'api');
       const server = createOpenAPI({
         input: { api: async () => placeCodeSamples(await bundleSpec(file), samples) }
       });
@@ -125,5 +126,51 @@ describe('placeCodeSamples', () => {
       expect(document.paths['/pets'].get[EXTENSION]).to.deep.equal([typescript('pets')]);
       expect(document.paths['/owners'].get[EXTENSION]).to.deep.equal([typescript('owners')]);
     });
+  });
+});
+
+describe('readCodeSamples', () => {
+  let root: string;
+
+  /** The samples file the CLI writes: samples filed under `orders`, and `paths` for every section. */
+  const samplesFile = (paths: object) => {
+    const file = path.join(root, 'code-samples.json');
+    fs.writeFileSync(
+      file,
+      JSON.stringify({ paths, specs: { orders: { '/status': { GET: [typescript('orders')] } } } })
+    );
+    return file;
+  };
+
+  beforeEach(() => {
+    root = fs.mkdtempSync(path.join(os.tmpdir(), 'code-samples-read-'));
+  });
+
+  afterEach(() => {
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  it('gives a section paths plus the samples filed under its slug, and any other section paths alone', async () => {
+    const file = samplesFile({ '/health': { GET: [typescript('health')] } });
+
+    expect(await readCodeSamples(file, 'orders')).to.deep.equal({
+      '/health': { GET: [typescript('health')] },
+      '/status': { GET: [typescript('orders')] }
+    });
+    expect(await readCodeSamples(file, 'inventory')).to.deep.equal({ '/health': { GET: [typescript('health')] } });
+  });
+
+  it("puts a section's own samples after those in paths on one operation", async () => {
+    const file = samplesFile({ '/status': { GET: [csharp('status')] } });
+
+    expect(await readCodeSamples(file, 'orders')).to.deep.equal({
+      '/status': { GET: [csharp('status'), typescript('orders')] }
+    });
+  });
+
+  it("gives a section named after one of an object's own members the samples in paths alone", async () => {
+    const file = samplesFile({ '/status': { GET: [typescript('shared')] } });
+
+    expect(await readCodeSamples(file, 'constructor')).to.deep.equal({ '/status': { GET: [typescript('shared')] } });
   });
 });

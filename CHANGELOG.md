@@ -1,3 +1,5 @@
+Releases from 2.0.0 on are listed in [GitHub Releases](https://github.com/apimatic/apimatic-cli/releases). This file ends at 1.5.0.
+
 # [1.5.0](https://github.com/apimatic/apimatic-cli/compare/v1.4.0...v1.5.0) (2026-09-14)
 
 

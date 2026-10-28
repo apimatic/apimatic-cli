@@ -64,7 +64,6 @@ describe('PortalProjectService', () => {
     specDirectory: new DirectoryPath(root).join('spec'),
     unmergedSpecs: [],
     leftOutSpecs: [],
-    sharedEndpoints: [],
     contentDirectory: null,
     staticDirectory: null,
     shadowedFiles: [],
@@ -266,6 +265,20 @@ describe('PortalProjectService', () => {
       expect(module).to.contain("from '../../portal.identity.json'");
     });
 
+    // The dev server compares a file's real path against its allow list, which names this directory.
+    it('names the static directory by its real path, when the source is reached through a link', async () => {
+      const real = path.join(root, 'real');
+      fs.mkdirSync(path.join(real, 'static'), { recursive: true });
+      fs.symlinkSync(real, path.join(root, 'linked'), 'junction');
+      const staticDirectory = new DirectoryPath(root).join('linked', 'static');
+
+      (await service.prepare(project, sourceFor({ staticDirectory }), NO_ARTIFACTS))._unsafeUnwrap();
+
+      expect(readConfig().staticDir).to.equal(
+        path.join(fs.realpathSync.native(real), 'static').split(path.sep).join('/')
+      );
+    });
+
     it('reports no static directory when the project has none', async () => {
       (await service.prepare(project, sourceFor(), NO_ARTIFACTS))._unsafeUnwrap();
 
@@ -294,27 +307,62 @@ describe('PortalProjectService', () => {
       undefined
     );
 
+    const LIST_PETS = { lang: 'typescript', label: 'TypeScript', sources: { Example: 'await client.pets.list();' } };
+
+    /** Two specs in folders of their own, both declaring `GET /pets`. */
+    const sharingSource = () => {
+      const spec = new DirectoryPath(root).join('spec');
+      return sourceFor({
+        specs: ['alpha', 'beta'].map((folder) => ({
+          slug: folder,
+          file: new FilePath(spec.join(folder), new FileName('openapi.json')),
+          endpoints: [new Endpoint('get', '/pets')]
+        }))
+      });
+    };
+
+    const writtenSamples = () => JSON.parse(fs.readFileSync(readConfig().codeSamples, 'utf8'));
+
     it('writes the samples beside the configuration, keyed by path and method, and names them in it', async () => {
       (await service.prepare(project, sourceFor(), withCatalogs))._unsafeUnwrap();
 
       const config = readConfig();
       expect(config.codeSamples).to.equal(path.join(project.toString(), 'code-samples.json').split(path.sep).join('/'));
-      expect(JSON.parse(fs.readFileSync(config.codeSamples, 'utf8'))).to.deep.equal({
-        '/pets': {
-          GET: [{ lang: 'typescript', label: 'TypeScript', sources: { Example: 'await client.pets.list();' } }]
-        }
-      });
+      expect(writtenSamples()).to.deep.equal({ paths: { '/pets': { GET: [LIST_PETS] } }, specs: {} });
     });
 
     // The samples hold one per method and path, which would be another API's call on all but one of the pages.
     it('leaves out the samples of an operation more than one spec declares', async () => {
-      const spec = new DirectoryPath(root).join('spec');
-      const files = ['alpha', 'beta'].map((folder) => new FilePath(spec.join(folder), new FileName('openapi.json')));
-      const source = sourceFor({ sharedEndpoints: [{ key: new Endpoint('get', '/pets'), files }] });
+      (await service.prepare(project, sharingSource(), withCatalogs))._unsafeUnwrap();
 
-      (await service.prepare(project, source, withCatalogs))._unsafeUnwrap();
+      expect(writtenSamples()).to.deep.equal({ paths: {}, specs: {} });
+    });
 
-      expect(JSON.parse(fs.readFileSync(readConfig().codeSamples, 'utf8'))).to.deep.equal({});
+    it("writes each spec's own samples under its slug when the run files them by spec", async () => {
+      const filed = new PortalArtifacts(
+        new CodeSampleCatalogs([
+          CodeSampleCatalog.fromJson(Language.TYPESCRIPT, {
+            paths: { '/pets': { GET: { Example: 'await client.pets.list();' } } },
+            specs: {
+              'alpha/openapi.json': { paths: { '/pets': { GET: { Example: 'await client.pets.list();' } } } },
+              'beta/openapi.json': { paths: { '/pets': { GET: { Example: 'await client.stock.list();' } } } }
+            }
+          }) as CodeSampleCatalog
+        ]),
+        new Map(),
+        new Map(),
+        undefined
+      );
+
+      (await service.prepare(project, sharingSource(), filed))._unsafeUnwrap();
+
+      expect(writtenSamples()).to.deep.equal({
+        paths: {},
+        specs: {
+          alpha: { '/pets': { GET: [LIST_PETS] } },
+          beta: { '/pets': { GET: [{ ...LIST_PETS, sources: { Example: 'await client.stock.list();' } }] } }
+        }
+      });
     });
 
     it('points each spec at its own file, samples or not', async () => {

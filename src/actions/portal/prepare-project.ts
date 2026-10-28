@@ -72,7 +72,6 @@ export class PreparePortalProjectAction {
     this.prompts.contentNotices(source.value.contentNotices, sourceDirectory);
     this.prompts.unmergedSpecs(source.value.unmergedSpecs, sourceDirectory);
     this.prompts.leftOutSpecs(source.value.leftOutSpecs, sourceDirectory);
-    this.prompts.sharedEndpoints(source.value.sharedEndpoints, sourceDirectory);
 
     if (!(await confirm())) {
       return ActionResult.cancelled();
@@ -81,9 +80,15 @@ export class PreparePortalProjectAction {
     // The artifacts live in this directory for as long as the caller needs them, so it wraps
     // everything that reads them rather than being opened and closed around the call.
     return await withDirPath(async (artifactsDirectory) => {
+      const build = await project.buildZip(artifactsDirectory);
+      if (build.isErr()) {
+        this.prompts.sourceNotZipped(build.error, sourceDirectory);
+        return ActionResult.failed();
+      }
+
       const artifacts = await this.prompts.generateArtifacts(
         this.artifactsService.generate(
-          sourceDirectory,
+          build.value,
           artifactsDirectory,
           this.configDir,
           this.commandMetadata,
@@ -94,9 +99,9 @@ export class PreparePortalProjectAction {
         return ActionResult.failed();
       }
 
-      this.prompts.unplacedSamples(
-        artifacts.value.codeSampleCatalogs.unplacedIn(source.value.specs.flatMap((spec) => spec.endpoints))
-      );
+      const codeSamples = artifacts.value.codeSampleCatalogs.placedOn(source.value.specs, source.value.specDirectory);
+      this.prompts.sharedEndpoints(codeSamples.sharedEndpoints(), sourceDirectory);
+      this.prompts.unplacedSamples(codeSamples.unplaced(), sourceDirectory);
 
       const missing = source.value.generatedPages.missingFrom(artifacts.value);
       if (missing !== null) {

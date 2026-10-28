@@ -12,7 +12,6 @@ import { envInfo } from '../../../src/infrastructure/env-info';
 import { DirectoryPath } from '../../../src/types/file/directoryPath';
 import { FileName } from '../../../src/types/file/fileName';
 import { FilePath } from '../../../src/types/file/filePath';
-import { Endpoint } from '../../../src/types/portal/endpoint';
 
 const GENERATION_ID = '11111111-2222-3333-4444-555555555555';
 const AUTH_KEY = 'test-auth-key';
@@ -26,13 +25,14 @@ describe('PortalArtifactsService', () => {
   let server: http.Server;
   let workDir: string;
   let source: DirectoryPath;
+  let build: FilePath;
   let configDir: DirectoryPath;
   let service: PortalArtifactsService;
 
   /** What the endpoint will answer the download with, built fresh per test. */
   let artifactsZip: Buffer;
   let respondToStatus: (res: http.ServerResponse) => void;
-  let postedBodyBytes: number;
+  let postedBody: Buffer;
 
   const json = (res: http.ServerResponse, statusCode: number, body: unknown) => {
     res.writeHead(statusCode, { 'Content-Type': 'application/json' });
@@ -58,7 +58,7 @@ describe('PortalArtifactsService', () => {
 
   const generate = async (into?: string) => {
     const destination = into ?? fs.mkdtempSync(path.join(workDir, 'into-'));
-    return await service.generate(source, new DirectoryPath(destination), configDir, metadata, AUTH_KEY);
+    return await service.generate(build, new DirectoryPath(destination), configDir, metadata, AUTH_KEY);
   };
 
   before(async () => {
@@ -66,9 +66,12 @@ describe('PortalArtifactsService', () => {
       const url = req.url ?? '';
 
       if (req.method === 'POST') {
-        postedBodyBytes = 0;
-        req.on('data', (chunk: Buffer) => (postedBodyBytes += chunk.length));
-        req.on('end', () => json(res, 202, { id: GENERATION_ID }));
+        const chunks: Buffer[] = [];
+        req.on('data', (chunk: Buffer) => chunks.push(chunk));
+        req.on('end', () => {
+          postedBody = Buffer.concat(chunks);
+          json(res, 202, { id: GENERATION_ID });
+        });
         return;
       }
 
@@ -93,12 +96,14 @@ describe('PortalArtifactsService', () => {
 
     workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'portal-artifacts-'));
 
-    // The source directory the service zips and uploads.
+    // The build the service uploads: a zipped source directory.
     const sourceDir = path.join(workDir, 'src');
     fs.mkdirSync(path.join(sourceDir, 'spec'), { recursive: true });
     fs.writeFileSync(path.join(sourceDir, 'apimatic.json'), JSON.stringify({ schemaVersion: 1 }));
     fs.writeFileSync(path.join(sourceDir, 'spec', 'openapi.json'), '{}');
     source = new DirectoryPath(sourceDir);
+    build = new FilePath(new DirectoryPath(workDir), new FileName('build.zip'));
+    (await new ZipService().archive(source, build))._unsafeUnwrap();
 
     // No config.json here, so the explicit authKey is used.
     configDir = new DirectoryPath(workDir);
@@ -140,8 +145,8 @@ describe('PortalArtifactsService', () => {
     it('reads a catalog per language into the samples the build merges', async () => {
       const artifacts = (await generate())._unsafeUnwrap();
 
-      const samples = artifacts.codeSampleCatalogs.samplesFor(new Endpoint('GET', '/payments'));
-      expect(samples.map((sample) => sample.lang)).to.deep.equal(['csharp']);
+      const { paths } = artifacts.codeSampleCatalogs.placedOn([], source.join('spec')).toJson();
+      expect(paths['/payments'].GET.map((sample) => sample.lang)).to.deep.equal(['csharp']);
     });
 
     // Keyed by the delivered name rather than parsed, so placement is a copy under the same name.
@@ -174,7 +179,7 @@ describe('PortalArtifactsService', () => {
     it('succeeds with no samples, no SDKs and no plugin', async () => {
       const artifacts = (await generate())._unsafeUnwrap();
 
-      expect(artifacts.codeSampleCatalogs.samplesFor(new Endpoint('GET', '/payments'))).to.be.empty;
+      expect(artifacts.codeSampleCatalogs.isEmpty()).to.be.true;
       expect(artifacts.sdks.size).to.equal(0);
       expect(artifacts.sdkDocs.size).to.equal(0);
       expect(artifacts.plugin).to.be.undefined;
@@ -201,11 +206,10 @@ describe('PortalArtifactsService', () => {
     });
   });
 
-  it('uploads the source directory as the build', async () => {
+  it('uploads the build it is given', async () => {
     await generate();
 
-    // The zip carries the two files written above, so a body this size cannot be an empty archive.
-    expect(postedBodyBytes).to.be.greaterThan(100);
+    expect(postedBody.includes(fs.readFileSync(build.toString()))).to.be.true;
   });
 
   describe('a run that fails', () => {
@@ -256,7 +260,7 @@ describe('PortalArtifactsService', () => {
 
       const error = (
         await impatient.generate(
-          source,
+          build,
           new DirectoryPath(fs.mkdtempSync(path.join(workDir, 'into-'))),
           configDir,
           metadata,
@@ -299,7 +303,7 @@ describe('PortalArtifactsService', () => {
   it('asks for an auth key it does not have rather than calling without one', async () => {
     const error = (
       await service.generate(
-        source,
+        build,
         new DirectoryPath(fs.mkdtempSync(path.join(workDir, 'into-'))),
         configDir,
         metadata,

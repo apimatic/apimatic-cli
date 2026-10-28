@@ -9,14 +9,16 @@ import { downloads } from './downloads.ts';
 import { generatedPagesReload } from './generated-pages-reload.ts';
 import { readBuildPaths, readPortalIdentity } from './portal-config.ts';
 import { prerenderPages } from './prerender-pages.ts';
+import { remarkJsxImages } from './remark-jsx-images.ts';
 import { specReload } from './spec-reload.ts';
 import { remarkImageReferences } from './src/lib/remark-image-references.ts';
 import { staticFunctionsBase } from './static-functions-base.ts';
 import { staticImages } from './static-images.ts';
 
-export default defineConfig(async () => {
+export default defineConfig(async ({ command, isPreview }) => {
   const [paths, identity] = await Promise.all([readBuildPaths(), readPortalIdentity()]);
-  const pages = await prerenderPages(paths, identity.siteUrl);
+  // `vite dev` prerenders nothing, and listing the pages bundles every spec: one that fails would stop it starting.
+  const pages = command === 'serve' && !isPreview ? [] : await prerenderPages(paths, identity.siteUrl);
   const publicDir: string | false = paths.staticDir ?? false;
   const portalProjectDirectory = fileURLToPath(new URL('.', import.meta.url));
 
@@ -35,7 +37,7 @@ export default defineConfig(async () => {
           mdxOptions: {
             remarkImageOptions: { publicDir: publicDir || undefined, external: false },
             // A function, so it runs ahead of the preset's own plugins, `remarkImage` among them.
-            remarkPlugins: (plugins) => [remarkImageReferences, ...plugins]
+            remarkPlugins: (plugins) => [remarkImageReferences, [remarkJsxImages, { publicDir }], ...plugins]
           }
         }
       }),
