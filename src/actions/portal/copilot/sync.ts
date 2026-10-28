@@ -1,6 +1,4 @@
-import { resolveAuthKey } from '../../../client-utils/auth-manager.js';
 import { CopilotIngestService } from '../../../infrastructure/services/copilot-ingest-service.js';
-import { PortalAuthorizationService } from '../../../infrastructure/services/portal-authorization-service.js';
 import { PortalCopilotSyncPrompts } from '../../../prompts/portal/copilot/sync.js';
 import { CommandMetadata } from '../../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../../types/file/directoryPath.js';
@@ -8,11 +6,11 @@ import { PLACEHOLDER_SITE } from '../../../types/portal/config/site-config.js';
 import { GeneratedPortalContext } from '../../../types/portal/copilot/generated-portal-context.js';
 import { ProjectContext } from '../../../types/project-context.js';
 import { ActionResult } from '../../action-result.js';
+import { authorizeAskAi } from './access.js';
 
 export class PortalCopilotSyncAction {
   private readonly prompts = new PortalCopilotSyncPrompts();
   private readonly ingestService = new CopilotIngestService();
-  private readonly authorizationService = new PortalAuthorizationService();
 
   constructor(
     private readonly configDir: DirectoryPath,
@@ -38,17 +36,9 @@ export class PortalCopilotSyncAction {
       this.prompts.copilotNotConfigured(project.sourceDirectory());
       return ActionResult.failed();
     }
-    const authKey = await resolveAuthKey(this.configDir, this.authKey);
-    if (authKey === null) {
-      this.prompts.notLoggedIn();
-      return ActionResult.failed();
-    }
     const { shell } = this.commandMetadata;
-    const entitled = await this.prompts.checkSubscription(
-      this.authorizationService.authorizeAskAi(this.configDir, shell, authKey)
-    );
-    if (entitled.isErr()) {
-      this.prompts.authorizationFailed(entitled.error);
+    const authKey = await authorizeAskAi(this.prompts, this.configDir, shell, this.authKey);
+    if (authKey === null) {
       return ActionResult.failed();
     }
 
