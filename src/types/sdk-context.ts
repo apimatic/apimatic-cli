@@ -11,14 +11,13 @@ import { NO_PATHS, RelativePaths } from './file/relative-paths.js';
 import { GIT_DIRECTORY } from './git/git-directory.js';
 import { RECORD_DIRECTORY, SdkGeneration } from './sdk/generation-record.js';
 import { destinationFor, SdkDestination, Unresolved } from './sdk/sdk-destination.js';
+import { SdkPath } from './sdk/sdk-path.js';
 import { InspectionProblem, RepositoryProblem } from './sdk/repository-state.js';
 import { fileFailed } from './sdk-repository/on-disk.js';
 import { SdkRepositoryContext } from './sdk-repository-context.js';
 import { TempContext } from './temp-context.js';
 
-const KEPT_OUT_OF_ARCHIVE = [GIT_DIRECTORY.toString(), RECORD_DIRECTORY].map(
-  (name) => RelativeDirectoryPath.fromGit(name)!
-);
+const KEPT_OUT_OF_ARCHIVE = [RelativeDirectoryPath.fromGit(GIT_DIRECTORY.toString())!, RECORD_DIRECTORY];
 
 export class SdkContext {
   private readonly fileService = new FileService();
@@ -57,14 +56,13 @@ export class SdkContext {
 
   /** Makes the SDK directory a repository of its own, creating it when it is not there yet. */
   public async initRepository(): Promise<Result<SdkRepositoryContext, RepositoryProblem>> {
-    const sdk = this.sdkDirectory;
     try {
-      await this.fileService.createDirectoryIfNotExists(sdk);
+      await this.fileService.createDirectoryIfNotExists(this.sdkDirectory);
     } catch (error) {
       return err(fileFailed(error));
     }
-    const initialised = await this.git.init(sdk);
-    return initialised.map(() => SdkRepositoryContext.own(sdk));
+    const initialised = await this.git.init(this.sdkDirectory);
+    return initialised.map(() => SdkRepositoryContext.own(this.sdkDirectory));
   }
 
   /** Overwrites the directory; a `.git` in it is the developer's, or holds the snapshots, and stays. */
@@ -106,11 +104,11 @@ export class SdkContext {
     if (found.value === undefined) {
       return ok(undefined);
     }
-    const root = new DirectoryPath(canonical(found.value.toString()));
+    const root = found.value;
     if (root.isEqual(real)) {
       return ok(SdkRepositoryContext.create(root, real));
     }
-    const ignored = await this.git.isIgnored(root, real);
+    const ignored = await this.git.isIgnored(root, SdkPath.of(root, real));
     if (ignored.isErr()) {
       return err(ignored.error);
     }

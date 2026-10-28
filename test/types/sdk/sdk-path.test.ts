@@ -29,8 +29,8 @@ describe('SdkPath', () => {
     const file = RelativeFilePath.fromGit('models/book.py')!;
 
     expect(sdk.fromRoot(file).toString()).to.equal('sdk/python/models/book.py');
-    expect(sdk.below(RelativeFilePath.fromGit('sdk/python/models/book.py')!)?.toString()).to.equal('models/book.py');
-    expect(sdk.below(RelativeFilePath.fromGit('docs/index.md')!)).to.be.undefined;
+    expect(sdk.within(RelativeFilePath.fromGit('sdk/python/models/book.py')!)?.toString()).to.equal('models/book.py');
+    expect(sdk.within(RelativeFilePath.fromGit('docs/index.md')!)).to.be.undefined;
     expect(SdkPath.fromGit('')!.fromRoot(file).isEqual(file)).to.be.true;
   });
 

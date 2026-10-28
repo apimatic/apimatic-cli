@@ -10,6 +10,7 @@ import { execa } from 'execa';
 import { GitService } from '../../src/infrastructure/git-service.js';
 import { DirectoryPath } from '../../src/types/file/directoryPath.js';
 import { CommitId } from '../../src/types/git/commit-id.js';
+import { RemoteName } from '../../src/types/git/remote-name.js';
 import { SdkPath } from '../../src/types/sdk/sdk-path.js';
 import { describeCommit } from '../helpers/snapshots.js';
 import { SnapshotRef } from '../../src/types/sdk/snapshot-ref.js';
@@ -222,7 +223,7 @@ describe('GitService', () => {
     expect((await git.resolveRef(repo, ref))._unsafeUnwrap()?.isEqual(second)).to.be.true;
     expect((await git.resolveRef(repo, SnapshotRef.pristine(SdkPath.fromGit('other')!)))._unsafeUnwrap()).to.be
       .undefined;
-    expect((await git.listRefs(repo, 'refs/apimatic/pristine'))._unsafeUnwrap()).to.deep.equal([
+    expect((await git.listRefs(repo, SnapshotRef.allPristine()))._unsafeUnwrap().map(String)).to.deep.equal([
       'refs/apimatic/pristine/sdk'
     ]);
     expect(await describeCommit(repo, second)).to.deep.equal({
@@ -272,7 +273,7 @@ describe('GitService', () => {
       ['A', 'moved/a.txt']
     ]);
     const modified = plain.find((change) => change.path.toString() === 'b.txt')!;
-    expect('blob' in modified && modified.blob).to.have.lengthOf(40);
+    expect('blob' in modified && modified.blob.toString()).to.have.lengthOf(40);
   });
 
   describe('mergeTree', () => {
@@ -346,9 +347,9 @@ describe('GitService', () => {
       });
 
       const listed = async (directory: string) =>
-        (await git.unmergedStages(repo, directory))
+        (await git.unmergedStages(repo, SdkPath.fromGit(directory)!))
           ._unsafeUnwrap()
-          .map((entry) => `${entry.path}:${entry.stage}:${entry.oid === oid}`);
+          .map((entry) => `${entry.path}:${entry.stage}:${entry.oid.toString() === oid}`);
 
       expect(await listed('sdk/ts')).to.deep.equal([
         'sdk/ts/a.ts:1:true',
@@ -357,8 +358,8 @@ describe('GitService', () => {
         'sdk/ts/b.ts:2:true',
         'sdk/ts/b.ts:3:true'
       ]);
-      expect(await listed('.')).to.include.members(['sdk/py/a.py:1:true', 'sdk/py/a.py:2:true']);
-      expect((await git.unmergedStages(repo, 'docs'))._unsafeUnwrap()).to.deep.equal([]);
+      expect(await listed('')).to.include.members(['sdk/py/a.py:1:true', 'sdk/py/a.py:2:true']);
+      expect((await git.unmergedStages(repo, SdkPath.fromGit('docs')!))._unsafeUnwrap()).to.deep.equal([]);
     });
   });
 
@@ -395,11 +396,11 @@ describe('GitService', () => {
       expect((await git.remoteOf(repo))._unsafeUnwrap()).to.be.undefined;
 
       await execa('git', ['remote', 'add', 'origin', (await bare()).toString()], { cwd: repo.toString() });
-      expect((await git.remoteOf(repo))._unsafeUnwrap()).to.equal('origin');
+      expect((await git.remoteOf(repo))._unsafeUnwrap()?.toString()).to.equal('origin');
 
       await execa('git', ['remote', 'add', 'fork', (await bare('fork.git')).toString()], { cwd: repo.toString() });
       await execa('git', ['config', 'branch.main.remote', 'fork'], { cwd: repo.toString() });
-      expect((await git.remoteOf(repo))._unsafeUnwrap()).to.equal('fork');
+      expect((await git.remoteOf(repo))._unsafeUnwrap()?.toString()).to.equal('fork');
     });
 
     it('fetches a ref with its objects, and answers with nothing for a ref the remote lacks', async () => {
@@ -409,9 +410,12 @@ describe('GitService', () => {
       const first = await snapshot(a, 'one');
       await execa('git', ['push', '-q', 'origin', refspec(ref)], { cwd: a.toString() });
 
-      expect((await git.fetchRef(b, 'origin', SnapshotRef.pristine(SdkPath.fromGit('elsewhere')!)))._unsafeUnwrap()).to
-        .be.undefined;
-      const tip = (await git.fetchRef(b, 'origin', ref))._unsafeUnwrap();
+      expect(
+        (
+          await git.fetchRef(b, RemoteName.origin(), SnapshotRef.pristine(SdkPath.fromGit('elsewhere')!))
+        )._unsafeUnwrap()
+      ).to.be.undefined;
+      const tip = (await git.fetchRef(b, RemoteName.origin(), ref))._unsafeUnwrap();
 
       expect(tip?.isEqual(first)).to.be.true;
       expect((await git.hasCommit(b, first))._unsafeUnwrap()).to.be.true;
@@ -456,7 +460,7 @@ describe('GitService', () => {
       fs.writeFileSync(script, `printf x > "${marker}"\nexit 1\n`);
       await execa('git', ['config', 'core.sshCommand', `sh "${script}"`], { cwd: repo.toString() });
 
-      const fetched = await git.fetchRef(repo, 'ssh://example.invalid/sdk.git', ref);
+      const fetched = await git.fetchRef(repo, RemoteName.fromGit('ssh://example.invalid/sdk.git')!, ref);
 
       expect(fetched.isErr()).to.be.true;
       expect(fs.existsSync(marker)).to.be.true;

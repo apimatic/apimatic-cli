@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { DirectoryPath } from './directoryPath.js';
 
 /**
  * A directory's place below some root, spelt as git names a path inside a tree: `/` between the
@@ -22,6 +23,11 @@ export class RelativeDirectoryPath {
       !path.posix.isAbsolute(spelled) &&
       segments.every((segment) => segment !== '' && segment !== '.' && segment !== '..');
     return wellFormed ? new RelativeDirectoryPath(spelled) : undefined;
+  }
+
+  /** The directory on disk, below `root`. */
+  public in(root: DirectoryPath): DirectoryPath {
+    return root.join(...this.value.split('/'));
   }
 
   public isEqual(other: RelativeDirectoryPath): boolean {

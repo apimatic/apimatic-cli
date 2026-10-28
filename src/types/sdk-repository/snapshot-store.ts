@@ -3,6 +3,7 @@ import { GitService } from '../../infrastructure/git-service.js';
 import { DirectoryPath } from '../file/directoryPath.js';
 import { RelativeFilePath } from '../file/relativeFilePath.js';
 import { CommitId } from '../git/commit-id.js';
+import { RemoteName } from '../git/remote-name.js';
 import { TreeId } from '../git/tree-id.js';
 import { describeGeneration, SdkGeneration } from '../sdk/generation-record.js';
 import { NestedSdkDirectory, RepositoryProblem } from '../sdk/repository-state.js';
@@ -103,7 +104,7 @@ export class SnapshotStore {
   }
 
   /** A chain that continues the local one moves the ref; two that diverged are joined with a two-parent commit, so neither machine's generations are lost. */
-  public async fetch(remote: string): Promise<Result<void, RepositoryProblem>> {
+  public async fetch(remote: RemoteName): Promise<Result<void, RepositoryProblem>> {
     const ref = this.pristineRef();
     const remoteTip = await this.git.fetchRef(this.root, remote, ref);
     if (remoteTip.isErr()) {
@@ -152,13 +153,11 @@ export class SnapshotStore {
 
   /** Refs are files, so another SDK directory's snapshots above or below this one would be in the way. */
   public async verifyNotNested(): Promise<Result<void, RepositoryProblem | NestedSdkDirectory>> {
-    const names = await this.git.listRefs(this.root, SnapshotRef.pristineNamespace());
-    if (names.isErr()) {
-      return err(names.error);
+    const refs = await this.git.listRefs(this.root, SnapshotRef.allPristine());
+    if (refs.isErr()) {
+      return err(refs.error);
     }
-    const nested = names.value
-      .flatMap((name) => SnapshotRef.fromGit(name)?.sdkPath() ?? [])
-      .find((other) => other.nests(this.path));
+    const nested = refs.value.map((ref) => ref.sdkPath()).find((other) => other.nests(this.path));
     if (nested === undefined) {
       return ok(undefined);
     }

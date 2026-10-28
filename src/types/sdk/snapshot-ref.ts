@@ -53,9 +53,9 @@ export class SnapshotRef {
     return path === undefined ? undefined : new SnapshotRef(name, path);
   }
 
-  /** Where git keeps every pristine ref, for listing them. */
-  public static pristineNamespace(): string {
-    return PRISTINE;
+  /** The ref every pristine ref sits at or below: the root's own, which lists them all. */
+  public static allPristine(): SnapshotRef {
+    return SnapshotRef.pristine(SdkPath.root());
   }
 
   /** The SDK directory's path below the repository root, which the ref is named after. */

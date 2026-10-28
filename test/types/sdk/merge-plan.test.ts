@@ -1,11 +1,13 @@
 import { RelativeFilePath } from '../../../src/types/file/relativeFilePath.js';
 import { expect } from 'chai';
+import { Buffer } from 'node:buffer';
+import { BlobId } from '../../../src/types/git/blob-id.js';
 import { MergeTreeOutput } from '../../../src/types/git/merge-tree.js';
 import { TreeId } from '../../../src/types/git/tree-id.js';
 import { ConflictKind, MergeInputs, MergePlan } from '../../../src/types/sdk/merge-plan.js';
 
 const TREE = TreeId.fromGit('c'.repeat(40))!;
-const blob = (name: string) => name.padEnd(40, '0');
+const blob = (name: string) => BlobId.fromGit(Buffer.from(name).toString('hex').padEnd(40, '0'))!;
 
 const merge = (overrides: Partial<MergeTreeOutput> = {}): MergeTreeOutput => ({
   tree: TREE,

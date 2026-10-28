@@ -13,11 +13,11 @@ export class GenerationRecordFile {
   constructor(private readonly sdk: DirectoryPath) {}
 
   private get file(): FilePath {
-    return new FilePath(this.sdk.join(RECORD_DIRECTORY), new FileName(RECORD_FILE));
+    return new FilePath(RECORD_DIRECTORY.in(this.sdk), new FileName(RECORD_FILE));
   }
 
   private get attributes(): FilePath {
-    return new FilePath(this.sdk.join(RECORD_DIRECTORY), new FileName(RECORD_ATTRIBUTES_FILE));
+    return new FilePath(RECORD_DIRECTORY.in(this.sdk), new FileName(RECORD_ATTRIBUTES_FILE));
   }
 
   /** The record, or none when there is no file, or not one a CLI wrote. */

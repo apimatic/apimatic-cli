@@ -411,9 +411,9 @@ function whereItWasLookedFor(fetch: SnapshotFetch): string {
     case 'noRemote':
       return 'here, and there is no remote to fetch it from';
     case 'absent':
-      return `here or on ${f.var(fetch.remote)}`;
+      return `here or on ${f.var(fetch.remote.toString())}`;
     case 'failed':
-      return `here, and could not be fetched from ${f.var(fetch.remote)} (${fetch.reason})`;
+      return `here, and could not be fetched from ${f.var(fetch.remote.toString())} (${fetch.reason})`;
   }
 }
 

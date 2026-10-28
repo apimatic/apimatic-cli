@@ -3,8 +3,11 @@ import { GitService } from '../infrastructure/git-service.js';
 import { DirectoryPath } from './file/directoryPath.js';
 import { RelativeFilePath } from './file/relativeFilePath.js';
 import { RelativePaths } from './file/relative-paths.js';
+import { ValueMap, ValueSet } from './common/value-map.js';
+import { BlobId } from './git/blob-id.js';
 import { CommitId } from './git/commit-id.js';
 import { STAGE, StageEntry } from './git/merge-tree.js';
+import { RemoteName } from './git/remote-name.js';
 import { TreeId } from './git/tree-id.js';
 import { GenerationRecord, SdkGeneration } from './sdk/generation-record.js';
 import { ConflictSide, MergePlan } from './sdk/merge-plan.js';
@@ -56,22 +59,21 @@ export class SdkRepositoryContext {
   }
 
   /** The remote the SDK's snapshots are shared through: where the current branch pushes, else `origin`. */
-  public async remote(): Promise<Result<string | undefined, RepositoryProblem>> {
+  public async remote(): Promise<Result<RemoteName | undefined, RepositoryProblem>> {
     return this.git.remoteOf(this.rootDirectory);
   }
 
   /** What a run needs before it decides how to write: an operation in progress or a nested SDK is refused, unmerged files come first, a missing snapshot is fetched. */
   public async inspect(
     generation: SdkGeneration,
-    remote: string | undefined
+    remote: RemoteName | undefined
   ): Promise<Result<SdkRepositoryState, InspectionProblem>> {
-    const root = this.rootDirectory;
-    const operation = await this.git.operationInProgress(root);
+    const operation = await this.git.operationInProgress(this.rootDirectory);
     if (operation.isErr()) {
       return err(operation.error);
     }
     if (operation.value !== undefined) {
-      return err({ kind: 'operationInProgress', operation: operation.value, root });
+      return err({ kind: 'operationInProgress', operation: operation.value, root: this.rootDirectory });
     }
     const notNested = await this.snapshots.verifyNotNested();
     if (notNested.isErr()) {
@@ -102,12 +104,14 @@ export class SdkRepositoryContext {
     side: ConflictSide,
     paths: readonly RelativeFilePath[]
   ): Promise<Result<void, RepositoryProblem>> {
-    const root = this.rootDirectory;
-    const stages = await this.git.unmergedStages(root, this.path.pathspec());
+    const stages = await this.git.unmergedStages(this.rootDirectory, this.path);
     if (stages.isErr()) {
       return err(stages.error);
     }
-    const blobs = await this.git.readBlobs(root, [...new Set(stages.value.map((entry) => entry.oid))]);
+    const blobs = await this.git.readBlobs(
+      this.rootDirectory,
+      stages.value.map((entry) => entry.oid)
+    );
     if (blobs.isErr()) {
       return err(blobs.error);
     }
@@ -117,11 +121,10 @@ export class SdkRepositoryContext {
         return settled;
       }
     }
-    const unstaged = await this.git.unstage(
-      root,
+    return this.git.unstage(
+      this.rootDirectory,
       paths.map((path) => this.path.fromRoot(path))
     );
-    return unstaged;
   }
 
   /** A freshly generated SDK as a tree: every file, whatever its own `.gitignore` says. */
@@ -171,32 +174,30 @@ export class SdkRepositoryContext {
 
   /** What the repository's ignore rules keep out of the SDK directory, so an upload leaves it out as a commit would. */
   public async ignored(): Promise<Result<RelativePaths, RepositoryProblem>> {
-    const ignored = await this.git.ignoredBelow(this.sdk);
-    return ignored;
+    return this.git.ignoredBelow(this.sdk);
   }
 
   /** Marks the conflicted paths in the repository's index the way a merge would, so git's own tools take over. */
   public async stageConflicts(outcome: MergeOutcome): Promise<Result<void, RepositoryProblem>> {
-    const staged = await this.git.stageConflicts(
+    return this.git.stageConflicts(
       this.rootDirectory,
       outcome.stages.map((entry) => ({ ...entry, path: this.path.fromRoot(entry.path) }))
     );
-    return staged;
   }
 
   /** The paths below the SDK directory that git holds as unmerged: what a run left, and `git add` has not marked resolved. */
   private async unresolvedConflicts(): Promise<Result<RelativeFilePath[], RepositoryProblem>> {
-    const stages = await this.git.unmergedStages(this.rootDirectory, this.path.pathspec());
+    const stages = await this.git.unmergedStages(this.rootDirectory, this.path);
     return stages.map((found) => {
-      const paths = new Map(found.map((entry) => [entry.path.toString(), entry.path]));
-      return [...paths.values()].flatMap((path) => this.path.below(path) ?? []);
+      const paths = new ValueSet(found.map((entry) => entry.path));
+      return paths.values().flatMap((path) => this.path.within(path) ?? []);
     });
   }
 
   /** Ready when the recorded base is here; else fetched from `remote` once, and the reason it is still missing otherwise. */
   private async readiness(
     base: CommitId,
-    remote: string | undefined
+    remote: RemoteName | undefined
   ): Promise<Result<SdkRepositoryState, RepositoryProblem>> {
     const present = await this.snapshots.hasCommit(base);
     if (present.isErr()) {
@@ -223,7 +224,7 @@ export class SdkRepositoryContext {
     side: ConflictSide,
     path: RelativeFilePath,
     stages: readonly StageEntry[],
-    blobs: Map<string, Uint8Array>
+    blobs: ValueMap<BlobId, Uint8Array>
   ): Promise<Result<void, RepositoryProblem>> {
     const fromRoot = this.path.fromRoot(path);
     const stage = (number: StageEntry['stage']) => {

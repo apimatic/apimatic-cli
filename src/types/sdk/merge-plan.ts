@@ -1,4 +1,6 @@
+import { ValueMap, ValueSet } from '../common/value-map.js';
 import { RelativeFilePath } from '../file/relativeFilePath.js';
+import { BlobId } from '../git/blob-id.js';
 import { Change, MergeTreeOutput, STAGE } from '../git/merge-tree.js';
 
 export type MergeInputs = {
@@ -28,7 +30,7 @@ export type ConflictKind =
   | 'other';
 
 /** A file to write, as the blob the merged tree holds; `settle` is the side whose lines win in each marker block. */
-export type FileWrite = { path: RelativeFilePath; blob: string; settle?: ConflictSide };
+export type FileWrite = { path: RelativeFilePath; blob: BlobId; settle?: ConflictSide };
 
 /** Whose lines win where you and the generator changed the same ones. */
 export type ConflictSide = 'generated' | 'yours';
@@ -43,6 +45,9 @@ export type Conflict = { path: RelativeFilePath; kind: ConflictKind };
 
 /** Each side's version of a file git could not merge line by line; none where that side has no file. */
 export type Sides<T> = { yours: T | undefined; generated: T | undefined };
+
+/** For each conflicted path, the blob each side holds for it. */
+export type ConflictSides = ValueMap<RelativeFilePath, Sides<BlobId>>;
 
 /**
  * The whole-file settlement for `side`: the generator's side falls back to yours where it no
@@ -98,26 +103,24 @@ function kindOf(type: string, message: string, stages: ReadonlySet<number>): Con
 }
 
 function conflictsOf(merge: MergeTreeOutput): Conflict[] {
-  const stagesByPath = new Map<string, Set<number>>();
+  const stagesByPath = new ValueMap<RelativeFilePath, Set<number>>();
   for (const entry of merge.stages) {
-    const key = entry.path.toString();
-    stagesByPath.set(key, (stagesByPath.get(key) ?? new Set()).add(entry.stage));
+    stagesByPath.set(entry.path, (stagesByPath.get(entry.path) ?? new Set()).add(entry.stage));
   }
-  const byPath = new Map<string, Conflict>();
+  const byPath = new ValueMap<RelativeFilePath, Conflict>();
   for (const { paths, type, message } of merge.messages) {
     if (!type.startsWith(CONFLICT_PREFIX)) {
       continue;
     }
     for (const path of paths) {
-      const key = path.toString();
-      const kind = kindOf(type, message, stagesByPath.get(key) ?? new Set());
-      const known = byPath.get(key);
+      const kind = kindOf(type, message, stagesByPath.get(path) ?? new Set());
+      const known = byPath.get(path);
       if (known === undefined || RANK[kind] > RANK[known.kind]) {
-        byPath.set(key, { path, kind });
+        byPath.set(path, { path, kind });
       }
     }
   }
-  return [...byPath.values()];
+  return byPath.values();
 }
 
 /** The conflicts whose file is written with markers in it. */
@@ -126,32 +129,32 @@ const MARKED_KINDS: readonly ConflictKind[] = ['bothChanged', 'bothAdded'];
 const leavesMarkers = (conflict: Conflict): boolean => MARKED_KINDS.includes(conflict.kind);
 
 /** Each change under every path it names, so a rename is found by either name. */
-const changedPaths = (changes: readonly Change[]): Map<string, Change> =>
-  new Map(
-    changes.flatMap((change): [string, Change][] =>
+const changedPaths = (changes: readonly Change[]): ValueMap<RelativeFilePath, Change> =>
+  new ValueMap(
+    changes.flatMap((change): [RelativeFilePath, Change][] =>
       'from' in change
         ? [
-            [change.from.toString(), change],
-            [change.path.toString(), change]
+            [change.from, change],
+            [change.path, change]
           ]
-        : [[change.path.toString(), change]]
+        : [[change.path, change]]
     )
   );
 
-/** The blob a side holds at `key` itself; none where its change moved the file away from there. */
-const blobAt = (changes: Map<string, Change>, key: string): string | undefined => {
-  const change = changes.get(key);
-  return change !== undefined && change.path.toString() === key && 'blob' in change ? change.blob : undefined;
+/** The blob a side holds at `path` itself; none where its change moved the file away from there. */
+const blobAt = (changes: ValueMap<RelativeFilePath, Change>, path: RelativeFilePath): BlobId | undefined => {
+  const change = changes.get(path);
+  return change !== undefined && change.path.isEqual(path) && 'blob' in change ? change.blob : undefined;
 };
 
 /** What the summary reports: every path that is not in conflict, by what happened to it. */
 function filesOf(
   inputs: MergeInputs,
-  conflicted: ReadonlySet<string>,
-  yours: Map<string, Change>,
-  generated: Map<string, Change>
+  conflicted: ValueSet<RelativeFilePath>,
+  yours: ValueMap<RelativeFilePath, Change>,
+  generated: ValueMap<RelativeFilePath, Change>
 ): MergeFiles {
-  const base = new Set(inputs.basePaths.map((path) => path.toString()));
+  const base = new ValueSet(inputs.basePaths);
   const files: Record<keyof MergeFiles, RelativeFilePath[]> = {
     added: [],
     updated: [],
@@ -160,22 +163,22 @@ function filesOf(
     kept: []
   };
   for (const change of inputs.applied) {
-    const key = change.path.toString();
-    if (conflicted.has(key)) {
+    const { path } = change;
+    if (conflicted.has(path)) {
       continue;
     }
     if (change.status === 'D') {
-      files.removed.push(change.path);
-    } else if (!base.has(key) && generated.get(key)?.status === 'A') {
-      files.added.push(change.path);
-    } else if (yours.get(key)?.status === 'M' && generated.has(key)) {
-      files.merged.push(change.path);
+      files.removed.push(path);
+    } else if (!base.has(path) && generated.get(path)?.status === 'A') {
+      files.added.push(path);
+    } else if (yours.get(path)?.status === 'M' && generated.has(path)) {
+      files.merged.push(path);
     } else {
-      files.updated.push(change.path);
+      files.updated.push(path);
     }
   }
-  for (const [key, change] of yours) {
-    if ((change.status === 'M' || change.status === 'A') && !generated.has(key) && !conflicted.has(key)) {
+  for (const [path, change] of yours) {
+    if ((change.status === 'M' || change.status === 'A') && !generated.has(path) && !conflicted.has(path)) {
       files.kept.push(change.path);
     }
   }
@@ -188,15 +191,14 @@ export class MergePlan {
   public readonly deletes: readonly RelativeFilePath[];
   public readonly conflicts: readonly Conflict[];
   public readonly files: MergeFiles;
-  /** For each conflicted path, the blob each side holds for it. */
-  private readonly sides: ReadonlyMap<string, Sides<string>>;
+  private readonly sides: ConflictSides;
 
   constructor(
     writes: readonly FileWrite[],
     deletes: readonly RelativeFilePath[],
     conflicts: readonly Conflict[],
     files: MergeFiles,
-    sides: ReadonlyMap<string, Sides<string>> = new Map()
+    sides: ConflictSides = new ValueMap()
   ) {
     this.writes = writes;
     this.deletes = deletes;
@@ -208,18 +210,18 @@ export class MergePlan {
   /** What git's merge means for the SDK directory: writes, deletions, conflicts with each side's version, and the summary. */
   public static from(inputs: MergeInputs): MergePlan {
     const conflicts = conflictsOf(inputs.merge);
-    const conflicted = new Set(conflicts.map((conflict) => conflict.path.toString()));
+    const conflicted = new ValueSet(conflicts.map((conflict) => conflict.path));
     const yours = changedPaths(inputs.yours);
     const generated = changedPaths(inputs.generated);
     const writes = inputs.applied.flatMap((change) =>
       change.status === 'D' ? [] : [{ path: change.path, blob: change.blob }]
     );
     const deletes = inputs.applied.flatMap((change) => (change.status === 'D' ? [change.path] : []));
-    const sides = new Map(
-      conflicts.map((conflict): [string, Sides<string>] => {
-        const key = conflict.path.toString();
-        return [key, { yours: blobAt(yours, key), generated: blobAt(generated, key) }];
-      })
+    const sides: ConflictSides = new ValueMap(
+      conflicts.map((conflict): [RelativeFilePath, Sides<BlobId>] => [
+        conflict.path,
+        { yours: blobAt(yours, conflict.path), generated: blobAt(generated, conflict.path) }
+      ])
     );
     return new MergePlan(writes, deletes, conflicts, filesOf(inputs, conflicted, yours, generated), sides);
   }
@@ -229,37 +231,36 @@ export class MergePlan {
    * whole as `chosen` decides; a conflict of another shape keeps git's placement.
    */
   public taking(side: ConflictSide): MergePlan {
-    const writes = new Map(this.writes.map((write) => [write.path.toString(), write]));
-    const deletes = new Map(this.deletes.map((path) => [path.toString(), path]));
+    const writes = new ValueMap(this.writes.map((write): [RelativeFilePath, FileWrite] => [write.path, write]));
+    const deletes = new ValueSet(this.deletes);
     const updated = [...this.files.updated];
     const merged = [...this.files.merged];
     const kept = [...this.files.kept];
     for (const conflict of this.conflicts) {
       const { path, kind } = conflict;
-      const key = path.toString();
       if (kind === 'other') {
         continue;
       }
-      const marked = writes.get(key);
+      const marked = writes.get(path);
       if (leavesMarkers(conflict) && marked !== undefined) {
-        writes.set(key, { ...marked, settle: side });
+        writes.set(path, { ...marked, settle: side });
         merged.push(path);
         continue;
       }
-      const sides = this.sides.get(key) ?? { yours: undefined, generated: undefined };
+      const sides = this.sides.get(path) ?? { yours: undefined, generated: undefined };
       const blob = chosen(side, sides);
-      deletes.delete(key);
+      deletes.delete(path);
       if (blob === undefined) {
-        writes.delete(key);
-      } else if (blob === sides.yours) {
-        writes.delete(key);
+        writes.delete(path);
+      } else if (sides.yours !== undefined && blob.isEqual(sides.yours)) {
+        writes.delete(path);
         kept.push(path);
       } else {
-        writes.set(key, { path, blob });
+        writes.set(path, { path, blob });
         updated.push(path);
       }
     }
-    return new MergePlan([...writes.values()], [...deletes.values()], [], { ...this.files, updated, merged, kept });
+    return new MergePlan(writes.values(), deletes.values(), [], { ...this.files, updated, merged, kept });
   }
 
   public hasConflicts(): boolean {

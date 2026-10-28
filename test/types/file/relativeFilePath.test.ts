@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { expect } from 'chai';
 import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
+import { RelativeDirectoryPath } from '../../../src/types/file/relativeDirectoryPath.js';
 import { RelativeFilePath } from '../../../src/types/file/relativeFilePath.js';
 
 describe('RelativeFilePath', () => {
@@ -24,20 +25,19 @@ describe('RelativeFilePath', () => {
     expect(file.name().toString()).to.equal('book.ts');
   });
 
-  it('is seen from above a prefix without changing its spelling, and unchanged from an empty one', () => {
+  it('is seen from above a directory without changing its spelling', () => {
     const file = RelativeFilePath.fromGit('src/models/book.ts')!;
+    const sdk = RelativeDirectoryPath.fromGit('sdk/typescript')!;
 
-    expect(file.below('sdk/typescript').toString()).to.equal('sdk/typescript/src/models/book.ts');
-    expect(file.below('')).to.equal(file);
+    expect(file.under(sdk).toString()).to.equal('sdk/typescript/src/models/book.ts');
   });
 
-  it('is seen from inside a prefix it is under, and not from one it is not', () => {
+  it('is seen from inside a directory it is under, and not from one it is not', () => {
     const file = RelativeFilePath.fromGit('sdk/typescript/src/models/book.ts')!;
 
-    expect(file.inside('sdk/typescript')?.toString()).to.equal('src/models/book.ts');
-    expect(file.inside('sdk/types')).to.be.undefined;
-    expect(file.inside('docs')).to.be.undefined;
-    expect(file.inside('')).to.equal(file);
+    expect(file.within(RelativeDirectoryPath.fromGit('sdk/typescript')!)?.toString()).to.equal('src/models/book.ts');
+    expect(file.within(RelativeDirectoryPath.fromGit('sdk/types')!)).to.be.undefined;
+    expect(file.within(RelativeDirectoryPath.fromGit('docs')!)).to.be.undefined;
   });
 
   it('compares by value', () => {

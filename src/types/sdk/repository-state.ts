@@ -4,6 +4,7 @@ import { RelativeFilePath } from '../file/relativeFilePath.js';
 import { CommitId } from '../git/commit-id.js';
 import { GitOperation } from '../git/git-operation.js';
 import { StageEntry } from '../git/merge-tree.js';
+import { RemoteName } from '../git/remote-name.js';
 import { TreeId } from '../git/tree-id.js';
 import { SdkGeneration } from './generation-record.js';
 import { MergePlan } from './merge-plan.js';
@@ -36,8 +37,8 @@ export type InspectionProblem = NestedSdkDirectory | OperationInProgress | Repos
 /** Why a recorded snapshot is still absent after the one place it could have come from was tried. */
 export type SnapshotFetch =
   | { kind: 'noRemote' }
-  | { kind: 'absent'; remote: string }
-  | { kind: 'failed'; remote: string; reason: string };
+  | { kind: 'absent'; remote: RemoteName }
+  | { kind: 'failed'; remote: RemoteName; reason: string };
 
 /** What the repository knows about its SDK directory before a run, from the record and the refs. */
 export type SdkRepositoryState =

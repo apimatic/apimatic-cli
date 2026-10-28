@@ -9,6 +9,7 @@ import { Language } from '../../../src/types/sdk/generate.js';
 import { RelativeFilePath } from '../../../src/types/file/relativeFilePath.js';
 import { ConflictKind, MergePlan } from '../../../src/types/sdk/merge-plan.js';
 import { CodeGenerationVersion, Stability } from '../../../src/types/sdk/generate.js';
+import { RemoteName } from '../../../src/types/git/remote-name.js';
 import { SdkGeneration } from '../../../src/types/sdk/generation-record.js';
 
 describe('SdkGeneratePrompts.languageNotAvailable', () => {
@@ -234,8 +235,8 @@ describe('SdkGeneratePrompts.snapshotMissing', () => {
     const warn = sinon.stub(log, 'warn');
 
     new SdkGeneratePrompts().snapshotMissing({ kind: 'noRemote' });
-    new SdkGeneratePrompts().snapshotMissing({ kind: 'absent', remote: 'origin' });
-    new SdkGeneratePrompts().snapshotMissing({ kind: 'failed', remote: 'origin', reason: 'could not read' });
+    new SdkGeneratePrompts().snapshotMissing({ kind: 'absent', remote: RemoteName.origin() });
+    new SdkGeneratePrompts().snapshotMissing({ kind: 'failed', remote: RemoteName.origin(), reason: 'could not read' });
 
     const said = warn.getCalls().map((call) => stripVTControlCharacters(call.args[0]));
     expect(said[0]).to.contain('not available here, and there is no remote to fetch it from');

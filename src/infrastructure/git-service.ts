@@ -7,20 +7,23 @@ import { err, ok, Result } from 'neverthrow';
 import { RelativeFilePath } from '../types/file/relativeFilePath.js';
 import { RelativeDirectoryPath } from '../types/file/relativeDirectoryPath.js';
 import { RelativePaths } from '../types/file/relative-paths.js';
-import { DirectoryPath, posix } from '../types/file/directoryPath.js';
+import { DirectoryPath } from '../types/file/directoryPath.js';
 import { SdkPath } from '../types/sdk/sdk-path.js';
 import { FileName } from '../types/file/fileName.js';
 import { FilePath } from '../types/file/filePath.js';
+import { ValueMap } from '../types/common/value-map.js';
+import { BlobId } from '../types/git/blob-id.js';
 import { CommitId } from '../types/git/commit-id.js';
 import { GitOperation, OPERATIONS } from '../types/git/git-operation.js';
 import { GitProblem } from '../types/git/git-problem.js';
 import { GitVersion } from '../types/git/git-version.js';
 import { Change, MergeMessage, MergeTreeOutput, parseStageEntry, StageEntry } from '../types/git/merge-tree.js';
+import { RemoteName } from '../types/git/remote-name.js';
 import { TreeEntry } from '../types/git/tree-entry.js';
 import { TreeId } from '../types/git/tree-id.js';
 import { SnapshotRef } from '../types/sdk/snapshot-ref.js';
 import { errorMessage } from '../utils/error-utils.js';
-import { withDirPath } from './tmp-extensions.js';
+import { canonical, withDirPath } from './tmp-extensions.js';
 
 /** A remote that does not answer within this is reported, not waited for. */
 const REMOTE_TIMEOUT_MS = 30_000;
@@ -114,14 +117,14 @@ export class GitService {
     }
   }
 
-  /** The root of the repository enclosing `directory`, or none when nothing does. */
+  /** The root of the repository enclosing `directory`, spelt as the OS does, or none when nothing does. */
   public async topLevel(directory: DirectoryPath): Promise<Result<DirectoryPath | undefined, GitProblem>> {
     const ran = await this.run(directory, ['rev-parse', '--show-toplevel'], { exitCodes: [0, 128] });
     if (ran.isErr()) {
       return err(ran.error);
     }
     if (ran.value.exitCode === 0) {
-      return ok(new DirectoryPath(ran.value.stdout.trim()));
+      return ok(new DirectoryPath(canonical(ran.value.stdout.trim())));
     }
     return /not a git repository/i.test(ran.value.stderr) ? ok(undefined) : err(failed('rev-parse', ran.value.stderr));
   }
@@ -131,9 +134,8 @@ export class GitService {
   }
 
   /** Whether the repository's ignore rules exclude `directory`, which need not exist. */
-  public async isIgnored(root: DirectoryPath, directory: DirectoryPath): Promise<Result<boolean, GitProblem>> {
-    const relative = posix(path.relative(root.toString(), directory.toString()));
-    const ran = await this.run(root, ['check-ignore', '-q', '--', relative], { exitCodes: [0, 1] });
+  public async isIgnored(root: DirectoryPath, directory: SdkPath): Promise<Result<boolean, GitProblem>> {
+    const ran = await this.run(root, ['check-ignore', '-q', '--', directory.pathspec()], { exitCodes: [0, 1] });
     return ran.map(({ exitCode }) => exitCode === 0);
   }
 
@@ -285,10 +287,14 @@ export class GitService {
     return ran.value.exitCode === 0 ? read('rev-parse', ran.value.stdout.trim(), CommitId.fromGit) : ok(undefined);
   }
 
-  /** The full names of the refs below `prefix`. */
-  public async listRefs(root: DirectoryPath, prefix: string): Promise<Result<string[], GitProblem>> {
-    const ran = await this.run(root, ['for-each-ref', '--format=%(refname)', prefix]);
-    return ran.map(({ stdout }) => stdout.split('\n').filter((line) => line !== ''));
+  /** The snapshot refs at or below `ref`. */
+  public async listRefs(root: DirectoryPath, ref: SnapshotRef): Promise<Result<SnapshotRef[], GitProblem>> {
+    const ran = await this.run(root, ['for-each-ref', '--format=%(refname)', ref.toString()]);
+    if (ran.isErr()) {
+      return err(ran.error);
+    }
+    const names = ran.value.stdout.split('\n').filter((line) => line !== '');
+    return readAll('for-each-ref', names, SnapshotRef.fromGit);
   }
 
   public async hasCommit(root: DirectoryPath, commit: CommitId): Promise<Result<boolean, GitProblem>> {
@@ -314,37 +320,43 @@ export class GitService {
     const entries = ran.value.stdout.split('\0').filter((entry) => entry !== '');
     return readAll('ls-tree', entries, (entry): TreeEntry | undefined => {
       const [meta, filePath] = entry.split('\t');
-      const [mode, type, oid] = meta.split(' ');
+      const [mode, type, sha] = meta.split(' ');
+      const oid = BlobId.fromGit(sha);
       const path = RelativeFilePath.fromGit(filePath);
-      return path === undefined ? undefined : { mode, type: type as TreeEntry['type'], oid, path };
+      return oid === undefined || path === undefined ? undefined : { mode, type: type as TreeEntry['type'], oid, path };
     });
   }
 
   /** The contents of the given blobs, by id. */
   public async readBlobs(
     root: DirectoryPath,
-    oids: readonly string[]
-  ): Promise<Result<Map<string, Uint8Array>, GitProblem>> {
-    if (oids.length === 0) {
-      return ok(new Map());
+    ids: readonly BlobId[]
+  ): Promise<Result<ValueMap<BlobId, Uint8Array>, GitProblem>> {
+    const blobs = new ValueMap<BlobId, Uint8Array>();
+    const wanted = [...new Set(ids.map(String))];
+    if (wanted.length === 0) {
+      return ok(blobs);
     }
-    const ran = await this.run(root, ['cat-file', '--batch'], { input: oids.join('\n'), encoding: 'buffer' });
+    const ran = await this.run(root, ['cat-file', '--batch'], { input: wanted.join('\n'), encoding: 'buffer' });
     if (ran.isErr()) {
       return err(ran.error);
     }
-    const blobs = new Map<string, Uint8Array>();
     // execa hands a buffer-encoded stdout over as a bare Uint8Array, which cannot read its own text.
     const stdout = Buffer.from(ran.value.stdout);
     let offset = 0;
     while (offset < stdout.length) {
       const headerEnd = stdout.indexOf(0x0a, offset);
-      const [oid, type, size] = stdout.subarray(offset, headerEnd).toString('utf-8').split(' ');
+      const [sha, type, size] = stdout.subarray(offset, headerEnd).toString('utf-8').split(' ');
       offset = headerEnd + 1;
       if (type === 'missing') {
-        return err(problem(`object ${oid} is not in the repository`));
+        return err(problem(`object ${sha} is not in the repository`));
+      }
+      const oid = read('cat-file', sha, BlobId.fromGit);
+      if (oid.isErr()) {
+        return err(oid.error);
       }
       const length = Number(size);
-      blobs.set(oid, new Uint8Array(stdout.subarray(offset, offset + length)));
+      blobs.set(oid.value, new Uint8Array(stdout.subarray(offset, offset + length)));
       offset += length + 1;
     }
     return ok(blobs);
@@ -425,10 +437,18 @@ export class GitService {
         return err(paths.error);
       }
       const [first, second] = paths.value;
-      if (status === 'R' || status === 'C') {
-        entries.push({ status, from: first, path: second, blob: dstBlob });
+      if (status === 'D') {
+        entries.push({ status, path: first });
       } else {
-        entries.push(status === 'D' ? { status, path: first } : { status, path: first, blob: dstBlob });
+        const blob = read('diff-tree', dstBlob, BlobId.fromGit);
+        if (blob.isErr()) {
+          return err(blob.error);
+        }
+        entries.push(
+          status === 'R' || status === 'C'
+            ? { status, from: first, path: second, blob: blob.value }
+            : { status, path: first, blob: blob.value }
+        );
       }
       index += paths.value.length + 1;
     }
@@ -440,7 +460,7 @@ export class GitService {
    * see them; a stage-0 entry is dropped first, or git keeps it beside the others.
    */
   public async stageConflicts(root: DirectoryPath, entries: readonly StageEntry[]): Promise<Result<void, GitProblem>> {
-    const zero = '0'.repeat(entries[0]?.oid.length ?? 40);
+    const zero = '0'.repeat(entries[0]?.oid.toString().length ?? 40);
     const removals = [...new Set(entries.map((entry) => entry.path.toString()))].map((path) => `0 ${zero} 0\t${path}`);
     const stages = entries.map((entry) => `${entry.mode} ${entry.oid} ${entry.stage}\t${entry.path}`);
     const ran = await this.run(root, ['update-index', '-z', '--index-info'], {
@@ -450,8 +470,8 @@ export class GitService {
   }
 
   /** The index entries below `directory` git holds as unmerged, paths from the root: what a merge left and `git add` has not marked resolved. */
-  public async unmergedStages(root: DirectoryPath, directory: string): Promise<Result<StageEntry[], GitProblem>> {
-    const ran = await this.run(root, ['ls-files', '-u', '-z', '--', directory]);
+  public async unmergedStages(root: DirectoryPath, directory: SdkPath): Promise<Result<StageEntry[], GitProblem>> {
+    const ran = await this.run(root, ['ls-files', '-u', '-z', '--', directory.pathspec()]);
     if (ran.isErr()) {
       return err(ran.error);
     }
@@ -460,7 +480,7 @@ export class GitService {
   }
 
   /** The remote the current branch is set to push to, else `origin` when there is one, else none. */
-  public async remoteOf(root: DirectoryPath): Promise<Result<string | undefined, GitProblem>> {
+  public async remoteOf(root: DirectoryPath): Promise<Result<RemoteName | undefined, GitProblem>> {
     // No branch yet, or a detached HEAD, is exit 128 here and means no configured remote.
     const head = await this.run(root, ['symbolic-ref', '--short', 'HEAD'], { exitCodes: [0, 128] });
     if (head.isErr()) {
@@ -471,21 +491,23 @@ export class GitService {
       if (configured.isErr()) {
         return err(configured.error);
       }
+      // `.` names this repository itself, which is no remote to fetch from.
       if (configured.value !== undefined && configured.value !== '.') {
-        return ok(configured.value);
+        return read('config', configured.value, RemoteName.fromGit);
       }
     }
     const remotes = await this.run(root, ['remote']);
-    return remotes.map(({ stdout }) => (stdout.split('\n').includes('origin') ? 'origin' : undefined));
+    const origin = RemoteName.origin();
+    return remotes.map(({ stdout }) => (stdout.split('\n').includes(origin.toString()) ? origin : undefined));
   }
 
   /** Brings `ref` and its objects over from `remote` and answers with its tip, or none when the remote has no such ref. */
   public async fetchRef(
     root: DirectoryPath,
-    remote: string,
+    remote: RemoteName,
     ref: SnapshotRef
   ): Promise<Result<CommitId | undefined, GitProblem>> {
-    const fetched = await this.runRemote(root, ['fetch', '--quiet', '--no-tags', remote, ref.toString()]);
+    const fetched = await this.runRemote(root, ['fetch', '--quiet', '--no-tags', remote.toString(), ref.toString()]);
     if (fetched.isErr()) {
       return err(fetched.error);
     }

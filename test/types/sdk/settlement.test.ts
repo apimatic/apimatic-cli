@@ -1,11 +1,17 @@
 import { expect } from 'chai';
+import { ValueMap } from '../../../src/types/common/value-map.js';
 import { RelativeFilePath } from '../../../src/types/file/relativeFilePath.js';
+import { BlobId } from '../../../src/types/git/blob-id.js';
 import { TreeId } from '../../../src/types/git/tree-id.js';
-import { Conflict, MergeFiles, MergePlan, Sides } from '../../../src/types/sdk/merge-plan.js';
+import { Conflict, ConflictSides, MergeFiles, MergePlan } from '../../../src/types/sdk/merge-plan.js';
 import { favouring, resolving } from '../../../src/types/sdk/settlement.js';
 import { Regeneration } from '../../../src/types/sdk/repository-state.js';
 
 const rel = (value: string) => RelativeFilePath.fromGit(value)!;
+
+const OF_YOURS = BlobId.fromGit('a'.repeat(40))!;
+const OF_GENERATED = BlobId.fromGit('b'.repeat(40))!;
+const WITH_MARKERS = BlobId.fromGit('c'.repeat(40))!;
 
 const NO_FILES: MergeFiles = { added: [], updated: [], merged: [], removed: [], kept: [] };
 
@@ -14,12 +20,12 @@ const NO_FILES: MergeFiles = { added: [], updated: [], merged: [], removed: [], 
  * the generator's side of every other one is known, and yours is on disk.
  */
 const regeneration = (conflicts: Conflict[]): Regeneration => {
-  const sides = new Map<string, Sides<string>>(
-    conflicts.map((conflict) => [conflict.path.toString(), { yours: 'blob-of-yours', generated: 'blob-of-generated' }])
+  const sides: ConflictSides = new ValueMap(
+    conflicts.map((conflict) => [conflict.path, { yours: OF_YOURS, generated: OF_GENERATED }])
   );
   const writes = conflicts
     .filter((conflict) => conflict.kind === 'bothChanged' || conflict.kind === 'bothAdded')
-    .map((conflict) => ({ path: conflict.path, blob: 'blob-with-markers' }));
+    .map((conflict) => ({ path: conflict.path, blob: WITH_MARKERS }));
   const plan = new MergePlan(writes, [], conflicts, NO_FILES, sides);
   return { generated: TreeId.fromGit('a'.repeat(40))!, merge: { plan, stages: [] } };
 };
@@ -47,8 +53,8 @@ describe('Settlement', () => {
     expect(settlement.regeneration).to.equal(original);
     expect(settlement.plan.hasConflicts()).to.be.false;
     expect(settlement.plan.writes).to.deep.equal([
-      { path: rel('a.py'), blob: 'blob-with-markers', settle: 'generated' },
-      { path: rel('b.py'), blob: 'blob-of-generated' }
+      { path: rel('a.py'), blob: WITH_MARKERS, settle: 'generated' },
+      { path: rel('b.py'), blob: OF_GENERATED }
     ]);
     expect(settlement.settled?.side).to.equal('generated');
     expect(settlement.settled?.paths.map(String)).to.deep.equal(['a.py', 'b.py']);
@@ -64,7 +70,7 @@ describe('Settlement', () => {
 
     expect(settlement.regeneration).to.equal(original);
     expect(settlement.plan.hasConflicts()).to.be.false;
-    expect(settlement.plan.writes).to.deep.equal([{ path: rel('a.py'), blob: 'blob-with-markers', settle: 'yours' }]);
+    expect(settlement.plan.writes).to.deep.equal([{ path: rel('a.py'), blob: WITH_MARKERS, settle: 'yours' }]);
     expect(settlement.plan.files.merged.map(String)).to.deep.equal(['a.py']);
     expect(settlement.plan.files.kept.map(String)).to.deep.equal(['b.py']);
     expect(settlement.settled?.side).to.equal('yours');

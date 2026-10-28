@@ -18,38 +18,36 @@ export class MergeEngine {
     disk: TreeId,
     generated: TreeId
   ): Promise<Result<MergeOutcome, RepositoryProblem>> {
-    const git = this.git;
-    const root = this.root;
-    const baseTree = await git.treeOfCommit(root, base);
+    const baseTree = await this.git.treeOfCommit(this.root, base);
     if (baseTree.isErr()) {
       return err(baseTree.error);
     }
-    const yours = await git.commitTree(root, disk, [base], 'apimatic: your changes');
+    const yours = await this.git.commitTree(this.root, disk, [base], 'apimatic: your changes');
     if (yours.isErr()) {
       return err(yours.error);
     }
-    const theirs = await git.commitTree(root, generated, [base], 'apimatic: generated');
+    const theirs = await this.git.commitTree(this.root, generated, [base], 'apimatic: generated');
     if (theirs.isErr()) {
       return err(theirs.error);
     }
-    const merged = await git.mergeTree(root, yours.value, theirs.value);
+    const merged = await this.git.mergeTree(this.root, yours.value, theirs.value);
     if (merged.isErr()) {
       return err(merged.error);
     }
     const merge = merged.value;
-    const yourChanges = await git.diffTrees(root, baseTree.value, disk, true);
+    const yourChanges = await this.git.diffTrees(this.root, baseTree.value, disk, true);
     if (yourChanges.isErr()) {
       return err(yourChanges.error);
     }
-    const generatedChanges = await git.diffTrees(root, baseTree.value, generated, true);
+    const generatedChanges = await this.git.diffTrees(this.root, baseTree.value, generated, true);
     if (generatedChanges.isErr()) {
       return err(generatedChanges.error);
     }
-    const applied = await git.diffTrees(root, disk, merge.tree, false);
+    const applied = await this.git.diffTrees(this.root, disk, merge.tree, false);
     if (applied.isErr()) {
       return err(applied.error);
     }
-    const baseEntries = await git.listTree(root, baseTree.value);
+    const baseEntries = await this.git.listTree(this.root, baseTree.value);
     if (baseEntries.isErr()) {
       return err(baseEntries.error);
     }

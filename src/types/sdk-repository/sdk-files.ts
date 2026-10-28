@@ -2,9 +2,11 @@ import { Buffer } from 'node:buffer';
 import { err, ok, Result } from 'neverthrow';
 import { FileService } from '../../infrastructure/file-service.js';
 import { GitService } from '../../infrastructure/git-service.js';
+import { ValueMap } from '../common/value-map.js';
 import { DirectoryPath } from '../file/directoryPath.js';
 import { FilePath } from '../file/filePath.js';
 import { RelativeFilePath } from '../file/relativeFilePath.js';
+import { BlobId } from '../git/blob-id.js';
 import { CommitId } from '../git/commit-id.js';
 import { relabelMarkers, settleMarkers } from '../sdk/conflict-markers.js';
 import { FileWrite, MergePlan } from '../sdk/merge-plan.js';
@@ -25,7 +27,10 @@ export class SdkFiles {
     previous: { commit: CommitId; ref: SnapshotRef },
     generated: DirectoryPath
   ): Promise<Result<void, WriteProblem>> {
-    const blobs = await this.git.readBlobs(this.root, [...new Set(plan.writes.map((write) => write.blob))]);
+    const blobs = await this.git.readBlobs(
+      this.root,
+      plan.writes.map((write) => write.blob)
+    );
     if (blobs.isErr()) {
       return err(blobs.error);
     }
@@ -82,14 +87,16 @@ export class SdkFiles {
     if (entries.isErr()) {
       return err(entries.error);
     }
-    const kept = new Map(entries.value.map((entry) => [entry.path.toString(), entry.oid]));
-    const oids = touched.flatMap((relative) => kept.get(relative.toString()) ?? []);
-    const blobs = await this.git.readBlobs(this.root, [...new Set(oids)]);
+    const kept = new ValueMap(entries.value.map((entry): [RelativeFilePath, BlobId] => [entry.path, entry.oid]));
+    const blobs = await this.git.readBlobs(
+      this.root,
+      touched.flatMap((relative) => kept.get(relative) ?? [])
+    );
     if (blobs.isErr()) {
       return err(blobs.error);
     }
     for (const relative of touched) {
-      const oid = kept.get(relative.toString());
+      const oid = kept.get(relative);
       const restored = await onDisk(
         oid === undefined ? this.remove(relative.in(this.sdk)) : this.put(relative.in(this.sdk), blobs.value.get(oid)!)
       );

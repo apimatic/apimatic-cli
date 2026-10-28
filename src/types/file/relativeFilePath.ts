@@ -2,6 +2,7 @@ import path from 'node:path';
 import { DirectoryPath } from './directoryPath.js';
 import { FileName } from './fileName.js';
 import { FilePath } from './filePath.js';
+import { RelativeDirectoryPath } from './relativeDirectoryPath.js';
 
 /**
  * A file's place below some directory, spelt as git names a path inside a tree: `/` between the
@@ -30,17 +31,15 @@ export class RelativeFilePath {
     return new FilePath(directory.join(path.posix.dirname(this.value)), this.name());
   }
 
-  /** The same file seen from above `prefix`, a directory spelt the same way, or from the same place when `prefix` is empty. */
-  public below(prefix: string): RelativeFilePath {
-    return prefix === '' ? this : new RelativeFilePath(`${prefix}/${this.value}`);
+  /** The same file seen from above `directory`: its place below the root `directory` sits in. */
+  public under(directory: RelativeDirectoryPath): RelativeFilePath {
+    return new RelativeFilePath(`${directory}/${this.value}`);
   }
 
-  /** The same file seen from inside `prefix`, undoing `below`; none when the file is not under it. */
-  public inside(prefix: string): RelativeFilePath | undefined {
-    if (prefix === '') {
-      return this;
-    }
-    return this.value.startsWith(`${prefix}/`) ? new RelativeFilePath(this.value.slice(prefix.length + 1)) : undefined;
+  /** The same file seen from inside `directory`, undoing `under`; none when the file is not below it. */
+  public within(directory: RelativeDirectoryPath): RelativeFilePath | undefined {
+    const prefix = `${directory}/`;
+    return this.value.startsWith(prefix) ? new RelativeFilePath(this.value.slice(prefix.length)) : undefined;
   }
 
   public name(): FileName {

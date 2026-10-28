@@ -8,6 +8,7 @@ import { GitService } from '../../src/infrastructure/git-service.js';
 import { DirectoryPath } from '../../src/types/file/directoryPath.js';
 import { RelativeFilePath } from '../../src/types/file/relativeFilePath.js';
 import { CommitId } from '../../src/types/git/commit-id.js';
+import { RemoteName } from '../../src/types/git/remote-name.js';
 import { SdkContext } from '../../src/types/sdk-context.js';
 import { SdkRepositoryContext } from '../../src/types/sdk-repository-context.js';
 import { CodeGenerationVersion, Language, Stability } from '../../src/types/sdk/generate.js';
@@ -498,11 +499,14 @@ describe('SdkRepositoryContext', () => {
       const { sdk, origin } = await withOrigin();
       const base = await published(sdk);
       const clone = await cloneOf(origin, 'clone');
-      const before = (await clone.repository.inspect(TYPESCRIPT, 'origin'))._unsafeUnwrap();
-      expect(before).to.deep.include({ kind: 'snapshotMissing', fetch: { kind: 'absent', remote: 'origin' } });
+      const before = (await clone.repository.inspect(TYPESCRIPT, RemoteName.origin()))._unsafeUnwrap();
+      expect(before).to.deep.include({
+        kind: 'snapshotMissing',
+        fetch: { kind: 'absent', remote: RemoteName.origin() }
+      });
 
       await sh(sdk.root, 'push', '-q', '--no-verify', 'origin', refspec(sdk.pristine));
-      const after = (await clone.repository.inspect(TYPESCRIPT, 'origin'))._unsafeUnwrap();
+      const after = (await clone.repository.inspect(TYPESCRIPT, RemoteName.origin()))._unsafeUnwrap();
 
       expect(after.kind === 'ready' && after.base.isEqual(base)).to.be.true;
       expect((await pristineOf(clone))?.isEqual(base)).to.be.true;
@@ -513,12 +517,12 @@ describe('SdkRepositoryContext', () => {
       const first = await published(sdk);
       await sh(sdk.root, 'push', '-q', '--no-verify', 'origin', refspec(sdk.pristine));
       const clone = await cloneOf(origin, 'clone');
-      expect((await clone.repository.inspect(TYPESCRIPT, 'origin'))._unsafeUnwrap().kind).to.equal('ready');
+      expect((await clone.repository.inspect(TYPESCRIPT, RemoteName.origin()))._unsafeUnwrap().kind).to.equal('ready');
       const second = (await record(sdk, { 'README.md': '# v2' }))._unsafeUnwrap();
       await sh(sdk.root, 'push', '-q', '--no-verify', 'origin', refspec(sdk.pristine));
       await writeRecord(clone, GenerationRecord.written(TYPESCRIPT, second));
 
-      const state = (await clone.repository.inspect(TYPESCRIPT, 'origin'))._unsafeUnwrap();
+      const state = (await clone.repository.inspect(TYPESCRIPT, RemoteName.origin()))._unsafeUnwrap();
 
       expect(state.kind === 'ready' && state.base.isEqual(second)).to.be.true;
       const tip = (await pristineOf(clone))!;
@@ -532,12 +536,12 @@ describe('SdkRepositoryContext', () => {
       const clone = await cloneOf(origin, 'clone');
       fs.rmSync(origin.toString(), { recursive: true, force: true });
 
-      const unreachable = (await clone.repository.inspect(TYPESCRIPT, 'origin'))._unsafeUnwrap();
+      const unreachable = (await clone.repository.inspect(TYPESCRIPT, RemoteName.origin()))._unsafeUnwrap();
       const none = (await clone.repository.inspect(TYPESCRIPT, undefined))._unsafeUnwrap();
 
       expect(unreachable.kind === 'snapshotMissing' && unreachable.fetch).to.include({
         kind: 'failed',
-        remote: 'origin'
+        remote: RemoteName.origin()
       });
       expect(none.kind === 'snapshotMissing' && none.fetch).to.deep.equal({ kind: 'noRemote' });
     });
@@ -554,7 +558,7 @@ describe('SdkRepositoryContext', () => {
       const second = (await record(b, { 'README.md': '# b' }))._unsafeUnwrap();
       await writeRecord(b, GenerationRecord.written(TYPESCRIPT, first));
 
-      const state = (await b.repository.inspect(TYPESCRIPT, 'origin'))._unsafeUnwrap();
+      const state = (await b.repository.inspect(TYPESCRIPT, RemoteName.origin()))._unsafeUnwrap();
 
       expect(state.kind === 'ready' && state.base.isEqual(first)).to.be.true;
       const tip = (await pristineOf(b))!;

@@ -13,6 +13,7 @@ import { CommandMetadata } from '../../../src/types/common/command-metadata.js';
 import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
 import { CommitId } from '../../../src/types/git/commit-id.js';
 import { GitVersion } from '../../../src/types/git/git-version.js';
+import { RemoteName } from '../../../src/types/git/remote-name.js';
 import { ProjectContext } from '../../../src/types/project-context.js';
 import { CodeGenerationVersion, Language, Stability } from '../../../src/types/sdk/generate.js';
 import { GenerationRecord, SdkGeneration } from '../../../src/types/sdk/generation-record.js';
@@ -248,7 +249,7 @@ describe('GenerateAction (sdk) — the destination', () => {
       sinon.stub(SdkGeneratePrompts.prototype, 'destinationDirNotEmpty');
 
       expect((await execute({ force: false })).isCancelled()).to.be.true;
-      expect(snapshotMissing.firstCall.args[0]).to.deep.equal({ kind: 'absent', remote: 'origin' });
+      expect(snapshotMissing.firstCall.args[0]).to.deep.equal({ kind: 'absent', remote: RemoteName.origin() });
       expect(generateSdk.called).to.be.false;
 
       await sh(root, 'push', '-q', '--no-verify', 'origin', 'refs/apimatic/pristine/*:refs/apimatic/pristine/*');
