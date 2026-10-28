@@ -58,7 +58,7 @@ class EnvInfo {
   /** The Ask AI service `APIMATIC_COPILOT_URL` names, or undefined for APIMatic's own. Read each time, as tests set it. */
   public getCopilotUrl(): string | undefined {
     const named = process.env.APIMATIC_COPILOT_URL?.trim();
-    return named ? named : undefined;
+    return named || undefined;
   }
 
   public getAuthBaseUrl(): string | undefined {
