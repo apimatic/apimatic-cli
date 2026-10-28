@@ -2,11 +2,7 @@ import { RelativeFilePath } from '../file/relativeFilePath.js';
 import { Regeneration } from './repository-state.js';
 import { ConflictSide, MergePlan } from './merge-plan.js';
 
-/**
- * A regeneration whose conflicts are settled: the plan the run writes, and, when the developer
- * chose a side, that side and the paths settled for it, named once they are written. Markers
- * the developer chose to resolve stay in the plan as conflicts.
- */
+/** A regeneration with its conflicts settled: the plan to write, and the side and paths settled for it, if any. */
 export type Settlement = {
   regeneration: Regeneration;
   plan: MergePlan;

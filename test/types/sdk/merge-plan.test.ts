@@ -58,7 +58,7 @@ describe('MergePlan.from', () => {
       { path: rel('new.ts'), blob: blob('ng') }
     ]);
     expect(plan.deletes).to.deep.equal(['d.ts'].map(rel));
-    expect(counts(plan)).to.deep.equal({ added: 1, updated: 1, merged: 1, removed: 1, kept: 1, unchanged: 1 });
+    expect(counts(plan)).to.deep.equal({ added: 1, updated: 1, merged: 1, removed: 1, kept: 1 });
     expect(plan.hasConflicts()).to.be.false;
   });
 
@@ -124,12 +124,12 @@ describe('MergePlan.from', () => {
       { path: rel('logo.png'), kind: 'binary' },
       { path: rel('deleted-by-you.ts'), kind: 'deletedByYou' },
       { path: rel('dropped.ts'), kind: 'noLongerGenerated' },
-      { path: rel('x.ts'), kind: 'other', message: 'CONFLICT (rename/rename): a.ts renamed to x.ts and y.ts' },
-      { path: rel('y.ts'), kind: 'other', message: 'CONFLICT (rename/rename): a.ts renamed to x.ts and y.ts' }
+      { path: rel('x.ts'), kind: 'other' },
+      { path: rel('y.ts'), kind: 'other' }
     ]);
     expect(plan.hasMarkers(rel('same.ts'))).to.be.true;
     expect(plan.hasMarkers(rel('deleted-by-you.ts'))).to.be.false;
-    expect(counts(plan)).to.deep.equal({ added: 0, updated: 0, merged: 0, removed: 0, kept: 0, unchanged: 0 });
+    expect(counts(plan)).to.deep.equal({ added: 0, updated: 0, merged: 0, removed: 0, kept: 0 });
   });
 
   it('counts a file you added, which the generator never produced, among the kept ones', () => {
@@ -280,10 +280,35 @@ describe('MergePlan.from', () => {
     expect(settled.files.removed).to.deep.equal([]);
   });
 
+  it('does not bring back a path the generator renamed away when its deletion is settled for the generator', () => {
+    const plan = MergePlan.from(
+      inputs({
+        basePaths: ['old.ts'].map(rel),
+        yours: [{ status: 'D', path: rel('old.ts') }],
+        generated: [{ status: 'R', from: rel('old.ts'), path: rel('new.ts'), blob: blob('n') }],
+        applied: [{ status: 'A', path: rel('new.ts'), blob: blob('n') }],
+        merge: merge({
+          stages: [
+            { mode: '100644', oid: blob('1'), stage: 1, path: rel('old.ts') },
+            { mode: '100644', oid: blob('3'), stage: 3, path: rel('old.ts') }
+          ],
+          messages: [
+            { paths: ['old.ts'].map(rel), type: 'CONFLICT (rename/delete)', message: 'CONFLICT (rename/delete): …' }
+          ]
+        })
+      })
+    );
+
+    const settled = plan.taking('generated');
+
+    expect(settled.writes).to.deep.equal([{ path: rel('new.ts'), blob: blob('n') }]);
+    expect(settled.deletes).to.deep.equal([]);
+  });
+
   it('tells the conflicts that leave markers in the file from those that leave it whole', () => {
     const marks = (...kinds: ConflictKind[]) => {
       const conflicts = kinds.map((kind, index) => ({ path: rel(`${index}.ts`), kind }));
-      const plan = new MergePlan([], [], conflicts, [], MergePlan.from(inputs({})).files);
+      const plan = new MergePlan([], [], conflicts, MergePlan.from(inputs({})).files);
       return [plan.hasMarkedConflicts(), plan.hasUnmarkedConflicts()];
     };
 
@@ -291,20 +316,5 @@ describe('MergePlan.from', () => {
     expect(marks('deletedByYou', 'noLongerGenerated', 'binary', 'other')).to.deep.equal([false, true]);
     expect(marks('bothChanged', 'binary')).to.deep.equal([true, true]);
     expect(marks()).to.deep.equal([false, false]);
-  });
-
-  it('reports the renames each side made', () => {
-    const plan = MergePlan.from(
-      inputs({
-        basePaths: ['a.ts', 'b.ts'].map(rel),
-        yours: [{ status: 'R', from: rel('a.ts'), path: rel('moved/a.ts'), blob: blob('a') }],
-        generated: [{ status: 'R', from: rel('b.ts'), path: rel('b-model.ts'), blob: blob('b') }]
-      })
-    );
-
-    expect(plan.renames).to.deep.equal([
-      { from: rel('b.ts'), to: rel('b-model.ts'), by: 'generator' },
-      { from: rel('a.ts'), to: rel('moved/a.ts'), by: 'you' }
-    ]);
   });
 });

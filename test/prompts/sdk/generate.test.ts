@@ -83,14 +83,12 @@ const plan = (
     [],
     [],
     conflicts.map((conflict) => ({ ...conflict, path: rel(conflict.path) })),
-    [],
     {
       added: [],
       updated: [],
       merged: [],
       removed: [],
       kept: [],
-      unchanged: [],
       ...Object.fromEntries(Object.entries(files).map(([kind, paths]) => [kind, paths.map(rel)]))
     }
   );
@@ -131,7 +129,7 @@ describe('SdkGeneratePrompts.sdkMerged', () => {
   it('still names your files when the generator changed nothing, since they are what the next run will merge', () => {
     const info = sinon.stub(log, 'info');
 
-    new SdkGeneratePrompts().sdkMerged(sdk, plan({ unchanged: ['README.md'], kept: ['src/models/book.ts'] }));
+    new SdkGeneratePrompts().sdkMerged(sdk, plan({ kept: ['src/models/book.ts'] }));
 
     expect(stripVTControlCharacters(info.firstCall.args[0])).to.equal(
       [
@@ -224,5 +222,65 @@ describe('SdkGeneratePrompts.snapshotNotRecorded', () => {
       'The SDK was written, but its snapshot could not be recorded: git broke\n' +
         "The next run will merge against the snapshot recorded before this one, and list this run's generated changes as yours."
     );
+  });
+});
+
+describe('SdkGeneratePrompts.snapshotMissing', () => {
+  afterEach(() => {
+    sinon.restore();
+  });
+
+  it('says where the snapshot was looked for: no remote, the remote too, or a remote that failed', () => {
+    const warn = sinon.stub(log, 'warn');
+
+    new SdkGeneratePrompts().snapshotMissing({ kind: 'noRemote' });
+    new SdkGeneratePrompts().snapshotMissing({ kind: 'absent', remote: 'origin' });
+    new SdkGeneratePrompts().snapshotMissing({ kind: 'failed', remote: 'origin', reason: 'could not read' });
+
+    const said = warn.getCalls().map((call) => stripVTControlCharacters(call.args[0]));
+    expect(said[0]).to.contain('not available here, and there is no remote to fetch it from');
+    expect(said[1]).to.contain('not available here or on');
+    expect(said[1]).to.contain('origin');
+    expect(said[2]).to.contain('could not be fetched from');
+    expect(said[2]).to.contain('could not read');
+    expect(said.every((line) => line.endsWith('so the new SDK cannot be merged into it.'))).to.be.true;
+  });
+});
+
+describe('SdkGeneratePrompts.directoryNotInspected', () => {
+  const sdk = new DirectoryPath(process.cwd()).join('sdk', 'python');
+
+  afterEach(() => {
+    sinon.restore();
+  });
+
+  it('words each problem by its kind: nested either way, an operation in progress, or git itself', () => {
+    const error = sinon.stub(log, 'error');
+    const other = new DirectoryPath(process.cwd()).join('sdk');
+
+    new SdkGeneratePrompts().directoryNotInspected(sdk, { kind: 'nestedSdkDirectory', other, encloses: true });
+    new SdkGeneratePrompts().directoryNotInspected(sdk, {
+      kind: 'nestedSdkDirectory',
+      other: sdk.join('inner'),
+      encloses: false
+    });
+    new SdkGeneratePrompts().directoryNotInspected(sdk, {
+      kind: 'operationInProgress',
+      operation: 'rebase',
+      root: new DirectoryPath(process.cwd())
+    });
+    new SdkGeneratePrompts().directoryNotInspected(sdk, {
+      kind: 'gitFailed',
+      reason: 'git rev-parse failed: bad config'
+    });
+
+    const said = error.getCalls().map((call) => stripVTControlCharacters(call.args[0]));
+    expect(said[0]).to.equal("The SDK cannot be generated at './sdk/python': it sits inside the SDK at './sdk'.");
+    expect(said[1]).to.equal(
+      "The SDK cannot be generated at './sdk/python': the SDK at './sdk/python/inner' sits inside it."
+    );
+    expect(said[2]).to.contain('in the middle of a rebase');
+    expect(said[2]).to.contain('git rebase --abort');
+    expect(said[3]).to.contain('git rev-parse failed: bad config');
   });
 });

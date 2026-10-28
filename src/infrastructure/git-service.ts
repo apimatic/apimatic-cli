@@ -6,19 +6,18 @@ import { execa, ExecaError } from 'execa';
 import { err, Err, errAsync, ok, okAsync, Result, ResultAsync, safeTry } from 'neverthrow';
 import { RelativeFilePath } from '../types/file/relativeFilePath.js';
 import { DirectoryPath, posix } from '../types/file/directoryPath.js';
+import { SdkPath } from '../types/sdk/sdk-path.js';
 import { FileName } from '../types/file/fileName.js';
 import { FilePath } from '../types/file/filePath.js';
 import { CommitId } from '../types/git/commit-id.js';
 import { GitVersion } from '../types/git/git-version.js';
-import { Change, MergeMessage, MergeTreeOutput, StageEntry } from '../types/git/merge-tree.js';
+import { Change, MergeMessage, MergeTreeOutput, parseStageEntry, StageEntry } from '../types/git/merge-tree.js';
 import { TreeId } from '../types/git/tree-id.js';
 import { SnapshotRef } from '../types/sdk/snapshot-ref.js';
 import { errorMessage } from '../utils/error-utils.js';
 import { withDirPath } from './tmp-extensions.js';
 
 export type TreeEntry = { mode: string; type: 'blob' | 'tree' | 'commit'; oid: string; path: RelativeFilePath };
-
-export type CommitDescription = { parents: CommitId[]; authorName: string; subject: string };
 
 /** What went wrong with a git command: git's own words where it said any. */
 export type GitProblem = { reason: string };
@@ -50,7 +49,6 @@ function remoteSaid(stderr: string): string {
 }
 
 const AUTHOR = { name: 'APIMatic CLI', email: 'developer@apimatic.io' } as const;
-const EMPTY_TREE = '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
 
 // The developer's own configuration must not change a tree, a merge or its markers.
 const SETTINGS: readonly (readonly [string, string])[] = [
@@ -90,11 +88,8 @@ const isNotFound = (error: unknown): boolean =>
     /is not recognized as an internal or external command/.test(String(error.stderr)));
 
 /**
- * The system git, driven through its plumbing. Every call carries the same `-c` settings so a
- * developer's own configuration cannot change a tree, a merge or its markers, and no command
- * here touches the working tree or a branch of the repository it runs in; the index only to
- * mark conflicts and to unmark them. Nothing here throws: every method answers with a `Result`
- * whose problem carries git's own words.
+ * The system git through its plumbing, with the same `-c` settings on every call so a developer's
+ * configuration cannot change a tree or a merge; the index is touched only to mark and unmark conflicts. Nothing here throws.
  */
 export class GitService {
   /** The git on PATH; none when there is no such command, a problem when it is there but does not answer. */
@@ -127,10 +122,7 @@ export class GitService {
     );
   }
 
-  /**
-   * Every file below `directory` that git tracks or would add: the untracked ones its ignore
-   * rules allow, so a `node_modules` or `dist` stays out. A tracked file deleted from disk is not listed.
-   */
+  /** Every file below `directory` git tracks or would add, so its ignore rules keep `node_modules` out; a tracked file deleted from disk is not listed. */
   public filesToCommit(directory: DirectoryPath): ResultAsync<RelativeFilePath[], GitProblem> {
     return this.run(directory, ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', '.']).map(
       ({ stdout }) =>
@@ -153,10 +145,8 @@ export class GitService {
   }
 
   /**
-   * `directory` as a tree in `root`'s object database, through a temporary index. With
-   * `include: 'all'` every file goes in; otherwise the directory's own `.gitignore` is honoured,
-   * except for the listed paths, which go in regardless. Line endings are normalised to LF, so
-   * a CRLF file and its LF twin compare equal and merge line by line, unless `asIs` is asked for.
+   * `directory` as a tree through a temporary index: every file with `include: 'all'`, else the
+   * ignore rules honoured except for the listed paths; line endings normalised unless `asIs`.
    */
   public treeOf(
     root: DirectoryPath,
@@ -164,28 +154,45 @@ export class GitService {
     include: 'all' | readonly RelativeFilePath[],
     lineEndings: 'normalized' | 'asIs' = 'normalized'
   ): ResultAsync<TreeId, GitProblem> {
+    // A directory inside the repository is added from the root, so the root's ignore rules count.
+    const inside = root.contains(directory) ? SdkPath.of(root, directory) : undefined;
+    const workTree = inside === undefined ? directory : root;
     return this.gitDir(root).andThen((gitDir) =>
       this.inTemporaryDirectory((temporary) => {
         const env = { GIT_INDEX_FILE: new FilePath(temporary, new FileName('index')).toString() };
         const attributesIn = lineEndings === 'normalized' ? temporary : undefined;
         const inWorkTree = (args: string[], input?: string) =>
-          this.run(directory, ['--git-dir', gitDir, '--work-tree', directory.toString(), ...args], {
+          this.run(workTree, ['--git-dir', gitDir, '--work-tree', workTree.toString(), ...args], {
             env,
             attributesIn,
             input
           });
         const forced =
           include === 'all' ? [] : include.filter((relative) => fs.existsSync(relative.in(directory).toString()));
+        const fromRoot = (relative: RelativeFilePath) => (inside === undefined ? relative : inside.fromRoot(relative));
         return safeTry(async function* () {
-          yield* inWorkTree(['add', '--all', ...(include === 'all' ? ['--force'] : []), '--', '.']);
+          // `--sparse` reaches paths a sparse checkout leaves out of the cone.
+          yield* inWorkTree([
+            'add',
+            '--all',
+            '--sparse',
+            ...(include === 'all' ? ['--force'] : []),
+            '--',
+            inside === undefined ? '.' : inside.pathspec()
+          ]);
           if (forced.length > 0) {
             yield* inWorkTree(
-              ['add', '--force', '--pathspec-from-file=-', '--pathspec-file-nul'],
-              forced.map(String).join('\0')
+              ['add', '--force', '--sparse', '--pathspec-from-file=-', '--pathspec-file-nul'],
+              forced.map((relative) => fromRoot(relative).toString()).join('\0')
             );
           }
-          const { stdout } = yield* inWorkTree(['write-tree']);
-          return ok(TreeId.fromGit(stdout.trim()));
+          const written = yield* inWorkTree(['write-tree']);
+          const whole = TreeId.fromGit(written.stdout.trim());
+          if (inside === undefined || inside.isRoot()) {
+            return ok(whole);
+          }
+          const subtree = yield* inWorkTree(['rev-parse', `${whole}:${inside}`]);
+          return ok(TreeId.fromGit(subtree.stdout.trim()));
         });
       })
     );
@@ -235,17 +242,6 @@ export class GitService {
     );
   }
 
-  public describe(root: DirectoryPath, commit: CommitId): ResultAsync<CommitDescription, GitProblem> {
-    return this.run(root, ['show', '--no-patch', '--format=%P%n%an%n%s', commit.toString()]).map(({ stdout }) => {
-      const [parents, authorName, subject] = stdout.split('\n');
-      return {
-        parents: parents === '' ? [] : parents.split(' ').map((sha) => CommitId.fromGit(sha)),
-        authorName,
-        subject
-      };
-    });
-  }
-
   public treeOfCommit(root: DirectoryPath, commit: CommitId): ResultAsync<TreeId, GitProblem> {
     return this.run(root, ['rev-parse', `${commit}^{tree}`]).map(({ stdout }) => TreeId.fromGit(stdout.trim()));
   }
@@ -289,11 +285,7 @@ export class GitService {
     });
   }
 
-  /**
-   * `git merge-tree --write-tree -z` of two commits that share a parent. It prints the merged
-   * tree's id, then one entry per stage of every conflicted path, then, after an empty entry, the
-   * messages git would have shown during a merge, each as a count, that many paths, a type and the text.
-   */
+  /** `merge-tree --write-tree -z`: the merged tree, a stage entry per conflicted path, then git's messages as count, paths, type and text. */
   public mergeTree(root: DirectoryPath, ours: CommitId, theirs: CommitId): ResultAsync<MergeTreeOutput, GitProblem> {
     return this.inTemporaryDirectory((temporary) =>
       this.run(root, ['merge-tree', '--write-tree', '-z', ours.toString(), theirs.toString()], {
@@ -305,9 +297,7 @@ export class GitService {
         const stages: StageEntry[] = [];
         let index = 1;
         for (; index < fields.length && fields[index] !== ''; index += 1) {
-          const [meta, path] = fields[index].split('\t');
-          const [mode, oid, stage] = meta.split(' ');
-          stages.push({ mode, oid, stage: Number(stage) as StageEntry['stage'], path: RelativeFilePath.fromGit(path) });
+          stages.push(parseStageEntry(fields[index]));
         }
         const messages: MergeMessage[] = [];
         for (index += 1; index < fields.length && fields[index] !== ''; ) {
@@ -344,17 +334,12 @@ export class GitService {
       for (let index = 0; index < fields.length && fields[index] !== ''; ) {
         const [, , , dstBlob, statusWithScore] = fields[index].slice(1).split(' ');
         const status = statusWithScore[0] as Change['status'];
-        const first = fields[index + 1];
+        const first = RelativeFilePath.fromGit(fields[index + 1]);
         if (status === 'R' || status === 'C') {
-          entries.push({
-            status,
-            from: RelativeFilePath.fromGit(first),
-            path: RelativeFilePath.fromGit(fields[index + 2]),
-            blob: dstBlob
-          });
+          entries.push({ status, from: first, path: RelativeFilePath.fromGit(fields[index + 2]), blob: dstBlob });
           index += 3;
         } else {
-          entries.push({ status, path: RelativeFilePath.fromGit(first), ...(status === 'D' ? {} : { blob: dstBlob }) });
+          entries.push(status === 'D' ? { status, path: first } : { status, path: first, blob: dstBlob });
           index += 2;
         }
       }
@@ -363,41 +348,25 @@ export class GitService {
   }
 
   /**
-   * Puts the versions of each conflicted path into the repository's own index, as a merge
-   * would, so `git status` reports it as both modified and `git mergetool` can open it. Paths
-   * are from the repository root. A stage-0 entry is dropped first, since git would otherwise
-   * keep it beside the others.
+   * Puts the conflicted paths into the index as a merge would, so `git status` and `git mergetool`
+   * see them; a stage-0 entry is dropped first, or git keeps it beside the others.
    */
   public stageConflicts(root: DirectoryPath, entries: readonly StageEntry[]): ResultAsync<void, GitProblem> {
-    const removals = [...new Set(entries.map((entry) => entry.path.toString()))].map(
-      (path) => `0 ${'0'.repeat(40)} 0\t${path}`
-    );
+    const zero = '0'.repeat(entries[0]?.oid.length ?? 40);
+    const removals = [...new Set(entries.map((entry) => entry.path.toString()))].map((path) => `0 ${zero} 0\t${path}`);
     const stages = entries.map((entry) => `${entry.mode} ${entry.oid} ${entry.stage}\t${entry.path}`);
     return this.run(root, ['update-index', '-z', '--index-info'], {
       input: `${[...removals, ...stages].join('\0')}\0`
     }).map(() => undefined);
   }
 
-  /**
-   * The index entries below `directory` (from the repository root, `.` for the root itself)
-   * that git holds in the unmerged state, paths as git names them from the root: what a merge
-   * left for the developer and `git add` has not yet marked resolved, one entry per side kept.
-   */
+  /** The index entries below `directory` git holds as unmerged, paths from the root: what a merge left and `git add` has not marked resolved. */
   public unmergedStages(root: DirectoryPath, directory: string): ResultAsync<StageEntry[], GitProblem> {
     return this.run(root, ['ls-files', '-u', '-z', '--', directory]).map(({ stdout }) =>
       stdout
         .split('\0')
         .filter((entry) => entry !== '')
-        .map((entry) => {
-          const tab = entry.indexOf('\t');
-          const [mode, oid, stage] = entry.slice(0, tab).split(' ');
-          return {
-            mode,
-            oid,
-            stage: Number(stage) as StageEntry['stage'],
-            path: RelativeFilePath.fromGit(entry.slice(tab + 1))
-          };
-        })
+        .map((entry) => parseStageEntry(entry))
     );
   }
 
@@ -453,34 +422,20 @@ export class GitService {
     );
   }
 
-  /**
-   * Takes `paths` out of the unmerged state once the CLI settled them: each index entry goes back
-   * to what HEAD holds, or is forgotten where there is no HEAD yet, so `git status` stops saying
-   * "both modified"; the files on disk are not touched.
-   */
+  /** Takes settled `paths` out of the unmerged state, back to HEAD or forgotten where there is no HEAD yet; files on disk are not touched. */
   public unstage(root: DirectoryPath, paths: readonly RelativeFilePath[]): ResultAsync<void, GitProblem> {
     if (paths.length === 0) {
       return okAsync(undefined);
     }
-    const input = paths.map(String).join('\0');
     return this.run(root, ['reset', '-q', '--pathspec-from-file=-', '--pathspec-file-nul'], {
-      input,
-      exitCodes: [0, 128]
-    }).andThen((reset) =>
-      reset.exitCode === 0
-        ? okAsync(undefined)
-        : this.run(root, ['update-index', '--force-remove', '-z', '--stdin'], { input }).map(() => undefined)
-    );
+      input: paths.map(String).join('\0')
+    }).map(() => undefined);
   }
 
   public isAncestor(root: DirectoryPath, ancestor: CommitId, descendant: CommitId): ResultAsync<boolean, GitProblem> {
     return this.run(root, ['merge-base', '--is-ancestor', ancestor.toString(), descendant.toString()], {
       exitCodes: [0, 1]
     }).map((result) => result.exitCode === 0);
-  }
-
-  public static emptyTree(): TreeId {
-    return TreeId.fromGit(EMPTY_TREE);
   }
 
   /** `steps` as one `Result`: the first `yield*` that fails answers with its problem, and nothing after it runs. */
@@ -502,9 +457,7 @@ export class GitService {
     );
   }
 
-  // A remote command may not ask anything: no terminal prompt, no credential helper dialogue,
-  // no ssh passphrase, and it is given up on after the timeout, so a missing credential or a
-  // dead remote becomes a reported failure rather than a stuck run.
+  // No prompt, no credential dialogue, no passphrase, and a timeout, so a dead remote is reported rather than waited on.
   private runRemote(cwd: DirectoryPath, args: string[]): ResultAsync<Ran<string>, GitProblem> {
     return this.batchSsh(cwd).andThen((ssh) =>
       ResultAsync.fromPromise(

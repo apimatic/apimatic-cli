@@ -1,6 +1,4 @@
-const VERSION = 2;
-const BEGIN_PREFIX = '# >>> apimatic snapshots v';
-const BEGIN = `${BEGIN_PREFIX}${VERSION}`;
+const BEGIN = '# >>> apimatic snapshots';
 const END = '# <<< apimatic snapshots';
 const DEFAULT_SHEBANG = '#!/bin/sh';
 const SHELL_SHEBANG =
@@ -9,20 +7,13 @@ const SHELL_SHEBANG =
 /** The file the CLI keeps in git's own hooks directory; the `pre-push` hook, wherever it lives, only calls it. */
 export const SHARE_HOOK_SCRIPT_NAME = 'apimatic-pre-push';
 
-/**
- * The one line a `pre-push` hook needs in order to share snapshots. It finds the script through
- * git, so it is the same in `.git/hooks/pre-push`, in husky's `.husky/pre-push`, or anywhere
- * else; it does nothing where the CLI never ran (no script yet) and never fails the push.
- */
+/** Finds the script through git, so the line is the same wherever the hook lives; does nothing where the CLI never ran, and never fails the push. */
 export const SHARE_HOOK_CALL =
   `f="$(git rev-parse --git-common-dir)/hooks/${SHARE_HOOK_SCRIPT_NAME}"; ` + '[ -f "$f" ] && sh "$f" "$@" || true';
 
 /**
- * The script: pushes `refs/apimatic/pristine` and every ref below it to the remote being pushed
- * to; an SDK at the repository root has the ref itself, so it is matched as a ref and not only as
- * a directory. It pushes first; when the remote's chain moved on it fetches that chain into the
- * same names below `refs/apimatic/remotes/<remote>/`, joins the two with a two-parent commit, and
- * pushes again. It never prompts, never fails the developer's push, and warns in one line.
+ * Pushes every pristine ref; when the remote's chain moved on, fetches it below
+ * `refs/apimatic/remotes/<remote>/`, joins the two, and pushes again. It never fails the developer's push.
  */
 export const SHARE_HOOK_SCRIPT = [
   DEFAULT_SHEBANG,
@@ -56,7 +47,7 @@ export const SHARE_HOOK_SCRIPT = [
   ''
 ].join('\n');
 
-/** The marked block a `pre-push` hook carries: the call, and nothing the CLI will ever need to update. */
+/** The marked block a `pre-push` hook carries: the call, and nothing the CLI will ever need to update; the markers find it again. */
 export const SHARE_HOOK_BLOCK = [BEGIN, SHARE_HOOK_CALL, END].join('\n');
 
 /** The hook file as it should be, or why the block cannot be added to the one that is there. */
@@ -65,45 +56,26 @@ export type ShareHookFile =
   | { kind: 'present' }
   | { kind: 'notShell'; shebang: string };
 
-/**
- * How the block goes into a repository's `pre-push` hook: on its own in a fresh hook, or right
- * after the shebang of an existing shell hook, so an early `exit` further down cannot skip it.
- * An older version of the block is replaced; a hook in another language is left alone.
- */
+/** Right after the shebang of a shell hook, so an early `exit` cannot skip it; a hook in another language, or with no shebang to tell, is left alone. */
 export class ShareHook {
   public static installInto(existing: string | undefined): ShareHookFile {
     if (existing === undefined || existing.trim() === '') {
       return { kind: 'installed', content: `${DEFAULT_SHEBANG}\n\n${SHARE_HOOK_BLOCK}\n` };
     }
-    const lines = ShareHook.withoutBlock(existing.split(/\r?\n/));
-    if (lines === undefined) {
+    const lines = existing.split(/\r?\n/);
+    if (lines.includes(BEGIN)) {
       return { kind: 'present' };
     }
-    const shebang = lines[0]?.startsWith('#!') ? lines[0] : undefined;
-    if (shebang !== undefined && !SHELL_SHEBANG.test(shebang)) {
+    const shebang = lines[0].startsWith('#!') ? lines[0] : '';
+    if (!SHELL_SHEBANG.test(shebang)) {
       return { kind: 'notShell', shebang };
     }
-    const rest = shebang === undefined ? lines : lines.slice(1);
-    const content = [shebang ?? DEFAULT_SHEBANG, '', SHARE_HOOK_BLOCK, '', ...rest].join('\n');
+    const content = [shebang, '', SHARE_HOOK_BLOCK, '', ...lines.slice(1)].join('\n');
     return { kind: 'installed', content: content.endsWith('\n') ? content : `${content}\n` };
   }
 
   /** True when a hook, in whatever language and wherever it lives, already runs the script. */
   public static calls(hook: string | undefined): boolean {
     return hook !== undefined && hook.includes(SHARE_HOOK_SCRIPT_NAME);
-  }
-
-  /** The lines with any earlier block taken out, or none when the current block is already there. */
-  private static withoutBlock(lines: string[]): string[] | undefined {
-    const begin = lines.findIndex((line) => line.startsWith(BEGIN_PREFIX));
-    if (begin === -1) {
-      return lines;
-    }
-    if (lines[begin] === BEGIN) {
-      return undefined;
-    }
-    const end = lines.findIndex((line, index) => index > begin && line === END);
-    const removed = lines.filter((_, index) => index < begin || index > (end === -1 ? begin : end));
-    return removed.length > 0 && removed[removed.length - 1] === '' ? removed.slice(0, -1) : removed;
   }
 }

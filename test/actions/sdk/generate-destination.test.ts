@@ -23,6 +23,9 @@ import { SdkRepositoryContext } from '../../../src/types/sdk-repository-context.
 import { terminal } from '../../../src/utils/terminal-utils.js';
 import { Files, stubSdkGeneration, writeFiles } from '../../helpers/sdk-generation.js';
 
+/** A ref onto itself, as `git push` and `git fetch` take it. */
+const refspec = (ref: SnapshotRef): string => `${ref}:${ref}`;
+
 const COMMAND_METADATA: CommandMetadata = { commandName: 'sdk generate', shell: 'test' };
 const STABLE: SdkGeneration = {
   language: Language.PYTHON,
@@ -45,10 +48,10 @@ describe('GenerateAction (sdk) — the destination', () => {
   const read = (relative: string) => fs.readFileSync(at(relative), 'utf8');
   const write = (relative: string, contents: string) => writeFiles(sdk().toString(), { [relative]: contents });
   const record = () => GenerationRecord.parse(read('.apimatic/generation.json'))!;
-  /** A merge keeps the base as the pristine snapshot (the generation is unchanged) and saves the pre-run state. */
-  const mergedAgainst = async (repository: SdkRepositoryContext, base: CommitId) =>
-    record().pristineCommit().isEqual(base) &&
-    (await git.resolveRef(repository.root(), repository.previousRef()))._unsafeUnwrap() !== undefined;
+  /** What a developer sees after a merge: the generator's change landed in the edited directory, and the run said so. */
+  const V2: Files = { 'README.md': '# sdk v2' };
+  const merged = () =>
+    read('README.md') === '# sdk v2' && (SdkGeneratePrompts.prototype.sdkMerged as sinon.SinonStub).calledOnce;
 
   const execute = async (
     options: { force?: boolean; stability?: Stability; files?: Files; destination?: DirectoryPath } = {}
@@ -140,16 +143,22 @@ describe('GenerateAction (sdk) — the destination', () => {
       expect(fs.readdirSync(sdk().toString())).to.deep.equal(['README.md']);
     });
 
-    it('does not ask with --force or without a terminal: no repository, the warning, exit 0', async () => {
-      const createRepository = sinon.stub(SdkGeneratePrompts.prototype, 'createRepository');
-      const notCreated = SdkGeneratePrompts.prototype.repositoryNotCreated as sinon.SinonStub;
+    for (const [how, tty, force] of [
+      ['with --force', true, true],
+      ['without a terminal', false, false]
+    ] as const) {
+      it(`does not ask ${how}: no repository, the warning, exit 0`, async () => {
+        sinon.stub(terminal, 'isInteractive').returns(tty);
+        const createRepository = sinon.stub(SdkGeneratePrompts.prototype, 'createRepository');
+        const notCreated = SdkGeneratePrompts.prototype.repositoryNotCreated as sinon.SinonStub;
 
-      expect((await execute({ force: true })).isSuccess()).to.be.true;
+        expect((await execute({ force })).isSuccess()).to.be.true;
 
-      expect(createRepository.called).to.be.false;
-      expect(notCreated.calledOnce).to.be.true;
-      expect(fs.readdirSync(sdk().toString())).to.deep.equal(['README.md']);
-    });
+        expect(createRepository.called).to.be.false;
+        expect(notCreated.calledOnce).to.be.true;
+        expect(fs.readdirSync(sdk().toString())).to.deep.equal(['README.md']);
+      });
+    }
   });
 
   it('records into the enclosing repository when the directory has no record', async () => {
@@ -223,8 +232,7 @@ describe('GenerateAction (sdk) — the destination', () => {
     const sh = (cwd: string, ...args: string[]) =>
       execa('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...args], { cwd });
     try {
-      const repository = await recorded({ 'README.md': '# sdk' });
-      const base = (await repository.readRecord())!.pristineCommit();
+      await recorded({ 'README.md': '# sdk' });
       await sh(root, 'add', '.');
       await sh(root, 'commit', '-qm', 'sdk');
       await sh(root, 'init', '-q', '--bare', '--initial-branch=main', remote);
@@ -243,8 +251,8 @@ describe('GenerateAction (sdk) — the destination', () => {
       await sh(root, 'push', '-q', 'origin', 'refs/apimatic/pristine/*:refs/apimatic/pristine/*');
       await sh(clone, 'fetch', '-q', 'origin', '+refs/apimatic/pristine/*:refs/apimatic/pristine/*');
 
-      expect((await execute({ force: false })).isSuccess()).to.be.true;
-      expect(await mergedAgainst((await sdkContext().repository())._unsafeUnwrap()!, base)).to.be.true;
+      expect((await execute({ force: false, files: V2 })).isSuccess()).to.be.true;
+      expect(merged()).to.be.true;
     } finally {
       fs.rmSync(remote, { recursive: true, force: true });
       fs.rmSync(clone, { recursive: true, force: true });
@@ -252,16 +260,15 @@ describe('GenerateAction (sdk) — the destination', () => {
   });
 
   it('merges against the recorded snapshot, without asking, when the record and its commit are there', async () => {
-    const repository = await recorded({ 'README.md': '# sdk' });
-    const base = (await repository.readRecord())!.pristineCommit();
-    write('README.md', '# edited');
+    await recorded({ 'README.md': '# sdk' });
+    write('NOTES.md', '# mine');
     const overwriteSdk = sinon.stub(SdkGeneratePrompts.prototype, 'overwriteSdk');
 
-    expect((await execute({ force: false })).isSuccess()).to.be.true;
+    expect((await execute({ force: false, files: V2 })).isSuccess()).to.be.true;
 
     expect(overwriteSdk.called).to.be.false;
-    expect(read('README.md')).to.equal('# edited');
-    expect(await mergedAgainst(repository, base)).to.be.true;
+    expect(read('NOTES.md')).to.equal('# mine');
+    expect(merged()).to.be.true;
   });
 
   it('refuses while git holds a file of the SDK as unmerged', async () => {
@@ -307,30 +314,30 @@ describe('GenerateAction (sdk) — the destination', () => {
     };
 
     it('settles the markers still there for the generator, keeping the rest of the file, then merges', async () => {
-      const { repository, base } = await marked();
+      await marked();
       sinon.stub(SdkGeneratePrompts.prototype, 'unresolvedChoice').resolves('generated');
       const conflictsResolved = sinon.stub(SdkGeneratePrompts.prototype, 'conflictsResolved');
 
-      expect((await execute({ force: false, files: FILES })).isSuccess()).to.be.true;
+      expect((await execute({ force: false, files: { ...FILES, ...V2 } })).isSuccess()).to.be.true;
 
       expect(read('a.py')).to.equal('kept above\ntheirs\nkept below\n');
       expect(read('b.py')).to.equal('resolved by hand');
       expect(conflictsResolved.firstCall.args[0]).to.equal('generated');
       expect(conflictsResolved.firstCall.args[1].map(String)).to.deep.equal(['a.py']);
-      expect(await mergedAgainst(repository, base)).to.be.true;
+      expect(merged()).to.be.true;
     });
 
     it('settles the markers still there for you, keeping the rest of the file, then merges', async () => {
-      const { repository, base } = await marked();
+      await marked();
       sinon.stub(SdkGeneratePrompts.prototype, 'unresolvedChoice').resolves('yours');
       const conflictsResolved = sinon.stub(SdkGeneratePrompts.prototype, 'conflictsResolved');
 
-      expect((await execute({ force: false, files: FILES })).isSuccess()).to.be.true;
+      expect((await execute({ force: false, files: { ...FILES, ...V2 } })).isSuccess()).to.be.true;
 
       expect(read('a.py')).to.equal('kept above\nmine\nkept below\n');
       expect(read('b.py')).to.equal('resolved by hand');
       expect(conflictsResolved.firstCall.args[0]).to.equal('yours');
-      expect(await mergedAgainst(repository, base)).to.be.true;
+      expect(merged()).to.be.true;
     });
 
     it('stops, touching nothing, when the developer will finish resolving or backs out', async () => {
@@ -345,17 +352,22 @@ describe('GenerateAction (sdk) — the destination', () => {
       expect(generateSdk.called).to.be.false;
     });
 
-    it('does not ask with --force or without a terminal', async () => {
-      await marked();
-      (terminal.isInteractive as sinon.SinonStub).returns(false);
-      const unresolvedChoice = sinon.stub(SdkGeneratePrompts.prototype, 'unresolvedChoice');
-      const conflictsUnresolved = sinon.stub(SdkGeneratePrompts.prototype, 'conflictsUnresolved');
+    for (const [how, tty, force] of [
+      ['with --force', true, true],
+      ['without a terminal', false, false]
+    ] as const) {
+      it(`does not ask ${how}`, async () => {
+        await marked();
+        (terminal.isInteractive as sinon.SinonStub).returns(tty);
+        const unresolvedChoice = sinon.stub(SdkGeneratePrompts.prototype, 'unresolvedChoice');
+        const conflictsUnresolved = sinon.stub(SdkGeneratePrompts.prototype, 'conflictsUnresolved');
 
-      expect((await execute({ force: false, files: FILES })).isFailed()).to.be.true;
+        expect((await execute({ force, files: FILES })).isFailed()).to.be.true;
 
-      expect(unresolvedChoice.called).to.be.false;
-      expect(conflictsUnresolved.calledOnce).to.be.true;
-    });
+        expect(unresolvedChoice.called).to.be.false;
+        expect(conflictsUnresolved.calledOnce).to.be.true;
+      });
+    }
   });
 
   it('refuses an SDK directory nested in one that has snapshots', async () => {
@@ -459,18 +471,18 @@ describe('GenerateAction (sdk) — the destination', () => {
       await sh(root, 'init', '-q', '--bare', '--initial-branch=main', origin);
       await sh(root, 'remote', 'add', 'origin', origin);
       await sh(root, 'push', '-q', 'origin', 'main');
-      await sh(root, 'push', '-q', 'origin', repository.pristineRef().refspec());
+      await sh(root, 'push', '-q', 'origin', refspec(repository.pristineRef()));
       await sh(root, 'clone', '-q', '--no-local', origin, clone);
       project = clone;
       return { clone, origin, base };
     };
 
     it('merges in a clone by itself, fetching the snapshot the origin shared', async () => {
-      const { clone, origin, base } = await shared();
+      const { clone, origin } = await shared();
       try {
-        expect((await execute()).isSuccess()).to.be.true;
+        expect((await execute({ files: V2 })).isSuccess()).to.be.true;
 
-        expect(await mergedAgainst((await sdkContext().repository())._unsafeUnwrap()!, base)).to.be.true;
+        expect(merged()).to.be.true;
       } finally {
         fs.rmSync(clone, { recursive: true, force: true });
         fs.rmSync(origin, { recursive: true, force: true });
@@ -492,7 +504,7 @@ describe('GenerateAction (sdk) — the destination', () => {
         await sh(published, 'init', '-q', '--bare', '--initial-branch=main', origin);
         await sh(published, 'remote', 'add', 'origin', origin);
         await sh(published, 'push', '-q', 'origin', 'main');
-        await sh(published, 'push', '-q', 'origin', repository.pristineRef().refspec());
+        await sh(published, 'push', '-q', 'origin', refspec(repository.pristineRef()));
         await sh(published, 'clone', '-q', '--no-local', origin, clone);
         writeFiles(clone, { 'README.md': '# edited' });
 

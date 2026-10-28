@@ -7,7 +7,7 @@ import { Regeneration } from '../../../src/types/sdk-repository-context.js';
 
 const rel = (value: string) => RelativeFilePath.fromGit(value);
 
-const NO_FILES: MergeFiles = { added: [], updated: [], merged: [], removed: [], kept: [], unchanged: [] };
+const NO_FILES: MergeFiles = { added: [], updated: [], merged: [], removed: [], kept: [] };
 
 /**
  * A regeneration whose merge left `conflicts`: a file with markers is written as git merged it,
@@ -20,11 +20,8 @@ const regeneration = (conflicts: Conflict[]): Regeneration => {
   const writes = conflicts
     .filter((conflict) => conflict.kind === 'bothChanged' || conflict.kind === 'bothAdded')
     .map((conflict) => ({ path: conflict.path, blob: 'blob-with-markers' }));
-  const plan = new MergePlan(writes, [], conflicts, [], NO_FILES, sides);
-  return {
-    generated: TreeId.fromGit('a'.repeat(40)),
-    merge: { plan, merged: TreeId.fromGit('b'.repeat(40)), stages: [] }
-  };
+  const plan = new MergePlan(writes, [], conflicts, NO_FILES, sides);
+  return { generated: TreeId.fromGit('a'.repeat(40)), merge: { plan, stages: [] } };
 };
 
 describe('Settlement', () => {

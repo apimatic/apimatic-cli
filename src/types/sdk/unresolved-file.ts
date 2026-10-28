@@ -1,10 +1,7 @@
 import { settleMarkers } from './conflict-markers.js';
 import { chosen, ConflictSide } from './merge-plan.js';
 
-/**
- * A file the last run left in conflict and git still holds as unmerged: as it is now, and the
- * two sides git kept for it in the index, stage 2 being yours and stage 3 the generator's.
- */
+/** A file git still holds as unmerged: as it is now, and the two sides git kept in the index. */
 export type UnresolvedFile = {
   /** The file on disk; none when it is not there. */
   disk: Uint8Array | undefined;
@@ -19,11 +16,8 @@ const isBinary = (content: Uint8Array | undefined): boolean =>
   content !== undefined && content.subarray(0, 8000).includes(0);
 
 /**
- * The file's content once its remaining conflict is settled for `side`; none where it stays
- * deleted. Markers still in the file are settled in place, keeping every line around them.
- * Without markers, a file git could not merge line by line, because one side has no version
- * or it is binary, settles whole as `chosen` decides, yours being the file as it is on disk. A
- * text file whose markers are all gone was resolved by hand and stays as it is.
+ * Markers still in the file settle in place; a file git could not merge line by line settles
+ * whole as `chosen` decides; one whose markers are gone was resolved by hand and stays. None where it stays deleted.
  */
 export function settledContent(side: ConflictSide, file: UnresolvedFile): Uint8Array | undefined {
   const marked = file.disk === undefined ? undefined : settleMarkers(file.disk, side);

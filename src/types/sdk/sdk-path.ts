@@ -2,11 +2,7 @@ import path from 'node:path';
 import { DirectoryPath, posix } from '../file/directoryPath.js';
 import { RelativeFilePath } from '../file/relativeFilePath.js';
 
-/**
- * Where an SDK directory sits below its repository's root, spelt as git names paths: `/`
- * between the segments, and empty for an SDK that is the repository itself. It is what names
- * the directory's refs, and what turns a path below the directory into one git sees from the root.
- */
+/** Where an SDK directory sits below its repository's root, as git spells paths; empty for an SDK that is the repository. */
 export class SdkPath {
   private constructor(private readonly value: string) {}
 

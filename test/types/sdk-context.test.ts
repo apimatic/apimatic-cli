@@ -49,6 +49,46 @@ describe('SdkContext', () => {
     });
   });
 
+  describe('repository, as the SDK directory sits', () => {
+    const git = new GitService();
+
+    it('finds nothing outside a repository', async () => {
+      fs.mkdirSync(inRoot('sdk', 'python'), { recursive: true });
+
+      expect((await context.repository())._unsafeUnwrap()).to.be.undefined;
+    });
+
+    it('answers with the enclosing repository, however deep the SDK directory sits', async () => {
+      (await git.init(new DirectoryPath(root)))._unsafeUnwrap();
+      const deep = new SdkContext(new DirectoryPath(inRoot('packages', 'sdk', 'python')));
+
+      const repository = (await deep.repository())._unsafeUnwrap()!;
+
+      expect(repository.root().isEqual(new DirectoryPath(canonical(root)))).to.be.true;
+      expect(repository.pristineRef().toString()).to.equal('refs/apimatic/pristine/packages/sdk/python');
+    });
+  });
+
+  describe('initRepository', () => {
+    it('creates the SDK directory when it is not there yet, as a repository of its own', async () => {
+      const repository = (await context.initRepository())._unsafeUnwrap();
+
+      expect(fs.existsSync(inRoot('sdk', 'python', '.git'))).to.be.true;
+      expect(repository.root().isEqual(new DirectoryPath(inRoot('sdk', 'python')))).to.be.true;
+      expect(repository.pristineRef().toString()).to.equal('refs/apimatic/pristine');
+    });
+
+    it('makes the SDK directory its own repository, on main, leaving its files alone', async () => {
+      fs.mkdirSync(inRoot('sdk', 'python'), { recursive: true });
+      fs.writeFileSync(inRoot('sdk', 'python', 'README.md'), '# sdk');
+
+      (await context.initRepository())._unsafeUnwrap();
+
+      expect(fs.readFileSync(inRoot('sdk', 'python', '.git', 'HEAD'), 'utf-8').trim()).to.equal('ref: refs/heads/main');
+      expect(fs.readFileSync(inRoot('sdk', 'python', 'README.md'), 'utf-8')).to.equal('# sdk');
+    });
+  });
+
   describe('archive', () => {
     const git = new GitService();
     const entries = (archive: string) => new AdmZip(archive).getEntries().map((entry) => entry.entryName);

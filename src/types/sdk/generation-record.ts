@@ -1,3 +1,4 @@
+import { isJsonObject } from '../../utils/json-utils.js';
 import { CommitId } from '../git/commit-id.js';
 import { CodeGenerationVersion, Language, Stability } from './generate.js';
 
@@ -14,11 +15,8 @@ const isOneOf = <T extends string>(values: readonly T[], value: unknown): value 
   typeof value === 'string' && (values as readonly string[]).includes(value);
 
 /**
- * What `.apimatic/generation.json` records: the pristine snapshot an SDK directory was last
- * written from, and nothing that changes from run to run, so a regeneration that changed
- * nothing leaves it untouched. Committed with the SDK, so a branch or a clone merges against
- * the base it was generated from. The conflicts a run leaves are git's unmerged index
- * entries, not the record's, since only the index says when the developer has resolved them.
+ * What `.apimatic/generation.json` records: the pristine snapshot the directory was last written
+ * from, and nothing that changes from run to run. Committed with the SDK, so a clone merges against the right base.
  */
 export class GenerationRecord {
   private readonly generation: SdkGeneration;
@@ -41,10 +39,10 @@ export class GenerationRecord {
     } catch {
       return undefined;
     }
-    if (typeof parsed !== 'object' || parsed === null) {
+    if (!isJsonObject(parsed)) {
       return undefined;
     }
-    const record = parsed as Record<string, unknown>;
+    const record = parsed;
     const pristine = typeof record.pristine === 'string' ? CommitId.create(record.pristine) : undefined;
     if (
       record.schemaVersion !== SCHEMA_VERSION ||
@@ -99,11 +97,4 @@ export const RECORD_ATTRIBUTES =
 /** How a snapshot's commit message names its generation. */
 export function describeGeneration(generation: SdkGeneration): string {
   return `${generation.language} ${generation.codegenVersion} ${generation.stability}`;
-}
-
-/** Each as "stable typescript", with the codegen version added only when that is what sets them apart. */
-export function describeApart(recorded: SdkGeneration, requested: SdkGeneration): [string, string] {
-  const brief = (generation: SdkGeneration) => `${generation.stability} ${generation.language}`;
-  const full = (generation: SdkGeneration) => `${brief(generation)} (codegen ${generation.codegenVersion})`;
-  return brief(recorded) === brief(requested) ? [full(recorded), full(requested)] : [brief(recorded), brief(requested)];
 }

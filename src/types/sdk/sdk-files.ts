@@ -14,23 +14,14 @@ import { SnapshotRef } from './snapshot-ref.js';
 
 type Steps<T> = AsyncGenerator<Err<never, SdkRepositoryProblem>, Result<T, SdkRepositoryProblem>>;
 
-/**
- * The files on disk below an SDK directory: a merge plan landed on them, put back from a
- * snapshot when that fails partway, and one file read or settled. Trees hold LF, so a blob
- * is written with the line ending the file there uses, else the generator's fresh copy of it,
- * else LF; a blob with a CR of its own, or binary, is written as it is.
- */
+/** The files on disk below an SDK directory: a plan landed, undone from a snapshot when a step fails, a file read or settled. */
 export class SdkFiles {
   private readonly fileService = new FileService();
   private readonly git = new GitService();
 
   constructor(private readonly root: DirectoryPath, private readonly sdk: DirectoryPath) {}
 
-  /**
-   * Applies the plan, removals before writes so a path renamed only in case lands on a
-   * filesystem that ignores case. A write or removal that fails ends the run and puts back,
-   * from `previous`, every path it had changed, so the directory is as it was.
-   */
+  /** Removals before writes, so a case-only rename lands on a filesystem that ignores case; a failed step puts back what came before it. */
   public apply(
     plan: MergePlan,
     previous: { commit: CommitId; ref: SnapshotRef },

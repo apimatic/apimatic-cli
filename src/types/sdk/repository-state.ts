@@ -11,10 +11,7 @@ import { SdkGeneration } from './generation-record.js';
 import { MergePlan } from './merge-plan.js';
 import { SnapshotRef } from './snapshot-ref.js';
 
-/**
- * A file the run could not write or remove. What it had changed before was put back from the
- * previous snapshot, unless that failed too; then the snapshot is there to restore from by hand.
- */
+/** A file the run could not write or remove; what it had changed is put back from the previous snapshot, else that snapshot is named. */
 export type NotApplied = {
   kind: 'notApplied';
   file: FilePath;
@@ -23,15 +20,10 @@ export type NotApplied = {
   undo: { kind: 'done' } | { kind: 'failed'; reason: string; previous: SnapshotRef };
 };
 
-/** `gitFailed` is git's own words; `fileFailed` the file system's. */
-export type SdkRepositoryProblem =
-  | { kind: 'gitFailed' | 'fileFailed' | 'recordNotWritten' | 'hookNotWritten'; reason: string }
-  | NotApplied;
+/** `gitFailed` is git's own words; `fileFailed` the file system's; `notApplied` names the file a write stopped at. */
+export type SdkRepositoryProblem = { kind: 'gitFailed' | 'fileFailed'; reason: string } | NotApplied;
 
-/**
- * Two SDK directories, one inside the other: refs are files, so only one of them can have
- * snapshots. `encloses` says the other one is the outer directory.
- */
+/** Two SDK directories, one inside the other: refs are files, so only one can have snapshots; `encloses` says the other is the outer one. */
 export type NestedSdkDirectory = { kind: 'nestedSdkDirectory'; other: DirectoryPath; encloses: boolean };
 
 /** The repository is in the middle of a git operation of the developer's own, which a run must not merge over. */
@@ -55,19 +47,16 @@ export type SdkRepositoryState =
   | { kind: 'ready'; base: CommitId };
 
 /**
- * The pre-push hook that shares snapshots runs the script (`written` when this run put the
- * call there), or the one line the developer has to add to `file` so that it does: because
- * git runs hooks from `hooksPath`, which is in the repository (`inRepository`) or, as
- * `~/.githooks`, the developer's own, or because the hook there is not a shell script the
- * CLI can add to.
+ * The hook runs the script (`written` when this run put the call there), or the one line to add
+ * to `file`: because git runs hooks from `hooksPath`, or because the hook there is not a shell script.
  */
 export type ShareHookInstall =
   | { kind: 'installed'; file: FilePath; written: boolean }
   | { kind: 'elsewhere'; file: FilePath; hooksPath: string; inRepository: boolean; script: FilePath }
   | { kind: 'notShell'; file: FilePath; shebang: string; script: FilePath };
 
-/** The plan, the merged tree, and git's versions of every conflicted path, below the SDK directory. */
-export type MergeOutcome = { plan: MergePlan; merged: TreeId; stages: StageEntry[] };
+/** The plan, and git's versions of every conflicted path, below the SDK directory. */
+export type MergeOutcome = { plan: MergePlan; stages: StageEntry[] };
 
 /** A fresh generation merged over the directory as it is: the snapshot it will be recorded as, and the merge. */
 export type Regeneration = { generated: TreeId; merge: MergeOutcome };

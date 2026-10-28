@@ -18,18 +18,9 @@ describe('SnapshotRef', () => {
 
     expect(ref.toString()).to.equal('refs/apimatic/pristine/My%20API/sdk/%2Etypescript/v1%2Elock/caf%C3%A9%7E2');
     expect(ref.sdkPath().toString()).to.equal('My API/sdk/.typescript/v1.lock/café~2');
-    expect(SnapshotRef.fromGit(ref.toString()).isEqual(ref)).to.be.true;
+    expect(SnapshotRef.fromGit(ref.toString()).toString()).to.equal(ref.toString());
     expect(SnapshotRef.fromGit('refs/apimatic/pristine').sdkPath().toString()).to.equal('');
     expect(SnapshotRef.previous(SdkPath.fromGit('sdk/typescript')).sdkPath().toString()).to.equal('sdk/typescript');
-  });
-
-  it('maps itself onto itself for push and fetch, forced when the other side may have moved on', () => {
-    const ref = SnapshotRef.pristine(SdkPath.fromGit('sdk/typescript'));
-
-    expect(ref.refspec()).to.equal('refs/apimatic/pristine/sdk/typescript:refs/apimatic/pristine/sdk/typescript');
-    expect(ref.forcedRefspec()).to.equal(
-      '+refs/apimatic/pristine/sdk/typescript:refs/apimatic/pristine/sdk/typescript'
-    );
   });
 
   it('collides only with a ref on its own path, in either direction', () => {

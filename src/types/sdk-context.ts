@@ -21,9 +21,8 @@ import { TempContext } from './temp-context.js';
 const GIT_DIRECTORY = '.git';
 
 /**
- * The directory spelt as git will spell it, and its nearest ancestor that exists, which is where
- * git can be asked about it: the SDK directory of a first run is not there yet, and on Windows
- * the one the caller holds may be an 8.3 alias where git answers with the long name.
+ * The directory as git spells it (an 8.3 alias expands on Windows), and its nearest existing
+ * ancestor, where git can be asked about a directory that is not there yet.
  */
 function realSpelling(directory: DirectoryPath): { real: DirectoryPath; existing: DirectoryPath } {
   let existing = directory.toString();
@@ -47,10 +46,7 @@ export class SdkContext {
     return !(await this.fileService.directoryEmpty(this.sdkDirectory));
   }
 
-  /**
-   * How a run will write the directory, from what git and the enclosing repository say about
-   * it; `unresolved` when the last run's markers are still in the files. Nothing is asked here.
-   */
+  /** How a run will write the directory, from git and the enclosing repository; nothing is asked here. */
   public async destination(generation: SdkGeneration): Promise<Result<SdkDestination | Unresolved, InspectionProblem>> {
     const version = await this.git.version();
     if (version.isErr()) {
@@ -64,7 +60,7 @@ export class SdkContext {
       return err(repository.error);
     }
     if (repository.value === undefined) {
-      return ok({ kind: 'record', repository: undefined, because: { kind: 'noRepository' } });
+      return ok({ kind: 'noRepository' });
     }
     const remote = await repository.value.remote();
     if (remote.isErr()) {
@@ -74,11 +70,7 @@ export class SdkContext {
     return (await found.inspect(generation, remote.value)).map((state) => destinationFor(found, state));
   }
 
-  /**
-   * The repository enclosing the SDK directory, which need not exist yet, or none when nothing
-   * does. A repository whose ignore rules exclude the directory does not count: its index and
-   * its remote are not meant to hold the SDK, so the directory gets a repository of its own.
-   */
+  /** The repository enclosing the SDK directory; one whose ignore rules exclude it does not count, since its index and remote are not meant to hold the SDK. */
   public repository(): ResultAsync<SdkRepositoryContext | undefined, SdkRepositoryProblem> {
     const { real, existing } = realSpelling(this.sdkDirectory);
     return this.git
@@ -102,15 +94,7 @@ export class SdkContext {
       (error): SdkRepositoryProblem => ({ kind: 'fileFailed', reason: errorMessage(error) })
     )
       .andThen(() => this.git.init(sdk).mapErr(gitFailed))
-      .andThen(() => {
-        const repository = SdkRepositoryContext.create(sdk, sdk);
-        return repository === undefined
-          ? err<SdkRepositoryContext, SdkRepositoryProblem>({
-              kind: 'gitFailed',
-              reason: 'the repository could not be opened'
-            })
-          : ok(repository);
-      });
+      .map(() => SdkRepositoryContext.own(sdk));
   }
 
   /** Overwrites the directory; a `.git` in it is the developer's, or holds the snapshots, and stays. */
@@ -120,11 +104,7 @@ export class SdkContext {
     return this.sdkDirectory;
   }
 
-  /**
-   * The SDK zipped for upload, in `tempDirectory`: the files git would commit, so the SDK's own
-   * `.gitignore` keeps a `node_modules` or `dist` out, and never `.git` or the CLI's record.
-   * Without a repository, every file but those.
-   */
+  /** The SDK zipped for upload: the files git would commit, never `.git` or the CLI's record; without a repository, every file but those. */
   public async archive(tempDirectory: DirectoryPath): Promise<Result<FilePath, FileProblem>> {
     const files = await this.repository().andThen((repository) =>
       repository === undefined

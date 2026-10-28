@@ -15,7 +15,10 @@ import { GenerationRecord, RECORD_ATTRIBUTES, SdkGeneration } from '../../src/ty
 import { SHARE_HOOK_BLOCK, SHARE_HOOK_CALL, SHARE_HOOK_SCRIPT } from '../../src/types/sdk/share-hook.js';
 import { SdkPath } from '../../src/types/sdk/sdk-path.js';
 import { SnapshotRef } from '../../src/types/sdk/snapshot-ref.js';
-import { snapshotFiles } from '../helpers/snapshots.js';
+import { describeCommit, snapshotFiles } from '../helpers/snapshots.js';
+
+/** A ref onto itself, as `git push` and `git fetch` take it. */
+const refspec = (ref: SnapshotRef): string => `${ref}:${ref}`;
 
 const TYPESCRIPT: SdkGeneration = {
   language: Language.TYPESCRIPT,
@@ -99,59 +102,6 @@ describe('SdkRepositoryContext', () => {
     fs.rmSync(root, { recursive: true, force: true });
   });
 
-  describe('SdkContext.repository', () => {
-    it('finds nothing outside a repository', async () => {
-      const sdk = new DirectoryPath(path.join(root, 'sdk', 'typescript'));
-      fs.mkdirSync(sdk.toString(), { recursive: true });
-
-      expect((await contextFor(sdk).repository())._unsafeUnwrap()).to.be.undefined;
-    });
-
-    it('answers for an SDK directory that is not there yet, from its nearest existing ancestor', async () => {
-      const projectDirectory = new DirectoryPath(path.join(root, 'project'));
-      fs.mkdirSync(projectDirectory.toString());
-      (await git.init(projectDirectory))._unsafeUnwrap();
-
-      const repository = (await contextFor(projectDirectory.join('sdk', 'typescript')).repository())._unsafeUnwrap()!;
-
-      expect(repository.root().isEqual(projectDirectory)).to.be.true;
-      expect(repository.pristineRef().toString()).to.equal('refs/apimatic/pristine/sdk/typescript');
-    });
-
-    it('answers with the enclosing repository, however deep the SDK directory sits', async () => {
-      const repository = await project(path.join('packages', 'sdk', 'typescript'));
-
-      expect(repository.root().isEqual(new DirectoryPath(path.join(root, 'project')))).to.be.true;
-      expect(repository.isRootSdk()).to.be.false;
-      expect(repository.pristineRef().toString()).to.equal('refs/apimatic/pristine/packages/sdk/typescript');
-    });
-  });
-
-  describe('SdkContext.initRepository', () => {
-    it('creates the SDK directory when it is not there yet', async () => {
-      const sdk = new DirectoryPath(path.join(root, 'sdk', 'typescript'));
-
-      const repository = (await contextFor(sdk).initRepository())._unsafeUnwrap();
-
-      expect(repository.isRootSdk()).to.be.true;
-      expect(fs.existsSync(path.join(sdk.toString(), '.git'))).to.be.true;
-    });
-
-    it('makes the SDK directory its own repository, on main, leaving its files alone', async () => {
-      const sdk = new DirectoryPath(path.join(root, 'sdk', 'typescript'));
-      write(sdk, 'README.md', '# sdk');
-
-      const repository = (await contextFor(sdk).initRepository())._unsafeUnwrap();
-
-      expect(repository.isRootSdk()).to.be.true;
-      expect(repository.pristineRef().toString()).to.equal('refs/apimatic/pristine');
-      expect(fs.readFileSync(path.join(sdk.toString(), '.git', 'HEAD'), 'utf-8').trim()).to.equal(
-        'ref: refs/heads/main'
-      );
-      expect(fs.readFileSync(path.join(sdk.toString(), 'README.md'), 'utf-8')).to.equal('# sdk');
-    });
-  });
-
   describe('recordPristine', () => {
     it('records the first snapshot with no parent, under the SDK directory’s ref', async () => {
       const repository = await project();
@@ -167,7 +117,7 @@ describe('SdkRepositoryContext', () => {
 
       expect((await git.resolveRef(repository.root(), repository.pristineRef()))._unsafeUnwrap()?.isEqual(commit)).to.be
         .true;
-      expect((await git.describe(repository.root(), commit))._unsafeUnwrap()).to.deep.equal({
+      expect(await describeCommit(repository.root(), commit)).to.deep.equal({
         parents: [],
         authorName: 'APIMatic CLI',
         subject: 'apimatic: pristine typescript v4 stable'
@@ -198,7 +148,7 @@ describe('SdkRepositoryContext', () => {
 
       const second = (await record(repository, { 'README.md': '# v2' }))._unsafeUnwrap();
 
-      expect((await git.describe(repository.root(), second))._unsafeUnwrap().parents).to.deep.equal([first]);
+      expect((await describeCommit(repository.root(), second)).parents).to.deep.equal([first]);
       expect((await git.resolveRef(repository.root(), repository.pristineRef()))._unsafeUnwrap()?.isEqual(second)).to.be
         .true;
       expect((await snapshotFiles(repository.root(), first)).get('README.md')).to.equal('# v1');
@@ -212,47 +162,7 @@ describe('SdkRepositoryContext', () => {
       const changed = (await record(repository, { 'README.md': '# v2' }))._unsafeUnwrap();
 
       expect(again.isEqual(first)).to.be.true;
-      expect((await git.describe(repository.root(), changed))._unsafeUnwrap().parents).to.deep.equal([first]);
-    });
-
-    it('refuses an SDK directory inside one that already has snapshots, and the reverse', async () => {
-      const outer = await project();
-      (await record(outer, { 'README.md': '# outer' }))._unsafeUnwrap();
-      fs.mkdirSync(outer.sdkDirectory().join('typescript').toString());
-      const inner = (await contextFor(outer.sdkDirectory().join('typescript')).repository())._unsafeUnwrap()!;
-
-      expect((await inner.inspect(TYPESCRIPT, undefined))._unsafeUnwrapErr()).to.deep.include({
-        kind: 'nestedSdkDirectory',
-        other: outer.sdkDirectory(),
-        encloses: true
-      });
-
-      const other = await project(path.join('other', 'typescript', 'nested'));
-      (await record(other, { 'README.md': '# nested' }))._unsafeUnwrap();
-      const parent = (
-        await contextFor(new DirectoryPath(path.join(root, 'project', 'other', 'typescript'))).repository()
-      )._unsafeUnwrap()!;
-      expect((await parent.inspect(TYPESCRIPT, undefined))._unsafeUnwrapErr()).to.deep.include({
-        kind: 'nestedSdkDirectory',
-        other: other.sdkDirectory(),
-        encloses: false
-      });
-    });
-
-    it('refuses any SDK directory below a repository whose root is one', async () => {
-      const sdk = new DirectoryPath(path.join(root, 'sdk'));
-      fs.mkdirSync(sdk.toString(), { recursive: true });
-      const repository = (await contextFor(sdk).initRepository())._unsafeUnwrap();
-      (await record(repository, { 'README.md': '# root' }))._unsafeUnwrap();
-      expect((await git.resolveRef(sdk, SnapshotRef.pristine(SdkPath.fromGit(''))))._unsafeUnwrap()).to.not.be.undefined;
-      fs.mkdirSync(sdk.join('typescript').toString());
-      const below = (await contextFor(sdk.join('typescript')).repository())._unsafeUnwrap()!;
-
-      expect((await below.inspect(TYPESCRIPT, undefined))._unsafeUnwrapErr()).to.deep.include({
-        kind: 'nestedSdkDirectory',
-        other: sdk,
-        encloses: true
-      });
+      expect((await describeCommit(repository.root(), changed)).parents).to.deep.equal([first]);
     });
   });
 
@@ -271,7 +181,7 @@ describe('SdkRepositoryContext', () => {
       expect([...kept.keys()]).to.have.members(['README.md', '.apimatic/generation.json']);
       expect(kept.get('README.md')).to.equal('# edited again');
       expect((await git.resolveRef(sdk, repository.previousRef()))._unsafeUnwrap()?.isEqual(second)).to.be.true;
-      expect((await git.describe(sdk, second))._unsafeUnwrap().parents).to.be.empty;
+      expect((await describeCommit(sdk, second)).parents).to.be.empty;
       expect((await snapshotFiles(sdk, first)).get('README.md')).to.equal('# edited');
     });
 
@@ -529,6 +439,47 @@ describe('SdkRepositoryContext', () => {
       expect(state.kind === 'ready' && state.base.isEqual(pristine)).to.be.true;
     });
 
+    it('refuses an SDK directory inside one that already has snapshots, and the reverse', async () => {
+      const outer = await project();
+      (await record(outer, { 'README.md': '# outer' }))._unsafeUnwrap();
+      fs.mkdirSync(outer.sdkDirectory().join('typescript').toString());
+      const inner = (await contextFor(outer.sdkDirectory().join('typescript')).repository())._unsafeUnwrap()!;
+
+      expect((await inner.inspect(TYPESCRIPT, undefined))._unsafeUnwrapErr()).to.deep.include({
+        kind: 'nestedSdkDirectory',
+        other: outer.sdkDirectory(),
+        encloses: true
+      });
+
+      const other = await project(path.join('other', 'typescript', 'nested'));
+      (await record(other, { 'README.md': '# nested' }))._unsafeUnwrap();
+      const parent = (
+        await contextFor(new DirectoryPath(path.join(root, 'project', 'other', 'typescript'))).repository()
+      )._unsafeUnwrap()!;
+      expect((await parent.inspect(TYPESCRIPT, undefined))._unsafeUnwrapErr()).to.deep.include({
+        kind: 'nestedSdkDirectory',
+        other: other.sdkDirectory(),
+        encloses: false
+      });
+    });
+
+    it('refuses any SDK directory below a repository whose root is one', async () => {
+      const sdk = new DirectoryPath(path.join(root, 'sdk'));
+      fs.mkdirSync(sdk.toString(), { recursive: true });
+      const repository = (await contextFor(sdk).initRepository())._unsafeUnwrap();
+      (await record(repository, { 'README.md': '# root' }))._unsafeUnwrap();
+      expect((await git.resolveRef(sdk, SnapshotRef.pristine(SdkPath.fromGit(''))))._unsafeUnwrap()).to.not.be
+        .undefined;
+      fs.mkdirSync(sdk.join('typescript').toString());
+      const below = (await contextFor(sdk.join('typescript')).repository())._unsafeUnwrap()!;
+
+      expect((await below.inspect(TYPESCRIPT, undefined))._unsafeUnwrapErr()).to.deep.include({
+        kind: 'nestedSdkDirectory',
+        other: sdk,
+        encloses: true
+      });
+    });
+
     it('refuses an SDK directory nested in one that has snapshots', async () => {
       const outer = await project();
       (await record(outer, { 'README.md': '# outer' }))._unsafeUnwrap();
@@ -573,11 +524,29 @@ describe('SdkRepositoryContext', () => {
       const before = (await clone.inspect(TYPESCRIPT, 'origin'))._unsafeUnwrap();
       expect(before).to.deep.include({ kind: 'snapshotMissing', fetch: { kind: 'absent', remote: 'origin' } });
 
-      await sh(repository.root(), 'push', '-q', 'origin', repository.pristineRef().refspec());
+      await sh(repository.root(), 'push', '-q', 'origin', refspec(repository.pristineRef()));
       const after = (await clone.inspect(TYPESCRIPT, 'origin'))._unsafeUnwrap();
 
       expect(after.kind === 'ready' && after.base.isEqual(base)).to.be.true;
       expect((await git.resolveRef(clone.root(), clone.pristineRef()))._unsafeUnwrap()?.isEqual(base)).to.be.true;
+    });
+
+    it('moves its ref forward to a chain the remote continued, without a join', async () => {
+      const { repository, origin } = await withOrigin();
+      const first = await published(repository);
+      await sh(repository.root(), 'push', '-q', 'origin', refspec(repository.pristineRef()));
+      const clone = await cloneOf(origin, 'clone');
+      expect((await clone.inspect(TYPESCRIPT, 'origin'))._unsafeUnwrap().kind).to.equal('ready');
+      const second = (await record(repository, { 'README.md': '# v2' }))._unsafeUnwrap();
+      await sh(repository.root(), 'push', '-q', 'origin', refspec(repository.pristineRef()));
+      await writeRecord(clone, GenerationRecord.written(TYPESCRIPT, second));
+
+      const state = (await clone.inspect(TYPESCRIPT, 'origin'))._unsafeUnwrap();
+
+      expect(state.kind === 'ready' && state.base.isEqual(second)).to.be.true;
+      const tip = (await git.resolveRef(clone.root(), clone.pristineRef()))._unsafeUnwrap()!;
+      expect(tip.isEqual(second)).to.be.true;
+      expect((await describeCommit(clone.root(), tip)).parents).to.deep.equal([first]);
     });
 
     it('reports a remote it cannot reach, and no remote at all', async () => {
@@ -599,7 +568,7 @@ describe('SdkRepositoryContext', () => {
     it('joins its own chain with the remote’s while fetching a snapshot it lacks', async () => {
       const { repository: a, origin } = await withOrigin();
       const first = (await record(a, { 'README.md': '# a' }))._unsafeUnwrap();
-      await sh(a.root(), 'push', '-q', 'origin', a.pristineRef().refspec());
+      await sh(a.root(), 'push', '-q', 'origin', refspec(a.pristineRef()));
       const bRoot = new DirectoryPath(path.join(root, 'b'));
       fs.mkdirSync(bRoot.join('sdk', 'typescript').toString(), { recursive: true });
       (await git.init(bRoot))._unsafeUnwrap();
@@ -612,7 +581,7 @@ describe('SdkRepositoryContext', () => {
 
       expect(state.kind === 'ready' && state.base.isEqual(first)).to.be.true;
       const tip = (await git.resolveRef(bRoot, b.pristineRef()))._unsafeUnwrap()!;
-      expect((await git.describe(bRoot, tip))._unsafeUnwrap().parents.map(String)).to.have.members([
+      expect((await describeCommit(bRoot, tip)).parents.map(String)).to.have.members([
         second.toString(),
         first.toString()
       ]);
@@ -622,6 +591,22 @@ describe('SdkRepositoryContext', () => {
   describe('the hook that shares snapshots', () => {
     const sh = (cwd: DirectoryPath | string, ...args: string[]) =>
       execa('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...args], { cwd: cwd.toString() });
+
+    // A developer's own `core.hooksPath`, set globally, would move every hook these tests write.
+    let globalConfig: string | undefined;
+    beforeEach(() => {
+      globalConfig = process.env.GIT_CONFIG_GLOBAL;
+      const empty = path.join(root, 'gitconfig');
+      fs.writeFileSync(empty, '');
+      process.env.GIT_CONFIG_GLOBAL = empty;
+    });
+    afterEach(() => {
+      if (globalConfig === undefined) {
+        delete process.env.GIT_CONFIG_GLOBAL;
+      } else {
+        process.env.GIT_CONFIG_GLOBAL = globalConfig;
+      }
+    });
 
     const hookFile = (repository: SdkRepositoryContext, name = 'pre-push') =>
       path.join(repository.root().toString(), '.git', 'hooks', name);
@@ -812,8 +797,8 @@ describe('SdkRepositoryContext', () => {
 
       expect(pushed.stderr).to.not.contain('apimatic');
       const tip = (await git.resolveRef(a.origin, b.repository.pristineRef()))._unsafeUnwrap()!;
-      expect((await git.describe(a.origin, tip))._unsafeUnwrap().subject).to.equal('apimatic: pristine chains joined');
-      expect((await git.describe(a.origin, tip))._unsafeUnwrap().parents.map(String)).to.have.members([
+      expect((await describeCommit(a.origin, tip)).subject).to.equal('apimatic: pristine chains joined');
+      expect((await describeCommit(a.origin, tip)).parents.map(String)).to.have.members([
         b.commit.toString(),
         a.commit.toString()
       ]);
@@ -827,7 +812,7 @@ describe('SdkRepositoryContext', () => {
       await sh(b.repository.root(), 'push', '-q', 'origin', 'HEAD:refs/heads/b');
 
       const tip = (await git.resolveRef(a.origin, b.repository.pristineRef()))._unsafeUnwrap()!;
-      expect((await git.describe(a.origin, tip))._unsafeUnwrap().parents.map(String)).to.have.members([
+      expect((await describeCommit(a.origin, tip)).parents.map(String)).to.have.members([
         b.commit.toString(),
         a.commit.toString()
       ]);

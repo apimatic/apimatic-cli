@@ -3,7 +3,7 @@ import { GitService } from '../infrastructure/git-service.js';
 import { DirectoryPath } from './file/directoryPath.js';
 import { RelativeFilePath } from './file/relativeFilePath.js';
 import { CommitId } from './git/commit-id.js';
-import { StageEntry } from './git/merge-tree.js';
+import { STAGE, StageEntry } from './git/merge-tree.js';
 import { TreeId } from './git/tree-id.js';
 import { GenerationRecord, SdkGeneration } from './sdk/generation-record.js';
 import { GenerationRecordFile, RECORD_DIRECTORY } from './sdk/generation-record-file.js';
@@ -41,13 +41,7 @@ export { RECORD_DIRECTORY } from './sdk/generation-record-file.js';
 
 type Steps<T, E> = AsyncGenerator<Err<never, E>, Result<T, E>>;
 
-/**
- * An SDK directory together with the git repository that encloses it: its snapshots
- * (`SnapshotStore`), its generation record (`GenerationRecordFile`), the files on disk
- * (`SdkFiles`), the hook that shares the snapshots (`ShareHookInstaller`), and the index,
- * where git keeps the conflicts a run left. It merges a regeneration over the directory
- * against the recorded base. The repository is never pushed or checked out from here.
- */
+/** An SDK directory with the repository enclosing it: snapshots, record, files, hook and index, and the merge of a regeneration against the recorded base. */
 export class SdkRepositoryContext {
   private readonly git = new GitService();
   private readonly snapshots: SnapshotStore;
@@ -66,17 +60,17 @@ export class SdkRepositoryContext {
     return root.contains(sdkDirectory) ? new SdkRepositoryContext(root, sdkDirectory) : undefined;
   }
 
+  /** An SDK directory that is a repository of its own. */
+  public static own(directory: DirectoryPath): SdkRepositoryContext {
+    return new SdkRepositoryContext(directory, directory);
+  }
+
   public root(): DirectoryPath {
     return this.rootDirectory;
   }
 
   public sdkDirectory(): DirectoryPath {
     return this.sdk;
-  }
-
-  /** True when the SDK directory is the repository itself, so its `.git` sits among the SDK files. */
-  public isRootSdk(): boolean {
-    return this.path.isRoot();
   }
 
   public pristineRef(): SnapshotRef {
@@ -97,12 +91,7 @@ export class SdkRepositoryContext {
     return this.git.remoteOf(this.rootDirectory).mapErr(gitFailed);
   }
 
-  /**
-   * Everything a run needs to know before it decides how to write. Refused while the developer
-   * is in the middle of a merge of their own, and for a nested SDK directory. Files the last
-   * run left unmerged come first, whatever the record says, so no run writes over them. A
-   * recorded snapshot the repository lacks is fetched from `remote` first.
-   */
+  /** What a run needs before it decides how to write: an operation in progress or a nested SDK is refused, unmerged files come first, a missing snapshot is fetched. */
   public inspect(
     generation: SdkGeneration,
     remote: string | undefined
@@ -151,11 +140,7 @@ export class SdkRepositoryContext {
     return new ShareHookInstaller(this.rootDirectory).install();
   }
 
-  /**
-   * Settles what is left of the conflicts in `paths` for `side`, from the two sides git kept in
-   * the index and the files as they are now (`settledContent`), and takes the files out of the
-   * unmerged state, so `git status` stops listing them as both modified.
-   */
+  /** Settles the remaining conflicts in `paths` for `side` from the index's two sides and the files as they are, and takes them out of the unmerged state. */
   public settleUnresolved(
     side: ConflictSide,
     paths: readonly RelativeFilePath[]
@@ -168,13 +153,13 @@ export class SdkRepositoryContext {
     const stages = yield* this.git.unmergedStages(root, this.path.pathspec()).mapErr(gitFailed);
     const blobs = yield* this.git.readBlobs(root, [...new Set(stages.map((entry) => entry.oid))]).mapErr(gitFailed);
     for (const path of paths) {
-      const key = this.rootRelative(path).toString();
+      const fromRoot = this.rootRelative(path);
       const stage = (number: StageEntry['stage']) => {
-        const entry = stages.find((candidate) => candidate.stage === number && candidate.path.toString() === key);
+        const entry = stages.find((candidate) => candidate.stage === number && candidate.path.isEqual(fromRoot));
         return entry === undefined ? undefined : blobs.get(entry.oid);
       };
       const disk = yield* this.files.contentOf(path);
-      const settled = settledContent(side, { disk, yours: stage(2), generated: stage(3) });
+      const settled = settledContent(side, { disk, yours: stage(STAGE.yours), generated: stage(STAGE.generated) });
       if (settled !== disk) {
         yield* this.files.settle(path, settled);
       }
@@ -226,11 +211,7 @@ export class SdkRepositoryContext {
     return this.record.read();
   }
 
-  /**
-   * The three-way merge, done by git: the disk and the fresh generation are committed on the
-   * pristine base as temporary commits, `merge-tree` merges them, and the plan says which
-   * paths differ between the disk and the result.
-   */
+  /** git's three-way merge: disk and generation as temporary commits on the pristine base, merged by `merge-tree`. */
   public merge(base: CommitId, disk: TreeId, generated: TreeId): ResultAsync<MergeOutcome, SdkRepositoryProblem> {
     return safeTry(this.merging.bind(this, base, disk, generated));
   }
@@ -252,13 +233,10 @@ export class SdkRepositoryContext {
       applied: yield* git.diffTrees(root, disk, merge.tree, false).mapErr(gitFailed),
       basePaths: (yield* git.listTree(root, baseTree).mapErr(gitFailed)).map((entry) => entry.path)
     });
-    return ok({ plan, merged: merge.tree, stages: merge.stages });
+    return ok({ plan, stages: merge.stages });
   }
 
-  /**
-   * The generation in `generated` merged over the directory against `base`, in one step: both
-   * trees are snapshotted, then merged.
-   */
+  /** Both trees snapshotted, then merged against `base`. */
   public regenerate(base: CommitId, generated: DirectoryPath): ResultAsync<Regeneration, SdkRepositoryProblem> {
     return this.snapshotGenerated(generated).andThen((generatedTree) =>
       this.snapshotDisk(base).andThen((disk) =>
@@ -267,11 +245,7 @@ export class SdkRepositoryContext {
     );
   }
 
-  /**
-   * Keeps the directory as it is under the previous ref, then applies the plan; a write or
-   * removal that fails puts back, from that ref, every path it had changed, and the ref stays
-   * for a developer to restore from by hand.
-   */
+  /** The previous ref first, then the plan; a step that fails is undone from that ref, which stays for a restore by hand. */
   public write(base: CommitId, plan: MergePlan, generated: DirectoryPath): ResultAsync<void, SdkRepositoryProblem> {
     return this.savePrevious(base).andThen((commit) =>
       this.files.apply(plan, { commit, ref: this.previousRef() }, generated)

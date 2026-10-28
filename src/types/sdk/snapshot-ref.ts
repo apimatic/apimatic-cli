@@ -19,10 +19,7 @@ function encodeSegment(segment: string): string {
 
 const encodePath = (sdkPath: SdkPath): string => sdkPath.toString().split('/').map(encodeSegment).join('/');
 
-/**
- * A hidden ref holding one SDK directory's snapshots: never a branch, never checked out, and
- * named after the directory's path from the repository root so each SDK directory has its own.
- */
+/** A hidden ref holding one SDK directory's snapshots, named after the directory's path so each has its own. */
 export class SnapshotRef {
   private readonly name: string;
 
@@ -59,20 +56,6 @@ export class SnapshotRef {
     return (
       this.name !== other.name && (other.name.startsWith(`${this.name}/`) || this.name.startsWith(`${other.name}/`))
     );
-  }
-
-  /** This ref onto itself, as `git push` and `git fetch` take it to move the ref between repositories. */
-  public refspec(): string {
-    return `${this.name}:${this.name}`;
-  }
-
-  /** As `refspec`, but taking the other side's ref even where it moved on. */
-  public forcedRefspec(): string {
-    return `+${this.name}:${this.name}`;
-  }
-
-  public isEqual(other: SnapshotRef): boolean {
-    return this.name === other.name;
   }
 
   public toString(): string {

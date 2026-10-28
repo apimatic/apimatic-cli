@@ -7,7 +7,7 @@ import { errAsync, okAsync } from 'neverthrow';
 import sinon from 'sinon';
 import { GenerateAction } from '../../../src/actions/sdk/generate.js';
 import { GitService } from '../../../src/infrastructure/git-service.js';
-import { SdkGeneratePrompts } from '../../../src/prompts/sdk/generate.js';
+import { MERGE_NEEDS_RESOLVING, SdkGeneratePrompts } from '../../../src/prompts/sdk/generate.js';
 import { CommandMetadata } from '../../../src/types/common/command-metadata.js';
 import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
 import { FileName } from '../../../src/types/file/fileName.js';
@@ -24,7 +24,7 @@ import { SnapshotRef } from '../../../src/types/sdk/snapshot-ref.js';
 import { SdkRepositoryContext } from '../../../src/types/sdk-repository-context.js';
 import { terminal } from '../../../src/utils/terminal-utils.js';
 import { Files, stubSdkGeneration, writeFiles } from '../../helpers/sdk-generation.js';
-import { snapshotFiles } from '../../helpers/snapshots.js';
+import { describeCommit, snapshotFiles } from '../../helpers/snapshots.js';
 
 const COMMAND_METADATA: CommandMetadata = { commandName: 'sdk generate', shell: 'test' };
 const STABLE: SdkGeneration = {
@@ -200,9 +200,7 @@ describe('GenerateAction (sdk) — writing the SDK', () => {
         kept: ['notes.txt']
       });
       expect(record().pristineCommit().isEqual(base)).to.be.false;
-      expect((await git.describe(repository.root(), record().pristineCommit()))._unsafeUnwrap().parents).to.deep.equal([
-        base
-      ]);
+      expect((await describeCommit(repository.root(), record().pristineCommit())).parents).to.deep.equal([base]);
       const previous = (await git.resolveRef(repository.root(), repository.previousRef()))._unsafeUnwrap()!;
       const kept = await snapshotFiles(repository.root(), previous);
       expect(kept.get('models/book.py')).to.equal(DECORATED + MODEL_V1);
@@ -218,7 +216,7 @@ describe('GenerateAction (sdk) — writing the SDK', () => {
 
       expect(result.isFailed()).to.be.true;
       expect(result.getExitCode()).to.equal(1);
-      expect(result.getMessage()).to.equal('Resolve the conflicts and rerun');
+      expect(result.getMessage()).to.equal(MERGE_NEEDS_RESOLVING);
       expect(conflicts.firstCall.args[0].conflicts).to.deep.equal([
         { path: rel('models/book.py'), kind: 'bothChanged' }
       ]);
@@ -226,7 +224,7 @@ describe('GenerateAction (sdk) — writing the SDK', () => {
       expect(read('models/book.py')).to.contain('    # Retail price in US dollars.\n');
       expect(read('models/book.py')).to.contain(`${GENERATED_MARKER}\n`);
       expect(read('README.md')).to.equal('# sdk v2');
-      expect(record().toJson()).to.not.contain('conflicts');
+      expect(read('.apimatic/generation.json')).to.not.contain('conflicts');
       const cwd = repository.root().toString();
       expect((await execa('git', ['status', '--porcelain'], { cwd })).stdout).to.contain(
         'UU sdk/python/models/book.py'
@@ -248,7 +246,7 @@ describe('GenerateAction (sdk) — writing the SDK', () => {
       const result = await execute({ 'models/book.py': MODEL_V2 });
 
       expect(result.isFailed()).to.be.true;
-      expect(result.getMessage()).to.equal('Resolve the conflicts and rerun');
+      expect(result.getMessage()).to.equal(MERGE_NEEDS_RESOLVING);
       expect(conflictsNotStaged.firstCall.args[0]).to.equal('index locked');
       expect(conflicts.called).to.be.true;
       expect(read('models/book.py')).to.contain(YOURS_MARKER);
@@ -356,25 +354,25 @@ describe('GenerateAction (sdk) — writing the SDK', () => {
       expect(conflictsResolved.firstCall.args[1].map(String)).to.deep.equal(['models/book.py']);
     });
 
-    it('writes nothing at all when the developer cancels the run, or backs out of the question', async () => {
-      for (const answer of ['cancel', undefined] as const) {
+    for (const [answer, how] of [
+      ['cancel', 'cancels the run'],
+      [undefined, 'backs out of the question']
+    ] as const) {
+      it(`writes nothing at all when the developer ${how}`, async () => {
         const { repository, base } = await conflicting();
         sinon.stub(SdkGeneratePrompts.prototype, 'conflictChoice').resolves(answer);
         const runCancelled = sinon.stub(SdkGeneratePrompts.prototype, 'runCancelled');
 
         const result = await execute(NEXT, false);
 
-        expect(result.isCancelled(), String(answer)).to.be.true;
+        expect(result.isCancelled()).to.be.true;
         expect(read('models/book.py')).to.equal(DECORATED + MODEL_V1_EDITED);
         expect(read('README.md')).to.equal('# sdk');
         expect(record().pristineCommit().isEqual(base)).to.be.true;
         expect((await git.resolveRef(repository.root(), repository.previousRef()))._unsafeUnwrap()).to.be.undefined;
         expect(runCancelled.calledOnce).to.be.true;
-        sinon.restore();
-        fs.rmSync(root, { recursive: true, force: true });
-        fresh();
-      }
-    });
+      });
+    }
 
     it('leaves markers when the developer will resolve, with the steps but not the list again', async () => {
       await conflicting();
@@ -390,19 +388,24 @@ describe('GenerateAction (sdk) — writing the SDK', () => {
       expect(conflicts.called).to.be.false;
     });
 
-    it('does not ask without a terminal, or with --force: markers, the list and the steps', async () => {
-      await conflicting();
-      (terminal.isInteractive as sinon.SinonStub).returns(false);
-      const conflictChoice = sinon.stub(SdkGeneratePrompts.prototype, 'conflictChoice');
-      const conflicts = sinon.stub(SdkGeneratePrompts.prototype, 'conflicts');
+    for (const [how, tty, force] of [
+      ['without a terminal', false, false],
+      ['with --force', true, true]
+    ] as const) {
+      it(`does not ask ${how}: markers, the list and the steps`, async () => {
+        await conflicting();
+        (terminal.isInteractive as sinon.SinonStub).returns(tty);
+        const conflictChoice = sinon.stub(SdkGeneratePrompts.prototype, 'conflictChoice');
+        const conflicts = sinon.stub(SdkGeneratePrompts.prototype, 'conflicts');
 
-      const result = await execute(NEXT, false);
+        const result = await execute(NEXT, force);
 
-      expect(result.isFailed()).to.be.true;
-      expect(conflictChoice.called).to.be.false;
-      expect(conflicts.calledOnce).to.be.true;
-      expect(read('models/book.py')).to.contain(YOURS_MARKER);
-    });
+        expect(result.isFailed()).to.be.true;
+        expect(conflictChoice.called).to.be.false;
+        expect(conflicts.calledOnce).to.be.true;
+        expect(read('models/book.py')).to.contain(YOURS_MARKER);
+      });
+    }
   });
 
   describe('the hook that shares snapshots', () => {
@@ -446,7 +449,7 @@ describe('GenerateAction (sdk) — writing the SDK', () => {
     it('warns when the hook cannot be written, and still succeeds', async () => {
       sinon
         .stub(SdkRepositoryContext.prototype, 'installShareHook')
-        .returns(errAsync({ kind: 'hookNotWritten', reason: 'EACCES: permission denied' }));
+        .returns(errAsync({ kind: 'fileFailed', reason: 'EACCES: permission denied' }));
       const shareHookNotInstalled = sinon.stub(SdkGeneratePrompts.prototype, 'shareHookNotInstalled');
 
       expect((await recordOne()).isSuccess()).to.be.true;

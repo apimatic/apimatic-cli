@@ -36,7 +36,6 @@ export class GenerationRecordFile {
   public write(record: GenerationRecord): ResultAsync<FilePath, SdkRepositoryProblem> {
     return onDisk(this.fileService.replaceContentsIfChanged(this.attributes, RECORD_ATTRIBUTES))
       .andThen(() => onDisk(this.fileService.replaceContentsIfChanged(this.file, record.toJson())))
-      .map(() => this.file)
-      .mapErr((problem) => ({ kind: 'recordNotWritten', reason: problem.reason }));
+      .map(() => this.file);
   }
 }

@@ -41,11 +41,10 @@ describe('ShareHook', () => {
     expect(content.endsWith('set -e\necho mine\nexit 0\n')).to.be.true;
   });
 
-  it('gives a hook without a shebang one', () => {
-    const content = installed('echo mine\n');
+  it('leaves a hook with no shebang alone, since it may be a binary, unless it runs the script already', () => {
+    const result = ShareHook.installInto('echo mine\n');
 
-    expect(content.startsWith('#!/bin/sh\n')).to.be.true;
-    expect(content.endsWith('echo mine\n')).to.be.true;
+    expect(result).to.deep.equal({ kind: 'notShell', shebang: '' });
   });
 
   it('writes LF whatever the hook had, since sh cannot read CRLF', () => {
@@ -58,18 +57,6 @@ describe('ShareHook', () => {
   it('leaves a hook that already holds the current block alone', () => {
     expect(ShareHook.installInto(installed(undefined))).to.deep.equal({ kind: 'present' });
     expect(ShareHook.installInto(installed('#!/bin/sh\necho mine\n'))).to.deep.equal({ kind: 'present' });
-  });
-
-  it('replaces an older block, keeping the rest of the hook', () => {
-    const older =
-      '#!/bin/sh\n\n# >>> apimatic snapshots v1\nold_sharing() { :; }\nold_sharing "$1"\n# <<< apimatic snapshots\n\necho mine\n';
-
-    const content = installed(older);
-
-    expect(content).to.contain(SHARE_HOOK_BLOCK);
-    expect(content).to.not.contain('old_sharing');
-    expect(content).to.not.contain('v1');
-    expect(content.endsWith('echo mine\n')).to.be.true;
   });
 
   it('refuses a hook in another language, naming its shebang', () => {

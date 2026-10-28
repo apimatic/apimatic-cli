@@ -150,33 +150,7 @@ describe('SdkRepositoryContext: the merge', () => {
     fs.rmSync(root, { recursive: true, force: true });
   });
 
-  describe('files the base holds', () => {
-    it('writes the new version of a file you never edited', async () => {
-      const { plan, read } = await run({ 'a.ts': 'v1\n' }, { 'a.ts': 'v1\n' }, { 'a.ts': 'v2\n' });
-
-      expect(read('a.ts')).to.equal('v2\n');
-      expect(plan.files.updated).to.have.length(1);
-      expect(plan.hasConflicts()).to.be.false;
-    });
-
-    it('keeps your edit when the generator left the file alone', async () => {
-      const { plan, read } = await run({ 'a.ts': 'v1\n' }, { 'a.ts': 'v1 edited\n' }, { 'a.ts': 'v1\n' });
-
-      expect(read('a.ts')).to.equal('v1 edited\n');
-      expect(plan.writes).to.be.empty;
-      expect(plan.files.kept).to.have.length(1);
-    });
-
-    it('does nothing when neither side changed, or when you already made the generator’s change', async () => {
-      const same = await run({ 'a.ts': 'v1\n' }, { 'a.ts': 'v1\n' }, { 'a.ts': 'v1\n' });
-      const ahead = await run({ 'a.ts': 'v1\n' }, { 'a.ts': 'v2\n' }, { 'a.ts': 'v2\n' });
-
-      expect(same.plan.writes).to.be.empty;
-      expect(same.plan.files.unchanged).to.have.length(1);
-      expect(ahead.plan.writes).to.be.empty;
-      expect(ahead.plan.hasConflicts()).to.be.false;
-    });
-
+  describe('files the base holds, where git decides the lines', () => {
     it('merges your edit with the generator’s change when they touch different lines', async () => {
       const { plan, read } = await run(
         { 'book.ts': MODEL_V1 },
@@ -210,52 +184,6 @@ describe('SdkRepositoryContext: the merge', () => {
         ].join('\n')
       );
       expect(plan.conflicts).to.deep.equal([{ path: rel('book.ts'), kind: 'bothChanged' }]);
-    });
-
-    it('leaves a file you deleted deleted while the generator does not change it', async () => {
-      const { plan, exists } = await run(
-        { 'a.ts': 'v1\n', 'b.ts': 'b\n' },
-        { 'b.ts': 'b\n' },
-        { 'a.ts': 'v1\n', 'b.ts': 'b\n' }
-      );
-
-      expect(exists('a.ts')).to.be.false;
-      expect(plan.writes).to.be.empty;
-      expect(plan.hasConflicts()).to.be.false;
-    });
-
-    it('writes back a file you deleted once the generator changes it, as a conflict', async () => {
-      const { plan, read } = await run(
-        { 'a.ts': 'v1\n', 'b.ts': 'b\n' },
-        { 'b.ts': 'b\n' },
-        { 'a.ts': 'v2\n', 'b.ts': 'b\n' }
-      );
-
-      expect(read('a.ts')).to.equal('v2\n');
-      expect(plan.conflicts).to.deep.equal([{ path: rel('a.ts'), kind: 'deletedByYou' }]);
-    });
-
-    it('removes a file the generator stopped producing when you never edited it', async () => {
-      const { plan, exists } = await run(
-        { 'authors.ts': 'v1\n', 'b.ts': 'b\n' },
-        { 'authors.ts': 'v1\n', 'b.ts': 'b\n' },
-        { 'b.ts': 'b\n' }
-      );
-
-      expect(exists('authors.ts')).to.be.false;
-      expect(plan.deletes).to.deep.equal(['authors.ts'].map(rel));
-      expect(plan.files.removed).to.have.length(1);
-    });
-
-    it('keeps a file the generator stopped producing when you edited it, as a conflict', async () => {
-      const { plan, read } = await run(
-        { 'authors.ts': 'v1\n', 'b.ts': 'b\n' },
-        { 'authors.ts': 'v1 + getMany\n', 'b.ts': 'b\n' },
-        { 'b.ts': 'b\n' }
-      );
-
-      expect(read('authors.ts')).to.equal('v1 + getMany\n');
-      expect(plan.conflicts).to.deep.equal([{ path: rel('authors.ts'), kind: 'noLongerGenerated' }]);
     });
   });
 
@@ -304,9 +232,6 @@ describe('SdkRepositoryContext: the merge', () => {
 
       expect(read('models/catalog/book.ts')).to.equal(MODEL_V2 + HELPER);
       expect(exists('models/book.ts')).to.be.false;
-      expect(plan.renames).to.deep.equal([
-        { from: rel('models/book.ts'), to: rel('models/catalog/book.ts'), by: 'you' }
-      ]);
       expect(plan.hasConflicts()).to.be.false;
     });
 
@@ -332,9 +257,6 @@ describe('SdkRepositoryContext: the merge', () => {
 
       expect(read('models/book-model.ts')).to.equal(MODEL_V2 + HELPER);
       expect(exists('models/book.ts')).to.be.false;
-      expect(plan.renames).to.deep.equal([
-        { from: rel('models/book.ts'), to: rel('models/book-model.ts'), by: 'generator' }
-      ]);
       expect(plan.hasConflicts()).to.be.false;
     });
   });
@@ -478,7 +400,7 @@ describe('SdkRepositoryContext: the merge', () => {
         expect.fail('the undo should have failed');
       }
       expect(problem.undo.reason).to.contain('a.ts');
-      expect(problem.undo.previous.isEqual(repository.previousRef())).to.be.true;
+      expect(problem.undo.previous.toString()).to.equal(repository.previousRef().toString());
       expect(read('a.ts')).to.equal('2\r\n');
       expect(read('c.ts')).to.equal('1\n');
     });
@@ -534,7 +456,7 @@ describe('SdkRepositoryContext: the merge', () => {
     });
   });
 
-  describe('the Bookstore lab, replayed', () => {
+  describe('two spec versions in a row, as a generator ships them', () => {
     const v1: Files = {
       'src/models/book.ts': MODEL_V1,
       'src/sdk/authors.ts': 'export class Authors {}\n',
@@ -567,7 +489,7 @@ describe('SdkRepositoryContext: the merge', () => {
       ]);
       expect(read('src/models/book.ts')).to.equal(MODEL_V2 + HELPER);
       expect(plan.conflicts).to.deep.equal([{ path: rel('docs/models/book.md'), kind: 'deletedByYou' }]);
-      expect(counts(plan)).to.deep.equal({ added: 1, updated: 0, merged: 1, removed: 0, kept: 1, unchanged: 1 });
+      expect(counts(plan)).to.deep.equal({ added: 1, updated: 0, merged: 1, removed: 0, kept: 1 });
     });
 
     it('keeps an edited file the v3 spec drops, and removes nothing else it did not produce', async () => {

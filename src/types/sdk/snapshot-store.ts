@@ -11,12 +11,7 @@ import { SnapshotRef } from './snapshot-ref.js';
 
 type Steps<T, E> = AsyncGenerator<Err<never, E>, Result<T, E>>;
 
-/**
- * One SDK directory's snapshots in its repository, as commits under hidden refs: the pristine
- * chain, one commit per generation and the base of the next merge, and the previous state,
- * the directory before the last run wrote to it. Fetched from the remote when a record names
- * a commit the repository lacks, and joined with a chain another machine pushed first.
- */
+/** One SDK directory's snapshots: the pristine chain, the base of the next merge, and the previous state; fetched and joined with a remote's. */
 export class SnapshotStore {
   private readonly git = new GitService();
 
@@ -39,10 +34,7 @@ export class SnapshotStore {
     return this.git.treeOf(this.root, generated, 'all').mapErr(gitFailed);
   }
 
-  /**
-   * The SDK directory as it is on disk: its `.gitignore` is honoured, except that every path
-   * `base` holds goes in, so a generated file an ignore rule matches is never taken for deleted.
-   */
+  /** The SDK directory as it is on disk; every path `base` holds goes in, so a generated file an ignore rule matches is never taken for deleted. */
   public snapshotDisk(
     base: CommitId | undefined,
     lineEndings: 'normalized' | 'asIs' = 'normalized'
@@ -99,11 +91,7 @@ export class SnapshotStore {
     return this.git.hasCommit(this.root, commit).mapErr(gitFailed);
   }
 
-  /**
-   * Brings the pristine chain over from `remote`: a chain that continues the local one, or
-   * that the local one continues, moves the ref; two that diverged are joined by a commit with
-   * both as parents, so neither machine's generations are lost.
-   */
+  /** A chain that continues the local one moves the ref; two that diverged are joined with a two-parent commit, so neither machine's generations are lost. */
   public fetch(remote: string): ResultAsync<void, SdkRepositoryProblem> {
     return safeTry(this.fetching.bind(this, remote));
   }

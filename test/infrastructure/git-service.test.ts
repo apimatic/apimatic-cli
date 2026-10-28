@@ -11,7 +11,11 @@ import { GitService } from '../../src/infrastructure/git-service.js';
 import { DirectoryPath } from '../../src/types/file/directoryPath.js';
 import { CommitId } from '../../src/types/git/commit-id.js';
 import { SdkPath } from '../../src/types/sdk/sdk-path.js';
+import { describeCommit } from '../helpers/snapshots.js';
 import { SnapshotRef } from '../../src/types/sdk/snapshot-ref.js';
+
+/** A ref onto itself, as `git push` and `git fetch` take it. */
+const refspec = (ref: SnapshotRef): string => `${ref}:${ref}`;
 
 const text = (content: Uint8Array | undefined) =>
   content === undefined ? undefined : new TextDecoder().decode(content);
@@ -132,6 +136,18 @@ describe('GitService', () => {
   });
 
   describe('treeOf', () => {
+    it('honours the repository’s ignore rules for a directory inside it, and roots the tree at that directory', async () => {
+      const repo = await repository();
+      write(repo, '.gitignore', '*.env\n');
+      write(repo, 'sdk/python/.env', 'secret');
+      write(repo, 'sdk/python/keep.py', 'kept');
+      write(repo, 'other.py', 'outside');
+
+      const tree = (await git.treeOf(repo, repo.join('sdk', 'python'), []))._unsafeUnwrap();
+
+      expect([...(await filesOf(repo, tree)).keys()]).to.deep.equal(['keep.py']);
+    });
+
     it('honours the directory’s own .gitignore, except for the paths told to include', async () => {
       const repo = await repository();
       const sdk = repo.join('sdk');
@@ -200,11 +216,12 @@ describe('GitService', () => {
     (await git.updateRef(repo, ref, second))._unsafeUnwrap();
 
     expect((await git.resolveRef(repo, ref))._unsafeUnwrap()?.isEqual(second)).to.be.true;
-    expect((await git.resolveRef(repo, SnapshotRef.pristine(SdkPath.fromGit('other'))))._unsafeUnwrap()).to.be.undefined;
+    expect((await git.resolveRef(repo, SnapshotRef.pristine(SdkPath.fromGit('other'))))._unsafeUnwrap()).to.be
+      .undefined;
     expect((await git.listRefs(repo, 'refs/apimatic/pristine'))._unsafeUnwrap()).to.deep.equal([
       'refs/apimatic/pristine/sdk'
     ]);
-    expect((await git.describe(repo, second))._unsafeUnwrap()).to.deep.equal({
+    expect(await describeCommit(repo, second)).to.deep.equal({
       parents: [first],
       authorName: 'APIMatic CLI',
       subject: 'second'
@@ -229,7 +246,11 @@ describe('GitService', () => {
     const plain = (await git.diffTrees(repo, from, to, false))._unsafeUnwrap();
 
     expect(
-      paired.map(({ status, path: changed, from: origin }) => [status, changed.toString(), origin?.toString()])
+      paired.map((change) => [
+        change.status,
+        change.path.toString(),
+        'from' in change ? change.from.toString() : undefined
+      ])
     ).to.deep.equal(
       [
         ['M', 'b.txt', undefined],
@@ -246,7 +267,8 @@ describe('GitService', () => {
       ['A', 'c.txt'],
       ['A', 'moved/a.txt']
     ]);
-    expect(plain.find((change) => change.path.toString() === 'b.txt')?.blob).to.have.lengthOf(40);
+    const modified = plain.find((change) => change.path.toString() === 'b.txt')!;
+    expect('blob' in modified && modified.blob).to.have.lengthOf(40);
   });
 
   describe('mergeTree', () => {
@@ -381,9 +403,10 @@ describe('GitService', () => {
       const a = await withRemote('a', origin);
       const b = await withRemote('b', origin);
       const first = await snapshot(a, 'one');
-      await execa('git', ['push', '-q', 'origin', ref.refspec()], { cwd: a.toString() });
+      await execa('git', ['push', '-q', 'origin', refspec(ref)], { cwd: a.toString() });
 
-      expect((await git.fetchRef(b, 'origin', SnapshotRef.pristine(SdkPath.fromGit('elsewhere'))))._unsafeUnwrap()).to.be.undefined;
+      expect((await git.fetchRef(b, 'origin', SnapshotRef.pristine(SdkPath.fromGit('elsewhere'))))._unsafeUnwrap()).to
+        .be.undefined;
       const tip = (await git.fetchRef(b, 'origin', ref))._unsafeUnwrap();
 
       expect(tip?.isEqual(first)).to.be.true;

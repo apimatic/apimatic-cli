@@ -6,10 +6,6 @@ export class TreeId {
     this.sha = sha;
   }
 
-  public static create(sha: string): TreeId | undefined {
-    return /^[0-9a-f]{40}$/.test(sha) ? new TreeId(sha) : undefined;
-  }
-
   /** From git itself, whose ids need no check. */
   public static fromGit(sha: string): TreeId {
     return new TreeId(sha);

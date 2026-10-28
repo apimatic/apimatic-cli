@@ -5,17 +5,13 @@ import { SdkRepositoryContext } from '../sdk-repository-context.js';
 import { SdkRepositoryState } from './repository-state.js';
 
 /** Why a run records a fresh snapshot instead of merging: there is no base, or not one for this generation. */
-export type RecordReason = { kind: 'noRepository' } | Exclude<SdkRepositoryState, { kind: 'ready' | 'unresolved' }>;
+export type RecordReason = Exclude<SdkRepositoryState, { kind: 'ready' | 'unresolved' }>;
 
-/**
- * How a run will write the SDK directory, decided before anything is uploaded, with the reason
- * the developer is told: replaced as today, when git cannot keep anything; replaced and then
- * recorded, so the next run has a base; or merged over the developer's changes against the
- * base the generation record names.
- */
+/** How a run will write the SDK directory, decided before anything is uploaded, with the reason the developer is told. */
 export type SdkDestination =
   | { kind: 'overwrite'; found: GitVersion | undefined }
-  | { kind: 'record'; repository: SdkRepositoryContext | undefined; because: RecordReason }
+  | { kind: 'noRepository' }
+  | { kind: 'record'; repository: SdkRepositoryContext; because: RecordReason }
   | { kind: 'merge'; repository: SdkRepositoryContext; base: CommitId };
 
 /** The last run's markers are still in the files; nothing is decided until the developer settles them. */

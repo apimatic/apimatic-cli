@@ -9,7 +9,7 @@ import { ServiceError } from '../../infrastructure/service-error.js';
 import { AVAILABLE_LANGUAGES, Language, languageLabel, UPCOMING_LANGUAGES } from '../../types/sdk/generate.js';
 import { RelativeFilePath } from '../../types/file/relativeFilePath.js';
 import { GitVersion } from '../../types/git/git-version.js';
-import { describeApart, SdkGeneration } from '../../types/sdk/generation-record.js';
+import { SdkGeneration } from '../../types/sdk/generation-record.js';
 import {
   ConflictChoice,
   ConflictKind,
@@ -31,8 +31,27 @@ const CONFLICT_LABELS: Record<ConflictKind, string> = {
   deletedByYou: 'deleted by you, changed by the generator; the new version is back',
   noLongerGenerated: 'no longer generated; your edited file stays',
   binary: 'binary file changed by you and by the generator; yours stays',
-  other: ''
+  other: 'placed by git where it could, with both versions on disk'
 };
+
+/** Each as "stable typescript", with the codegen version added only when that is what sets them apart. */
+function describeApart(recorded: SdkGeneration, requested: SdkGeneration): [string, string] {
+  const brief = (generation: SdkGeneration) => `${generation.stability} ${generation.language}`;
+  const full = (generation: SdkGeneration) => `${brief(generation)} (codegen ${generation.codegenVersion})`;
+  return brief(recorded) === brief(requested) ? [full(recorded), full(requested)] : [brief(recorded), brief(requested)];
+}
+
+const stillUnresolved = (paths: readonly RelativeFilePath[]): string =>
+  `${plural(paths.length, 'file')} from the last run ${paths.length === 1 ? 'is' : 'are'} still unresolved`;
+
+/** The one rule both SDK commands refuse a destination by, worded once. */
+export function destinationContainsSource(sourceDirectory: DirectoryPath, sdkDirectory: DirectoryPath): string {
+  return (
+    `The destination ${f.path(sdkDirectory)} contains your source directory ` +
+    `${f.path(sourceDirectory)}, and everything in the destination is replaced by the ` +
+    `generated SDK. Choose a destination outside it, such as ${f.flag('destination', './sdk')}.`
+  );
+}
 
 const RESOLVED_HEADINGS: Record<ConflictSide, string> = {
   generated: "Resolved using the generator's changes:",
@@ -56,11 +75,7 @@ const listed = (sdk: DirectoryPath, paths: readonly RelativeFilePath[]) =>
 
 /** No method uses `this`, so each can be handed to a step as it is, the way `conflictChoice` is. */
 export class SdkGeneratePrompts {
-  /**
-   * Named rather than listed as flag values: a user whose language is on its way back reads
-   * something different from one who mistyped, and neither is told to reach for a generator
-   * version that no longer exists.
-   */
+  /** Named rather than listed: a language on its way back reads differently from a typo, and no one is sent to a generator version that no longer exists. */
   public languageNotAvailable(language: Language) {
     log.error(
       `${languageLabel(language)} isn't available yet.\n` +
@@ -70,10 +85,7 @@ export class SdkGeneratePrompts {
   }
 
   public destinationContainsSource(sourceDirectory: DirectoryPath, sdkDirectory: DirectoryPath) {
-    const message =
-      `The destination ${f.path(sdkDirectory)} contains your source directory ` +
-      `${f.path(sourceDirectory)}, and everything in the destination is replaced by the ` +
-      `generated SDK. Choose a destination outside it, such as ${f.flag('destination', './sdk')}.`;
+    const message = destinationContainsSource(sourceDirectory, sdkDirectory);
     log.error(message);
   }
 
@@ -170,11 +182,11 @@ export class SdkGeneratePrompts {
 
   public conflictsUnresolved(paths: readonly RelativeFilePath[], sdk: DirectoryPath) {
     const one = paths.length === 1;
-    const message =
-      `${plural(paths.length, 'file')} from the last run ${one ? 'is' : 'are'} still unresolved. ` +
-      `Resolve and stage ${one ? 'it' : 'them'}, then rerun:\n` +
-      listed(sdk, paths).join('\n');
-    log.error(message);
+    log.error(
+      `${stillUnresolved(paths)}. Resolve and stage ${one ? 'it' : 'them'}, then rerun:\n${listed(sdk, paths).join(
+        '\n'
+      )}`
+    );
   }
 
   /** The files still unresolved and the question, before anything is generated; none when the developer backs out. */
@@ -183,10 +195,7 @@ export class SdkGeneratePrompts {
     sdk: DirectoryPath
   ): Promise<UnresolvedChoice | undefined> {
     const one = paths.length === 1;
-    log.warn(
-      `${plural(paths.length, 'file')} from the last run ${one ? 'is' : 'are'} still unresolved:\n` +
-        listed(sdk, paths).join('\n')
-    );
+    log.warn(`${stillUnresolved(paths)}:\n${listed(sdk, paths).join('\n')}`);
     const choice = await select<UnresolvedChoice>({
       message: 'What should happen?',
       options: [
@@ -413,7 +422,7 @@ function attentionTitle(plan: MergePlan): string {
 
 function conflictLines(plan: MergePlan, sdk: DirectoryPath): string[] {
   return plan.conflicts.map(
-    (conflict) => `${f.relativePath(conflict.path.in(sdk))}\n  ${conflict.message ?? CONFLICT_LABELS[conflict.kind]}`
+    (conflict) => `${f.relativePath(conflict.path.in(sdk))}\n  ${CONFLICT_LABELS[conflict.kind]}`
   );
 }
 

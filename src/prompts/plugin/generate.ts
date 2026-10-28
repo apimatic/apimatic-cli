@@ -1,4 +1,5 @@
 import { confirm, isCancel, log, multiselect } from '@clack/prompts';
+import { terminal } from '../../utils/terminal-utils.js';
 import { Result } from 'neverthrow';
 import { ServiceError } from '../../infrastructure/service-error.js';
 import { PublishingProfileItem } from '../../types/publish-api/publishing-profile-item.js';
@@ -87,7 +88,7 @@ export class PluginGeneratePrompts {
 
   // Without a terminal a prompt never answers, and Node exits with nothing said.
   public canAsk(): boolean {
-    return process.stdin.isTTY === true;
+    return terminal.isInteractive();
   }
 
   public setupNeedsTerminal(sourceDirectory: DirectoryPath, config: PluginConfig) {

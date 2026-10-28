@@ -86,12 +86,7 @@ export class GenerateAction {
     } else if (destination.kind === 'record' && destination.because.kind === 'snapshotMissing') {
       this.prompts.snapshotMissing(destination.because.fetch);
     }
-    if (
-      force &&
-      destination.kind === 'record' &&
-      destination.because.kind !== 'noRepository' &&
-      destination.because.kind !== 'noRecord'
-    ) {
+    if (force && destination.kind === 'record' && destination.because.kind !== 'noRecord') {
       this.prompts.recordedSdkNotReplaced(sdk);
       return ActionResult.failed();
     }
@@ -105,9 +100,7 @@ export class GenerateAction {
       return ActionResult.cancelled();
     }
     const withRepository =
-      destination.kind !== 'record' ||
-      destination.repository !== undefined ||
-      (canAsk && (await this.prompts.createRepository(sdk)));
+      destination.kind !== 'noRepository' || (canAsk && (await this.prompts.createRepository(sdk)));
     if (!withRepository) {
       this.prompts.repositoryNotCreated(sdk);
     }
@@ -130,16 +123,16 @@ export class GenerateAction {
         return ActionResult.success();
       }
 
-      if (destination.kind === 'record') {
+      if (destination.kind === 'record' || destination.kind === 'noRepository') {
         const opened =
-          destination.repository === undefined ? await sdkContext.initRepository() : ok(destination.repository);
+          destination.kind === 'noRepository' ? await sdkContext.initRepository() : ok(destination.repository);
         if (opened.isErr()) {
           this.prompts.repositoryNotInitialised(sdk, opened.error.reason);
           return ActionResult.failed();
         }
         const repository = opened.value;
         await sdkContext.save(tempSdk);
-        if (destination.repository === undefined) {
+        if (destination.kind === 'noRepository') {
           this.prompts.repositoryInitialised(sdk);
         }
         await this.recordSnapshot(

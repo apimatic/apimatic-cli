@@ -1,5 +1,5 @@
 import { RelativeFilePath } from '../file/relativeFilePath.js';
-import { Change, MergeTreeOutput } from '../git/merge-tree.js';
+import { Change, MergeTreeOutput, STAGE } from '../git/merge-tree.js';
 
 export type MergeInputs = {
   merge: MergeTreeOutput;
@@ -24,13 +24,10 @@ export type ConflictKind =
   | 'noLongerGenerated'
   /** You and the generator both changed a binary file; yours stays. */
   | 'binary'
-  /** A shape git reports that fits none of the above, such as both sides renaming one file differently; `message` is git's. */
+  /** A shape git reports that fits none of the above, such as both sides renaming one file differently. */
   | 'other';
 
-/**
- * A file to write, as the blob the merged tree holds for it. `settle` names the side whose
- * lines win in each block of markers the blob holds, where the developer chose one.
- */
+/** A file to write, as the blob the merged tree holds; `settle` is the side whose lines win in each marker block. */
 export type FileWrite = { path: RelativeFilePath; blob: string; settle?: ConflictSide };
 
 /** Whose lines win where you and the generator changed the same ones. */
@@ -42,22 +39,18 @@ export type ConflictChoice = 'resolve' | ConflictSide | 'cancel';
 /** What the developer chose when the last run's conflicts are still unresolved, asked before generating. */
 export type UnresolvedChoice = 'resolve' | ConflictSide;
 
-export type Conflict = { path: RelativeFilePath; kind: ConflictKind; message?: string };
+export type Conflict = { path: RelativeFilePath; kind: ConflictKind };
 
 /** Each side's version of a file git could not merge line by line; none where that side has no file. */
 export type Sides<T> = { yours: T | undefined; generated: T | undefined };
 
 /**
- * The version a conflicted file settles to, whole, for `side`. The generator's side falls back
- * to yours where the generator no longer produces the file, so an edit of yours is never thrown
- * away by a choice that promises to keep your other edits; your side stays deleted where you
- * deleted the file.
+ * The whole-file settlement for `side`: the generator's side falls back to yours where it no
+ * longer produces the file, so an edit of yours is never thrown away by a choice that keeps the rest.
  */
 export function chosen<T>(side: ConflictSide, sides: Sides<T>): T | undefined {
   return side === 'generated' ? sides.generated ?? sides.yours : sides.yours;
 }
-
-export type Rename = { from: RelativeFilePath; to: RelativeFilePath; by: 'generator' | 'you' };
 
 /** Every path the run touched or left alone, by what happened to it; conflicted paths are listed under `conflicts` instead. */
 export type MergeFiles = {
@@ -71,12 +64,7 @@ export type MergeFiles = {
   removed: readonly RelativeFilePath[];
   /** Files you edited or added that the generator left alone, and conflicted files settled for your side. */
   kept: readonly RelativeFilePath[];
-  /** Files neither side changed. */
-  unchanged: readonly RelativeFilePath[];
 };
-
-/** The `MergeFiles` holding files you never edited, which only the generator changed. */
-export const GENERATOR_FILES = ['added', 'updated', 'removed'] as const;
 
 /** The `MergeFiles` holding files you edited. */
 export const YOUR_FILES = ['merged', 'kept'] as const;
@@ -101,7 +89,7 @@ function kindOf(type: string, message: string, stages: ReadonlySet<number>): Con
     return 'bothAdded';
   }
   if (type === 'CONFLICT (modify/delete)' || type === 'CONFLICT (rename/delete)') {
-    return stages.has(2) ? 'noLongerGenerated' : 'deletedByYou';
+    return stages.has(STAGE.yours) ? 'noLongerGenerated' : 'deletedByYou';
   }
   if (type === 'CONFLICT (contents)') {
     return 'bothChanged';
@@ -125,7 +113,7 @@ function conflictsOf(merge: MergeTreeOutput): Conflict[] {
       const kind = kindOf(type, message, stagesByPath.get(key) ?? new Set());
       const known = byPath.get(key);
       if (known === undefined || RANK[kind] > RANK[known.kind]) {
-        byPath.set(key, kind === 'other' ? { path, kind, message } : { path, kind });
+        byPath.set(key, { path, kind });
       }
     }
   }
@@ -141,24 +129,64 @@ const leavesMarkers = (conflict: Conflict): boolean => MARKED_KINDS.includes(con
 const changedPaths = (changes: readonly Change[]): Map<string, Change> =>
   new Map(
     changes.flatMap((change): [string, Change][] =>
-      change.from === undefined
-        ? [[change.path.toString(), change]]
-        : [
+      'from' in change
+        ? [
             [change.from.toString(), change],
             [change.path.toString(), change]
           ]
+        : [[change.path.toString(), change]]
     )
   );
 
-/**
- * What a run writes and removes in the SDK directory, by path below it with `/` between segments.
- * A path the plan does not mention is left as it is.
- */
+/** The blob a side holds at `key` itself; none where its change moved the file away from there. */
+const blobAt = (changes: Map<string, Change>, key: string): string | undefined => {
+  const change = changes.get(key);
+  return change !== undefined && change.path.toString() === key && 'blob' in change ? change.blob : undefined;
+};
+
+/** What the summary reports: every path that is not in conflict, by what happened to it. */
+function filesOf(
+  inputs: MergeInputs,
+  conflicted: ReadonlySet<string>,
+  yours: Map<string, Change>,
+  generated: Map<string, Change>
+): MergeFiles {
+  const base = new Set(inputs.basePaths.map((path) => path.toString()));
+  const files: Record<keyof MergeFiles, RelativeFilePath[]> = {
+    added: [],
+    updated: [],
+    merged: [],
+    removed: [],
+    kept: []
+  };
+  for (const change of inputs.applied) {
+    const key = change.path.toString();
+    if (conflicted.has(key)) {
+      continue;
+    }
+    if (change.status === 'D') {
+      files.removed.push(change.path);
+    } else if (!base.has(key) && generated.get(key)?.status === 'A') {
+      files.added.push(change.path);
+    } else if (yours.get(key)?.status === 'M' && generated.has(key)) {
+      files.merged.push(change.path);
+    } else {
+      files.updated.push(change.path);
+    }
+  }
+  for (const [key, change] of yours) {
+    if ((change.status === 'M' || change.status === 'A') && !generated.has(key) && !conflicted.has(key)) {
+      files.kept.push(change.path);
+    }
+  }
+  return files;
+}
+
+/** What a run writes and removes below the SDK directory; a path the plan does not mention is left as it is. */
 export class MergePlan {
   public readonly writes: readonly FileWrite[];
   public readonly deletes: readonly RelativeFilePath[];
   public readonly conflicts: readonly Conflict[];
-  public readonly renames: readonly Rename[];
   public readonly files: MergeFiles;
   /** For each conflicted path, the blob each side holds for it. */
   private readonly sides: ReadonlyMap<string, Sides<string>>;
@@ -167,101 +195,38 @@ export class MergePlan {
     writes: readonly FileWrite[],
     deletes: readonly RelativeFilePath[],
     conflicts: readonly Conflict[],
-    renames: readonly Rename[],
     files: MergeFiles,
     sides: ReadonlyMap<string, Sides<string>> = new Map()
   ) {
     this.writes = writes;
     this.deletes = deletes;
     this.conflicts = conflicts;
-    this.renames = renames;
     this.files = files;
     this.sides = sides;
   }
 
-  /**
-   * What git's merge means for the SDK directory: the writes and deletions that bring the disk
-   * to the merged tree, the conflicts by kind, the renames each side made, and every other path
-   * by what happened to it.
-   */
+  /** What git's merge means for the SDK directory: writes, deletions, conflicts with each side's version, and the summary. */
   public static from(inputs: MergeInputs): MergePlan {
     const conflicts = conflictsOf(inputs.merge);
     const conflicted = new Set(conflicts.map((conflict) => conflict.path.toString()));
     const yours = changedPaths(inputs.yours);
     const generated = changedPaths(inputs.generated);
-    const base = new Set(inputs.basePaths.map((path) => path.toString()));
-
-    const writes: FileWrite[] = [];
-    const deletes: RelativeFilePath[] = [];
-    const files: Record<keyof MergeFiles, RelativeFilePath[]> = {
-      added: [],
-      updated: [],
-      merged: [],
-      removed: [],
-      kept: [],
-      unchanged: []
-    };
-
-    for (const change of inputs.applied) {
-      const key = change.path.toString();
-      if (change.status === 'D') {
-        deletes.push(change.path);
-        if (!conflicted.has(key)) {
-          files.removed.push(change.path);
-        }
-        continue;
-      }
-      writes.push({ path: change.path, blob: change.blob! });
-      if (conflicted.has(key)) {
-        continue;
-      }
-      if (!base.has(key) && generated.get(key)?.status === 'A') {
-        files.added.push(change.path);
-      } else if (yours.get(key)?.status === 'M' && generated.has(key)) {
-        files.merged.push(change.path);
-      } else {
-        files.updated.push(change.path);
-      }
-    }
-
-    for (const [key, change] of yours) {
-      if ((change.status === 'M' || change.status === 'A') && !generated.has(key) && !conflicted.has(key)) {
-        files.kept.push(change.path);
-      }
-    }
-    for (const path of inputs.basePaths) {
-      const key = path.toString();
-      if (!yours.has(key) && !generated.has(key)) {
-        files.unchanged.push(path);
-      }
-    }
-
-    const renames: Rename[] = [
-      ...inputs.generated
-        .filter((change) => change.status === 'R')
-        .map((change) => ({ from: change.from!, to: change.path, by: 'generator' as const })),
-      ...inputs.yours
-        .filter((change) => change.status === 'R')
-        .map((change) => ({ from: change.from!, to: change.path, by: 'you' as const }))
-    ];
-
+    const writes = inputs.applied.flatMap((change) =>
+      change.status === 'D' ? [] : [{ path: change.path, blob: change.blob }]
+    );
+    const deletes = inputs.applied.flatMap((change) => (change.status === 'D' ? [change.path] : []));
     const sides = new Map(
       conflicts.map((conflict): [string, Sides<string>] => {
         const key = conflict.path.toString();
-        return [key, { yours: yours.get(key)?.blob, generated: generated.get(key)?.blob }];
+        return [key, { yours: blobAt(yours, key), generated: blobAt(generated, key) }];
       })
     );
-    return new MergePlan(writes, deletes, conflicts, renames, files, sides);
+    return new MergePlan(writes, deletes, conflicts, filesOf(inputs, conflicted, yours, generated), sides);
   }
 
   /**
-   * The same plan with every conflict settled for `side`. A file with markers is settled block
-   * by block when written, that side's lines winning and the rest merged as git did. Any other
-   * conflict is settled whole, as `chosen` decides: that side's version written, yours left as
-   * it is on disk, or the file left deleted. A conflict of another shape, such as a file of
-   * yours inside a directory the generator renamed, keeps git's own placement, which the plan
-   * already holds, and stays listed as what happened to it. Every other path keeps what the
-   * merge decided.
+   * Every conflict settled for `side`: a marked file block by block as it is written, the rest
+   * whole as `chosen` decides; a conflict of another shape keeps git's placement.
    */
   public taking(side: ConflictSide): MergePlan {
     const writes = new Map(this.writes.map((write) => [write.path.toString(), write]));
@@ -294,12 +259,7 @@ export class MergePlan {
         updated.push(path);
       }
     }
-    return new MergePlan([...writes.values()], [...deletes.values()], [], this.renames, {
-      ...this.files,
-      updated,
-      merged,
-      kept
-    });
+    return new MergePlan([...writes.values()], [...deletes.values()], [], { ...this.files, updated, merged, kept });
   }
 
   public hasConflicts(): boolean {

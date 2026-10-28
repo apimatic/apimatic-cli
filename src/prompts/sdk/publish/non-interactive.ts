@@ -2,6 +2,7 @@ import { log } from '@clack/prompts';
 import { Result } from 'neverthrow';
 import { PublishType } from '../../../types/publish-api/publishing-profile-item.js';
 import { format as f } from '../../../prompts/format.js';
+import { destinationContainsSource as destinationContainsSourceMessage } from '../generate.js';
 import { DirectoryPath } from '../../../types/file/directoryPath.js';
 import { ServiceError } from '../../../infrastructure/service-error.js';
 import { withSpinner } from '../../prompt.js';
@@ -13,11 +14,7 @@ import { APIMATIC_CONFIG_FILE_NAME } from '../../../types/apimatic-config/docume
 
 export class SdkPublishNonInteractivePrompts {
   public destinationContainsSource(sourceDirectory: DirectoryPath, sdkDirectory: DirectoryPath) {
-    const message =
-      `The destination ${f.path(sdkDirectory)} contains your source directory ` +
-      `${f.path(sourceDirectory)}, and everything in the destination is replaced by the ` +
-      `generated SDK. Choose a destination outside it, such as ${f.flag('destination', './sdk')}.`;
-    log.error(message);
+    log.error(destinationContainsSourceMessage(sourceDirectory, sdkDirectory));
   }
 
   public sourceDirectoryDoesNotExist(directory: DirectoryPath) {

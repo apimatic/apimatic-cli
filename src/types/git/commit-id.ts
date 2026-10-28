@@ -1,3 +1,5 @@
+import { isObjectId } from './object-id.js';
+
 export class CommitId {
   private readonly sha: string;
 
@@ -7,7 +9,7 @@ export class CommitId {
 
   /** From a record or user input, which may hold anything. */
   public static create(sha: string): CommitId | undefined {
-    return /^[0-9a-f]{40}$/.test(sha) ? new CommitId(sha) : undefined;
+    return isObjectId(sha) ? new CommitId(sha) : undefined;
   }
 
   /** From git itself, whose ids need no check. */
