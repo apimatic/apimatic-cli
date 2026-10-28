@@ -1,14 +1,20 @@
 import { err, ok, Result } from 'neverthrow';
 import { FileService } from '../infrastructure/file-service.js';
+import { errorMessage } from '../utils/error-utils.js';
 import { ApimaticConfigContext } from './apimatic-config-context.js';
-import { BuildConfig } from './build/build.js';
 import { DirectoryPath } from './file/directoryPath.js';
 import { FileName } from './file/fileName.js';
 import { FilePath } from './file/filePath.js';
 import { FileProblem } from './file/file-problem.js';
 import { PluginConfigContext } from './plugin-config-context.js';
+import { PluginBuildProblem } from './plugin/generation-problem.js';
 import { PortalSourceContext } from './portal-source-context.js';
-import { OUTPUT_DIRECTORY_NAMES, SOURCE_DIRECTORY_NAME, SPEC_DIRECTORY_NAME } from './project-layout.js';
+import {
+  LOCAL_ONLY_DIRECTORY_NAMES,
+  OUTPUT_DIRECTORY_NAMES,
+  SOURCE_DIRECTORY_NAME,
+  SPEC_DIRECTORY_NAME
+} from './project-layout.js';
 import { Language } from './sdk/generate.js';
 import { SdkContext } from './sdk-context.js';
 import { SpecContext } from './spec-context.js';
@@ -22,8 +28,6 @@ export const GENERATED: readonly string[] = Object.values(OUTPUT_DIRECTORY_NAMES
 /** Neither stops a portal being built, so the wizard says so and carries on. */
 export type GitignoreFailure = 'unreadable' | 'unwritable';
 
-export type VersionProblem = 'noVersions' | 'versionNotFound';
-
 export type SpecZipProblem =
   | { kind: 'noSpec'; specDirectory: DirectoryPath }
   | { kind: 'unreadable'; specDirectory: DirectoryPath; reason: string }
@@ -33,11 +37,7 @@ export type SpecZipProblem =
 export class ProjectContext {
   private readonly fileService = new FileService();
 
-  private constructor(
-    private readonly projectDirectory: DirectoryPath,
-    private readonly source: DirectoryPath,
-    private readonly version?: string
-  ) {}
+  private constructor(private readonly projectDirectory: DirectoryPath, private readonly source: DirectoryPath) {}
 
   public static at(input: string | undefined): ProjectContext {
     return ProjectContext.in(DirectoryPath.createInput(input));
@@ -45,10 +45,6 @@ export class ProjectContext {
 
   public static in(projectDirectory: DirectoryPath): ProjectContext {
     return new ProjectContext(projectDirectory, projectDirectory.join(SOURCE_DIRECTORY_NAME));
-  }
-
-  private get buildFile(): FilePath {
-    return new FilePath(this.source, new FileName('APIMATIC-BUILD.json'));
   }
 
   private get gitignore(): FilePath {
@@ -71,8 +67,11 @@ export class ProjectContext {
     return directory.contains(this.source);
   }
 
-  public sdkDirectory(destination?: string): DirectoryPath {
-    return this.outputDirectory(OUTPUT_DIRECTORY_NAMES.sdk, destination);
+  /** The SDK directory itself: the `--destination` when one is named, else `sdk/<language>` beside the source. */
+  public sdkDirectory(language: Language, destination?: string): DirectoryPath {
+    return destination
+      ? new DirectoryPath(destination)
+      : this.projectDirectory.join(OUTPUT_DIRECTORY_NAMES.sdk, language);
   }
 
   public portalDirectory(destination?: string): DirectoryPath {
@@ -113,50 +112,34 @@ export class ProjectContext {
     );
   }
 
-  public async srcDirZip(
+  public async buildZip(
     tempDirectory: DirectoryPath,
     packageSettingsDirectory?: DirectoryPath
   ): Promise<Result<FilePath, FileProblem>> {
-    const staged = tempDirectory.join(SOURCE_DIRECTORY_NAME);
-    await this.fileService.copyDirectoryContents(this.source, staged);
-    if (packageSettingsDirectory) {
-      await this.fileService.copyDirectoryContents(packageSettingsDirectory, staged.join('package-settings'));
+    const staged = await this.stagedBuild(tempDirectory, packageSettingsDirectory);
+    if (staged.isErr()) {
+      return err(staged.error);
     }
-    return await new TempContext(tempDirectory).zip(staged);
+    return await new TempContext(tempDirectory).zip(staged.value);
   }
 
-  public async isVersioned(): Promise<boolean> {
-    const buildConfig = await this.buildConfig();
-    return buildConfig !== undefined && buildConfig.isVersioned();
+  public async pluginBuildZip(
+    tempDirectory: DirectoryPath,
+    languages: readonly Language[]
+  ): Promise<Result<FilePath, PluginBuildProblem>> {
+    const staged = await this.stagedBuild(tempDirectory);
+    if (staged.isErr()) {
+      return err(staged.error);
+    }
+    const covered = await new PluginConfigContext(staged.value).coverOnly(languages);
+    if (covered.isErr()) {
+      return err({ kind: 'configNotPrepared', failure: covered.error });
+    }
+    return await new TempContext(tempDirectory).zip(staged.value);
   }
 
-  public async versionToBuild(
-    apiVersion: string | undefined,
-    ask: (versions: string[]) => Promise<string | undefined>
-  ): Promise<Result<ProjectContext, VersionProblem>> {
-    const buildConfig = await this.buildConfig();
-    if (!buildConfig?.isVersioned()) {
-      return ok(this);
-    }
-
-    const versionsDirectory = this.source.join(buildConfig.versionsPath());
-    const versions = (await this.fileService.directoryExists(versionsDirectory))
-      ? await this.fileService.getSubDirectoriesPaths(versionsDirectory)
-      : [];
-    if (versions.length === 0) {
-      return err('noVersions');
-    }
-    if (!apiVersion && versions.length === 1) {
-      return ok(this.reading(versions[0]));
-    }
-
-    const chosen = apiVersion || (await ask(versions.map((version) => version.leafName())));
-    const version = versions.find((directory) => directory.leafName() === chosen);
-    return version === undefined ? err('versionNotFound') : ok(this.reading(version));
-  }
-
-  public sdk(language: Language, sdkDirectory: DirectoryPath): SdkContext {
-    return new SdkContext(language, sdkDirectory, this.version);
+  public sdk(directory: DirectoryPath): SdkContext {
+    return new SdkContext(directory);
   }
 
   public portalSource(): PortalSourceContext {
@@ -200,18 +183,26 @@ export class ProjectContext {
     return ok(undefined);
   }
 
-  private reading(versionDirectory: DirectoryPath): ProjectContext {
-    return new ProjectContext(this.projectDirectory, versionDirectory, versionDirectory.leafName());
+  // A copy that fails is reported as a zip that fails: either way, the build could not be packed.
+  private async stagedBuild(
+    tempDirectory: DirectoryPath,
+    packageSettingsDirectory?: DirectoryPath
+  ): Promise<Result<DirectoryPath, FileProblem>> {
+    const staged = tempDirectory.join(SOURCE_DIRECTORY_NAME);
+    const localOnly = LOCAL_ONLY_DIRECTORY_NAMES.map((name) => new FileName(name));
+    try {
+      await this.fileService.copyDirectoryContentsFollowingLinks(this.source, staged, localOnly);
+      if (packageSettingsDirectory) {
+        const packageSettings = staged.join('package-settings');
+        await this.fileService.copyDirectoryContentsFollowingLinks(packageSettingsDirectory, packageSettings);
+      }
+      return ok(staged);
+    } catch (error) {
+      return err({ kind: 'zipFailed', reason: errorMessage(error) });
+    }
   }
 
   private outputDirectory(name: string, destination: string | undefined): DirectoryPath {
     return destination ? new DirectoryPath(destination) : this.projectDirectory.join(name);
-  }
-
-  private async buildConfig(): Promise<BuildConfig | undefined> {
-    if (!(await this.fileService.fileExists(this.buildFile))) {
-      return undefined;
-    }
-    return BuildConfig.parse(await this.fileService.getContents(this.buildFile));
   }
 }
