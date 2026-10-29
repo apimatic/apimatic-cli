@@ -46,18 +46,18 @@ export class ZipService {
   }
 
   private async write(outputZipPath: FilePath, entries: readonly ZipEntry[]): Promise<void> {
-    const zipfile = new yazl.ZipFile();
+    const zipFile = new yazl.ZipFile();
 
     return new Promise((resolve, reject) => {
       const output = fs.createWriteStream(outputZipPath.toString());
-      zipfile.on('error', (error: Error) => output.destroy(error));
+      zipFile.on('error', (error: Error) => output.destroy(error));
       output.on('error', reject);
       output.on('close', resolve);
-      zipfile.outputStream.pipe(output);
+      zipFile.outputStream.pipe(output);
       for (const { file, metadataPath } of entries) {
-        zipfile.addFile(file.toString(), metadataPath);
+        zipFile.addFile(file.toString(), metadataPath);
       }
-      zipfile.end();
+      zipFile.end();
     });
   }
 
