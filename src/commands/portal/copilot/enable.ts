@@ -37,7 +37,6 @@ The portal is registered with APIMatic's Ask AI service, or with the one the API
     }),
     origin: Flags.string({
       multiple: true,
-      default: [],
       description: "a site besides the portal's 'site.url' allowed to use the key, such as 'https://staging.example.com'."
     }),
     ...FlagsProvider.input,
@@ -56,7 +55,7 @@ The portal is registered with APIMatic's Ask AI service, or with the one the API
 
     intro('Enable Ask AI');
     const action = new PortalCopilotEnableAction(this.getConfigDir(), commandMetadata, authKey);
-    const result = await action.execute(project, { kind: dev ? 'dev' : 'live', rotate, origins: origin });
+    const result = await action.execute(project, { kind: dev ? 'dev' : 'live', rotate, origins: origin ?? [] });
     outro(result);
 
     await result.mapAll(

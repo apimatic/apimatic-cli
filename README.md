@@ -334,7 +334,7 @@ FLAGS
   -k, --auth-key=<value>   override current authentication state with an authentication key.
       --dev                use a development key, which also works on this machine and answers a limited number of
                            questions a day.
-      --origin=<value>...  [default: ] a site besides the portal's 'site.url' allowed to use the key, such as
+      --origin=<value>...  a site besides the portal's 'site.url' allowed to use the key, such as
                            'https://staging.example.com'.
       --rotate             replace the portal's key with a new one, and revoke the old one.
 

@@ -7,7 +7,7 @@ const { parse } = flagParser(PortalCopilotEnable);
 describe('portal copilot enable flags', () => {
   it('asks for a live key, kept as it is, for the site alone, by default', async () => {
     expect((await parse([])).flags).to.include({ dev: false, rotate: false });
-    expect((await parse([])).flags.origin).to.deep.equal([]);
+    expect((await parse([])).flags.origin).to.be.undefined;
   });
 
   it('takes several sites, a development key and a new key', async () => {
