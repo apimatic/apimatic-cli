@@ -23,8 +23,8 @@ export type OnConflict = 'ask' | 'generated' | 'refuse';
 /** How the run writes the SDK directory, with the one question each way may still need. */
 export type WriteMode<Repository> =
   | { kind: 'refuse'; because: WriteRefusal }
-  /** Replace the directory; `warnNoRepository` when no repository will keep the developer's edits. */
-  | { kind: 'save'; confirmOverwrite: boolean; warnNoRepository: boolean }
+  /** Replace the directory; `suggestGitInit` when no repository will keep the developer's edits, for the steps that make one. */
+  | { kind: 'save'; confirmOverwrite: boolean; suggestGitInit: boolean }
   /** Make the directory a repository of its own, then record. */
   | { kind: 'init'; confirmOverwrite: boolean }
   /**
@@ -74,11 +74,11 @@ export function writeModeFor<Repository>(
   }
   switch (destination.kind) {
     case 'overwrite':
-      return { kind: 'save', confirmOverwrite, warnNoRepository: false };
+      return { kind: 'save', confirmOverwrite, suggestGitInit: false };
     case 'noRepository':
       return run.gitInit
         ? { kind: 'init', confirmOverwrite }
-        : { kind: 'save', confirmOverwrite, warnNoRepository: true };
+        : { kind: 'save', confirmOverwrite, suggestGitInit: true };
     case 'record': {
       const recorded = destination.because.kind !== 'noRecord';
       return {

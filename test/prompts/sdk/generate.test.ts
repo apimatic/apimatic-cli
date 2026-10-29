@@ -235,15 +235,24 @@ describe('SdkGeneratePrompts, about the repository', () => {
     sinon.restore();
   });
 
-  it('names the flag that makes the SDK directory a repository when it is not one', () => {
-    const warn = sinon.stub(log, 'warn');
+  it('gives the steps that keep edits when the SDK directory is not a repository: --git-init first, then customize', () => {
+    const write = sinon.stub(process.stdout, 'write').returns(true);
+    try {
+      new SdkGeneratePrompts().gitInitSteps(sdk);
+    } finally {
+      write.restore();
+    }
+    const note = stripVTControlCharacters(write.args.map(([chunk]) => String(chunk)).join(''));
 
-    new SdkGeneratePrompts().repositoryNotCreated(sdk);
-
-    expect(stripVTControlCharacters(warn.firstCall.args[0])).to.equal(
-      "'./sdk/python' is not a git repository of its own, so your customizations to the generated SDK " +
-        'will not persist across regenerations. Run with --git-init to make it one.'
-    );
+    const order = [
+      'Next steps',
+      "Changes you make to './sdk/python' are lost the next time it is regenerated. To keep them:",
+      '1. Rerun with --git-init before you change anything. It makes the folder a git repository of its own.',
+      '2. Then customize the SDK; each later run merges your changes into the new generation.'
+    ];
+    const at = order.map((text) => note.indexOf(text));
+    expect(at).to.not.include(-1);
+    expect(at).to.deep.equal([...at].sort((a, b) => a - b));
   });
 
   it('says which repository keeps the customizations when the developer already had one', () => {

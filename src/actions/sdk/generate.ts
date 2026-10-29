@@ -102,9 +102,6 @@ export class GenerateAction {
       this.prompts.destinationDirNotEmpty();
       return ActionResult.cancelled();
     }
-    if (mode.kind === 'save' && mode.warnNoRepository) {
-      this.prompts.repositoryNotCreated(sdk);
-    }
 
     return await withDirPath(async (tempDirectory): Promise<ActionResult> => {
       const build = await project.buildZip(tempDirectory, packageSettingsDirectory);
@@ -138,6 +135,9 @@ export class GenerateAction {
         case 'save': {
           const saved = await sdkContext.save(tempSdk);
           this.prompts.sdkGenerated(saved);
+          if (mode.suggestGitInit) {
+            this.prompts.gitInitSteps(saved);
+          }
           return ActionResult.success();
         }
         case 'init':

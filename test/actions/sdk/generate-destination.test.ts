@@ -118,7 +118,7 @@ describe('GenerateAction (sdk) — the destination', () => {
     sinon.stub(SdkGeneratePrompts.prototype, 'sdkMerged');
     sinon.stub(SdkGeneratePrompts.prototype, 'repositoryInitialised');
     sinon.stub(SdkGeneratePrompts.prototype, 'repositoryFound');
-    sinon.stub(SdkGeneratePrompts.prototype, 'repositoryNotCreated');
+    sinon.stub(SdkGeneratePrompts.prototype, 'gitInitSteps');
     sinon.stub(SdkGeneratePrompts.prototype, 'shareHookInstalled');
   });
 
@@ -164,24 +164,25 @@ describe('GenerateAction (sdk) — the destination', () => {
         expect(record().isFor(STABLE)).to.be.true;
       });
 
-      it(`writes the SDK without a repository otherwise, and warns that edits will not persist, ${how}`, async () => {
+      it(`writes the SDK without a repository otherwise, then gives the steps that keep edits, ${how}`, async () => {
         sinon.stub(terminal, 'isInteractive').returns(tty);
-        const notCreated = SdkGeneratePrompts.prototype.repositoryNotCreated as sinon.SinonStub;
+        const steps = SdkGeneratePrompts.prototype.gitInitSteps as sinon.SinonStub;
 
         expect((await execute({ force })).isSuccess()).to.be.true;
 
-        expect(notCreated.firstCall.args[0].isEqual(sdk())).to.be.true;
+        expect(steps.firstCall.args[0].isEqual(sdk())).to.be.true;
+        expect(steps.calledAfter(SdkGeneratePrompts.prototype.sdkGenerated as sinon.SinonStub)).to.be.true;
         expect(fs.readdirSync(sdk().toString())).to.deep.equal(['README.md']);
       });
     }
 
     it('leaves a project repository that only encloses it alone', async () => {
       (await git.init(new DirectoryPath(root)))._unsafeUnwrap();
-      const notCreated = SdkGeneratePrompts.prototype.repositoryNotCreated as sinon.SinonStub;
+      const steps = SdkGeneratePrompts.prototype.gitInitSteps as sinon.SinonStub;
 
       expect((await execute()).isSuccess()).to.be.true;
 
-      expect(notCreated.calledOnce).to.be.true;
+      expect(steps.calledOnce).to.be.true;
       expect(fs.existsSync(at('.apimatic'))).to.be.false;
       const refs = await execa('git', ['for-each-ref', 'refs/apimatic'], { cwd: root });
       expect(refs.stdout).to.equal('');
@@ -425,11 +426,11 @@ describe('GenerateAction (sdk) — the destination', () => {
   it('treats an SDK directory inside another SDK’s repository as having none, leaving that repository alone', async () => {
     await recorded({ 'README.md': '# sdk' });
     const before = (await execa('git', ['for-each-ref', 'refs/apimatic'], { cwd: sdk().toString() })).stdout;
-    const notCreated = SdkGeneratePrompts.prototype.repositoryNotCreated as sinon.SinonStub;
+    const steps = SdkGeneratePrompts.prototype.gitInitSteps as sinon.SinonStub;
 
     expect((await execute({ destination: sdk().join('python') })).isSuccess()).to.be.true;
 
-    expect(notCreated.firstCall.args[0].isEqual(sdk().join('python'))).to.be.true;
+    expect(steps.firstCall.args[0].isEqual(sdk().join('python'))).to.be.true;
     expect((await execa('git', ['for-each-ref', 'refs/apimatic'], { cwd: sdk().toString() })).stdout).to.equal(before);
   });
 

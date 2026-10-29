@@ -213,11 +213,15 @@ export class SdkGeneratePrompts {
     log.info(`The generated SDK can be found at ${f.relativePath(sdk)}.`);
   }
 
-  public repositoryNotCreated(sdk: DirectoryPath) {
-    log.warn(
-      `${f.relativePath(sdk)} is not a git repository of its own, so your customizations to the generated SDK ` +
-        `will not persist across regenerations. Run with ${f.flag('git-init')} to make it one.`
-    );
+  /** How to have edits kept from now on, for an SDK written without a repository of its own. */
+  public gitInitSteps(sdk: DirectoryPath) {
+    const steps = [
+      `Changes you make to ${f.relativePath(sdk)} are lost the next time it is regenerated. To keep them:`,
+      `1. Rerun with ${f.flag('git-init')} before you change anything.` +
+        ' It makes the folder a git repository of its own.',
+      '2. Then customize the SDK; each later run merges your changes into the new generation.'
+    ];
+    noteWrapped(steps.join('\n'), 'Next steps');
   }
 
   /** `--force` replaced an SDK with a generation record, which may have held customizations; git still has the committed ones. */

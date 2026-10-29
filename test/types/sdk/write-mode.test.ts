@@ -40,17 +40,17 @@ describe('writeModeFor', () => {
     expect(writeModeFor(overwrite, ASKING, false)).to.deep.equal({
       kind: 'save',
       confirmOverwrite: false,
-      warnNoRepository: false
+      suggestGitInit: false
     });
     expect(writeModeFor(overwrite, ASKING, true)).to.deep.equal({
       kind: 'save',
       confirmOverwrite: true,
-      warnNoRepository: false
+      suggestGitInit: false
     });
     expect(writeModeFor(overwrite, FORCED, true)).to.deep.equal({
       kind: 'save',
       confirmOverwrite: false,
-      warnNoRepository: false
+      suggestGitInit: false
     });
   });
 
@@ -63,7 +63,7 @@ describe('writeModeFor', () => {
       expect(writeModeFor(noRepository, run, false)).to.deep.equal({
         kind: 'save',
         confirmOverwrite: false,
-        warnNoRepository: true
+        suggestGitInit: true
       });
     }
     expect(writeModeFor(noRepository, { ...ASKING, gitInit: true }, true)).to.deep.equal({
