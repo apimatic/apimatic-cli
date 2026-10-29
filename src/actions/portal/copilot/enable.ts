@@ -55,7 +55,10 @@ export class PortalCopilotEnableAction {
     }
 
     const current = config.copilotService()?.key ?? null;
-    // An existing key is registered again, so changed origins reach the service.
+    // A new key when the portal has none or one is asked for; otherwise the same key is registered again, so
+    // changed origins reach the service.
+    const fresh = current === null || rotate;
+    // Spelt out again rather than `fresh`, so TypeScript knows `current` is a key on the second branch.
     const key = current === null || rotate ? ok(CopilotKey.generate(kind)) : CopilotKey.reusable(current, kind);
     if (key.isErr()) {
       this.prompts.keyNotReusable(key.error, kind);
@@ -77,9 +80,9 @@ export class PortalCopilotEnableAction {
       return ActionResult.failed();
     }
 
-    const replaced = current !== null && current !== key.value.toString() ? current : null;
-    if (current !== key.value.toString()) {
-      const written = await project.portalSource().writeCopilotKey(key.value.toString());
+    const replaced = rotate ? current : null;
+    if (fresh) {
+      const written = await project.portalSource().writeCopilotKey(key.value);
       if (written.isErr()) {
         this.prompts.keyNotSaved(written.error, key.value, sourceDirectory);
         return ActionResult.failed();

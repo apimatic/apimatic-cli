@@ -18,6 +18,7 @@ import {
   STATIC_DIRECTORY_NAME
 } from './project-layout.js';
 import { ServiceAddress } from './portal/config/service-address.js';
+import { CopilotKey } from './portal/copilot/copilot-key.js';
 import { PLACEHOLDER_SITE, SiteConfig, SuggestedSite } from './portal/config/site-config.js';
 import { AcceptedContent, ContentFile, ContentTree, ReadPage } from './portal/content-tree.js';
 import { GeneratedPages, PluginSource } from './portal/generated-pages.js';
@@ -442,7 +443,7 @@ export class PortalSourceContext {
    * Sets the portal's Ask AI key in `portal.ai.copilot`, keeping the block's other settings, or
    * with null removes the block. The `portal` block must already be an object, as a parsed one is.
    */
-  public async writeCopilotKey(key: string | null): Promise<Result<FilePath, PortalScaffoldProblem>> {
+  public async writeCopilotKey(key: CopilotKey | null): Promise<Result<FilePath, PortalScaffoldProblem>> {
     try {
       const written = await this.mergeConfig((document) => {
         const portal = document.portal();
@@ -457,7 +458,7 @@ export class PortalSourceContext {
         }
         return document.with('portal', {
           ...portal,
-          ai: { ...ai, copilot: { ...(isJsonObject(copilot) ? copilot : {}), key } }
+          ai: { ...ai, copilot: { ...(isJsonObject(copilot) ? copilot : {}), key: key.toString() } }
         });
       });
       return written.map(() => this.configFile);
