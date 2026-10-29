@@ -34,8 +34,11 @@ export class PortalCopilotEnableAction {
     { kind, rotate, origins }: CopilotEnableOptions
   ): Promise<ActionResult> => {
     const sourceDirectory = project.sourceDirectory();
-    // The site's name is all the service is told of it, so the specifications need not be read to default it.
-    const settings = await project.portalSource().resolveSettings(PLACEHOLDER_SITE);
+    const source = project.portalSource();
+    // Named as `generate` names it, from the only specification when `site.name` is left out. A specification the
+    // build would refuse is the build's to report, so it only leaves the placeholder.
+    const suggested = (await source.resolveSuggestedSite()).unwrapOr(PLACEHOLDER_SITE);
+    const settings = await source.resolveSettings(suggested);
     if (settings.isErr()) {
       this.prompts.sourceProblem(settings.error, sourceDirectory);
       return ActionResult.failed();
@@ -82,7 +85,7 @@ export class PortalCopilotEnableAction {
 
     const replaced = rotate ? current : null;
     if (fresh) {
-      const written = await project.portalSource().writeCopilotKey(key.value);
+      const written = await source.writeCopilotKey(key.value);
       if (written.isErr()) {
         this.prompts.keyNotSaved(written.error, key.value, sourceDirectory);
         return ActionResult.failed();

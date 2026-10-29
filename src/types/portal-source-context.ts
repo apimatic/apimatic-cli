@@ -191,6 +191,11 @@ export class PortalSourceContext {
     return (await this.specs()).map(({ specs }) => specs);
   }
 
+  /** What the only specification says of the site, as `resolve` reads it, or null when there are several. */
+  public async resolveSuggestedSite(): Promise<Result<SuggestedSite | null, PortalSourceProblem>> {
+    return (await this.specs()).map(({ suggestedSite }) => suggestedSite);
+  }
+
   /**
    * The `content/` half of `resolve`, for `portal serve` to run on each save, against the `specs`
    * it found and the generated pages the preview shows.

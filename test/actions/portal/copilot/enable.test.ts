@@ -109,6 +109,18 @@ describe('PortalCopilotEnableAction', () => {
     expect(prompts.nextSteps.calledOnceWith('dev')).to.be.true;
   });
 
+  it('names a portal without site.name after its only specification, as generate does', async () => {
+    writeConfig({ site: { url: 'https://example.com/docs' } });
+    fs.mkdirSync(path.join(root, 'src', 'spec'));
+    fs.writeFileSync(
+      path.join(root, 'src', 'spec', 'openapi.json'),
+      JSON.stringify({ openapi: '3.0.3', info: { title: 'Pets API', version: '1.0.0' }, paths: {} })
+    );
+
+    expect((await execute()).isSuccess()).to.be.true;
+    expect(registered().name).to.equal('Pets API');
+  });
+
   it('registers with the service APIMATIC_COPILOT_URL names', async () => {
     process.env.APIMATIC_COPILOT_URL = 'http://localhost:8787';
 
