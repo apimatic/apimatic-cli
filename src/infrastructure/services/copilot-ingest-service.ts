@@ -6,7 +6,8 @@ import { IndexedVersion, IndexingState, IngestReceipt, IngestStatus } from '../.
 import { isJsonObject } from '../../utils/json-utils.js';
 import { envInfo } from '../env-info.js';
 import { pollUntilSettled } from '../generation-status-poller.js';
-import { ServiceError } from '../service-error.js';
+import { ServiceError, ServiceErrorCode } from '../service-error.js';
+import { sleep } from '../timer-extensions.js';
 import { copilotFailureOf, copilotTransportFailure, duration } from './copilot-responses.js';
 
 export const COPILOT_INGEST_TIMINGS = {
@@ -22,6 +23,10 @@ export type CopilotIngestTimings = Partial<typeof COPILOT_INGEST_TIMINGS>;
 export type CopilotTarget = CopilotService;
 
 const STATES = new Set<IndexingState>(['queued', 'building', 'active', 'superseded', 'failed']);
+
+/** A status check may fail this often in a row, to a dropped connection, a timeout or a 5xx, before the wait ends. */
+const STATUS_ATTEMPTS = 3;
+const TRANSIENT = new Set([ServiceErrorCode.NetworkError, ServiceErrorCode.Timeout, ServiceErrorCode.ServerError]);
 
 /** Uploads a portal's pages to the Ask AI service, which swaps them in once it has indexed them all. */
 export class CopilotIngestService {
@@ -67,7 +72,7 @@ export class CopilotIngestService {
   ): Promise<Result<IndexedVersion, ServiceError>> {
     return pollUntilSettled({
       pollIntervalMs: this.timings.pollIntervalMs,
-      fetchStatus: () => this.status(copilot, versionId, shell, authKey),
+      fetchStatus: () => this.statusRetried(copilot, versionId, shell, authKey),
       timeout: { budgetMs: this.timings.indexTimeoutMs, label: 'Indexing' },
       settle: (current): Result<IndexedVersion, ServiceError> | null => {
         const { status, error } = current;
@@ -77,6 +82,22 @@ export class CopilotIngestService {
         return status === 'queued' || status === 'building' ? null : ok({ ...current, status });
       }
     });
+  }
+
+  // A wait of minutes meets the odd dropped connection or redeploy; only a check that keeps failing ends it.
+  private async statusRetried(
+    copilot: CopilotTarget,
+    versionId: string,
+    shell: string,
+    token: string
+  ): Promise<Result<IngestStatus, ServiceError>> {
+    for (let attempt = 1; ; attempt++) {
+      const status = await this.status(copilot, versionId, shell, token);
+      if (status.isOk() || attempt === STATUS_ATTEMPTS || !TRANSIENT.has(status.error.code)) {
+        return status;
+      }
+      await sleep(this.timings.pollIntervalMs);
+    }
   }
 
   private async status(
