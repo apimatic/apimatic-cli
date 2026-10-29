@@ -15,12 +15,15 @@ import { CopilotKey } from '../../../../src/types/portal/copilot/copilot-key';
 import { CopilotRegistration } from '../../../../src/types/portal/copilot/copilot-registration';
 import { ProjectContext } from '../../../../src/types/project-context';
 import { entitlementsWith } from '../../../helpers/account';
+import { withoutCopilotUrl } from '../../../helpers/copilot-url';
 
 const COMMAND_METADATA: CommandMetadata = { commandName: 'portal:copilot:enable', shell: 'test' };
 const LIVE_KEY = `pk_live_${'a'.repeat(32)}`;
 const DEV_KEY = `pk_dev_${'b'.repeat(32)}`;
 
 describe('PortalCopilotEnableAction', () => {
+  withoutCopilotUrl();
+
   let root: string;
   let prompts: sinon.SinonStubbedInstance<PortalCopilotEnablePrompts>;
   let authorizeAskAi: sinon.SinonStub;
@@ -65,7 +68,6 @@ describe('PortalCopilotEnableAction', () => {
   });
 
   afterEach(() => {
-    delete process.env.APIMATIC_COPILOT_URL;
     sinon.restore();
     fs.rmSync(root, { recursive: true, force: true });
   });

@@ -26,6 +26,7 @@ import { PLUGIN_SECTION, SDK_SECTION } from '../../src/types/portal/generated-pa
 import { TabEntry } from '../../src/types/portal/portal-navigation';
 import { ZipService } from '../../src/infrastructure/zip-service';
 import { bundleSpec } from '../../portal-template/src/lib/openapi-bundle.server';
+import { withoutCopilotUrl } from '../helpers/copilot-url';
 
 const OPENAPI = JSON.stringify({ openapi: '3.0.0', info: { title: 'Calc', version: '1' }, paths: {} });
 
@@ -381,13 +382,9 @@ describe('PortalSourceContext', () => {
     });
 
     describe('the Ask AI service', () => {
-      const saved = process.env.APIMATIC_COPILOT_URL;
+      withoutCopilotUrl();
       beforeEach(() => {
         process.env.APIMATIC_COPILOT_URL = 'http://ask.example.com';
-      });
-      afterEach(() => {
-        if (saved === undefined) delete process.env.APIMATIC_COPILOT_URL;
-        else process.env.APIMATIC_COPILOT_URL = saved;
       });
 
       it('reports an APIMATIC_COPILOT_URL it cannot use apart from the file, for a portal with Ask AI', async () => {

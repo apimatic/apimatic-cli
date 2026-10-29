@@ -20,6 +20,7 @@ import { SiteAddress } from '../../../../src/types/portal/config/site-address';
 import { GeneratedPortalContext } from '../../../../src/types/portal/copilot/generated-portal-context';
 import { PortalAuthorizationService } from '../../../../src/infrastructure/services/portal-authorization-service';
 import { entitlementsWith } from '../../../helpers/account';
+import { withoutCopilotUrl } from '../../../helpers/copilot-url';
 
 /** The bundle as the service receives it. */
 const uploaded = (bundle: CopilotBundle) =>
@@ -47,6 +48,8 @@ const indexed = (status: 'active' | 'superseded') => ({
 });
 
 describe('PortalCopilotSyncAction', () => {
+  withoutCopilotUrl();
+
   let root: string;
   let prompts: sinon.SinonStubbedInstance<PortalCopilotSyncPrompts>;
   let upload: sinon.SinonStub;
@@ -111,7 +114,6 @@ describe('PortalCopilotSyncAction', () => {
   });
 
   afterEach(() => {
-    delete process.env.APIMATIC_COPILOT_URL;
     sinon.restore();
     fs.rmSync(root, { recursive: true, force: true });
   });

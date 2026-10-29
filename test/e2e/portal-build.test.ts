@@ -16,6 +16,7 @@ import { BundlePage } from '../../src/types/portal/copilot/copilot-bundle';
 import { COPILOT_PAGES_FILE } from '../../src/types/portal/copilot/generated-portal-context';
 import { Language } from '../../src/types/sdk/generate';
 import { canonical } from '../../src/infrastructure/tmp-extensions';
+import { withoutCopilotUrl } from '../helpers/copilot-url';
 
 // A real Vite build takes tens of seconds and needs every runtime dependency installed,
 // so it stays out of the default run. CI switches it on for the platform matrix.
@@ -1033,6 +1034,8 @@ const stylesheetOf = (output: DirectoryPath) => {
 (enabled ? describe : describe.skip)('portal build, with the Ask AI chat (end to end)', function () {
   this.timeout(10 * 60 * 1000);
 
+  // The fixture is built with APIMatic's service, whatever the shell names.
+  withoutCopilotUrl({ suite: true });
   const portal = portalBuilt('copilot');
   const { read } = portal;
 

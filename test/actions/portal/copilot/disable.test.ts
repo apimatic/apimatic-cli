@@ -12,12 +12,15 @@ import { PortalCopilotDisablePrompts } from '../../../../src/prompts/portal/copi
 import { CommandMetadata } from '../../../../src/types/common/command-metadata';
 import { DirectoryPath } from '../../../../src/types/file/directoryPath';
 import { ProjectContext } from '../../../../src/types/project-context';
+import { withoutCopilotUrl } from '../../../helpers/copilot-url';
 
 const COMMAND_METADATA: CommandMetadata = { commandName: 'portal:copilot:disable', shell: 'test' };
 const KEY = `pk_live_${'a'.repeat(32)}`;
 const SITE = { name: 'Acme Docs', url: 'https://example.com/docs' };
 
 describe('PortalCopilotDisableAction', () => {
+  withoutCopilotUrl();
+
   let root: string;
   let prompts: sinon.SinonStubbedInstance<PortalCopilotDisablePrompts>;
   let revoke: sinon.SinonStub;

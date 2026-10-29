@@ -1,7 +1,10 @@
 import { expect } from 'chai';
 import { ServiceAddress } from '../../../../src/types/portal/config/service-address';
+import { withoutCopilotUrl } from '../../../helpers/copilot-url';
 
 describe('ServiceAddress', () => {
+  withoutCopilotUrl();
+
   const SETTING = 'APIMATIC_COPILOT_URL';
 
   const address = (value: unknown) => ServiceAddress.parse(value, SETTING)._unsafeUnwrap();
@@ -78,10 +81,6 @@ describe('ServiceAddress', () => {
   });
 
   describe('current', () => {
-    afterEach(() => {
-      delete process.env.APIMATIC_COPILOT_URL;
-    });
-
     it("is APIMatic's own service unless APIMATIC_COPILOT_URL names another", () => {
       expect(ServiceAddress.current()._unsafeUnwrap().toString()).to.equal('https://ask.apimatic.io');
       process.env.APIMATIC_COPILOT_URL = '  ';
