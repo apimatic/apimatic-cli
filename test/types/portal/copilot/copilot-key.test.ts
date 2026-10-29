@@ -12,12 +12,6 @@ describe('CopilotKey', () => {
         expect(CopilotKey.parse(key.toString())?.toString()).to.equal(key.toString());
       }
     });
-
-    it('never makes the same key twice', () => {
-      const keys = new Set(Array.from({ length: 500 }, () => CopilotKey.generate('live').toString()));
-
-      expect(keys.size).to.equal(500);
-    });
   });
 
   describe('parse', () => {

@@ -98,17 +98,22 @@ describe('PortalCopilotEnableAction', () => {
     expect(prompts.nextSteps.calledOnceWith('live')).to.be.true;
   });
 
-  it('registers a development key, which needs no site, with the service APIMATIC_COPILOT_URL names', async () => {
-    process.env.APIMATIC_COPILOT_URL = 'http://localhost:8787';
+  it('registers a development key, which needs no site', async () => {
     writeConfig({ site: { name: 'Acme Docs' } });
 
     const result = await execute({ kind: 'dev' });
 
     expect(result.isSuccess()).to.be.true;
     expect(registeredKey()).to.match(/^pk_dev_/);
-    expect(`${register.firstCall.args[0]}`).to.equal('http://localhost:8787');
     expect(registered().allowedOrigins).to.deep.equal([]);
     expect(prompts.nextSteps.calledOnceWith('dev')).to.be.true;
+  });
+
+  it('registers with the service APIMATIC_COPILOT_URL names', async () => {
+    process.env.APIMATIC_COPILOT_URL = 'http://localhost:8787';
+
+    expect((await execute()).isSuccess()).to.be.true;
+    expect(`${register.firstCall.args[0]}`).to.equal('http://localhost:8787');
   });
 
   it('registers the key the portal already has again, so changed sites reach the service', async () => {
