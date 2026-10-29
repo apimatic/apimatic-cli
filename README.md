@@ -10,7 +10,7 @@ The official CLI for APIMatic.
 
 # Requirements
 
-Node.js 24 or newer, for every command. npm only warns when your Node is older, so the
+Node.js 22.12 or newer, for every command. npm only warns when your Node is older, so the
 install succeeds and the CLI then refuses to run, naming the version it found.
 
 # Getting Started
