@@ -14,8 +14,8 @@ export type DestinationNotice =
   | { kind: 'gitUnavailable'; found: GitVersion | undefined }
   | { kind: 'snapshotMissing'; fetch: SnapshotFetch };
 
-/** Why a run stops before generating: `--force` over a recorded SDK with no base to merge against, or the overwrite question with no one to answer it. */
-export type WriteRefusal = { kind: 'recordedNotReplaced' } | { kind: 'cannotAskToOverwrite' };
+/** Why a run stops before generating: the overwrite question with no one to answer it. */
+export type WriteRefusal = { kind: 'cannotAskToOverwrite' };
 
 /** What happens when files conflict: the developer is asked, `--force` takes the generator's side, or the run stops. */
 export type OnConflict = 'ask' | 'generated' | 'refuse';
@@ -27,8 +27,17 @@ export type WriteMode<Repository> =
   | { kind: 'save'; confirmOverwrite: boolean; warnNoRepository: boolean }
   /** Make the directory a repository of its own, then record. */
   | { kind: 'init'; confirmOverwrite: boolean }
-  /** Record in the directory's repository; `announceRepository` on the first run to record there. */
-  | { kind: 'record'; repository: Repository; confirmOverwrite: boolean; announceRepository: boolean }
+  /**
+   * Record in the directory's repository; `announceRepository` on the first run to record there,
+   * `warnReplacedRecord` when `--force` replaces a recorded SDK the run could not merge into.
+   */
+  | {
+      kind: 'record';
+      repository: Repository;
+      confirmOverwrite: boolean;
+      announceRepository: boolean;
+      warnReplacedRecord: boolean;
+    }
   | { kind: 'merge'; repository: Repository; base: CommitId; confirmOverwrite: false; onConflict: OnConflict };
 
 /** What the destination means for the developer, before the run decides anything about writing. */
@@ -70,16 +79,16 @@ export function writeModeFor<Repository>(
       return run.gitInit
         ? { kind: 'init', confirmOverwrite }
         : { kind: 'save', confirmOverwrite, warnNoRepository: true };
-    case 'record':
-      if (run.force && destination.because.kind !== 'noRecord') {
-        return { kind: 'refuse', because: { kind: 'recordedNotReplaced' } };
-      }
+    case 'record': {
+      const recorded = destination.because.kind !== 'noRecord';
       return {
         kind: 'record',
         repository: destination.repository,
         confirmOverwrite,
-        announceRepository: destination.because.kind === 'noRecord'
+        announceRepository: !recorded,
+        warnReplacedRecord: run.force && recorded
       };
+    }
     case 'merge':
       return {
         kind: 'merge',

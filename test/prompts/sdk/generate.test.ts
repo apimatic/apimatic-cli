@@ -255,6 +255,18 @@ describe('SdkGeneratePrompts, about the repository', () => {
       "Found a git repository in './sdk/python', which keeps your customizations across regenerations."
     );
   });
+
+  it('warns that --force replaced a recorded SDK, and where the committed customizations still are', () => {
+    const warn = sinon.stub(log, 'warn');
+
+    new SdkGeneratePrompts().recordedSdkReplaced(sdk);
+
+    expect(stripVTControlCharacters(warn.firstCall.args[0])).to.equal(
+      "The new SDK could not be merged into './sdk/python', so --force replaced it, " +
+        'and your customizations to it were not carried over. Those you committed are still in its git history, ' +
+        "and git -C './sdk/python' diff shows what changed; uncommitted ones are gone."
+    );
+  });
 });
 
 describe('SdkGeneratePrompts.snapshotNotRecorded', () => {

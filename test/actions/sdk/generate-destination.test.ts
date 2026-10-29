@@ -249,19 +249,23 @@ describe('GenerateAction (sdk) — the destination', () => {
       }
     ]
   ] as const) {
-    it(`refuses, with --force, to replace an SDK recorded for ${what}, before anything is uploaded`, async () => {
+    it(`replaces, with --force, an SDK recorded for ${what}, warning, and records it for the next run`, async () => {
       await recorded({ 'README.md': '# sdk' });
       write('README.md', '# edited');
       sinon.stub(SdkGeneratePrompts.prototype, 'snapshotMissing');
-      const notReplaced = sinon.stub(SdkGeneratePrompts.prototype, 'recordedSdkNotReplaced');
+      const replaced = sinon.stub(SdkGeneratePrompts.prototype, 'recordedSdkReplaced');
+      const repositoryFound = SdkGeneratePrompts.prototype.repositoryFound as sinon.SinonStub;
       const options = await prepare();
+      const before = record().pristineCommit();
 
-      const result = await execute({ ...options, force: true });
+      const result = await execute({ ...options, force: true, files: V2 });
 
-      expect(result.isFailed()).to.be.true;
-      expect(notReplaced.firstCall.args[0].isEqual(sdk())).to.be.true;
-      expect(generateSdk.called).to.be.false;
-      expect(read('README.md')).to.equal('# edited');
+      expect(result.isSuccess()).to.be.true;
+      expect(replaced.firstCall.args[0].isEqual(sdk())).to.be.true;
+      expect(repositoryFound.called).to.be.false;
+      expect(read('README.md')).to.equal('# sdk v2');
+      expect(record().pristineCommit()).to.not.deep.equal(before);
+      expect((await git.resolveRef(sdk(), PRISTINE))._unsafeUnwrap()).to.deep.equal(record().pristineCommit());
     });
   }
 

@@ -220,11 +220,12 @@ export class SdkGeneratePrompts {
     );
   }
 
-  /** `--force` never replaces an SDK that has a generation record, since that may hold customizations. */
-  public recordedSdkNotReplaced(sdk: DirectoryPath) {
-    log.error(
-      `${f.relativePath(sdk)} holds an SDK with a generation record, which ${f.flag('force')} does not replace, ` +
-        `so nothing was generated. Rerun without ${f.flag('force')} to be asked, or remove the directory to start over.`
+  /** `--force` replaced an SDK with a generation record, which may have held customizations; git still has the committed ones. */
+  public recordedSdkReplaced(sdk: DirectoryPath) {
+    log.warn(
+      `The new SDK could not be merged into ${f.relativePath(sdk)}, so ${f.flag('force')} replaced it, ` +
+        `and your customizations to it were not carried over. Those you committed are still in its git history, ` +
+        `and git -C ${f.relativePath(sdk)} diff shows what changed; uncommitted ones are gone.`
     );
   }
 
@@ -421,8 +422,6 @@ export class SdkGeneratePrompts {
   /** Why the run stops before generating. */
   public refused(because: WriteRefusal, sdk: DirectoryPath) {
     switch (because.kind) {
-      case 'recordedNotReplaced':
-        return this.recordedSdkNotReplaced(sdk);
       case 'cannotAskToOverwrite':
         return log.error(
           `The destination ${f.path(sdk)} is not empty, and this run cannot ask whether to overwrite it. ` +

@@ -152,6 +152,8 @@ export class GenerateAction {
             this.prompts.repositoryInitialised(sdk);
           } else if (mode.announceRepository) {
             this.prompts.repositoryFound(sdk);
+          } else if (mode.warnReplacedRecord) {
+            this.prompts.recordedSdkReplaced(sdk);
           }
           const recorded = await opened.value.recordFresh(tempSdk, generation);
           this.prompts.recorded(recordingNotice(recorded, 'fresh'));

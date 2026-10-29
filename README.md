@@ -416,8 +416,8 @@ USAGE
 
 FLAGS
   -d, --destination=<value>       [default: <input>/sdk/<language>] directory the SDK is generated into
-  -f, --force                     never ask: an SDK with no record is replaced, conflicts are resolved using the
-                                  generator's changes, and a recorded SDK that cannot be merged is not touched.
+  -f, --force                     never ask: conflicts are resolved using the generator's changes, and an SDK that
+                                  cannot be merged is replaced, with a warning.
   -i, --input=<value>             [default: ./] path to the parent directory containing the 'src' directory, which
                                   includes API specifications and configuration files.
   -k, --auth-key=<value>          override current authentication state with an authentication key.
@@ -460,8 +460,8 @@ USAGE
 
 FLAGS
   -d, --destination=<value>       [default: <input>/sdk/<language>] path where the sdk will be generated.
-  -f, --force                     never ask: an SDK with no record is replaced, conflicts are resolved using the
-                                  generator's changes, and a recorded SDK that cannot be merged is not touched.
+  -f, --force                     never ask: conflicts are resolved using the generator's changes, and an SDK that
+                                  cannot be merged is replaced, with a warning.
   -i, --input=<value>             [default: ./] path to the parent directory containing the 'src' directory, which
                                   includes API specifications and configuration files.
   -l, --language=<option>         Language of the SDK to generate and publish.

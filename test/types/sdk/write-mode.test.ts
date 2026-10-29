@@ -19,6 +19,11 @@ const otherGeneration: SdkDestination<string> = {
   repository,
   because: { kind: 'otherGeneration' }
 };
+const snapshotMissing: SdkDestination<string> = {
+  kind: 'record',
+  repository,
+  because: { kind: 'snapshotMissing', fetch: { kind: 'noRemote' } }
+};
 const merge: SdkDestination<string> = { kind: 'merge', repository, base };
 
 describe('noticeFor', () => {
@@ -67,29 +72,40 @@ describe('writeModeFor', () => {
     });
   });
 
-  it('records a fresh snapshot, announcing the repository the first time, but refuses --force over a record it cannot merge against', () => {
+  it('records a fresh snapshot, announcing the repository the first time', () => {
     expect(writeModeFor(noRecord, ASKING, true)).to.deep.equal({
       kind: 'record',
       repository,
       confirmOverwrite: true,
-      announceRepository: true
+      announceRepository: true,
+      warnReplacedRecord: false
     });
     expect(writeModeFor(noRecord, FORCED, true)).to.deep.equal({
       kind: 'record',
       repository,
       confirmOverwrite: false,
-      announceRepository: true
+      announceRepository: true,
+      warnReplacedRecord: false
     });
     expect(writeModeFor(otherGeneration, ASKING, true)).to.deep.equal({
       kind: 'record',
       repository,
       confirmOverwrite: true,
-      announceRepository: false
+      announceRepository: false,
+      warnReplacedRecord: false
     });
-    expect(writeModeFor(otherGeneration, FORCED, true)).to.deep.equal({
-      kind: 'refuse',
-      because: { kind: 'recordedNotReplaced' }
-    });
+  });
+
+  it('replaces, under --force, a recorded SDK it cannot merge into, warning instead of asking', () => {
+    for (const destination of [otherGeneration, snapshotMissing]) {
+      expect(writeModeFor(destination, FORCED, true)).to.deep.equal({
+        kind: 'record',
+        repository,
+        confirmOverwrite: false,
+        announceRepository: false,
+        warnReplacedRecord: true
+      });
+    }
   });
 
   it('refuses before anything else when the overwrite question has no one to answer it', () => {
@@ -97,11 +113,16 @@ describe('writeModeFor', () => {
       kind: 'refuse',
       because: { kind: 'cannotAskToOverwrite' }
     });
+    expect(writeModeFor(otherGeneration, SILENT, true)).to.deep.equal({
+      kind: 'refuse',
+      because: { kind: 'cannotAskToOverwrite' }
+    });
     expect(writeModeFor(noRecord, SILENT, false)).to.deep.equal({
       kind: 'record',
       repository,
       confirmOverwrite: false,
-      announceRepository: true
+      announceRepository: true,
+      warnReplacedRecord: false
     });
   });
 

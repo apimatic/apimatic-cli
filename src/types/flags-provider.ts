@@ -55,6 +55,6 @@ export class FlagsProvider {
 
   /** For the SDK commands, where a run keeps edits and asks before it writes over them. */
   public static forceSdk = FlagsProvider.forceWith(
-    "never ask: an SDK with no record is replaced, conflicts are resolved using the generator's changes, and a recorded SDK that cannot be merged is not touched."
+    "never ask: conflicts are resolved using the generator's changes, and an SDK that cannot be merged is replaced, with a warning."
   );
 }
