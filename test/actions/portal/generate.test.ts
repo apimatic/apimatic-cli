@@ -19,6 +19,7 @@ import { ProjectContext } from '../../../src/types/project-context';
 import { COPILOT_PAGES_FILE, GeneratedPortalContext } from '../../../src/types/portal/copilot/generated-portal-context';
 import { completeArtifacts, stubPreparePortalProject } from './prepare-project-stubs';
 import { entitlementsWith } from '../../helpers/account';
+import { withoutCopilotUrl } from '../../helpers/copilot-url';
 
 const COMMAND_METADATA: CommandMetadata = { commandName: 'portal generate', shell: 'test' };
 const FIXTURE = new DirectoryPath(process.cwd()).join('test/resources/portal-inputs/default');
@@ -225,6 +226,8 @@ describe('GenerateAction', () => {
   });
 
   describe('with Ask AI', () => {
+    withoutCopilotUrl();
+
     const readPortal = (relative: string) => fs.readFileSync(path.join(portalDirectory.toString(), relative), 'utf8');
 
     const PAGE = { path: '/', title: 'Welcome', description: 'Start here', markdown: '# Welcome' };
@@ -268,6 +271,22 @@ describe('GenerateAction', () => {
 
       expect((await execute(COPILOT_FIXTURE)).isSuccess()).to.be.true;
       expect(prompts.copilotDevelopmentKey.called).to.be.false;
+    });
+
+    it('warns when the portal is built for a service other than APIMatic’s, naming it', async () => {
+      writePages();
+      process.env.APIMATIC_COPILOT_URL = 'http://localhost:8787';
+
+      expect((await execute(COPILOT_FIXTURE)).isSuccess()).to.be.true;
+      expect(prompts.copilotOtherService.calledOnce).to.be.true;
+      expect(`${prompts.copilotOtherService.firstCall.args[0]}`).to.equal('http://localhost:8787');
+    });
+
+    it('does not warn about the service when it is APIMatic’s own', async () => {
+      writePages();
+
+      expect((await execute(COPILOT_FIXTURE)).isSuccess()).to.be.true;
+      expect(prompts.copilotOtherService.called).to.be.false;
     });
 
     it('deploys the pages with the portal, named by a build ID the service compares', async () => {

@@ -45,6 +45,11 @@ export class ServiceAddress {
     return ok(new ServiceAddress(url.origin));
   }
 
+  /** Whether it is APIMatic's own service, which a deployed portal should use. */
+  public isApimatic(): boolean {
+    return this.origin === ASK_AI_SERVICE;
+  }
+
   /** The service's origin, such as `https://ask.apimatic.io`. */
   public toString(): string {
     return this.origin;

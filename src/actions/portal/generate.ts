@@ -96,6 +96,8 @@ export class GenerateAction {
     this.prompts.nextSteps(portalDirectory, zipPortal, site);
     if (copilotPublished) this.prompts.copilotUpdatesAfterDeploy(site);
     if (copilot !== null && CopilotKey.parse(copilot.key)?.kind() === 'dev') this.prompts.copilotDevelopmentKey();
+    // Built into the portal, so a local service left in the shell would follow it to its site.
+    if (copilot !== null && !copilot.address.isApimatic()) this.prompts.copilotOtherService(copilot.address);
 
     return ActionResult.success();
   }
