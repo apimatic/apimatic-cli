@@ -30,8 +30,9 @@ export class SdkContext {
 
   constructor(private readonly sdkDirectory: DirectoryPath) {}
 
+  /** Whether saving over the directory would remove anything: hidden entries such as `.github` count, only `.git` stays. */
   public async exists() {
-    return !(await this.fileService.directoryEmpty(this.sdkDirectory));
+    return this.fileService.hasEntriesExcluding(this.sdkDirectory, [GIT_DIRECTORY]);
   }
 
   /** How a run will write the directory, from git and the SDK directory's own repository; nothing is asked here. */

@@ -94,6 +94,18 @@ describe('SdkContext', () => {
     });
   });
 
+  describe('exists', () => {
+    it('counts what a save would remove: not a directory that is not there, or holds only .git', async () => {
+      expect(await context.exists()).to.be.false;
+
+      fs.mkdirSync(inRoot('sdk', 'python', '.git'), { recursive: true });
+      expect(await context.exists()).to.be.false;
+
+      fs.mkdirSync(inRoot('sdk', 'python', '.github'));
+      expect(await context.exists()).to.be.true;
+    });
+  });
+
   describe('initRepository', () => {
     it('creates the SDK directory when it is not there yet, as a repository of its own', async () => {
       const repository = (await context.initRepository())._unsafeUnwrap();

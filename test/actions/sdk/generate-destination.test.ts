@@ -447,6 +447,21 @@ describe('GenerateAction (sdk) — the destination', () => {
     expect(notInspected.firstCall.args[0]).to.deep.equal({ reason: 'git broke' });
   });
 
+  it('asks before replacing a repository of the developer’s own that holds only hidden files besides .git', async () => {
+    fs.mkdirSync(sdk().toString(), { recursive: true });
+    (await git.init(sdk()))._unsafeUnwrap();
+    write('.github/workflows/publish.yml', 'on: push');
+    interactive();
+    const overwriteSdk = sinon.stub(SdkGeneratePrompts.prototype, 'overwriteSdk').resolves(false);
+    sinon.stub(SdkGeneratePrompts.prototype, 'destinationDirNotEmpty');
+
+    expect((await execute({ force: false })).isCancelled()).to.be.true;
+
+    expect(overwriteSdk.calledOnce).to.be.true;
+    expect(read('.github/workflows/publish.yml')).to.equal('on: push');
+    expect(generateSdk.called).to.be.false;
+  });
+
   describe('the overwrite question', () => {
     beforeEach(() => write('README.md', '# mine'));
 

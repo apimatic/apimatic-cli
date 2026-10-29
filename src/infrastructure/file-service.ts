@@ -73,6 +73,16 @@ export class FileService {
     }
   }
 
+  /** Whether `cleanDirectoryExcluding` would remove anything from `dir`, hidden entries included; none when it is not there. */
+  public async hasEntriesExcluding(dir: DirectoryPath, excludeNames: FileName[]): Promise<boolean> {
+    try {
+      const entries = await fsExtra.readdir(dir.toString());
+      return entries.some((entry) => !excludeNames.some((exclude) => exclude.toString() === entry));
+    } catch (error) {
+      return !(error instanceof Error && 'code' in error && error.code === 'ENOENT');
+    }
+  }
+
   public async findSymlinks(dir: DirectoryPath): Promise<Result<FilePath[], string>> {
     try {
       return ok(await this.symlinksUnder(dir));
