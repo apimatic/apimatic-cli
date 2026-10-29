@@ -25,6 +25,11 @@ export class SdkPublishPrompts {
     log.error(serviceError.errorMessage);
   }
 
+  /** The SDK holds conflicts the developer still has to resolve, so it goes no further than the directory. */
+  public conflictsNotPublished() {
+    log.warn('Nothing was published, since the SDK still has conflicts. Rerun once they are resolved and staged.');
+  }
+
   public sdkNotZipped(sdkDirectory: DirectoryPath, problem: FileProblem | RepositoryProblem) {
     log.error(`The SDK in ${f.path(sdkDirectory)} could not be zipped for upload: ${problem.reason}`);
   }

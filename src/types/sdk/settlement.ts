@@ -5,8 +5,8 @@ import { Regeneration } from './repository-state.js';
 /** How the developer answered when a regeneration conflicted: resolve the markers themselves, let one side win, or stop the run. */
 export type ConflictChoice = 'resolve' | ConflictSide | 'cancel';
 
-/** How the developer answered about the last run's unresolved files: finish resolving themselves, or let one side win. */
-export type UnresolvedChoice = 'resolve' | ConflictSide;
+/** How the developer answered about the last run's unresolved files: finish resolving themselves, let one side win, or back out. */
+export type UnresolvedChoice = 'resolve' | ConflictSide | 'cancel';
 
 /** A regeneration with its conflicts settled: the plan to write, and the side and paths settled for it, if any. */
 export type Settlement = {

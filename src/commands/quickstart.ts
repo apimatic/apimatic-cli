@@ -35,6 +35,7 @@ export default class Quickstart extends Command {
     await result.mapAll(
       async () => await telemetryService.trackEvent(new QuickstartCompletedEvent(), commandMetadata.shell),
       async () => {},
+      async () => {},
       async () => {}
     );
   }

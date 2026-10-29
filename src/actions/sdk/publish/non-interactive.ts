@@ -127,6 +127,9 @@ export class SdkPublishNonInteractiveAction {
     if (publishResult.isCancelled()) {
       return ActionResult.cancelled();
     }
+    if (publishResult.isConflicted()) {
+      return ActionResult.conflicted();
+    }
 
     // A dry run publishes nothing, so recording it would claim an SDK that does not exist anywhere.
     if (dryRun) {

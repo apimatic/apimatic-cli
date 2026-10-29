@@ -183,7 +183,7 @@ flowchart TD
   C1 --> R1[git init in the SDK directory with --git-init, when it is not a repository of its own]
   R1 --> E[Write the SDK; an overwrite empties the directory but keeps any existing .git]
   D -- yes --> G{Files still unmerged from the last run?}
-  G -- yes --> Y([Asked in a terminal, settled for the generator under --force, else Failed: resolve those files first])
+  G -- yes --> Y([Asked in a terminal, settled for the generator under --force, else Conflicted: resolve those files first])
   G -- no --> C2[Zip src/ and upload; poll; download the SDK zip into a temp directory]
   C2 --> H[Save disk state to refs/apimatic/previous]
   H --> I[git merge-tree of yours and the generation over the pristine base; write the result in place]
@@ -298,8 +298,12 @@ modified, `git mergetool` opens them, `git add` marks them resolved. The steps d
 `refs/apimatic/previous`; that ref is the safety net of section 3, named only when a write
 failed and could not be undone.
 
-The result is a success, exit 0 (decided 2026-10-29 on the product review): the developer
-chose to resolve by hand, and the run did that. A run without a terminal never writes
+The result is conflicted (`ActionResult.conflicted()`, closed in yellow), exit 1 (decided
+2026-10-29, replacing the success of the product review): not a success, since the SDK holds
+markers and will not build, and not a failure, since the run did what was chosen. The exit
+code is the one `git merge` gives conflicts, so a command chained after the run does not run.
+`sdk publish` stops on a conflicted generation before zipping, so markers are never uploaded
+or recorded as published, and ends conflicted too. A run without a terminal never writes
 markers; it stops with the list, failed, exit 1. Nothing is lost: every other file is already
 updated, the pristine snapshot is recorded, the index holds the conflicted paths.
 
@@ -347,10 +351,11 @@ is written gives the same result on 2.38.
 
 The next run, while git holds any of the SDK's files as unmerged, asks before generating
 (`SdkGeneratePrompts.unresolvedChoice`); `--force` settles them for the generator without
-asking, and a run without a terminal gets the refusal as before (`onConflictFor`):
+asking, and a run without a terminal names them and ends conflicted, exit 1 (`onConflictFor`):
 
-- **I'll finish resolving them**, or backing out: nothing done; the result is cancelled, exit
-  130 (decided 2026-10-29 on the product review, replacing a failure).
+- **I'll finish resolving them**: nothing done; the result is conflicted, exit 1 (decided
+  2026-10-29, replacing the cancellation of the product review, which replaced a failure).
+  Backing out of the question cancels, exit 130, as it does at every other question.
 - **Resolve remaining conflicts using generator changes** and **… using my changes**:
   `SdkRepositoryContext.settleUnresolved(side, paths)` reads the two sides git kept in the
   index (`GitService.unmergedStages`, stage 2 yours, stage 3 the generator's) and settles each
@@ -363,7 +368,7 @@ asking, and a run without a terminal gets the refusal as before (`onConflictFor`
 There is no undo and no cancel on this question (decided 2026-10-23): the first question
 already offers the cancel, before anything is written. After either side, the directory is
 inspected again, once; a file still unmerged after that is reported, never asked about
-twice. The run then generates and merges from the settled state.
+twice, and the run ends conflicted. The run then generates and merges from the settled state.
 
 Nothing is reported to telemetry (section 2). Whether a question can be asked is
 `terminal.isInteractive()` (`process.stdin.isTTY`, `src/infrastructure/terminal.ts`), stubbed
@@ -423,6 +428,7 @@ Every row of section 5 and this table is a test over real repositories in
 | 16 | this file | Product review (2026-10-29): `--git-init` replaces the create-repository question (`RunMode.gitInit`; `askToCreate`, `creating`, the `createRepository` prompt and its refusal gone), always on for `sdk publish` with flags and a flag in its step-by-step experience; only the SDK directory's own repository counts (`SdkContext.repository`; `GitService.isIgnored` gone); "Found a git repository" on the first run to record in one (`announceRepository`, `repositoryFound`); `--force` takes the generator's side on conflicts, this run's and the last run's (`onConflictFor`, `OnConflict` `generated`; `conflicts` and `mergeNeedsResolving` gone); resolving by hand succeeds, with steps that offer a merge tool and name the files with markers and without (`MergePlan.markedPaths` and `unmarkedPaths` replace `nextSteps`); "I'll finish resolving them" cancels; the conflict labels say what happened and nothing more; the warning about another generation is gone (`recordNotForThisGeneration`, `GenerationDifference`, `differenceFrom`, `describe`, `describeWithGenerator`, and the state's `recorded` with `GenerationRecord.generatedAs`). With one SDK directory per repository, what served one below a root went too: `SdkPath`, per-path and percent-encoded refs (`SnapshotRef` is the two fixed refs), the nested-SDK refusal (`NestedSdkDirectory`, `SnapshotStore.nested`, `GitService.listRefs`), `SdkRepositoryContext.create`, the sub-path branch of `GitService`'s tree snapshot and of `unmergedStages`, `RelativeFilePath.under`; the hook script pushes the one ref; the restore command runs `git -C` in the SDK directory. |
 | 17 | this file | `--force` replaces a recorded SDK it cannot merge into, whose record names another generation or a missing snapshot, instead of refusing it, and warns after the write that the customizations were not carried over (`WriteMode` `record` `warnReplacedRecord`, `recordedSdkReplaced`; `recordedNotReplaced` and `recordedSdkNotReplaced` gone); the flag's help says so. |
 | 18 | this file | The overwrite question counts hidden entries: the save keeps only `.git`, but the check skipped every name starting with a dot, so a first recording run in a repository of the developer's own that held only `.github` or `.husky` removed them without asking. `SdkContext.exists` asks `FileService.hasEntriesExcluding`, which pairs with `cleanDirectoryExcluding`; the other commands keep `directoryEmpty`. |
+| 19 | this file | A run that leaves files to resolve ends conflicted (`ActionResult.conflicted()`, a yellow outro, exit 1 as `git merge` gives conflicts): "I'll resolve them myself" was a success, "I'll finish resolving them" was cancelled, and a run without a terminal facing unresolved files failed. Backing out of the unresolved question cancels (`UnresolvedChoice` gains `cancel`). `sdk publish` stops on a conflicted generation instead of uploading the markers; it checked only for a failure or a cancellation. |
 
 PR into `dev`, squash-merged, title `feat(sdk): keep your edits when regenerating an SDK`.
 

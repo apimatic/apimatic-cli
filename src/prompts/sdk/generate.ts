@@ -167,10 +167,10 @@ export class SdkGeneratePrompts {
   public conflictsUnresolved(paths: readonly RelativeFilePath[], sdk: DirectoryPath) {
     const them = paths.length === 1 ? 'it' : 'them';
     const files = listed(sdk, paths).join('\n');
-    log.error(`${stillUnresolved(paths)}. Resolve and stage ${them}, then rerun:\n${files}`);
+    log.warn(`${stillUnresolved(paths)}. Resolve and stage ${them}, then rerun:\n${files}`);
   }
 
-  /** The files still unresolved and the question, before anything is generated; backing out is finishing by hand. */
+  /** The files still unresolved and the question, before anything is generated; backing out cancels the run. */
   public async unresolvedChoice(paths: readonly RelativeFilePath[], sdk: DirectoryPath): Promise<UnresolvedChoice> {
     const one = paths.length === 1;
     log.warn(`${stillUnresolved(paths)}:\n${listed(sdk, paths).join('\n')}`);
@@ -194,7 +194,7 @@ export class SdkGeneratePrompts {
         }
       ]
     });
-    return isCancel(choice) ? 'resolve' : choice;
+    return isCancel(choice) ? 'cancel' : choice;
   }
 
   public resolveLater() {

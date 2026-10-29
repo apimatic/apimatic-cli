@@ -20,13 +20,16 @@ import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
 import { FileName } from '../../../src/types/file/fileName.js';
 import { FilePath } from '../../../src/types/file/filePath.js';
 import { FileProblem } from '../../../src/types/file/file-problem.js';
+import { RelativeFilePath } from '../../../src/types/file/relativeFilePath.js';
 import { ProjectContext } from '../../../src/types/project-context.js';
 import { PublishingProfileItem, PublishType } from '../../../src/types/publish-api/publishing-profile-item.js';
 import { ProfileId } from '../../../src/types/publish/profile-id.js';
 import { PublishingProfile } from '../../../src/types/publish/publishing-profile.js';
 import { SemVersion } from '../../../src/types/publish/version.js';
+import { SdkContext } from '../../../src/types/sdk-context.js';
 import { CodeGenerationVersion, Language, Stability } from '../../../src/types/sdk/generate.js';
 import { StabilityChoice } from '../../../src/types/sdk/stability-choice.js';
+import { RunMode } from '../../../src/types/sdk/write-mode.js';
 import { TempContext } from '../../../src/types/temp-context.js';
 
 const COMMAND_METADATA: CommandMetadata = { commandName: 'sdk publish', shell: 'test' };
@@ -41,13 +44,13 @@ describe('SdkPublishAction', () => {
 
   const sdk = () => new DirectoryPath(path.join(root, 'sdk', 'python'));
 
-  const execute = (dryRun = false) =>
+  const execute = (dryRun = false, run: RunMode = { force: true, interaction: 'never', gitInit: true }) =>
     new SdkPublishAction(new DirectoryPath(root), COMMAND_METADATA).execute(
       ProjectContext.in(new DirectoryPath(root)),
       sdk(),
       { language: Language.PYTHON, codegenVersion: CodeGenerationVersion.V4, stability: Stability.STABLE },
       [PublishType.PackagePublishing],
-      { force: true, interaction: 'never', gitInit: true },
+      run,
       ProfileId.tryCreate('profile')._unsafeUnwrap(),
       SemVersion.tryCreate('1.0.0')._unsafeUnwrap(),
       withoutPackageSettings,
@@ -168,6 +171,22 @@ describe('SdkPublishAction', () => {
     expect(result.isSuccess()).to.be.true;
     expect(fs.readFileSync(path.join(sdk().toString(), 'README.md'), 'utf8')).to.equal('# sdk');
     expect(opened.firstCall.args[0].isEqual(sdk())).to.be.true;
+  });
+
+  // Markers would go up with the rest, and the version would be recorded as published.
+  it('publishes nothing, and ends conflicted, while the SDK still has conflicts to resolve', async () => {
+    const unresolved = { kind: 'unresolved', repository: undefined, paths: [RelativeFilePath.fromGit('a.py')!] };
+    sinon.stub(SdkContext.prototype, 'destination').resolves(ok(unresolved as never));
+    sinon.stub(SdkGeneratePrompts.prototype, 'conflictsUnresolved');
+    const conflictsNotPublished = sinon.stub(SdkPublishPrompts.prototype, 'conflictsNotPublished');
+    const publishSdkPackage = sinon.stub(PublishingApiService.prototype, 'publishSdkPackage');
+
+    const result = await execute(false, { force: false, interaction: 'never', gitInit: true });
+
+    expect(result.isConflicted()).to.be.true;
+    expect(conflictsNotPublished.calledOnce).to.be.true;
+    expect(publishSdkPackage.called).to.be.false;
+    expect(onPublishSdkError.called).to.be.false;
   });
 
   it('reports an SDK it could not zip, without publishing', async () => {

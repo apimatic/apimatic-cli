@@ -1,8 +1,20 @@
 enum ResultType {
-  Success = 0,
-  Cancel = 130,
-  Failure = 1
+  Success,
+  Failure,
+  Cancel,
+  Conflict
 }
+
+/**
+ * A conflicted run exits as `git merge` does on conflicts: files are left to resolve, so whatever
+ * is chained after it should not run. Two kinds share a code, so the codes are kept apart from them.
+ */
+const EXIT_CODES: Record<ResultType, number> = {
+  [ResultType.Success]: 0,
+  [ResultType.Failure]: 1,
+  [ResultType.Cancel]: 130,
+  [ResultType.Conflict]: 1
+};
 
 export class ActionResult<T = void, E = never> {
   private readonly message: string;
@@ -33,12 +45,17 @@ export class ActionResult<T = void, E = never> {
     return new ActionResult(ResultType.Cancel, message);
   }
 
+  /** The run ended with files the developer still has to resolve. */
+  static conflicted<T = never>(message = 'Conflicted'): ActionResult<T> {
+    return new ActionResult(ResultType.Conflict, message);
+  }
+
   public getMessage(): string {
     return this.message;
   }
 
   public getExitCode(): number {
-    return this.resultType.valueOf();
+    return EXIT_CODES[this.resultType];
   }
 
   public isFailed(): boolean {
@@ -51,6 +68,10 @@ export class ActionResult<T = void, E = never> {
 
   public isCancelled(): boolean {
     return this.resultType === ResultType.Cancel;
+  }
+
+  public isConflicted(): boolean {
+    return this.resultType === ResultType.Conflict;
   }
 
   public getValue(): T {
@@ -68,7 +89,7 @@ export class ActionResult<T = void, E = never> {
     return new ActionResult(this.resultType, this.message);
   }
 
-  public mapAll<R>(onSuccess: (value?: T) => R, onFailure: () => R, onCancel: () => R): R {
+  public mapAll<R>(onSuccess: (value?: T) => R, onFailure: () => R, onCancel: () => R, onConflict: () => R): R {
     switch (this.resultType) {
       case ResultType.Success:
         return onSuccess(this.value);
@@ -76,6 +97,8 @@ export class ActionResult<T = void, E = never> {
         return onFailure();
       case ResultType.Cancel:
         return onCancel();
+      case ResultType.Conflict:
+        return onConflict();
     }
   }
 }

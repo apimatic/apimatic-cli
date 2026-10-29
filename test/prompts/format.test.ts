@@ -1,6 +1,8 @@
 import path from 'node:path';
 import { expect } from 'chai';
-import { format } from '../../src/prompts/format.js';
+import sinon from 'sinon';
+import { ActionResult } from '../../src/actions/action-result.js';
+import { format, outro } from '../../src/prompts/format.js';
 import { DirectoryPath } from '../../src/types/file/directoryPath.js';
 
 // `DirectoryPath` resolves on construction, so every path the CLI holds is absolute. The commands
@@ -36,5 +38,26 @@ describe('format.relative', () => {
     const dotted = new DirectoryPath(process.cwd()).join('..cache');
 
     expect(format.relative(dotted)).to.equal('./..cache');
+  });
+});
+
+// The last line of every command: its result's message on that result's colour, and its exit code.
+describe('outro', () => {
+  const closing = (result: ActionResult) => {
+    const written = sinon.stub(process.stdout, 'write').returns(true);
+    try {
+      outro(result);
+      return { text: written.args.map(([chunk]) => String(chunk)).join(''), exitCode: process.exitCode };
+    } finally {
+      written.restore();
+      process.exitCode = undefined;
+    }
+  };
+
+  it('closes a run left with conflicts as Conflicted, exiting 1', () => {
+    const { text, exitCode } = closing(ActionResult.conflicted());
+
+    expect(text).to.contain('Conflicted');
+    expect(exitCode).to.equal(1);
   });
 });
