@@ -61,7 +61,7 @@ describe('SnapshotStore', () => {
       const kept = await snapshotFiles(sdk, second);
       expect([...kept.keys()]).to.have.members(['README.md', '.apimatic/generation.json']);
       expect(kept.get('README.md')).to.equal('# edited again');
-      expect((await git.resolveRef(sdk, snapshots.previousRef()))._unsafeUnwrap()?.isEqual(second)).to.be.true;
+      expect((await git.resolveRef(sdk, snapshots.previousRef()))._unsafeUnwrap()).to.deep.equal(second);
       expect((await describeCommit(sdk, second)).parents).to.be.empty;
       expect((await snapshotFiles(sdk, first)).get('README.md')).to.equal('# edited');
     });

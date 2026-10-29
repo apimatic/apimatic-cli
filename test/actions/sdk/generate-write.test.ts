@@ -126,7 +126,7 @@ describe('GenerateAction (sdk) — writing the SDK', () => {
       expect(repositoryInitialised.firstCall.args[0].isEqual(sdk())).to.be.true;
       expect(fs.readFileSync(at('.git/HEAD'), 'utf-8').trim()).to.equal('ref: refs/heads/main');
       const pristine = (await git.resolveRef(sdk(), pristineRef))._unsafeUnwrap()!;
-      expect(record().pristineCommit().isEqual(pristine)).to.be.true;
+      expect(record().pristineCommit()).to.deep.equal(pristine);
       expect(record().isFor(STABLE)).to.be.true;
       const files = await snapshotFiles(sdk(), pristine);
       expect([...files.keys()]).to.have.members(['README.md', 'a.py']);
@@ -143,7 +143,7 @@ describe('GenerateAction (sdk) — writing the SDK', () => {
       expect(repositoryInitialised.called).to.be.false;
       expect(repositoryFound.firstCall.args[0].isEqual(sdk())).to.be.true;
       expect(fs.existsSync(at('old.py'))).to.be.false;
-      expect((await git.resolveRef(sdk(), pristineRef))._unsafeUnwrap()?.isEqual(record().pristineCommit())).to.be.true;
+      expect((await git.resolveRef(sdk(), pristineRef))._unsafeUnwrap()).to.deep.equal(record().pristineCommit());
     });
 
     it('still succeeds, with a warning, when the snapshot cannot be recorded', async () => {
@@ -199,7 +199,7 @@ describe('GenerateAction (sdk) — writing the SDK', () => {
         removed: [],
         kept: ['notes.txt']
       });
-      expect(record().pristineCommit().isEqual(base)).to.be.false;
+      expect(record().pristineCommit()).to.not.deep.equal(base);
       expect((await describeCommit(sdk(), record().pristineCommit())).parents).to.deep.equal([base]);
       const previous = (await git.resolveRef(sdk(), previousRef))._unsafeUnwrap()!;
       const kept = await snapshotFiles(sdk(), previous);
@@ -265,7 +265,7 @@ describe('GenerateAction (sdk) — writing the SDK', () => {
 
       expect(read('README.md')).to.equal('# edited');
       expect(read('models/book.py')).to.equal(MODEL_V1);
-      expect(record().pristineCommit().isEqual(base)).to.be.true;
+      expect(record().pristineCommit()).to.deep.equal(base);
       const [where, problem] = sdkNotWritten.firstCall.args;
       expect(where.isEqual(sdk())).to.be.true;
       expect(problem.file.name().toString()).to.equal('book.py');
@@ -281,7 +281,7 @@ describe('GenerateAction (sdk) — writing the SDK', () => {
       expect((await execute({ 'README.md': '# sdk v2' })).isFailed()).to.be.true;
 
       expect(read('README.md')).to.equal('# edited');
-      expect(record().pristineCommit().isEqual(base)).to.be.true;
+      expect(record().pristineCommit()).to.deep.equal(base);
       expect(customCodeFailed.firstCall.args[0]).to.deep.equal({ reason: 'git broke' });
     });
   });
@@ -360,7 +360,7 @@ describe('GenerateAction (sdk) — writing the SDK', () => {
         expect(result.isCancelled()).to.be.true;
         expect(read('models/book.py')).to.equal(DECORATED + MODEL_V1_EDITED);
         expect(read('README.md')).to.equal('# sdk');
-        expect(record().pristineCommit().isEqual(base)).to.be.true;
+        expect(record().pristineCommit()).to.deep.equal(base);
         expect((await git.resolveRef(sdk(), previousRef))._unsafeUnwrap()).to.be.undefined;
         expect(runCancelled.calledOnce).to.be.true;
       });

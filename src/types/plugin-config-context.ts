@@ -91,10 +91,6 @@ export class PluginConfig {
       () => undefined
     );
   }
-
-  public hasNoSourceRepository(language: Language): boolean {
-    return !this.config.languages?.[language]?.publishing?.source;
-  }
 }
 
 export type PluginConfigWriteFailure = ApimaticConfigWriteFailure;

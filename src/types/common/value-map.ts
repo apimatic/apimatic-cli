@@ -28,10 +28,6 @@ export class ValueMap<K extends Spelled, V> {
     return this.entries.delete(key.toString());
   }
 
-  public keys(): K[] {
-    return [...this.entries.values()].map((entry) => entry.key);
-  }
-
   public values(): V[] {
     return [...this.entries.values()].map((entry) => entry.value);
   }

@@ -8,9 +8,6 @@ import { RepositoryProblem, ShareHookInstall } from '../sdk/repository-state.js'
 import { SHARE_HOOK_SCRIPT, SHARE_HOOK_SCRIPT_NAME, ShareHook, shareHookSteps } from '../sdk/share-hook.js';
 import { onDisk } from './on-disk.js';
 
-// Owner-only, as git's own sample hooks are; git runs a hook only when it is executable.
-const HOOK_MODE = 0o700;
-
 /** The script goes into git's own hooks directory, so the one line a hook elsewhere needs is the same everywhere; the block goes into the hook git runs. */
 export class ShareHookInstaller {
   private readonly fileService = new FileService();
@@ -77,7 +74,7 @@ export class ShareHookInstaller {
 
   private async writeExecutable(file: FilePath, content: string): Promise<void> {
     if (await this.fileService.replaceContentsIfChanged(file, content)) {
-      await this.fileService.chmod(file, HOOK_MODE);
+      await this.fileService.makeExecutable(file);
     }
   }
 }

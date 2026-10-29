@@ -689,10 +689,7 @@ describe('PluginGenerateAction', () => {
     it('reports every message the response carries, whatever key it arrived under', async () => {
       // The service assembles one message from every key, so no key can be dropped for
       // being one the CLI does not recognise.
-      const error = ServiceError.badRequest('One or more validation errors occurred.\n- a\n- b', {
-        pluginConfig: ['a'],
-        someKeyTheCliDoesNotKnow: ['b']
-      });
+      const error = ServiceError.badRequest('One or more validation errors occurred.\n- a\n- b');
       sinon.stub(PluginService.prototype, 'generatePlugin').resolves(err(error));
       const printed = sinon.stub(log, 'error');
 

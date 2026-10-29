@@ -65,7 +65,7 @@ describe('PluginGeneratePrompts', () => {
     });
 
     it('passes the service message through as it was assembled', () => {
-      const error = ServiceError.badRequest('One or more validation errors occurred.\n- a', { pluginConfig: ['a'] });
+      const error = ServiceError.badRequest('One or more validation errors occurred.\n- a');
 
       expect(printed({ kind: 'generationFailed', error })).to.equal('One or more validation errors occurred.\n- a');
     });

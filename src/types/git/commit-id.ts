@@ -12,10 +12,6 @@ export class CommitId {
     return isObjectId(sha) ? new CommitId(sha) : undefined;
   }
 
-  public isEqual(other: CommitId): boolean {
-    return this.sha === other.sha;
-  }
-
   public toString(): string {
     return this.sha;
   }

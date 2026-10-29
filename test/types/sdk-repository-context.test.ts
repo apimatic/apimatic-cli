@@ -123,7 +123,7 @@ describe('SdkRepositoryContext', () => {
         })
       )._unsafeUnwrap();
 
-      expect((await pristineOf(sdk))?.isEqual(commit)).to.be.true;
+      expect(await pristineOf(sdk)).to.deep.equal(commit);
       expect(await describeCommit(sdk.directory, commit)).to.deep.equal({
         parents: [],
         authorName: 'APIMatic CLI',
@@ -140,7 +140,7 @@ describe('SdkRepositoryContext', () => {
       const commit = (await record(sdk, { 'README.md': '# v1' }))._unsafeUnwrap();
       await writeRecord(sdk, GenerationRecord.written(TYPESCRIPT, commit));
 
-      expect((await pristineOf(sdk))?.isEqual(commit)).to.be.true;
+      expect(await pristineOf(sdk)).to.deep.equal(commit);
       expect((await sdk.repository.inspect(TYPESCRIPT))._unsafeUnwrap()).to.deep.equal({
         kind: 'ready',
         base: commit
@@ -154,7 +154,7 @@ describe('SdkRepositoryContext', () => {
       const second = (await record(sdk, { 'README.md': '# v2' }))._unsafeUnwrap();
 
       expect((await describeCommit(sdk.directory, second)).parents).to.deep.equal([first]);
-      expect((await pristineOf(sdk))?.isEqual(second)).to.be.true;
+      expect(await pristineOf(sdk)).to.deep.equal(second);
       expect((await snapshotFiles(sdk.directory, first)).get('README.md')).to.equal('# v1');
     });
 
@@ -165,7 +165,7 @@ describe('SdkRepositoryContext', () => {
       const again = (await record(sdk, { 'README.md': '# v1' }))._unsafeUnwrap();
       const changed = (await record(sdk, { 'README.md': '# v2' }))._unsafeUnwrap();
 
-      expect(again.isEqual(first)).to.be.true;
+      expect(again).to.deep.equal(first);
       expect((await describeCommit(sdk.directory, changed)).parents).to.deep.equal([first]);
     });
   });
@@ -233,7 +233,7 @@ describe('SdkRepositoryContext', () => {
 
       const written = GenerationRecord.parse(fs.readFileSync(recordFile(sdk), 'utf8'))!;
       expect(written.isFor(TYPESCRIPT)).to.be.true;
-      expect((await pristineOf(sdk))?.isEqual(written.pristineCommit())).to.be.true;
+      expect(await pristineOf(sdk)).to.deep.equal(written.pristineCommit());
       expect((await sdk.repository.inspect(TYPESCRIPT))._unsafeUnwrap()).to.deep.equal({
         kind: 'ready',
         base: written.pristineCommit()
@@ -398,7 +398,7 @@ describe('SdkRepositoryContext', () => {
       const state = (await sdk.repository.inspect(TYPESCRIPT))._unsafeUnwrap();
 
       expect(state.kind).to.equal('ready');
-      expect(state.kind === 'ready' && state.base.isEqual(pristine)).to.be.true;
+      expect(state.kind === 'ready' && state.base).to.deep.equal(pristine);
     });
   });
 
@@ -443,8 +443,8 @@ describe('SdkRepositoryContext', () => {
       await sh(sdk.directory, 'push', '-q', '--no-verify', 'origin', refspec(PRISTINE));
       const after = (await clone.repository.inspect(TYPESCRIPT))._unsafeUnwrap();
 
-      expect(after.kind === 'ready' && after.base.isEqual(base)).to.be.true;
-      expect((await pristineOf(clone))?.isEqual(base)).to.be.true;
+      expect(after.kind === 'ready' && after.base).to.deep.equal(base);
+      expect(await pristineOf(clone)).to.deep.equal(base);
     });
 
     it('moves its ref forward to a chain the remote continued, without a join', async () => {
@@ -459,9 +459,9 @@ describe('SdkRepositoryContext', () => {
 
       const state = (await clone.repository.inspect(TYPESCRIPT))._unsafeUnwrap();
 
-      expect(state.kind === 'ready' && state.base.isEqual(second)).to.be.true;
+      expect(state.kind === 'ready' && state.base).to.deep.equal(second);
       const tip = (await pristineOf(clone))!;
-      expect(tip.isEqual(second)).to.be.true;
+      expect(tip).to.deep.equal(second);
       expect((await describeCommit(clone.directory, tip)).parents).to.deep.equal([first]);
     });
 
@@ -496,7 +496,7 @@ describe('SdkRepositoryContext', () => {
 
       const state = (await b.repository.inspect(TYPESCRIPT))._unsafeUnwrap();
 
-      expect(state.kind === 'ready' && state.base.isEqual(first)).to.be.true;
+      expect(state.kind === 'ready' && state.base).to.deep.equal(first);
       const tip = (await pristineOf(b))!;
       expect((await describeCommit(bRoot, tip)).parents.map(String)).to.have.members([
         second.toString(),
@@ -659,7 +659,7 @@ describe('SdkRepositoryContext', () => {
       const pushed = await sh(sdk.directory, 'push', '-q', 'origin', 'main');
 
       expect(pushed.stderr).to.not.contain('apimatic');
-      expect((await git.resolveRef(origin, PRISTINE))._unsafeUnwrap()?.isEqual(commit)).to.be.true;
+      expect((await git.resolveRef(origin, PRISTINE))._unsafeUnwrap()).to.deep.equal(commit);
     });
 
     it('shares through husky’s hook too, once it has the line', async () => {
@@ -674,7 +674,7 @@ describe('SdkRepositoryContext', () => {
 
       expect(pushed.stderr).to.contain('husky ran');
       expect(pushed.stderr).to.not.contain('apimatic');
-      expect((await git.resolveRef(origin, PRISTINE))._unsafeUnwrap()?.isEqual(commit)).to.be.true;
+      expect((await git.resolveRef(origin, PRISTINE))._unsafeUnwrap()).to.deep.equal(commit);
     });
 
     it('does not fail a push from a clone that never ran the CLI', async () => {
@@ -736,7 +736,7 @@ describe('SdkRepositoryContext', () => {
       const pushed = await sh(sdk.directory, 'push', '-q', 'origin', 'main');
 
       expect(pushed.stderr.match(/existing hook ran/g)).to.have.length(1);
-      expect((await git.resolveRef(origin, PRISTINE))._unsafeUnwrap()?.isEqual(tip)).to.be.true;
+      expect((await git.resolveRef(origin, PRISTINE))._unsafeUnwrap()).to.deep.equal(tip);
     });
   });
 });

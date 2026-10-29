@@ -30,10 +30,6 @@ export class RelativeDirectoryPath {
     return root.join(...this.value.split('/'));
   }
 
-  public isEqual(other: RelativeDirectoryPath): boolean {
-    return this.value === other.value;
-  }
-
   public toString(): string {
     return this.value;
   }

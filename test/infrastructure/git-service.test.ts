@@ -206,7 +206,7 @@ describe('GitService', () => {
     const second = (await git.commitTree(repo, tree, [first], 'second'))._unsafeUnwrap();
     (await git.updateRef(repo, ref, second))._unsafeUnwrap();
 
-    expect((await git.resolveRef(repo, ref))._unsafeUnwrap()?.isEqual(second)).to.be.true;
+    expect((await git.resolveRef(repo, ref))._unsafeUnwrap()).to.deep.equal(second);
     expect((await git.resolveRef(repo, SnapshotRef.previous()))._unsafeUnwrap()).to.be.undefined;
     expect(await describeCommit(repo, second)).to.deep.equal({
       parents: [first],
@@ -385,7 +385,7 @@ describe('GitService', () => {
       expect((await git.fetchRef(b, RemoteName.origin(), SnapshotRef.previous()))._unsafeUnwrap()).to.be.undefined;
       const tip = (await git.fetchRef(b, RemoteName.origin(), ref))._unsafeUnwrap();
 
-      expect(tip?.isEqual(first)).to.be.true;
+      expect(tip).to.deep.equal(first);
       expect((await git.hasCommit(b, first))._unsafeUnwrap()).to.be.true;
     });
 

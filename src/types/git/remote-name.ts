@@ -16,10 +16,6 @@ export class RemoteName {
     return new RemoteName('origin');
   }
 
-  public isEqual(other: RemoteName): boolean {
-    return this.name === other.name;
-  }
-
   public toString(): string {
     return this.name;
   }

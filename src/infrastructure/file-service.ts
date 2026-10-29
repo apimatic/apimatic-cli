@@ -324,8 +324,9 @@ export class FileService {
     await fsExtra.writeFile(filePath.toString(), content);
   }
 
-  public async chmod(filePath: FilePath, mode: number): Promise<void> {
-    await fsExtra.chmod(filePath.toString(), mode);
+  /** Owner-only, as git's own sample hooks are; git runs a hook only when it is executable. */
+  public async makeExecutable(filePath: FilePath): Promise<void> {
+    await fsExtra.chmod(filePath.toString(), 0o700);
   }
 
   /** Removes `directory` and then each parent while it is empty, stopping below `within`, which stays whatever it holds. */
@@ -397,33 +398,6 @@ export class FileService {
     } catch {
       return false;
     }
-  }
-
-  public async getAvailableDirectoryPath(currentPath: DirectoryPath): Promise<DirectoryPath> {
-    if (!(await this.directoryExists(currentPath))) return currentPath;
-
-    const dir = path.dirname(currentPath.toString());
-    let baseName = path.basename(currentPath.toString());
-
-    // Strip existing " (n)" suffix using string methods
-    if (baseName.endsWith(')')) {
-      const open = baseName.lastIndexOf('(');
-      if (open !== -1 && baseName[open - 1] === ' ') {
-        const inner = baseName.slice(open + 1, -1);
-        if (inner.length > 0 && !isNaN(Number(inner))) {
-          baseName = baseName.slice(0, open - 1);
-        }
-      }
-    }
-
-    let counter = 1;
-    let newPath: string;
-
-    do {
-      newPath = path.join(dir, `${baseName} (${counter++})`);
-    } while (await this.directoryExists(new DirectoryPath(newPath)));
-
-    return new DirectoryPath(newPath);
   }
 }
 

@@ -13,10 +13,6 @@ export class BlobId {
     return isObjectId(sha) ? new BlobId(sha) : undefined;
   }
 
-  public isEqual(other: BlobId): boolean {
-    return this.sha === other.sha;
-  }
-
   public toString(): string {
     return this.sha;
   }

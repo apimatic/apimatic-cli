@@ -19,13 +19,6 @@ describe('RelativeDirectoryPath', () => {
     expect(RelativeDirectoryPath.fromGit('dist')!.toString()).to.equal('dist');
   });
 
-  it('compares by value', () => {
-    const directory = RelativeDirectoryPath.fromGit('dist/')!;
-
-    expect(directory.isEqual(RelativeDirectoryPath.fromGit('dist')!)).to.be.true;
-    expect(directory.isEqual(RelativeDirectoryPath.fromGit('build')!)).to.be.false;
-  });
-
   it('refuses what git would never print, so a parser slip is reported rather than carried', () => {
     expect(RelativeDirectoryPath.fromGit('/absolute/')).to.be.undefined;
   });

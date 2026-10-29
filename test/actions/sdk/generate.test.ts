@@ -107,7 +107,7 @@ describe('GenerateAction (sdk)', () => {
     expect(fs.readFileSync(at('README.md'), 'utf-8')).to.equal('# sdk');
     const record = GenerationRecord.parse(fs.readFileSync(at('.apimatic/generation.json'), 'utf-8'))!;
     const pristine = (await new GitService().resolveRef(sdk(), SnapshotRef.pristine()))._unsafeUnwrap();
-    expect(record.pristineCommit().isEqual(pristine!)).to.be.true;
+    expect(record.pristineCommit()).to.deep.equal(pristine);
   });
 
   it('writes the SDK as it always has when git is not there', async () => {

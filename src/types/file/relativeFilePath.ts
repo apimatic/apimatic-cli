@@ -45,11 +45,6 @@ export class RelativeFilePath {
     return this.value === other.value;
   }
 
-  /** By code point, as `FileName.compare` is and for its reason. */
-  public compare(other: RelativeFilePath): number {
-    return this.value < other.value ? -1 : Number(this.value > other.value);
-  }
-
   public toString(): string {
     return this.value;
   }

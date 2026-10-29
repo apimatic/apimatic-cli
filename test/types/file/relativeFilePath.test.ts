@@ -38,10 +38,6 @@ describe('RelativeFilePath', () => {
 
     expect(a.isEqual(RelativeFilePath.fromGit('a.ts')!)).to.be.true;
     expect(a.isEqual(RelativeFilePath.fromGit('b.ts')!)).to.be.false;
-    expect([RelativeFilePath.fromGit('b.ts')!, a].sort((x, y) => x.compare(y)).map(String)).to.deep.equal([
-      'a.ts',
-      'b.ts'
-    ]);
   });
 
   it('refuses what git would never print, so a parser slip is reported rather than carried', () => {

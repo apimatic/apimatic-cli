@@ -193,7 +193,7 @@ describe('GenerateAction (sdk) — the destination', () => {
 
       expect((await execute({ gitInit: true })).isSuccess()).to.be.true;
 
-      expect((await git.resolveRef(sdk(), PRISTINE))._unsafeUnwrap()?.isEqual(record().pristineCommit())).to.be.true;
+      expect((await git.resolveRef(sdk(), PRISTINE))._unsafeUnwrap()).to.deep.equal(record().pristineCommit());
       expect((await execa('git', ['for-each-ref', 'refs/apimatic'], { cwd: root })).stdout).to.equal('');
     });
   });
@@ -206,7 +206,7 @@ describe('GenerateAction (sdk) — the destination', () => {
     expect((await execute()).isSuccess()).to.be.true;
 
     expect(repositoryFound.firstCall.args[0].isEqual(sdk())).to.be.true;
-    expect((await git.resolveRef(sdk(), PRISTINE))._unsafeUnwrap()?.isEqual(record().pristineCommit())).to.be.true;
+    expect((await git.resolveRef(sdk(), PRISTINE))._unsafeUnwrap()).to.deep.equal(record().pristineCommit());
   });
 
   it('records over an SDK generated at another stability, asking only whether to overwrite it', async () => {
@@ -233,7 +233,7 @@ describe('GenerateAction (sdk) — the destination', () => {
     expect((await execute({ force: false })).isSuccess()).to.be.true;
 
     expect(snapshotMissing.firstCall.args[0]).to.deep.equal({ kind: 'noRemote' });
-    expect(record().pristineCommit().isEqual(missing)).to.be.false;
+    expect(record().pristineCommit()).to.not.deep.equal(missing);
   });
 
   for (const [what, prepare] of [
@@ -504,7 +504,7 @@ describe('GenerateAction (sdk) — the destination', () => {
       const recordedInClone = GenerationRecord.parse(
         fs.readFileSync(path.join(clone, '.apimatic/generation.json'), 'utf8')
       )!;
-      expect(recordedInClone.pristineCommit().isEqual(base)).to.be.true;
+      expect(recordedInClone.pristineCommit()).to.deep.equal(base);
     } finally {
       fs.rmSync(clone, { recursive: true, force: true });
       fs.rmSync(origin, { recursive: true, force: true });

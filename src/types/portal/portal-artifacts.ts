@@ -18,9 +18,4 @@ export class PortalArtifacts {
     public readonly sdkDocs: ReadonlyMap<string, string>,
     public readonly plugin: FilePath | undefined
   ) {}
-
-  /** A run that was never made: a portal declaring no languages and no plugin has nothing to ask for. */
-  public static none(): PortalArtifacts {
-    return new PortalArtifacts(new CodeSampleCatalogs([]), new Map(), new Map(), undefined);
-  }
 }
