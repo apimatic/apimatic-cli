@@ -179,6 +179,13 @@ describe('the Ask AI client', () => {
     expect(calls).to.have.length(3);
   });
 
+  it('bounds the time the session may take to open, so a service that never answers fails it', async () => {
+    const { calls, send } = service(session('t1'));
+    await new CopilotClient(COPILOT, () => undefined, send).prepare();
+    expect(calls[0]!.init.signal).to.be.instanceOf(AbortSignal);
+    expect(calls[0]!.init.signal!.aborted).to.be.false;
+  });
+
   it('continues the thread the service started, and starts afresh with a new chat', () => {
     const client = new CopilotClient(COPILOT, () => undefined, service().send);
     expect(client.questionBody([{ id: 'q1' }], 'submit-message')).to.deep.equal({

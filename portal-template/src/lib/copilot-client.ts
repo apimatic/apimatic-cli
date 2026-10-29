@@ -4,6 +4,8 @@ import type { PortalCopilot } from './portal-types';
 const TURNED_AWAY = new Set(['copilot_disabled', 'invalid_key', 'origin_not_allowed']);
 /** A session is renewed this long before it expires, so a question never meets a stale one. */
 const RENEW_EARLY_MS = 30_000;
+/** A session that takes longer gives up, so the panel never waits on "Starting Ask AI…" for a service that never answers. */
+const SESSION_TIMEOUT_MS = 10_000;
 
 interface Problem {
   code?: string;
@@ -130,7 +132,8 @@ export class CopilotClient {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ key: this.copilot.key }),
-        credentials: 'omit'
+        credentials: 'omit',
+        signal: AbortSignal.timeout(SESSION_TIMEOUT_MS)
       });
     } catch {
       throw new Error('Ask AI is unavailable right now. Please try again later.');
