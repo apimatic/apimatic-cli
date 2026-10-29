@@ -4,7 +4,7 @@ import { PortalConfig } from '../portal-config.js';
 import { CopilotKeyKind } from './copilot-key.js';
 
 /** As the Ask AI service receives it. */
-export interface CopilotRegistrationBody {
+interface CopilotRegistrationBody {
   name: string;
   siteUrl: string | null;
   allowedOrigins: string[];

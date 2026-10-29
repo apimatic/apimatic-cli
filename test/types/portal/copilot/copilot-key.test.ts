@@ -9,7 +9,7 @@ describe('CopilotKey', () => {
 
         expect(key.toString()).to.match(new RegExp(`^pk_${kind}_[A-Za-z0-9]{32}$`));
         expect(key.kind()).to.equal(kind);
-        expect(CopilotKey.parse(key.toString())?.equals(key)).to.be.true;
+        expect(CopilotKey.parse(key.toString())?.toString()).to.equal(key.toString());
       }
     });
 

@@ -45,10 +45,6 @@ export class CopilotKey {
     return this.keyKind;
   }
 
-  public equals(other: CopilotKey): boolean {
-    return this.value === other.value;
-  }
-
   public toString(): string {
     return this.value;
   }

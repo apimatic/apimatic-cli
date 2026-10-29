@@ -7,6 +7,7 @@ export interface SubscriptionInfo {
   allowedLanguages: number; // might be a comma-separated string or code — clarify if needed
   isPackagePublishingAllowed: boolean;
   isOnPremGenerationAllowed: boolean;
-  isApiCopilotAllowed: boolean;
+  /** Left out by a platform that predates Ask AI, which grants nothing. */
+  isApiCopilotAllowed?: boolean;
   ApiCopilotKeys: string[];
 }

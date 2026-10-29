@@ -10,8 +10,7 @@ export class AccountEntitlements {
   public static of(account: SubscriptionInfo): AccountEntitlements {
     const features = new Set<SubscriptionFeature>();
     if (account.isOnPremGenerationAllowed) features.add('portalGeneration');
-    // A platform without the flag answers without it, which grants nothing.
-    if (account.isApiCopilotAllowed === true) features.add('askAi');
+    if (account.isApiCopilotAllowed) features.add('askAi');
     return new AccountEntitlements(features);
   }
 
