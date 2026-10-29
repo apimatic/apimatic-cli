@@ -3,17 +3,12 @@ import { err, ok, Result } from 'neverthrow';
 import { ServiceAddress } from '../../types/portal/config/service-address.js';
 import { CopilotKey } from '../../types/portal/copilot/copilot-key.js';
 import { CopilotRegistration } from '../../types/portal/copilot/copilot-registration.js';
+import { RegistrationOutcome, RevocationOutcome } from '../../types/portal/copilot/portal-key-outcomes.js';
 import { envInfo } from '../env-info.js';
 import { ServiceError } from '../service-error.js';
 import { copilotFailureOf, copilotTransportFailure, duration } from './copilot-responses.js';
 
 const COPILOT_PORTAL_TIMEOUT_MS = 30_000;
-
-/** `created` for a key the service did not know; `updated` when it already held it for this account. */
-export type RegistrationOutcome = 'created' | 'updated';
-
-/** `unknown` when the service holds no such key, which leaves nothing to revoke. */
-export type RevocationOutcome = 'revoked' | 'unknown';
 
 /** Registers a portal's key with the Ask AI service, which checks the account's subscription, and revokes it. */
 export class CopilotPortalService {

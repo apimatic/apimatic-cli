@@ -55,7 +55,8 @@ describe('PreparePortalProjectAction', () => {
     const result = await execute(onPrepared);
 
     expect(result.isFailed()).to.be.true;
-    expect(shared.prompts.authorizationFailed.calledOnceWith({ kind: 'notEntitled', feature: 'portalGeneration' })).to.be.true;
+    expect(shared.prompts.authorizationFailed.calledOnceWith({ kind: 'notEntitled', feature: 'portalGeneration' })).to
+      .be.true;
     expect(shared.artifacts.called).to.be.false;
     expect(onPrepared.called).to.be.false;
   });
@@ -77,7 +78,12 @@ describe('PreparePortalProjectAction', () => {
       ).execute(ProjectContext.in(COPILOT_FIXTURE), { onPrepared });
 
       expect(result.isFailed()).to.be.true;
-      expect(shared.prompts.askAiNotEntitled.calledOnceWith(COPILOT_FIXTURE.join('src'))).to.be.true;
+      expect(
+        shared.prompts.askAiNotEntitled.calledOnceWith(
+          { kind: 'notEntitled', feature: 'askAi' },
+          COPILOT_FIXTURE.join('src')
+        )
+      ).to.be.true;
       expect(shared.artifacts.called).to.be.false;
       expect(onPrepared.called).to.be.false;
     });
@@ -98,7 +104,9 @@ describe('PreparePortalProjectAction', () => {
   it('stops before signing in when the source is on a network share', async function () {
     if (process.platform !== 'win32') this.skip();
     const shared = stubPreparePortalProject();
-    const authorize = sinon.stub(PortalAuthorizationService.prototype, 'authorize').resolves(ok(entitlementsWith('portalGeneration')));
+    const authorize = sinon
+      .stub(PortalAuthorizationService.prototype, 'authorize')
+      .resolves(ok(entitlementsWith('portalGeneration')));
     const onPrepared = sinon.stub();
     const share = new DirectoryPath('\\\\server\\share\\api');
 

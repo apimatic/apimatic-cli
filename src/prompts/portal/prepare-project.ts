@@ -40,8 +40,8 @@ export class PreparePortalProjectPrompts {
     reportAuthorizationFailure(failure);
   }
 
-  public askAiNotEntitled(sourceDirectory: DirectoryPath) {
-    reportAuthorizationFailure({ kind: 'notEntitled', feature: 'askAi' });
+  public askAiNotEntitled(failure: PortalAuthorizationFailure, sourceDirectory: DirectoryPath) {
+    reportAuthorizationFailure(failure);
     const config = new FilePath(sourceDirectory, new FileName(APIMATIC_CONFIG_FILE_NAME));
     log.message(
       `To build the portal without its Ask AI chat, remove ${f.var('ai.copilot')} from the ${f.var('portal')} ` +

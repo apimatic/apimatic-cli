@@ -1,7 +1,7 @@
 import { log } from '@clack/prompts';
 import { Result } from 'neverthrow';
 import { ServiceError } from '../../../infrastructure/service-error.js';
-import { RegistrationOutcome, RevocationOutcome } from '../../../infrastructure/services/copilot-portal-service.js';
+import { RegistrationOutcome, RevocationOutcome } from '../../../types/portal/copilot/portal-key-outcomes.js';
 import { APIMATIC_CONFIG_FILE_NAME } from '../../../types/apimatic-config/document.js';
 import { DirectoryPath } from '../../../types/file/directoryPath.js';
 import { FileName } from '../../../types/file/fileName.js';
@@ -13,7 +13,7 @@ import { PortalScaffoldProblem, PortalSourceProblem } from '../../../types/porta
 import { format as f } from '../../format.js';
 import { noteWrapped, withSpinner } from '../../prompt.js';
 import { reportInvalidServiceAddress, reportSourceProblem } from '../source.js';
-import { reportServiceFailure } from './shared.js';
+import { describeScaffoldProblem, reportServiceFailure } from './shared.js';
 
 const enableCommand = (...flags: string[]) => [f.cmdAlt('apimatic', 'portal', 'copilot', 'enable'), ...flags].join(' ');
 
@@ -78,7 +78,7 @@ export class PortalCopilotEnablePrompts {
     const setting = `"ai": { "copilot": { "key": "${key.toString()}" } }`;
     log.error(
       `The portal is registered with Ask AI, but its key could not be saved to ${f.path(config)} ` +
-        `(${describeUnsaved(problem)}). Set ${f.var(setting)} in its ${f.var('portal')} block by hand.`
+        `(${describeScaffoldProblem(problem)}). Set ${f.var(setting)} in its ${f.var('portal')} block by hand.`
     );
   }
 
@@ -126,17 +126,6 @@ function describeEnabled(outcome: RegistrationOutcome, rotated: boolean): string
     return 'Ask AI has a new key';
   }
   return outcome === 'created' ? 'Ask AI is set up' : "Ask AI's settings are up to date";
-}
-
-function describeUnsaved(problem: PortalScaffoldProblem): string {
-  switch (problem.kind) {
-    case 'sourceUnwritable':
-      return problem.reason;
-    case 'configUnreadable':
-      return 'it could not be read';
-    case 'configUnwritable':
-      return 'it could not be written';
-  }
 }
 
 function describeKind(kind: CopilotKeyKind): string {

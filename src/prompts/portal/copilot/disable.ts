@@ -1,7 +1,7 @@
 import { log } from '@clack/prompts';
 import { Result } from 'neverthrow';
 import { ServiceError } from '../../../infrastructure/service-error.js';
-import { RevocationOutcome } from '../../../infrastructure/services/copilot-portal-service.js';
+import { RevocationOutcome } from '../../../types/portal/copilot/portal-key-outcomes.js';
 import { APIMATIC_CONFIG_FILE_NAME } from '../../../types/apimatic-config/document.js';
 import { DirectoryPath } from '../../../types/file/directoryPath.js';
 import { FileName } from '../../../types/file/fileName.js';
@@ -11,7 +11,7 @@ import { PortalScaffoldProblem, PortalSourceProblem } from '../../../types/porta
 import { format as f } from '../../format.js';
 import { noteWrapped, withSpinner } from '../../prompt.js';
 import { reportSourceProblem } from '../source.js';
-import { reportServiceFailure } from './shared.js';
+import { describeScaffoldProblem, reportServiceFailure } from './shared.js';
 
 export class PortalCopilotDisablePrompts {
   public sourceProblem(problem: PortalSourceProblem, sourceDirectory: DirectoryPath) {
@@ -41,9 +41,8 @@ export class PortalCopilotDisablePrompts {
 
   public keyNotRemoved(problem: PortalScaffoldProblem, sourceDirectory: DirectoryPath) {
     const config = new FilePath(sourceDirectory, new FileName(APIMATIC_CONFIG_FILE_NAME));
-    const reason = problem.kind === 'sourceUnwritable' ? `: ${problem.reason}` : '';
     log.error(
-      `The key is revoked, but ${f.path(config)} could not be updated${reason}. Remove ` +
+      `The key is revoked, but ${f.path(config)} could not be updated (${describeScaffoldProblem(problem)}). Remove ` +
         `${f.var('ai.copilot')} from its ${f.var('portal')} block by hand.`
     );
   }

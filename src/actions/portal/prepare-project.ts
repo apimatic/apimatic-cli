@@ -69,7 +69,7 @@ export class PreparePortalProjectAction {
       return ActionResult.failed();
     }
     if (source.value.config.copilotService() !== null && !authorization.value.includes('askAi')) {
-      this.prompts.askAiNotEntitled(sourceDirectory);
+      this.prompts.askAiNotEntitled({ kind: 'notEntitled', feature: 'askAi' }, sourceDirectory);
       return ActionResult.failed();
     }
     this.prompts.filesShadowedByStatic(source.value.shadowedFiles);
