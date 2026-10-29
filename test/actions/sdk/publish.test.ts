@@ -171,8 +171,7 @@ describe('SdkPublishAction', () => {
 
   it('reports an SDK it could not zip, without publishing', async () => {
     const problem: FileProblem = { kind: 'zipFailed', reason: 'EACCES: permission denied' };
-    const zip = sinon.stub(TempContext.prototype, 'zip').callThrough();
-    zip.onSecondCall().resolves(err(problem));
+    sinon.stub(TempContext.prototype, 'zipWithout').resolves(err(problem));
     const publishSdkPackage = sinon.stub(PublishingApiService.prototype, 'publishSdkPackage');
     const sdkNotZipped = sinon.stub(SdkPublishPrompts.prototype, 'sdkNotZipped');
 
