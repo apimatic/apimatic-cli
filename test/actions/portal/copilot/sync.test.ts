@@ -21,6 +21,7 @@ import { GeneratedPortalContext } from '../../../../src/types/portal/copilot/gen
 import { PortalAuthorizationService } from '../../../../src/infrastructure/services/portal-authorization-service';
 import { entitlementsWith } from '../../../helpers/account';
 import { withoutCopilotUrl } from '../../../helpers/copilot-url';
+import { AskAiAccessPrompts } from '../../../../src/prompts/portal/copilot/access';
 
 /** The bundle as the service receives it. */
 const uploaded = (bundle: CopilotBundle) =>
@@ -52,6 +53,7 @@ describe('PortalCopilotSyncAction', () => {
 
   let root: string;
   let prompts: sinon.SinonStubbedInstance<PortalCopilotSyncPrompts>;
+  let access: sinon.SinonStubbedInstance<AskAiAccessPrompts>;
   let upload: sinon.SinonStub;
   let awaitIndexing: sinon.SinonStub;
   let authorizeAskAi: sinon.SinonStub;
@@ -101,7 +103,8 @@ describe('PortalCopilotSyncAction', () => {
     // The spinners would render to stdout; pass the underlying promise straight through.
     prompts.upload.callsFake((fn) => fn);
     prompts.awaitIndexing.callsFake((fn) => fn);
-    prompts.checkSubscription.callsFake((fn) => fn);
+    access = sinon.stub(AskAiAccessPrompts.prototype);
+    access.checkSubscription.callsFake((fn) => fn);
     authorizeAskAi = sinon
       .stub(PortalAuthorizationService.prototype, 'authorizeAskAi')
       .resolves(ok(entitlementsWith('askAi')));
@@ -252,7 +255,7 @@ describe('PortalCopilotSyncAction', () => {
     const result = await execute();
 
     expect(result.isFailed()).to.be.true;
-    expect(prompts.authorizationFailed.calledOnceWith(refused)).to.be.true;
+    expect(access.authorizationFailed.calledOnceWith(refused)).to.be.true;
     expect(upload.called).to.be.false;
   });
 
@@ -264,7 +267,7 @@ describe('PortalCopilotSyncAction', () => {
     const result = await execute(true, null);
 
     expect(result.isFailed()).to.be.true;
-    expect(prompts.notLoggedIn.calledOnce).to.be.true;
+    expect(access.notLoggedIn.calledOnce).to.be.true;
     expect(authorizeAskAi.called).to.be.false;
     expect(upload.called).to.be.false;
   });

@@ -6,7 +6,7 @@ import { PLACEHOLDER_SITE } from '../../../types/portal/config/site-config.js';
 import { GeneratedPortalContext } from '../../../types/portal/copilot/generated-portal-context.js';
 import { ProjectContext } from '../../../types/project-context.js';
 import { ActionResult } from '../../action-result.js';
-import { authorizeAskAi } from './access.js';
+import { AskAiAccessAction } from './access.js';
 
 export class PortalCopilotSyncAction {
   private readonly prompts = new PortalCopilotSyncPrompts();
@@ -37,7 +37,8 @@ export class PortalCopilotSyncAction {
       return ActionResult.failed();
     }
     const { shell } = this.commandMetadata;
-    const authKey = await authorizeAskAi(this.prompts, this.configDir, shell, this.authKey);
+    const access = new AskAiAccessAction(this.configDir, this.commandMetadata, this.authKey, 'sync Ask AI');
+    const authKey = await access.execute();
     if (authKey === null) {
       return ActionResult.failed();
     }

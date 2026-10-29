@@ -16,7 +16,8 @@ describe('PortalCopilotEnablePrompts', () => {
   let warn: sinon.SinonStub;
 
   // Without its colours, which picocolors adds on Windows and in CI whatever the terminal.
-  const plain = (stub: sinon.SinonStub) => stub.getCalls().map((call) => stripVTControlCharacters(String(call.args[0])));
+  const plain = (stub: sinon.SinonStub) =>
+    stub.getCalls().map((call) => stripVTControlCharacters(String(call.args[0])));
 
   beforeEach(() => {
     error = sinon.stub(log, 'error');
@@ -26,20 +27,6 @@ describe('PortalCopilotEnablePrompts', () => {
 
   afterEach(() => {
     sinon.restore();
-  });
-
-  it('names the plan, not the build, when the subscription does not include Ask AI', () => {
-    prompts.authorizationFailed({ kind: 'notEntitled', feature: 'askAi' });
-
-    const [message] = plain(error);
-    expect(message).to.contain('Your subscription does not include Ask AI.');
-    expect(message).to.contain('https://www.apimatic.io/pricing');
-  });
-
-  it('asks to sign in to set up Ask AI', () => {
-    prompts.authorizationFailed({ kind: 'unauthenticated' });
-
-    expect(plain(error)[0]).to.contain('You need to be signed in to set up Ask AI.');
   });
 
   it('names the service and the variable when the service cannot be reached', () => {

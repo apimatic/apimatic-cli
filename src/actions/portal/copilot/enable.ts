@@ -9,7 +9,7 @@ import { CopilotKey, CopilotKeyKind } from '../../../types/portal/copilot/copilo
 import { CopilotRegistration } from '../../../types/portal/copilot/copilot-registration.js';
 import { ProjectContext } from '../../../types/project-context.js';
 import { ActionResult } from '../../action-result.js';
-import { authorizeAskAi } from './access.js';
+import { AskAiAccessAction } from './access.js';
 
 export interface CopilotEnableOptions {
   kind: CopilotKeyKind;
@@ -63,7 +63,8 @@ export class PortalCopilotEnableAction {
     }
 
     const { shell } = this.commandMetadata;
-    const authKey = await authorizeAskAi(this.prompts, this.configDir, shell, this.authKey);
+    const access = new AskAiAccessAction(this.configDir, this.commandMetadata, this.authKey, 'set up Ask AI');
+    const authKey = await access.execute();
     if (authKey === null) {
       return ActionResult.failed();
     }

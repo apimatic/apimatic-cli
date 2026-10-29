@@ -1,8 +1,6 @@
 import { log } from '@clack/prompts';
 import { Result } from 'neverthrow';
 import { ServiceError, ServiceErrorCode } from '../../../infrastructure/service-error.js';
-import { PortalAuthorizationFailure } from '../../../infrastructure/services/portal-authorization-service.js';
-import { AccountEntitlements } from '../../../types/api/account-entitlements.js';
 import { APIMATIC_CONFIG_FILE_NAME } from '../../../types/apimatic-config/document.js';
 import { DirectoryPath } from '../../../types/file/directoryPath.js';
 import { ServiceAddress } from '../../../types/portal/config/service-address.js';
@@ -12,9 +10,7 @@ import { IndexedVersion, IngestReceipt } from '../../../types/portal/copilot/ing
 import { PortalSourceProblem } from '../../../types/portal/portal-source.js';
 import { format as f } from '../../format.js';
 import { withSpinner } from '../../prompt.js';
-import { reportAuthorizationFailure } from '../authorization.js';
 import { reportSourceProblem } from '../source.js';
-import { checkAskAiSubscription } from './shared.js';
 
 const pages = (count: number): string => `${count} ${count === 1 ? 'page' : 'pages'}`;
 
@@ -30,18 +26,6 @@ export class PortalCopilotSyncPrompts {
       `Run ${f.cmdAlt('apimatic', 'portal', 'copilot', 'enable')} to set one up, then generate and deploy ` +
       `the portal again.`;
     log.error(message);
-  }
-
-  public notLoggedIn() {
-    log.error(ServiceError.unauthorizedWithHint(null).errorMessage);
-  }
-
-  public checkSubscription(fn: Promise<Result<AccountEntitlements, PortalAuthorizationFailure>>) {
-    return checkAskAiSubscription(fn);
-  }
-
-  public authorizationFailed(failure: PortalAuthorizationFailure) {
-    reportAuthorizationFailure(failure, 'sync Ask AI');
   }
 
   public portalNotGenerated(portalDirectory: DirectoryPath) {

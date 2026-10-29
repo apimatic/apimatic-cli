@@ -16,6 +16,7 @@ import { CopilotRegistration } from '../../../../src/types/portal/copilot/copilo
 import { ProjectContext } from '../../../../src/types/project-context';
 import { entitlementsWith } from '../../../helpers/account';
 import { withoutCopilotUrl } from '../../../helpers/copilot-url';
+import { AskAiAccessPrompts } from '../../../../src/prompts/portal/copilot/access';
 
 const COMMAND_METADATA: CommandMetadata = { commandName: 'portal:copilot:enable', shell: 'test' };
 const LIVE_KEY = `pk_live_${'a'.repeat(32)}`;
@@ -26,6 +27,7 @@ describe('PortalCopilotEnableAction', () => {
 
   let root: string;
   let prompts: sinon.SinonStubbedInstance<PortalCopilotEnablePrompts>;
+  let access: sinon.SinonStubbedInstance<AskAiAccessPrompts>;
   let authorizeAskAi: sinon.SinonStub;
   let register: sinon.SinonStub;
   let revoke: sinon.SinonStub;
@@ -56,7 +58,8 @@ describe('PortalCopilotEnableAction', () => {
     root = fs.mkdtempSync(path.join(os.tmpdir(), 'copilot-enable-'));
     prompts = sinon.stub(PortalCopilotEnablePrompts.prototype);
     // The spinners would render to stdout; pass the underlying promise straight through.
-    prompts.checkSubscription.callsFake((fn) => fn);
+    access = sinon.stub(AskAiAccessPrompts.prototype);
+    access.checkSubscription.callsFake((fn) => fn);
     prompts.register.callsFake((fn) => fn);
     prompts.revokePrevious.callsFake((fn) => fn);
     authorizeAskAi = sinon
@@ -200,7 +203,7 @@ describe('PortalCopilotEnableAction', () => {
     const result = await execute();
 
     expect(result.isFailed()).to.be.true;
-    expect(prompts.authorizationFailed.calledOnceWith(refused)).to.be.true;
+    expect(access.authorizationFailed.calledOnceWith(refused)).to.be.true;
     expect(register.called).to.be.false;
     expect(savedConfig().portal).to.not.have.property('ai');
   });
@@ -213,7 +216,7 @@ describe('PortalCopilotEnableAction', () => {
 
     writeSavedLogin('');
     expect((await execute({}, '  ')).isFailed()).to.be.true;
-    expect(prompts.notLoggedIn.calledOnce).to.be.true;
+    expect(access.notLoggedIn.calledOnce).to.be.true;
   });
 
   it('fails, saving nothing, when the service refuses the registration', async () => {
