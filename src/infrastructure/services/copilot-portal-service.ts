@@ -4,6 +4,7 @@ import { ServiceAddress } from '../../types/portal/config/service-address.js';
 import { CopilotKey } from '../../types/portal/copilot/copilot-key.js';
 import { CopilotRegistration } from '../../types/portal/copilot/copilot-registration.js';
 import { RegistrationOutcome, RevocationOutcome } from '../../types/portal/copilot/portal-key-outcomes.js';
+import { isJsonObject } from '../../utils/json-utils.js';
 import { envInfo } from '../env-info.js';
 import { ServiceError } from '../service-error.js';
 import { copilotFailureOf, copilotTransportFailure, duration } from './copilot-responses.js';
@@ -44,7 +45,7 @@ export class CopilotPortalService {
     try {
       const response = await this.axiosInstance(address, key, shell, authKey).delete('/v1/portals');
       if (response.status === 204 || response.status === 200) return ok('revoked');
-      if (response.status === 404) return ok('unknown');
+      if (response.status === 404 && isUnknownKey(response.data)) return ok('unknown');
       return err(copilotFailureOf(response));
     } catch (error) {
       return err(copilotTransportFailure(error, this.timedOut()));
@@ -69,4 +70,9 @@ export class CopilotPortalService {
       }
     });
   }
+}
+
+// Only the service's own answer says it holds no such key; a 404 from another host is a failure, so the key is kept.
+function isUnknownKey(body: unknown): boolean {
+  return isJsonObject(body) && body.code === 'not_found';
 }

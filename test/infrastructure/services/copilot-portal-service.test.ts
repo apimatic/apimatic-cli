@@ -119,9 +119,16 @@ describe('CopilotPortalService', () => {
     });
 
     it('treats a key the service does not know as nothing to revoke', async () => {
-      nock(API_URL).delete('/v1/portals').reply(404, { code: 'unknown_key', message: 'No such key.' });
+      nock(API_URL).delete('/v1/portals').reply(404, { code: 'not_found', message: 'No such Copilot key.' });
 
       expect((await revoke())._unsafeUnwrap()).to.equal('unknown');
+    });
+
+    // Say, APIMATIC_COPILOT_URL left pointing at another service: the key must not be dropped as revoked.
+    it('fails on a 404 that is not the service saying it holds no such key', async () => {
+      nock(API_URL).delete('/v1/portals').reply(404, '<html>Not Found</html>');
+
+      expect((await revoke())._unsafeUnwrapErr().code).to.equal(ServiceErrorCode.NotFound);
     });
 
     it("passes on the service's refusal", async () => {

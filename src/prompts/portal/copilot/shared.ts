@@ -13,6 +13,13 @@ export function reportServiceFailure(error: ServiceError, service: ServiceAddres
     );
     return;
   }
+  if (error.code === ServiceErrorCode.NotFound) {
+    log.error(
+      `${error.errorMessage} Check that ${f.link(service.toString())} is the Ask AI service, or ` +
+        `${f.var(COPILOT_URL_VARIABLE)} if you set it, and try again.`
+    );
+    return;
+  }
   log.error(error.errorMessage);
 }
 
