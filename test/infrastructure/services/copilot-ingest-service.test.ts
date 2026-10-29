@@ -163,14 +163,47 @@ describe('CopilotIngestService', () => {
       expect(result._unsafeUnwrapErr().errorMessage).to.equal('Indexing timed out.');
     });
 
+    it('keeps waiting through a status check that fails now and then', async () => {
+      const scope = nock(API_URL)
+        .get(`/v1/ingest/${VERSION_ID}`)
+        .reply(502)
+        .get(`/v1/ingest/${VERSION_ID}`)
+        .replyWithError('socket hang up')
+        .get(`/v1/ingest/${VERSION_ID}`)
+        .reply(200, statusBody('building'))
+        .get(`/v1/ingest/${VERSION_ID}`)
+        .reply(503)
+        .get(`/v1/ingest/${VERSION_ID}`)
+        .reply(200, statusBody('active'));
+
+      expect((await awaitIndexing())._unsafeUnwrap().status).to.equal('active');
+      expect(scope.isDone()).to.be.true;
+    });
+
+    it('gives up once a status check fails three times in a row', async () => {
+      const scope = nock(API_URL).get(`/v1/ingest/${VERSION_ID}`).times(3).reply(500);
+
+      expect((await awaitIndexing())._unsafeUnwrapErr().code).to.equal(ServiceErrorCode.ServerError);
+      expect(scope.isDone()).to.be.true;
+    });
+
+    it('does not retry a status check the service refuses', async () => {
+      const scope = nock(API_URL)
+        .get(`/v1/ingest/${VERSION_ID}`)
+        .reply(404, { code: 'not_found', message: 'No such version.' });
+
+      expect((await awaitIndexing())._unsafeUnwrapErr().errorMessage).to.equal('No such version.');
+      expect(scope.isDone()).to.be.true;
+    });
+
     it('refuses a status body it cannot read', async () => {
       nock(API_URL).get(`/v1/ingest/${VERSION_ID}`).reply(200, { status: 'done' });
 
       expect((await awaitIndexing())._unsafeUnwrapErr().code).to.equal(ServiceErrorCode.InvalidResponse);
     });
 
-    it('reports a status check that runs out of time as a timeout, not as a service it cannot reach', async () => {
-      nock(API_URL).get(`/v1/ingest/${VERSION_ID}`).delay(500).reply(200, statusBody('building'));
+    it('reports a status check that keeps running out of time as a timeout, not as a service it cannot reach', async () => {
+      nock(API_URL).get(`/v1/ingest/${VERSION_ID}`).times(3).delay(500).reply(200, statusBody('building'));
       const impatient = new CopilotIngestService({ pollIntervalMs: 1, statusTimeoutMs: 50 });
 
       const failure = (await impatient.awaitIndexing(COPILOT, VERSION_ID, 'bash', 'auth-key'))._unsafeUnwrapErr();
