@@ -37,7 +37,7 @@ export type CopilotChatProps = Readonly<{
 export default function CopilotChat({ copilot, open, onOpenChange, panel }: CopilotChatProps) {
   const [availability, setAvailability] = useState<Availability>('checking');
   return (
-    <CopilotProvider copilot={copilot} available={availability !== 'hidden'} onAvailability={setAvailability}>
+    <CopilotProvider copilot={copilot} availability={availability} onAvailability={setAvailability}>
       <FollowLayout open={open} onOpenChange={onOpenChange} />
       {panel !== null && createPortal(<CopilotPanel availability={availability} />, panel)}
     </CopilotProvider>
@@ -56,23 +56,27 @@ function FollowLayout({ open, onOpenChange }: Readonly<{ open: boolean; onOpenCh
 
 type ProviderProps = Readonly<{
   copilot: PortalCopilot;
-  available: boolean;
+  availability: Availability;
   onAvailability: Dispatch<SetStateAction<Availability>>;
   children: ReactNode;
 }>;
 
 /** The chat state and the "Ask AI" button; beside the layout, so a conversation survives navigation. */
-function CopilotProvider({ copilot, available, onAvailability, children }: ProviderProps) {
+function CopilotProvider({ copilot, availability, onAvailability, children }: ProviderProps) {
   // Turned away by the service (turned off, unknown key, another website): the portal shows no Ask AI at all,
   // unless the portal's plan lapsed, which the panel explains instead.
   const client = useMemo(
     () => new CopilotClient(copilot, (lapsed) => onAvailability(lapsed ?? 'hidden')),
     [copilot, onAvailability]
   );
+  const available = availability !== 'hidden';
+  // Once turned away, the answer stands for the page's life, so neither a hover nor an open asks the service again.
+  const turnedAway = !available || typeof availability === 'object';
   // A session that could not open for any other reason still offers the chat, whose question then says why.
   const prepare = useCallback(() => {
+    if (turnedAway) return;
     void client.prepare().then(() => onAvailability((now) => (now === 'checking' ? 'available' : now)));
-  }, [client, onAvailability]);
+  }, [client, onAvailability, turnedAway]);
   const transport = useMemo(() => chatTransport(client), [client]);
   const chat = useChat({ transport, onData: client.noteData });
   const suggestions = copilot.suggestions.length > 0 ? copilot.suggestions : undefined;
