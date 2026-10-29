@@ -83,7 +83,13 @@ export class PortalCopilotEnablePrompts {
   }
 
   public revokePrevious(fn: Promise<Result<RevocationOutcome, ServiceError>>) {
-    return withSpinner('Revoking the previous key', 'Revoked the previous key.', 'Revoking failed.', fn);
+    return withSpinner(
+      'Revoking the previous key',
+      (outcome) =>
+        outcome === 'revoked' ? 'Revoked the previous key.' : 'The Ask AI service no longer knew the previous key.',
+      'Revoking failed.',
+      fn
+    );
   }
 
   public previousKeyNotRevoked(error: ServiceError) {
