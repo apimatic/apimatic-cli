@@ -410,6 +410,46 @@ describe('GenerateAction', () => {
     expect(shared.prompts.sharedEndpoints.firstCall.args[0]).to.deep.equal([]);
   });
 
+  describe('an operation two merged specs declare', () => {
+    const MERGED_FIXTURE = new DirectoryPath(process.cwd()).join('test/resources/portal-inputs/merged');
+    const STATUS = { GET: { Example: 'const result = await client.health.getOrdersStatus();' } };
+
+    const deliverSamples = (catalog: object) =>
+      shared.artifacts.resolves(
+        ok(
+          completeArtifacts(undefined, {
+            codeSampleCatalogs: new CodeSampleCatalogs([CodeSampleCatalog.fromJson(Language.TYPESCRIPT, catalog)!])
+          })
+        )
+      );
+
+    it('is named with the specs declaring it once the samples arrive, when they are not filed by spec', async () => {
+      deliverSamples({ paths: { '/status': STATUS } });
+
+      const result = await execute(MERGED_FIXTURE);
+
+      expect(result.isSuccess()).to.be.true;
+      const [endpoints] = shared.prompts.sharedEndpoints.firstCall.args;
+      const named = endpoints.map(({ key, files }) => [`${key}`, files.map((file) => file.relativeTo(MERGED_FIXTURE))]);
+      expect(named).to.deep.equal([
+        ['GET /status', ['src/spec/orders/openapi.yaml', 'src/spec/inventory/openapi.json']]
+      ]);
+      expect(shared.prompts.sharedEndpoints.calledAfter(shared.artifacts)).to.be.true;
+    });
+
+    it('is not named when the samples are filed by spec', async () => {
+      deliverSamples({
+        paths: { '/status': STATUS },
+        specs: { 'orders/openapi.yaml': { paths: { '/status': STATUS } } }
+      });
+
+      const result = await execute(MERGED_FIXTURE);
+
+      expect(result.isSuccess()).to.be.true;
+      expect(shared.prompts.sharedEndpoints.firstCall.args[0]).to.deep.equal([]);
+    });
+  });
+
   // The fixture's root nav.json makes a tab of `guides`, and no two of its tabs share a name.
   it('reports the content notices, with no tab name shared in the fixture', async () => {
     const result = await execute();

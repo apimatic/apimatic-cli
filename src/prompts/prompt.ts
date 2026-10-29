@@ -4,6 +4,8 @@ import pc from 'picocolors';
 import { getColumns } from '@clack/core';
 import { log, note, NoteOptions, S_BAR_H, S_CONNECT_LEFT, spinner } from '@clack/prompts';
 import { Result } from 'neverthrow';
+import { DirectoryPath } from '../types/file/directoryPath.js';
+import { format as f } from './format.js';
 
 /** A fixed message, or one built from what the operation returned. */
 type SpinnerMessage<T> = string | ((value: T) => string);
@@ -55,6 +57,9 @@ export const noteWrapped = (message: string, title: string) => {
     note(message, title, opts);
   }
 };
+
+export const notZippedForUpload = (directory: DirectoryPath, reason: string): string =>
+  `${f.path(directory)} could not be zipped for upload: ${reason}`;
 
 type ColumnStyle = 'primary' | 'secondary' | 'item';
 
