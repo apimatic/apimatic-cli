@@ -4,6 +4,12 @@ import { PortalConfig } from './portal-config.js';
 const HEADER = "/* Written by the APIMatic CLI from the 'portal' block of src/apimatic.json. Edit that instead. */";
 
 /**
+ * The Ask AI chat's preset: a `@source` of the chat's code, so Tailwind writes the classes it uses. Imported
+ * only for a portal that offers the chat, so no other portal's stylesheet carries them.
+ */
+export const CHAT_PRESET = "@import '@fumadocs/ai-chat/css/preset.css';";
+
+/**
  * Scoped with `:not(.dark)`: a bare `:root` has the specificity of the theme's `.dark` block and
  * comes after it, so a colour meant for light mode would win in dark mode too.
  */
@@ -16,10 +22,10 @@ export const DARK_SELECTOR = '.dark';
  * can rewrite it whole when the block changes; rendered here so the CSS is tested without a build.
  */
 export class PortalStylesheet {
-  private constructor(private readonly primary: { light: Color; dark: Color } | null) {}
+  private constructor(private readonly primary: { light: Color; dark: Color } | null, private readonly chat: boolean) {}
 
   public static of(config: PortalConfig): PortalStylesheet {
-    return new PortalStylesheet(config.brandSettings().brandColors().primaryColors());
+    return new PortalStylesheet(config.brandSettings().brandColors().primaryColors(), config.copilotService() !== null);
   }
 
   public toString(): string {
@@ -30,7 +36,8 @@ export class PortalStylesheet {
             PortalStylesheet.rule(LIGHT_SELECTOR, this.primary.light),
             PortalStylesheet.rule(DARK_SELECTOR, this.primary.dark)
           ];
-    return [HEADER, ...rules].join('\n\n').concat('\n');
+    // An import goes before any rule, or the stylesheet drops it.
+    return [HEADER, ...(this.chat ? [CHAT_PRESET] : []), ...rules].join('\n\n').concat('\n');
   }
 
   private static rule(selector: string, primary: Color): string {

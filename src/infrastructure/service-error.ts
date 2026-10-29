@@ -11,7 +11,8 @@ export enum ServiceErrorCode {
   UnAuthorized = 'UNAUTHORIZED',
   BadRequest = 'BAD_REQUEST',
   Forbidden = 'FORBIDDEN',
-  Timeout = 'TIMEOUT'
+  Timeout = 'TIMEOUT',
+  ProcessingFailed = 'PROCESSING_FAILED'
 }
 
 export class ServiceError {
@@ -39,6 +40,10 @@ export class ServiceError {
   }
   static timeout(customMessage: string): ServiceError {
     return new ServiceError(ServiceErrorCode.Timeout, customMessage, {});
+  }
+  /** The service took the work on but could not finish it; the message is its reason, or empty without one. */
+  static processingFailed(reason: string | null): ServiceError {
+    return new ServiceError(ServiceErrorCode.ProcessingFailed, reason ?? '', {});
   }
   static unauthorizedWithHint(apiMessage: string | null): ServiceError {
     // Both remedies name the full `auth login` command: the key is supplied to

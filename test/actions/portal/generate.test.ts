@@ -1,3 +1,4 @@
+import { createHash } from 'crypto';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -15,12 +16,14 @@ import { ServiceError } from '../../../src/infrastructure/service-error';
 import { DirectoryPath } from '../../../src/types/file/directoryPath';
 import { CommandMetadata } from '../../../src/types/common/command-metadata';
 import { ProjectContext } from '../../../src/types/project-context';
+import { COPILOT_PAGES_FILE, GeneratedPortalContext } from '../../../src/types/portal/copilot/generated-portal-context';
 import { completeArtifacts, stubPreparePortalProject } from './prepare-project-stubs';
 
 const COMMAND_METADATA: CommandMetadata = { commandName: 'portal generate', shell: 'test' };
 const FIXTURE = new DirectoryPath(process.cwd()).join('test/resources/portal-inputs/default');
 const CODE_SAMPLES_FIXTURE = new DirectoryPath(process.cwd()).join('test/resources/portal-inputs/code-samples');
 const SUBPATH_FIXTURE = new DirectoryPath(process.cwd()).join('test/resources/portal-inputs/subpath');
+const COPILOT_FIXTURE = new DirectoryPath(process.cwd()).join('test/resources/portal-inputs/copilot');
 
 /** The catalogs the merged fixture expects, read the way the service reads them. */
 const samplesFromFixture = (): CodeSampleCatalogs => {
@@ -37,6 +40,7 @@ describe('GenerateAction', () => {
   let shared: ReturnType<typeof stubPreparePortalProject>;
   let authorize: sinon.SinonStub;
   let build: sinon.SinonStub;
+  let builtSite: DirectoryPath;
 
   const execute = (projectDirectory = FIXTURE, force = false, zip = false) =>
     new GenerateAction(new DirectoryPath(root), COMMAND_METADATA, 'auth-key').execute(
@@ -58,7 +62,7 @@ describe('GenerateAction', () => {
     portalDirectory = new DirectoryPath(root).join('portal');
 
     // What a successful build hands back: a directory holding the finished site.
-    const builtSite = new DirectoryPath(root).join('site');
+    builtSite = new DirectoryPath(root).join('site');
     fs.mkdirSync(builtSite.toString(), { recursive: true });
     fs.writeFileSync(path.join(builtSite.toString(), 'index.html'), '<html></html>');
     fs.writeFileSync(path.join(builtSite.toString(), '_shell.html'), '<html></html>');
@@ -239,6 +243,86 @@ describe('GenerateAction', () => {
     expect(inPortal('404.html')).to.be.true;
     expect(prompts.portalGenerated.calledOnceWith(portalDirectory)).to.be.true;
     expect(prompts.nextSteps.calledOnceWith(portalDirectory, false)).to.be.true;
+    expect(prompts.copilotUpdatesAfterDeploy.called, 'no Ask AI to update').to.be.false;
+    expect(inPortal('__copilot')).to.be.false;
+  });
+
+  describe('with Ask AI', () => {
+    const readPortal = (relative: string) => fs.readFileSync(path.join(portalDirectory.toString(), relative), 'utf8');
+
+    const PAGE = { path: '/', title: 'Welcome', description: 'Start here', markdown: '# Welcome' };
+
+    /** As a build of a portal with Ask AI writes them. */
+    const writePages = (pages: unknown[] = [PAGE]) => {
+      const file = path.join(builtSite.toString(), COPILOT_PAGES_FILE);
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      fs.writeFileSync(file, JSON.stringify(pages));
+    };
+
+    it('deploys the pages with the portal, named by a build ID the service compares', async () => {
+      writePages();
+
+      const result = await execute(COPILOT_FIXTURE);
+
+      expect(result.isSuccess()).to.be.true;
+      expect(inPortal(COPILOT_PAGES_FILE), 'the pages as the build wrote them').to.be.false;
+      const bundle = readPortal('__copilot/bundle.json');
+      const { pages } = JSON.parse(bundle) as { pages: unknown[] };
+      expect(pages).to.deep.equal([PAGE]);
+      const manifest = JSON.parse(readPortal('__copilot/build.json')) as { formatVersion: number; buildId: string };
+      expect(manifest.formatVersion).to.equal(1);
+      // The service refuses a deployed bundle.json that does not hash to this.
+      expect(manifest.buildId).to.equal(createHash('sha256').update(bundle).digest('hex'));
+      // The fixture gives no `site.url`, so the service cannot find the portal by itself.
+      expect(prompts.copilotUpdatesAfterDeploy.calledOnceWith(null)).to.be.true;
+    });
+
+    it('puts the pages in the archive when the portal is zipped', async () => {
+      writePages();
+
+      const result = await execute(COPILOT_FIXTURE, false, true);
+
+      expect(result.isSuccess()).to.be.true;
+      expect(inPortal('__copilot')).to.be.false;
+      expect(fs.existsSync(path.join(builtSite.toString(), '__copilot', 'build.json'))).to.be.true;
+    });
+
+    it('still saves the portal when its pages cannot be read', async () => {
+      writePages();
+      sinon.stub(GeneratedPortalContext.prototype, 'takePages').resolves(err('EACCES: permission denied'));
+
+      const result = await execute(COPILOT_FIXTURE);
+
+      expect(result.isSuccess()).to.be.true;
+      expect(inPortal('index.html')).to.be.true;
+      expect(inPortal('__copilot')).to.be.false;
+      expect(prompts.copilotBundleNotWritten.calledOnceWith('EACCES: permission denied')).to.be.true;
+      expect(prompts.copilotUpdatesAfterDeploy.called).to.be.false;
+    });
+
+    it('still saves the portal when it has no pages', async () => {
+      writePages([]);
+
+      const result = await execute(COPILOT_FIXTURE);
+
+      expect(result.isSuccess()).to.be.true;
+      expect(inPortal('index.html')).to.be.true;
+      expect(inPortal('__copilot')).to.be.false;
+      expect(prompts.copilotPagesNotFound.calledOnce).to.be.true;
+      expect(prompts.copilotPagesNotBuilt.called).to.be.false;
+      expect(prompts.copilotUpdatesAfterDeploy.called).to.be.false;
+    });
+
+    it('still saves the portal when the build wrote no pages for Ask AI, naming it a fault of the build', async () => {
+      const result = await execute(COPILOT_FIXTURE);
+
+      expect(result.isSuccess()).to.be.true;
+      expect(inPortal('index.html')).to.be.true;
+      expect(inPortal('__copilot')).to.be.false;
+      expect(prompts.copilotPagesNotBuilt.calledOnce).to.be.true;
+      expect(prompts.copilotPagesNotFound.called).to.be.false;
+      expect(prompts.copilotUpdatesAfterDeploy.called).to.be.false;
+    });
   });
 
   it('writes an archive instead when asked', async () => {

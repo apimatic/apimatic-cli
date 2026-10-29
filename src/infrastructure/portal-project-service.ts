@@ -14,6 +14,7 @@ import { PortalConfig } from '../types/portal/portal-config.js';
 import { PLUGIN_DOWNLOAD, SDK_DOWNLOADS_FOLDER, sdkDownload } from '../types/portal/portal-downloads.js';
 import { PortalSettings, PortalSource } from '../types/portal/portal-source.js';
 import { PortalStylesheet } from '../types/portal/portal-stylesheet.js';
+import { PortalCopilotEntry } from '../types/portal/portal-copilot-entry.js';
 import { errorMessage } from '../utils/error-utils.js';
 import { envInfo } from './env-info.js';
 import { FileService } from './file-service.js';
@@ -27,6 +28,8 @@ export const COPIED_DEPENDENCIES = ['@fontsource-variable/geist', '@fontsource-v
 // pnpm global install, `npx` or `pnpm dlx` the package has no nested `node_modules`, and a
 // single link also lets Vite write its scratch files into the CLI's own install directory.
 export const LINKED_DEPENDENCIES = [
+  '@ai-sdk/react',
+  '@fumadocs/ai-chat',
   '@fumadocs/api-docs',
   '@scalar/json-magic',
   '@tailwindcss/vite',
@@ -34,6 +37,7 @@ export const LINKED_DEPENDENCIES = [
   '@tanstack/react-start',
   '@tanstack/start-static-server-functions',
   '@vitejs/plugin-react',
+  'ai',
   'fumadocs-core',
   'fumadocs-mdx',
   'fumadocs-openapi',
@@ -57,6 +61,8 @@ const IDENTITY_FILE_NAME = 'portal.identity.json';
 
 /** In `src/styles/`, beside `app.css`, which imports it. */
 const STYLESHEET_FILE_NAME = 'theme.css';
+/** Beside `layout.tsx`, which takes the Ask AI chat from it. */
+const COPILOT_ENTRY_FILE_NAME = 'copilot-entry.ts';
 
 /** Where the SDKs and the context plugin are laid out as the site serves them, inside the project. */
 export const DOWNLOADS_DIRECTORY_NAME = 'downloads';
@@ -388,6 +394,10 @@ export class PortalProjectService {
       [
         new FilePath(projectDirectory.join('src').join('styles'), new FileName(STYLESHEET_FILE_NAME)),
         PortalStylesheet.of(config).toString()
+      ],
+      [
+        new FilePath(projectDirectory.join('src').join('lib'), new FileName(COPILOT_ENTRY_FILE_NAME)),
+        PortalCopilotEntry.of(config).toString()
       ]
     ];
   }

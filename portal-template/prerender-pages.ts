@@ -1,7 +1,7 @@
 import { readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { getSlugs, loader } from 'fumadocs-core/source';
-import type { BuildPaths } from './portal-config.ts';
+import type { BuildIdentity, BuildPaths } from './portal-config.ts';
 import { withBasePath } from './src/lib/base-path';
 import { oauthCallbackPath } from './src/lib/oauth-callback';
 import { openApiSection } from './src/lib/openapi-section.server';
@@ -16,8 +16,13 @@ const isSkippedByGlob = (segment: string) => segment.startsWith('.') || segment 
  * collapsed sidebar folders and never sees the `.md` URLs the page actions fetch, so
  * the list is computed here from the same sources the site is built from.
  */
-export async function prerenderPages(config: BuildPaths, siteUrl: string | null): Promise<{ path: string }[]> {
+export async function prerenderPages(
+  config: BuildPaths,
+  { siteUrl, copilot }: BuildIdentity
+): Promise<{ path: string }[]> {
   const urls = new Set<string>(['/', '/api/search.json', '/llms.txt', '/llms-full.txt']);
+  // The pages the CLI bundles for Ask AI, so only for a portal that offers it.
+  if (copilot) urls.add('/api/copilot-pages.json');
   // Both need absolute URLs, so they are only emitted for a portal that declares its address.
   if (siteUrl) {
     urls.add('/sitemap.xml');

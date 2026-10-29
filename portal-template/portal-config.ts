@@ -25,7 +25,7 @@ export async function readBuildPaths(): Promise<BuildPaths> {
 }
 
 /** The part of what the browser is told that the build set-up reads too. */
-export type BuildIdentity = Pick<Portal, 'siteUrl'>;
+export type BuildIdentity = Pick<Portal, 'siteUrl' | 'copilot'>;
 
 export async function readPortalIdentity(): Promise<BuildIdentity> {
   return (await readJson('./portal.identity.json')) as BuildIdentity;
