@@ -1,4 +1,3 @@
-import net from 'node:net';
 import { Buffer } from 'node:buffer';
 import { gunzipSync } from 'node:zlib';
 import nock from 'nock';
@@ -7,6 +6,7 @@ import { CopilotIngestService } from '../../../src/infrastructure/services/copil
 import { ServiceErrorCode } from '../../../src/infrastructure/service-error';
 import { CopilotBundle } from '../../../src/types/portal/copilot/copilot-bundle';
 import { ServiceAddress } from '../../../src/types/portal/config/service-address';
+import { closedPort } from '../../helpers/network';
 
 const API_URL = 'http://localhost:8787';
 const at = (url: string) => ServiceAddress.parse(url, 'apiUrl')._unsafeUnwrap();
@@ -30,15 +30,6 @@ const statusBody = (status: string, extra: Record<string, unknown> = {}) => ({
   error: null,
   ...extra
 });
-
-/** A port nothing listens on, so a connection to it is refused. */
-const closedPort = async (): Promise<number> => {
-  const server = net.createServer();
-  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
-  const { port } = server.address() as net.AddressInfo;
-  await new Promise<void>((resolve) => server.close(() => resolve()));
-  return port;
-};
 
 describe('CopilotIngestService', () => {
   const service = new CopilotIngestService({ pollIntervalMs: 1, indexTimeoutMs: 5000 });

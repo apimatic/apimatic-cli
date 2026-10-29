@@ -1,4 +1,3 @@
-import net from 'node:net';
 import nock from 'nock';
 import { expect } from 'chai';
 import { CopilotPortalService } from '../../../src/infrastructure/services/copilot-portal-service';
@@ -7,6 +6,7 @@ import { ServiceAddress } from '../../../src/types/portal/config/service-address
 import { PortalConfig } from '../../../src/types/portal/portal-config';
 import { CopilotKey } from '../../../src/types/portal/copilot/copilot-key';
 import { CopilotRegistration } from '../../../src/types/portal/copilot/copilot-registration';
+import { closedPort } from '../../helpers/network';
 
 const API_URL = 'http://localhost:8787';
 const ADDRESS = ServiceAddress.parse(API_URL, 'APIMATIC_COPILOT_URL')._unsafeUnwrap();
@@ -19,15 +19,6 @@ const REGISTRATION = CopilotRegistration.of(
   [],
   'live'
 )._unsafeUnwrap();
-
-/** A port nothing listens on, so a connection to it is refused. */
-const closedPort = async (): Promise<number> => {
-  const server = net.createServer();
-  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
-  const { port } = server.address() as net.AddressInfo;
-  await new Promise<void>((resolve) => server.close(() => resolve()));
-  return port;
-};
 
 describe('CopilotPortalService', () => {
   const service = new CopilotPortalService(500);

@@ -11,9 +11,6 @@ import { profileWith } from '../../helpers/account';
 
 const BASE_URL = 'http://portal-authorization.test';
 
-const profile = (isOnPremGenerationAllowed: boolean) =>
-  isOnPremGenerationAllowed ? profileWith('portalGeneration') : profileWith();
-
 describe('PortalAuthorizationService', () => {
   const service = new PortalAuthorizationService();
   let configDir: DirectoryPath;
@@ -53,7 +50,7 @@ describe('PortalAuthorizationService', () => {
 
   it('allows an account whose subscription includes on-premises generation', async () => {
     storeKey('stored-key');
-    nock(BASE_URL).get('/account/profile').reply(200, profile(true));
+    nock(BASE_URL).get('/account/profile').reply(200, profileWith('portalGeneration'));
 
     expect((await authorize()).isOk()).to.be.true;
   });
@@ -63,7 +60,7 @@ describe('PortalAuthorizationService', () => {
     const scope = nock(BASE_URL)
       .matchHeader('Authorization', 'X-Auth-Key flag-key')
       .get('/account/profile')
-      .reply(200, profile(true));
+      .reply(200, profileWith('portalGeneration'));
 
     expect((await authorize('flag-key')).isOk()).to.be.true;
     expect(scope.isDone()).to.be.true;
@@ -74,7 +71,7 @@ describe('PortalAuthorizationService', () => {
     const scope = nock(BASE_URL)
       .matchHeader('Authorization', 'X-Auth-Key stored-key')
       .get('/account/profile')
-      .reply(200, profile(true));
+      .reply(200, profileWith('portalGeneration'));
 
     expect((await authorize()).isOk()).to.be.true;
     expect(scope.isDone()).to.be.true;
@@ -82,7 +79,7 @@ describe('PortalAuthorizationService', () => {
 
   it('reports an account with no entitlement separately from one it could not reach', async () => {
     storeKey('stored-key');
-    nock(BASE_URL).get('/account/profile').reply(200, profile(false));
+    nock(BASE_URL).get('/account/profile').reply(200, profileWith());
 
     expect((await authorize())._unsafeUnwrapErr()).to.deep.equal({ kind: 'notEntitled', feature: 'portalGeneration' });
   });
@@ -95,7 +92,7 @@ describe('PortalAuthorizationService', () => {
   });
 
   it('treats a missing key as unauthenticated without calling the API', async () => {
-    const scope = nock(BASE_URL).get('/account/profile').reply(200, profile(true));
+    const scope = nock(BASE_URL).get('/account/profile').reply(200, profileWith('portalGeneration'));
 
     expect((await authorize())._unsafeUnwrapErr().kind).to.equal('unauthenticated');
     expect(scope.isDone(), 'no request should have been made').to.be.false;
