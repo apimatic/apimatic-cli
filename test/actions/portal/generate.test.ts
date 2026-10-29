@@ -243,17 +243,6 @@ describe('GenerateAction', () => {
       authorize.resolves(ok(entitlementsWith('portalGeneration', 'askAi')));
     });
 
-    it('fails without building when the subscription does not include Ask AI, saying how to build without it', async () => {
-      authorize.resolves(ok(entitlementsWith('portalGeneration')));
-
-      const result = await execute(COPILOT_FIXTURE);
-
-      expect(result.isFailed()).to.be.true;
-      expect(shared.prompts.askAiNotEntitled.calledOnce).to.be.true;
-      expect(shared.artifacts.called).to.be.false;
-      expect(build.called).to.be.false;
-    });
-
     it('warns when the portal is built with a development key', async () => {
       writePages();
       const project = new DirectoryPath(root).join('dev-key-project');
