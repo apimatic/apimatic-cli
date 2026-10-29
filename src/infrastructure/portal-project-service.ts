@@ -134,10 +134,7 @@ export class PortalProjectService {
       projectDirectory,
       source,
       await this.contentDirectory(projectDirectory, source),
-      await this.writeCodeSamples(
-        projectDirectory,
-        artifacts.codeSampleCatalogs.without(source.sharedEndpoints.map(({ key }) => key))
-      ),
+      await this.writeCodeSamples(projectDirectory, source, artifacts.codeSampleCatalogs),
       await this.writeDownloads(projectDirectory, artifacts)
     );
 
@@ -198,13 +195,15 @@ export class PortalProjectService {
   // The template places the samples on the specs as it bundles them, so the specs are read where they are.
   private async writeCodeSamples(
     projectDirectory: DirectoryPath,
+    source: PortalSource,
     codeSampleCatalogs: CodeSampleCatalogs
   ): Promise<FilePath | null> {
     if (codeSampleCatalogs.isEmpty()) {
       return null;
     }
     const file = new FilePath(projectDirectory, new FileName('code-samples.json'));
-    await this.fileService.writeContents(file, JSON.stringify(codeSampleCatalogs.toJson()));
+    const placed = codeSampleCatalogs.placedOn(source.specs, source.specDirectory);
+    await this.fileService.writeContents(file, JSON.stringify(placed.toJson()));
     return file;
   }
 

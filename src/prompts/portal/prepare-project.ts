@@ -5,20 +5,22 @@ import { PortalAuthorizationFailure } from '../../infrastructure/services/portal
 import { APIMATIC_CONFIG_FILE_NAME } from '../../types/apimatic-config/document.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { FileName } from '../../types/file/fileName.js';
+import { FileProblem } from '../../types/file/file-problem.js';
 import { FilePath } from '../../types/file/filePath.js';
+import { SharedEndpoint, UnplacedSamples } from '../../types/portal/code-samples.js';
 import { ContentNotices } from '../../types/portal/content-notices.js';
 import { MissingArtifacts } from '../../types/portal/generated-pages.js';
 import { PortalArtifacts } from '../../types/portal/portal-artifacts.js';
-import { PortalSourceProblem, SharedEndpoint } from '../../types/portal/portal-source.js';
+import { PortalSourceProblem } from '../../types/portal/portal-source.js';
 import { format as f } from '../format.js';
+import { notZippedForUpload } from '../prompt.js';
 import { describeMissingArtifacts, generateArtifacts } from './artifacts.js';
 import { reportAuthorizationFailure } from './authorization.js';
-import { reportUnplacedSamples } from './code-samples.js';
+import { reportSharedEndpoints, reportUnplacedSamples } from './code-samples.js';
 import {
   reportContentNotices,
   reportLeftOutSpecs,
   reportShadowedFiles,
-  reportSharedEndpoints,
   reportSourceProblem,
   reportUnmergedSpecs
 } from './source.js';
@@ -47,6 +49,10 @@ export class PreparePortalProjectPrompts {
       `To build the portal without its Ask AI chat, remove ${f.var('ai.copilot')} from the ${f.var('portal')} ` +
         `block of ${f.path(config)}.`
     );
+  }
+
+  public sourceNotZipped(problem: FileProblem, sourceDirectory: DirectoryPath) {
+    log.error(notZippedForUpload(sourceDirectory, problem.reason));
   }
 
   public generateArtifacts(fn: Promise<Result<PortalArtifacts, ServiceError>>) {
@@ -85,8 +91,8 @@ export class PreparePortalProjectPrompts {
     reportSharedEndpoints(shared, sourceDirectory);
   }
 
-  public unplacedSamples(endpoints: string[]) {
-    reportUnplacedSamples(endpoints);
+  public unplacedSamples(unplaced: UnplacedSamples[], sourceDirectory: DirectoryPath) {
+    reportUnplacedSamples(unplaced, sourceDirectory);
   }
 
   // A run delivers everything or nothing, so a gap is the server's, and trying again is the fix.

@@ -89,15 +89,15 @@ export class CopilotIngestService {
     copilot: CopilotTarget,
     versionId: string,
     shell: string,
-    token: string
+    token: string,
+    attemptsLeft: number = STATUS_ATTEMPTS
   ): Promise<Result<IngestStatus, ServiceError>> {
-    for (let attempt = 1; ; attempt++) {
-      const status = await this.status(copilot, versionId, shell, token);
-      if (status.isOk() || attempt === STATUS_ATTEMPTS || !TRANSIENT.has(status.error.code)) {
-        return status;
-      }
-      await sleep(this.timings.pollIntervalMs);
+    const status = await this.status(copilot, versionId, shell, token);
+    if (status.isOk() || attemptsLeft <= 1 || !TRANSIENT.has(status.error.code)) {
+      return status;
     }
+    await sleep(this.timings.pollIntervalMs);
+    return this.statusRetried(copilot, versionId, shell, token, attemptsLeft - 1);
   }
 
   private async status(

@@ -984,34 +984,12 @@ describe('PortalSourceContext', () => {
         expect((await resolve())._unsafeUnwrap().unmergedSpecs).to.be.empty;
       });
 
-      it('names each operation more than one spec declares, with the specs that do', async () => {
-        write('spec/APIMATIC-META.json', JSON.stringify({ MergeConfiguration: { MergeApis: true } }));
-        write('spec/alpha/openapi.json', withPaths({ '/status': { get: {} }, '/alpha': { get: {} } }));
-        write('spec/beta/openapi.json', withPaths({ '/status': { get: {}, post: {} }, '/beta': { get: {} } }));
-
-        const shared = (await resolve())._unsafeUnwrap().sharedEndpoints;
-
-        expect(shared.map(({ key, files }) => [`${key}`, files.map(relative)])).to.deep.equal([
-          ['GET /status', ['spec/alpha/openapi.json', 'spec/beta/openapi.json']]
-        ]);
-      });
-
-      it('names none when no two specs declare the same operation', async () => {
-        write('spec/a.json', withPaths({ '/a': { get: {} } }));
-        write('spec/b.json', withPaths({ '/b': { get: {} } }));
-
-        expect((await resolve())._unsafeUnwrap().sharedEndpoints).to.be.empty;
-      });
-
       // A path item's own method beside its `$ref` declares the operation a second time, in the one spec.
-      it('reads an operation one spec declares twice once, and names none shared', async () => {
+      it('reads an operation one spec declares twice once', async () => {
         write('spec/paths/pets.json', JSON.stringify({ get: {} }));
         write('spec/api.json', withPaths({ '/pets': { $ref: './paths/pets.json', get: {} } }));
 
-        const source = (await resolve())._unsafeUnwrap();
-
-        expect(source.specs[0].endpoints.map(String)).to.deep.equal(['GET /pets']);
-        expect(source.sharedEndpoints).to.be.empty;
+        expect((await resolve())._unsafeUnwrap().specs[0].endpoints.map(String)).to.deep.equal(['GET /pets']);
       });
     });
   });
@@ -1957,7 +1935,7 @@ describe('PortalSourceContext', () => {
     });
   });
 
-  // The build imports each Markdown image, and fails as a whole over one it cannot find.
+  // The build imports each image, and fails as a whole over one it cannot find.
   describe('the images the pages show', () => {
     beforeEach(() => {
       writeConfig({ site: { name: 'Calc' } });
@@ -2045,6 +2023,18 @@ describe('PortalSourceContext', () => {
 
       expect(await missingImages()).to.deep.equal([
         ['content/index.mdx:6', '/images/missing.png', 'static/images/missing.png', null]
+      ]);
+    });
+
+    it('names an <img> in an .mdx page whose file the build would not find', async () => {
+      write(
+        'content/guides/index.mdx',
+        page('Guides') +
+          '<img src="/images/logo.png" width="200" />\n\n<img src="./diagram.png" />\n\n<img src="./missing.png" />\n'
+      );
+
+      expect(await missingImages()).to.deep.equal([
+        ['content/guides/index.mdx:8', './missing.png', 'content/guides/missing.png', null]
       ]);
     });
 

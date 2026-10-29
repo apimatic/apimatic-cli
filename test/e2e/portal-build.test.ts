@@ -268,6 +268,11 @@ const stylesheetOf = (output: DirectoryPath) => {
     expect(exists('images/logo.png')).to.be.true;
   });
 
+  // Hosted at the root too, an `<img>` is bundled (remark-jsx-images.ts); a file this small is inlined.
+  it("bundles an <img>'s file", () => {
+    expect(read('authentication/index.html')).to.match(/<img[^>]* src="data:image\/svg\+xml,[^"]+"[^>]* width="48"/);
+  });
+
   it('writes the not-found page static hosts serve for unknown paths', () => {
     expect(exists('404.html')).to.be.true;
   });
@@ -861,6 +866,7 @@ const stylesheetOf = (output: DirectoryPath) => {
     for (const page of [
       'index.html',
       'authentication/index.html',
+      'figures/index.html',
       'api/apimatic-calculator/simple-calculator/Calculate/index.html',
       'sdks/index.html',
       'sdks/typescript/index.html',
@@ -891,6 +897,14 @@ const stylesheetOf = (output: DirectoryPath) => {
     expect(read('authentication/index.html')).to.match(/<img[^>]* src="\/api\/assets\/diagram[^"]*\.png"/);
   });
 
+  // `remarkImage` bundles Markdown images alone; the template bundles these (remark-jsx-images.ts).
+  it('bundles an <img> in an .mdx page, from the static directory or beside its page', () => {
+    const page = read('figures/index.html');
+
+    expect(page).to.match(/<img[^>]* src="\/api\/assets\/diagram[^"]*\.png"[^>]* width="320"/);
+    expect(page).to.match(/<img[^>]* src="\/api\/assets\/flow[^"]*\.png"/);
+  });
+
   // Fumadocs swapped a bundled image for its import's name, `<img src="__img0" />` (fuma-nama/fumadocs#3662).
   it('keeps the images as written in the Markdown twins and llms-full.txt', () => {
     const full = read('llms-full.txt');
@@ -898,8 +912,11 @@ const stylesheetOf = (output: DirectoryPath) => {
     expect(read('index.md')).to.contain('![How a calculation flows](/images/diagram.png)');
     expect(read('authentication.md')).to.contain('![The flow, by reference][flow]');
     expect(read('authentication.md')).to.contain('[flow]: /images/diagram.png');
+    expect(read('figures.md')).to.contain('<img src="/images/diagram.png" width="320"');
+    expect(read('figures.md')).to.contain('<img src="./flow.png" alt="The steps" />');
     expect(full).to.contain('![How a calculation flows](/images/diagram.png)');
     expect(full).to.not.contain('__img');
+    expect(full).to.not.contain('__jsxImg');
   });
 
   // Fumadocs' own renderer fails the whole page over an image in a description; `ApiMarkdown` stands in for it.
@@ -974,6 +991,14 @@ const stylesheetOf = (output: DirectoryPath) => {
   });
 });
 
+/** A TypeScript sample of `call`, as the platform delivers one. */
+const sample = (call: string) => ({ Example: `const result = await ${call};` });
+
+const LIST_ORDERS = 'api/orders/orders/listOrders';
+const LIST_STOCK = 'api/inventory/stock/listStock';
+const ORDERS_STATUS = 'api/orders/health/getOrdersStatus';
+const INVENTORY_STATUS = 'api/inventory/health/getInventoryStatus';
+
 /**
  * The layout the platform merges several APIs into one SDK from: a folder to each API, named in
  * `APIMATIC-META.json`. Both APIs declare `GET /status`, and the orders API keeps a schema in a
@@ -982,7 +1007,6 @@ const stylesheetOf = (output: DirectoryPath) => {
 (enabled ? describe : describe.skip)('portal build, merged spec folders (end to end)', function () {
   this.timeout(10 * 60 * 1000);
 
-  const sample = (call: string) => ({ Example: `const result = await ${call};` });
   const portal = portalBuilt('merged', {
     codeSampleCatalogs: new CodeSampleCatalogs([
       CodeSampleCatalog.fromJson(Language.TYPESCRIPT, {
@@ -996,9 +1020,7 @@ const stylesheetOf = (output: DirectoryPath) => {
   });
   const { read, exists } = portal;
 
-  const LIST_ORDERS = 'api/orders/orders/listOrders';
-  const LIST_STOCK = 'api/inventory/stock/listStock';
-  const STATUS_PAGES = ['api/orders/health/getOrdersStatus', 'api/inventory/health/getInventoryStatus'];
+  const STATUS_PAGES = [ORDERS_STATUS, INVENTORY_STATUS];
 
   it('writes a section per merged folder, named after it, with a page per operation', () => {
     for (const page of [LIST_ORDERS, LIST_STOCK, ...STATUS_PAGES]) {
@@ -1018,7 +1040,7 @@ const stylesheetOf = (output: DirectoryPath) => {
     expect(stock).to.contain('https://inventory.store.test');
   });
 
-  // The samples hold one per method and path: the inventory page would show the orders API's call.
+  // Not filed by spec, the samples hold one per method and path: the inventory page would show the orders API's call.
   it('shows no SDK sample on an operation both APIs declare', () => {
     for (const page of STATUS_PAGES) {
       expect(read(`${page}/index.html`), page).to.not.contain('x-apimatic-codeSamples');
@@ -1113,5 +1135,44 @@ const stylesheetOf = (output: DirectoryPath) => {
     expect(scripts.some((script) => script.text.includes('https://ask.apimatic.io'))).to.be.true;
     const fixture = new DirectoryPath(process.cwd()).join('test/resources/portal-inputs/copilot/src');
     expect(publishedFilesNaming(portal.output(), portal.project().toString(), fixture.toString())).to.deep.equal([]);
+  });
+});
+
+/**
+ * The same folders with the samples filed by spec, as the platform files them for two specs: each
+ * under its main file, while `paths` keeps the first call it reached on `GET /status`.
+ */
+(enabled ? describe : describe.skip)('portal build, samples filed by spec (end to end)', function () {
+  this.timeout(10 * 60 * 1000);
+
+  const ordersStatus = 'client.health.getOrdersStatus()';
+  const inventoryStatus = 'client.health.getInventoryStatus()';
+  const listOrders = { GET: sample('client.orders.listOrders()') };
+  const listStock = { GET: sample('client.stock.listStock()') };
+  const { read } = portalBuilt('merged', {
+    codeSampleCatalogs: new CodeSampleCatalogs([
+      CodeSampleCatalog.fromJson(Language.TYPESCRIPT, {
+        paths: { '/orders': listOrders, '/stock': listStock, '/status': { GET: sample(ordersStatus) } },
+        specs: {
+          'orders/openapi.yaml': { paths: { '/orders': listOrders, '/status': { GET: sample(ordersStatus) } } },
+          'inventory/openapi.json': { paths: { '/stock': listStock, '/status': { GET: sample(inventoryStatus) } } }
+        }
+      }) as CodeSampleCatalog
+    ])
+  });
+
+  it("shows each API's own SDK call on the operation both declare", () => {
+    const orders = read(`${ORDERS_STATUS}/index.html`);
+    const inventory = read(`${INVENTORY_STATUS}/index.html`);
+
+    expect(orders).to.contain(ordersStatus);
+    expect(orders).to.not.contain(inventoryStatus);
+    expect(inventory).to.contain(inventoryStatus);
+    expect(inventory).to.not.contain(ordersStatus);
+  });
+
+  it("shows each API's own SDK call on an operation only it declares", () => {
+    expect(read(`${LIST_ORDERS}/index.html`)).to.contain('client.orders.listOrders()');
+    expect(read(`${LIST_STOCK}/index.html`)).to.contain('client.stock.listStock()');
   });
 });

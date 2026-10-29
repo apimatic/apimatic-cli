@@ -40,7 +40,6 @@ import {
   SpecConversion,
   UnreadableSpecReason
 } from './portal/portal-source.js';
-import { shared } from './portal/shared.js';
 import { ReferencedFile, SpecBundle } from './portal/spec-bundle.js';
 import { SpecMetadata } from './portal/spec-metadata.js';
 import { SpecContext } from './spec-context.js';
@@ -178,7 +177,6 @@ export class PortalSourceContext {
       specDirectory: this.specDirectory,
       unmergedSpecs,
       leftOutSpecs,
-      sharedEndpoints: shared(specs.flatMap(({ file, endpoints }) => endpoints.map((key) => ({ key, file })))),
       contentDirectory,
       staticDirectory,
       shadowedFiles: staticDirectory === null ? [] : await this.shadowedFiles(staticDirectory),

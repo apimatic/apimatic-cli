@@ -3,13 +3,34 @@ import type { Document } from 'fumadocs-openapi';
 import { CODE_SAMPLES_EXTENSION } from './code-samples';
 import { isJsonObject, type JsonObject } from './json';
 
-/** Each endpoint's code samples, keyed by path and then by upper-case method, as the CLI writes them. */
-export type CodeSamplesByEndpoint = Record<string, Record<string, unknown[]>>;
+/** Each endpoint's code samples, keyed by path and then by upper-case method. */
+export type CodeSamplesByEndpoint<Sample = unknown> = Record<string, Record<string, Sample[]>>;
+
+/** What the CLI writes: the samples filed under each spec by its slug, and in `paths` those every section takes. */
+export interface CodeSamplesFile<Sample = unknown> {
+  paths: CodeSamplesByEndpoint<Sample>;
+  specs: Record<string, CodeSamplesByEndpoint<Sample>>;
+}
 
 const HTTP_METHODS = new Set(['get', 'put', 'post', 'delete', 'options', 'head', 'patch', 'trace']);
 
-export async function readCodeSamples(file: string | null): Promise<CodeSamplesByEndpoint> {
-  return file === null ? {} : (JSON.parse(await readFile(file, 'utf8')) as CodeSamplesByEndpoint);
+/** The samples of the section mounted at `slug`: those in `paths`, and those filed under its slug. */
+export async function readCodeSamples(file: string | null, slug: string): Promise<CodeSamplesByEndpoint> {
+  if (file === null) return {};
+  const { paths, specs } = JSON.parse(await readFile(file, 'utf8')) as CodeSamplesFile;
+  return Object.hasOwn(specs, slug) ? combined(paths, specs[slug]) : paths;
+}
+
+/** Each endpoint's samples from both, `first`'s ahead of `second`'s. */
+function combined(first: CodeSamplesByEndpoint, second: CodeSamplesByEndpoint): CodeSamplesByEndpoint {
+  const merged: CodeSamplesByEndpoint = {};
+  for (const [path, methods] of [...Object.entries(first), ...Object.entries(second)]) {
+    const byMethod = (merged[path] ??= {});
+    for (const [method, samples] of Object.entries(methods)) {
+      byMethod[method] = [...(byMethod[method] ?? []), ...samples];
+    }
+  }
+  return merged;
 }
 
 /**
