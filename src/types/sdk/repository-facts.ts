@@ -6,16 +6,14 @@ import { GitOperation } from '../git/git-operation.js';
 import { RemoteName } from '../git/remote-name.js';
 import { GenerationRecord } from './generation-record.js';
 import { SdkGeneration } from './sdk-generation.js';
-import { InspectionRefusal, NestedSdkDirectory, SdkRepositoryState } from './repository-state.js';
+import { OperationInProgress, SdkRepositoryState } from './repository-state.js';
 
 /** What the repository says about its SDK directory, every fact read before any of them is weighed. */
 export type RepositoryFacts = {
   root: DirectoryPath;
   /** A merge, rebase, cherry-pick or revert of the developer's own, mid-way. */
   operation: GitOperation | undefined;
-  /** Another SDK directory with snapshots above or below this one. */
-  nested: NestedSdkDirectory | undefined;
-  /** The paths below the SDK directory git still holds as unmerged. */
+  /** The paths git still holds as unmerged. */
   unresolved: readonly RelativeFilePath[];
   record: GenerationRecord | undefined;
   /** Whether the recorded pristine commit is in the repository; false without a record. */
@@ -37,12 +35,9 @@ export type FetchOutcome = { kind: 'failed'; reason: string } | { kind: 'fetched
 export function classify(
   facts: RepositoryFacts,
   generation: SdkGeneration
-): Result<SdkRepositoryState | FetchNeeded, InspectionRefusal> {
+): Result<SdkRepositoryState | FetchNeeded, OperationInProgress> {
   if (facts.operation !== undefined) {
     return err({ kind: 'operationInProgress', operation: facts.operation, root: facts.root });
-  }
-  if (facts.nested !== undefined) {
-    return err(facts.nested);
   }
   if (facts.unresolved.length > 0) {
     return ok({ kind: 'unresolved', paths: [...facts.unresolved] });
@@ -51,7 +46,7 @@ export function classify(
     return ok({ kind: 'noRecord' });
   }
   if (!facts.record.isFor(generation)) {
-    return ok({ kind: 'otherGeneration', recorded: facts.record.generatedAs() });
+    return ok({ kind: 'otherGeneration' });
   }
   const base = facts.record.pristineCommit();
   if (facts.baseHere) {

@@ -20,7 +20,7 @@ export class SdkFiles {
   private readonly fileService = new FileService();
   private readonly git = new GitService();
 
-  constructor(private readonly root: DirectoryPath, private readonly sdk: DirectoryPath) {}
+  constructor(private readonly sdk: DirectoryPath) {}
 
   /** Removals before writes, so a case-only rename lands on a filesystem that ignores case; a failed step puts back what came before it. */
   public async apply(
@@ -29,7 +29,7 @@ export class SdkFiles {
     generated: DirectoryPath
   ): Promise<Result<void, WriteProblem>> {
     const blobs = await this.git.readBlobs(
-      this.root,
+      this.sdk,
       plan.writes.map((write) => write.blob)
     );
     if (blobs.isErr()) {
@@ -84,13 +84,13 @@ export class SdkFiles {
     previous: CommitId,
     touched: readonly RelativeFilePath[]
   ): Promise<Result<void, RepositoryProblem>> {
-    const entries = await this.git.listTree(this.root, previous);
+    const entries = await this.git.listTree(this.sdk, previous);
     if (entries.isErr()) {
       return err(entries.error);
     }
     const kept = new ValueMap(entries.value.map((entry): [RelativeFilePath, BlobId] => [entry.path, entry.oid]));
     const blobs = await this.git.readBlobs(
-      this.root,
+      this.sdk,
       touched.flatMap((relative) => kept.get(relative) ?? [])
     );
     if (blobs.isErr()) {

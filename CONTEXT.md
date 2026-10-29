@@ -63,7 +63,7 @@ The directory `sdk generate` writes an SDK into, and reads back on every later r
 _Avoid_: Destination, output directory, language directory
 
 **Pristine snapshot**:
-One generation's output exactly as the server returned it, stored as a commit under the hidden ref `refs/apimatic/pristine/<path>` of the repository enclosing the SDK directory, never on a branch; the base of the next merge.
+One generation's output exactly as the server returned it, stored as a commit under the hidden ref `refs/apimatic/pristine` of the SDK directory's own repository, never on a branch; the base of the next merge.
 _Avoid_: Generated snapshot, baseline, original
 
 **Generation record**:

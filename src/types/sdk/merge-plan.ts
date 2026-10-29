@@ -269,31 +269,18 @@ export class MergePlan {
     return this.conflicts.map((conflict) => conflict.path);
   }
 
-  /** Whether any conflicted file is written with conflict markers in it. */
-  public hasMarkedConflicts(): boolean {
-    return this.conflicts.some(leavesMarkers);
+  /** The conflicted files written with conflict markers in them. */
+  public markedPaths(): RelativeFilePath[] {
+    return this.conflicts.filter(leavesMarkers).map((conflict) => conflict.path);
   }
 
-  /** Whether any conflicted file is left without markers, for you to keep or remove. */
-  public hasUnmarkedConflicts(): boolean {
-    return this.conflicts.some((conflict) => !leavesMarkers(conflict));
+  /** The conflicted files left without markers, for you to keep or remove. */
+  public unmarkedPaths(): RelativeFilePath[] {
+    return this.conflicts.filter((conflict) => !leavesMarkers(conflict)).map((conflict) => conflict.path);
   }
 
   /** Whether the file at `path` is written with conflict markers in it. */
   public hasMarkers(path: RelativeFilePath): boolean {
     return this.conflicts.some((conflict) => conflict.path.isEqual(path) && leavesMarkers(conflict));
   }
-
-  /** What the developer does about the conflicts left in the files; `canAskLater` when a rerun could settle them instead. */
-  public nextSteps(canAskLater: boolean): NextStep[] {
-    return [
-      ...(this.hasMarkedConflicts() ? ['resolveMarked' as const] : []),
-      ...(this.hasUnmarkedConflicts() ? ['decideUnmarked' as const] : []),
-      'rerun',
-      ...(canAskLater ? ['orLetCliResolve' as const] : [])
-    ];
-  }
 }
-
-/** A step towards a clean rerun: resolve the marked files, decide each unmarked one, rerun, or let the CLI settle what is left. */
-export type NextStep = 'resolveMarked' | 'decideUnmarked' | 'rerun' | 'orLetCliResolve';

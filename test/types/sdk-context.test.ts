@@ -12,7 +12,6 @@ import { Found, SdkContext } from '../../src/types/sdk-context.js';
 import { SdkRepositoryContext } from '../../src/types/sdk-repository-context.js';
 import { CodeGenerationVersion, Language, Stability } from '../../src/types/sdk/generate.js';
 import { SdkGeneration } from '../../src/types/sdk/sdk-generation.js';
-import { SdkPath } from '../../src/types/sdk/sdk-path.js';
 import { SnapshotRef } from '../../src/types/sdk/snapshot-ref.js';
 
 const PYTHON = SdkGeneration.create({
@@ -42,14 +41,9 @@ describe('SdkContext', () => {
     (await repository.recordFresh(new DirectoryPath(generated), PYTHON))._unsafeUnwrap();
   };
 
-  /** The pristine commit for the SDK at `sdkPath` in the repository at `repositoryRoot`, or none. */
-  const pristineAt = async (repositoryRoot: string, sdkPath: string) =>
-    (
-      await new GitService().resolveRef(
-        new DirectoryPath(repositoryRoot),
-        SnapshotRef.pristine(SdkPath.fromGit(sdkPath)!)
-      )
-    )._unsafeUnwrap();
+  /** The pristine commit in the repository at `repositoryRoot`, or none. */
+  const pristineAt = async (repositoryRoot: string) =>
+    (await new GitService().resolveRef(new DirectoryPath(repositoryRoot), SnapshotRef.pristine()))._unsafeUnwrap();
 
   beforeEach(() => {
     root = fs.mkdtempSync(path.join(os.tmpdir(), 'sdk-context-'));
@@ -58,49 +52,45 @@ describe('SdkContext', () => {
 
   afterEach(() => fs.rmSync(root, { recursive: true, force: true }));
 
-  describe('destination, by the enclosing repository', () => {
+  describe('destination, by the SDK directory’s own repository', () => {
     const git = new GitService();
 
-    it('writes through the repository enclosing the SDK directory, which need not exist yet', async () => {
-      (await git.init(new DirectoryPath(root)))._unsafeUnwrap();
+    it('writes through the SDK directory when it is a repository of its own', async () => {
+      fs.mkdirSync(inRoot('sdk', 'python'), { recursive: true });
+      (await git.init(new DirectoryPath(inRoot('sdk', 'python'))))._unsafeUnwrap();
 
       const repository = repositoryIn((await context.destination(PYTHON))._unsafeUnwrap());
 
       await recordOne(repository);
-      expect(await pristineAt(root, 'sdk/python')).to.not.be.undefined;
+      expect(await pristineAt(inRoot('sdk', 'python'))).to.not.be.undefined;
     });
 
-    it('finds none when that repository ignores the SDK directory, until the directory is a repository of its own', async () => {
+    it('finds none in a repository that only encloses it, whether the directory is there yet or not', async () => {
       (await git.init(new DirectoryPath(root)))._unsafeUnwrap();
-      fs.writeFileSync(inRoot('.gitignore'), '/sdk/\n');
+      const deep = new SdkContext(new DirectoryPath(inRoot('packages', 'sdk', 'python')));
 
       expect((await context.destination(PYTHON))._unsafeUnwrap().kind).to.equal('noRepository');
+      expect((await deep.destination(PYTHON))._unsafeUnwrap().kind).to.equal('noRepository');
+      fs.mkdirSync(inRoot('sdk', 'python'), { recursive: true });
+      expect((await context.destination(PYTHON))._unsafeUnwrap().kind).to.equal('noRepository');
+    });
 
+    it('finds the SDK directory’s own repository inside one that encloses it, and records there', async () => {
+      (await git.init(new DirectoryPath(root)))._unsafeUnwrap();
       fs.mkdirSync(inRoot('sdk', 'python'), { recursive: true });
       (await git.init(new DirectoryPath(inRoot('sdk', 'python'))))._unsafeUnwrap();
-      const own = repositoryIn((await context.destination(PYTHON))._unsafeUnwrap());
-      await recordOne(own);
-      expect(await pristineAt(inRoot('sdk', 'python'), '')).to.not.be.undefined;
-    });
-  });
 
-  describe('destination, as the SDK directory sits', () => {
-    const git = new GitService();
+      const own = repositoryIn((await context.destination(PYTHON))._unsafeUnwrap());
+
+      await recordOne(own);
+      expect(await pristineAt(inRoot('sdk', 'python'))).to.not.be.undefined;
+      expect(await pristineAt(root)).to.be.undefined;
+    });
 
     it('finds no repository outside one', async () => {
       fs.mkdirSync(inRoot('sdk', 'python'), { recursive: true });
 
       expect((await context.destination(PYTHON))._unsafeUnwrap().kind).to.equal('noRepository');
-    });
-
-    it('writes through the enclosing repository, however deep the SDK directory sits', async () => {
-      (await git.init(new DirectoryPath(root)))._unsafeUnwrap();
-      const deep = new SdkContext(new DirectoryPath(inRoot('packages', 'sdk', 'python')));
-
-      const repository = repositoryIn((await deep.destination(PYTHON))._unsafeUnwrap());
-
-      await recordOne(repository);
-      expect(await pristineAt(root, 'packages/sdk/python')).to.not.be.undefined;
     });
   });
 
@@ -110,7 +100,7 @@ describe('SdkContext', () => {
 
       expect(fs.existsSync(inRoot('sdk', 'python', '.git'))).to.be.true;
       await recordOne(repository);
-      expect(await pristineAt(inRoot('sdk', 'python'), '')).to.not.be.undefined;
+      expect(await pristineAt(inRoot('sdk', 'python'))).to.not.be.undefined;
     });
 
     it('makes the SDK directory its own repository, on main, leaving its files alone', async () => {
@@ -129,10 +119,10 @@ describe('SdkContext', () => {
     const entries = (archive: string) => new AdmZip(archive).getEntries().map((entry) => entry.entryName);
 
     it('zips the files git would commit: not .git, the record, or what the SDK’s .gitignore excludes', async () => {
-      (await git.init(new DirectoryPath(root)))._unsafeUnwrap();
       fs.mkdirSync(inRoot('sdk', 'python', 'models'), { recursive: true });
+      (await git.init(new DirectoryPath(inRoot('sdk', 'python'))))._unsafeUnwrap();
       fs.writeFileSync(inRoot('sdk', 'python', 'models', 'book.py'), 'class Book: ...');
-      await execa('git', ['add', '.'], { cwd: root });
+      await execa('git', ['add', '.'], { cwd: inRoot('sdk', 'python') });
       fs.writeFileSync(inRoot('sdk', 'python', 'README.md'), '# sdk');
       fs.writeFileSync(inRoot('sdk', 'python', '.gitignore'), 'dist/\n');
       fs.mkdirSync(inRoot('sdk', 'python', 'dist'));

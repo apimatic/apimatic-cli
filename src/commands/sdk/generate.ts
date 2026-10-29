@@ -26,7 +26,7 @@ export default class SdkGenerate extends Command {
 
   static readonly description = `Generate a Software Development Kit (SDK) from an API specification.
 ${inProse(AVAILABLE_LANGUAGES)} are available; ${inProse(UPCOMING_LANGUAGES)} are coming soon.
-With git ${GitVersion.required()} or newer installed, your edits to the generated SDK are kept when you regenerate it.`;
+With git ${GitVersion.required()} or newer installed and the SDK directory a git repository of its own (--git-init makes it one), your edits to the generated SDK are kept when you regenerate it.`;
 
   static readonly cmdTxt = format.cmd('apimatic', 'sdk', 'generate');
 
@@ -52,6 +52,11 @@ With git ${GitVersion.required()} or newer installed, your edits to the generate
       description: 'Stability level of the generated SDK. Defaults to the level the language offers.',
       options: Object.values(Stability).map((s) => s.valueOf())
     }),
+    'git-init': Flags.boolean({
+      default: false,
+      description:
+        'make the SDK directory a git repository when it is not one of its own, so your edits to the SDK are kept when you regenerate it'
+    }),
     ...FlagsProvider.input,
     ...FlagsProvider.forceSdk,
     ...FlagsProvider.authKey
@@ -65,7 +70,16 @@ With git ${GitVersion.required()} or newer installed, your edits to the generate
 
   async run() {
     const {
-      flags: { language, input, destination, force, stability, 'codegen-version': codegenVersion, 'auth-key': authKey }
+      flags: {
+        language,
+        input,
+        destination,
+        force,
+        stability,
+        'codegen-version': codegenVersion,
+        'auth-key': authKey,
+        'git-init': gitInit
+      }
     } = await this.parse(SdkGenerate);
 
     const project = ProjectContext.at(input);
@@ -76,7 +90,7 @@ With git ${GitVersion.required()} or newer installed, your edits to the generate
     };
 
     intro('Generate SDK');
-    const run: RunMode = { force, interaction: !force && terminal.isInteractive() ? 'ask' : 'never' };
+    const run: RunMode = { force, interaction: !force && terminal.isInteractive() ? 'ask' : 'never', gitInit };
     const action = new GenerateAction(this.getConfigDir(), commandMetadata, authKey);
     const result = await action.execute(
       project,

@@ -25,13 +25,6 @@ describe('RelativeFilePath', () => {
     expect(file.name().toString()).to.equal('book.ts');
   });
 
-  it('is seen from above a directory without changing its spelling', () => {
-    const file = RelativeFilePath.fromGit('src/models/book.ts')!;
-    const sdk = RelativeDirectoryPath.fromGit('sdk/typescript')!;
-
-    expect(file.under(sdk).toString()).to.equal('sdk/typescript/src/models/book.ts');
-  });
-
   it('is seen from inside a directory it is under, and not from one it is not', () => {
     const file = RelativeFilePath.fromGit('sdk/typescript/src/models/book.ts')!;
 

@@ -7,7 +7,6 @@ import { StageEntry } from '../git/merge-tree.js';
 import { RemoteName } from '../git/remote-name.js';
 import { TreeId } from '../git/tree-id.js';
 import { MergePlan } from './merge-plan.js';
-import { SdkGeneration } from './sdk-generation.js';
 import { SnapshotRef } from './snapshot-ref.js';
 
 /** A file the run could not write or remove; what it had changed is put back from the previous snapshot, else that snapshot is named. */
@@ -25,17 +24,11 @@ export type RepositoryProblem = { reason: string };
 /** A write that stopped at a file, or one that did not start. */
 export type WriteProblem = NotApplied | RepositoryProblem;
 
-/** Two SDK directories, one inside the other: refs are files, so only one can have snapshots; `encloses` says the other is the outer one. */
-export type NestedSdkDirectory = { kind: 'nestedSdkDirectory'; other: DirectoryPath; encloses: boolean };
-
-/** The repository is in the middle of a git operation of the developer's own, which a run must not merge over. */
+/** The repository is in the middle of a git operation of the developer's own, which a run must not merge over; named so the developer can clear it. */
 export type OperationInProgress = { kind: 'operationInProgress'; operation: GitOperation; root: DirectoryPath };
 
-/** A state of the repository a run will not write over, named so the developer can clear it. */
-export type InspectionRefusal = NestedSdkDirectory | OperationInProgress;
-
 /** Why a run could not find out how to write the SDK directory: a refusal it can name, or git's own words. */
-export type InspectionProblem = InspectionRefusal | RepositoryProblem;
+export type InspectionProblem = OperationInProgress | RepositoryProblem;
 
 /** Why a recorded snapshot is still absent after the one place it could have come from was tried. */
 export type SnapshotFetch =
@@ -46,7 +39,7 @@ export type SnapshotFetch =
 /** What the repository knows about its SDK directory before a run, from the record and the refs. */
 export type SdkRepositoryState =
   | { kind: 'noRecord' }
-  | { kind: 'otherGeneration'; recorded: SdkGeneration }
+  | { kind: 'otherGeneration' }
   | { kind: 'snapshotMissing'; fetch: SnapshotFetch }
   | { kind: 'unresolved'; paths: RelativeFilePath[] }
   | { kind: 'ready'; base: CommitId };
@@ -65,9 +58,9 @@ export type ShareHookInstall =
 
 export type ShareHookNeedsOneStep = Exclude<ShareHookInstall, { kind: 'installed' }>;
 
-/** The git command that puts the SDK directory back as the previous snapshot has it; `workTree` spelt as the developer will type it. */
-export const restoreCommand = (workTree: string, previous: SnapshotRef): string =>
-  `git --work-tree=${workTree} restore --source=${previous} --worktree -- .`;
+/** The git command that puts the SDK directory back as the previous snapshot has it, run in its own repository; `sdk` spelt as the developer will type it. */
+export const restoreCommand = (sdk: string, previous: SnapshotRef): string =>
+  `git -C ${sdk} restore --source=${previous} --worktree -- .`;
 
 /** Which step of recording a generation did not happen, in git's or the file system's words: the snapshot with its record, or the hook that shares them. */
 export type RecordProblem = { step: 'snapshot' | 'hook'; reason: string };

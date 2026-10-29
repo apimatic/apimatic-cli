@@ -22,20 +22,7 @@ describe('SdkGeneration', () => {
     expect(stable.isSameAs(SdkGeneration.create(request(Language.PYTHON, Stability.BETA))!)).to.be.false;
   });
 
-  it('names what sets a requested generation apart, and the flag that would make them match', () => {
-    expect(stable.differenceFrom(SdkGeneration.create(request(Language.TYPESCRIPT, Stability.STABLE))!)).to.deep.equal({
-      kind: 'language'
-    });
-    expect(stable.differenceFrom(SdkGeneration.create(request(Language.PYTHON, Stability.BETA))!)).to.deep.equal({
-      kind: 'stability',
-      rerunWith: Stability.STABLE
-    });
-    expect(stable.differenceFrom(stable)).to.deep.equal({ kind: 'codegen', rerunWith: CodeGenerationVersion.V4 });
-  });
-
-  it('describes itself for prose, with the generator when asked, and for a commit message', () => {
-    expect(stable.describe()).to.equal('stable python');
-    expect(stable.describeWithGenerator()).to.equal('stable python (codegen v4)');
+  it('names itself for a commit message', () => {
     expect(String(stable)).to.equal('python v4 stable');
   });
 });

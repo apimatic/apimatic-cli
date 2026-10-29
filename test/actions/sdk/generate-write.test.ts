@@ -21,7 +21,6 @@ import { GENERATED_MARKER, YOURS_MARKER } from '../../../src/types/sdk/conflict-
 import { CodeGenerationVersion, Language, Stability } from '../../../src/types/sdk/generate.js';
 import { GenerationRecord } from '../../../src/types/sdk/generation-record.js';
 import { SdkGeneration } from '../../../src/types/sdk/sdk-generation.js';
-import { SdkPath } from '../../../src/types/sdk/sdk-path.js';
 import { SnapshotRef } from '../../../src/types/sdk/snapshot-ref.js';
 import { SnapshotStore } from '../../../src/types/sdk-repository/snapshot-store.js';
 import { SdkRepositoryContext } from '../../../src/types/sdk-repository-context.js';
@@ -59,30 +58,35 @@ describe('GenerateAction (sdk) — writing the SDK', () => {
   const git = new GitService();
 
   const sdk = () => new DirectoryPath(path.join(root, 'sdk', 'python'));
-  const previousRef = SnapshotRef.previous(SdkPath.fromGit('sdk/python')!);
-  const pristineRef = SnapshotRef.pristine(SdkPath.fromGit('sdk/python')!);
-  const rootDirectory = () => new DirectoryPath(root);
+  const previousRef = SnapshotRef.previous();
+  const pristineRef = SnapshotRef.pristine();
   const at = (relative: string) => path.join(sdk().toString(), relative);
   const read = (relative: string) => fs.readFileSync(at(relative), 'utf-8');
   const record = () => GenerationRecord.parse(read('.apimatic/generation.json'))!;
 
-  const execute = async (files: Files, force = true) => {
+  const execute = async (files: Files, force = true, gitInit = false) => {
     await generates(files);
     return new GenerateAction(new DirectoryPath(root), COMMAND_METADATA, 'auth-key').execute(
       ProjectContext.in(new DirectoryPath(root)),
       sdk(),
       { language: Language.PYTHON, codegenVersion: CodeGenerationVersion.V4, stability: Stability.STABLE },
-      runMode(force)
+      runMode(force, gitInit)
     );
   };
 
-  /** A first generation of `files`, written and recorded into the project's repository. */
+  /** A first generation of `files`, written and recorded into the SDK directory's own repository. */
   const recorded = async (files: Files): Promise<{ repository: SdkRepositoryContext; base: CommitId }> => {
     writeFiles(sdk().toString(), files);
-    (await git.init(new DirectoryPath(root)))._unsafeUnwrap();
+    (await git.init(sdk()))._unsafeUnwrap();
     const repository = (await repositoryOf(sdk(), STABLE))!;
     (await repository.recordFresh(sdk(), STABLE))._unsafeUnwrap();
-    return { repository, base: (await git.resolveRef(rootDirectory(), pristineRef))._unsafeUnwrap()! };
+    return { repository, base: (await git.resolveRef(sdk(), pristineRef))._unsafeUnwrap()! };
+  };
+
+  /** The SDK directory as a repository of its own, with nothing recorded in it yet. */
+  const ownRepository = async () => {
+    fs.mkdirSync(sdk().toString(), { recursive: true });
+    (await git.init(sdk()))._unsafeUnwrap();
   };
 
   const fresh = () => {
@@ -112,41 +116,39 @@ describe('GenerateAction (sdk) — writing the SDK', () => {
   });
 
   describe('record', () => {
-    it('initialises a repository in the SDK directory when the developer says yes, says so, and records the snapshot', async () => {
-      sinon.stub(terminal, 'isInteractive').returns(true);
-      sinon.stub(SdkGeneratePrompts.prototype, 'createRepository').resolves(true);
+    it('initialises a repository in the SDK directory with --git-init, says so, and records the snapshot', async () => {
       sinon.stub(SdkGeneratePrompts.prototype, 'shareHookInstalled');
       const repositoryInitialised = sinon.stub(SdkGeneratePrompts.prototype, 'repositoryInitialised');
 
-      const result = await execute({ 'README.md': '# sdk', 'a.py': 'x' }, false);
+      const result = await execute({ 'README.md': '# sdk', 'a.py': 'x' }, true, true);
 
       expect(result.isSuccess()).to.be.true;
       expect(repositoryInitialised.firstCall.args[0].isEqual(sdk())).to.be.true;
       expect(fs.readFileSync(at('.git/HEAD'), 'utf-8').trim()).to.equal('ref: refs/heads/main');
-      const pristine = (await git.resolveRef(sdk(), SnapshotRef.pristine(SdkPath.fromGit('')!)))._unsafeUnwrap()!;
+      const pristine = (await git.resolveRef(sdk(), pristineRef))._unsafeUnwrap()!;
       expect(record().pristineCommit().isEqual(pristine)).to.be.true;
       expect(record().isFor(STABLE)).to.be.true;
       const files = await snapshotFiles(sdk(), pristine);
       expect([...files.keys()]).to.have.members(['README.md', 'a.py']);
     });
 
-    it('records into the enclosing repository under the SDK directory’s ref, keeping what was there out of it', async () => {
+    it('records into the SDK directory’s own repository, saying it found it, and keeps what was there out of it', async () => {
+      await ownRepository();
       writeFiles(sdk().toString(), { 'old.py': 'old' });
-      (await git.init(new DirectoryPath(root)))._unsafeUnwrap();
       const repositoryInitialised = sinon.stub(SdkGeneratePrompts.prototype, 'repositoryInitialised');
+      const repositoryFound = sinon.stub(SdkGeneratePrompts.prototype, 'repositoryFound');
 
       expect((await execute({ 'README.md': '# sdk' })).isSuccess()).to.be.true;
 
       expect(repositoryInitialised.called).to.be.false;
-      expect(fs.existsSync(at('.git'))).to.be.false;
+      expect(repositoryFound.firstCall.args[0].isEqual(sdk())).to.be.true;
       expect(fs.existsSync(at('old.py'))).to.be.false;
-      const ref = SnapshotRef.pristine(SdkPath.fromGit('sdk/python')!);
-      expect((await git.resolveRef(new DirectoryPath(root), ref))._unsafeUnwrap()?.isEqual(record().pristineCommit()))
-        .to.be.true;
+      expect((await git.resolveRef(sdk(), pristineRef))._unsafeUnwrap()?.isEqual(record().pristineCommit())).to.be.true;
     });
 
     it('still succeeds, with a warning, when the snapshot cannot be recorded', async () => {
-      (await git.init(new DirectoryPath(root)))._unsafeUnwrap();
+      await ownRepository();
+      sinon.stub(SdkGeneratePrompts.prototype, 'repositoryFound');
       sinon.stub(SdkRepositoryContext.prototype, 'record').resolves(err({ step: 'snapshot', reason: 'git broke' }));
       const snapshotNotRecorded = sinon.stub(SdkGeneratePrompts.prototype, 'snapshotNotRecorded');
 
@@ -157,13 +159,11 @@ describe('GenerateAction (sdk) — writing the SDK', () => {
     });
 
     it('fails with its own message, writing nothing, when the SDK directory cannot be made a repository', async () => {
-      sinon.stub(terminal, 'isInteractive').returns(true);
-      sinon.stub(SdkGeneratePrompts.prototype, 'createRepository').resolves(true);
       sinon.stub(SdkContext.prototype, 'initRepository').resolves(err({ reason: 'git broke' }));
       const notInitialised = sinon.stub(SdkGeneratePrompts.prototype, 'repositoryNotInitialised');
       const customCodeFailed = sinon.stub(SdkGeneratePrompts.prototype, 'customCodeFailed');
 
-      expect((await execute({ 'README.md': '# sdk' }, false)).isFailed()).to.be.true;
+      expect((await execute({ 'README.md': '# sdk' }, true, true)).isFailed()).to.be.true;
 
       expect(fs.existsSync(path.join(sdk().toString(), 'README.md'))).to.be.false;
       expect(notInitialised.firstCall.args[0].isEqual(sdk())).to.be.true;
@@ -200,55 +200,53 @@ describe('GenerateAction (sdk) — writing the SDK', () => {
         kept: ['notes.txt']
       });
       expect(record().pristineCommit().isEqual(base)).to.be.false;
-      expect((await describeCommit(rootDirectory(), record().pristineCommit())).parents).to.deep.equal([base]);
-      const previous = (await git.resolveRef(rootDirectory(), previousRef))._unsafeUnwrap()!;
-      const kept = await snapshotFiles(rootDirectory(), previous);
+      expect((await describeCommit(sdk(), record().pristineCommit())).parents).to.deep.equal([base]);
+      const previous = (await git.resolveRef(sdk(), previousRef))._unsafeUnwrap()!;
+      const kept = await snapshotFiles(sdk(), previous);
       expect(kept.get('models/book.py')).to.equal(DECORATED + MODEL_V1);
     });
 
-    it('writes markers where you and the generator changed the same lines, lists the file and fails', async () => {
+    it('writes markers where you and the generator changed the same lines when you will resolve them, for a merge tool to find', async () => {
       await recorded({ 'README.md': '# sdk', 'models/book.py': MODEL_V1 });
       writeFiles(sdk().toString(), { 'models/book.py': MODEL_V1_EDITED });
+      sinon.stub(terminal, 'isInteractive').returns(true);
       sinon.stub(SdkGeneratePrompts.prototype, 'sdkMerged');
-      const conflicts = sinon.stub(SdkGeneratePrompts.prototype, 'conflicts');
-      const mergeNeedsResolving = sinon.stub(SdkGeneratePrompts.prototype, 'mergeNeedsResolving');
+      sinon.stub(SdkGeneratePrompts.prototype, 'conflictChoice').resolves('resolve');
+      const conflictSteps = sinon.stub(SdkGeneratePrompts.prototype, 'conflictSteps');
 
-      const result = await execute({ 'README.md': '# sdk v2', 'models/book.py': MODEL_V2 });
+      const result = await execute({ 'README.md': '# sdk v2', 'models/book.py': MODEL_V2 }, false);
 
-      expect(result.isFailed()).to.be.true;
-      expect(result.getExitCode()).to.equal(1);
-      expect(mergeNeedsResolving.calledOnce).to.be.true;
-      expect(conflicts.firstCall.args[0].conflicts).to.deep.equal([
-        { path: rel('models/book.py'), kind: 'bothChanged' }
-      ]);
+      expect(result.isSuccess()).to.be.true;
+      const [plan, where, staged] = conflictSteps.firstCall.args;
+      expect(plan.conflicts).to.deep.equal([{ path: rel('models/book.py'), kind: 'bothChanged' }]);
+      expect(where.isEqual(sdk())).to.be.true;
+      expect(staged).to.be.true;
       expect(read('models/book.py')).to.contain(`${YOURS_MARKER}\n    # Price in USD, VAT included.\n=======\n`);
       expect(read('models/book.py')).to.contain('    # Retail price in US dollars.\n');
       expect(read('models/book.py')).to.contain(`${GENERATED_MARKER}\n`);
       expect(read('README.md')).to.equal('# sdk v2');
       expect(read('.apimatic/generation.json')).to.not.contain('conflicts');
-      const cwd = root;
-      expect((await execa('git', ['status', '--porcelain'], { cwd })).stdout).to.contain(
-        'UU sdk/python/models/book.py'
-      );
-      const staged = (await execa('git', ['ls-files', '--stage', '--', 'sdk/python/models/book.py'], { cwd })).stdout;
-      expect(staged.split('\n').map((line) => line.split(/\s+/)[2])).to.deep.equal(['1', '2', '3']);
+      const cwd = sdk().toString();
+      expect((await execa('git', ['status', '--porcelain'], { cwd })).stdout).to.contain('UU models/book.py');
+      const stages = (await execa('git', ['ls-files', '--stage', '--', 'models/book.py'], { cwd })).stdout;
+      expect(stages.split('\n').map((line) => line.split(/\s+/)[2])).to.deep.equal(['1', '2', '3']);
     });
 
-    it('still reports the conflicts when they cannot be marked in the index, with a warning', async () => {
+    it('leaves the merge tool out of the steps when the conflicts cannot be marked in the index, with a warning', async () => {
       await recorded({ 'README.md': '# sdk', 'models/book.py': MODEL_V1 });
       writeFiles(sdk().toString(), { 'models/book.py': MODEL_V1_EDITED });
+      sinon.stub(terminal, 'isInteractive').returns(true);
+      sinon.stub(SdkGeneratePrompts.prototype, 'conflictChoice').resolves('resolve');
       sinon.stub(SdkRepositoryContext.prototype, 'stageConflicts').resolves(err({ reason: 'index locked' }));
       sinon.stub(SdkGeneratePrompts.prototype, 'sdkMerged');
       const conflictsNotStaged = sinon.stub(SdkGeneratePrompts.prototype, 'conflictsNotStaged');
-      const conflicts = sinon.stub(SdkGeneratePrompts.prototype, 'conflicts');
-      const mergeNeedsResolving = sinon.stub(SdkGeneratePrompts.prototype, 'mergeNeedsResolving');
+      const conflictSteps = sinon.stub(SdkGeneratePrompts.prototype, 'conflictSteps');
 
-      const result = await execute({ 'models/book.py': MODEL_V2 });
+      const result = await execute({ 'models/book.py': MODEL_V2 }, false);
 
-      expect(result.isFailed()).to.be.true;
-      expect(mergeNeedsResolving.calledOnce).to.be.true;
+      expect(result.isSuccess()).to.be.true;
       expect(conflictsNotStaged.firstCall.args[0]).to.deep.equal({ reason: 'index locked' });
-      expect(conflicts.called).to.be.true;
+      expect(conflictSteps.firstCall.args[2]).to.be.false;
       expect(read('models/book.py')).to.contain(YOURS_MARKER);
     });
 
@@ -313,10 +311,8 @@ describe('GenerateAction (sdk) — writing the SDK', () => {
       expect(read('notes.txt')).to.equal('mine');
       expect(conflictsResolved.firstCall.args[0]).to.equal('generated');
       expect(conflictsResolved.firstCall.args[1].map(String)).to.deep.equal(['models/book.py']);
-      const previous = (await git.resolveRef(rootDirectory(), previousRef))._unsafeUnwrap()!;
-      expect((await snapshotFiles(rootDirectory(), previous)).get('models/book.py')).to.equal(
-        DECORATED + MODEL_V1_EDITED
-      );
+      const previous = (await git.resolveRef(sdk(), previousRef))._unsafeUnwrap()!;
+      expect((await snapshotFiles(sdk(), previous)).get('models/book.py')).to.equal(DECORATED + MODEL_V1_EDITED);
     });
 
     it('keeps an edited file the generator stopped producing when settling for the generator', async () => {
@@ -365,36 +361,36 @@ describe('GenerateAction (sdk) — writing the SDK', () => {
         expect(read('models/book.py')).to.equal(DECORATED + MODEL_V1_EDITED);
         expect(read('README.md')).to.equal('# sdk');
         expect(record().pristineCommit().isEqual(base)).to.be.true;
-        expect((await git.resolveRef(rootDirectory(), previousRef))._unsafeUnwrap()).to.be.undefined;
+        expect((await git.resolveRef(sdk(), previousRef))._unsafeUnwrap()).to.be.undefined;
         expect(runCancelled.calledOnce).to.be.true;
       });
     }
 
-    it('leaves markers when the developer will resolve, with the steps but not the list again', async () => {
+    it('leaves markers when the developer will resolve, and succeeds with the steps', async () => {
       await conflicting();
       sinon.stub(SdkGeneratePrompts.prototype, 'conflictChoice').resolves('resolve');
       const conflictSteps = sinon.stub(SdkGeneratePrompts.prototype, 'conflictSteps');
-      const conflicts = sinon.stub(SdkGeneratePrompts.prototype, 'conflicts');
 
       const result = await execute(NEXT, false);
 
-      expect(result.isFailed()).to.be.true;
+      expect(result.isSuccess()).to.be.true;
       expect(read('models/book.py')).to.contain(YOURS_MARKER);
       expect(conflictSteps.calledOnce).to.be.true;
-      expect(conflicts.called).to.be.false;
     });
 
-    it('does not ask with --force: markers, the list and the steps', async () => {
+    it('does not ask with --force, and settles the overlapping hunks for the generator', async () => {
       await conflicting();
       const conflictChoice = sinon.stub(SdkGeneratePrompts.prototype, 'conflictChoice');
-      const conflicts = sinon.stub(SdkGeneratePrompts.prototype, 'conflicts');
+      const conflictsResolved = sinon.stub(SdkGeneratePrompts.prototype, 'conflictsResolved');
 
       const result = await execute(NEXT, true);
 
-      expect(result.isFailed()).to.be.true;
+      expect(result.isSuccess()).to.be.true;
       expect(conflictChoice.called).to.be.false;
-      expect(conflicts.calledOnce).to.be.true;
-      expect(read('models/book.py')).to.contain(YOURS_MARKER);
+      expect(read('models/book.py')).to.equal(DECORATED + MODEL_V2);
+      expect(read('notes.txt')).to.equal('mine');
+      expect(conflictsResolved.firstCall.args[0]).to.equal('generated');
+      expect(conflictsResolved.firstCall.args[1].map(String)).to.deep.equal(['models/book.py']);
     });
 
     it('refuses without a terminal, naming the conflicts, and writes nothing', async () => {
@@ -416,7 +412,8 @@ describe('GenerateAction (sdk) — writing the SDK', () => {
 
   describe('the hook that shares snapshots', () => {
     beforeEach(async () => {
-      (await git.init(new DirectoryPath(root)))._unsafeUnwrap();
+      await ownRepository();
+      sinon.stub(SdkGeneratePrompts.prototype, 'repositoryFound');
     });
 
     const recordOne = () => execute({ 'README.md': '# sdk' });

@@ -70,10 +70,6 @@ export class GenerationRecord {
     return this.pristine;
   }
 
-  public generatedAs(): SdkGeneration {
-    return this.generation;
-  }
-
   /** Whether `generation` would produce the same kind of output the recorded snapshot holds. */
   public isFor(generation: SdkGeneration): boolean {
     return this.generation.isSameAs(generation);

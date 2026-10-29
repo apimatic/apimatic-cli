@@ -7,25 +7,21 @@ import { RemoteName } from '../git/remote-name.js';
 import { TreeId } from '../git/tree-id.js';
 import { SdkGeneration } from '../sdk/sdk-generation.js';
 import { ChainFacts, reconcile } from '../sdk/pristine-chain.js';
-import { NestedSdkDirectory, RepositoryProblem } from '../sdk/repository-state.js';
-import { SdkPath } from '../sdk/sdk-path.js';
+import { RepositoryProblem } from '../sdk/repository-state.js';
 import { SnapshotRef } from '../sdk/snapshot-ref.js';
 
-/** One SDK directory's snapshots: the pristine chain, the base of the next merge, and the previous state; fetched and joined with a remote's. */
+/** The SDK directory's snapshots, in its own repository: the pristine chain, the base of the next merge, and the previous state; fetched and joined with a remote's. */
 export class SnapshotStore {
   private readonly git = new GitService();
-  private readonly sdk: DirectoryPath;
 
-  constructor(private readonly root: DirectoryPath, private readonly path: SdkPath) {
-    this.sdk = path.in(root);
-  }
+  constructor(private readonly root: DirectoryPath) {}
 
   public pristineRef(): SnapshotRef {
-    return SnapshotRef.pristine(this.path);
+    return SnapshotRef.pristine();
   }
 
   public previousRef(): SnapshotRef {
-    return SnapshotRef.previous(this.path);
+    return SnapshotRef.previous();
   }
 
   /** A freshly generated SDK as a tree: every file, whatever its own `.gitignore` says. */
@@ -39,7 +35,7 @@ export class SnapshotStore {
     if (include.isErr()) {
       return err(include.error);
     }
-    return this.git.treeOfDirectory(this.root, this.sdk, include.value);
+    return this.git.treeOfDirectory(this.root, include.value);
   }
 
   /** As `snapshotDisk`, byte for byte, for a snapshot a restore must reproduce exactly. */
@@ -48,7 +44,7 @@ export class SnapshotStore {
     if (include.isErr()) {
       return err(include.error);
     }
-    return this.git.treeOfDirectoryAsIs(this.root, this.sdk, include.value);
+    return this.git.treeOfDirectoryAsIs(this.root, include.value);
   }
 
   private async pathsHeldBy(base: CommitId | undefined): Promise<Result<RelativeFilePath[], RepositoryProblem>> {
@@ -169,19 +165,5 @@ export class SnapshotStore {
       return err(joined.error);
     }
     return this.git.updateRef(this.root, this.pristineRef(), joined.value);
-  }
-
-  /** Another SDK directory with snapshots above or below this one, if any: refs are files, so only one of the two can have them. */
-  public async nested(): Promise<Result<NestedSdkDirectory | undefined, RepositoryProblem>> {
-    const refs = await this.git.listRefs(this.root, SnapshotRef.allPristine());
-    if (refs.isErr()) {
-      return err(refs.error);
-    }
-    const nested = refs.value.map((ref) => ref.sdkPath()).find((other) => other.nests(this.path));
-    if (nested === undefined) {
-      return ok(undefined);
-    }
-    const other = nested.in(this.root);
-    return ok({ kind: 'nestedSdkDirectory', other, encloses: other.contains(this.sdk) });
   }
 }

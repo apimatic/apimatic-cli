@@ -113,7 +113,7 @@ export class SdkPublishNonInteractiveAction {
       sdkDirectory,
       { language, codegenVersion, stability: stability.stabilityLevel() },
       publishTypes,
-      { force, interaction: 'never' },
+      { force, interaction: 'never', gitInit: true },
       publishingProfileId,
       semVersion,
       publishingProfile,

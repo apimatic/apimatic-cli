@@ -1,5 +1,5 @@
 import { ShareHookStep } from './repository-state.js';
-import { PRISTINE_REFS, SNAPSHOT_REFS } from './snapshot-ref.js';
+import { PRISTINE_REF, SNAPSHOT_REFS } from './snapshot-ref.js';
 
 const BEGIN = '# >>> apimatic snapshots';
 const END = '# <<< apimatic snapshots';
@@ -15,25 +15,20 @@ export const SHARE_HOOK_CALL =
   `f="$(git rev-parse --git-common-dir)/hooks/${SHARE_HOOK_SCRIPT_NAME}"; ` + '[ -f "$f" ] && sh "$f" "$@" || true';
 
 /**
- * Pushes every pristine ref; when the remote's chain moved on, fetches it below
- * `refs/apimatic/remotes/<remote>/`, joins the two, and pushes again. It never fails the developer's push.
+ * Pushes the pristine ref; when the remote's chain moved on, fetches it to
+ * `refs/apimatic/remotes/<remote>/pristine`, joins the two, and pushes again. It never fails the developer's push.
  */
 export const SHARE_HOOK_SCRIPT = [
   DEFAULT_SHEBANG,
-  `# Shares the SDK snapshots (${PRISTINE_REFS} and every ref below it) with the remote on`,
-  '# every push, so a clone can merge its customizations. Written by the APIMatic CLI; the pre-push',
-  '# hook calls it.',
+  `# Shares the SDK snapshots (${PRISTINE_REF}) with the remote on every push, so a clone`,
+  '# can merge its customizations. Written by the APIMatic CLI; the pre-push hook calls it.',
   'remote="$1"',
-  `refs=$(git for-each-ref --format='%(refname)' ${PRISTINE_REFS})`,
-  '[ -z "$refs" ] && exit 0',
-  'specs=""',
-  'for ref in $refs; do specs="$specs $ref:$ref"; done',
-  'GIT_TERMINAL_PROMPT=0 git push --quiet --no-verify "$remote" $specs >/dev/null 2>&1 && exit 0',
-  'GIT_TERMINAL_PROMPT=0 git fetch --quiet --no-tags "$remote" \\',
-  `  "+${PRISTINE_REFS}*:${SNAPSHOT_REFS}/remotes/$remote/pristine*" >/dev/null 2>&1 || true`,
-  'for ref in $refs; do',
-  `  tracking="${SNAPSHOT_REFS}/remotes/$remote/$(printf '%s' "$ref" | sed 's|^${SNAPSHOT_REFS}/||')"`,
-  '  git rev-parse -q --verify "$tracking^{commit}" >/dev/null 2>&1 || continue',
+  `ref=${PRISTINE_REF}`,
+  `tracking="${SNAPSHOT_REFS}/remotes/$remote/pristine"`,
+  'git rev-parse -q --verify "$ref^{commit}" >/dev/null 2>&1 || exit 0',
+  'GIT_TERMINAL_PROMPT=0 git push --quiet --no-verify "$remote" "$ref:$ref" >/dev/null 2>&1 && exit 0',
+  'GIT_TERMINAL_PROMPT=0 git fetch --quiet --no-tags "$remote" "+$ref:$tracking" >/dev/null 2>&1 || true',
+  'if git rev-parse -q --verify "$tracking^{commit}" >/dev/null 2>&1; then',
   '  if git merge-base --is-ancestor "$ref" "$tracking"; then',
   '    git update-ref "$ref" "$tracking"',
   '  elif ! git merge-base --is-ancestor "$tracking" "$ref"; then',
@@ -41,8 +36,8 @@ export const SHARE_HOOK_SCRIPT = [
   '      commit-tree "$ref^{tree}" -p "$ref" -p "$tracking" -m \'apimatic: pristine chains joined\')',
   '    git update-ref "$ref" "$joined"',
   '  fi',
-  'done',
-  'said=$(GIT_TERMINAL_PROMPT=0 git push --quiet --no-verify "$remote" $specs 2>&1 >/dev/null) && exit 0',
+  'fi',
+  'said=$(GIT_TERMINAL_PROMPT=0 git push --quiet --no-verify "$remote" "$ref:$ref" 2>&1 >/dev/null) && exit 0',
   "reason=$(printf '%s\\n' \"$said\" | grep -m1 '^remote:' | sed 's/^remote: *//')",
   '[ -z "$reason" ] && reason=$(printf \'%s\\n\' "$said" | grep -m1 .)',
   'echo "apimatic: the SDK snapshots could not be pushed to $remote: $reason" >&2',

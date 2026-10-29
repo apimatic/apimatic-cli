@@ -11,7 +11,6 @@ import { GitService } from '../../src/infrastructure/git-service.js';
 import { DirectoryPath } from '../../src/types/file/directoryPath.js';
 import { CommitId } from '../../src/types/git/commit-id.js';
 import { RemoteName } from '../../src/types/git/remote-name.js';
-import { SdkPath } from '../../src/types/sdk/sdk-path.js';
 import { describeCommit } from '../helpers/snapshots.js';
 import { SnapshotRef } from '../../src/types/sdk/snapshot-ref.js';
 
@@ -141,30 +140,17 @@ describe('GitService', () => {
   });
 
   describe('treeOf', () => {
-    it('honours the repository’s ignore rules for a directory inside it, and roots the tree at that directory', async () => {
+    it('honours the repository’s ignore rules, except for the paths told to include', async () => {
       const repo = await repository();
-      write(repo, '.gitignore', '*.env\n');
-      write(repo, 'sdk/python/.env', 'secret');
-      write(repo, 'sdk/python/keep.py', 'kept');
-      write(repo, 'other.py', 'outside');
-
-      const tree = (await git.treeOfDirectory(repo, repo.join('sdk', 'python'), []))._unsafeUnwrap();
-
-      expect([...(await filesOf(repo, tree)).keys()]).to.deep.equal(['keep.py']);
-    });
-
-    it('honours the directory’s own .gitignore, except for the paths told to include', async () => {
-      const repo = await repository();
-      const sdk = repo.join('sdk');
-      write(sdk, '.gitignore', 'dist/\n*.log\n');
-      write(sdk, 'src/index.ts', 'export {};\n');
-      write(sdk, 'dist/index.js', 'built\n');
-      write(sdk, 'dist/generated.js', 'generated\n');
-      write(sdk, 'debug.log', 'noise\n');
+      write(repo, '.gitignore', 'dist/\n*.log\n');
+      write(repo, 'src/index.ts', 'export {};\n');
+      write(repo, 'dist/index.js', 'built\n');
+      write(repo, 'dist/generated.js', 'generated\n');
+      write(repo, 'debug.log', 'noise\n');
 
       const files = await filesOf(
         repo,
-        (await git.treeOfDirectory(repo, sdk, ['dist/generated.js', 'missing.txt'].map(rel)))._unsafeUnwrap()
+        (await git.treeOfDirectory(repo, ['dist/generated.js', 'missing.txt'].map(rel)))._unsafeUnwrap()
       );
 
       expect([...files.keys()]).to.have.members(['.gitignore', 'src/index.ts', 'dist/generated.js']);
@@ -198,7 +184,7 @@ describe('GitService', () => {
       write(repo, 'cr-at-end.bin', 'x\r');
 
       const entries = (
-        await git.listTree(repo, (await git.treeOfDirectoryAsIs(repo, repo, []))._unsafeUnwrap())
+        await git.listTree(repo, (await git.treeOfDirectoryAsIs(repo, []))._unsafeUnwrap())
       )._unsafeUnwrap();
       const crlf = entries.find((entry) => entry.path.toString() === 'crlf.txt')!;
       const cr = entries.find((entry) => entry.path.toString() === 'cr-at-end.bin')!;
@@ -214,18 +200,14 @@ describe('GitService', () => {
     write(repo, 'a.txt', 'a\n');
     const tree = (await git.treeOfEveryFile(repo, repo))._unsafeUnwrap();
     const { SnapshotRef } = await import('../../src/types/sdk/snapshot-ref.js');
-    const ref = SnapshotRef.pristine(SdkPath.fromGit('sdk')!);
+    const ref = SnapshotRef.pristine();
 
     const first = (await git.commitTree(repo, tree, [], 'first'))._unsafeUnwrap();
     const second = (await git.commitTree(repo, tree, [first], 'second'))._unsafeUnwrap();
     (await git.updateRef(repo, ref, second))._unsafeUnwrap();
 
     expect((await git.resolveRef(repo, ref))._unsafeUnwrap()?.isEqual(second)).to.be.true;
-    expect((await git.resolveRef(repo, SnapshotRef.pristine(SdkPath.fromGit('other')!)))._unsafeUnwrap()).to.be
-      .undefined;
-    expect((await git.listRefs(repo, SnapshotRef.allPristine()))._unsafeUnwrap().map(String)).to.deep.equal([
-      'refs/apimatic/pristine/sdk'
-    ]);
+    expect((await git.resolveRef(repo, SnapshotRef.previous()))._unsafeUnwrap()).to.be.undefined;
     expect(await describeCommit(repo, second)).to.deep.equal({
       parents: [first],
       authorName: 'APIMatic CLI',
@@ -330,41 +312,31 @@ describe('GitService', () => {
   });
 
   describe('unmergedStages', () => {
-    it('lists the sides git kept for each unmerged path below the directory, from the root, and none outside it', async () => {
+    it('lists the sides git kept for each unmerged path, and nothing for a merged one', async () => {
       const repo = await repository();
       const oid = (
         await execa('git', ['hash-object', '-w', '--stdin'], { cwd: repo.toString(), input: 'x' })
       ).stdout.trim();
       const entries = [
-        ...[1, 2, 3].map((stage) => `100644 ${oid} ${stage}\tsdk/ts/b.ts`),
-        ...[1, 3].map((stage) => `100644 ${oid} ${stage}\tsdk/ts/a.ts`),
-        ...[1, 2].map((stage) => `100644 ${oid} ${stage}\tsdk/py/a.py`),
-        `100644 ${oid} 0\tsdk/ts/clean.ts`
+        ...[1, 2, 3].map((stage) => `100644 ${oid} ${stage}\tb.ts`),
+        ...[1, 3].map((stage) => `100644 ${oid} ${stage}\ta.ts`),
+        `100644 ${oid} 0\tclean.ts`
       ];
       await execa('git', ['update-index', '-z', '--index-info'], {
         cwd: repo.toString(),
         input: entries.join('\0') + '\0'
       });
 
-      const listed = async (directory: string) =>
-        (await git.unmergedStages(repo, SdkPath.fromGit(directory)!))
-          ._unsafeUnwrap()
-          .map((entry) => `${entry.path}:${entry.stage}:${entry.oid.toString() === oid}`);
+      const listed = (await git.unmergedStages(repo))
+        ._unsafeUnwrap()
+        .map((entry) => `${entry.path}:${entry.stage}:${entry.oid.toString() === oid}`);
 
-      expect(await listed('sdk/ts')).to.deep.equal([
-        'sdk/ts/a.ts:1:true',
-        'sdk/ts/a.ts:3:true',
-        'sdk/ts/b.ts:1:true',
-        'sdk/ts/b.ts:2:true',
-        'sdk/ts/b.ts:3:true'
-      ]);
-      expect(await listed('')).to.include.members(['sdk/py/a.py:1:true', 'sdk/py/a.py:2:true']);
-      expect((await git.unmergedStages(repo, SdkPath.fromGit('docs')!))._unsafeUnwrap()).to.deep.equal([]);
+      expect(listed).to.deep.equal(['a.ts:1:true', 'a.ts:3:true', 'b.ts:1:true', 'b.ts:2:true', 'b.ts:3:true']);
     });
   });
 
   describe('remotes', () => {
-    const ref = SnapshotRef.pristine(SdkPath.fromGit('sdk/typescript')!);
+    const ref = SnapshotRef.pristine();
 
     const bare = async (name = 'origin.git'): Promise<DirectoryPath> => {
       const directory = new DirectoryPath(path.join(root, name));
@@ -410,11 +382,7 @@ describe('GitService', () => {
       const first = await snapshot(a, 'one');
       await execa('git', ['push', '-q', 'origin', refspec(ref)], { cwd: a.toString() });
 
-      expect(
-        (
-          await git.fetchRef(b, RemoteName.origin(), SnapshotRef.pristine(SdkPath.fromGit('elsewhere')!))
-        )._unsafeUnwrap()
-      ).to.be.undefined;
+      expect((await git.fetchRef(b, RemoteName.origin(), SnapshotRef.previous()))._unsafeUnwrap()).to.be.undefined;
       const tip = (await git.fetchRef(b, RemoteName.origin(), ref))._unsafeUnwrap();
 
       expect(tip?.isEqual(first)).to.be.true;

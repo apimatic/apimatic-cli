@@ -8,7 +8,6 @@ import { err, ok } from 'neverthrow';
 import sinon from 'sinon';
 import { SdkPublishAction } from '../../../src/actions/sdk/publish.js';
 import { SdkPublishNonInteractiveAction } from '../../../src/actions/sdk/publish/non-interactive.js';
-import { GitService } from '../../../src/infrastructure/git-service.js';
 import { LauncherService } from '../../../src/infrastructure/launcher-service.js';
 import { PublishingApiService } from '../../../src/infrastructure/services/publishing-api-service.js';
 import { SdkGenerationService } from '../../../src/infrastructure/services/sdk-generation-service.js';
@@ -48,7 +47,7 @@ describe('SdkPublishAction', () => {
       sdk(),
       { language: Language.PYTHON, codegenVersion: CodeGenerationVersion.V4, stability: Stability.STABLE },
       [PublishType.PackagePublishing],
-      { force: true, interaction: 'never' },
+      { force: true, interaction: 'never', gitInit: true },
       ProfileId.tryCreate('profile')._unsafeUnwrap(),
       SemVersion.tryCreate('1.0.0')._unsafeUnwrap(),
       withoutPackageSettings,
@@ -83,8 +82,8 @@ describe('SdkPublishAction', () => {
   });
 
   it('uploads the SDK without the CLI’s record, the repository or what its ignore rules keep out', async () => {
-    await new GitService().init(new DirectoryPath(root));
     sinon.stub(SdkGeneratePrompts.prototype, 'sdkGenerated');
+    sinon.stub(SdkGeneratePrompts.prototype, 'repositoryInitialised');
     sinon.stub(SdkGeneratePrompts.prototype, 'shareHookInstalled');
     sinon.stub(SdkPublishPrompts.prototype, 'publishSdk').callsFake((fn) => fn);
     sinon.stub(SdkPublishPrompts.prototype, 'publishingRunningNotice');
@@ -107,7 +106,8 @@ describe('SdkPublishAction', () => {
 
   it('generates into the SDK directory on a dry run and opens it, uploading nothing', async () => {
     sinon.stub(SdkGeneratePrompts.prototype, 'sdkGenerated');
-    sinon.stub(SdkGeneratePrompts.prototype, 'repositoryNotCreated');
+    sinon.stub(SdkGeneratePrompts.prototype, 'repositoryInitialised');
+    sinon.stub(SdkGeneratePrompts.prototype, 'shareHookInstalled');
     const dryRunNotice = sinon.stub(SdkPublishPrompts.prototype, 'dryRunNotice');
     const opened = sinon.stub(LauncherService.prototype, 'openDirectoryInEditorOrFileExplorer').resolves();
     const publishSdkPackage = sinon.stub(PublishingApiService.prototype, 'publishSdkPackage');
@@ -146,7 +146,8 @@ describe('SdkPublishAction', () => {
     sinon.stub(SdkPublishNonInteractivePrompts.prototype, 'sourceCodeOnlyPublishingNotice');
     sinon.stub(SdkPublishNonInteractivePrompts.prototype, 'dryRunPluginConfigNotice');
     sinon.stub(SdkGeneratePrompts.prototype, 'sdkGenerated');
-    sinon.stub(SdkGeneratePrompts.prototype, 'repositoryNotCreated');
+    sinon.stub(SdkGeneratePrompts.prototype, 'repositoryInitialised');
+    sinon.stub(SdkGeneratePrompts.prototype, 'shareHookInstalled');
     sinon.stub(SdkPublishPrompts.prototype, 'dryRunNotice');
     const opened = sinon.stub(LauncherService.prototype, 'openDirectoryInEditorOrFileExplorer').resolves();
 

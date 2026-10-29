@@ -22,13 +22,11 @@ const TYPESCRIPT = SdkGeneration.create({
 const base = CommitId.fromGit('a'.repeat(40))!;
 const root = new DirectoryPath(process.cwd());
 const origin = RemoteName.origin();
-const nested = { kind: 'nestedSdkDirectory' as const, other: root.join('sdk'), encloses: true };
 
 /** A repository with a record for Python whose base is here, and nothing else in the way. */
 const ready: RepositoryFacts = {
   root,
   operation: undefined,
-  nested: undefined,
   unresolved: [],
   record: GenerationRecord.written(PYTHON, base),
   baseHere: true,
@@ -36,15 +34,14 @@ const ready: RepositoryFacts = {
 };
 
 describe('classify', () => {
-  it('refuses an operation in progress before anything else, then a nested SDK directory', () => {
-    const busy = { ...ready, operation: 'rebase' as const, nested };
+  it('refuses an operation in progress before anything else', () => {
+    const busy = { ...ready, operation: 'rebase' as const, unresolved: [RelativeFilePath.fromGit('a.py')!] };
 
     expect(classify(busy, PYTHON)._unsafeUnwrapErr()).to.deep.equal({
       kind: 'operationInProgress',
       operation: 'rebase',
       root
     });
-    expect(classify({ ...ready, nested }, PYTHON)._unsafeUnwrapErr()).to.deep.equal(nested);
   });
 
   it('puts unmerged files before the record, whatever the record says', () => {
@@ -58,7 +55,7 @@ describe('classify', () => {
 
   it('reads the record: none, another generation, or this one', () => {
     expect(classify({ ...ready, record: undefined }, PYTHON)._unsafeUnwrap()).to.deep.equal({ kind: 'noRecord' });
-    expect(classify(ready, TYPESCRIPT)._unsafeUnwrap()).to.deep.equal({ kind: 'otherGeneration', recorded: PYTHON });
+    expect(classify(ready, TYPESCRIPT)._unsafeUnwrap()).to.deep.equal({ kind: 'otherGeneration' });
     expect(classify(ready, PYTHON)._unsafeUnwrap()).to.deep.equal({ kind: 'ready', base });
   });
 

@@ -16,12 +16,11 @@ import { ConflictSide, MergePlan } from '../../src/types/sdk/merge-plan.js';
 import { SdkRepositoryContext } from '../../src/types/sdk-repository-context.js';
 import { SnapshotStore } from '../../src/types/sdk-repository/snapshot-store.js';
 import { WriteProblem } from '../../src/types/sdk/repository-state.js';
-import { SdkPath } from '../../src/types/sdk/sdk-path.js';
 import { SnapshotRef } from '../../src/types/sdk/snapshot-ref.js';
 import { recordPristine } from '../helpers/snapshots.js';
 
 /** The ref a run keeps the directory under before writing, for the SDK every test here generates. */
-const PREVIOUS_REF = SnapshotRef.previous(SdkPath.fromGit('sdk/typescript')!);
+const PREVIOUS_REF = SnapshotRef.previous();
 
 const TYPESCRIPT = SdkGeneration.create({
   language: Language.TYPESCRIPT,
@@ -100,11 +99,10 @@ describe('SdkRepositoryContext: the merge', () => {
     generated: Files,
     { favour, beforeWrite }: { favour?: ConflictSide; beforeWrite?: () => void } = {}
   ): Promise<Run> => {
-    const project = new DirectoryPath(path.join(root, `project-${counter++}`));
-    const sdk = project.join('sdk', 'typescript');
+    const sdk = new DirectoryPath(path.join(root, `sdk-${counter++}`));
     fs.mkdirSync(sdk.toString(), { recursive: true });
-    (await git.init(project))._unsafeUnwrap();
-    const repository = SdkRepositoryContext.create(project, SdkPath.of(project, sdk)!);
+    (await git.init(sdk))._unsafeUnwrap();
+    const repository = SdkRepositoryContext.own(sdk);
     const baseDirectory = new DirectoryPath(path.join(root, `base-${counter}`));
     const generatedDirectory = new DirectoryPath(path.join(root, `generated-${counter}`));
     fs.mkdirSync(baseDirectory.toString());
@@ -112,13 +110,11 @@ describe('SdkRepositoryContext: the merge', () => {
     write(baseDirectory, base);
     write(sdk, disk);
     write(generatedDirectory, generated);
-    const baseCommit = (await recordPristine(project, sdk, baseDirectory, TYPESCRIPT))._unsafeUnwrap();
+    const baseCommit = (await recordPristine(sdk, baseDirectory, TYPESCRIPT))._unsafeUnwrap();
     const regeneration = (await repository.regenerate(baseCommit, generatedDirectory))._unsafeUnwrap();
     expect(
       regeneration.generated.isEqual(
-        (
-          await new SnapshotStore(project, SdkPath.of(project, sdk)!).snapshotGenerated(generatedDirectory)
-        )._unsafeUnwrap()
+        (await new SnapshotStore(sdk).snapshotGenerated(generatedDirectory))._unsafeUnwrap()
       )
     ).to.be.true;
     const plan = favour === undefined ? regeneration.merge.plan : regeneration.merge.plan.taking(favour);
@@ -127,7 +123,7 @@ describe('SdkRepositoryContext: the merge', () => {
     if (beforeWrite === undefined) {
       written._unsafeUnwrap();
     }
-    expect((await git.resolveRef(project, PREVIOUS_REF))._unsafeUnwrap()).to.not.be.undefined;
+    expect((await git.resolveRef(sdk, PREVIOUS_REF))._unsafeUnwrap()).to.not.be.undefined;
 
     const at = (relative: string) => path.join(sdk.toString(), relative);
     const list = (directory: string): string[] =>

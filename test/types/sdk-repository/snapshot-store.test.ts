@@ -6,7 +6,6 @@ import { GitService } from '../../../src/infrastructure/git-service.js';
 import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
 import { CodeGenerationVersion, Language, Stability } from '../../../src/types/sdk/generate.js';
 import { SdkGeneration } from '../../../src/types/sdk/sdk-generation.js';
-import { SdkPath } from '../../../src/types/sdk/sdk-path.js';
 import { SnapshotStore } from '../../../src/types/sdk-repository/snapshot-store.js';
 import { describeCommit, snapshotFiles } from '../../helpers/snapshots.js';
 
@@ -41,11 +40,11 @@ describe('SnapshotStore', () => {
     return directory;
   };
 
-  /** The store for the SDK at `sdk` in the repository at `project`, once `git init` ran there. */
-  const store = async (project: DirectoryPath, sdk: DirectoryPath): Promise<SnapshotStore> => {
+  /** The store for the SDK at `sdk`, once `git init` made it a repository of its own. */
+  const store = async (sdk: DirectoryPath): Promise<SnapshotStore> => {
     fs.mkdirSync(sdk.toString(), { recursive: true });
-    (await git.init(project))._unsafeUnwrap();
-    return new SnapshotStore(project, SdkPath.of(project, sdk)!);
+    (await git.init(sdk))._unsafeUnwrap();
+    return new SnapshotStore(sdk);
   };
 
   describe('savePrevious', () => {
@@ -53,7 +52,7 @@ describe('SnapshotStore', () => {
       const sdk = new DirectoryPath(path.join(root, 'sdk', 'typescript'));
       write(sdk, 'README.md', '# edited');
       write(sdk, path.join('.apimatic', 'generation.json'), '{}');
-      const snapshots = await store(sdk, sdk);
+      const snapshots = await store(sdk);
 
       const first = (await snapshots.savePrevious(undefined))._unsafeUnwrap();
       write(sdk, 'README.md', '# edited again');
@@ -68,9 +67,8 @@ describe('SnapshotStore', () => {
     });
 
     it('includes a generated file the SDK’s own .gitignore matches, and leaves other ignored files out', async () => {
-      const project = new DirectoryPath(path.join(root, 'project'));
-      const sdk = project.join('sdk', 'typescript');
-      const snapshots = await store(project, sdk);
+      const sdk = new DirectoryPath(path.join(root, 'sdk', 'typescript'));
+      const snapshots = await store(sdk);
       const tree = (
         await snapshots.snapshotGenerated(generated({ '.gitignore': 'dist/\n', 'dist/generated.js': 'generated' }))
       )._unsafeUnwrap();
@@ -81,7 +79,7 @@ describe('SnapshotStore', () => {
 
       const previous = (await snapshots.savePrevious(base))._unsafeUnwrap();
 
-      expect([...(await snapshotFiles(project, previous)).keys()]).to.have.members(['.gitignore', 'dist/generated.js']);
+      expect([...(await snapshotFiles(sdk, previous)).keys()]).to.have.members(['.gitignore', 'dist/generated.js']);
     });
   });
 });

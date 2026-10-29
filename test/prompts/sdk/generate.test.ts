@@ -8,9 +8,10 @@ import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
 import { Language } from '../../../src/types/sdk/generate.js';
 import { RelativeFilePath } from '../../../src/types/file/relativeFilePath.js';
 import { ConflictKind, MergePlan } from '../../../src/types/sdk/merge-plan.js';
-import { CodeGenerationVersion, Stability } from '../../../src/types/sdk/generate.js';
 import { RemoteName } from '../../../src/types/git/remote-name.js';
-import { SdkGeneration } from '../../../src/types/sdk/sdk-generation.js';
+import { FileName } from '../../../src/types/file/fileName.js';
+import { FilePath } from '../../../src/types/file/filePath.js';
+import { SnapshotRef } from '../../../src/types/sdk/snapshot-ref.js';
 
 describe('SdkGeneratePrompts.languageNotAvailable', () => {
   const prompts = new SdkGeneratePrompts();
@@ -169,53 +170,89 @@ describe('SdkGeneratePrompts.sdkMerged', () => {
   });
 });
 
-describe('SdkGeneratePrompts.recordNotForThisGeneration', () => {
+describe('SdkGeneratePrompts, about the conflicts', () => {
+  const sdk = new DirectoryPath(process.cwd()).join('sdk', 'typescript');
+  const conflicted = plan({}, [
+    { path: 'src/models/book.ts', kind: 'bothChanged' },
+    { path: 'src/resources/reviews.ts', kind: 'noLongerGenerated' }
+  ]);
+
+  /** Boxed or not depending on the terminal's width, but each line stays a line of its own. */
+  const printed = (say: (prompts: SdkGeneratePrompts) => void) => {
+    const write = sinon.stub(process.stdout, 'write').returns(true);
+    try {
+      say(new SdkGeneratePrompts());
+    } finally {
+      write.restore();
+    }
+    return stripVTControlCharacters(write.args.map(([chunk]) => String(chunk)).join(''));
+  };
+
+  it('labels each conflicted file by what happened to it, and nothing about how it is written', () => {
+    const note = printed((prompts) => prompts.conflictsNotAsked(conflicted, sdk));
+
+    expect(note).to.contain('changed by you and by the generator');
+    expect(note).to.contain('no longer generated');
+    expect(note).to.not.contain(';');
+  });
+
+  it('sends a run that could not ask to a terminal, or to --force for the generator’s changes', () => {
+    expect(printed((prompts) => prompts.conflictsNotAsked(conflicted, sdk))).to.contain(
+      "or with --force to resolve them using the generator's changes."
+    );
+  });
+
+  it('offers a merge tool once git holds the files as unmerged, and names the files with markers and without', () => {
+    const note = printed((prompts) => prompts.conflictSteps(conflicted, sdk, true));
+
+    const order = [
+      "1. Resolve them in a merge tool, such as 'git mergetool' or your editor's merge view, or by hand:",
+      'With markers: keep what is right, remove the markers, and stage each file.',
+      "'./sdk/typescript/src/models/book.ts'",
+      'Without markers: decide whether each file stays or goes',
+      "'./sdk/typescript/src/resources/reviews.ts'",
+      '2. Rerun the command; nothing needs committing first.',
+      '3. Or rerun and let the CLI resolve what is left, using either side.'
+    ].map((line) => note.indexOf(line));
+    expect(order.every((at, index) => at >= 0 && (index === 0 || at > order[index - 1]))).to.be.true;
+  });
+
+  it('leaves the merge tool out when git does not hold the files as unmerged, and the group a plan does not have', () => {
+    const note = printed((prompts) =>
+      prompts.conflictSteps(plan({}, [{ path: 'src/models/book.ts', kind: 'bothChanged' }]), sdk, false)
+    );
+
+    expect(note).to.contain('1. Resolve it by hand:');
+    expect(note).to.not.contain('merge tool');
+    expect(note).to.not.contain('Without markers');
+  });
+});
+
+describe('SdkGeneratePrompts, about the repository', () => {
   const sdk = new DirectoryPath(process.cwd()).join('sdk', 'python');
-  const stable = SdkGeneration.create({
-    language: Language.PYTHON,
-    codegenVersion: CodeGenerationVersion.V4,
-    stability: Stability.STABLE
-  })!;
 
   afterEach(() => {
     sinon.restore();
   });
 
-  it('advises the recorded stability when that is what sets the two apart', () => {
+  it('names the flag that makes the SDK directory a repository when it is not one', () => {
     const warn = sinon.stub(log, 'warn');
 
-    new SdkGeneratePrompts().recordNotForThisGeneration(
-      stable,
-      SdkGeneration.create({
-        language: Language.PYTHON,
-        codegenVersion: CodeGenerationVersion.V4,
-        stability: Stability.BETA
-      })!,
-      sdk
-    );
+    new SdkGeneratePrompts().repositoryNotCreated(sdk);
 
     expect(stripVTControlCharacters(warn.firstCall.args[0])).to.equal(
-      "'./sdk/python' holds a stable python SDK; a beta python SDK cannot be merged into it. " +
-        'To merge into it, rerun with --stability=stable.'
+      "'./sdk/python' is not a git repository of its own, so your customizations to the generated SDK " +
+        'will not persist across regenerations. Run with --git-init to make it one.'
     );
   });
 
-  it('advises another directory for another language', () => {
-    const warn = sinon.stub(log, 'warn');
+  it('says which repository keeps the customizations when the developer already had one', () => {
+    const info = sinon.stub(log, 'info');
 
-    new SdkGeneratePrompts().recordNotForThisGeneration(
-      stable,
-      SdkGeneration.create({
-        language: Language.TYPESCRIPT,
-        codegenVersion: CodeGenerationVersion.V4,
-        stability: Stability.STABLE
-      })!,
-      sdk
-    );
+    new SdkGeneratePrompts().repositoryFound(sdk);
 
-    expect(stripVTControlCharacters(warn.firstCall.args[0])).to.equal(
-      "'./sdk/python' holds a stable python SDK; a stable typescript SDK cannot be merged into it. " +
-        'Generate it into another directory, with --destination.'
+    expect(stripVTControlCharacters(info.firstCall.args[0])).to.equal(
+      "Found a git repository in './sdk/python', which keeps your customizations across regenerations."
     );
   });
 });
@@ -264,39 +301,48 @@ describe('SdkGeneratePrompts.snapshotMissing', () => {
   });
 });
 
-describe('SdkGeneratePrompts.directoryNotInspected', () => {
+describe('SdkGeneratePrompts.sdkNotWritten', () => {
   const sdk = new DirectoryPath(process.cwd()).join('sdk', 'python');
 
   afterEach(() => {
     sinon.restore();
   });
 
-  it('words each problem by its kind: nested either way, an operation in progress, or git itself', () => {
+  it('names the command that puts the directory back from its own repository when the undo failed too', () => {
     const error = sinon.stub(log, 'error');
-    const other = new DirectoryPath(process.cwd()).join('sdk');
 
-    new SdkGeneratePrompts().directoryNotInspected(sdk, { kind: 'nestedSdkDirectory', other, encloses: true });
-    new SdkGeneratePrompts().directoryNotInspected(sdk, {
-      kind: 'nestedSdkDirectory',
-      other: sdk.join('inner'),
-      encloses: false
+    new SdkGeneratePrompts().sdkNotWritten(sdk, {
+      kind: 'notApplied',
+      file: new FilePath(sdk, new FileName('book.py')),
+      operation: 'write',
+      reason: 'EACCES: permission denied',
+      undo: { kind: 'failed', reason: 'EBUSY: resource busy', previous: SnapshotRef.previous() }
     });
-    new SdkGeneratePrompts().directoryNotInspected(sdk, {
+
+    const said = stripVTControlCharacters(error.firstCall.args[0]);
+    expect(said).to.contain("'./sdk/python/book.py' could not be written: EACCES: permission denied");
+    expect(said).to.contain("  git -C './sdk/python' restore --source=refs/apimatic/previous --worktree -- .");
+  });
+});
+
+describe('SdkGeneratePrompts.directoryNotInspected', () => {
+  afterEach(() => {
+    sinon.restore();
+  });
+
+  it('words each problem by its kind: an operation in progress, or git itself', () => {
+    const error = sinon.stub(log, 'error');
+
+    new SdkGeneratePrompts().directoryNotInspected({
       kind: 'operationInProgress',
       operation: 'rebase',
       root: new DirectoryPath(process.cwd())
     });
-    new SdkGeneratePrompts().directoryNotInspected(sdk, {
-      reason: 'git rev-parse failed: bad config'
-    });
+    new SdkGeneratePrompts().directoryNotInspected({ reason: 'git rev-parse failed: bad config' });
 
     const said = error.getCalls().map((call) => stripVTControlCharacters(call.args[0]));
-    expect(said[0]).to.equal("The SDK cannot be generated at './sdk/python': it sits inside the SDK at './sdk'.");
-    expect(said[1]).to.equal(
-      "The SDK cannot be generated at './sdk/python': the SDK at './sdk/python/inner' sits inside it."
-    );
-    expect(said[2]).to.contain('in the middle of a rebase');
-    expect(said[2]).to.contain('git rebase --abort');
-    expect(said[3]).to.contain('git rev-parse failed: bad config');
+    expect(said[0]).to.contain('in the middle of a rebase');
+    expect(said[0]).to.contain('git rebase --abort');
+    expect(said[1]).to.contain('git rev-parse failed: bad config');
   });
 });

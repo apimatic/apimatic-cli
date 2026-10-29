@@ -307,35 +307,17 @@ describe('MergePlan.from', () => {
 
   it('tells the conflicts that leave markers in the file from those that leave it whole', () => {
     const marks = (...kinds: ConflictKind[]) => {
-      const conflicts = kinds.map((kind, index) => ({ path: rel(`${index}.ts`), kind }));
+      const conflicts = kinds.map((kind) => ({ path: rel(`${kind}.ts`), kind }));
       const plan = new MergePlan([], [], conflicts, MergePlan.from(inputs({})).files);
-      return [plan.hasMarkedConflicts(), plan.hasUnmarkedConflicts()];
+      return [plan.markedPaths().map(String), plan.unmarkedPaths().map(String)];
     };
 
-    expect(marks('bothChanged', 'bothAdded')).to.deep.equal([true, false]);
-    expect(marks('deletedByYou', 'noLongerGenerated', 'binary', 'other')).to.deep.equal([false, true]);
-    expect(marks('bothChanged', 'binary')).to.deep.equal([true, true]);
-    expect(marks()).to.deep.equal([false, false]);
-  });
-});
-
-describe('MergePlan.nextSteps', () => {
-  const planWith = (kinds: ConflictKind[]) =>
-    new MergePlan(
+    expect(marks('bothChanged', 'bothAdded')).to.deep.equal([['bothChanged.ts', 'bothAdded.ts'], []]);
+    expect(marks('deletedByYou', 'noLongerGenerated', 'binary', 'other')).to.deep.equal([
       [],
-      [],
-      kinds.map((kind, index) => ({ path: rel(`${index}.ts`), kind })),
-      MergePlan.from(inputs({})).files
-    );
-
-  it('names a step for the marked files, one for the unmarked, the rerun, and the offer only when a rerun could ask', () => {
-    expect(planWith(['bothChanged', 'deletedByYou']).nextSteps(true)).to.deep.equal([
-      'resolveMarked',
-      'decideUnmarked',
-      'rerun',
-      'orLetCliResolve'
+      ['deletedByYou.ts', 'noLongerGenerated.ts', 'binary.ts', 'other.ts']
     ]);
-    expect(planWith(['bothChanged']).nextSteps(false)).to.deep.equal(['resolveMarked', 'rerun']);
-    expect(planWith(['noLongerGenerated']).nextSteps(false)).to.deep.equal(['decideUnmarked', 'rerun']);
+    expect(marks('bothChanged', 'binary')).to.deep.equal([['bothChanged.ts'], ['binary.ts']]);
+    expect(marks()).to.deep.equal([[], []]);
   });
 });

@@ -12,7 +12,7 @@ import { SdkContext } from '../../types/sdk-context.js';
 import { recordingNotice } from '../../types/sdk/recording-notice.js';
 import { GenerationRequest, SdkGeneration } from '../../types/sdk/sdk-generation.js';
 import { settle } from '../../types/sdk/settlement.js';
-import { creating, noticeFor, RunMode, writeModeFor } from '../../types/sdk/write-mode.js';
+import { noticeFor, onConflictFor, RunMode, writeModeFor } from '../../types/sdk/write-mode.js';
 
 export class GenerateAction {
   private readonly prompts: SdkGeneratePrompts = new SdkGeneratePrompts();
@@ -60,15 +60,16 @@ export class GenerateAction {
 
     const sdkContext = new SdkContext(sdk);
     const inspected = await sdkContext.destination(generation);
+    const onConflict = onConflictFor(run);
     const unresolved =
-      inspected.isOk() && inspected.value.kind === 'unresolved' && run.interaction === 'ask'
+      inspected.isOk() && inspected.value.kind === 'unresolved' && onConflict !== 'refuse'
         ? inspected.value
         : undefined;
     if (unresolved !== undefined) {
-      const choice = await this.prompts.unresolvedChoice(unresolved.paths, sdk);
+      const choice = onConflict === 'ask' ? await this.prompts.unresolvedChoice(unresolved.paths, sdk) : 'generated';
       if (choice === 'resolve') {
         this.prompts.resolveLater();
-        return ActionResult.failed();
+        return ActionResult.cancelled();
       }
       const settled = await unresolved.repository.settleUnresolved(choice, unresolved.paths);
       if (settled.isErr()) {
@@ -79,7 +80,7 @@ export class GenerateAction {
     }
     const looked = unresolved === undefined ? inspected : await sdkContext.destination(generation);
     if (looked.isErr()) {
-      this.prompts.directoryNotInspected(sdk, looked.error);
+      this.prompts.directoryNotInspected(looked.error);
       return ActionResult.failed();
     }
     // Left unresolved by a run that could not ask, or by a settling that did not clear every file.
@@ -90,18 +91,17 @@ export class GenerateAction {
     const destination = looked.value;
     const notice = noticeFor(destination);
     if (notice !== undefined) {
-      this.prompts.destinationNotice(notice, generation, sdk);
+      this.prompts.destinationNotice(notice);
     }
-    const proposed = writeModeFor(destination, run, await sdkContext.exists());
-    if (proposed.kind === 'refuse') {
-      this.prompts.refused(proposed.because, sdk);
+    const mode = writeModeFor(destination, run, await sdkContext.exists());
+    if (mode.kind === 'refuse') {
+      this.prompts.refused(mode.because, sdk);
       return ActionResult.failed();
     }
-    if (proposed.confirmOverwrite && !(await this.prompts.overwriteSdk(sdk))) {
+    if (mode.confirmOverwrite && !(await this.prompts.overwriteSdk(sdk))) {
       this.prompts.destinationDirNotEmpty();
       return ActionResult.cancelled();
     }
-    const mode = proposed.kind === 'askToCreate' ? creating(await this.prompts.createRepository(sdk)) : proposed;
     if (mode.kind === 'save' && mode.warnNoRepository) {
       this.prompts.repositoryNotCreated(sdk);
     }
@@ -150,6 +150,8 @@ export class GenerateAction {
           await sdkContext.save(tempSdk);
           if (mode.kind === 'init') {
             this.prompts.repositoryInitialised(sdk);
+          } else if (mode.announceRepository) {
+            this.prompts.repositoryFound(sdk);
           }
           const recorded = await opened.value.recordFresh(tempSdk, generation);
           this.prompts.recorded(recordingNotice(recorded, 'fresh'));
@@ -169,8 +171,11 @@ export class GenerateAction {
             this.prompts.conflictsNotAsked(plan, sdk);
             return ActionResult.failed();
           }
-          const choice =
-            plan.hasConflicts() && mode.onConflict === 'ask' ? await this.prompts.conflictChoice(plan, sdk) : 'resolve';
+          const choice = !plan.hasConflicts()
+            ? 'resolve'
+            : mode.onConflict === 'ask'
+            ? await this.prompts.conflictChoice(plan, sdk)
+            : 'generated';
           if (choice === 'cancel') {
             this.prompts.runCancelled(sdk);
             return ActionResult.cancelled();
@@ -198,14 +203,8 @@ export class GenerateAction {
           if (staged.isErr()) {
             this.prompts.conflictsNotStaged(staged.error);
           }
-          const steps = settlement.plan.nextSteps(mode.onConflict === 'ask');
-          if (mode.onConflict === 'ask') {
-            this.prompts.conflictSteps(steps);
-          } else {
-            this.prompts.conflicts(settlement.plan, sdk, steps);
-          }
-          this.prompts.mergeNeedsResolving();
-          return ActionResult.failed();
+          this.prompts.conflictSteps(settlement.plan, sdk, staged.isOk());
+          return ActionResult.success();
         }
       }
     });

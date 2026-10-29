@@ -19,7 +19,6 @@ import { FileProblem } from '../../../src/types/file/file-problem.js';
 import { ProjectContext } from '../../../src/types/project-context.js';
 import { CodeGenerationVersion, Language, Stability } from '../../../src/types/sdk/generate.js';
 import { GenerationRecord } from '../../../src/types/sdk/generation-record.js';
-import { SdkPath } from '../../../src/types/sdk/sdk-path.js';
 import { SnapshotRef } from '../../../src/types/sdk/snapshot-ref.js';
 import { TempContext } from '../../../src/types/temp-context.js';
 import { terminal } from '../../../src/infrastructure/terminal.js';
@@ -32,12 +31,12 @@ describe('GenerateAction (sdk)', () => {
   let sdkArchive: Buffer;
   let generateSdk: sinon.SinonStub;
 
-  const execute = (options: { force?: boolean; destination?: DirectoryPath } = {}) =>
+  const execute = (options: { force?: boolean; gitInit?: boolean; destination?: DirectoryPath } = {}) =>
     new GenerateAction(new DirectoryPath(root), COMMAND_METADATA, 'auth-key').execute(
       ProjectContext.in(new DirectoryPath(root)),
       options.destination ?? sdk(),
       { language: Language.PYTHON, codegenVersion: CodeGenerationVersion.V4, stability: Stability.STABLE },
-      runMode(options.force ?? true)
+      runMode(options.force ?? true, options.gitInit)
     );
 
   const sdk = () => new DirectoryPath(path.join(root, 'sdk', 'python'));
@@ -100,16 +99,14 @@ describe('GenerateAction (sdk)', () => {
   });
 
   it('expands the generated SDK into its language directory and records it for the next run', async () => {
-    (await new GitService().init(new DirectoryPath(root)))._unsafeUnwrap();
+    sinon.stub(SdkGeneratePrompts.prototype, 'repositoryInitialised');
     sinon.stub(SdkGeneratePrompts.prototype, 'shareHookInstalled');
 
-    expect((await execute()).isSuccess()).to.be.true;
+    expect((await execute({ gitInit: true })).isSuccess()).to.be.true;
 
     expect(fs.readFileSync(at('README.md'), 'utf-8')).to.equal('# sdk');
     const record = GenerationRecord.parse(fs.readFileSync(at('.apimatic/generation.json'), 'utf-8'))!;
-    const pristine = (
-      await new GitService().resolveRef(new DirectoryPath(root), SnapshotRef.pristine(SdkPath.fromGit('sdk/python')!))
-    )._unsafeUnwrap();
+    const pristine = (await new GitService().resolveRef(sdk(), SnapshotRef.pristine()))._unsafeUnwrap();
     expect(record.pristineCommit().isEqual(pristine!)).to.be.true;
   });
 

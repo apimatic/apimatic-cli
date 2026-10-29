@@ -23,7 +23,7 @@ export type Unresolved<Repository = undefined> = {
   paths: readonly RelativeFilePath[];
 };
 
-/** What a run found before deciding: the git on PATH, and the enclosing repository's state when a supported git found one. */
+/** What a run found before deciding: the git on PATH, and the state of the SDK directory's own repository when a supported git found one. */
 export type Inspected<Repository = undefined> = {
   git: GitVersion | undefined;
   repository: { handle: Repository; state: SdkRepositoryState } | undefined;

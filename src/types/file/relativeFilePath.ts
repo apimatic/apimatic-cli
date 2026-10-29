@@ -31,12 +31,7 @@ export class RelativeFilePath {
     return new FilePath(directory.join(path.posix.dirname(this.value)), this.name());
   }
 
-  /** The same file seen from above `directory`: its place below the root `directory` sits in. */
-  public under(directory: RelativeDirectoryPath): RelativeFilePath {
-    return new RelativeFilePath(`${directory}/${this.value}`);
-  }
-
-  /** The same file seen from inside `directory`, undoing `under`; none when the file is not below it. */
+  /** The same file seen from inside `directory`; none when the file is not below it. */
   public within(directory: RelativeDirectoryPath): RelativeFilePath | undefined {
     const prefix = `${directory}/`;
     return this.value.startsWith(prefix) ? new RelativeFilePath(this.value.slice(prefix.length)) : undefined;

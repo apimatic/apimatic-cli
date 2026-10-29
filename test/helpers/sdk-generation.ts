@@ -52,7 +52,8 @@ export function stubSdkGeneration(root: string): {
 }
 
 /** How the `sdk generate` command starts a run: asks only in a terminal, and never under --force. */
-export const runMode = (force: boolean): RunMode => ({
+export const runMode = (force: boolean, gitInit = false): RunMode => ({
   force,
-  interaction: !force && terminal.isInteractive() ? 'ask' : 'never'
+  interaction: !force && terminal.isInteractive() ? 'ask' : 'never',
+  gitInit
 });

@@ -21,7 +21,6 @@ import {
   ShareHookInstall,
   WriteProblem
 } from './sdk/repository-state.js';
-import { SdkPath } from './sdk/sdk-path.js';
 import { Settlement } from './sdk/settlement.js';
 import { settledContent } from './sdk/unresolved-file.js';
 import { GenerationRecordFile } from './sdk-repository/generation-record-file.js';
@@ -31,7 +30,7 @@ import { SdkFiles } from './sdk-repository/sdk-files.js';
 import { ShareHookInstaller } from './sdk-repository/share-hook-installer.js';
 import { SnapshotStore } from './sdk-repository/snapshot-store.js';
 
-/** An SDK directory with the repository enclosing it: snapshots, record, files, hook and index, and the merge of a regeneration against the recorded base. */
+/** An SDK directory that is a repository of its own: snapshots, record, files, hook and index, and the merge of a regeneration against the recorded base. */
 export class SdkRepositoryContext {
   private readonly git = new GitService();
   private readonly snapshots: SnapshotStore;
@@ -40,25 +39,16 @@ export class SdkRepositoryContext {
   private readonly hook: ShareHookInstaller;
   private readonly merger: MergeEngine;
 
-  private readonly sdk: DirectoryPath;
-
-  private constructor(private readonly rootDirectory: DirectoryPath, private readonly path: SdkPath) {
-    this.sdk = path.in(rootDirectory);
-    this.snapshots = new SnapshotStore(rootDirectory, path);
-    this.recordFile = new GenerationRecordFile(this.sdk);
-    this.files = new SdkFiles(rootDirectory, this.sdk);
-    this.hook = new ShareHookInstaller(rootDirectory);
-    this.merger = new MergeEngine(rootDirectory);
+  private constructor(private readonly sdk: DirectoryPath) {
+    this.snapshots = new SnapshotStore(sdk);
+    this.recordFile = new GenerationRecordFile(sdk);
+    this.files = new SdkFiles(sdk);
+    this.hook = new ShareHookInstaller(sdk);
+    this.merger = new MergeEngine(sdk);
   }
 
-  /** The SDK directory at `path` in the repository rooted at `root`. */
-  public static create(root: DirectoryPath, path: SdkPath): SdkRepositoryContext {
-    return new SdkRepositoryContext(root, path);
-  }
-
-  /** An SDK directory that is a repository of its own. */
   public static own(directory: DirectoryPath): SdkRepositoryContext {
-    return new SdkRepositoryContext(directory, SdkPath.root());
+    return new SdkRepositoryContext(directory);
   }
 
   /** What a run needs before it decides how to write: the local facts, read then classified, and one fetch when the recorded base is elsewhere. */
@@ -88,17 +78,13 @@ export class SdkRepositoryContext {
 
   /** Every local fact the state is decided from, read before any of them is weighed; the remote is where the branch pushes, else `origin`. */
   private async facts(): Promise<Result<RepositoryFacts, RepositoryProblem>> {
-    const remote = await this.git.remoteOf(this.rootDirectory);
+    const remote = await this.git.remoteOf(this.sdk);
     if (remote.isErr()) {
       return err(remote.error);
     }
-    const operation = await this.git.operationInProgress(this.rootDirectory);
+    const operation = await this.git.operationInProgress(this.sdk);
     if (operation.isErr()) {
       return err(operation.error);
-    }
-    const nested = await this.snapshots.nested();
-    if (nested.isErr()) {
-      return err(nested.error);
     }
     const unresolved = await this.unresolvedConflicts();
     if (unresolved.isErr()) {
@@ -114,9 +100,8 @@ export class SdkRepositoryContext {
       return err(baseHere.error);
     }
     return ok({
-      root: this.rootDirectory,
+      root: this.sdk,
       operation: operation.value,
-      nested: nested.value,
       unresolved: unresolved.value,
       record: record.value,
       baseHere: baseHere.value,
@@ -129,12 +114,12 @@ export class SdkRepositoryContext {
     side: ConflictSide,
     paths: readonly RelativeFilePath[]
   ): Promise<Result<void, RepositoryProblem>> {
-    const stages = await this.git.unmergedStages(this.rootDirectory, this.path);
+    const stages = await this.git.unmergedStages(this.sdk);
     if (stages.isErr()) {
       return err(stages.error);
     }
     const blobs = await this.git.readBlobs(
-      this.rootDirectory,
+      this.sdk,
       stages.value.map((entry) => entry.oid)
     );
     if (blobs.isErr()) {
@@ -146,10 +131,7 @@ export class SdkRepositoryContext {
         return settled;
       }
     }
-    return this.git.unstage(
-      this.rootDirectory,
-      paths.map((path) => this.path.fromRoot(path))
-    );
+    return this.git.unstage(this.sdk, paths);
   }
 
   /** A freshly written SDK recorded as the next base: snapshotted whole, then recorded as `record` does. */
@@ -215,19 +197,13 @@ export class SdkRepositoryContext {
 
   /** Marks the regeneration's conflicted paths in the repository's index the way a merge would, so git's own tools take over. */
   public async stageConflicts(regeneration: Regeneration): Promise<Result<void, RepositoryProblem>> {
-    return this.git.stageConflicts(
-      this.rootDirectory,
-      regeneration.merge.stages.map((entry) => ({ ...entry, path: this.path.fromRoot(entry.path) }))
-    );
+    return this.git.stageConflicts(this.sdk, regeneration.merge.stages);
   }
 
-  /** The paths below the SDK directory that git holds as unmerged: what a run left, and `git add` has not marked resolved. */
+  /** The paths git holds as unmerged: what a run left, and `git add` has not marked resolved. */
   private async unresolvedConflicts(): Promise<Result<RelativeFilePath[], RepositoryProblem>> {
-    const stages = await this.git.unmergedStages(this.rootDirectory, this.path);
-    return stages.map((found) => {
-      const paths = new ValueSet(found.map((entry) => entry.path));
-      return paths.values().flatMap((path) => this.path.within(path) ?? []);
-    });
+    const stages = await this.git.unmergedStages(this.sdk);
+    return stages.map((found) => new ValueSet(found.map((entry) => entry.path)).values());
   }
 
   private async settleOne(
@@ -236,9 +212,8 @@ export class SdkRepositoryContext {
     stages: readonly StageEntry[],
     blobs: ValueMap<BlobId, Uint8Array>
   ): Promise<Result<void, RepositoryProblem>> {
-    const fromRoot = this.path.fromRoot(path);
     const stage = (number: StageEntry['stage']) => {
-      const entry = stages.find((candidate) => candidate.stage === number && candidate.path.isEqual(fromRoot));
+      const entry = stages.find((candidate) => candidate.stage === number && candidate.path.isEqual(path));
       return entry === undefined ? undefined : blobs.get(entry.oid);
     };
     const disk = await this.files.contentOf(path);

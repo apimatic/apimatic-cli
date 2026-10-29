@@ -1,22 +1,15 @@
 import { expect } from 'chai';
 import { CommitId } from '../../../src/types/git/commit-id.js';
 import { GitVersion } from '../../../src/types/git/git-version.js';
-import { CodeGenerationVersion, Language, Stability } from '../../../src/types/sdk/generate.js';
 import { SdkDestination } from '../../../src/types/sdk/sdk-destination.js';
-import { SdkGeneration } from '../../../src/types/sdk/sdk-generation.js';
-import { creating, noticeFor, RunMode, writeModeFor } from '../../../src/types/sdk/write-mode.js';
+import { noticeFor, onConflictFor, RunMode, writeModeFor } from '../../../src/types/sdk/write-mode.js';
 
 const repository = 'the repository';
 const base = CommitId.fromGit('a'.repeat(40))!;
-const recorded = SdkGeneration.create({
-  language: Language.PYTHON,
-  codegenVersion: CodeGenerationVersion.V4,
-  stability: Stability.BETA
-})!;
 
-const ASKING: RunMode = { force: false, interaction: 'ask' };
-const SILENT: RunMode = { force: false, interaction: 'never' };
-const FORCED: RunMode = { force: true, interaction: 'never' };
+const ASKING: RunMode = { force: false, interaction: 'ask', gitInit: false };
+const SILENT: RunMode = { force: false, interaction: 'never', gitInit: false };
+const FORCED: RunMode = { force: true, interaction: 'never', gitInit: false };
 
 const overwrite: SdkDestination<string> = { kind: 'overwrite', found: GitVersion.parse('git version 2.30.2') };
 const noRepository: SdkDestination<string> = { kind: 'noRepository' };
@@ -24,15 +17,15 @@ const noRecord: SdkDestination<string> = { kind: 'record', repository, because: 
 const otherGeneration: SdkDestination<string> = {
   kind: 'record',
   repository,
-  because: { kind: 'otherGeneration', recorded }
+  because: { kind: 'otherGeneration' }
 };
 const merge: SdkDestination<string> = { kind: 'merge', repository, base };
 
 describe('noticeFor', () => {
   it('tells the developer what the destination means, when it means something', () => {
     expect(noticeFor(overwrite)).to.deep.equal({ kind: 'gitUnavailable', found: overwrite.found });
-    expect(noticeFor(otherGeneration)).to.deep.equal({ kind: 'otherGeneration', recorded });
     expect(noticeFor(noRecord)).to.be.undefined;
+    expect(noticeFor(otherGeneration)).to.be.undefined;
     expect(noticeFor(merge)).to.be.undefined;
   });
 });
@@ -56,22 +49,43 @@ describe('writeModeFor', () => {
     });
   });
 
-  it('asks whether to create a repository, saves without one under --force, and refuses when it cannot ask', () => {
-    expect(writeModeFor(noRepository, ASKING, false)).to.deep.equal({ kind: 'askToCreate', confirmOverwrite: false });
-    expect(writeModeFor(noRepository, FORCED, true)).to.deep.equal({
-      kind: 'save',
-      confirmOverwrite: false,
-      warnNoRepository: true
-    });
-    expect(writeModeFor(noRepository, SILENT, false)).to.deep.equal({
-      kind: 'refuse',
-      because: { kind: 'cannotAsk', question: 'createRepository' }
+  it('makes the directory a repository only with --git-init, and otherwise saves without one, warning, however the run started', () => {
+    for (const run of [ASKING, SILENT, FORCED]) {
+      expect(writeModeFor(noRepository, { ...run, gitInit: true }, false)).to.deep.equal({
+        kind: 'init',
+        confirmOverwrite: false
+      });
+      expect(writeModeFor(noRepository, run, false)).to.deep.equal({
+        kind: 'save',
+        confirmOverwrite: false,
+        warnNoRepository: true
+      });
+    }
+    expect(writeModeFor(noRepository, { ...ASKING, gitInit: true }, true)).to.deep.equal({
+      kind: 'init',
+      confirmOverwrite: true
     });
   });
 
-  it('records a fresh snapshot, but refuses --force over a record it cannot merge against', () => {
-    expect(writeModeFor(noRecord, ASKING, true)).to.deep.equal({ kind: 'record', repository, confirmOverwrite: true });
-    expect(writeModeFor(noRecord, FORCED, true)).to.deep.equal({ kind: 'record', repository, confirmOverwrite: false });
+  it('records a fresh snapshot, announcing the repository the first time, but refuses --force over a record it cannot merge against', () => {
+    expect(writeModeFor(noRecord, ASKING, true)).to.deep.equal({
+      kind: 'record',
+      repository,
+      confirmOverwrite: true,
+      announceRepository: true
+    });
+    expect(writeModeFor(noRecord, FORCED, true)).to.deep.equal({
+      kind: 'record',
+      repository,
+      confirmOverwrite: false,
+      announceRepository: true
+    });
+    expect(writeModeFor(otherGeneration, ASKING, true)).to.deep.equal({
+      kind: 'record',
+      repository,
+      confirmOverwrite: true,
+      announceRepository: false
+    });
     expect(writeModeFor(otherGeneration, FORCED, true)).to.deep.equal({
       kind: 'refuse',
       because: { kind: 'recordedNotReplaced' }
@@ -81,26 +95,26 @@ describe('writeModeFor', () => {
   it('refuses before anything else when the overwrite question has no one to answer it', () => {
     expect(writeModeFor(noRecord, SILENT, true)).to.deep.equal({
       kind: 'refuse',
-      because: { kind: 'cannotAsk', question: 'overwrite' }
+      because: { kind: 'cannotAskToOverwrite' }
     });
     expect(writeModeFor(noRecord, SILENT, false)).to.deep.equal({
       kind: 'record',
       repository,
-      confirmOverwrite: false
+      confirmOverwrite: false,
+      announceRepository: true
     });
   });
 
-  it('merges without confirming, meeting conflicts as the run allows: a question, markers, or a refusal', () => {
+  it('merges without confirming, meeting conflicts as the run allows: a question, the generator’s side, or a refusal', () => {
     const modes = [ASKING, FORCED, SILENT].map((run) => writeModeFor(merge, run, true));
 
-    expect(modes.map((mode) => mode.kind === 'merge' && mode.onConflict)).to.deep.equal(['ask', 'markers', 'refuse']);
+    expect(modes.map((mode) => mode.kind === 'merge' && mode.onConflict)).to.deep.equal(['ask', 'generated', 'refuse']);
     expect(modes.every((mode) => mode.kind === 'merge' && !mode.confirmOverwrite && mode.base === base)).to.be.true;
   });
 });
 
-describe('creating', () => {
-  it('initialises a repository on yes, and saves without one on no', () => {
-    expect(creating(true)).to.deep.equal({ kind: 'init', confirmOverwrite: false });
-    expect(creating(false)).to.deep.equal({ kind: 'save', confirmOverwrite: false, warnNoRepository: true });
+describe('onConflictFor', () => {
+  it('asks in a terminal, takes the generator’s side under --force, and stops any other run', () => {
+    expect([ASKING, FORCED, SILENT].map(onConflictFor)).to.deep.equal(['ask', 'generated', 'refuse']);
   });
 });

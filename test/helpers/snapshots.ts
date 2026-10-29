@@ -8,10 +8,9 @@ import { SdkContext } from '../../src/types/sdk-context.js';
 import { SdkRepositoryContext } from '../../src/types/sdk-repository-context.js';
 import { RepositoryProblem } from '../../src/types/sdk/repository-state.js';
 import { SdkGeneration } from '../../src/types/sdk/sdk-generation.js';
-import { SdkPath } from '../../src/types/sdk/sdk-path.js';
 import { SnapshotStore } from '../../src/types/sdk-repository/snapshot-store.js';
 
-/** The repository a run would write the SDK at `sdk` through, as `destination` finds it; none when no repository encloses it. */
+/** The repository a run would write the SDK at `sdk` through, as `destination` finds it; none when it is not a repository of its own. */
 export async function repositoryOf(
   sdk: DirectoryPath,
   generation: SdkGeneration
@@ -22,12 +21,11 @@ export async function repositoryOf(
 
 /** A pristine snapshot of `generated`, recorded on the store alone: no record file is written and no hook installed. */
 export async function recordPristine(
-  root: DirectoryPath,
   sdk: DirectoryPath,
   generated: DirectoryPath,
   generation: SdkGeneration
 ): Promise<Result<CommitId, RepositoryProblem>> {
-  const snapshots = new SnapshotStore(root, SdkPath.of(root, sdk)!);
+  const snapshots = new SnapshotStore(sdk);
   const tree = await snapshots.snapshotGenerated(generated);
   if (tree.isErr()) {
     return err(tree.error);

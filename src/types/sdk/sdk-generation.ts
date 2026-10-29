@@ -7,12 +7,6 @@ export type GenerationRequest = {
   stability: Stability;
 };
 
-/** What sets a recorded generation apart from the one requested, and the flag that would make them match. */
-export type GenerationDifference =
-  | { kind: 'language' }
-  | { kind: 'stability'; rerunWith: Stability }
-  | { kind: 'codegen'; rerunWith: CodeGenerationVersion };
-
 /** What was generated: a language at a stability level by one generator. A snapshot is a base only for the same output. */
 export class SdkGeneration {
   private constructor(
@@ -40,27 +34,6 @@ export class SdkGeneration {
       this.codegenVersion === other.codegenVersion &&
       this.stability === other.stability
     );
-  }
-
-  /** How `requested` falls short of this one, for a generation that is not the same: the first difference decides. */
-  public differenceFrom(requested: SdkGeneration): GenerationDifference {
-    if (this.language !== requested.language) {
-      return { kind: 'language' };
-    }
-    if (this.stability !== requested.stability) {
-      return { kind: 'stability', rerunWith: this.stability };
-    }
-    return { kind: 'codegen', rerunWith: this.codegenVersion };
-  }
-
-  /** As prose names it: "stable python". */
-  public describe(): string {
-    return `${this.stability} ${this.language}`;
-  }
-
-  /** As prose names it when the generator is what matters: "stable python (codegen v4)". */
-  public describeWithGenerator(): string {
-    return `${this.describe()} (codegen ${this.codegenVersion})`;
   }
 
   /** As a snapshot's commit message names it. */

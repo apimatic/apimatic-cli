@@ -8,7 +8,6 @@ import { RelativeFilePath } from '../types/file/relativeFilePath.js';
 import { RelativeDirectoryPath } from '../types/file/relativeDirectoryPath.js';
 import { RelativePaths } from '../types/file/relative-paths.js';
 import { DirectoryPath } from '../types/file/directoryPath.js';
-import { SdkPath } from '../types/sdk/sdk-path.js';
 import { FileName } from '../types/file/fileName.js';
 import { FilePath } from '../types/file/filePath.js';
 import { ValueMap } from '../types/common/value-map.js';
@@ -138,12 +137,6 @@ export class GitService {
     return (await this.run(directory, ['init', '--quiet', '--initial-branch=main', '.'])).map(() => undefined);
   }
 
-  /** Whether the repository's ignore rules exclude `directory`, which need not exist. */
-  public async isIgnored(root: DirectoryPath, directory: SdkPath): Promise<Result<boolean, GitProblem>> {
-    const ran = await this.run(root, ['check-ignore', '-q', '--', directory.pathspec()], { exitCodes: [0, 1] });
-    return ran.map(({ exitCode }) => exitCode === 0);
-  }
-
   /** Everything below `directory` its ignore rules keep out, such as `node_modules`: a directory ignored whole as one entry, a file beside something tracked on its own. */
   public async ignoredBelow(directory: DirectoryPath): Promise<Result<RelativePaths, GitProblem>> {
     const ran = await this.run(directory, [
@@ -187,27 +180,25 @@ export class GitService {
     });
   }
 
-  /** `directory` as a tree: every file, whatever any ignore rule says, with line endings normalised. */
+  /** `directory` as a tree in the repository at `root`: every file, whatever any ignore rule says, with line endings normalised. */
   public treeOfEveryFile(root: DirectoryPath, directory: DirectoryPath): Promise<Result<TreeId, GitProblem>> {
     return this.tree(root, directory, { include: 'all', lineEndings: 'normalized' });
   }
 
-  /** `directory` as a tree: the ignore rules honoured except for the paths `including`, with line endings normalised. */
+  /** A repository's working tree as a tree: its ignore rules honoured except for the paths `including`, with line endings normalised. */
   public treeOfDirectory(
     root: DirectoryPath,
-    directory: DirectoryPath,
     including: readonly RelativeFilePath[]
   ): Promise<Result<TreeId, GitProblem>> {
-    return this.tree(root, directory, { include: including, lineEndings: 'normalized' });
+    return this.tree(root, root, { include: including, lineEndings: 'normalized' });
   }
 
   /** As `treeOfDirectory`, with every byte as it is on disk. */
   public treeOfDirectoryAsIs(
     root: DirectoryPath,
-    directory: DirectoryPath,
     including: readonly RelativeFilePath[]
   ): Promise<Result<TreeId, GitProblem>> {
-    return this.tree(root, directory, { include: including, lineEndings: 'asIs' });
+    return this.tree(root, root, { include: including, lineEndings: 'asIs' });
   }
 
   private async tree(
@@ -215,9 +206,6 @@ export class GitService {
     directory: DirectoryPath,
     { include, lineEndings }: { include: 'all' | readonly RelativeFilePath[]; lineEndings: 'normalized' | 'asIs' }
   ): Promise<Result<TreeId, GitProblem>> {
-    // A directory inside the repository is added from the root, so the root's ignore rules count.
-    const inside = root.contains(directory) ? SdkPath.of(root, directory) : undefined;
-    const workTree = inside === undefined ? directory : root;
     const gitDir = await this.gitDir(root);
     if (gitDir.isErr()) {
       return err(gitDir.error);
@@ -226,14 +214,13 @@ export class GitService {
       const env = { GIT_INDEX_FILE: new FilePath(temporary, new FileName('index')).toString() };
       const attributesIn = lineEndings === 'normalized' ? temporary : undefined;
       const inWorkTree = (args: string[], input?: string) =>
-        this.run(workTree, ['--git-dir', gitDir.value, '--work-tree', workTree.toString(), ...args], {
+        this.run(directory, ['--git-dir', gitDir.value, '--work-tree', directory.toString(), ...args], {
           env,
           attributesIn,
           input
         });
       const forced =
         include === 'all' ? [] : include.filter((relative) => fs.existsSync(relative.in(directory).toString()));
-      const fromRoot = (relative: RelativeFilePath) => (inside === undefined ? relative : inside.fromRoot(relative));
       // `--sparse` reaches paths a sparse checkout leaves out of the cone.
       const added = await inWorkTree([
         'add',
@@ -241,7 +228,7 @@ export class GitService {
         '--sparse',
         ...(include === 'all' ? ['--force'] : []),
         '--',
-        inside === undefined ? '.' : inside.pathspec()
+        '.'
       ]);
       if (added.isErr()) {
         return err(added.error);
@@ -249,7 +236,7 @@ export class GitService {
       if (forced.length > 0) {
         const forcedAdded = await inWorkTree(
           ['add', '--force', '--sparse', '--pathspec-from-file=-', '--pathspec-file-nul'],
-          forced.map((relative) => fromRoot(relative).toString()).join('\0')
+          forced.map(String).join('\0')
         );
         if (forcedAdded.isErr()) {
           return err(forcedAdded.error);
@@ -259,18 +246,7 @@ export class GitService {
       if (written.isErr()) {
         return err(written.error);
       }
-      const whole = read('write-tree', written.value.stdout.trim(), TreeId.fromGit);
-      if (whole.isErr()) {
-        return err(whole.error);
-      }
-      if (inside === undefined || inside.isRoot()) {
-        return ok(whole.value);
-      }
-      const subtree = await inWorkTree(['rev-parse', `${whole.value}:${inside}`]);
-      if (subtree.isErr()) {
-        return err(subtree.error);
-      }
-      return read('rev-parse', subtree.value.stdout.trim(), TreeId.fromGit);
+      return read('write-tree', written.value.stdout.trim(), TreeId.fromGit);
     });
   }
 
@@ -308,16 +284,6 @@ export class GitService {
       return err(ran.error);
     }
     return ran.value.exitCode === 0 ? read('rev-parse', ran.value.stdout.trim(), CommitId.fromGit) : ok(undefined);
-  }
-
-  /** The snapshot refs at or below `ref`. */
-  public async listRefs(root: DirectoryPath, ref: SnapshotRef): Promise<Result<SnapshotRef[], GitProblem>> {
-    const ran = await this.run(root, ['for-each-ref', '--format=%(refname)', ref.toString()]);
-    if (ran.isErr()) {
-      return err(ran.error);
-    }
-    const names = ran.value.stdout.split('\n').filter((line) => line !== '');
-    return readAll('for-each-ref', names, SnapshotRef.fromGit);
   }
 
   public async hasCommit(root: DirectoryPath, commit: CommitId): Promise<Result<boolean, GitProblem>> {
@@ -476,9 +442,9 @@ export class GitService {
     return ran.map(() => undefined);
   }
 
-  /** The index entries below `directory` git holds as unmerged, paths from the root: what a merge left and `git add` has not marked resolved. */
-  public async unmergedStages(root: DirectoryPath, directory: SdkPath): Promise<Result<StageEntry[], GitProblem>> {
-    const ran = await this.run(root, ['ls-files', '-u', '-z', '--', directory.pathspec()]);
+  /** The index entries git holds as unmerged: what a merge left and `git add` has not marked resolved. */
+  public async unmergedStages(root: DirectoryPath): Promise<Result<StageEntry[], GitProblem>> {
+    const ran = await this.run(root, ['ls-files', '-u', '-z']);
     if (ran.isErr()) {
       return err(ran.error);
     }

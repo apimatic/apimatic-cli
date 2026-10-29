@@ -412,12 +412,12 @@ Generate an SDK for your API
 ```
 USAGE
   $ apimatic sdk generate -l csharp|java|php|python|ruby|typescript|go [-d <value>] [--codegen-version v4]
-    [--stability stable|beta] [-i <value>] [-f] [-k <value>]
+    [--stability stable|beta] [--git-init] [-i <value>] [-f] [-k <value>]
 
 FLAGS
   -d, --destination=<value>       [default: <input>/sdk/<language>] directory the SDK is generated into
-  -f, --force                     never ask: an SDK with no record is replaced, conflicts are left marked in the files,
-                                  and a recorded SDK that cannot be merged is not touched.
+  -f, --force                     never ask: an SDK with no record is replaced, conflicts are resolved using the
+                                  generator's changes, and a recorded SDK that cannot be merged is not touched.
   -i, --input=<value>             [default: ./] path to the parent directory containing the 'src' directory, which
                                   includes API specifications and configuration files.
   -k, --auth-key=<value>          override current authentication state with an authentication key.
@@ -425,6 +425,8 @@ FLAGS
                                   <options: csharp|java|php|python|ruby|typescript|go>
       --codegen-version=<option>  [default: v4] Version of the code generator to use
                                   <options: v4>
+      --git-init                  make the SDK directory a git repository when it is not one of its own, so your edits
+                                  to the SDK are kept when you regenerate it
       --stability=<option>        Stability level of the generated SDK. Defaults to the level the language offers.
                                   <options: stable|beta>
 
@@ -433,7 +435,8 @@ DESCRIPTION
 
   Generate a Software Development Kit (SDK) from an API specification.
   C#, TypeScript and Python are available; Java, Ruby, Go and PHP are coming soon.
-  With git 2.38 or newer installed, your edits to the generated SDK are kept when you regenerate it.
+  With git 2.38 or newer installed and the SDK directory a git repository of its own (--git-init makes it one), your
+  edits to the generated SDK are kept when you regenerate it.
 
 EXAMPLES
   apimatic sdk generate --language=typescript
@@ -453,12 +456,12 @@ Generate and publish an SDK to a package registry and/or source repository
 USAGE
   $ apimatic sdk publish [-p <value>] [-v <value>] [-d <value>] [-l csharp|java|php|python|ruby|typescript|go]
     [-f] [-i <value>] [--publish-type package|sourcecode...] [--dry-run] [--codegen-version v4] [--stability
-    stable|beta]
+    stable|beta] [--git-init]
 
 FLAGS
   -d, --destination=<value>       [default: <input>/sdk/<language>] path where the sdk will be generated.
-  -f, --force                     never ask: an SDK with no record is replaced, conflicts are left marked in the files,
-                                  and a recorded SDK that cannot be merged is not touched.
+  -f, --force                     never ask: an SDK with no record is replaced, conflicts are resolved using the
+                                  generator's changes, and a recorded SDK that cannot be merged is not touched.
   -i, --input=<value>             [default: ./] path to the parent directory containing the 'src' directory, which
                                   includes API specifications and configuration files.
   -l, --language=<option>         Language of the SDK to generate and publish.
@@ -468,6 +471,9 @@ FLAGS
       --codegen-version=<option>  [default: v4] Version of the code generator to use
                                   <options: v4>
       --dry-run                   Generate the SDK locally for review without publishing.
+      --git-init                  In the step-by-step experience, make the SDK directory a git repository when it is not
+                                  one of its own, so your edits to the SDK are kept when you regenerate it. A run with
+                                  the other flags always does.
       --publish-type=<option>...  One or more publishing targets: 'package' for a package registry, 'sourcecode' for a
                                   git repository.
                                   <options: package|sourcecode>
@@ -478,8 +484,8 @@ DESCRIPTION
   Generate and publish an SDK to a package registry and/or source repository
 
   Generate and publish an SDK using a publishing profile configured in the APIMatic App. Requires an input directory
-  containing the API specification. Run without flags for a step-by-step interactive experience, or pass all required
-  flags for CI/CD automation.
+  containing the API specification. Run without flags, or with --git-init alone, for a step-by-step interactive
+  experience, or pass all required flags for CI/CD automation.
 
 EXAMPLES
   apimatic sdk publish
