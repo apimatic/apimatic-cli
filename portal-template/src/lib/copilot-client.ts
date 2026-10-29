@@ -17,6 +17,12 @@ export interface LapsedPlan {
   upgradeUrl: string;
 }
 
+/**
+ * Whether the service lets this portal offer Ask AI: `checking` until its first answer, hidden when turned away,
+ * explained when the plan lapsed.
+ */
+export type Availability = 'checking' | 'available' | 'hidden' | LapsedPlan;
+
 /** The page a visitor asks from, as the browser reports it. */
 export interface AskingPage {
   href: string;
@@ -54,7 +60,10 @@ export class CopilotClient {
 
   readonly chatAddress = (): string => `${this.copilot.apiUrl}/v1/chat`;
 
-  /** Opens the session as the panel opens, so a portal the service turns away says so before anyone types. */
+  /**
+   * Opens the session before anyone types, as the button is pointed at or the panel opens, so a portal the service
+   * turns away says so at once. Resolves either way; a refusal reaches `turnedAway` first.
+   */
   readonly prepare = async (): Promise<void> => {
     await this.currentSession().catch(() => undefined);
   };
