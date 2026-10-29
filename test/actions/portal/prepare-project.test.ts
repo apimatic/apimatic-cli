@@ -7,6 +7,7 @@ import { expect } from 'chai';
 import { err, ok } from 'neverthrow';
 import { ActionResult } from '../../../src/actions/action-result';
 import { PreparePortalProjectAction } from '../../../src/actions/portal/prepare-project';
+import { ServiceError } from '../../../src/infrastructure/service-error';
 import { PortalAuthorizationService } from '../../../src/infrastructure/services/portal-authorization-service';
 import { DirectoryPath } from '../../../src/types/file/directoryPath';
 import { FileProblem } from '../../../src/types/file/file-problem';
@@ -115,11 +116,55 @@ describe('PreparePortalProjectAction', () => {
         expect(result.isFailed()).to.be.true;
         expect(shared.prompts.copilotKeyUnrecognized.calledOnceWith(project.join('src'))).to.be.true;
         expect(shared.prompts.askAiNotEntitled.called).to.be.false;
+        expect(shared.lookUpCopilotKey.called).to.be.false;
         expect(shared.artifacts.called).to.be.false;
         expect(onPrepared.called).to.be.false;
       } finally {
         fs.rmSync(project.toString(), { recursive: true, force: true });
       }
+    });
+
+    const executeCopilot = (onPrepared: sinon.SinonStub) =>
+      new PreparePortalProjectAction(new DirectoryPath(os.tmpdir()), COMMAND_METADATA, 'auth-key').execute(
+        ProjectContext.in(COPILOT_FIXTURE),
+        { onPrepared }
+      );
+
+    it('refuses a key the service does not hold for the account, before requesting anything', async () => {
+      for (const outcome of ['unknown', 'otherAccount'] as const) {
+        sinon.restore();
+        const shared = stubPreparePortalProject();
+        shared.lookUpCopilotKey.resolves(ok(outcome));
+        withPlan('portalGeneration', 'askAi');
+        const onPrepared = sinon.stub();
+
+        const result = await executeCopilot(onPrepared);
+
+        expect(result.isFailed(), outcome).to.be.true;
+        expect(shared.lookUpCopilotKey.firstCall.args.slice(1)).to.deep.equal([
+          'pk_live_e2eFixtureKey00000000000000000',
+          'test',
+          'auth-key'
+        ]);
+        expect(shared.prompts.copilotKeyNotRegistered.calledOnceWith(outcome, COPILOT_FIXTURE.join('src')), outcome).to
+          .be.true;
+        expect(shared.artifacts.called, outcome).to.be.false;
+        expect(onPrepared.called, outcome).to.be.false;
+      }
+    });
+
+    it('builds anyway, with a warning, when the service cannot say', async () => {
+      const shared = stubPreparePortalProject();
+      shared.lookUpCopilotKey.resolves(err(ServiceError.NetworkError));
+      withPlan('portalGeneration', 'askAi');
+      const onPrepared = sinon.stub().resolves(ActionResult.success());
+
+      const result = await executeCopilot(onPrepared);
+
+      expect(result.isSuccess()).to.be.true;
+      expect(shared.prompts.copilotKeyNotChecked.calledOnceWith(ServiceError.NetworkError)).to.be.true;
+      expect(shared.prompts.copilotKeyNotRegistered.called).to.be.false;
+      expect(onPrepared.calledOnce).to.be.true;
     });
 
     it('prepares a portal without the chat on a plan without Ask AI', async () => {
@@ -131,6 +176,7 @@ describe('PreparePortalProjectAction', () => {
 
       expect(result.isSuccess()).to.be.true;
       expect(shared.prompts.askAiNotEntitled.called).to.be.false;
+      expect(shared.lookUpCopilotKey.called).to.be.false;
       expect(onPrepared.calledOnce).to.be.true;
     });
   });

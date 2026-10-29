@@ -25,6 +25,7 @@ describe('CopilotPortalService', () => {
 
   const register = () => service.register(ADDRESS, KEY, REGISTRATION, 'bash', 'auth-key');
   const revoke = () => service.revoke(ADDRESS, KEY.toString(), 'bash', 'auth-key');
+  const lookUp = () => service.lookUp(ADDRESS, KEY.toString(), 'bash', 'auth-key');
 
   beforeEach(() => nock.cleanAll());
 
@@ -135,6 +136,34 @@ describe('CopilotPortalService', () => {
       nock(API_URL).delete('/v1/portals').reply(403, { code: 'forbidden', message: 'This key is not yours.' });
 
       expect((await revoke())._unsafeUnwrapErr().errorMessage).to.equal('This key is not yours.');
+    });
+  });
+
+  describe('lookUp', () => {
+    it('asks after the key named in the header, with the APIMatic login', async () => {
+      const scope = nock(API_URL, {
+        reqheaders: { authorization: 'X-Auth-Key auth-key', 'x-copilot-key': KEY.toString() }
+      })
+        .get('/v1/portals')
+        .reply(200, { portalId: 'p-1', environment: 'live' });
+
+      expect((await lookUp())._unsafeUnwrap()).to.equal('registered');
+      expect(scope.isDone()).to.be.true;
+    });
+
+    it("reads the service's answer for a key it does not know, or that is another account's", async () => {
+      nock(API_URL).get('/v1/portals').reply(404, { code: 'not_found', message: 'No such Copilot key.' });
+      expect((await lookUp())._unsafeUnwrap()).to.equal('unknown');
+
+      nock(API_URL).get('/v1/portals').reply(403, { code: 'forbidden', message: 'Another account.' });
+      expect((await lookUp())._unsafeUnwrap()).to.equal('otherAccount');
+    });
+
+    // A service from before the lookup answers Hono's own 404: that says nothing of the key.
+    it('fails on a 404 that is not the service saying it holds no such key', async () => {
+      nock(API_URL).get('/v1/portals').reply(404, '404 Not Found');
+
+      expect((await lookUp())._unsafeUnwrapErr().code).to.equal(ServiceErrorCode.NotFound);
     });
   });
 });

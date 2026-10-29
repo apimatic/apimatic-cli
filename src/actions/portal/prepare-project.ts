@@ -1,10 +1,13 @@
+import { resolveAuthKey } from '../../client-utils/auth-manager.js';
 import { PortalProjectPaths, PortalProjectService } from '../../infrastructure/portal-project-service.js';
+import { CopilotPortalService } from '../../infrastructure/services/copilot-portal-service.js';
 import { PortalArtifactsService } from '../../infrastructure/services/portal-artifacts-service.js';
 import { PortalAuthorizationService } from '../../infrastructure/services/portal-authorization-service.js';
 import { withDirPath } from '../../infrastructure/tmp-extensions.js';
 import { PreparePortalProjectPrompts } from '../../prompts/portal/prepare-project.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
+import { CopilotService } from '../../types/portal/config/copilot-config.js';
 import { CopilotKey } from '../../types/portal/copilot/copilot-key.js';
 import { PortalArtifacts } from '../../types/portal/portal-artifacts.js';
 import { PortalSource } from '../../types/portal/portal-source.js';
@@ -22,11 +25,15 @@ export interface PreparationSteps {
   ) => Promise<ActionResult>;
 }
 
+// Shorter than a registration's: the build goes on without the answer.
+const COPILOT_LOOKUP_TIMEOUT_MS = 10_000;
+
 export class PreparePortalProjectAction {
   private readonly prompts: PreparePortalProjectPrompts = new PreparePortalProjectPrompts();
   private readonly projectService = new PortalProjectService();
   private readonly authorizationService = new PortalAuthorizationService();
   private readonly artifactsService = new PortalArtifactsService();
+  private readonly copilotService = new CopilotPortalService(COPILOT_LOOKUP_TIMEOUT_MS);
 
   public constructor(
     private readonly configDir: DirectoryPath,
@@ -77,6 +84,9 @@ export class PreparePortalProjectAction {
     }
     if (copilot !== null && !authorization.value.includes('askAi')) {
       this.prompts.askAiNotEntitled({ kind: 'notEntitled', feature: 'askAi' }, sourceDirectory);
+      return ActionResult.failed();
+    }
+    if (copilot !== null && !(await this.copilotKeyRegistered(copilot, sourceDirectory))) {
       return ActionResult.failed();
     }
     this.prompts.filesShadowedByStatic(source.value.shadowedFiles);
@@ -131,4 +141,21 @@ export class PreparePortalProjectAction {
       });
     });
   };
+
+  /** False once the prompts have said the service does not hold the key for this account; a failed check only warns. */
+  private async copilotKeyRegistered(copilot: CopilotService, sourceDirectory: DirectoryPath): Promise<boolean> {
+    // Signed in already: the account was just authorized with this key.
+    const authKey = await resolveAuthKey(this.configDir, this.authKey);
+    if (authKey === null) return true;
+    const found = await this.prompts.lookUpCopilotKey(
+      this.copilotService.lookUp(copilot.address, copilot.key, this.commandMetadata.shell, authKey)
+    );
+    if (found.isErr()) {
+      this.prompts.copilotKeyNotChecked(found.error, copilot.address);
+      return true;
+    }
+    if (found.value === 'registered') return true;
+    this.prompts.copilotKeyNotRegistered(found.value, sourceDirectory);
+    return false;
+  }
 }
