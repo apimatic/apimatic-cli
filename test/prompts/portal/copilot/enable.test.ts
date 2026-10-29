@@ -45,6 +45,14 @@ describe('PortalCopilotEnablePrompts', () => {
     expect(message).to.contain('APIMATIC_COPILOT_URL');
   });
 
+  it('names the service and the variable when the address answers, but not as the service does', () => {
+    prompts.registrationFailed(ServiceError.InvalidResponse, SERVICE);
+
+    const [message] = plain(error);
+    expect(message).to.contain('http://localhost:8787 did not answer as the Ask AI service does');
+    expect(message).to.contain('APIMATIC_COPILOT_URL');
+  });
+
   it("shows the service's own reason for refusing", () => {
     prompts.registrationFailed(ServiceError.badRequest('This key belongs to another account.', {}), SERVICE);
 

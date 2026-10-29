@@ -81,13 +81,10 @@ export class PreparePortalProjectPrompts {
 
   /** The portal is still built: whether the key works is only known once a visitor asks. */
   public copilotKeyNotChecked(error: ServiceError, service: ServiceAddress) {
-    const reason =
-      error.code === ServiceErrorCode.NetworkError
-        ? `${f.link(service.toString())} could not be reached`
-        : `${f.link(service.toString())} answered: ${error.errorMessage}`;
     log.warn(
-      `The portal's Ask AI key could not be checked, because ${reason}. The portal is built anyway; if the ` +
-        `service does not know the key, its chat will not work. Check ${f.var(COPILOT_URL_VARIABLE)} if you set it.`
+      `The portal's Ask AI key could not be checked, because ${uncheckedReason(error, service)}. The portal is ` +
+        `built anyway; if the service does not know the key, its chat will not work. Check ` +
+        `${f.var(COPILOT_URL_VARIABLE)} if you set it.`
     );
   }
 
@@ -142,4 +139,14 @@ export class PreparePortalProjectPrompts {
         `need. Try again, and if it keeps happening, reach out to our team at ${f.var('support@apimatic.io')}.`
     );
   }
+}
+
+// The service's own "no such key" is an outcome, not an error, so a 404 or an unreadable answer here is another site's.
+function uncheckedReason(error: ServiceError, service: ServiceAddress): string {
+  const address = f.link(service.toString());
+  if (error.code === ServiceErrorCode.NetworkError) return `${address} could not be reached`;
+  if (error.code === ServiceErrorCode.NotFound || error.code === ServiceErrorCode.InvalidResponse) {
+    return `${address} did not answer as the Ask AI service does`;
+  }
+  return `${address} answered: ${error.errorMessage.replace(/\.$/, '')}`;
 }

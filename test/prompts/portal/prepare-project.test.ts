@@ -2,7 +2,9 @@ import { stripVTControlCharacters } from 'node:util';
 import { expect } from 'chai';
 import sinon from 'sinon';
 import { log } from '@clack/prompts';
+import { ServiceError } from '../../../src/infrastructure/service-error.js';
 import { PreparePortalProjectPrompts } from '../../../src/prompts/portal/prepare-project.js';
+import { ServiceAddress } from '../../../src/types/portal/config/service-address.js';
 import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
 import { PortalSourceProblem } from '../../../src/types/portal/portal-source.js';
 import { Language } from '../../../src/types/sdk/generate.js';
@@ -33,6 +35,31 @@ describe('PreparePortalProjectPrompts', () => {
     expect(stripVTControlCharacters(String(error.firstCall.args[0]))).to.contain(
       "did not include the SDK docs for 'python', which"
     );
+  });
+
+  describe("an Ask AI key it couldn't check", () => {
+    const SERVICE = ServiceAddress.parse('https://example.com', 'APIMATIC_COPILOT_URL')._unsafeUnwrap();
+    const warned = (error: ServiceError) => {
+      const warn = sinon.stub(log, 'warn');
+      new PreparePortalProjectPrompts().copilotKeyNotChecked(error, SERVICE);
+      return stripVTControlCharacters(String(warn.firstCall.args[0]));
+    };
+
+    // The service's own "no such key" is an outcome, so these answers came from another site.
+    it("says an address that doesn't answer as the service does may not be the service", () => {
+      for (const error of [ServiceError.NotFound, ServiceError.InvalidResponse]) {
+        sinon.restore();
+        expect(warned(error)).to.contain(
+          'could not be checked, because https://example.com did not answer as the Ask AI service does. The portal'
+        );
+      }
+    });
+
+    it("quotes the service's reason without doubling its full stop", () => {
+      expect(warned(ServiceError.badRequest('Too many requests.', {}))).to.contain(
+        'because https://example.com answered: Too many requests. The portal'
+      );
+    });
   });
 
   it('names the source directory it could not zip, and why', () => {

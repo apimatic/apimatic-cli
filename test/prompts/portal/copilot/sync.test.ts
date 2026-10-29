@@ -58,6 +58,17 @@ describe('PortalCopilotSyncPrompts', () => {
 
     for (const message of printed()) {
       expect(message).to.contain(`The Ask AI service at ${API_URL} could not be reached`);
+      expect(message).to.contain('APIMATIC_COPILOT_URL');
+    }
+  });
+
+  it('tells either step that an address whose answer it cannot read may not be the service', () => {
+    prompts.uploadFailed(ServiceError.InvalidResponse, SERVICE);
+    prompts.indexingFailed(ServiceError.InvalidResponse, SERVICE);
+
+    for (const message of printed()) {
+      expect(message).to.contain(`${API_URL} did not answer as the Ask AI service does`);
+      expect(message).to.contain('APIMATIC_COPILOT_URL');
     }
   });
 });

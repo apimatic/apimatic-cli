@@ -7,10 +7,7 @@ import { format as f } from '../../format.js';
 /** Shared by the commands that call the service's portal routes. */
 export function reportServiceFailure(error: ServiceError, service: ServiceAddress) {
   if (error.code === ServiceErrorCode.NetworkError) {
-    log.error(
-      `The Ask AI service at ${f.link(service.toString())} could not be reached. Check your connection, or ` +
-        `${f.var(COPILOT_URL_VARIABLE)} if you set it, and try again.`
-    );
+    reportUnreachable(service);
     return;
   }
   if (error.code === ServiceErrorCode.NotFound) {
@@ -20,7 +17,27 @@ export function reportServiceFailure(error: ServiceError, service: ServiceAddres
     );
     return;
   }
+  if (error.code === ServiceErrorCode.InvalidResponse) {
+    reportNotTheService(service);
+    return;
+  }
   log.error(error.errorMessage);
+}
+
+/** Every command words this the same way, naming the variable that most likely holds the wrong address. */
+export function reportUnreachable(service: ServiceAddress) {
+  log.error(
+    `The Ask AI service at ${f.link(service.toString())} could not be reached. Check your connection, or ` +
+      `${f.var(COPILOT_URL_VARIABLE)} if you set it, and try again.`
+  );
+}
+
+// The service explains every refusal as `{ code, message }`, so an answer without one is most likely another site's.
+export function reportNotTheService(service: ServiceAddress) {
+  log.error(
+    `${f.link(service.toString())} did not answer as the Ask AI service does. Check that it is the Ask AI ` +
+      `service, or ${f.var(COPILOT_URL_VARIABLE)} if you set it, and try again.`
+  );
 }
 
 /** Why `apimatic.json` could not be updated, as the clause in brackets after saying so. */

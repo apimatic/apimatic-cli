@@ -11,6 +11,7 @@ import { PortalSourceProblem } from '../../../types/portal/portal-source.js';
 import { format as f } from '../../format.js';
 import { withSpinner } from '../../prompt.js';
 import { reportSourceProblem } from '../source.js';
+import { reportNotTheService, reportUnreachable } from './shared.js';
 
 const pages = (count: number): string => `${count} ${count === 1 ? 'page' : 'pages'}`;
 
@@ -79,9 +80,10 @@ export class PortalCopilotSyncPrompts {
   private syncFailed(error: ServiceError, service: ServiceAddress, timedOut: string) {
     switch (error.code) {
       case ServiceErrorCode.NetworkError:
-        log.error(
-          `The Ask AI service at ${f.link(service.toString())} could not be reached. Check the address and try again.`
-        );
+        reportUnreachable(service);
+        return;
+      case ServiceErrorCode.InvalidResponse:
+        reportNotTheService(service);
         return;
       case ServiceErrorCode.Forbidden:
         log.error(
