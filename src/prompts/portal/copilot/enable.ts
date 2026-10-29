@@ -1,10 +1,7 @@
 import { log } from '@clack/prompts';
 import { Result } from 'neverthrow';
 import { ServiceError } from '../../../infrastructure/service-error.js';
-import {
-  RegistrationOutcome,
-  RevocationOutcome
-} from '../../../infrastructure/services/copilot-portal-service.js';
+import { RegistrationOutcome, RevocationOutcome } from '../../../infrastructure/services/copilot-portal-service.js';
 import { PortalAuthorizationFailure } from '../../../infrastructure/services/portal-authorization-service.js';
 import { AccountEntitlements } from '../../../types/api/account-entitlements.js';
 import { APIMATIC_CONFIG_FILE_NAME } from '../../../types/apimatic-config/document.js';
@@ -18,7 +15,7 @@ import { PortalScaffoldProblem, PortalSourceProblem } from '../../../types/porta
 import { format as f } from '../../format.js';
 import { noteWrapped, withSpinner } from '../../prompt.js';
 import { reportAuthorizationFailure } from '../authorization.js';
-import { reportSourceProblem } from '../source.js';
+import { reportInvalidServiceAddress, reportSourceProblem } from '../source.js';
 import { checkAskAiSubscription, reportServiceFailure } from './shared.js';
 
 const enableCommand = (...flags: string[]) => [f.cmdAlt('apimatic', 'portal', 'copilot', 'enable'), ...flags].join(' ');
@@ -29,7 +26,7 @@ export class PortalCopilotEnablePrompts {
   }
 
   public invalidServiceAddress(errors: string[]) {
-    log.error(errors.join('\n'));
+    reportInvalidServiceAddress(errors);
   }
 
   public registrationInvalid(problems: CopilotRegistrationProblem[], sourceDirectory: DirectoryPath) {

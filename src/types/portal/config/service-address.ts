@@ -15,10 +15,15 @@ const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
 export class ServiceAddress {
   private constructor(private readonly origin: string) {}
 
+  /** APIMatic's own service. */
+  public static apimatic(): ServiceAddress {
+    return new ServiceAddress(ASK_AI_SERVICE);
+  }
+
   /** The service this run uses: the one `APIMATIC_COPILOT_URL` names, else APIMatic's own. */
   public static current(): Parsed<ServiceAddress> {
     const named = envInfo.getCopilotUrl();
-    return named === undefined ? ok(new ServiceAddress(ASK_AI_SERVICE)) : ServiceAddress.parse(named, COPILOT_URL_VARIABLE);
+    return named === undefined ? ok(ServiceAddress.apimatic()) : ServiceAddress.parse(named, COPILOT_URL_VARIABLE);
   }
 
   public static parse(value: unknown, path: string): Parsed<ServiceAddress> {

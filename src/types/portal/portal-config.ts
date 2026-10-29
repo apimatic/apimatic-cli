@@ -7,6 +7,7 @@ import { BrandConfig, ColorMode } from './config/brand-config.js';
 import { allOf, optional, Parsed, unknownKeys } from './config/fields.js';
 import { Link } from './config/link.js';
 import { NavigationConfig } from './config/navigation-config.js';
+import { ServiceAddress } from './config/service-address.js';
 import { SiteAddress } from './config/site-address.js';
 import { SiteConfig, SuggestedSite } from './config/site-config.js';
 import { StaticAsset } from './config/static-asset.js';
@@ -70,9 +71,14 @@ export class PortalConfig {
   /**
    * `block` is whatever the file holds under `portal`. `suggested` is what the only specification
    * says about itself, or null when there are several; it fills the site's name and description
-   * when the block leaves them out.
+   * when the block leaves them out. `copilotAddress` is the Ask AI service this run uses, which the
+   * file does not name: the source context reads it from the environment.
    */
-  public static fromBlock(block: unknown, suggested: SuggestedSite | null): Result<PortalConfig, string[]> {
+  public static fromBlock(
+    block: unknown,
+    suggested: SuggestedSite | null,
+    copilotAddress: ServiceAddress = ServiceAddress.apimatic()
+  ): Result<PortalConfig, string[]> {
     if (block === undefined) {
       return err([`'${BLOCK}' is required.`]);
     }
@@ -88,7 +94,7 @@ export class PortalConfig {
         SiteConfig.parse(block.site, `${BLOCK}.site`, suggested),
         BrandConfig.parse(block.brand, `${BLOCK}.brand`),
         NavigationConfig.parse(block.navigation, `${BLOCK}.navigation`),
-        AiConfig.parse(block.ai, `${BLOCK}.ai`),
+        AiConfig.parse(block.ai, `${BLOCK}.ai`, copilotAddress),
         optional(block.pluginUrl, (value) => secureAddress(value, `${BLOCK}.${PLUGIN_URL}`))
       ])
     ).map((settings) => new PortalConfig(...settings));

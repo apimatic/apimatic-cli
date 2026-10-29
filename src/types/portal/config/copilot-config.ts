@@ -29,18 +29,17 @@ export class CopilotConfig {
     private readonly suggestions: string[]
   ) {}
 
-  /** The block names the portal's key; the service is the one this run of the CLI uses. */
-  public static parse(value: unknown, path: string): Parsed<CopilotConfig> {
+  /** The block names the portal's key; `address` is the service this run of the CLI uses, which it does not name. */
+  public static parse(value: unknown, path: string, address: ServiceAddress): Parsed<CopilotConfig> {
     return namespace(value, path).andThen((data) =>
       allOf(
         unknownKeys(data, KNOWN, path),
         // The key is not checked here: the Ask AI service validates it, and its design may change.
         Result.combineWithAllErrors([
           nonEmptyString(data.key, `${path}.key`),
-          ServiceAddress.current(),
           optional(data.suggestions, (present) => suggestionList(present, `${path}.suggestions`))
         ])
-      ).map(([key, address, suggestions]) => new CopilotConfig(key, address, suggestions ?? []))
+      ).map(([key, suggestions]) => new CopilotConfig(key, address, suggestions ?? []))
     );
   }
 

@@ -379,6 +379,34 @@ describe('PortalSourceContext', () => {
     it('reports a file removed while the preview runs', async () => {
       expect((await context().resolveSettings(null))._unsafeUnwrapErr()).to.deep.equal({ kind: 'missingConfig' });
     });
+
+    describe('the Ask AI service', () => {
+      const saved = process.env.APIMATIC_COPILOT_URL;
+      beforeEach(() => {
+        process.env.APIMATIC_COPILOT_URL = 'http://ask.example.com';
+      });
+      afterEach(() => {
+        if (saved === undefined) delete process.env.APIMATIC_COPILOT_URL;
+        else process.env.APIMATIC_COPILOT_URL = saved;
+      });
+
+      it('reports an APIMATIC_COPILOT_URL it cannot use apart from the file, for a portal with Ask AI', async () => {
+        writeConfig({ site: { name: 'Calc' }, ai: { copilot: { key: 'pk_dev_abc' } } });
+
+        expect((await context().resolveSettings(null))._unsafeUnwrapErr()).to.deep.equal({
+          kind: 'invalidServiceAddress',
+          errors: [
+            "'APIMATIC_COPILOT_URL' must be the address of an Ask AI service, starting with 'https://', or of one on this machine, such as 'http://localhost:8787'."
+          ]
+        });
+      });
+
+      it('does not read it for a portal without Ask AI', async () => {
+        writeConfig({ site: { name: 'Calc' } });
+
+        expect((await context().resolveSettings(null)).isOk()).to.be.true;
+      });
+    });
   });
 
   /** A file the specifications could not be read from: the kind, the file, and the file that refers to it. */

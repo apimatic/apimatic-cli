@@ -1,6 +1,7 @@
 import { expect } from 'chai';
 import { DirectoryPath } from '../../../src/types/file/directoryPath';
 import { PortalConfig } from '../../../src/types/portal/portal-config';
+import { ServiceAddress } from '../../../src/types/portal/config/service-address';
 import { SuggestedSite } from '../../../src/types/portal/config/site-config';
 
 describe('PortalConfig', () => {
@@ -397,10 +398,6 @@ describe('PortalConfig', () => {
     describe('copilot', () => {
       const PUBLIC_KEY = `askai_pk_ab12cd34_${'A'.repeat(43)}`;
 
-      afterEach(() => {
-        delete process.env.APIMATIC_COPILOT_URL;
-      });
-
       it('offers the Ask AI chat only when the block sets one up', () => {
         expect(config({}).identity().copilot).to.be.null;
         const copilot = { key: PUBLIC_KEY };
@@ -449,15 +446,12 @@ describe('PortalConfig', () => {
         ]);
       });
 
-      it('uses the service APIMATIC_COPILOT_URL names, and reports one it cannot use', () => {
-        process.env.APIMATIC_COPILOT_URL = 'http://localhost:8787/';
-        expect(config({ ai: { copilot: { key: PUBLIC_KEY } } }).identity().copilot?.apiUrl).to.equal(
+      it('tells the browser the service it is given, which the file does not name', () => {
+        const local = ServiceAddress.parse('http://localhost:8787', 'APIMATIC_COPILOT_URL')._unsafeUnwrap();
+        const block = { ai: { copilot: { key: PUBLIC_KEY } } };
+        expect(PortalConfig.fromBlock(block, suggested, local)._unsafeUnwrap().identity().copilot?.apiUrl).to.equal(
           'http://localhost:8787'
         );
-        process.env.APIMATIC_COPILOT_URL = 'http://ask.example.com';
-        expect(errorsOf({ ai: { copilot: { key: PUBLIC_KEY } } })).to.deep.equal([
-          "'APIMATIC_COPILOT_URL' must be the address of an Ask AI service, starting with 'https://', or of one on this machine, such as 'http://localhost:8787'."
-        ]);
       });
     });
   });

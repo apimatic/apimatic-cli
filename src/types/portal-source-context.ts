@@ -17,6 +17,7 @@ import {
   SPEC_EXTENSIONS,
   STATIC_DIRECTORY_NAME
 } from './project-layout.js';
+import { ServiceAddress } from './portal/config/service-address.js';
 import { PLACEHOLDER_SITE, SiteConfig, SuggestedSite } from './portal/config/site-config.js';
 import { AcceptedContent, ContentFile, ContentTree, ReadPage } from './portal/content-tree.js';
 import { GeneratedPages, PluginSource } from './portal/generated-pages.js';
@@ -56,6 +57,10 @@ const NO_DOCUMENT = new Set<UnreadableSpecReason['kind']>(['empty', 'noValue', '
 /** A file at the top of a folder that holds no document, which the build reads past as it does any file that is no API. */
 const holdsNoDocument = (problem: PortalSourceProblem): boolean =>
   problem.kind === 'unreadableSpec' && NO_DOCUMENT.has(problem.reason.kind);
+
+/** Whether the `portal` block turns on the Ask AI chat, whatever else it holds. */
+const offersCopilot = (block: unknown): boolean =>
+  isJsonObject(block) && isJsonObject(block.ai) && block.ai.copilot !== undefined;
 
 type DiscoveredSpecs = Pick<PortalSource, 'specs' | 'suggestedSite' | 'unmergedSpecs' | 'leftOutSpecs'>;
 
@@ -328,7 +333,12 @@ export class PortalSourceContext {
     suggested: SuggestedSite | null
   ): Result<PortalSettings, PortalSourceProblem> {
     const block = document.portal();
-    const config = PortalConfig.fromBlock(block, suggested);
+    // Read only for a portal with Ask AI, so a bad APIMATIC_COPILOT_URL fails nothing else, and is not the file's fault.
+    const copilotAddress = offersCopilot(block) ? ServiceAddress.current() : ok(ServiceAddress.apimatic());
+    if (copilotAddress.isErr()) {
+      return err({ kind: 'invalidServiceAddress', errors: copilotAddress.error });
+    }
+    const config = PortalConfig.fromBlock(block, suggested, copilotAddress.value);
     const languages = PortalLanguages.fromBlock(document.languages(), document.findingsFor('languages'));
     const errors = [
       ...findingSentences(document.findingsFor('root')),
