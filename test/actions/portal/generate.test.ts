@@ -249,7 +249,7 @@ describe('GenerateAction', () => {
       fs.cpSync(COPILOT_FIXTURE.toString(), project.toString(), { recursive: true });
       const configFile = path.join(project.toString(), 'src', 'apimatic.json');
       const devKey = `pk_dev_${'a'.repeat(32)}`;
-      fs.writeFileSync(configFile, fs.readFileSync(configFile, 'utf8').replace('pk_test_e2e', devKey));
+      fs.writeFileSync(configFile, fs.readFileSync(configFile, 'utf8').replace('pk_live_e2eFixtureKey00000000000000000', devKey));
 
       expect((await execute(project)).isSuccess()).to.be.true;
       expect(prompts.copilotDevelopmentKey.calledOnce).to.be.true;

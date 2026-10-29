@@ -1,4 +1,6 @@
+import fs from 'fs';
 import os from 'os';
+import path from 'path';
 import AdmZip from 'adm-zip';
 import sinon from 'sinon';
 import { expect } from 'chai';
@@ -90,6 +92,34 @@ describe('PreparePortalProjectAction', () => {
       ).to.be.true;
       expect(shared.artifacts.called).to.be.false;
       expect(onPrepared.called).to.be.false;
+    });
+
+    it('refuses a portal whose chat key is not an Ask AI key, before requesting anything', async () => {
+      const shared = stubPreparePortalProject();
+      withPlan('portalGeneration', 'askAi');
+      const onPrepared = sinon.stub();
+      const project = new DirectoryPath(fs.mkdtempSync(path.join(os.tmpdir(), 'copilot-key-')));
+      fs.cpSync(COPILOT_FIXTURE.toString(), project.toString(), { recursive: true });
+      const configFile = path.join(project.toString(), 'src', 'apimatic.json');
+      const config = JSON.parse(fs.readFileSync(configFile, 'utf8'));
+      config.portal.ai.copilot.key = 'fsdfsddfsd';
+      fs.writeFileSync(configFile, JSON.stringify(config));
+
+      try {
+        const result = await new PreparePortalProjectAction(
+          new DirectoryPath(os.tmpdir()),
+          COMMAND_METADATA,
+          'auth-key'
+        ).execute(ProjectContext.in(project), { onPrepared });
+
+        expect(result.isFailed()).to.be.true;
+        expect(shared.prompts.copilotKeyUnrecognized.calledOnceWith(project.join('src'))).to.be.true;
+        expect(shared.prompts.askAiNotEntitled.called).to.be.false;
+        expect(shared.artifacts.called).to.be.false;
+        expect(onPrepared.called).to.be.false;
+      } finally {
+        fs.rmSync(project.toString(), { recursive: true, force: true });
+      }
     });
 
     it('prepares a portal without the chat on a plan without Ask AI', async () => {

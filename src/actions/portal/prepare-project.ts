@@ -5,6 +5,7 @@ import { withDirPath } from '../../infrastructure/tmp-extensions.js';
 import { PreparePortalProjectPrompts } from '../../prompts/portal/prepare-project.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
+import { CopilotKey } from '../../types/portal/copilot/copilot-key.js';
 import { PortalArtifacts } from '../../types/portal/portal-artifacts.js';
 import { PortalSource } from '../../types/portal/portal-source.js';
 import { ProjectContext } from '../../types/project-context.js';
@@ -68,7 +69,13 @@ export class PreparePortalProjectAction {
       this.prompts.sourceProblem(source.error, sourceDirectory);
       return ActionResult.failed();
     }
-    if (source.value.config.copilotService() !== null && !authorization.value.includes('askAi')) {
+    const copilot = source.value.config.copilotService();
+    // Built in, the portal would only show its chat as unavailable; the service is not asked whether it knows the key.
+    if (copilot !== null && CopilotKey.parse(copilot.key) === null) {
+      this.prompts.copilotKeyUnrecognized(sourceDirectory);
+      return ActionResult.failed();
+    }
+    if (copilot !== null && !authorization.value.includes('askAi')) {
       this.prompts.askAiNotEntitled({ kind: 'notEntitled', feature: 'askAi' }, sourceDirectory);
       return ActionResult.failed();
     }

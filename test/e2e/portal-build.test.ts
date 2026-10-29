@@ -1127,11 +1127,11 @@ const INVENTORY_STATUS = 'api/inventory/health/getInventoryStatus';
     ) as { copilot: unknown };
 
     expect(copilot).to.deep.equal({
-      key: 'pk_test_e2e',
+      key: 'pk_live_e2eFixtureKey00000000000000000',
       apiUrl: 'https://ask.apimatic.io',
       suggestions: ['How do I list pets?']
     });
-    expect(scripts.some((script) => script.text.includes('pk_test_e2e'))).to.be.true;
+    expect(scripts.some((script) => script.text.includes('pk_live_e2eFixtureKey00000000000000000'))).to.be.true;
     expect(scripts.some((script) => script.text.includes('https://ask.apimatic.io'))).to.be.true;
     const fixture = new DirectoryPath(process.cwd()).join('test/resources/portal-inputs/copilot/src');
     expect(publishedFilesNaming(portal.output(), portal.project().toString(), fixture.toString())).to.deep.equal([]);

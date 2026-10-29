@@ -51,6 +51,15 @@ export class PreparePortalProjectPrompts {
     );
   }
 
+  public copilotKeyUnrecognized(sourceDirectory: DirectoryPath) {
+    const config = new FilePath(sourceDirectory, new FileName(APIMATIC_CONFIG_FILE_NAME));
+    log.error(
+      `The ${f.var('portal.ai.copilot.key')} in ${f.path(config)} is not an Ask AI key. Run ` +
+        `${f.cmdAlt('apimatic', 'portal', 'copilot', 'enable')} ${f.flag('rotate')} to replace it with a new one, ` +
+        `or remove ${f.var('ai.copilot')} to build the portal without its Ask AI chat.`
+    );
+  }
+
   public sourceNotZipped(problem: FileProblem, sourceDirectory: DirectoryPath) {
     log.error(notZippedForUpload(sourceDirectory, problem.reason));
   }
