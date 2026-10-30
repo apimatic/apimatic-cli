@@ -18,9 +18,11 @@ no commit required before regenerating.
 What changes for the developer:
 
 - **Git is required.** The CLI uses the git on `PATH`, 2.38 or newer, for the snapshots and
-  the merge. Without it `sdk generate` behaves exactly as before, writes no `.git` and no
-  `.apimatic/`, and warns: "git was not found, so your customizations to the generated SDK
-  will not persist across regenerations".
+  the merge. It looks for git only when the SDK directory has a repository of its own (a
+  `.git` in it) or `--git-init` will make one; anywhere else there is nothing for git to keep,
+  so a machine without git sees nothing about it. Without it `sdk generate` behaves exactly
+  as before, writes no `.git` and no `.apimatic/`, and warns: "git was not found, so your
+  customizations to the generated SDK will not persist across regenerations".
 - **First run**: as before, a spec and a language; the SDK lands in `<project>/sdk/<language>`,
   or in the `--destination` itself when one is named, with no language directory added below it.
   If that directory is not a git repository of its own, `--git-init` makes it one; without the
@@ -59,7 +61,7 @@ portal downloads that include custom code (section 11), and any push by the CLI 
 |---|---|---|
 | Where the merge runs | In the CLI, against the working tree. The server is unchanged. | Nothing is uploaded or downloaded beyond the SDK zip, the merge sees uncommitted edits, and the design matches Speakeasy's, which the lab showed working. |
 | When it merges | Always, whenever git is available, the SDK directory is a git repository of its own and has a generation record. No switch in `apimatic.json`. | One rule to explain: "with git installed, your edits are kept". A switch would be read only after the first edit is already lost. |
-| Git is a hard requirement | The system git, 2.38 or newer, found on `PATH` at the start of every run. Absent or older: today's flow, no `.git` or `.apimatic/` written, one warning. No bundled fallback engine. | Git's merge is the reference everyone else measures against: rename detection, modify/delete and add/add semantics, binary handling. Generators that embed a library write their own diff3 (Speakeasy, isomorphic-git); tools that accept git as a prerequisite shell out to it (JHipster, Copier, Cruft); none reimplements rename detection. 2.38 (October 2022) is the first with `merge-tree --write-tree`. |
+| Git is a hard requirement | The system git, 2.38 or newer, found on `PATH`, looked for only when the SDK directory has a `.git` of its own or `--git-init` will make one (2026-10-30; every run looked before). Absent or older: today's flow, no `.git` or `.apimatic/` written, one warning. No bundled fallback engine. | Git's merge is the reference everyone else measures against: rename detection, modify/delete and add/add semantics, binary handling. Generators that embed a library write their own diff3 (Speakeasy, isomorphic-git); tools that accept git as a prerequisite shell out to it (JHipster, Copier, Cruft); none reimplements rename detection. 2.38 (October 2022) is the first with `merge-tree --write-tree`. |
 | No repository | `--git-init` makes the SDK directory a repository: `git init -b main` there after the generation succeeds and before the first write, reported afterwards. Without it the SDK is written without a repository, exit 0, however the run started, and a "Next steps" box after the write says how to keep edits, should the developer make any: rerun with `--git-init` before changing anything (it needs git 2.38 or newer), then make the changes (decided 2026-10-29 on the product review, replacing the question of 2026-10-27; the steps replaced a warning printed before the upload the same day, and were worded on 2026-10-30 not to assume the SDK will be edited). `sdk publish` always passes it when run with flags, and takes `--git-init` in its step-by-step experience. A non-empty directory without a repository is asked "overwrite?" first. | Without a snapshot of the first generation there is nothing to merge against later, but a repository nobody asked for inside `sdk/<language>` trips `git add .` once the project becomes a repository of its own, and CI should never get one by surprise. A flag says so up front, where the question could not be answered in CI at all. |
 | Only the SDK directory's own repository | A repository counts only when its root is the SDK directory. One that encloses it from above, the project's or any other, is treated as none: nothing is written into it, no refs, no hook (decided 2026-10-29 on the product review). | The CLI should not keep refs and a hook in a repository the developer keeps for something else. The cost: inside a project repository, `--git-init` makes the SDK directory an embedded repository, which the project then tracks as a gitlink rather than as files. |
 | Repository found but no record | Ask "overwrite?" as before (skipped by `--force`); then record a snapshot, saying once that the repository was found. | An SDK generated by an older CLI, copied in, or built from the portal has no base. |
@@ -175,7 +177,9 @@ before the fresh SDK was copied in. Nothing on disk survived a regeneration.
 
 ```mermaid
 flowchart TD
-  A([apimatic sdk generate -l typescript]) --> V{git 2.38+ on PATH?}
+  A([apimatic sdk generate -l typescript]) --> G0{.git in the SDK directory, or --git-init?}
+  G0 -- no --> N1([Write without a repository; Next steps say how to keep edits; git never asked])
+  G0 -- yes --> V{git 2.38+ on PATH?}
   V -- no --> V1([Warn: customizations will not persist; today's flow, no .git, no .apimatic])
   V -- yes --> D{Generation record and its pristine commit found?}
   D -- no, directory empty --> C1
@@ -200,11 +204,14 @@ The run is one action, `GenerateAction.execute`, read top to bottom; every quest
 message is in it (section 10). It validates as before, then `SdkContext.destination` says
 how the SDK will be written, before the upload:
 
-1. `git --version`. Absent, or older than 2.38: warn that customizations will not persist;
-   `overwrite`, writing no `.git` and no `.apimatic/`.
-2. `SdkContext.repository()` finds the SDK directory's own repository: git's top level from the
-   directory (or its nearest existing ancestor, since a first run's directory is not there
-   yet), counted only when it is the directory itself; then `inspect`: a merge, rebase,
+1. A `.git` in the SDK directory, a folder or a worktree's file, looked for on disk. Without
+   one and without `--git-init`: `noRepository`, and git is never run (decided 2026-10-30 on
+   the product review; until then every run began with `git --version`).
+   Then `git --version`. Absent, or older than 2.38: warn that customizations will not persist;
+   `overwrite`, writing no `.git` and no `.apimatic/`. One that does not answer stops the run.
+2. `SdkContext.repository()` finds the SDK directory's own repository: none without a `.git`
+   in it, else git's top level from the directory, counted only when it is the directory
+   itself; then `inspect`: a merge, rebase,
    cherry-pick or revert in progress is refused, files git still holds as unmerged come next, and only then the record and whether its commit is
    present.
 3. No repository, no record, a record for another generation, or a missing commit: `record`
@@ -438,6 +445,7 @@ Every row of section 5 and this table is a test over real repositories in
 | 20 | this file | An SDK written without a repository of its own ends with a "Next steps" box after the write (`SdkGeneratePrompts.gitInitSteps`), in place of the warning printed before the upload (`repositoryNotCreated`): changes are lost on the next regeneration; to keep them, rerun with `--git-init` before changing anything, then customize. `WriteMode` `save` carries `suggestGitInit` for it, renamed from `warnNoRepository`. The step-by-step `sdk publish` shows it too when `--git-init` is not passed. |
 | 21 | this file | Wording, on the product review: the `gitInitSteps` box no longer assumes the SDK will be edited ("To customize … and keep your changes when it is regenerated:", then rerun with `--git-init` before changing anything, which needs git 2.38 or newer, then make the changes), and `conflictSteps` ends at "2. Rerun the command.", without "nothing needs committing first" or the third step offering to let the CLI resolve what is left, which the rerun asks anyway. |
 | 22 | this file | The yellow end state is named Action required, on the product review, so it is not tied to conflicts: `ActionResult.actionRequired()` and `isActionRequired()`, `ResultType.ActionRequired`, `mapAll`'s `onActionRequired` and `format.outroActionRequired`, renamed from `conflicted()`, `isConflicted()`, `Conflict`, `onConflict` and `outroConflicted`. Still yellow, still exit 1. `sdk publish` checks it under the new name, and its "Nothing was published, since the SDK still has conflicts" stays, since conflicts are the only way there. |
+| 23 | this file | Git is looked for only when it has something to keep, on the product review: `SdkContext.destination(generation, gitInit)` reads whether the SDK directory has a `.git` of its own from disk (a folder, or a worktree's file) and, without one and without `--git-init`, answers `noRepository` without running git, so a machine without git, with one too old or with one that does not answer writes the SDK and shows the Next steps. `SdkContext.repository()` takes the same check first, so `archive` asks git about ignore rules only inside a repository of its own. With a `.git` or `--git-init`, git is checked as before: absent or too old warns and overwrites, unusable stops the run. `sdk publish` run with flags passes `--git-init`, so it still checks. |
 
 PR into `dev`, squash-merged, title `feat(sdk): keep your edits when regenerating an SDK`.
 

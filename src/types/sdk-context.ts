@@ -35,8 +35,14 @@ export class SdkContext {
     return this.fileService.hasEntriesExcluding(this.sdkDirectory, [GIT_DIRECTORY]);
   }
 
-  /** How a run will write the directory, from git and the SDK directory's own repository; nothing is asked here. */
-  public async destination(generation: SdkGeneration): Promise<Result<Found, InspectionProblem>> {
+  /**
+   * How a run will write the directory, from git and the SDK directory's own repository; nothing is asked here.
+   * Git is looked for only when the directory has a repository of its own or `gitInit` will make it one.
+   */
+  public async destination(generation: SdkGeneration, gitInit: boolean): Promise<Result<Found, InspectionProblem>> {
+    if (!gitInit && !(await this.hasOwnGit())) {
+      return ok({ kind: 'noRepository' });
+    }
     const git = await this.git.version();
     if (git.isErr()) {
       return err(git.error);
@@ -107,7 +113,7 @@ export class SdkContext {
 
   /** The SDK directory's own repository; one that only encloses it belongs to the developer's project, which the CLI leaves alone. */
   private async repository(): Promise<Result<SdkRepositoryContext | undefined, RepositoryProblem>> {
-    if (!this.fileService.directoryExistsSync(this.sdkDirectory)) {
+    if (!(await this.hasOwnGit())) {
       return ok(undefined);
     }
     // Spelt as git spells the root, so an 8.3 alias on Windows still compares equal.
@@ -123,5 +129,13 @@ export class SdkContext {
       return err(repository.error);
     }
     return repository.value === undefined ? ok(NO_PATHS) : repository.value.ignored();
+  }
+
+  /** Whether the directory has a `.git` of its own, a folder or a worktree's file; read from disk, so a directory without one never needs git. */
+  private async hasOwnGit(): Promise<boolean> {
+    return (
+      (await this.fileService.directoryExists(this.sdkDirectory.join(GIT_DIRECTORY.toString()))) ||
+      (await this.fileService.fileExists(new FilePath(this.sdkDirectory, GIT_DIRECTORY)))
+    );
   }
 }

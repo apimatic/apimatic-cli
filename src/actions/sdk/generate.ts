@@ -59,7 +59,7 @@ export class GenerateAction {
     }
 
     const sdkContext = new SdkContext(sdk);
-    const inspected = await sdkContext.destination(generation);
+    const inspected = await sdkContext.destination(generation, run.gitInit);
     const onConflict = onConflictFor(run);
     const unresolved =
       inspected.isOk() && inspected.value.kind === 'unresolved' && onConflict !== 'refuse'
@@ -78,7 +78,7 @@ export class GenerateAction {
       }
       this.prompts.conflictsResolved(choice, unresolved.paths, sdk);
     }
-    const looked = unresolved === undefined ? inspected : await sdkContext.destination(generation);
+    const looked = unresolved === undefined ? inspected : await sdkContext.destination(generation, run.gitInit);
     if (looked.isErr()) {
       this.prompts.directoryNotInspected(looked.error);
       return ActionResult.failed();

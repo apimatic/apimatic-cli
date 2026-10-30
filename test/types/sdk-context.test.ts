@@ -4,6 +4,8 @@ import path from 'path';
 import AdmZip from 'adm-zip';
 import { expect } from 'chai';
 import { execa } from 'execa';
+import { err, ok } from 'neverthrow';
+import sinon from 'sinon';
 import { GitService } from '../../src/infrastructure/git-service.js';
 import { DirectoryPath } from '../../src/types/file/directoryPath.js';
 import { FileName } from '../../src/types/file/fileName.js';
@@ -50,7 +52,10 @@ describe('SdkContext', () => {
     context = new SdkContext(new DirectoryPath(inRoot('sdk', 'python')));
   });
 
-  afterEach(() => fs.rmSync(root, { recursive: true, force: true }));
+  afterEach(() => {
+    sinon.restore();
+    fs.rmSync(root, { recursive: true, force: true });
+  });
 
   describe('destination, by the SDK directory’s own repository', () => {
     const git = new GitService();
@@ -59,7 +64,7 @@ describe('SdkContext', () => {
       fs.mkdirSync(inRoot('sdk', 'python'), { recursive: true });
       (await git.init(new DirectoryPath(inRoot('sdk', 'python'))))._unsafeUnwrap();
 
-      const repository = repositoryIn((await context.destination(PYTHON))._unsafeUnwrap());
+      const repository = repositoryIn((await context.destination(PYTHON, false))._unsafeUnwrap());
 
       await recordOne(repository);
       expect(await pristineAt(inRoot('sdk', 'python'))).to.not.be.undefined;
@@ -69,10 +74,11 @@ describe('SdkContext', () => {
       (await git.init(new DirectoryPath(root)))._unsafeUnwrap();
       const deep = new SdkContext(new DirectoryPath(inRoot('packages', 'sdk', 'python')));
 
-      expect((await context.destination(PYTHON))._unsafeUnwrap().kind).to.equal('noRepository');
-      expect((await deep.destination(PYTHON))._unsafeUnwrap().kind).to.equal('noRepository');
+      // --git-init, so git is asked and finds only the enclosing repository.
+      expect((await context.destination(PYTHON, true))._unsafeUnwrap().kind).to.equal('noRepository');
+      expect((await deep.destination(PYTHON, true))._unsafeUnwrap().kind).to.equal('noRepository');
       fs.mkdirSync(inRoot('sdk', 'python'), { recursive: true });
-      expect((await context.destination(PYTHON))._unsafeUnwrap().kind).to.equal('noRepository');
+      expect((await context.destination(PYTHON, true))._unsafeUnwrap().kind).to.equal('noRepository');
     });
 
     it('finds the SDK directory’s own repository inside one that encloses it, and records there', async () => {
@@ -80,7 +86,7 @@ describe('SdkContext', () => {
       fs.mkdirSync(inRoot('sdk', 'python'), { recursive: true });
       (await git.init(new DirectoryPath(inRoot('sdk', 'python'))))._unsafeUnwrap();
 
-      const own = repositoryIn((await context.destination(PYTHON))._unsafeUnwrap());
+      const own = repositoryIn((await context.destination(PYTHON, false))._unsafeUnwrap());
 
       await recordOne(own);
       expect(await pristineAt(inRoot('sdk', 'python'))).to.not.be.undefined;
@@ -90,8 +96,51 @@ describe('SdkContext', () => {
     it('finds no repository outside one', async () => {
       fs.mkdirSync(inRoot('sdk', 'python'), { recursive: true });
 
-      expect((await context.destination(PYTHON))._unsafeUnwrap().kind).to.equal('noRepository');
+      expect((await context.destination(PYTHON, true))._unsafeUnwrap().kind).to.equal('noRepository');
     });
+  });
+
+  describe('destination, and when git is looked for', () => {
+    it('does not look for git without a repository of its own or --git-init, inside a project repository or not', async () => {
+      (await new GitService().init(new DirectoryPath(root)))._unsafeUnwrap();
+      fs.mkdirSync(inRoot('sdk', 'python'), { recursive: true });
+      const version = sinon.stub(GitService.prototype, 'version').resolves(err({ reason: 'this is not git' }));
+      const topLevel = sinon.spy(GitService.prototype, 'topLevel');
+
+      expect((await context.destination(PYTHON, false))._unsafeUnwrap().kind).to.equal('noRepository');
+
+      expect(version.called).to.be.false;
+      expect(topLevel.called).to.be.false;
+    });
+
+    for (const [how, setUp, gitInit] of [
+      ['with --git-init', () => {}, true],
+      [
+        'in a directory with a .git of its own',
+        () => fs.mkdirSync(inRoot('sdk', 'python', '.git'), { recursive: true }),
+        false
+      ],
+      [
+        'in a worktree, whose .git is a file',
+        () => {
+          fs.mkdirSync(inRoot('sdk', 'python'), { recursive: true });
+          fs.writeFileSync(inRoot('sdk', 'python', '.git'), 'gitdir: ../.git/worktrees/python');
+        },
+        false
+      ]
+    ] as const) {
+      it(`looks for git ${how}, and overwrites without it`, async () => {
+        setUp();
+        const version = sinon.stub(GitService.prototype, 'version').resolves(ok(undefined));
+
+        expect((await context.destination(PYTHON, gitInit))._unsafeUnwrap()).to.deep.equal({
+          kind: 'overwrite',
+          found: undefined
+        });
+
+        expect(version.calledOnce).to.be.true;
+      });
+    }
   });
 
   describe('exists', () => {
@@ -161,6 +210,18 @@ describe('SdkContext', () => {
       const archive = (await context.archive(new DirectoryPath(inRoot('temp'))))._unsafeUnwrap();
 
       expect(entries(archive.toString())).to.have.members(['README.md', 'models/book.py']);
+    });
+
+    it('zips without asking git when the directory has no .git of its own', async () => {
+      fs.mkdirSync(inRoot('sdk', 'python'), { recursive: true });
+      fs.writeFileSync(inRoot('sdk', 'python', 'README.md'), '# sdk');
+      fs.mkdirSync(inRoot('temp'));
+      const topLevel = sinon.spy(GitService.prototype, 'topLevel');
+
+      const archive = (await context.archive(new DirectoryPath(inRoot('temp'))))._unsafeUnwrap();
+
+      expect(entries(archive.toString())).to.have.members(['README.md']);
+      expect(topLevel.called).to.be.false;
     });
   });
 

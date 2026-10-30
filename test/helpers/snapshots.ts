@@ -15,7 +15,7 @@ export async function repositoryOf(
   sdk: DirectoryPath,
   generation: SdkGeneration
 ): Promise<SdkRepositoryContext | undefined> {
-  const destination = (await new SdkContext(sdk).destination(generation))._unsafeUnwrap();
+  const destination = (await new SdkContext(sdk).destination(generation, false))._unsafeUnwrap();
   return 'repository' in destination ? destination.repository : undefined;
 }
 

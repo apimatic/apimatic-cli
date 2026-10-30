@@ -134,18 +134,45 @@ describe('GenerateAction (sdk) — the destination', () => {
     ['no git', undefined],
     ['an older git', 'git version 2.30.2']
   ] as const) {
-    it(`with ${found}, warns that customizations will not persist and overwrites`, async () => {
+    const unavailable = () => {
       sinon
         .stub(GitService.prototype, 'version')
         .resolves(ok(output === undefined ? undefined : GitVersion.parse(output)));
-      const gitUnavailable = sinon.stub(SdkGeneratePrompts.prototype, 'gitUnavailable');
+      return sinon.stub(SdkGeneratePrompts.prototype, 'gitUnavailable');
+    };
 
-      expect((await execute()).isSuccess()).to.be.true;
+    it(`with ${found} and --git-init, warns that customizations will not persist and overwrites`, async () => {
+      const gitUnavailable = unavailable();
+
+      expect((await execute({ gitInit: true })).isSuccess()).to.be.true;
 
       expect(gitUnavailable.firstCall.args[0]?.toString()).to.equal(output === undefined ? undefined : '2.30.2');
       expect(fs.readdirSync(sdk().toString())).to.deep.equal(['README.md']);
     });
+
+    it(`with ${found}, warns and overwrites the SDK directory's own repository, keeping its .git`, async () => {
+      fs.mkdirSync(sdk().toString(), { recursive: true });
+      (await git.init(sdk()))._unsafeUnwrap();
+      const gitUnavailable = unavailable();
+
+      expect((await execute()).isSuccess()).to.be.true;
+
+      expect(gitUnavailable.calledOnce).to.be.true;
+      expect(fs.readdirSync(sdk().toString()).sort()).to.deep.equal(['.git', 'README.md']);
+    });
   }
+
+  it('does not look for git without a repository of its own or --git-init, and fails only once it needs one that does not answer', async () => {
+    const version = sinon.stub(GitService.prototype, 'version').resolves(err({ reason: 'this is not git' }));
+    const notInspected = sinon.stub(SdkGeneratePrompts.prototype, 'directoryNotInspected');
+
+    expect((await execute()).isSuccess()).to.be.true;
+    expect(version.called).to.be.false;
+    expect((SdkGeneratePrompts.prototype.gitInitSteps as sinon.SinonStub).calledOnce).to.be.true;
+
+    expect((await execute({ gitInit: true })).isFailed()).to.be.true;
+    expect(notInspected.firstCall.args[0]).to.deep.equal({ reason: 'this is not git' });
+  });
 
   describe('when the SDK directory is not a repository of its own', () => {
     for (const [how, tty, force] of [

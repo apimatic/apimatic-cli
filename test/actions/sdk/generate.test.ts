@@ -110,11 +110,13 @@ describe('GenerateAction (sdk)', () => {
     expect(record.pristineCommit()).to.deep.equal(pristine);
   });
 
-  it('writes the SDK as it always has when git is not there', async () => {
+  it('writes the SDK as it always has when --git-init finds no git', async () => {
     sinon.stub(GitService.prototype, 'version').resolves(ok(undefined));
-    sinon.stub(SdkGeneratePrompts.prototype, 'gitUnavailable');
+    const gitUnavailable = sinon.stub(SdkGeneratePrompts.prototype, 'gitUnavailable');
 
-    expect((await execute()).isSuccess()).to.be.true;
+    expect((await execute({ gitInit: true })).isSuccess()).to.be.true;
+
+    expect(gitUnavailable.calledOnce).to.be.true;
 
     expect(fs.readdirSync(sdk().toString())).to.deep.equal(['README.md']);
   });
