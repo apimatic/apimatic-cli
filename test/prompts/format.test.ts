@@ -54,10 +54,10 @@ describe('outro', () => {
     }
   };
 
-  it('closes a run left with conflicts as Conflicted, exiting 1', () => {
-    const { text, exitCode } = closing(ActionResult.conflicted());
+  it('closes a run that leaves the developer something to do as Action required, exiting 1', () => {
+    const { text, exitCode } = closing(ActionResult.actionRequired());
 
-    expect(text).to.contain('Conflicted');
+    expect(text).to.contain('Action required');
     expect(exitCode).to.equal(1);
   });
 });

@@ -65,9 +65,9 @@ export class SdkPublishAction {
         return ActionResult.cancelled();
       }
       // Markers would be uploaded, and recorded as published, along with the rest.
-      if (sdkGenerationResult.isConflicted()) {
+      if (sdkGenerationResult.isActionRequired()) {
         this.prompts.conflictsNotPublished();
-        return ActionResult.conflicted();
+        return ActionResult.actionRequired();
       }
 
       if (dryRun) {
@@ -110,8 +110,8 @@ export class SdkPublishAction {
     if (publishResult.isCancelled()) {
       return ActionResult.cancelled();
     }
-    if (publishResult.isConflicted()) {
-      return ActionResult.conflicted();
+    if (publishResult.isActionRequired()) {
+      return ActionResult.actionRequired();
     }
 
     // Since publishing was not initiated, skip the next steps for polling.

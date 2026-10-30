@@ -185,7 +185,7 @@ flowchart TD
   C1 --> R1[git init in the SDK directory with --git-init, when it is not a repository of its own]
   R1 --> E[Write the SDK; an overwrite empties the directory but keeps any existing .git]
   D -- yes --> G{Files still unmerged from the last run?}
-  G -- yes --> Y([Asked in a terminal, settled for the generator under --force, else Conflicted: resolve those files first])
+  G -- yes --> Y([Asked in a terminal, settled for the generator under --force, else Action required: resolve those files first])
   G -- no --> C2[Zip src/ and upload; poll; download the SDK zip into a temp directory]
   C2 --> H[Save disk state to refs/apimatic/previous]
   H --> I[git merge-tree of yours and the generation over the pristine base; write the result in place]
@@ -301,12 +301,13 @@ them resolved. The steps do not name
 `refs/apimatic/previous`; that ref is the safety net of section 3, named only when a write
 failed and could not be undone.
 
-The result is conflicted (`ActionResult.conflicted()`, closed in yellow), exit 1 (decided
-2026-10-29, replacing the success of the product review): not a success, since the SDK holds
+The run ends as Action required (`ActionResult.actionRequired()`, closed in yellow), exit 1
+(decided 2026-10-29, replacing the success of the product review; named Conflicted until
+2026-10-30, renamed so the state is not tied to conflicts): not a success, since the SDK holds
 markers and will not build, and not a failure, since the run did what was chosen. The exit
 code is the one `git merge` gives conflicts, so a command chained after the run does not run.
-`sdk publish` stops on a conflicted generation before zipping, so markers are never uploaded
-or recorded as published, and ends conflicted too. A run without a terminal never writes
+`sdk publish` stops on such a generation before zipping, so markers are never uploaded or
+recorded as published, and ends as Action required too. A run without a terminal never writes
 markers; it stops with the list, failed, exit 1. Nothing is lost: every other file is already
 updated, the pristine snapshot is recorded, the index holds the conflicted paths.
 
@@ -354,10 +355,12 @@ is written gives the same result on 2.38.
 
 The next run, while git holds any of the SDK's files as unmerged, asks before generating
 (`SdkGeneratePrompts.unresolvedChoice`); `--force` settles them for the generator without
-asking, and a run without a terminal names them and ends conflicted, exit 1 (`onConflictFor`):
+asking, and a run without a terminal names them and ends as Action required, exit 1
+(`onConflictFor`):
 
-- **I'll finish resolving them**: nothing done; the result is conflicted, exit 1 (decided
-  2026-10-29, replacing the cancellation of the product review, which replaced a failure).
+- **I'll finish resolving them**: nothing done; the run ends as Action required, exit 1
+  (decided 2026-10-29, replacing the cancellation of the product review, which replaced a
+  failure).
   Backing out of the question cancels, exit 130, as it does at every other question.
 - **Resolve remaining conflicts using generator changes** and **… using my changes**:
   `SdkRepositoryContext.settleUnresolved(side, paths)` reads the two sides git kept in the
@@ -371,7 +374,7 @@ asking, and a run without a terminal names them and ends conflicted, exit 1 (`on
 There is no undo and no cancel on this question (decided 2026-10-23): the first question
 already offers the cancel, before anything is written. After either side, the directory is
 inspected again, once; a file still unmerged after that is reported, never asked about
-twice, and the run ends conflicted. The run then generates and merges from the settled state.
+twice, and the run ends as Action required. The run then generates and merges from the settled state.
 
 Nothing is reported to telemetry (section 2). Whether a question can be asked is
 `terminal.isInteractive()` (`process.stdin.isTTY`, `src/infrastructure/terminal.ts`), stubbed
@@ -434,6 +437,7 @@ Every row of section 5 and this table is a test over real repositories in
 | 19 | this file | A run that leaves files to resolve ends conflicted (`ActionResult.conflicted()`, a yellow outro, exit 1 as `git merge` gives conflicts): "I'll resolve them myself" was a success, "I'll finish resolving them" was cancelled, and a run without a terminal facing unresolved files failed. Backing out of the unresolved question cancels (`UnresolvedChoice` gains `cancel`). `sdk publish` stops on a conflicted generation instead of uploading the markers; it checked only for a failure or a cancellation. |
 | 20 | this file | An SDK written without a repository of its own ends with a "Next steps" box after the write (`SdkGeneratePrompts.gitInitSteps`), in place of the warning printed before the upload (`repositoryNotCreated`): changes are lost on the next regeneration; to keep them, rerun with `--git-init` before changing anything, then customize. `WriteMode` `save` carries `suggestGitInit` for it, renamed from `warnNoRepository`. The step-by-step `sdk publish` shows it too when `--git-init` is not passed. |
 | 21 | this file | Wording, on the product review: the `gitInitSteps` box no longer assumes the SDK will be edited ("To customize … and keep your changes when it is regenerated:", then rerun with `--git-init` before changing anything, which needs git 2.38 or newer, then make the changes), and `conflictSteps` ends at "2. Rerun the command.", without "nothing needs committing first" or the third step offering to let the CLI resolve what is left, which the rerun asks anyway. |
+| 22 | this file | The yellow end state is named Action required, on the product review, so it is not tied to conflicts: `ActionResult.actionRequired()` and `isActionRequired()`, `ResultType.ActionRequired`, `mapAll`'s `onActionRequired` and `format.outroActionRequired`, renamed from `conflicted()`, `isConflicted()`, `Conflict`, `onConflict` and `outroConflicted`. Still yellow, still exit 1. `sdk publish` checks it under the new name, and its "Nothing was published, since the SDK still has conflicts" stays, since conflicts are the only way there. |
 
 PR into `dev`, squash-merged, title `feat(sdk): keep your edits when regenerating an SDK`.
 

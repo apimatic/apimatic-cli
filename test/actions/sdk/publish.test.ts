@@ -174,7 +174,7 @@ describe('SdkPublishAction', () => {
   });
 
   // Markers would go up with the rest, and the version would be recorded as published.
-  it('publishes nothing, and ends conflicted, while the SDK still has conflicts to resolve', async () => {
+  it('publishes nothing, and ends as Action required, while the SDK still has conflicts to resolve', async () => {
     const unresolved = { kind: 'unresolved', repository: undefined, paths: [RelativeFilePath.fromGit('a.py')!] };
     sinon.stub(SdkContext.prototype, 'destination').resolves(ok(unresolved as never));
     sinon.stub(SdkGeneratePrompts.prototype, 'conflictsUnresolved');
@@ -183,7 +183,7 @@ describe('SdkPublishAction', () => {
 
     const result = await execute(false, { force: false, interaction: 'never', gitInit: true });
 
-    expect(result.isConflicted()).to.be.true;
+    expect(result.isActionRequired()).to.be.true;
     expect(conflictsNotPublished.calledOnce).to.be.true;
     expect(publishSdkPackage.called).to.be.false;
     expect(onPublishSdkError.called).to.be.false;

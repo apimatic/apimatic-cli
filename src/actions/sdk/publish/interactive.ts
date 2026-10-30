@@ -142,8 +142,8 @@ export class SdkPublishInteractiveAction {
     if (publishResult.isCancelled()) {
       return ActionResult.cancelled();
     }
-    if (publishResult.isConflicted()) {
-      return ActionResult.conflicted();
+    if (publishResult.isActionRequired()) {
+      return ActionResult.actionRequired();
     }
 
     await new RecordPublishedSdkAction().execute(project, language, publishingProfile, publishTypes, version);

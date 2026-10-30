@@ -216,7 +216,7 @@ describe('GenerateAction (sdk) — writing the SDK', () => {
 
       const result = await execute({ 'README.md': '# sdk v2', 'models/book.py': MODEL_V2 }, false);
 
-      expect(result.isConflicted()).to.be.true;
+      expect(result.isActionRequired()).to.be.true;
       const [plan, where, staged] = conflictSteps.firstCall.args;
       expect(plan.conflicts).to.deep.equal([{ path: rel('models/book.py'), kind: 'bothChanged' }]);
       expect(where.isEqual(sdk())).to.be.true;
@@ -244,7 +244,7 @@ describe('GenerateAction (sdk) — writing the SDK', () => {
 
       const result = await execute({ 'models/book.py': MODEL_V2 }, false);
 
-      expect(result.isConflicted()).to.be.true;
+      expect(result.isActionRequired()).to.be.true;
       expect(conflictsNotStaged.firstCall.args[0]).to.deep.equal({ reason: 'index locked' });
       expect(conflictSteps.firstCall.args[2]).to.be.false;
       expect(read('models/book.py')).to.contain(YOURS_MARKER);
@@ -366,14 +366,14 @@ describe('GenerateAction (sdk) — writing the SDK', () => {
       });
     }
 
-    it('leaves markers when the developer will resolve, and ends conflicted with the steps', async () => {
+    it('leaves markers when the developer will resolve, and ends as Action required with the steps', async () => {
       await conflicting();
       sinon.stub(SdkGeneratePrompts.prototype, 'conflictChoice').resolves('resolve');
       const conflictSteps = sinon.stub(SdkGeneratePrompts.prototype, 'conflictSteps');
 
       const result = await execute(NEXT, false);
 
-      expect(result.isConflicted()).to.be.true;
+      expect(result.isActionRequired()).to.be.true;
       expect(read('models/book.py')).to.contain(YOURS_MARKER);
       expect(conflictSteps.calledOnce).to.be.true;
     });

@@ -69,7 +69,7 @@ export class GenerateAction {
       const choice = onConflict === 'ask' ? await this.prompts.unresolvedChoice(unresolved.paths, sdk) : 'generated';
       if (choice === 'resolve' || choice === 'cancel') {
         this.prompts.resolveLater();
-        return choice === 'resolve' ? ActionResult.conflicted() : ActionResult.cancelled();
+        return choice === 'resolve' ? ActionResult.actionRequired() : ActionResult.cancelled();
       }
       const settled = await unresolved.repository.settleUnresolved(choice, unresolved.paths);
       if (settled.isErr()) {
@@ -86,7 +86,7 @@ export class GenerateAction {
     // Left unresolved by a run that could not ask, or by a settling that did not clear every file.
     if (looked.value.kind === 'unresolved') {
       this.prompts.conflictsUnresolved(looked.value.paths, sdk);
-      return ActionResult.conflicted();
+      return ActionResult.actionRequired();
     }
     const destination = looked.value;
     const notice = noticeFor(destination);
@@ -206,7 +206,7 @@ export class GenerateAction {
             this.prompts.conflictsNotStaged(staged.error);
           }
           this.prompts.conflictSteps(settlement.plan, sdk, staged.isOk());
-          return ActionResult.conflicted();
+          return ActionResult.actionRequired();
         }
       }
     });

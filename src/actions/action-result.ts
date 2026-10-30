@@ -2,18 +2,19 @@ enum ResultType {
   Success,
   Failure,
   Cancel,
-  Conflict
+  ActionRequired
 }
 
 /**
- * A conflicted run exits as `git merge` does on conflicts: files are left to resolve, so whatever
- * is chained after it should not run. Two kinds share a code, so the codes are kept apart from them.
+ * A run that needs the developer to act exits as `git merge` does on conflicts: its work is not
+ * done, so whatever is chained after it should not run. Two kinds share a code, so the codes are
+ * kept apart from them.
  */
 const EXIT_CODES: Record<ResultType, number> = {
   [ResultType.Success]: 0,
   [ResultType.Failure]: 1,
   [ResultType.Cancel]: 130,
-  [ResultType.Conflict]: 1
+  [ResultType.ActionRequired]: 1
 };
 
 export class ActionResult<T = void, E = never> {
@@ -45,9 +46,9 @@ export class ActionResult<T = void, E = never> {
     return new ActionResult(ResultType.Cancel, message);
   }
 
-  /** The run ended with files the developer still has to resolve. */
-  static conflicted<T = never>(message = 'Conflicted'): ActionResult<T> {
-    return new ActionResult(ResultType.Conflict, message);
+  /** The run ended with something the developer still has to do, such as files to resolve. */
+  static actionRequired<T = never>(message = 'Action required'): ActionResult<T> {
+    return new ActionResult(ResultType.ActionRequired, message);
   }
 
   public getMessage(): string {
@@ -70,8 +71,8 @@ export class ActionResult<T = void, E = never> {
     return this.resultType === ResultType.Cancel;
   }
 
-  public isConflicted(): boolean {
-    return this.resultType === ResultType.Conflict;
+  public isActionRequired(): boolean {
+    return this.resultType === ResultType.ActionRequired;
   }
 
   public getValue(): T {
@@ -89,7 +90,7 @@ export class ActionResult<T = void, E = never> {
     return new ActionResult(this.resultType, this.message);
   }
 
-  public mapAll<R>(onSuccess: (value?: T) => R, onFailure: () => R, onCancel: () => R, onConflict: () => R): R {
+  public mapAll<R>(onSuccess: (value?: T) => R, onFailure: () => R, onCancel: () => R, onActionRequired: () => R): R {
     switch (this.resultType) {
       case ResultType.Success:
         return onSuccess(this.value);
@@ -97,8 +98,8 @@ export class ActionResult<T = void, E = never> {
         return onFailure();
       case ResultType.Cancel:
         return onCancel();
-      case ResultType.Conflict:
-        return onConflict();
+      case ResultType.ActionRequired:
+        return onActionRequired();
     }
   }
 }
