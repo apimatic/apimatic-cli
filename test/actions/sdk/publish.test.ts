@@ -6,22 +6,26 @@ import { expect } from 'chai';
 import { err, ok } from 'neverthrow';
 import sinon from 'sinon';
 import { SdkPublishAction } from '../../../src/actions/sdk/publish.js';
+import { SdkPublishNonInteractiveAction } from '../../../src/actions/sdk/publish/non-interactive.js';
+import { LauncherService } from '../../../src/infrastructure/launcher-service.js';
 import { PublishingApiService } from '../../../src/infrastructure/services/publishing-api-service.js';
 import { SdkGenerationService } from '../../../src/infrastructure/services/sdk-generation-service.js';
 import { ZipService } from '../../../src/infrastructure/zip-service.js';
 import { SdkGeneratePrompts } from '../../../src/prompts/sdk/generate.js';
 import { SdkPublishPrompts } from '../../../src/prompts/sdk/publish.js';
+import { SdkPublishNonInteractivePrompts } from '../../../src/prompts/sdk/publish/non-interactive.js';
 import { CommandMetadata } from '../../../src/types/common/command-metadata.js';
 import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
 import { FileName } from '../../../src/types/file/fileName.js';
 import { FilePath } from '../../../src/types/file/filePath.js';
 import { FileProblem } from '../../../src/types/file/file-problem.js';
 import { ProjectContext } from '../../../src/types/project-context.js';
-import { PublishType } from '../../../src/types/publish-api/publishing-profile-item.js';
+import { PublishingProfileItem, PublishType } from '../../../src/types/publish-api/publishing-profile-item.js';
 import { ProfileId } from '../../../src/types/publish/profile-id.js';
 import { PublishingProfile } from '../../../src/types/publish/publishing-profile.js';
 import { SemVersion } from '../../../src/types/publish/version.js';
 import { Language, Stability } from '../../../src/types/sdk/generate.js';
+import { StabilityChoice } from '../../../src/types/sdk/stability-choice.js';
 import { TempContext } from '../../../src/types/temp-context.js';
 
 const COMMAND_METADATA: CommandMetadata = { commandName: 'sdk publish', shell: 'test' };
@@ -34,18 +38,21 @@ describe('SdkPublishAction', () => {
     getPackageConfigurationDataForLanguage: () => undefined
   } as unknown as PublishingProfile;
 
-  const execute = () =>
+  const sdk = () => new DirectoryPath(path.join(root, 'sdk', 'python'));
+
+  const execute = (dryRun = false) =>
     new SdkPublishAction(new DirectoryPath(root), COMMAND_METADATA).execute(
       ProjectContext.in(new DirectoryPath(root)),
-      new DirectoryPath(path.join(root, 'sdk')),
+      sdk(),
       Language.PYTHON,
+      Stability.STABLE,
       [PublishType.PackagePublishing],
       true,
+      false,
       ProfileId.tryCreate('profile')._unsafeUnwrap(),
       SemVersion.tryCreate('1.0.0')._unsafeUnwrap(),
       withoutPackageSettings,
-      false,
-      Stability.STABLE,
+      dryRun,
       'summary',
       onPublishSdkError
     );
@@ -70,6 +77,67 @@ describe('SdkPublishAction', () => {
   afterEach(() => {
     sinon.restore();
     fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  it('generates into the SDK directory on a dry run and opens it, uploading nothing', async () => {
+    sinon.stub(SdkGeneratePrompts.prototype, 'sdkGenerated');
+    const dryRunNotice = sinon.stub(SdkPublishPrompts.prototype, 'dryRunNotice');
+    const opened = sinon.stub(LauncherService.prototype, 'openDirectoryInEditorOrFileExplorer').resolves();
+    const publishSdkPackage = sinon.stub(PublishingApiService.prototype, 'publishSdkPackage');
+
+    expect((await execute(true)).isSuccess()).to.be.true;
+
+    expect(fs.readFileSync(path.join(sdk().toString(), 'README.md'), 'utf8')).to.equal('# sdk');
+    expect(opened.firstCall.args[0].isEqual(sdk())).to.be.true;
+    expect(dryRunNotice.calledOnce).to.be.true;
+    expect(publishSdkPackage.called).to.be.false;
+  });
+
+  it('runs a dry run on the SDK directory the project names, not a throwaway one', async () => {
+    const profile = {
+      id: 'c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6',
+      name: 'profile',
+      apiGroupId: 'group',
+      apiGroupName: 'Group',
+      cSharpConfiguration: null,
+      goConfiguration: null,
+      javaConfiguration: null,
+      phpConfiguration: null,
+      pythonConfiguration: null,
+      rubyConfiguration: null,
+      typeScriptConfiguration: null,
+      cSharpGitConfiguration: null,
+      goGitConfiguration: null,
+      javaGitConfiguration: null,
+      phpGitConfiguration: null,
+      pythonGitConfiguration: { isEnabled: true, credentialsId: 'c', repositoryName: 'sdk', branch: 'main' },
+      rubyGitConfiguration: null,
+      typeScriptGitConfiguration: null
+    } satisfies PublishingProfileItem;
+    sinon.stub(PublishingApiService.prototype, 'getPublishingProfiles').resolves(ok([profile]));
+    sinon.stub(SdkPublishNonInteractivePrompts.prototype, 'getPublishingProfiles').callsFake((fn) => fn);
+    sinon.stub(SdkPublishNonInteractivePrompts.prototype, 'sourceCodeOnlyPublishingNotice');
+    sinon.stub(SdkPublishNonInteractivePrompts.prototype, 'dryRunPluginConfigNotice');
+    sinon.stub(SdkGeneratePrompts.prototype, 'sdkGenerated');
+    sinon.stub(SdkPublishPrompts.prototype, 'dryRunNotice');
+    const opened = sinon.stub(LauncherService.prototype, 'openDirectoryInEditorOrFileExplorer').resolves();
+
+    const result = await new SdkPublishNonInteractiveAction(new DirectoryPath(root), COMMAND_METADATA).execute(
+      ProjectContext.in(new DirectoryPath(root)),
+      undefined,
+      Language.PYTHON,
+      [PublishType.SourceCodePublishing],
+      true,
+      true,
+      StabilityChoice.for(Language.PYTHON, undefined),
+      onPublishSdkError,
+      profile.id,
+      '1.0.0'
+    );
+
+    expect(result.isSuccess()).to.be.true;
+    expect(fs.readFileSync(path.join(sdk().toString(), 'README.md'), 'utf8')).to.equal('# sdk');
+    expect(opened.firstCall.args[0].isEqual(sdk())).to.be.true;
   });
 
   it('reports an SDK it could not zip, without publishing', async () => {

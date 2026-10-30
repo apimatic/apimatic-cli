@@ -23,25 +23,26 @@ const COMMAND_METADATA: CommandMetadata = { commandName: 'sdk generate', shell: 
 
 describe('GenerateAction (sdk)', () => {
   let root: string;
-  let sdkDirectory: DirectoryPath;
   let sdkArchive: Buffer;
   let generateSdk: sinon.SinonStub;
 
-  const execute = (zipSdk = false) =>
+  const sdk = () => new DirectoryPath(path.join(root, 'sdk', 'python'));
+  const at = (relative: string) => path.join(sdk().toString(), relative);
+
+  const execute = (options: { force?: boolean; canAsk?: boolean; destination?: DirectoryPath } = {}) =>
     new GenerateAction(new DirectoryPath(root), COMMAND_METADATA, 'auth-key').execute(
       ProjectContext.in(new DirectoryPath(root)),
-      sdkDirectory,
+      options.destination ?? sdk(),
       Language.PYTHON,
       Stability.STABLE,
-      true,
-      zipSdk
+      options.force ?? true,
+      options.canAsk ?? false
     );
 
   beforeEach(async () => {
     root = fs.mkdtempSync(path.join(os.tmpdir(), 'sdk-generate-'));
     fs.mkdirSync(path.join(root, 'src', 'spec'), { recursive: true });
     fs.writeFileSync(path.join(root, 'src', 'spec', 'openapi.json'), '{}');
-    sdkDirectory = new DirectoryPath(path.join(root, 'sdk'));
 
     const generated = path.join(root, 'generated');
     fs.mkdirSync(generated);
@@ -61,11 +62,35 @@ describe('GenerateAction (sdk)', () => {
     fs.rmSync(root, { recursive: true, force: true });
   });
 
-  it('expands the generated SDK into its language directory', async () => {
+  it('expands the generated SDK into the SDK directory', async () => {
     expect((await execute()).isSuccess()).to.be.true;
 
-    expect(fs.readFileSync(path.join(sdkDirectory.toString(), 'python', 'README.md'), 'utf-8')).to.equal('# sdk');
+    expect(fs.readFileSync(at('README.md'), 'utf-8')).to.equal('# sdk');
   });
+
+  it('writes into the destination itself, with no language directory below it', async () => {
+    const destination = new DirectoryPath(path.join(root, 'my-python-sdk'));
+
+    expect((await execute({ destination })).isSuccess()).to.be.true;
+
+    expect(fs.readFileSync(path.join(destination.toString(), 'README.md'), 'utf-8')).to.equal('# sdk');
+    expect(fs.existsSync(path.join(destination.toString(), 'python'))).to.be.false;
+  });
+
+  for (const [named, destination] of [
+    ['the project', () => new DirectoryPath(root)],
+    ['the source directory', () => new DirectoryPath(path.join(root, 'src'))]
+  ] as const) {
+    it(`refuses ${named} as the destination, since writing the SDK would delete the source`, async () => {
+      const destinationContainsSource = sinon.stub(SdkGeneratePrompts.prototype, 'destinationContainsSource');
+
+      expect((await execute({ destination: destination() })).isFailed()).to.be.true;
+
+      expect(destinationContainsSource.calledOnce).to.be.true;
+      expect(generateSdk.called).to.be.false;
+      expect(fs.existsSync(path.join(root, 'src', 'spec', 'openapi.json'))).to.be.true;
+    });
+  }
 
   it('reports a source directory it could not zip, without generating', async () => {
     const problem: FileProblem = { kind: 'zipFailed', reason: 'EACCES: permission denied' };
@@ -87,18 +112,50 @@ describe('GenerateAction (sdk)', () => {
     expect(problem.reason).to.not.be.empty;
   });
 
-  it('reports an SDK it could not save, naming its language directory', async () => {
-    const archive = sinon.stub(ZipService.prototype, 'archive').callThrough();
-    archive.onSecondCall().resolves(err('ENOSPC: no space left on device, write'));
-    const sdkNotSaved = sinon.stub(SdkGeneratePrompts.prototype, 'sdkNotSaved');
-    const sdkGenerated = sinon.stub(SdkGeneratePrompts.prototype, 'sdkGenerated');
-
-    expect((await execute(true)).isFailed()).to.be.true;
-    expect(sdkNotSaved.firstCall.args[0]).to.deep.equal({
-      kind: 'zipFailed',
-      reason: 'ENOSPC: no space left on device, write',
-      sdkDirectory: sdkDirectory.join('python')
+  describe('the overwrite question', () => {
+    beforeEach(() => {
+      fs.mkdirSync(sdk().toString(), { recursive: true });
+      fs.writeFileSync(at('README.md'), '# mine');
     });
-    expect(sdkGenerated.called).to.be.false;
+
+    it('stops before generating when the developer declines', async () => {
+      const overwriteSdk = sinon.stub(SdkGeneratePrompts.prototype, 'overwriteSdk').resolves(false);
+      sinon.stub(SdkGeneratePrompts.prototype, 'destinationDirNotEmpty');
+
+      expect((await execute({ force: false, canAsk: true })).isCancelled()).to.be.true;
+
+      expect(overwriteSdk.firstCall.args[0].isEqual(sdk())).to.be.true;
+      expect(generateSdk.called).to.be.false;
+      expect(fs.readFileSync(at('README.md'), 'utf-8')).to.equal('# mine');
+    });
+
+    it('goes ahead on yes', async () => {
+      sinon.stub(SdkGeneratePrompts.prototype, 'overwriteSdk').resolves(true);
+
+      expect((await execute({ force: false, canAsk: true })).isSuccess()).to.be.true;
+
+      expect(fs.readFileSync(at('README.md'), 'utf-8')).to.equal('# sdk');
+    });
+
+    it('is not asked where nobody can answer it: the run fails, naming --force', async () => {
+      const overwriteSdk = sinon.stub(SdkGeneratePrompts.prototype, 'overwriteSdk');
+      const cannotAsk = sinon.stub(SdkGeneratePrompts.prototype, 'cannotAskToOverwrite');
+
+      expect((await execute({ force: false, canAsk: false })).isFailed()).to.be.true;
+
+      expect(overwriteSdk.called).to.be.false;
+      expect(cannotAsk.firstCall.args[0].isEqual(sdk())).to.be.true;
+      expect(generateSdk.called).to.be.false;
+      expect(fs.readFileSync(at('README.md'), 'utf-8')).to.equal('# mine');
+    });
+
+    it('is skipped by --force', async () => {
+      const overwriteSdk = sinon.stub(SdkGeneratePrompts.prototype, 'overwriteSdk');
+
+      expect((await execute({ force: true, canAsk: true })).isSuccess()).to.be.true;
+
+      expect(overwriteSdk.called).to.be.false;
+      expect(fs.readFileSync(at('README.md'), 'utf-8')).to.equal('# sdk');
+    });
   });
 });

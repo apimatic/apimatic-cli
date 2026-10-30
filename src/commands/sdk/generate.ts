@@ -2,6 +2,7 @@ import { Command, Flags } from '@oclif/core';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { FlagsProvider } from '../../types/flags-provider.js';
 import { GenerateAction } from '../../actions/sdk/generate.js';
+import { terminal } from '../../infrastructure/terminal.js';
 import {
   AVAILABLE_LANGUAGES,
   CodeGenerationVersion,
@@ -37,15 +38,7 @@ ${inProse(AVAILABLE_LANGUAGES)} are available; ${inProse(UPCOMING_LANGUAGES)} ar
     }),
     destination: Flags.string({
       char: 'd',
-      description:
-        '[default: <input>/sdk/<language> | <input>/sdk/<api-version>/<language>] path where the SDK will be generated'
-    }),
-    'api-version': Flags.string({
-      description: 'Version of the API to use for SDK generation (if multiple versions exist)'
-    }),
-    zip: Flags.boolean({
-      default: false,
-      description: 'Download the generated SDK as a .zip archive'
+      description: '[default: <input>/sdk/<language>] directory the SDK is generated into'
     }),
     'codegen-version': Flags.string({
       description: 'Version of the code generator to use',
@@ -64,23 +57,12 @@ ${inProse(AVAILABLE_LANGUAGES)} are available; ${inProse(UPCOMING_LANGUAGES)} ar
   static examples = [
     `${SdkGenerate.cmdTxt} ${format.flag('language', 'typescript')}`,
     `${SdkGenerate.cmdTxt} ${format.flag('language', 'csharp')} ${format.flag('input', './')}`,
-    `${SdkGenerate.cmdTxt} ${format.flag('language', 'python')} ${format.flag('destination', './sdk')} ${format.flag(
-      'zip'
-    )}`
+    `${SdkGenerate.cmdTxt} ${format.flag('language', 'python')} ${format.flag('destination', './my-python-sdk')}`
   ];
 
   async run() {
     const {
-      flags: {
-        language,
-        input,
-        destination,
-        force,
-        zip: zipSdk,
-        stability,
-        'auth-key': authKey,
-        'api-version': apiVersion
-      }
+      flags: { language, input, destination, force, stability, 'auth-key': authKey }
     } = await this.parse(SdkGenerate);
 
     const project = ProjectContext.at(input);
@@ -94,12 +76,14 @@ ${inProse(AVAILABLE_LANGUAGES)} are available; ${inProse(UPCOMING_LANGUAGES)} ar
     const action = new GenerateAction(this.getConfigDir(), commandMetadata, authKey);
     const result = await action.execute(
       project,
-      project.sdkDirectory(destination),
+      project.sdkDirectory(
+        language as Language,
+        destination === undefined ? undefined : DirectoryPath.fromUserInput(destination)
+      ),
       language as Language,
       StabilityChoice.for(language as Language, stability).stabilityLevel(),
       force,
-      zipSdk,
-      apiVersion
+      terminal.isInteractive()
     );
     outro(result);
   }

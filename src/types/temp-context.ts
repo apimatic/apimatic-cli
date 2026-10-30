@@ -24,6 +24,14 @@ export class TempContext {
     return archived.map(() => tempFile).mapErr((reason): FileProblem => ({ kind: 'zipFailed', reason }));
   }
 
+  /** The archive expanded into a directory of its own below the temp directory. */
+  public async unzip(archive: FilePath): Promise<Result<DirectoryPath, FileProblem>> {
+    const directory = this.tempDirectory.join(`${archive.name()}-unzipped`);
+    await this.fileService.createDirectoryIfNotExists(directory);
+    const unpacked = await this.zipService.unArchive(archive, directory);
+    return unpacked.map(() => directory).mapErr((reason): FileProblem => ({ kind: 'unzipFailed', reason }));
+  }
+
   public async save(portalStream: NodeJS.ReadableStream): Promise<FilePath> {
     const tempFile = this.getTempFileName;
     await this.fileService.writeFile(tempFile, portalStream);

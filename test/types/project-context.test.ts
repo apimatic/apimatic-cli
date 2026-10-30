@@ -19,9 +19,6 @@ describe('ProjectContext', () => {
     fs.writeFileSync(inProject(relative), contents);
   };
 
-  const versionedBuild = (build: object = { generateVersionedPortal: {} }) =>
-    write('src/APIMATIC-BUILD.json', JSON.stringify(build));
-
   beforeEach(() => {
     projectDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'project-context-'));
   });
@@ -37,13 +34,15 @@ describe('ProjectContext', () => {
     });
 
     it('writes each output beside the source directory', () => {
-      expect(project().sdkDirectory().toString()).to.equal(inProject('sdk'));
+      expect(project().sdkDirectory(Language.PYTHON).toString()).to.equal(inProject('sdk', 'python'));
       expect(project().portalDirectory().toString()).to.equal(inProject('portal'));
       expect(project().pluginDirectory().toString()).to.equal(inProject('plugin'));
     });
 
     it('writes where the destination flag says instead, when it says anywhere', () => {
-      expect(project().sdkDirectory('elsewhere').toString()).to.equal(path.resolve('elsewhere'));
+      expect(project().sdkDirectory(Language.PYTHON, new DirectoryPath('elsewhere')).toString()).to.equal(
+        path.resolve('elsewhere')
+      );
       expect(project().portalDirectory('').toString()).to.equal(inProject('portal'));
     });
 
@@ -180,98 +179,11 @@ describe('ProjectContext', () => {
     });
   });
 
-  describe('versionToBuild', () => {
-    const ask = () => sinon.stub<[string[]], Promise<string | undefined>>();
+  describe('sdk', () => {
+    it('writes into a named destination itself, adding no language', () => {
+      const clone = new DirectoryPath(inProject('my-sdk'));
 
-    it('builds from the project itself when it has no build file', async () => {
-      const whole = project();
-
-      expect((await whole.versionToBuild(undefined, ask()))._unsafeUnwrap()).to.equal(whole);
-      expect(await whole.isVersioned()).to.be.false;
-    });
-
-    it('builds from the project itself when its build file declares no versions', async () => {
-      versionedBuild({});
-      const whole = project();
-
-      expect((await whole.versionToBuild('v2', ask()))._unsafeUnwrap()).to.equal(whole);
-    });
-
-    it('has nothing to build from when a versioned build holds no versions', async () => {
-      versionedBuild();
-      expect(await project().isVersioned()).to.be.true;
-      expect((await project().versionToBuild(undefined, ask()))._unsafeUnwrapErr()).to.equal('noVersions');
-
-      fs.mkdirSync(inProject('src', 'versioned_docs'));
-
-      expect((await project().versionToBuild(undefined, ask()))._unsafeUnwrapErr()).to.equal('noVersions');
-    });
-
-    it('reads the only version there is without asking', async () => {
-      versionedBuild();
-      fs.mkdirSync(inProject('src', 'versioned_docs', 'v1'), { recursive: true });
-      const asked = ask();
-
-      const version = (await project().versionToBuild(undefined, asked))._unsafeUnwrap();
-
-      expect(version.sourceDirectory().toString()).to.equal(inProject('src', 'versioned_docs', 'v1'));
-      expect(asked.called).to.be.false;
-    });
-
-    it('asks which version when there are several, offering each by name', async () => {
-      versionedBuild();
-      fs.mkdirSync(inProject('src', 'versioned_docs', 'v1'), { recursive: true });
-      fs.mkdirSync(inProject('src', 'versioned_docs', 'v2'), { recursive: true });
-      const asked = ask().resolves('v2');
-
-      const version = (await project().versionToBuild(undefined, asked))._unsafeUnwrap();
-
-      expect(asked.firstCall.args[0]).to.have.members(['v1', 'v2']);
-      expect(version.sourceDirectory().toString()).to.equal(inProject('src', 'versioned_docs', 'v2'));
-    });
-
-    it('reads the version the flag names without asking, even when it is the only one', async () => {
-      versionedBuild({ generateVersionedPortal: {}, versionsPath: 'versions' });
-      fs.mkdirSync(inProject('src', 'versions', 'v3'), { recursive: true });
-      const asked = ask();
-
-      const version = (await project().versionToBuild('v3', asked))._unsafeUnwrap();
-
-      expect(version.sourceDirectory().toString()).to.equal(inProject('src', 'versions', 'v3'));
-      expect(asked.called).to.be.false;
-    });
-
-    it('has no version to build when the flag or the answer names none there is', async () => {
-      versionedBuild();
-      fs.mkdirSync(inProject('src', 'versioned_docs', 'v1'), { recursive: true });
-      fs.mkdirSync(inProject('src', 'versioned_docs', 'v2'), { recursive: true });
-
-      expect((await project().versionToBuild('v9', ask()))._unsafeUnwrapErr()).to.equal('versionNotFound');
-      expect((await project().versionToBuild(undefined, ask().resolves(undefined)))._unsafeUnwrapErr()).to.equal(
-        'versionNotFound'
-      );
-    });
-
-    it('writes a version where the project writes, the SDK under the version it was built from', async () => {
-      versionedBuild();
-      fs.mkdirSync(inProject('src', 'versioned_docs', 'v1'), { recursive: true });
-      const empty = new DirectoryPath(inProject('empty'));
-      fs.mkdirSync(empty.toString());
-
-      const version = (await project().versionToBuild(undefined, ask()))._unsafeUnwrap();
-      const saved = (await version.sdk(Language.TYPESCRIPT, version.sdkDirectory()).save(empty, false))._unsafeUnwrap();
-
-      expect(version.sdkDirectory().toString()).to.equal(inProject('sdk'));
-      expect(saved.toString()).to.equal(inProject('sdk', 'v1', 'typescript'));
-    });
-
-    it('writes an unversioned SDK straight under the SDK directory', async () => {
-      const empty = new DirectoryPath(inProject('empty'));
-      fs.mkdirSync(empty.toString());
-
-      const saved = (await project().sdk(Language.PYTHON, project().sdkDirectory()).save(empty, false))._unsafeUnwrap();
-
-      expect(saved.toString()).to.equal(inProject('sdk', 'python'));
+      expect(project().sdkDirectory(Language.TYPESCRIPT, clone).isEqual(clone)).to.be.true;
     });
   });
 

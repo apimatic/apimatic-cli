@@ -33,15 +33,6 @@ export class SdkPublishInteractiveAction {
     }
     const project = ProjectContext.in(workingDirectory);
 
-    const sdkDirectory = await this.prompts.inputSdkDirectory(
-      project.sdkDirectory(),
-      SdkPublishInteractiveAction.sdkDirectoryValidator(project)
-    );
-    if (!sdkDirectory) {
-      await this.prompts.noSdkDirectoryProvided();
-      return ActionResult.cancelled();
-    }
-
     const publishingProfilesResponse = await this.prompts.getPublishingProfiles(
       this.publishingApiService.getPublishingProfiles(this.configDir, this.commandMetadata.shell)
     );
@@ -86,6 +77,18 @@ export class SdkPublishInteractiveAction {
       return ActionResult.cancelled();
     }
 
+    const sdkDirectory = await this.prompts.inputSdkDirectory(project.sdkDirectory(language), (value) => {
+      if (!value) return;
+      const directory = DirectoryPath.fromUserInput(value);
+      if (project.isSourceWithin(directory)) {
+        return this.prompts.destinationContainsSource(project.sourceDirectory(), directory);
+      }
+    });
+    if (!sdkDirectory) {
+      await this.prompts.noSdkDirectoryProvided();
+      return ActionResult.cancelled();
+    }
+
     const levels = stabilityLevelsFor(language);
     const stability = levels.length === 1 ? levels[0] : await this.prompts.selectStability(levels);
     if (!stability) {
@@ -126,13 +129,14 @@ export class SdkPublishInteractiveAction {
       project,
       sdkDirectory,
       language,
+      stability,
       publishTypes,
       false,
+      true,
       publishingProfileId,
       version,
       publishingProfile,
       false,
-      stability,
       publishingSummary,
       onPublishSdkError
     );
@@ -155,14 +159,6 @@ export class SdkPublishInteractiveAction {
       const projectDirectory = value ? DirectoryPath.fromUserInput(value) : defaultProjectDirectory;
       if (!ProjectContext.in(projectDirectory).sourceExistsSync())
         return "The 'src' directory does not exist at the provided location. Please check the path and try again.";
-    };
-  }
-
-  public static sdkDirectoryValidator(project: ProjectContext): (value: string | undefined) => string | undefined {
-    return (value) => {
-      if (!value) return;
-      if (project.isSourceDirectory(DirectoryPath.fromUserInput(value)))
-        return 'SDK directory must be different from the src directory.';
     };
   }
 }

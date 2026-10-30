@@ -1,4 +1,4 @@
-import { isCancel, confirm, log, select } from '@clack/prompts';
+import { isCancel, confirm, log } from '@clack/prompts';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { FileProblem } from '../../types/file/file-problem.js';
 import { format as f } from '../format.js';
@@ -6,8 +6,6 @@ import { Result } from 'neverthrow';
 import { notZippedForUpload, withSpinner } from '../prompt.js';
 import { ServiceError } from '../../infrastructure/service-error.js';
 import { AVAILABLE_LANGUAGES, Language, languageLabel, UPCOMING_LANGUAGES } from '../../types/sdk/generate.js';
-import { VersionProblem } from '../../types/project-context.js';
-import { SdkSaveProblem } from '../../types/sdk-context.js';
 
 const names = (languages: readonly Language[]) => languages.map(languageLabel).join(', ');
 
@@ -25,6 +23,14 @@ export class SdkGeneratePrompts {
     );
   }
 
+  public destinationContainsSource(sourceDirectory: DirectoryPath, sdkDirectory: DirectoryPath) {
+    log.error(
+      `The destination ${f.path(sdkDirectory)} contains your source directory ` +
+        `${f.path(sourceDirectory)}, and everything in the destination is replaced by the ` +
+        `generated SDK. Choose a destination outside it, such as ${f.flag('destination', './sdk')}.`
+    );
+  }
+
   public async overwriteSdk(directory: DirectoryPath): Promise<boolean> {
     const overwrite = await confirm({
       message: `The destination ${f.path(directory)} is not empty, do you want to overwrite?`,
@@ -38,10 +44,12 @@ export class SdkGeneratePrompts {
     return overwrite;
   }
 
-  public sameSourceAndSdkDir(directory: DirectoryPath) {
-    const message =
-      `The ${f.var('src')} and ${f.var('sdk')} directories must be different. ` + `Current value: ${f.path(directory)}`;
-    log.error(message);
+  /** The overwrite question with no one to answer it. */
+  public cannotAskToOverwrite(directory: DirectoryPath) {
+    log.error(
+      `The destination ${f.path(directory)} is not empty, and this run cannot ask whether to overwrite it. ` +
+        `Rerun in a terminal to be asked, or with ${f.flag('force')} to overwrite.`
+    );
   }
 
   public sourceDirectoryEmpty(directory: DirectoryPath) {
@@ -73,35 +81,6 @@ export class SdkGeneratePrompts {
 
   public sdkNotUnzipped(problem: FileProblem) {
     log.error(`${ServiceError.InvalidResponse.errorMessage}\n${problem.reason}`);
-  }
-
-  public sdkNotSaved(problem: SdkSaveProblem) {
-    log.error(`The SDK could not be saved to ${f.path(problem.sdkDirectory)}: ${problem.reason}`);
-  }
-
-  public noVersionToBuild(problem: VersionProblem, sourceDirectory: DirectoryPath) {
-    const messages: Record<VersionProblem, string> = {
-      noVersions: `The ${f.var('versioned_docs')} directory is either empty or invalid: ${f.path(sourceDirectory)}`,
-      versionNotFound: 'The selected API version is invalid.'
-    };
-    log.error(messages[problem]);
-  }
-
-  public apiVersionOnlyApplicableWithVersionedBuild() {
-    log.warn(`The ${f.flag('api-version')} is only applicable with a versioned build.`);
-  }
-
-  public async selectVersion(versions: string[]): Promise<string | undefined> {
-    const version = await select({
-      message: 'Select an API version for SDK generation:',
-      options: versions.map((v) => ({ label: v, value: v }))
-    });
-
-    if (isCancel(version)) {
-      return undefined;
-    }
-
-    return version;
   }
 
   public sdkGenerated(sdk: DirectoryPath) {

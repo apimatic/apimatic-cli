@@ -407,24 +407,21 @@ Generate an SDK for your API
 
 ```
 USAGE
-  $ apimatic sdk generate -l csharp|java|php|python|ruby|typescript|go [-d <value>] [--api-version <value>]
-    [--zip] [--codegen-version v4] [--stability stable|beta] [-i <value>] [-f] [-k <value>]
+  $ apimatic sdk generate -l csharp|java|php|python|ruby|typescript|go [-d <value>] [--codegen-version v4]
+    [--stability stable|beta] [-i <value>] [-f] [-k <value>]
 
 FLAGS
-  -d, --destination=<value>       [default: <input>/sdk/<language> | <input>/sdk/<api-version>/<language>] path where
-                                  the SDK will be generated
+  -d, --destination=<value>       [default: <input>/sdk/<language>] directory the SDK is generated into
   -f, --force                     overwrite changes without asking for user consent.
   -i, --input=<value>             [default: ./] path to the parent directory containing the 'src' directory, which
                                   includes API specifications and configuration files.
   -k, --auth-key=<value>          override current authentication state with an authentication key.
   -l, --language=<option>         (required) Programming language for SDK generation
                                   <options: csharp|java|php|python|ruby|typescript|go>
-      --api-version=<value>       Version of the API to use for SDK generation (if multiple versions exist)
       --codegen-version=<option>  [default: v4] Version of the code generator to use
                                   <options: v4>
       --stability=<option>        Stability level of the generated SDK. Defaults to the level the language offers.
                                   <options: stable|beta>
-      --zip                       Download the generated SDK as a .zip archive
 
 DESCRIPTION
   Generate an SDK for your API
@@ -437,7 +434,7 @@ EXAMPLES
 
   apimatic sdk generate --language=csharp --input=./
 
-  apimatic sdk generate --language=python --destination=./sdk --zip
+  apimatic sdk generate --language=python --destination=./my-python-sdk
 ```
 
 _See code: [src/commands/sdk/generate.ts](https://github.com/apimatic/apimatic-cli/blob/dev/src/commands/sdk/generate.ts)_
@@ -453,7 +450,7 @@ USAGE
     stable|beta]
 
 FLAGS
-  -d, --destination=<value>       [default: <input>/sdk] path where the sdk will be generated.
+  -d, --destination=<value>       [default: <input>/sdk/<language>] path where the sdk will be generated.
   -f, --force                     overwrite changes without asking for user consent.
   -i, --input=<value>             [default: ./] path to the parent directory containing the 'src' directory, which
                                   includes API specifications and configuration files.

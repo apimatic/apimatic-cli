@@ -1,4 +1,3 @@
-import path from 'node:path';
 import { stripVTControlCharacters } from 'node:util';
 import { expect } from 'chai';
 import sinon from 'sinon';
@@ -6,7 +5,6 @@ import { log } from '@clack/prompts';
 import { ServiceError } from '../../../src/infrastructure/service-error.js';
 import { SdkGeneratePrompts } from '../../../src/prompts/sdk/generate.js';
 import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
-import { VersionProblem } from '../../../src/types/project-context.js';
 import { Language } from '../../../src/types/sdk/generate.js';
 
 describe('SdkGeneratePrompts.languageNotAvailable', () => {
@@ -55,32 +53,31 @@ describe('SdkGeneratePrompts.languageNotAvailable', () => {
   });
 });
 
-describe('SdkGeneratePrompts.noVersionToBuild', () => {
-  const prompts = new SdkGeneratePrompts();
-  const sourceDirectory = new DirectoryPath(path.resolve('project', 'src'));
-  let error: sinon.SinonStub;
-
-  beforeEach(() => {
-    error = sinon.stub(log, 'error');
-  });
+describe('SdkGeneratePrompts, about the destination', () => {
+  const root = new DirectoryPath(process.cwd());
 
   afterEach(() => {
-    error.restore();
+    sinon.restore();
   });
 
-  const messageFor = (problem: VersionProblem): string => {
-    prompts.noVersionToBuild(problem, sourceDirectory);
-    return stripVTControlCharacters(error.firstCall.args[0] as string);
-  };
+  it('refuses a destination holding the source, and suggests one outside it', () => {
+    const error = sinon.stub(log, 'error');
 
-  it('names the source directory when it holds no versions', () => {
-    expect(messageFor('noVersions')).to.equal(
-      `The 'versioned_docs' directory is either empty or invalid: '${sourceDirectory}'`
-    );
+    new SdkGeneratePrompts().destinationContainsSource(root.join('src'), root);
+
+    const said = stripVTControlCharacters(error.firstCall.args[0]);
+    expect(said).to.contain('contains your source directory');
+    expect(said).to.contain('--destination=./sdk');
   });
 
-  it('says the chosen version is not one of them', () => {
-    expect(messageFor('versionNotFound')).to.equal('The selected API version is invalid.');
+  it('sends a run that cannot ask about overwriting to a terminal, or to --force', () => {
+    const error = sinon.stub(log, 'error');
+
+    new SdkGeneratePrompts().cannotAskToOverwrite(root.join('sdk', 'python'));
+
+    const said = stripVTControlCharacters(error.firstCall.args[0]);
+    expect(said).to.contain('cannot ask whether to overwrite it');
+    expect(said).to.contain('Rerun in a terminal to be asked, or with --force to overwrite.');
   });
 });
 
