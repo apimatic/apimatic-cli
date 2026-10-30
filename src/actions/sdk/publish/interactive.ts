@@ -5,7 +5,7 @@ import { DirectoryPath } from '../../../types/file/directoryPath.js';
 import { PublishType } from '../../../types/publish-api/publishing-profile-item.js';
 import { PublishingProfile } from '../../../types/publish/publishing-profile.js';
 import { PublishingProfiles } from '../../../types/publish/publishing-profiles.js';
-import { AVAILABLE_LANGUAGES, stabilityLevelsFor } from '../../../types/sdk/generate.js';
+import { AVAILABLE_LANGUAGES, CodeGenerationVersion, stabilityLevelsFor } from '../../../types/sdk/generate.js';
 import { formatPublishingDetails } from '../../../prompts/sdk/publish.js';
 import { ActionResult } from '../../action-result.js';
 import { RecordPublishedSdkAction } from '../record-published-sdk.js';
@@ -21,6 +21,7 @@ export class SdkPublishInteractiveAction {
 
   public readonly execute = async (
     defaultProjectDirectory: DirectoryPath,
+    gitInit: boolean,
     onPublishSdkError: (errorMessage: string) => void
   ): Promise<ActionResult> => {
     const workingDirectory = await this.prompts.inputWorkingDirectory(
@@ -32,15 +33,6 @@ export class SdkPublishInteractiveAction {
       return ActionResult.cancelled();
     }
     const project = ProjectContext.in(workingDirectory);
-
-    const sdkDirectory = await this.prompts.inputSdkDirectory(
-      project.sdkDirectory(),
-      SdkPublishInteractiveAction.sdkDirectoryValidator(project)
-    );
-    if (!sdkDirectory) {
-      await this.prompts.noSdkDirectoryProvided();
-      return ActionResult.cancelled();
-    }
 
     const publishingProfilesResponse = await this.prompts.getPublishingProfiles(
       this.publishingApiService.getPublishingProfiles(this.configDir, this.commandMetadata.shell)
@@ -86,6 +78,15 @@ export class SdkPublishInteractiveAction {
       return ActionResult.cancelled();
     }
 
+    const sdkDirectory = await this.prompts.inputSdkDirectory(
+      project.sdkDirectory(language),
+      this.sdkDirectoryValidator(project)
+    );
+    if (!sdkDirectory) {
+      await this.prompts.noSdkDirectoryProvided();
+      return ActionResult.cancelled();
+    }
+
     const levels = stabilityLevelsFor(language);
     const stability = levels.length === 1 ? levels[0] : await this.prompts.selectStability(levels);
     if (!stability) {
@@ -125,14 +126,13 @@ export class SdkPublishInteractiveAction {
     const publishResult = await new SdkPublishAction(this.configDir, this.commandMetadata).execute(
       project,
       sdkDirectory,
-      language,
+      { language, codegenVersion: CodeGenerationVersion.V4, stability },
       publishTypes,
-      false,
+      { force: false, interaction: 'ask', gitInit },
       publishingProfileId,
       version,
       publishingProfile,
       false,
-      stability,
       publishingSummary,
       onPublishSdkError
     );
@@ -141,6 +141,9 @@ export class SdkPublishInteractiveAction {
     }
     if (publishResult.isCancelled()) {
       return ActionResult.cancelled();
+    }
+    if (publishResult.isActionRequired()) {
+      return ActionResult.actionRequired();
     }
 
     await new RecordPublishedSdkAction().execute(project, language, publishingProfile, publishTypes, version);
@@ -158,11 +161,13 @@ export class SdkPublishInteractiveAction {
     };
   }
 
-  public static sdkDirectoryValidator(project: ProjectContext): (value: string | undefined) => string | undefined {
+  private sdkDirectoryValidator(project: ProjectContext): (value: string | undefined) => string | undefined {
     return (value) => {
       if (!value) return;
-      if (project.isSourceDirectory(DirectoryPath.fromUserInput(value)))
-        return 'SDK directory must be different from the src directory.';
+      const directory = DirectoryPath.fromUserInput(value);
+      if (project.isSourceWithin(directory)) {
+        return this.prompts.destinationContainsSource(project.sourceDirectory(), directory);
+      }
     };
   }
 }

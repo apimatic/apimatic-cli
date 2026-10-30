@@ -48,15 +48,6 @@ describe('ApimaticConfigContext', () => {
     fs.rmSync(root, { recursive: true, force: true });
   });
 
-  describe('exists', () => {
-    it('is false without the file and true with it', async () => {
-      expect(await context.exists()).to.be.false;
-
-      withConfig({});
-      expect(await context.exists()).to.be.true;
-    });
-  });
-
   describe('read', () => {
     it('is missing when there is no file', async () => {
       expect(await context.read()).to.deep.equal({ state: 'missing' });

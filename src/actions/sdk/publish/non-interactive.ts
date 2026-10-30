@@ -5,41 +5,34 @@ import { CommandMetadata } from '../../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../../types/file/directoryPath.js';
 import { PublishingProfileItem, PublishType } from '../../../types/publish-api/publishing-profile-item.js';
 import { PublishingProfile } from '../../../types/publish/publishing-profile.js';
-import { Language } from '../../../types/sdk/generate.js';
+import { CodeGenerationVersion, Language } from '../../../types/sdk/generate.js';
 import { StabilityChoice } from '../../../types/sdk/stability-choice.js';
 import { ActionResult } from '../../action-result.js';
-import { getDownloadsDirectory } from '../../../infrastructure/os-extensions.js';
 import { SemVersion } from '../../../types/publish/version.js';
 import { ProfileId } from '../../../types/publish/profile-id.js';
 import { ProjectContext } from '../../../types/project-context.js';
 import { RecordPublishedSdkAction } from '../record-published-sdk.js';
 import { SdkPublishAction } from '../publish.js';
-import { FileService } from '../../../infrastructure/file-service.js';
 
 export class SdkPublishNonInteractiveAction {
   private readonly prompts: SdkPublishNonInteractivePrompts = new SdkPublishNonInteractivePrompts();
   private readonly publishingApiService: PublishingApiService = new PublishingApiService();
-  private readonly fileService: FileService = new FileService();
 
   public constructor(private readonly configDir: DirectoryPath, private readonly commandMetadata: CommandMetadata) {}
 
   public readonly execute = async (
     project: ProjectContext,
-    sdkDirectory: DirectoryPath,
+    destination: DirectoryPath | undefined,
     language: Language,
     publishTypes: PublishType[],
     force: boolean,
     dryRun: boolean,
     stability: StabilityChoice,
+    codegenVersion: CodeGenerationVersion,
     onPublishSdkError: (errorMessage: string) => void,
     profileId?: string,
     version?: string
   ): Promise<ActionResult> => {
-    if (project.isSourceDirectory(sdkDirectory)) {
-      this.prompts.directoryCannotBeSame(sdkDirectory);
-      return ActionResult.failed();
-    }
-
     if (!(await project.sourceExists())) {
       this.prompts.sourceDirectoryDoesNotExist(project.sourceDirectory());
       return ActionResult.failed();
@@ -55,6 +48,8 @@ export class SdkPublishNonInteractiveAction {
       this.prompts.interactiveModeNotice();
       return ActionResult.failed();
     }
+
+    const sdkDirectory = project.sdkDirectory(language, destination);
 
     const semVersionResult = SemVersion.tryCreate(version!);
     if (semVersionResult.isErr()) {
@@ -113,20 +108,16 @@ export class SdkPublishNonInteractiveAction {
       // Named only when the user chose it, so a run that took the default reads as the doc does.
       stability: stability.chosenLevel()
     });
-    const outputDir = dryRun
-      ? await this.fileService.getAvailableDirectoryPath(getDownloadsDirectory('apimatic-sdk'))
-      : sdkDirectory;
     const publishResult = await new SdkPublishAction(this.configDir, this.commandMetadata).execute(
       project,
-      outputDir,
-      language,
+      sdkDirectory,
+      { language, codegenVersion, stability: stability.stabilityLevel() },
       publishTypes,
-      force,
+      { force, interaction: 'never', gitInit: true },
       publishingProfileId,
       semVersion,
       publishingProfile,
       dryRun,
-      stability.stabilityLevel(),
       publishingSummary,
       onPublishSdkError
     );
@@ -135,6 +126,9 @@ export class SdkPublishNonInteractiveAction {
     }
     if (publishResult.isCancelled()) {
       return ActionResult.cancelled();
+    }
+    if (publishResult.isActionRequired()) {
+      return ActionResult.actionRequired();
     }
 
     // A dry run publishes nothing, so recording it would claim an SDK that does not exist anywhere.

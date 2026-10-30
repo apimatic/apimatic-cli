@@ -46,12 +46,11 @@ export class PortalGeneratePrompts {
   }
 
   public destinationContainsSource(sourceDirectory: DirectoryPath, portalDirectory: DirectoryPath) {
-    const message =
+    log.error(
       `The destination ${f.path(portalDirectory)} contains your source directory ` +
-      `${f.path(sourceDirectory)}, and everything in the destination is replaced by the ` +
-      `generated portal. Choose a destination outside it, such as ` +
-      `${f.flag('destination', './portal')}.`;
-    log.error(message);
+        `${f.path(sourceDirectory)}, and everything in the destination is replaced by the ` +
+        `generated portal. Choose a destination outside it, such as ${f.flag('destination', './portal')}.`
+    );
   }
 
   /**

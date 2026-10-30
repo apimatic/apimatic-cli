@@ -73,6 +73,16 @@ export class FileService {
     }
   }
 
+  /** Whether `cleanDirectoryExcluding` would remove anything from `dir`, hidden entries included; none when it is not there. */
+  public async hasEntriesExcluding(dir: DirectoryPath, excludeNames: FileName[]): Promise<boolean> {
+    try {
+      const entries = await fsExtra.readdir(dir.toString());
+      return entries.some((entry) => !excludeNames.some((exclude) => exclude.toString() === entry));
+    } catch (error) {
+      return !(error instanceof Error && 'code' in error && error.code === 'ENOENT');
+    }
+  }
+
   public async findSymlinks(dir: DirectoryPath): Promise<Result<FilePath[], string>> {
     try {
       return ok(await this.symlinksUnder(dir));
@@ -314,6 +324,32 @@ export class FileService {
     await fsExtra.writeFile(filePath.toString(), contents, 'utf-8');
   }
 
+  public async getBytes(filePath: FilePath): Promise<Uint8Array> {
+    return new Uint8Array(await fsExtra.readFile(filePath.toString()));
+  }
+
+  /** The bytes as they are, with the directories above the file made as needed. */
+  public async writeBytes(filePath: FilePath, content: Uint8Array): Promise<void> {
+    await fsExtra.ensureDir(filePath.directory().toString());
+    await fsExtra.writeFile(filePath.toString(), content);
+  }
+
+  /** Owner-only, as git's own sample hooks are; git runs a hook only when it is executable. */
+  public async makeExecutable(filePath: FilePath): Promise<void> {
+    await fsExtra.chmod(filePath.toString(), 0o700);
+  }
+
+  /** Removes `directory` and then each parent while it is empty, stopping below `within`, which stays whatever it holds. */
+  public async removeEmptyDirectories(directory: DirectoryPath, within: DirectoryPath): Promise<void> {
+    for (let current = directory; within.isAncestorOf(current); current = current.join('..')) {
+      try {
+        await fsExtra.rmdir(current.toString());
+      } catch {
+        return;
+      }
+    }
+  }
+
   /**
    * Writes beside the target and renames over it, so a fault mid-write leaves the target as it
    * was rather than half-written. The temporary file goes on a failure for the same reason: a
@@ -372,33 +408,6 @@ export class FileService {
     } catch {
       return false;
     }
-  }
-
-  public async getAvailableDirectoryPath(currentPath: DirectoryPath): Promise<DirectoryPath> {
-    if (!(await this.directoryExists(currentPath))) return currentPath;
-
-    const dir = path.dirname(currentPath.toString());
-    let baseName = path.basename(currentPath.toString());
-
-    // Strip existing " (n)" suffix using string methods
-    if (baseName.endsWith(')')) {
-      const open = baseName.lastIndexOf('(');
-      if (open !== -1 && baseName[open - 1] === ' ') {
-        const inner = baseName.slice(open + 1, -1);
-        if (inner.length > 0 && !isNaN(Number(inner))) {
-          baseName = baseName.slice(0, open - 1);
-        }
-      }
-    }
-
-    let counter = 1;
-    let newPath: string;
-
-    do {
-      newPath = path.join(dir, `${baseName} (${counter++})`);
-    } while (await this.directoryExists(new DirectoryPath(newPath)));
-
-    return new DirectoryPath(newPath);
   }
 }
 

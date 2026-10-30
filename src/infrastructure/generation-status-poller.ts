@@ -59,8 +59,7 @@ export async function pollUntilCompleted<T extends GenerationStatus>({
       return err(ServiceError.ServerError);
     }
     if (status === Status.ValidationError) {
-      const validationErrors = asMessages(errors);
-      return err(ServiceError.badRequest(formatValidationError(validationErrors), validationErrors));
+      return err(ServiceError.badRequest(formatValidationError(asMessages(errors))));
     }
     if (status === Status.SubscriptionError) {
       const message = Object.values(asMessages(errors)).flat()[0];

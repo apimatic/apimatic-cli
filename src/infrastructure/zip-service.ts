@@ -5,14 +5,30 @@ import { err, ok, Result } from 'neverthrow';
 import { DirectoryPath } from '../types/file/directoryPath.js';
 import { FileName } from '../types/file/fileName.js';
 import { FilePath } from '../types/file/filePath.js';
+import { NO_PATHS, RelativePaths } from '../types/file/relative-paths.js';
 import { errorMessage } from '../utils/error-utils.js';
 
 type ZipEntry = { file: FilePath; metadataPath: string };
+type Excluded = { files: ReadonlySet<string>; directories: ReadonlySet<string> };
 
 export class ZipService {
-  public async archive(sourceDir: DirectoryPath, outputZipPath: FilePath): Promise<Result<void, string>> {
+  /** Zips everything under `sourceDir`. */
+  public archive(sourceDir: DirectoryPath, outputZipPath: FilePath): Promise<Result<void, string>> {
+    return this.archiveWithout(sourceDir, outputZipPath, NO_PATHS);
+  }
+
+  /** Zips everything under `sourceDir` but the files and directories `excluding` names below it. */
+  public async archiveWithout(
+    sourceDir: DirectoryPath,
+    outputZipPath: FilePath,
+    excluding: RelativePaths
+  ): Promise<Result<void, string>> {
     try {
-      await this.write(sourceDir, outputZipPath);
+      const excluded: Excluded = {
+        files: new Set(excluding.files.map(String)),
+        directories: new Set(excluding.directories.map(String))
+      };
+      await this.write(outputZipPath, this.entriesUnder(sourceDir, '', excluded));
       return ok(undefined);
     } catch (error) {
       await fs.promises.rm(outputZipPath.toString(), { force: true }).catch(() => undefined);
@@ -29,29 +45,31 @@ export class ZipService {
     }
   }
 
-  private async write(sourceDir: DirectoryPath, outputZipPath: FilePath): Promise<void> {
-    const entries = this.entriesUnder(sourceDir, '');
-    const zipfile = new yazl.ZipFile();
+  private async write(outputZipPath: FilePath, entries: readonly ZipEntry[]): Promise<void> {
+    const zipFile = new yazl.ZipFile();
 
     return new Promise((resolve, reject) => {
       const output = fs.createWriteStream(outputZipPath.toString());
-      zipfile.on('error', (error: Error) => output.destroy(error));
+      zipFile.on('error', (error: Error) => output.destroy(error));
       output.on('error', reject);
       output.on('close', resolve);
-      zipfile.outputStream.pipe(output);
+      zipFile.outputStream.pipe(output);
       for (const { file, metadataPath } of entries) {
-        zipfile.addFile(file.toString(), metadataPath);
+        zipFile.addFile(file.toString(), metadataPath);
       }
-      zipfile.end();
+      zipFile.end();
     });
   }
 
-  private entriesUnder(dir: DirectoryPath, relativePrefix: string): ZipEntry[] {
+  private entriesUnder(dir: DirectoryPath, relativePrefix: string, excluded: Excluded): ZipEntry[] {
     return fs.readdirSync(dir.toString(), { withFileTypes: true }).flatMap((entry) => {
       // Always use forward slashes as metadataPath — zip format requires it
       const metadataPath = relativePrefix ? `${relativePrefix}/${entry.name}` : entry.name;
+      if ((entry.isDirectory() ? excluded.directories : excluded.files).has(metadataPath)) {
+        return [];
+      }
       return entry.isDirectory()
-        ? this.entriesUnder(dir.join(entry.name), metadataPath)
+        ? this.entriesUnder(dir.join(entry.name), metadataPath, excluded)
         : [{ file: new FilePath(dir, new FileName(entry.name)), metadataPath }];
     });
   }

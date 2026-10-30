@@ -46,10 +46,6 @@ export class ApimaticConfigContext {
     return new FilePath(this.sourceDirectory, new FileName(APIMATIC_CONFIG_FILE_NAME));
   }
 
-  public async exists(): Promise<boolean> {
-    return await this.fileService.fileExists(this.configFile);
-  }
-
   public async read(): Promise<ApimaticConfigState> {
     const loaded = await this.load();
     if (loaded === undefined) {

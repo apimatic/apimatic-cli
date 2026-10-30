@@ -12,6 +12,7 @@ import { format as f } from '../format.js';
 import { PublishingProfile } from '../../types/publish/publishing-profile.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { FileProblem } from '../../types/file/file-problem.js';
+import { RepositoryProblem } from '../../types/sdk/repository-state.js';
 
 export type PublishingOutcome = 'succeeded' | 'failed' | 'cancelled';
 
@@ -24,13 +25,20 @@ export class SdkPublishPrompts {
     log.error(serviceError.errorMessage);
   }
 
-  public sdkNotZipped(sdkDirectory: DirectoryPath, problem: FileProblem) {
+  /** The SDK holds conflicts the developer still has to resolve, so it goes no further than the directory. */
+  public conflictsNotPublished() {
+    log.warn('Nothing was published, since the SDK still has conflicts. Rerun once they are resolved and staged.');
+  }
+
+  public sdkNotZipped(sdkDirectory: DirectoryPath, problem: FileProblem | RepositoryProblem) {
     log.error(`The SDK in ${f.path(sdkDirectory)} could not be zipped for upload: ${problem.reason}`);
   }
 
-  public dryRunNotice(publishingSummary: string): void {
+  public dryRunNotice(sdk: DirectoryPath, publishingSummary: string): void {
     log.info(
-      `You can publish this SDK by removing the --dry-run flag. It will be published for the following:` +
+      `The SDK in ${f.path(sdk)} is what a run without ${f.flag('dry-run')} uploads: the files git would commit, ` +
+        `so .git, .apimatic and anything its .gitignore excludes stay out. ` +
+        `You can publish it by removing the flag. It will be published for the following:` +
         publishingSummary
     );
   }

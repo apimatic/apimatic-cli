@@ -25,7 +25,7 @@ Context objects live at `src/types/` and encapsulate path derivation, validation
 - **DON'T** expose derived file names — methods like `getScriptFileName()` leak internal naming logic.
 - **DON'T** add public properties for internal state — constructor parameters are `private readonly`, not exposed.
 - **DON'T** use `console.log` or any prompt output — contexts are silent.
-- **DON'T** use `Result<T, E>` for a plain file operation — return `boolean`, `undefined` or the value. A context returns a `Result` only when it does network I/O (rare) or reports a structured problem the prompts switch on, as `PortalSourceContext.resolve()` does with `PortalSourceProblem`.
+- **DON'T** use `Result<T, E>` for a plain file operation — return `boolean`, `undefined` or the value. A context returns a `Result` only when it does network I/O (rare) or reports a structured problem the prompts switch on, as `PortalSourceContext.resolve()` does with `PortalSourceProblem`. An async one is `Promise<Result<T, E>>`, written with `await` and early returns — never `ResultAsync` or `safeTry`.
 - **DON'T** use raw string paths — always wrap in `DirectoryPath`, `FilePath`, `FileName`.
 - **DON'T** add methods that only use infrastructure services (`fileService`, `zipService`) without touching domain-specific private fields — these are stateless utilities, not context behavior. Every public method must use at least one constructor-derived private field (e.g., `sdkDirectory`, `language`). If a method takes all its inputs as parameters and never reads context state, it belongs in a service or a different context.
 - **DON'T** embed the context's own domain subject in method names — if the class is `SdkContext`, a method named `cleanUpSdkDirectory()` is redundant. Prefer concise behavioral verbs: `cleanUp()`, `getChanges()`, `save()`.
@@ -69,6 +69,7 @@ Context objects live at `src/types/` and encapsulate path derivation, validation
 - [ ] `directory.join("subdir")` for subdirectory derivation
 - [ ] No `console.log`, no prompt output — contexts are silent
 - [ ] `Result` only for network I/O or for a structured problem type the prompts switch on
+- [ ] Async `Result`s are `Promise<Result<T, E>>` with `await` and early returns on `isErr()` — no `ResultAsync`, `safeTry`, `okAsync` or `errAsync`
 - [ ] Every public method uses at least one domain-specific private field — methods using only infrastructure services don't belong here
 - [ ] No public properties that expose constructor parameters
 - [ ] Method names do not embed the context's own domain subject — names are concise behavioral verbs (`cleanUp()` not `cleanUpSdkReviewDirectory()`)
@@ -83,7 +84,7 @@ Context objects live at `src/types/` and encapsulate path derivation, validation
 | Input context (validate + file ops) | `src/types/spec-context.ts` | Good — zip detection internal |
 | Temp context (zip + save stream) | `src/types/temp-context.ts` | Good — UUID naming internal |
 | Temp context (download + resolve) | `src/types/resource-context.ts` | Good — URL/file decision internal |
-| Composite (delegates to other contexts) | `src/types/project-context.ts` | Good — hands back `PortalSourceContext`, `PluginConfigContext` and `SdkContext`; knows the layout so no caller joins `src` |
+| Composite (delegates to other contexts) | `src/types/project-context.ts` | Good — hands back `PortalSourceContext` and `PluginConfigContext`, and derives the SDK directory; knows the layout so no caller joins `src` |
 | Output context (leaky — avoid pattern) | `src/types/sdk-context.ts` | Avoid — exposes `sdkLanguageDirectory`, has methods that only use infrastructure services without touching domain state |
 | Input context (validate + typed result) | `src/types/portal-source-context.ts` | Good — reports problems, exposes no paths |
 

@@ -1,8 +1,21 @@
 enum ResultType {
-  Success = 0,
-  Cancel = 130,
-  Failure = 1
+  Success,
+  Failure,
+  Cancel,
+  ActionRequired
 }
+
+/**
+ * A run that needs the developer to act exits as `git merge` does on conflicts: its work is not
+ * done, so whatever is chained after it should not run. Two kinds share a code, so the codes are
+ * kept apart from them.
+ */
+const EXIT_CODES: Record<ResultType, number> = {
+  [ResultType.Success]: 0,
+  [ResultType.Failure]: 1,
+  [ResultType.Cancel]: 130,
+  [ResultType.ActionRequired]: 1
+};
 
 export class ActionResult<T = void, E = never> {
   private readonly message: string;
@@ -33,12 +46,17 @@ export class ActionResult<T = void, E = never> {
     return new ActionResult(ResultType.Cancel, message);
   }
 
+  /** The run ended with something the developer still has to do, such as files to resolve. */
+  static actionRequired<T = never>(message = 'Action required'): ActionResult<T> {
+    return new ActionResult(ResultType.ActionRequired, message);
+  }
+
   public getMessage(): string {
     return this.message;
   }
 
   public getExitCode(): number {
-    return this.resultType.valueOf();
+    return EXIT_CODES[this.resultType];
   }
 
   public isFailed(): boolean {
@@ -51,6 +69,10 @@ export class ActionResult<T = void, E = never> {
 
   public isCancelled(): boolean {
     return this.resultType === ResultType.Cancel;
+  }
+
+  public isActionRequired(): boolean {
+    return this.resultType === ResultType.ActionRequired;
   }
 
   public getValue(): T {
@@ -68,7 +90,7 @@ export class ActionResult<T = void, E = never> {
     return new ActionResult(this.resultType, this.message);
   }
 
-  public mapAll<R>(onSuccess: (value?: T) => R, onFailure: () => R, onCancel: () => R): R {
+  public mapAll<R>(onSuccess: (value?: T) => R, onFailure: () => R, onCancel: () => R, onActionRequired: () => R): R {
     switch (this.resultType) {
       case ResultType.Success:
         return onSuccess(this.value);
@@ -76,6 +98,8 @@ export class ActionResult<T = void, E = never> {
         return onFailure();
       case ResultType.Cancel:
         return onCancel();
+      case ResultType.ActionRequired:
+        return onActionRequired();
     }
   }
 }

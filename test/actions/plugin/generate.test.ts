@@ -15,6 +15,7 @@ import { ApiService } from '../../../src/infrastructure/services/api-service.js'
 import { SubscriptionInfo } from '../../../src/types/api/account.js';
 import { PluginService } from '../../../src/infrastructure/services/plugin-service.js';
 import { ServiceError } from '../../../src/infrastructure/service-error.js';
+import { terminal } from '../../../src/infrastructure/terminal.js';
 import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
 import { FileName } from '../../../src/types/file/fileName.js';
 import { FilePath } from '../../../src/types/file/filePath.js';
@@ -96,7 +97,7 @@ describe('PluginGenerateAction', () => {
     // the quiet case — the prompt's own every-language default, no profile — so a test that is not
     // about either says nothing about them. Mocha runs without a terminal, which the prompt needs.
     selectLanguages = sinon.stub(PluginGeneratePrompts.prototype, 'selectLanguages').resolves([...AVAILABLE_LANGUAGES]);
-    canAsk = sinon.stub(PluginGeneratePrompts.prototype, 'canAsk').returns(true);
+    canAsk = sinon.stub(terminal, 'isInteractive').returns(true);
     getPublishingProfiles = sinon.stub(PublishingApiService.prototype, 'getPublishingProfiles').resolves(ok([]));
 
     action = new PluginGenerateAction(new DirectoryPath(tmpDirResult.path), COMMAND_METADATA, 'auth-key');
@@ -688,10 +689,7 @@ describe('PluginGenerateAction', () => {
     it('reports every message the response carries, whatever key it arrived under', async () => {
       // The service assembles one message from every key, so no key can be dropped for
       // being one the CLI does not recognise.
-      const error = ServiceError.badRequest('One or more validation errors occurred.\n- a\n- b', {
-        pluginConfig: ['a'],
-        someKeyTheCliDoesNotKnow: ['b']
-      });
+      const error = ServiceError.badRequest('One or more validation errors occurred.\n- a\n- b');
       sinon.stub(PluginService.prototype, 'generatePlugin').resolves(err(error));
       const printed = sinon.stub(log, 'error');
 

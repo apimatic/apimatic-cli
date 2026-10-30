@@ -8,11 +8,12 @@ import { PublishType } from '../../types/publish-api/publishing-profile-item.js'
 import { PublishingInfo } from '../../types/publish-api/publishing-info.js';
 import { ProfileId } from '../../types/publish/profile-id.js';
 import { SemVersion } from '../../types/publish/version.js';
-import { Language, Stability } from '../../types/sdk/generate.js';
+import { GenerationRequest } from '../../types/sdk/sdk-generation.js';
+import { RunMode } from '../../types/sdk/write-mode.js';
 import { PublishingProfile } from '../../types/publish/publishing-profile.js';
 import { PackageSettingsContext } from '../../types/package-settings-context.js';
 import { ProjectContext } from '../../types/project-context.js';
-import { TempContext } from '../../types/temp-context.js';
+import { SdkContext } from '../../types/sdk-context.js';
 import { ActionResult } from '../action-result.js';
 import { GenerateAction } from './generate.js';
 import { FileName } from '../../types/file/fileName.js';
@@ -27,18 +28,18 @@ export class SdkPublishAction {
 
   public readonly execute = async (
     project: ProjectContext,
-    outputDirectory: DirectoryPath,
-    language: Language,
+    sdkDirectory: DirectoryPath,
+    requested: GenerationRequest,
     publishType: PublishType[],
-    force: boolean,
+    run: RunMode,
     profileId: ProfileId,
     semVersion: SemVersion,
     publishingProfile: PublishingProfile,
     dryRun: boolean,
-    stability: Stability,
     publishingSummary: string,
     onPublishSdkError: (errorMessage: string) => void
   ): Promise<ActionResult> => {
+    const { language } = requested;
     const publishResult = await withDirPath(async (tempDirectory): Promise<ActionResult<PublishingInfo>> => {
       const packageConfigurationData = publishingProfile.getPackageConfigurationDataForLanguage(language);
       let packageSettingsDirectory: DirectoryPath | undefined;
@@ -52,12 +53,9 @@ export class SdkPublishAction {
       const sdkGenerateAction = new GenerateAction(this.configDir, this.commandMetadata);
       const sdkGenerationResult = await sdkGenerateAction.execute(
         project,
-        outputDirectory,
-        language,
-        stability,
-        force,
-        false,
-        undefined,
+        sdkDirectory,
+        requested,
+        run,
         packageSettingsDirectory
       );
       if (sdkGenerationResult.isFailed()) {
@@ -66,20 +64,22 @@ export class SdkPublishAction {
       if (sdkGenerationResult.isCancelled()) {
         return ActionResult.cancelled();
       }
-
-      const sdkLanguageDirectory = outputDirectory.join(language);
+      // Markers would be uploaded, and recorded as published, along with the rest.
+      if (sdkGenerationResult.isActionRequired()) {
+        this.prompts.conflictsNotPublished();
+        return ActionResult.actionRequired();
+      }
 
       if (dryRun) {
-        this.prompts.dryRunNotice(publishingSummary);
-        const readmeFilePath = new FilePath(sdkLanguageDirectory, new FileName('README.md'));
-        await this.launcherService.openDirectoryInEditorOrFileExplorer(sdkLanguageDirectory, readmeFilePath);
+        this.prompts.dryRunNotice(sdkDirectory, publishingSummary);
+        const readmeFilePath = new FilePath(sdkDirectory, new FileName('README.md'));
+        await this.launcherService.openDirectoryInEditorOrFileExplorer(sdkDirectory, readmeFilePath);
         return ActionResult.success();
       }
 
-      const tempContext = new TempContext(tempDirectory);
-      const sdkFile = await tempContext.zip(sdkLanguageDirectory);
+      const sdkFile = await new SdkContext(sdkDirectory).archive(tempDirectory);
       if (sdkFile.isErr()) {
-        this.prompts.sdkNotZipped(sdkLanguageDirectory, sdkFile.error);
+        this.prompts.sdkNotZipped(sdkDirectory, sdkFile.error);
         return ActionResult.failed();
       }
 
@@ -109,6 +109,9 @@ export class SdkPublishAction {
     }
     if (publishResult.isCancelled()) {
       return ActionResult.cancelled();
+    }
+    if (publishResult.isActionRequired()) {
+      return ActionResult.actionRequired();
     }
 
     // Since publishing was not initiated, skip the next steps for polling.
