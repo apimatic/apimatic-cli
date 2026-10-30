@@ -1,7 +1,8 @@
 import { Command, Flags } from '@oclif/core';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { FlagsProvider } from '../../types/flags-provider.js';
-import { GenerateAction } from '../../actions/sdk/generate.js';
+import { GenerateAction, RunMode } from '../../actions/sdk/generate.js';
+import { terminal } from '../../infrastructure/terminal.js';
 import {
   AVAILABLE_LANGUAGES,
   CodeGenerationVersion,
@@ -10,6 +11,7 @@ import {
   Stability,
   UPCOMING_LANGUAGES
 } from '../../types/sdk/generate.js';
+import { GitVersion } from '../../types/git/git-version.js';
 import { StabilityChoice } from '../../types/sdk/stability-choice.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { ProjectContext } from '../../types/project-context.js';
@@ -22,7 +24,8 @@ export default class SdkGenerate extends Command {
   static readonly summary = 'Generate an SDK for your API';
 
   static readonly description = `Generate a Software Development Kit (SDK) from an API specification.
-${inProse(AVAILABLE_LANGUAGES)} are available; ${inProse(UPCOMING_LANGUAGES)} are coming soon.`;
+${inProse(AVAILABLE_LANGUAGES)} are available; ${inProse(UPCOMING_LANGUAGES)} are coming soon.
+With git ${GitVersion.required()} or newer installed and the SDK directory a git repository of its own (--git-init makes it one), your edits to the generated SDK are kept when you regenerate it.`;
 
   static readonly cmdTxt = format.cmd('apimatic', 'sdk', 'generate');
 
@@ -37,15 +40,7 @@ ${inProse(AVAILABLE_LANGUAGES)} are available; ${inProse(UPCOMING_LANGUAGES)} ar
     }),
     destination: Flags.string({
       char: 'd',
-      description:
-        '[default: <input>/sdk/<language> | <input>/sdk/<api-version>/<language>] path where the SDK will be generated'
-    }),
-    'api-version': Flags.string({
-      description: 'Version of the API to use for SDK generation (if multiple versions exist)'
-    }),
-    zip: Flags.boolean({
-      default: false,
-      description: 'Download the generated SDK as a .zip archive'
+      description: '[default: <input>/sdk/<language>] directory the SDK is generated into'
     }),
     'codegen-version': Flags.string({
       description: 'Version of the code generator to use',
@@ -56,17 +51,20 @@ ${inProse(AVAILABLE_LANGUAGES)} are available; ${inProse(UPCOMING_LANGUAGES)} ar
       description: 'Stability level of the generated SDK. Defaults to the level the language offers.',
       options: Object.values(Stability).map((s) => s.valueOf())
     }),
+    'git-init': Flags.boolean({
+      default: false,
+      description:
+        'make the SDK directory a git repository when it is not one of its own, so your edits to the SDK are kept when you regenerate it'
+    }),
     ...FlagsProvider.input,
-    ...FlagsProvider.force,
+    ...FlagsProvider.forceSdk,
     ...FlagsProvider.authKey
   };
 
   static examples = [
     `${SdkGenerate.cmdTxt} ${format.flag('language', 'typescript')}`,
     `${SdkGenerate.cmdTxt} ${format.flag('language', 'csharp')} ${format.flag('input', './')}`,
-    `${SdkGenerate.cmdTxt} ${format.flag('language', 'python')} ${format.flag('destination', './sdk')} ${format.flag(
-      'zip'
-    )}`
+    `${SdkGenerate.cmdTxt} ${format.flag('language', 'python')} ${format.flag('destination', './my-python-sdk')}`
   ];
 
   async run() {
@@ -76,10 +74,10 @@ ${inProse(AVAILABLE_LANGUAGES)} are available; ${inProse(UPCOMING_LANGUAGES)} ar
         input,
         destination,
         force,
-        zip: zipSdk,
         stability,
+        'codegen-version': codegenVersion,
         'auth-key': authKey,
-        'api-version': apiVersion
+        'git-init': gitInit
       }
     } = await this.parse(SdkGenerate);
 
@@ -91,15 +89,20 @@ ${inProse(AVAILABLE_LANGUAGES)} are available; ${inProse(UPCOMING_LANGUAGES)} ar
     };
 
     intro('Generate SDK');
+    const run: RunMode = { force, interaction: !force && terminal.isInteractive() ? 'ask' : 'never', gitInit };
     const action = new GenerateAction(this.getConfigDir(), commandMetadata, authKey);
     const result = await action.execute(
       project,
-      project.sdkDirectory(destination),
-      language as Language,
-      StabilityChoice.for(language as Language, stability).stabilityLevel(),
-      force,
-      zipSdk,
-      apiVersion
+      project.sdkDirectory(
+        language as Language,
+        destination === undefined ? undefined : DirectoryPath.fromUserInput(destination)
+      ),
+      {
+        language: language as Language,
+        codegenVersion: codegenVersion as CodeGenerationVersion,
+        stability: StabilityChoice.for(language as Language, stability).stabilityLevel()
+      },
+      run
     );
     outro(result);
   }

@@ -89,7 +89,7 @@ export class PublishingApiService {
           const errors = data.errors as Record<string, string[]> | undefined;
           const detail = errors ? Object.values(errors)[0]?.[0] : data.detail;
           const errorMessage = data.title + '\n- ' + detail;
-          return err(ServiceError.badRequest(errorMessage, errors ?? {}));
+          return err(ServiceError.badRequest(errorMessage));
         }
         if (error.status === 403) {
           const errorMessage = data.title + '\n- ' + data.detail;

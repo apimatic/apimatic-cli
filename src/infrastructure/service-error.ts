@@ -19,26 +19,22 @@ export class ServiceError {
     'support@apimatic.io'
   )}`;
 
-  static readonly NotFound = new ServiceError(ServiceErrorCode.NotFound, 'Resource not found.', {});
-  static readonly ServerError = new ServiceError(ServiceErrorCode.ServerError, this.defaultErrorMessage, {});
-  static readonly NetworkError = new ServiceError(
-    ServiceErrorCode.NetworkError,
-    'Unable to connect to the server.',
-    {}
-  );
-  static readonly InvalidResponse = new ServiceError(ServiceErrorCode.InvalidResponse, this.defaultErrorMessage, {});
-  static readonly UnAuthorized = new ServiceError(ServiceErrorCode.UnAuthorized, 'Unauthorized access.', {});
-  static badRequest(customMessage: string, errors: Record<string, string[]>): ServiceError {
-    return new ServiceError(ServiceErrorCode.BadRequest, customMessage, errors);
+  static readonly NotFound = new ServiceError(ServiceErrorCode.NotFound, 'Resource not found.');
+  static readonly ServerError = new ServiceError(ServiceErrorCode.ServerError, this.defaultErrorMessage);
+  static readonly NetworkError = new ServiceError(ServiceErrorCode.NetworkError, 'Unable to connect to the server.');
+  static readonly InvalidResponse = new ServiceError(ServiceErrorCode.InvalidResponse, this.defaultErrorMessage);
+  static readonly UnAuthorized = new ServiceError(ServiceErrorCode.UnAuthorized, 'Unauthorized access.');
+  static badRequest(customMessage: string): ServiceError {
+    return new ServiceError(ServiceErrorCode.BadRequest, customMessage);
   }
   static forbidden(customMessage: string): ServiceError {
-    return new ServiceError(ServiceErrorCode.Forbidden, customMessage, {});
+    return new ServiceError(ServiceErrorCode.Forbidden, customMessage);
   }
   static notFound(customMessage: string): ServiceError {
-    return new ServiceError(ServiceErrorCode.NotFound, customMessage, {});
+    return new ServiceError(ServiceErrorCode.NotFound, customMessage);
   }
   static timeout(customMessage: string): ServiceError {
-    return new ServiceError(ServiceErrorCode.Timeout, customMessage, {});
+    return new ServiceError(ServiceErrorCode.Timeout, customMessage);
   }
   static unauthorizedWithHint(apiMessage: string | null): ServiceError {
     // Both remedies name the full `auth login` command: the key is supplied to
@@ -49,21 +45,13 @@ export class ServiceError {
       `${apiMessage ?? 'Authorization has been denied for this request.'} ` +
       `Please run ${loginCommand} to log in via browser, ` +
       `or ${loginCommand} ${f.flag('auth-key', '{api-key}')} to log in with an auth key.`;
-    return new ServiceError(ServiceErrorCode.UnAuthorized, message, {});
+    return new ServiceError(ServiceErrorCode.UnAuthorized, message);
   }
 
-  private constructor(
-    public readonly code: ServiceErrorCode,
-    private readonly defaultMessage: string,
-    private readonly errors: Record<string, string[]>
-  ) {}
+  private constructor(public readonly code: ServiceErrorCode, private readonly defaultMessage: string) {}
 
   public get errorMessage(): string {
     return this.defaultMessage;
-  }
-
-  public getError(key: string): string[] | undefined {
-    return this.errors[key];
   }
 }
 
@@ -77,7 +65,7 @@ function mapProblemDetailsError(error: ProblemDetailsError): ServiceError | null
   const firstFieldMessage = Object.values(errors)[0]?.[0];
   const title = error.result?.title ?? 'Request failed.';
   const errorMessage = firstFieldMessage ? `${title}\n- ${firstFieldMessage}` : title;
-  if (error.statusCode === 400) return ServiceError.badRequest(errorMessage, errors);
+  if (error.statusCode === 400) return ServiceError.badRequest(errorMessage);
   if (error.statusCode === 403) return ServiceError.forbidden(errorMessage);
   return null;
 }
@@ -125,7 +113,7 @@ function mapAxiosProblemDetails(error: unknown): ServiceError | undefined {
   const message = firstMessage ? `${title}\n- ${firstMessage}` : title;
 
   if (error.response?.status === 400) {
-    return ServiceError.badRequest(message, errors);
+    return ServiceError.badRequest(message);
   }
   if (error.response?.status === 403) {
     return ServiceError.forbidden(message);

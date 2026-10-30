@@ -8,6 +8,7 @@ Actions live at `src/actions/` and are the single use-case orchestrators for eac
 
 - **DO** use named export: `export class {PascalName}Action`.
 - **DO** use `public readonly execute = async (...): Promise<ActionResult> =>` (arrow function property).
+- **DO** `await` each `Result` a context or service answers with and return early on `isErr()` — never chain `andThen` or `asyncAndThen` on a promise, and never import `ResultAsync`.
 - **DO** initialize prompts as a field: `private readonly prompts = new {Name}Prompts()`.
 - **DO** initialize services as `private readonly` fields (inline with `new`) when the service takes no constructor args. If a service needs `configDir`, declare without initializer and assign in the constructor body after `this.configDir` is set.
 - **DO** use the full constructor pattern when the action calls an API: `constructor(configDir: DirectoryPath, commandMetadata: CommandMetadata, authKey: string | null = null)`.

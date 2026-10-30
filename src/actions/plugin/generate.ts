@@ -1,4 +1,5 @@
 import { ResultAsync } from 'neverthrow';
+import { terminal } from '../../infrastructure/terminal.js';
 import { withDirPath } from '../../infrastructure/tmp-extensions.js';
 import { PluginService } from '../../infrastructure/services/plugin-service.js';
 import { PublishingApiService } from '../../infrastructure/services/publishing-api-service.js';
@@ -58,7 +59,7 @@ export class PluginGenerateAction {
     }
 
     const recorded = configState.state === 'missing' ? PluginConfig.empty : configState;
-    if (!recorded.isSetUp() && !this.prompts.canAsk()) {
+    if (!recorded.isSetUp() && !terminal.isInteractive()) {
       this.prompts.setupNeedsTerminal(sourceDirectory, recorded);
       return ActionResult.failed();
     }

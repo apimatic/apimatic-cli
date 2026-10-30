@@ -25,7 +25,7 @@ import { PortalSource } from '../../src/types/portal/portal-source';
 import { PortalStylesheet } from '../../src/types/portal/portal-stylesheet';
 import { Language } from '../../src/types/sdk/generate';
 
-const NO_ARTIFACTS = PortalArtifacts.none();
+const NO_ARTIFACTS = new PortalArtifacts(new CodeSampleCatalogs([]), new Map(), new Map(), undefined);
 
 describe('PortalProjectService', () => {
   const service = new PortalProjectService();

@@ -10,6 +10,36 @@ import { FileName } from '../../src/types/file/fileName';
 import { FilePath } from '../../src/types/file/filePath';
 
 describe('FileService', () => {
+  describe('hasEntriesExcluding', () => {
+    const fileService = new FileService();
+    let root: string;
+    const dir = () => new DirectoryPath(path.join(root, 'sdk'));
+    const hasAnyButGit = () => fileService.hasEntriesExcluding(dir(), [new FileName('.git')]);
+
+    beforeEach(() => {
+      root = fs.mkdtempSync(path.join(os.tmpdir(), 'file-service-'));
+    });
+
+    afterEach(() => {
+      fs.rmSync(root, { recursive: true, force: true });
+    });
+
+    it('answers no for a directory that is not there, or holds only what is excluded', async () => {
+      expect(await hasAnyButGit()).to.be.false;
+
+      fs.mkdirSync(path.join(dir().toString(), '.git'), { recursive: true });
+
+      expect(await hasAnyButGit()).to.be.false;
+    });
+
+    it('counts a hidden entry, which cleanDirectoryExcluding would remove as well', async () => {
+      fs.mkdirSync(path.join(dir().toString(), '.github', 'workflows'), { recursive: true });
+
+      expect(await hasAnyButGit()).to.be.true;
+      expect(await fileService.directoryEmpty(dir())).to.be.true;
+    });
+  });
+
   describe('replaceContents', () => {
     const fileService = new FileService();
     let root: string;

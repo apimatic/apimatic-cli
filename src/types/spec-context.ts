@@ -2,7 +2,6 @@ import { ok, Result } from 'neverthrow';
 import { FileService } from '../infrastructure/file-service.js';
 import { DirectoryPath } from './file/directoryPath.js';
 import { FilePath } from './file/filePath.js';
-import { FileName } from './file/fileName.js';
 import { FileProblem } from './file/file-problem.js';
 import { ZipService } from '../infrastructure/zip-service.js';
 
@@ -28,11 +27,5 @@ export class SpecContext {
     }
     await this.fileService.copy(specPath, specPath.replaceDirectory(this.specDirectory));
     return ok(undefined);
-  }
-
-  public async save(stream: NodeJS.ReadableStream, fileName: FileName): Promise<FilePath> {
-    const filePath = new FilePath(this.specDirectory, fileName);
-    await this.fileService.writeFile(filePath, stream);
-    return filePath;
   }
 }

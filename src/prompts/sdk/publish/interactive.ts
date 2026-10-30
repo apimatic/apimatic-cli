@@ -15,6 +15,15 @@ import { SemVersion } from '../../../types/publish/version.js';
 import { SDK_PUBLISHING_OVERVIEW_URL } from '../../publishing/links.js';
 
 export class SdkPublishInteractivePrompts {
+  /** What the directory question answers with while a destination holding the source is typed. */
+  public destinationContainsSource(sourceDirectory: DirectoryPath, sdkDirectory: DirectoryPath): string {
+    return (
+      `The destination ${f.path(sdkDirectory)} contains your source directory ` +
+      `${f.path(sourceDirectory)}, and everything in the destination is replaced by the ` +
+      `generated SDK. Choose a destination outside it, such as ${f.flag('destination', './sdk')}.`
+    );
+  }
+
   public async inputWorkingDirectory(
     defaultDirectory: DirectoryPath,
     validator: (value: string | undefined) => string | Error | undefined

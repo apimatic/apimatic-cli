@@ -5,6 +5,7 @@ import { DirectoryPath } from './file/directoryPath.js';
 import { FilePath } from './file/filePath.js';
 import { FileName } from './file/fileName.js';
 import { FileProblem } from './file/file-problem.js';
+import { RelativePaths } from './file/relative-paths.js';
 import { randomUUID } from 'node:crypto';
 
 export class TempContext {
@@ -21,6 +22,13 @@ export class TempContext {
   public async zip(directory: DirectoryPath): Promise<Result<FilePath, FileProblem>> {
     const tempFile = this.getTempFileName;
     const archived = await this.zipService.archive(directory, tempFile);
+    return archived.map(() => tempFile).mapErr((reason): FileProblem => ({ kind: 'zipFailed', reason }));
+  }
+
+  /** A zip of `directory`, leaving out what `excluding` names below it. */
+  public async zipWithout(directory: DirectoryPath, excluding: RelativePaths): Promise<Result<FilePath, FileProblem>> {
+    const tempFile = this.getTempFileName;
+    const archived = await this.zipService.archiveWithout(directory, tempFile, excluding);
     return archived.map(() => tempFile).mapErr((reason): FileProblem => ({ kind: 'zipFailed', reason }));
   }
 

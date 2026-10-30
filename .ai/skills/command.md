@@ -84,6 +84,7 @@ These three layers are always created together and mirror each other in path str
 - **DO** use typed path objects (`DirectoryPath`, `FilePath`, `FileName`, `UrlPath`) instead of raw strings.
 - **DO** use `ActionResult.success(value?)`, `ActionResult.failed(message?)`, or `ActionResult.cancelled()` as return values.
 - **DO** use neverthrow `Result<T, E>` for service returns — check with `.isErr()` / `.isOk()`.
+- **DO** type an async `Result` as `Promise<Result<T, E>>` and `await` it before checking — never `ResultAsync`, `safeTry`, `okAsync` or `errAsync`.
 
 ### General — DON'T
 

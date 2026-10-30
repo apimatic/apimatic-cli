@@ -15,7 +15,7 @@ import { SdkPublishNonInteractiveAction } from '../../actions/sdk/publish/non-in
 export default class SdkPublish extends Command {
   static readonly summary = 'Generate and publish an SDK to a package registry and/or source repository';
 
-  static readonly description = `Generate and publish an SDK using a publishing profile configured in the APIMatic App. Requires an input directory containing the API specification. Run without flags for a step-by-step interactive experience, or pass all required flags for CI/CD automation.`;
+  static readonly description = `Generate and publish an SDK using a publishing profile configured in the APIMatic App. Requires an input directory containing the API specification. Run without flags, or with --git-init alone, for a step-by-step interactive experience, or pass all required flags for CI/CD automation.`;
 
   static readonly cmdTxt = format.cmd('apimatic', 'sdk', 'publish');
 
@@ -28,13 +28,13 @@ export default class SdkPublish extends Command {
       char: 'v',
       description: 'Semantic version of the SDK to publish (e.g. 1.0.0).'
     }),
-    ...FlagsProvider.destination('sdk', 'sdk'),
+    ...FlagsProvider.destination('sdk/<language>', 'sdk'),
     language: Flags.string({
       char: 'l',
       description: 'Language of the SDK to generate and publish.',
       options: Object.values(Language).map((l) => l.valueOf())
     }),
-    ...FlagsProvider.force,
+    ...FlagsProvider.forceSdk,
     ...FlagsProvider.input,
     'publish-type': Flags.string({
       description:
@@ -55,6 +55,11 @@ export default class SdkPublish extends Command {
     stability: Flags.string({
       description: 'Stability level of the generated SDK. Defaults to the level the language offers.',
       options: Object.values(Stability).map((s) => s.valueOf())
+    }),
+    'git-init': Flags.boolean({
+      default: false,
+      description:
+        'In the step-by-step experience, make the SDK directory a git repository when it is not one of its own, so your edits to the SDK are kept when you regenerate it. A run with the other flags always does.'
     })
   };
 
@@ -91,12 +96,13 @@ export default class SdkPublish extends Command {
         'publish-type': publishType,
         'dry-run': dryRun,
         stability,
-        'codegen-version': codegenVersion
+        'codegen-version': codegenVersion,
+        'git-init': gitInit
       }
     } = await this.parse(SdkPublish);
 
     const publishTypes = [...new Set(publishType)] as PublishType[];
-    const interactive = this.argv.length === 0;
+    const interactive = this.argv.every((arg) => arg === '--git-init');
     const commandMetadata: CommandMetadata = {
       commandName: SdkPublish.id,
       shell: this.config.shell
@@ -130,16 +136,18 @@ export default class SdkPublish extends Command {
     const result = interactive
       ? await new SdkPublishInteractiveAction(configDir, commandMetadata).execute(
           DirectoryPath.createInput(input),
+          gitInit,
           onPublishSdkError
         )
       : await new SdkPublishNonInteractiveAction(configDir, commandMetadata).execute(
           project,
-          project.sdkDirectory(destination),
+          destination === undefined ? undefined : DirectoryPath.fromUserInput(destination),
           language as Language,
           publishTypes,
           force,
           dryRun,
           StabilityChoice.for(language as Language, stability),
+          codegenVersion as CodeGenerationVersion,
           onPublishSdkError,
           profileId,
           version
