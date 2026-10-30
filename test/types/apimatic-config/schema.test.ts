@@ -24,9 +24,6 @@ const repositoryRoot = process.cwd();
 const schema = JSON.parse(fs.readFileSync(path.join(repositoryRoot, 'apimatic.schema.json'), 'utf8'));
 const manifest = JSON.parse(fs.readFileSync(path.join(repositoryRoot, 'package.json'), 'utf8'));
 
-/** A portal block whose Ask AI chat is on the service at `apiUrl`. */
-const askAi = (apiUrl: string) => ({ ai: { copilot: { key: 'pk_test', apiUrl } } });
-
 describe('apimatic.schema.json', () => {
   // Strict mode refuses unknown keywords and loose types, so a typo in the schema fails here
   // rather than silently validating nothing in an editor.
@@ -82,39 +79,6 @@ describe('apimatic.schema.json', () => {
     });
   });
 
-  // Each address through both, as an editor and `portal generate` would read it.
-  it('agrees with the parser on every Ask AI service address, accepted or not', () => {
-    for (const apiUrl of [
-      'https://ask.apimatic.io',
-      'HTTPS://ASK.APIMATIC.IO:8443',
-      'https://ask.staging.apimatic.io/',
-      'https://ask.apimatic.io:443',
-      'http://localhost:8787',
-      'https://localhost:65535',
-      'http://127.0.0.1:0',
-      'http://[::1]:8787',
-      'https://ask.example.com',
-      'http://ask.apimatic.io',
-      'https://ask.apimatic.io/v1',
-      'https://user@ask.apimatic.io',
-      'http://localhost:@evil.example/',
-      'http://localhost:99999',
-      'http://localhost:65536',
-      'http://localhost:08787',
-      'https://x.y:1.apimatic.io',
-      'https://.apimatic.io',
-      'https://ask..apimatic.io',
-      'http://127.1:8787',
-      'http://[0:0::1]:8787',
-      'https://ask%2eapimatic.io',
-      'https://ask.apimatic.io:',
-      'http://ask.localhost'
-    ]) {
-      const block = askAi(apiUrl);
-      expect(schemaVerdict({ portal: block }).valid, apiUrl).to.equal(portalAccepts(block));
-    }
-  });
-
   describe('agrees with the parser on the portal block', () => {
     const valid: [string, object][] = [
       ['an empty block', {}],
@@ -154,22 +118,14 @@ describe('apimatic.schema.json', () => {
       ['a link with two slashes in its query', { navigation: { links: [{ label: 'Next', url: '/start?next=//x' }] } }],
       ['a context plugin hosted elsewhere', { pluginUrl: 'https://plugins.acme.test/calc.zip?v=2' }],
       ['a plugin address with several query parameters', { pluginUrl: 'https://s3.test/calc.zip?a=1&b=2' }],
-      ["APIMatic's Ask AI service", askAi('https://ask.apimatic.io')],
-      ["APIMatic's Ask AI service, in capitals", askAi('HTTPS://ASK.APIMATIC.IO:8443')],
-      ["APIMatic's Ask AI service, with a trailing slash", askAi('https://ask.apimatic.io/')],
-      ['an Ask AI service on this machine', askAi('http://localhost:8787')]
+      ['an Ask AI chat', { ai: { copilot: { key: 'pk_live_test' } } }],
+      ['an Ask AI chat with starter questions', { ai: { copilot: { key: 'pk_live_test', suggestions: ['How?'] } } }]
     ];
 
     const invalid: [string, object][] = [
-      ['an Ask AI service address with a path', askAi('https://ask.apimatic.io/v1')],
-      ['an Ask AI service address with a query', askAi('https://ask.apimatic.io/?region=eu')],
-      ['an Ask AI service address with credentials', askAi('https://user@ask.apimatic.io')],
-      ['an Ask AI service APIMatic does not run', askAi('https://ask.example.com')],
-      ["APIMatic's Ask AI service over http", askAi('http://ask.apimatic.io')],
-      ['an Ask AI service on a host ending like APIMatic', askAi('https://ask.apimatic.io.example.com')],
-      ['an Ask AI service on this machine in name only', askAi('http://localhost:@evil.example/')],
-      // Resolved through DNS on some systems, so it may not be this machine.
-      ['an Ask AI service over http on a .localhost name', askAi('http://ask.localhost')],
+      // The service is the environment's, so a project's file cannot send the APIMatic login elsewhere.
+      ['an Ask AI service address', { ai: { copilot: { key: 'pk_live_test', apiUrl: 'https://ask.apimatic.io' } } }],
+      ['an Ask AI chat without a key', { ai: { copilot: {} } }],
       ['an unknown namespace', { theme: {} }],
       ['a key from the flat block', { title: 'Calc' }],
       ['a namespace that is not an object', { site: 'Calc' }],

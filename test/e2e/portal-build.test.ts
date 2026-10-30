@@ -16,6 +16,7 @@ import { BundlePage } from '../../src/types/portal/copilot/copilot-bundle';
 import { COPILOT_PAGES_FILE } from '../../src/types/portal/copilot/generated-portal-context';
 import { Language } from '../../src/types/sdk/generate';
 import { canonical } from '../../src/infrastructure/tmp-extensions';
+import { withoutCopilotUrl } from '../helpers/copilot-url';
 
 // A real Vite build takes tens of seconds and needs every runtime dependency installed,
 // so it stays out of the default run. CI switches it on for the platform matrix.
@@ -1055,6 +1056,8 @@ const INVENTORY_STATUS = 'api/inventory/health/getInventoryStatus';
 (enabled ? describe : describe.skip)('portal build, with the Ask AI chat (end to end)', function () {
   this.timeout(10 * 60 * 1000);
 
+  // The fixture is built with APIMatic's service, whatever the shell names.
+  withoutCopilotUrl({ suite: true });
   const portal = portalBuilt('copilot');
   const { read } = portal;
 
@@ -1105,13 +1108,14 @@ const INVENTORY_STATUS = 'api/inventory/health/getInventoryStatus';
     expect(pages.map(({ title }) => title)).to.include('Unlisted');
   });
 
-  // As `llms-full.txt` renders them: each operation's slice of the specification would repeat the schemas it shares.
-  it('renders each page without its specification', () => {
+  // As their Markdown companions render them: the service reads an operation's schemas and code samples from its
+  // slice of the specification, and without it indexes only the page's summary.
+  it('renders each operation page with its specification', () => {
     const operations = builtPages().filter(({ path: page }) => page.startsWith('/api/'));
 
     expect(operations, 'the specification has operations').to.not.be.empty;
     for (const { path: page, markdown } of operations) {
-      expect(markdown, page).to.contain(`(${page})`).and.not.contain('```yaml');
+      expect(markdown, page).to.contain(`(${page})`).and.match(/```yaml\nopenapi: 3/);
     }
   });
 
@@ -1123,11 +1127,11 @@ const INVENTORY_STATUS = 'api/inventory/health/getInventoryStatus';
     ) as { copilot: unknown };
 
     expect(copilot).to.deep.equal({
-      key: 'pk_test_e2e',
+      key: 'pk_live_e2eFixtureKey00000000000000000',
       apiUrl: 'https://ask.apimatic.io',
       suggestions: ['How do I list pets?']
     });
-    expect(scripts.some((script) => script.text.includes('pk_test_e2e'))).to.be.true;
+    expect(scripts.some((script) => script.text.includes('pk_live_e2eFixtureKey00000000000000000'))).to.be.true;
     expect(scripts.some((script) => script.text.includes('https://ask.apimatic.io'))).to.be.true;
     const fixture = new DirectoryPath(process.cwd()).join('test/resources/portal-inputs/copilot/src');
     expect(publishedFilesNaming(portal.output(), portal.project().toString(), fixture.toString())).to.deep.equal([]);

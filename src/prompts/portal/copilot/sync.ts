@@ -11,8 +11,7 @@ import { PortalSourceProblem } from '../../../types/portal/portal-source.js';
 import { format as f } from '../../format.js';
 import { withSpinner } from '../../prompt.js';
 import { reportSourceProblem } from '../source.js';
-
-const COPILOT_EXAMPLE = '"ai": { "copilot": { "key": "pk_…", "apiUrl": "https://ask.apimatic.io" } }';
+import { reportNotTheService, reportUnreachable } from './shared.js';
 
 const pages = (count: number): string => `${count} ${count === 1 ? 'page' : 'pages'}`;
 
@@ -24,13 +23,10 @@ export class PortalCopilotSyncPrompts {
   public copilotNotConfigured(sourceDirectory: DirectoryPath) {
     const config = new FilePath(sourceDirectory, new FileName(APIMATIC_CONFIG_FILE_NAME));
     const message =
-      `The portal has no Ask AI chat to sync. Add ${f.var(COPILOT_EXAMPLE)} to the ${f.var('portal')} block of ` +
-      `${f.path(config)}, then generate and deploy the portal again.`;
+      `The portal has no Ask AI chat to sync: ${f.path(config)} sets no ${f.var('portal.ai.copilot')}. ` +
+      `Run ${f.cmdAlt('apimatic', 'portal', 'copilot', 'enable')} to set one up, then generate and deploy ` +
+      `the portal again.`;
     log.error(message);
-  }
-
-  public notLoggedIn() {
-    log.error(ServiceError.unauthorizedWithHint(null).errorMessage);
   }
 
   public portalNotGenerated(portalDirectory: DirectoryPath) {
@@ -84,9 +80,10 @@ export class PortalCopilotSyncPrompts {
   private syncFailed(error: ServiceError, service: ServiceAddress, timedOut: string) {
     switch (error.code) {
       case ServiceErrorCode.NetworkError:
-        log.error(
-          `The Ask AI service at ${f.link(service.toString())} could not be reached. Check the address and try again.`
-        );
+        reportUnreachable(service);
+        return;
+      case ServiceErrorCode.InvalidResponse:
+        reportNotTheService(service);
         return;
       case ServiceErrorCode.Forbidden:
         log.error(

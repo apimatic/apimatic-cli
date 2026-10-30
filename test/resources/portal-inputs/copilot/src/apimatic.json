@@ -5,8 +5,7 @@
     "site": { "name": "Ask AI Pets" },
     "ai": {
       "copilot": {
-        "key": "pk_test_e2e",
-        "apiUrl": "https://ask.apimatic.io",
+        "key": "pk_live_e2eFixtureKey00000000000000000",
         "suggestions": ["How do I list pets?"]
       }
     }

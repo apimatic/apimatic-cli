@@ -264,7 +264,7 @@ describe('PortalProjectService', () => {
       const withoutChat = configFor({ site: { name: 'My API' } });
       const withChat = configFor({
         site: { name: 'My API' },
-        ai: { copilot: { key: 'pk_test', apiUrl: 'https://ask.apimatic.io' } }
+        ai: { copilot: { key: 'pk_test' } }
       });
 
       (await service.prepare(project, sourceFor({ config: withoutChat }), NO_ARTIFACTS))._unsafeUnwrap();

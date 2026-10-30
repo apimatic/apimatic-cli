@@ -33,6 +33,19 @@ describe('CopilotBundle', () => {
     });
   });
 
+  // An operation's description can run to thousands of characters; the service refuses a bundle past its limits.
+  it("cuts a title and description to the service's limits, on a word boundary", () => {
+    const long = { path: '/op', title: 'word '.repeat(200), description: 'word '.repeat(1500), markdown: '# Op' };
+
+    const [page] = (documentOf(CopilotBundle.of([long], null, '9.9.9', AT)) as { pages: Record<string, string>[] })
+      .pages;
+
+    expect(page!.title!.length).to.be.at.most(500);
+    expect(page!.description!.length).to.be.at.most(5000);
+    expect(page!.description).to.match(/ word$/);
+    expect(page!.markdown).to.equal('# Op');
+  });
+
   it('names the address a portal served under a path is at, and that path', () => {
     const bundle = CopilotBundle.of(PAGES, at('https://example.com/docs'), '9.9.9', AT);
 

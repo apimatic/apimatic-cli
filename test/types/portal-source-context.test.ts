@@ -26,6 +26,7 @@ import { PLUGIN_SECTION, SDK_SECTION } from '../../src/types/portal/generated-pa
 import { TabEntry } from '../../src/types/portal/portal-navigation';
 import { ZipService } from '../../src/infrastructure/zip-service';
 import { bundleSpec } from '../../portal-template/src/lib/openapi-bundle.server';
+import { withoutCopilotUrl } from '../helpers/copilot-url';
 
 const OPENAPI = JSON.stringify({ openapi: '3.0.0', info: { title: 'Calc', version: '1' }, paths: {} });
 
@@ -378,6 +379,30 @@ describe('PortalSourceContext', () => {
 
     it('reports a file removed while the preview runs', async () => {
       expect((await context().resolveSettings(null))._unsafeUnwrapErr()).to.deep.equal({ kind: 'missingConfig' });
+    });
+
+    describe('the Ask AI service', () => {
+      withoutCopilotUrl();
+      beforeEach(() => {
+        process.env.APIMATIC_COPILOT_URL = 'http://ask.example.com';
+      });
+
+      it('reports an APIMATIC_COPILOT_URL it cannot use apart from the file, for a portal with Ask AI', async () => {
+        writeConfig({ site: { name: 'Calc' }, ai: { copilot: { key: 'pk_dev_abc' } } });
+
+        expect((await context().resolveSettings(null))._unsafeUnwrapErr()).to.deep.equal({
+          kind: 'invalidServiceAddress',
+          errors: [
+            "'APIMATIC_COPILOT_URL' must be the address of an Ask AI service, starting with 'https://', or of one on this machine, such as 'http://localhost:8787'."
+          ]
+        });
+      });
+
+      it('does not read it for a portal without Ask AI', async () => {
+        writeConfig({ site: { name: 'Calc' } });
+
+        expect((await context().resolveSettings(null)).isOk()).to.be.true;
+      });
     });
   });
 

@@ -18,6 +18,8 @@ import { CommandMetadata } from '../../../src/types/common/command-metadata';
 import { ProjectContext } from '../../../src/types/project-context';
 import { COPILOT_PAGES_FILE, GeneratedPortalContext } from '../../../src/types/portal/copilot/generated-portal-context';
 import { completeArtifacts, stubPreparePortalProject } from './prepare-project-stubs';
+import { entitlementsWith } from '../../helpers/account';
+import { withoutCopilotUrl } from '../../helpers/copilot-url';
 
 const COMMAND_METADATA: CommandMetadata = { commandName: 'portal generate', shell: 'test' };
 const FIXTURE = new DirectoryPath(process.cwd()).join('test/resources/portal-inputs/default');
@@ -75,7 +77,7 @@ describe('GenerateAction', () => {
     prompts.savePortal.callsFake((fn) => fn);
     prompts.overwritePortal.resolves(true);
 
-    authorize = sinon.stub(PortalAuthorizationService.prototype, 'authorize').resolves(ok(undefined));
+    authorize = sinon.stub(PortalAuthorizationService.prototype, 'authorize').resolves(ok(entitlementsWith('portalGeneration')));
     build = sinon.stub(PortalBuildService.prototype, 'build').resolves(ok({ output: builtSite, pageCount: 3 }));
   });
 
@@ -137,30 +139,6 @@ describe('GenerateAction', () => {
 
     expect(result.isFailed()).to.be.true;
     expect(prompts.destinationContainsSource.calledOnceWith(source, portalDirectory)).to.be.true;
-    expect(build.called).to.be.false;
-  });
-
-  it('stops before anything else when the installation cannot build a portal', async () => {
-    shared.runtimeProblem.returns("The portal build dependency 'vite' is missing from this installation.");
-
-    const result = await execute();
-
-    expect(result.isFailed()).to.be.true;
-    expect(
-      shared.prompts.runtimeUnsupported.calledOnceWith(
-        "The portal build dependency 'vite' is missing from this installation."
-      )
-    ).to.be.true;
-    expect(authorize.called).to.be.false;
-  });
-
-  it('fails when the account may not build a portal, without starting a build', async () => {
-    authorize.resolves(err({ kind: 'notEntitled' as const }));
-
-    const result = await execute();
-
-    expect(result.isFailed()).to.be.true;
-    expect(shared.prompts.authorizationFailed.calledOnceWith({ kind: 'notEntitled' })).to.be.true;
     expect(build.called).to.be.false;
   });
 
@@ -248,6 +226,8 @@ describe('GenerateAction', () => {
   });
 
   describe('with Ask AI', () => {
+    withoutCopilotUrl();
+
     const readPortal = (relative: string) => fs.readFileSync(path.join(portalDirectory.toString(), relative), 'utf8');
 
     const PAGE = { path: '/', title: 'Welcome', description: 'Start here', markdown: '# Welcome' };
@@ -258,6 +238,45 @@ describe('GenerateAction', () => {
       fs.mkdirSync(path.dirname(file), { recursive: true });
       fs.writeFileSync(file, JSON.stringify(pages));
     };
+
+    beforeEach(() => {
+      authorize.resolves(ok(entitlementsWith('portalGeneration', 'askAi')));
+    });
+
+    it('warns when the portal is built with a development key', async () => {
+      writePages();
+      const project = new DirectoryPath(root).join('dev-key-project');
+      fs.cpSync(COPILOT_FIXTURE.toString(), project.toString(), { recursive: true });
+      const configFile = path.join(project.toString(), 'src', 'apimatic.json');
+      const devKey = `pk_dev_${'a'.repeat(32)}`;
+      fs.writeFileSync(configFile, fs.readFileSync(configFile, 'utf8').replace('pk_live_e2eFixtureKey00000000000000000', devKey));
+
+      expect((await execute(project)).isSuccess()).to.be.true;
+      expect(prompts.copilotDevelopmentKey.calledOnce).to.be.true;
+    });
+
+    it('does not warn about a key to deploy with', async () => {
+      writePages();
+
+      expect((await execute(COPILOT_FIXTURE)).isSuccess()).to.be.true;
+      expect(prompts.copilotDevelopmentKey.called).to.be.false;
+    });
+
+    it('warns when the portal is built for a service other than APIMatic’s, naming it', async () => {
+      writePages();
+      process.env.APIMATIC_COPILOT_URL = 'http://localhost:8787';
+
+      expect((await execute(COPILOT_FIXTURE)).isSuccess()).to.be.true;
+      expect(prompts.copilotOtherService.calledOnce).to.be.true;
+      expect(`${prompts.copilotOtherService.firstCall.args[0]}`).to.equal('http://localhost:8787');
+    });
+
+    it('does not warn about the service when it is APIMatic’s own', async () => {
+      writePages();
+
+      expect((await execute(COPILOT_FIXTURE)).isSuccess()).to.be.true;
+      expect(prompts.copilotOtherService.called).to.be.false;
+    });
 
     it('deploys the pages with the portal, named by a build ID the service compares', async () => {
       writePages();

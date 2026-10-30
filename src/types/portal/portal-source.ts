@@ -128,6 +128,8 @@ export type PortalSourceProblem =
   | { kind: 'missingConfig' }
   // `missingPortal`: the block itself is absent, which is what quickstart sets up.
   | { kind: 'invalidConfig'; errors: string[]; missingPortal: boolean }
+  // `APIMATIC_COPILOT_URL` names no service the CLI can use, for a portal with Ask AI; the file is not at fault.
+  | { kind: 'invalidServiceAddress'; errors: string[] }
   // Every problem found in `content/`, so that one run lists all that a build would refuse.
   | { kind: 'invalidContent'; problems: ContentProblem[] }
   | { kind: 'unreadableSpec'; file: FilePath; referencedBy: FilePath | null; reason: UnreadableSpecReason }

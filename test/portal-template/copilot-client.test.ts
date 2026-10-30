@@ -1,5 +1,5 @@
 import { expect } from 'chai';
-import { CopilotClient, questionMessage } from '../../portal-template/src/lib/copilot-client';
+import { CopilotClient, questionMessage, type LapsedPlan } from '../../portal-template/src/lib/copilot-client';
 
 const COPILOT = { key: 'pk_live_abc', apiUrl: 'https://ask.example.com' };
 
@@ -21,6 +21,7 @@ function service(...replies: (Response | (() => Response))[]) {
 }
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
+const PRICING = 'https://www.apimatic.io/pricing';
 const session = (token: string, inMs = 900_000) =>
   json({ token, expiresAt: new Date(Date.now() + inMs).toISOString() });
 
@@ -75,15 +76,51 @@ describe('the Ask AI client', () => {
     expect(await response.text()).to.equal('Limit reached. Search still works.');
   });
 
-  it('hides Ask AI when the service turns the portal away', async () => {
-    for (const code of ['copilot_disabled', 'invalid_key', 'origin_not_allowed']) {
-      let hidden = false;
-      const { send } = service(json({ code, message: 'no' }, 403));
-      const client = new CopilotClient(COPILOT, () => (hidden = true), send);
+  it('hides Ask AI when the service turns the key or the website away, upgrade link or not', async () => {
+    for (const code of ['invalid_key', 'origin_not_allowed']) {
+      let turnedAway: LapsedPlan | null | undefined;
+      const { send } = service(json({ code, message: 'no', upgradeUrl: PRICING }, 403));
+      const client = new CopilotClient(COPILOT, (lapsed) => (turnedAway = lapsed), send);
       let failed = false;
       await client.fetch(client.chatAddress(), {}).catch(() => (failed = true));
       expect(failed, code).to.be.true;
-      expect(hidden, code).to.be.true;
+      expect(turnedAway, code).to.be.null;
+    }
+  });
+
+  it('explains a lapsed plan with its message and upgrade link, as the session opens or on a question', async () => {
+    const lapsed = {
+      code: 'copilot_disabled',
+      reason: 'trial_ended',
+      message: "Ask AI is unavailable because this portal's APIMatic trial has ended.",
+      upgradeUrl: PRICING
+    };
+    let opening: LapsedPlan | null = null;
+    const atOpen = new CopilotClient(COPILOT, (plan) => (opening = plan), service(json(lapsed, 403)).send);
+    await atOpen.prepare();
+    expect(opening).to.deep.equal({ message: lapsed.message, upgradeUrl: lapsed.upgradeUrl });
+
+    let asking: LapsedPlan | null = null;
+    const onQuestion = new CopilotClient(
+      COPILOT,
+      (plan) => (asking = plan),
+      service(session('t1'), json(lapsed, 403)).send
+    );
+    const response = await onQuestion.fetch(onQuestion.chatAddress(), {});
+    expect(await response.text()).to.equal(lapsed.message);
+    expect(asking).to.deep.equal({ message: lapsed.message, upgradeUrl: lapsed.upgradeUrl });
+  });
+
+  it('hides Ask AI for the kill switch, or an upgrade link that is not a web address', async () => {
+    for (const body of [
+      { code: 'copilot_disabled', message: 'Ask AI is turned off for this portal.' },
+      { code: 'copilot_disabled', message: 'no', upgradeUrl: 'javascript:alert(1)' },
+      { code: 'copilot_disabled', message: 'no', upgradeUrl: 'not a url' }
+    ]) {
+      let turnedAway: LapsedPlan | null | undefined;
+      const client = new CopilotClient(COPILOT, (lapsed) => (turnedAway = lapsed), service(json(body, 403)).send);
+      await client.prepare();
+      expect(turnedAway, JSON.stringify(body)).to.be.null;
     }
   });
 
@@ -140,6 +177,13 @@ describe('the Ask AI client', () => {
     expect(message).to.contain('unavailable');
     expect(await (await client.fetch(client.chatAddress(), {})).text()).to.equal('ok');
     expect(calls).to.have.length(3);
+  });
+
+  it('bounds the time the session may take to open, so a service that never answers fails it', async () => {
+    const { calls, send } = service(session('t1'));
+    await new CopilotClient(COPILOT, () => undefined, send).prepare();
+    expect(calls[0]!.init.signal).to.be.instanceOf(AbortSignal);
+    expect(calls[0]!.init.signal!.aborted).to.be.false;
   });
 
   it('continues the thread the service started, and starts afresh with a new chat', () => {

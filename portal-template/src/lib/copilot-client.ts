@@ -1,14 +1,29 @@
 import type { PortalCopilot } from './portal-types';
 
-/** Why Ask AI stays hidden: the service turned this portal, its key or this website away. */
+/** Why Ask AI is unavailable: the service turned this portal, its key or this website away. */
 const TURNED_AWAY = new Set(['copilot_disabled', 'invalid_key', 'origin_not_allowed']);
 /** A session is renewed this long before it expires, so a question never meets a stale one. */
 const RENEW_EARLY_MS = 30_000;
+/** A session that takes longer gives up, so the panel never waits on "Starting Ask AI…" for a service that never answers. */
+const SESSION_TIMEOUT_MS = 10_000;
 
 interface Problem {
   code?: string;
   message?: string;
+  upgradeUrl?: unknown;
 }
+
+/** A portal whose APIMatic plan no longer includes Ask AI: what to tell visitors, and where its owner upgrades. */
+export interface LapsedPlan {
+  message: string;
+  upgradeUrl: string;
+}
+
+/**
+ * Whether the service lets this portal offer Ask AI: `checking` until its first answer, hidden when turned away,
+ * explained when the plan lapsed.
+ */
+export type Availability = 'checking' | 'available' | 'hidden' | LapsedPlan;
 
 /** The page a visitor asks from, as the browser reports it. */
 export interface AskingPage {
@@ -40,13 +55,17 @@ export class CopilotClient {
 
   constructor(
     private readonly copilot: Pick<PortalCopilot, 'key' | 'apiUrl'>,
-    private readonly turnedAway: () => void,
+    /** Called with the lapsed plan to explain, or null to hide Ask AI altogether. */
+    private readonly turnedAway: (lapsed: LapsedPlan | null) => void,
     private readonly send: typeof fetch = (input, init) => fetch(input, init)
   ) {}
 
   readonly chatAddress = (): string => `${this.copilot.apiUrl}/v1/chat`;
 
-  /** Opens the session as the panel opens, so a portal the service turns away hides Ask AI before anyone types. */
+  /**
+   * Opens the session before anyone types, as the button is pointed at or the panel opens, so a portal the service
+   * turns away says so at once. Resolves either way; a refusal reaches `turnedAway` first.
+   */
   readonly prepare = async (): Promise<void> => {
     await this.currentSession().catch(() => undefined);
   };
@@ -76,7 +95,7 @@ export class CopilotClient {
     }
     if (response.ok) return response;
     const problem = await problemOf(response);
-    if (TURNED_AWAY.has(problem.code ?? '')) this.turnedAway();
+    this.turnAwayOn(problem);
     return new Response(problem.message ?? 'Ask AI could not answer just now. Please try again shortly.', {
       status: response.status
     });
@@ -113,18 +132,38 @@ export class CopilotClient {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ key: this.copilot.key }),
-        credentials: 'omit'
+        credentials: 'omit',
+        signal: AbortSignal.timeout(SESSION_TIMEOUT_MS)
       });
     } catch {
       throw new Error('Ask AI is unavailable right now. Please try again later.');
     }
     if (!response.ok) {
       const problem = await problemOf(response);
-      if (TURNED_AWAY.has(problem.code ?? '')) this.turnedAway();
+      this.turnAwayOn(problem);
       throw new Error(problem.message ?? 'Ask AI is unavailable for this portal.');
     }
     const { token, expiresAt } = (await response.json()) as { token: string; expiresAt: string };
     return { token, expiresAt: Date.parse(expiresAt) };
+  }
+
+  private turnAwayOn(problem: Problem): void {
+    if (TURNED_AWAY.has(problem.code ?? '')) this.turnedAway(lapsedPlan(problem));
+  }
+}
+
+/** Only the service's lapsed-plan body explains itself; the kill switch, and older services, hide Ask AI. */
+function lapsedPlan({ code, message, upgradeUrl }: Problem): LapsedPlan | null {
+  if (code !== 'copilot_disabled' || typeof message !== 'string' || typeof upgradeUrl !== 'string') return null;
+  return isWebAddress(upgradeUrl) ? { message, upgradeUrl } : null;
+}
+
+// The address becomes a link, which must never run script.
+function isWebAddress(value: string): boolean {
+  try {
+    return ['https:', 'http:'].includes(new URL(value).protocol);
+  } catch {
+    return false;
   }
 }
 

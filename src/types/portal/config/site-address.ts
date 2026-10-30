@@ -51,6 +51,11 @@ export class SiteAddress {
     return ok(new SiteAddress(new URL(text).origin, basePath));
   }
 
+  /** The host the portal is on, such as `https://example.com`, as a browser names the site in `Origin`. */
+  public siteOrigin(): string {
+    return this.origin;
+  }
+
   /** Where the portal is served, in the form Vite's `base` takes: `/`, or `/docs/`. */
   public path(): string {
     return `${this.basePath}/`;

@@ -1,6 +1,7 @@
 import { ok } from 'neverthrow';
 import sinon from 'sinon';
 import { PortalProjectService } from '../../../src/infrastructure/portal-project-service';
+import { CopilotPortalService } from '../../../src/infrastructure/services/copilot-portal-service';
 import { PortalArtifactsService } from '../../../src/infrastructure/services/portal-artifacts-service';
 import { PreparePortalProjectPrompts } from '../../../src/prompts/portal/prepare-project';
 import { DirectoryPath } from '../../../src/types/file/directoryPath';
@@ -15,6 +16,7 @@ export interface PreparePortalProjectStubs {
   artifacts: sinon.SinonStub;
   runtimeProblem: sinon.SinonStub;
   prepare: sinon.SinonStub;
+  lookUpCopilotKey: sinon.SinonStub;
 }
 
 /**
@@ -42,10 +44,12 @@ export function stubPreparePortalProject(): PreparePortalProjectStubs {
   const prompts = sinon.stub(PreparePortalProjectPrompts.prototype);
   // The spinner would render to stdout; pass the underlying promise straight through.
   prompts.generateArtifacts.callsFake((fn) => fn);
+  prompts.lookUpCopilotKey.callsFake((fn) => fn);
 
   return {
     prompts,
     artifacts: sinon.stub(PortalArtifactsService.prototype, 'generate').resolves(ok(completeArtifacts())),
+    lookUpCopilotKey: sinon.stub(CopilotPortalService.prototype, 'lookUp').resolves(ok('registered' as const)),
     runtimeProblem: sinon.stub(PortalProjectService.prototype, 'runtimeProblem').returns(null),
     prepare: sinon.stub(PortalProjectService.prototype, 'prepare').callsFake(async (projectDirectory, source) =>
       ok({

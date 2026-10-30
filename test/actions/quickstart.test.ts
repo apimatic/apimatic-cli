@@ -23,6 +23,7 @@ import { ServiceError } from '../../src/infrastructure/service-error';
 import { UrlPath } from '../../src/types/file/urlPath';
 import { ProjectContext } from '../../src/types/project-context';
 import { completeArtifacts } from './portal/prepare-project-stubs';
+import { entitlementsWith } from '../helpers/account';
 
 const COMMAND_METADATA: CommandMetadata = { commandName: 'portal quickstart', shell: 'test' };
 const SPEC = new FilePath(
@@ -70,7 +71,7 @@ describe('QuickstartAction', () => {
       .stub(ValidationService.prototype, 'validateViaFile')
       .resolves(ok({ validation: PASSED, linting: PASSED } as never));
     runtimeProblem = sinon.stub(PortalProjectService.prototype, 'runtimeProblem').returns(null);
-    authorize = sinon.stub(PortalAuthorizationService.prototype, 'authorize').resolves(ok(undefined));
+    authorize = sinon.stub(PortalAuthorizationService.prototype, 'authorize').resolves(ok(entitlementsWith('portalGeneration')));
   });
 
   afterEach(() => {
@@ -88,10 +89,10 @@ describe('QuickstartAction', () => {
   });
 
   it('stops before any question when the account may not build a portal', async () => {
-    authorize.resolves(err({ kind: 'notEntitled' as const }));
+    authorize.resolves(err({ kind: 'notEntitled' as const, feature: 'portalGeneration' as const }));
 
     expect((await execute()).isFailed()).to.be.true;
-    expect(prompts.authorizationFailed.calledOnceWith({ kind: 'notEntitled' })).to.be.true;
+    expect(prompts.authorizationFailed.calledOnceWith({ kind: 'notEntitled', feature: 'portalGeneration' })).to.be.true;
     expect(prompts.specPathPrompt.called).to.be.false;
   });
 

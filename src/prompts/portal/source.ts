@@ -142,6 +142,11 @@ function reportEmptyMergedFolders(metadata: FilePath, folders: DirectoryPath[], 
   log.message(`Add ${add}, or list only the folders to merge in ${f.var(MERGE_SETTINGS.order)}.`);
 }
 
+/** `APIMATIC_COPILOT_URL` names no service the CLI can use; each error names the variable. */
+export function reportInvalidServiceAddress(errors: string[]): void {
+  log.error(errors.join('\n'));
+}
+
 /**
  * Shared by `portal generate` and `portal serve`: both read the same source directory, so
  * a broken one has to be explained the same way in both.
@@ -155,6 +160,10 @@ export function reportSourceProblem(problem: PortalSourceProblem, sourceDirector
     case 'invalidConfig': {
       log.error(`The ${f.var(APIMATIC_CONFIG_FILE_NAME)} in ${f.path(sourceDirectory)} is not valid:`);
       log.message(problem.errors.map((error) => `  • ${error}`).join('\n'));
+      return;
+    }
+    case 'invalidServiceAddress': {
+      reportInvalidServiceAddress(problem.errors);
       return;
     }
     case 'invalidContent': {

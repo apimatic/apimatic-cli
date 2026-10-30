@@ -43,6 +43,8 @@ USAGE
 * [`apimatic help [COMMAND]`](#apimatic-help-command)
 * [`apimatic plugin generate`](#apimatic-plugin-generate)
 * [`apimatic plugin publish`](#apimatic-plugin-publish)
+* [`apimatic portal copilot disable`](#apimatic-portal-copilot-disable)
+* [`apimatic portal copilot enable`](#apimatic-portal-copilot-enable)
 * [`apimatic portal copilot sync`](#apimatic-portal-copilot-sync)
 * [`apimatic portal generate`](#apimatic-portal-generate)
 * [`apimatic portal serve`](#apimatic-portal-serve)
@@ -287,6 +289,77 @@ EXAMPLES
 
 _See code: [src/commands/plugin/publish.ts](https://github.com/apimatic/apimatic-cli/blob/dev/src/commands/plugin/publish.ts)_
 
+## `apimatic portal copilot disable`
+
+Turn off the portal's Ask AI chat and revoke its key.
+
+```
+USAGE
+  $ apimatic portal copilot disable [-i <value>] [-k <value>]
+
+FLAGS
+  -i, --input=<value>     [default: ./] path to the parent directory containing the 'src' directory, which includes API
+                          specifications and configuration files.
+  -k, --auth-key=<value>  override current authentication state with an authentication key.
+
+DESCRIPTION
+  Turn off the portal's Ask AI chat and revoke its key.
+
+  Revokes the portal's Ask AI key with the Ask AI service and removes it from the 'portal' block of 'src/apimatic.json'.
+  Generate and deploy the portal again afterwards, so it no longer shows the chat.
+
+  The key is revoked with your saved APIMatic login, or with the auth key passed with --auth-key.
+
+EXAMPLES
+  apimatic portal copilot disable
+```
+
+_See code: [src/commands/portal/copilot/disable.ts](https://github.com/apimatic/apimatic-cli/blob/dev/src/commands/portal/copilot/disable.ts)_
+
+## `apimatic portal copilot enable`
+
+Set up an Ask AI chat for the portal, answered from its own pages.
+
+```
+USAGE
+  $ apimatic portal copilot enable [--dev] [--rotate] [--origin <value>...] [-i <value>] [-k <value>]
+
+FLAGS
+  -i, --input=<value>      [default: ./] path to the parent directory containing the 'src' directory, which includes API
+                           specifications and configuration files.
+  -k, --auth-key=<value>   override current authentication state with an authentication key.
+      --dev                use a development key, which also works on this machine and answers a limited number of
+                           questions a day.
+      --origin=<value>...  a site besides the portal's 'site.url' allowed to use the key, such as
+                           'https://staging.example.com'.
+      --rotate             replace the portal's key with a new one, and revoke the old one.
+
+DESCRIPTION
+  Set up an Ask AI chat for the portal, answered from its own pages.
+
+  Gives the portal an Ask AI key, registers it with the Ask AI service, and saves it to the 'portal' block of
+  'src/apimatic.json'. The next 'apimatic portal generate' builds the portal with its Ask AI chat.
+
+  The key works only on the sites allowed to use it: the portal's 'site.url', and any passed with --origin. Run this
+  command again after changing them, and the service is told. With --dev, the key also works on this machine, for
+  previewing the chat with 'apimatic portal serve', and answers a limited number of questions a day.
+
+  The portal is registered with APIMatic's Ask AI service, or with the one the APIMATIC_COPILOT_URL environment variable
+  names. It is registered with your saved APIMatic login, or with the auth key passed with --auth-key, and needs a
+  subscription that includes Ask AI.
+
+EXAMPLES
+  apimatic portal copilot enable
+
+  apimatic portal copilot enable --dev
+
+  apimatic portal copilot enable --origin=https://staging.example.com
+
+  apimatic portal copilot enable --rotate
+```
+
+_See code: [src/commands/portal/copilot/enable.ts](https://github.com/apimatic/apimatic-cli/blob/dev/src/commands/portal/copilot/enable.ts)_
+
 ## `apimatic portal copilot sync`
 
 Update the portal's Ask AI chat with the portal's current pages.
@@ -312,11 +385,12 @@ DESCRIPTION
   portal generated with 'apimatic portal generate' when it cannot: for a portal without 'site.url', or one the service
   cannot reach, such as one on a private network.
 
-  The service is set by the 'ai.copilot' setting in the 'portal' block of 'src/apimatic.json': APIMatic's Ask AI
-  service, or one on this machine. The pages are swapped in at once, after all of them are indexed; until then Ask AI
-  answers from the previous ones.
+  The portal's chat is the one 'apimatic portal copilot enable' set up in the 'portal' block of 'src/apimatic.json'. The
+  pages go to APIMatic's Ask AI service, or to the one the APIMATIC_COPILOT_URL environment variable names. They are
+  swapped in at once, after all of them are indexed; until then Ask AI answers from the previous ones.
 
-  The upload is made with your saved APIMatic login, or with the auth key passed with --auth-key.
+  The upload is made with your saved APIMatic login, or with the auth key passed with --auth-key, and needs a
+  subscription that includes Ask AI.
 
 EXAMPLES
   apimatic portal copilot sync

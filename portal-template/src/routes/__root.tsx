@@ -7,6 +7,7 @@ import { RootProvider } from 'fumadocs-ui/provider/tanstack';
 import SearchDialog from '@/components/search';
 import { withBasePath } from '@/lib/base-path';
 import { portal } from '@/lib/portal';
+import { RouterLink } from '@/lib/router-link';
 
 // The sidebar tree is the same on every page. Loaded here, once, it is written to a single
 // cache file instead of being repeated in every page's own loader payload.
@@ -53,7 +54,7 @@ function RootComponent() {
         <HeadContent />
       </head>
       <body className="flex flex-col min-h-screen">
-        <RootProvider search={{ SearchDialog }} theme={theme}>
+        <RootProvider search={{ SearchDialog }} theme={theme} components={{ Link: RouterLink }}>
           <Outlet />
         </RootProvider>
         <Scripts />

@@ -1,4 +1,4 @@
-import axios, { AxiosResponse } from 'axios';
+import axios from 'axios';
 import { err, ok, Result } from 'neverthrow';
 import { CopilotService } from '../../types/portal/config/copilot-config.js';
 import { CopilotBundle } from '../../types/portal/copilot/copilot-bundle.js';
@@ -6,8 +6,9 @@ import { IndexedVersion, IndexingState, IngestReceipt, IngestStatus } from '../.
 import { isJsonObject } from '../../utils/json-utils.js';
 import { envInfo } from '../env-info.js';
 import { pollUntilSettled } from '../generation-status-poller.js';
-import { handleServiceError, ServiceError, ServiceErrorCode } from '../service-error.js';
+import { ServiceError, ServiceErrorCode } from '../service-error.js';
 import { sleep } from '../timer-extensions.js';
+import { copilotFailureOf, copilotTransportFailure, duration } from './copilot-responses.js';
 
 export const COPILOT_INGEST_TIMINGS = {
   pollIntervalMs: 2000,
@@ -52,13 +53,13 @@ export class CopilotIngestService {
         }
       );
       if (response.status !== 200 && response.status !== 202) {
-        return err(failureOf(response));
+        return err(copilotFailureOf(response));
       }
       const receipt = response.data as unknown;
       return isReceipt(receipt) ? ok(receipt) : err(ServiceError.InvalidResponse);
     } catch (error) {
       const timedOut = `The upload did not finish within ${duration(this.timings.uploadTimeoutMs)}.`;
-      return err(transportFailure(error, timedOut));
+      return err(copilotTransportFailure(error, timedOut));
     }
   }
 
@@ -110,13 +111,13 @@ export class CopilotIngestService {
         `/v1/ingest/${encodeURIComponent(versionId)}`
       );
       if (response.status !== 200) {
-        return err(failureOf(response));
+        return err(copilotFailureOf(response));
       }
       const status = statusOf(response.data);
       return status === null ? err(ServiceError.InvalidResponse) : ok(status);
     } catch (error) {
       const timedOut = `The Ask AI service did not answer within ${duration(this.timings.statusTimeoutMs)}.`;
-      return err(transportFailure(error, timedOut));
+      return err(copilotTransportFailure(error, timedOut));
     }
   }
 
@@ -134,42 +135,6 @@ export class CopilotIngestService {
       }
     });
   }
-}
-
-/** The service explains every refusal as `{ code, message }`; the message is what the user is shown. */
-function failureOf(response: AxiosResponse): ServiceError {
-  const body = response.data as unknown;
-  const message = isJsonObject(body) && typeof body.message === 'string' ? body.message : null;
-  switch (response.status) {
-    case 400:
-    case 413:
-      return message === null ? ServiceError.InvalidResponse : ServiceError.badRequest(message, {});
-    case 401:
-      return ServiceError.unauthorizedWithHint(message);
-    case 403:
-      return ServiceError.forbidden(message ?? 'Access denied.');
-    case 404:
-      return message === null ? ServiceError.NotFound : ServiceError.notFound(message);
-    default:
-      return response.status >= 500 ? ServiceError.ServerError : ServiceError.InvalidResponse;
-  }
-}
-
-// Every request answers with its status, so an axios error here is one that never got an answer.
-function transportFailure(error: unknown, timedOut: string): ServiceError {
-  if (!axios.isAxiosError(error) || error.response !== undefined) {
-    return handleServiceError(error);
-  }
-  return error.code === 'ETIMEDOUT' ? ServiceError.timeout(timedOut) : ServiceError.NetworkError;
-}
-
-function duration(ms: number): string {
-  if (ms < 60_000) {
-    const seconds = Math.max(1, Math.round(ms / 1000));
-    return `${seconds} ${seconds === 1 ? 'second' : 'seconds'}`;
-  }
-  const minutes = Math.round(ms / 60_000);
-  return `${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`;
 }
 
 function isReceipt(body: unknown): body is IngestReceipt {

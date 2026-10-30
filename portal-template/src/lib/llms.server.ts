@@ -53,7 +53,8 @@ export interface AssistantPage {
   markdown: string;
 }
 
-// Every page, those the navigation leaves out too, as `llms-full.txt` renders it: without the specifications.
+// Every page, those the navigation leaves out too, as its Markdown companion renders it: an operation's page keeps
+// its slice of the specification, which is how the service knows it for one and reads its schemas and code samples.
 export async function renderAssistantPages(): Promise<AssistantPage[]> {
   return await Promise.all(
     source.getPages().map(async (page) => ({
@@ -61,7 +62,7 @@ export async function renderAssistantPages(): Promise<AssistantPage[]> {
       // The service names a page by its title in an answer's sources, so one without a title is named by its path.
       title: page.data.title ?? page.url,
       description: page.data.description ?? null,
-      markdown: await render(page, false)
+      markdown: await renderPage(page)
     }))
   );
 }

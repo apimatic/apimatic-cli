@@ -1,6 +1,7 @@
 import { Result } from 'neverthrow';
 import { CopilotConfig, CopilotService, PortalCopilot } from './copilot-config.js';
 import { allOf, namespace, optional, optionalBoolean, Parsed, unknownKeys } from './fields.js';
+import { ServiceAddress } from './service-address.js';
 
 const KNOWN = ['pageActions', 'copilot'];
 
@@ -9,13 +10,13 @@ export class AiConfig {
 
   public static readonly defaults = new AiConfig(true, null);
 
-  public static parse(value: unknown, path: string): Parsed<AiConfig> {
+  public static parse(value: unknown, path: string, copilotAddress: ServiceAddress): Parsed<AiConfig> {
     return namespace(value, path).andThen((data) =>
       allOf(
         unknownKeys(data, KNOWN, path),
         Result.combineWithAllErrors([
           optionalBoolean(data.pageActions, `${path}.pageActions`, AiConfig.defaults.pageActions),
-          optional(data.copilot, (present) => CopilotConfig.parse(present, `${path}.copilot`))
+          optional(data.copilot, (present) => CopilotConfig.parse(present, `${path}.copilot`, copilotAddress))
         ])
       ).map(([pageActions, copilot]) => new AiConfig(pageActions, copilot))
     );

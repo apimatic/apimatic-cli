@@ -3,6 +3,7 @@ import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { FilePath } from '../../types/file/filePath.js';
 import { PortalBuildFailure, PortalBuildResult } from '../../infrastructure/portal-build-service.js';
 import { NOT_FOUND_FILE_NAME, PortalSaveProblem, ZIP_FILE_NAME } from '../../types/portal-context.js';
+import { COPILOT_URL_VARIABLE, ServiceAddress } from '../../types/portal/config/service-address.js';
 import { SiteAddress } from '../../types/portal/config/site-address.js';
 import { Result } from 'neverthrow';
 import { format as f } from '../format.js';
@@ -129,6 +130,22 @@ export class PortalGeneratePrompts {
     log.info(
       `Ask AI picks up these pages by itself once the portal is deployed at ${f.link(site.toString())}. ` +
         `If the Ask AI service cannot reach it there, run ${syncCommand()} after deploying instead.`
+    );
+  }
+
+  public copilotDevelopmentKey() {
+    log.warn(
+      `The portal's Ask AI key is a development key: on its site the chat answers only a limited number of ` +
+        `questions a day. Run ${f.cmdAlt('apimatic', 'portal', 'copilot', 'enable')} ${f.flag('rotate')} for a ` +
+        `key to deploy with, then generate the portal again.`
+    );
+  }
+
+  public copilotOtherService(service: ServiceAddress) {
+    log.warn(
+      `The portal's Ask AI chat calls the service at ${f.link(service.toString())}, which ` +
+        `${f.var(COPILOT_URL_VARIABLE)} names, not APIMatic's own. Unset it and generate the portal again ` +
+        `before deploying.`
     );
   }
 

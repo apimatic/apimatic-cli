@@ -177,19 +177,14 @@
             },
             "copilot": {
               "type": "object",
-              "description": "The Ask AI chat the portal offers. Left out, the portal offers none.",
+              "description": "The Ask AI chat the portal offers, which 'apimatic portal copilot enable' sets up. Left out, the portal offers none. The chat uses APIMatic's Ask AI service, or the one the APIMATIC_COPILOT_URL environment variable names.",
               "additionalProperties": false,
-              "required": ["key", "apiUrl"],
+              "required": ["key"],
               "properties": {
                 "key": {
                   "type": "string",
-                  "description": "A public Ask AI key, bound to this portal and to the origins allowed to use it.",
+                  "description": "The portal's public Ask AI key, which 'apimatic portal copilot enable' writes. It is bound to this portal and to the origins allowed to use it.",
                   "minLength": 1
-                },
-                "apiUrl": {
-                  "type": "string",
-                  "description": "The address of APIMatic's Ask AI service, such as 'https://ask.apimatic.io', or of one on this machine while developing it, such as 'http://localhost:8787'. The address alone, without a path.",
-                  "pattern": "^([hH][tT][tT][pP][sS]://([A-Za-z0-9_-]+\\.)*[aA][pP][iI][mM][aA][tT][iI][cC]\\.[iI][oO]|[hH][tT][tT][pP][sS]?://([lL][oO][cC][aA][lL][hH][oO][sS][tT]|127\\.0\\.0\\.1|\\[::1\\]))(:(6553[0-5]|655[0-2][0-9]|65[0-4][0-9]{2}|6[0-4][0-9]{3}|[1-5][0-9]{4}|[1-9][0-9]{0,3}|0))?/?$"
                 },
                 "suggestions": {
                   "type": "array",

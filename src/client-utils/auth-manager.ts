@@ -57,3 +57,17 @@ export async function removeAuthInfo(configDir: DirectoryPath): Promise<void> {
 
   return await fs.writeFile(configFilePath, JSON.stringify(credentials));
 }
+
+/**
+ * The key a command sends: the one passed with `--auth-key`, else the saved login's, or null with
+ * neither. A blank flag (say, from an unset variable) is no key, and `auth logout` blanks the saved
+ * key rather than deleting the file, so both are checked for content.
+ */
+export async function resolveAuthKey(configDir: DirectoryPath, passed: string | null): Promise<string | null> {
+  const flagged = passed?.trim() ?? "";
+  if (flagged !== "") {
+    return flagged;
+  }
+  const saved = (await getAuthInfo(configDir.toString()))?.authKey;
+  return saved || null;
+}
