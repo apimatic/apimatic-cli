@@ -211,10 +211,10 @@ describe('SdkGeneratePrompts, about the conflicts', () => {
       "'./sdk/typescript/src/models/book.ts'",
       'Without markers: decide whether each file stays or goes',
       "'./sdk/typescript/src/resources/reviews.ts'",
-      '2. Rerun the command; nothing needs committing first.',
-      '3. Or rerun and let the CLI resolve what is left, using either side.'
+      '2. Rerun the command.'
     ].map((line) => note.indexOf(line));
     expect(order.every((at, index) => at >= 0 && (index === 0 || at > order[index - 1]))).to.be.true;
+    expect(note).to.not.contain('let the CLI resolve');
   });
 
   it('leaves the merge tool out when git does not hold the files as unmerged, and the group a plan does not have', () => {
@@ -235,7 +235,7 @@ describe('SdkGeneratePrompts, about the repository', () => {
     sinon.restore();
   });
 
-  it('gives the steps that keep edits when the SDK directory is not a repository: --git-init first, then customize', () => {
+  it('gives the steps that keep edits, should the developer make any, when the SDK directory is not a repository', () => {
     const write = sinon.stub(process.stdout, 'write').returns(true);
     try {
       new SdkGeneratePrompts().gitInitSteps(sdk);
@@ -246,9 +246,10 @@ describe('SdkGeneratePrompts, about the repository', () => {
 
     const order = [
       'Next steps',
-      "Changes you make to './sdk/python' are lost the next time it is regenerated. To keep them:",
-      '1. Rerun with --git-init before you change anything. It makes the folder a git repository of its own.',
-      '2. Then customize the SDK; each later run merges your changes into the new generation.'
+      "To customize './sdk/python' and keep your changes when it is regenerated:",
+      '1. Rerun with --git-init before you change anything.' +
+        ' It makes the folder a git repository of its own, and needs git 2.38 or newer.',
+      '2. Then make your changes; each later run merges them into the new generation.'
     ];
     const at = order.map((text) => note.indexOf(text));
     expect(at).to.not.include(-1);

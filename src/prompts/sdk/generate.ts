@@ -213,13 +213,13 @@ export class SdkGeneratePrompts {
     log.info(`The generated SDK can be found at ${f.relativePath(sdk)}.`);
   }
 
-  /** How to have edits kept from now on, for an SDK written without a repository of its own. */
+  /** How to keep edits from now on, should the developer make any, for an SDK written without a repository of its own. */
   public gitInitSteps(sdk: DirectoryPath) {
     const steps = [
-      `Changes you make to ${f.relativePath(sdk)} are lost the next time it is regenerated. To keep them:`,
+      `To customize ${f.relativePath(sdk)} and keep your changes when it is regenerated:`,
       `1. Rerun with ${f.flag('git-init')} before you change anything.` +
-        ' It makes the folder a git repository of its own.',
-      '2. Then customize the SDK; each later run merges your changes into the new generation.'
+        ` It makes the folder a git repository of its own, and needs git ${GitVersion.required()} or newer.`,
+      '2. Then make your changes; each later run merges them into the new generation.'
     ];
     noteWrapped(steps.join('\n'), 'Next steps');
   }
@@ -398,8 +398,7 @@ export class SdkGeneratePrompts {
     const steps = [
       `1. Resolve ${plan.conflicts.length === 1 ? 'it' : 'them'} ${tool}by hand:`,
       ...byHand.map((line) => `   ${line}`),
-      '2. Rerun the command; nothing needs committing first.',
-      '3. Or rerun and let the CLI resolve what is left, using either side.'
+      '2. Rerun the command.'
     ];
     noteWrapped(steps.join('\n'), 'Next steps');
   }
