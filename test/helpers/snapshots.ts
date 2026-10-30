@@ -1,0 +1,57 @@
+import { TextDecoder } from 'node:util';
+import { execa } from 'execa';
+import { err, Result } from 'neverthrow';
+import { inspectSdkDirectory, recordPristineSnapshot, RepositoryProblem } from '../../src/actions/sdk/generate.js';
+import { GitService } from '../../src/infrastructure/git-service.js';
+import { DirectoryPath } from '../../src/types/file/directoryPath.js';
+import { CommitId } from '../../src/types/git/commit-id.js';
+import { SdkGeneration } from '../../src/types/sdk/sdk-generation.js';
+
+/** The repository a run would write the SDK at `sdk` through, as the run finds it; none when it is not a repository of its own. */
+export async function repositoryOf(sdk: DirectoryPath, generation: SdkGeneration): Promise<DirectoryPath | undefined> {
+  const destination = (await inspectSdkDirectory(sdk, generation, false))._unsafeUnwrap();
+  return 'repository' in destination ? destination.repository : undefined;
+}
+
+/** A pristine snapshot of `generated`, recorded under the pristine ref alone: no record file is written and no hook installed. */
+export async function recordPristine(
+  sdk: DirectoryPath,
+  generated: DirectoryPath,
+  generation: SdkGeneration
+): Promise<Result<CommitId, RepositoryProblem>> {
+  const tree = await new GitService().tree(sdk, { kind: 'everyFileIn', directory: generated }, 'normalized');
+  if (tree.isErr()) {
+    return err(tree.error);
+  }
+  return recordPristineSnapshot(sdk, tree.value, generation);
+}
+
+/** A commit's parents, author and subject, as `git show` reports them. */
+export async function describeCommit(
+  root: DirectoryPath,
+  commit: CommitId
+): Promise<{ parents: CommitId[]; authorName: string; subject: string }> {
+  const { stdout } = await execa('git', ['show', '--no-patch', '--format=%P%n%an%n%s', commit.toString()], {
+    cwd: root.toString()
+  });
+  const [parents, authorName, subject] = stdout.split('\n');
+  return {
+    parents: parents === '' ? [] : parents.split(' ').map((sha) => CommitId.fromGit(sha)!),
+    authorName,
+    subject
+  };
+}
+
+/** The files a snapshot commit holds, by path below the SDK directory, as text. */
+export async function snapshotFiles(root: DirectoryPath, commit: CommitId): Promise<Map<string, string>> {
+  const git = new GitService();
+  const entries = (await git.listTree(root, commit))._unsafeUnwrap().filter((entry) => entry.type === 'blob');
+  const blobs = (
+    await git.readBlobs(
+      root,
+      entries.map((entry) => entry.oid)
+    )
+  )._unsafeUnwrap();
+  const decoder = new TextDecoder();
+  return new Map(entries.map((entry) => [entry.path.toString(), decoder.decode(blobs.get(entry.oid)!)]));
+}
