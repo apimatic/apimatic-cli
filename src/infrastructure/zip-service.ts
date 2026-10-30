@@ -8,11 +8,46 @@ import { FilePath } from '../types/file/filePath.js';
 import { NO_PATHS, RelativePaths } from '../types/file/relative-paths.js';
 import { errorMessage } from '../utils/error-utils.js';
 
-type ZipEntry = { file: FilePath; metadataPath: string };
-type Excluded = { files: ReadonlySet<string>; directories: ReadonlySet<string> };
+export class ZipService {
+  /** Zips everything under `sourceDir`. */
+  public archive(sourceDir: DirectoryPath, outputZipPath: FilePath): Promise<Result<void, string>> {
+    return this.archiveWithout(sourceDir, outputZipPath, NO_PATHS);
+  }
+
+  /** Zips everything under `sourceDir` but the files and directories `excluding` names below it. */
+  public async archiveWithout(
+    sourceDir: DirectoryPath,
+    outputZipPath: FilePath,
+    excluding: RelativePaths
+  ): Promise<Result<void, string>> {
+    try {
+      const excluded: Excluded = {
+        files: new Set(excluding.files.map(String)),
+        directories: new Set(excluding.directories.map(String))
+      };
+      await writeZip(outputZipPath, entriesUnder(sourceDir, '', excluded));
+      return ok(undefined);
+    } catch (error) {
+      await fs.promises.rm(outputZipPath.toString(), { force: true }).catch(() => undefined);
+      return err(errorMessage(error));
+    }
+  }
+
+  public async unArchive(sourceFile: FilePath, destinationDirectory: DirectoryPath): Promise<Result<void, string>> {
+    try {
+      extract(sourceFile, destinationDirectory);
+      return ok(undefined);
+    } catch (error) {
+      return err(errorMessage(error));
+    }
+  }
+}
 
 const MAX_FILES = 100_000;
 const MAX_SIZE = 1_000_000_000; // 1 GB
+
+type ZipEntry = { file: FilePath; metadataPath: string };
+type Excluded = { files: ReadonlySet<string>; directories: ReadonlySet<string> };
 
 /** Every file below `dir` but the ones `excluded` names, each with its path inside the zip. */
 function entriesUnder(dir: DirectoryPath, relativePrefix: string, excluded: Excluded): ZipEntry[] {
@@ -68,39 +103,4 @@ function extract(sourceFile: FilePath, destinationDirectory: DirectoryPath) {
   }
 
   zip.extractAllTo(destinationDirectory.toString(), /* overwrite */ true);
-}
-
-export class ZipService {
-  /** Zips everything under `sourceDir`. */
-  public archive(sourceDir: DirectoryPath, outputZipPath: FilePath): Promise<Result<void, string>> {
-    return this.archiveWithout(sourceDir, outputZipPath, NO_PATHS);
-  }
-
-  /** Zips everything under `sourceDir` but the files and directories `excluding` names below it. */
-  public async archiveWithout(
-    sourceDir: DirectoryPath,
-    outputZipPath: FilePath,
-    excluding: RelativePaths
-  ): Promise<Result<void, string>> {
-    try {
-      const excluded: Excluded = {
-        files: new Set(excluding.files.map(String)),
-        directories: new Set(excluding.directories.map(String))
-      };
-      await writeZip(outputZipPath, entriesUnder(sourceDir, '', excluded));
-      return ok(undefined);
-    } catch (error) {
-      await fs.promises.rm(outputZipPath.toString(), { force: true }).catch(() => undefined);
-      return err(errorMessage(error));
-    }
-  }
-
-  public async unArchive(sourceFile: FilePath, destinationDirectory: DirectoryPath): Promise<Result<void, string>> {
-    try {
-      extract(sourceFile, destinationDirectory);
-      return ok(undefined);
-    } catch (error) {
-      return err(errorMessage(error));
-    }
-  }
 }

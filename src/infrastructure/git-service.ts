@@ -31,186 +31,6 @@ import { SnapshotRef } from '../types/sdk/snapshot-ref.js';
 import { errorMessage } from '../utils/error-utils.js';
 import { canonical, withDirPath } from './tmp-extensions.js';
 
-/** A remote that does not answer within this is reported, not waited for. */
-const REMOTE_TIMEOUT_MS = 30_000;
-
-// A git hook runs the CLI with its own repository in the environment; every command here is about the one it is given.
-const OWN_REPOSITORY = { GIT_DIR: undefined, GIT_WORK_TREE: undefined, GIT_INDEX_FILE: undefined };
-
-const AUTHOR = { name: 'APIMatic CLI', email: 'developer@apimatic.io' } as const;
-
-// The developer's own configuration must not change a tree, a merge or its markers.
-const SETTINGS: readonly (readonly [string, string])[] = [
-  ['core.autocrlf', 'false'],
-  ['core.safecrlf', 'false'],
-  ['core.quotePath', 'false'],
-  ['merge.conflictStyle', CONFLICT_STYLE],
-  ['merge.renormalize', 'true'],
-  ['merge.renameLimit', '10000'],
-  ['diff.renameLimit', '10000'],
-  ['gc.auto', '0']
-];
-
-const REMOTE_SETTINGS: readonly (readonly [string, string])[] = [['credential.interactive', 'false']];
-
-/** What a tree is made of: every file below a directory, whatever any ignore rule says, or the repository's working tree under its rules. */
-export type TreeSource =
-  | { kind: 'everyFileIn'; directory: DirectoryPath }
-  /** The working tree with its ignore rules honoured, except for `including`, which go in regardless. */
-  | { kind: 'workingTree'; including: readonly RelativeFilePath[] };
-
-/** Whether a tree stores each file with its line endings normalised to LF, or every byte as it is on disk. */
-export type LineEndings = 'normalized' | 'asIs';
-
-/** Whether a diff pairs a moved file into one entry naming both paths, or lists it as a deletion and an addition. */
-export type Renames = 'paired' | 'unpaired';
-
-type RunOptions = {
-  env?: Record<string, string>;
-  /** Where to put the attributes file that normalises line endings; none leaves the repository's own rules. */
-  attributesIn?: DirectoryPath;
-  input?: string;
-  /** Exit codes that are an answer rather than a failure; `any` when the caller reads the code itself. */
-  exitCodes?: readonly number[] | 'any';
-  /** A command that reaches a remote: no prompts, a batch-mode ssh and a timeout. */
-  remote?: boolean;
-};
-
-type Ran<Out> = { stdout: Out; stderr: string; exitCode: number };
-
-const problem = (reason: string): GitProblem => ({ reason });
-
-const failed = (command: string, reason: string): GitProblem => problem(`git ${command} failed: ${reason.trim()}`);
-
-/** What the server itself said, which git relays as `remote:` lines; failing that, git's first line. */
-function remoteSaid(stderr: string): string {
-  const lines = stderr
-    .split('\n')
-    .map((line) => line.trim())
-    .filter((line) => line !== '');
-  const remote = lines.filter((line) => line.startsWith('remote:')).map((line) => line.slice('remote:'.length).trim());
-  return (remote.length > 0 ? remote : lines.slice(0, 1)).join(' ');
-}
-
-/** `text` as the value git's `command` prints there; none means a damaged repository, or a git this code does not know. */
-const read = <T>(command: string, text: string, parse: (text: string) => T | undefined): Result<T, GitProblem> => {
-  const value = parse(text);
-  return value === undefined
-    ? err(problem(`git ${command} printed what could not be read: ${text.trim()}`))
-    : ok(value);
-};
-
-const readAll = <T>(
-  command: string,
-  texts: readonly string[],
-  parse: (text: string) => T | undefined
-): Result<T[], GitProblem> => {
-  const values: T[] = [];
-  for (const text of texts) {
-    const value = read(command, text, parse);
-    if (value.isErr()) {
-      return err(value.error);
-    }
-    values.push(value.value);
-  }
-  return ok(values);
-};
-
-// Windows runs an unknown command through the shell instead, which says so on stderr and exits 1.
-const isNotFound = (error: unknown): boolean =>
-  (error as { code?: string }).code === 'ENOENT' ||
-  (error instanceof ExecaError &&
-    error.exitCode === 1 &&
-    /is not recognized as an internal or external command/.test(String(error.stderr)));
-
-// Trees are stored with line endings normalised, so a CRLF file and its LF twin merge line by line; the attributes never enter the repository.
-async function attributesFile(temporary: DirectoryPath): Promise<Result<string, GitProblem>> {
-  const file = new FilePath(temporary, new FileName('attributes'));
-  try {
-    await fs.promises.writeFile(file.toString(), '* text=auto\n');
-    return ok(file.toString());
-  } catch (error) {
-    return err(problem(errorMessage(error)));
-  }
-}
-
-/** A config value, or none when it is not set. */
-async function readConfig(cwd: DirectoryPath, key: string): Promise<Result<string | undefined, GitProblem>> {
-  const ran = await run(cwd, ['config', '--get', key], { exitCodes: [0, 1] });
-  return ran.map((result) => (result.exitCode === 0 ? result.stdout.trim() : undefined));
-}
-
-// The developer's own SSH client (GIT_SSH_COMMAND, core.sshCommand, GIT_SSH) is left alone; only the default ssh is told not to ask for a passphrase.
-async function batchSsh(cwd: DirectoryPath): Promise<Result<{ GIT_SSH_COMMAND?: string }, GitProblem>> {
-  if (process.env.GIT_SSH_COMMAND !== undefined || process.env.GIT_SSH !== undefined) {
-    return ok({});
-  }
-  const command = await readConfig(cwd, 'core.sshCommand');
-  return command.map((value) => (value === undefined ? { GIT_SSH_COMMAND: 'ssh -o BatchMode=yes' } : {}));
-}
-
-/** One git command with the CLI's own settings, answering with what it printed as text, or as bytes when asked; nothing here throws. */
-async function run<Encoding extends 'utf8' | 'buffer' = 'utf8'>(
-  cwd: DirectoryPath,
-  args: string[],
-  options: RunOptions & { encoding?: Encoding } = {}
-): Promise<Result<Ran<Encoding extends 'buffer' ? Uint8Array : string>, GitProblem>> {
-  const { env = {}, attributesIn, input, encoding = 'utf8', exitCodes = [0], remote = false } = options;
-  const settings: Result<readonly (readonly [string, string])[], GitProblem> =
-    attributesIn === undefined
-      ? ok(SETTINGS)
-      : (await attributesFile(attributesIn)).map((file) => [...SETTINGS, ['core.attributesFile', file] as const]);
-  if (settings.isErr()) {
-    return err(settings.error);
-  }
-  // A remote is given no prompt, no credential dialogue, no passphrase, and a timeout, so a dead one is reported rather than waited on.
-  const ssh = remote ? await batchSsh(cwd) : ok({});
-  if (ssh.isErr()) {
-    return err(ssh.error);
-  }
-  try {
-    const result = await execa(
-      'git',
-      [
-        ...[...settings.value, ...(remote ? REMOTE_SETTINGS : [])].flatMap(([key, value]) => ['-c', `${key}=${value}`]),
-        ...args
-      ],
-      {
-        cwd: cwd.toString(),
-        env: { ...OWN_REPOSITORY, ...env, ...ssh.value, GIT_TERMINAL_PROMPT: '0', LC_ALL: 'C' },
-        input,
-        encoding: encoding as 'utf8',
-        // Bytes are read by length, and stripping would take a final CR with the newline.
-        stripFinalNewline: encoding === 'utf8',
-        timeout: remote ? REMOTE_TIMEOUT_MS : undefined,
-        reject: false
-      }
-    );
-    if (result.timedOut) {
-      return err(problem(`the remote did not answer within ${REMOTE_TIMEOUT_MS / 1000} seconds`));
-    }
-    const stderr = String(result.stderr);
-    if (exitCodes !== 'any' && !exitCodes.includes(result.exitCode ?? -1)) {
-      // With no exit code git never ran (or was killed), so execa's own message says why.
-      const reason =
-        result.exitCode === undefined
-          ? result.shortMessage ?? 'git did not run'
-          : stderr.trim() || `exit code ${result.exitCode}`;
-      return err(failed(args[0], reason));
-    }
-    return ok({
-      stdout: result.stdout as Encoding extends 'buffer' ? Uint8Array : string,
-      stderr,
-      exitCode: result.exitCode ?? -1
-    });
-  } catch (error) {
-    if (error instanceof ExecaError && error.timedOut) {
-      return err(problem(`the remote did not answer within ${REMOTE_TIMEOUT_MS / 1000} seconds`));
-    }
-    return err(failed(args[0], error instanceof ExecaError ? error.shortMessage : errorMessage(error)));
-  }
-}
-
 /**
  * The system git through its plumbing, with the same `-c` settings on every call so a developer's
  * configuration cannot change a tree or a merge; the index is touched only to mark and unmark conflicts. Nothing here throws.
@@ -611,4 +431,192 @@ export class GitService {
     });
     return ran.map((result) => result.exitCode === 0);
   }
+}
+
+/** What a tree is made of: every file below a directory, whatever any ignore rule says, or the repository's working tree under its rules. */
+export type TreeSource =
+  | { kind: 'everyFileIn'; directory: DirectoryPath }
+  /** The working tree with its ignore rules honoured, except for `including`, which go in regardless. */
+  | { kind: 'workingTree'; including: readonly RelativeFilePath[] };
+
+/** Whether a tree stores each file with its line endings normalised to LF, or every byte as it is on disk. */
+export type LineEndings = 'normalized' | 'asIs';
+
+/** Whether a diff pairs a moved file into one entry naming both paths, or lists it as a deletion and an addition. */
+export type Renames = 'paired' | 'unpaired';
+
+/** A remote that does not answer within this is reported, not waited for. */
+const REMOTE_TIMEOUT_MS = 30_000;
+
+// A git hook runs the CLI with its own repository in the environment; every command here is about the one it is given.
+const OWN_REPOSITORY = { GIT_DIR: undefined, GIT_WORK_TREE: undefined, GIT_INDEX_FILE: undefined };
+
+const AUTHOR = { name: 'APIMatic CLI', email: 'developer@apimatic.io' } as const;
+
+// The developer's own configuration must not change a tree, a merge or its markers.
+const SETTINGS: readonly (readonly [string, string])[] = [
+  ['core.autocrlf', 'false'],
+  ['core.safecrlf', 'false'],
+  ['core.quotePath', 'false'],
+  ['merge.conflictStyle', CONFLICT_STYLE],
+  ['merge.renormalize', 'true'],
+  ['merge.renameLimit', '10000'],
+  ['diff.renameLimit', '10000'],
+  ['gc.auto', '0']
+];
+
+const REMOTE_SETTINGS: readonly (readonly [string, string])[] = [['credential.interactive', 'false']];
+
+type RunOptions = {
+  env?: Record<string, string>;
+  /** Where to put the attributes file that normalises line endings; none leaves the repository's own rules. */
+  attributesIn?: DirectoryPath;
+  input?: string;
+  /** Exit codes that are an answer rather than a failure; `any` when the caller reads the code itself. */
+  exitCodes?: readonly number[] | 'any';
+  /** A command that reaches a remote: no prompts, a batch-mode ssh and a timeout. */
+  remote?: boolean;
+};
+
+type Ran<Out> = { stdout: Out; stderr: string; exitCode: number };
+
+/** One git command with the CLI's own settings, answering with what it printed as text, or as bytes when asked; nothing here throws. */
+async function run<Encoding extends 'utf8' | 'buffer' = 'utf8'>(
+  cwd: DirectoryPath,
+  args: string[],
+  options: RunOptions & { encoding?: Encoding } = {}
+): Promise<Result<Ran<Encoding extends 'buffer' ? Uint8Array : string>, GitProblem>> {
+  const { env = {}, attributesIn, input, encoding = 'utf8', exitCodes = [0], remote = false } = options;
+  const settings: Result<readonly (readonly [string, string])[], GitProblem> =
+    attributesIn === undefined
+      ? ok(SETTINGS)
+      : (await attributesFile(attributesIn)).map((file) => [...SETTINGS, ['core.attributesFile', file] as const]);
+  if (settings.isErr()) {
+    return err(settings.error);
+  }
+  // A remote is given no prompt, no credential dialogue, no passphrase, and a timeout, so a dead one is reported rather than waited on.
+  const ssh = remote ? await batchSsh(cwd) : ok({});
+  if (ssh.isErr()) {
+    return err(ssh.error);
+  }
+  try {
+    const result = await execa(
+      'git',
+      [
+        ...[...settings.value, ...(remote ? REMOTE_SETTINGS : [])].flatMap(([key, value]) => ['-c', `${key}=${value}`]),
+        ...args
+      ],
+      {
+        cwd: cwd.toString(),
+        env: { ...OWN_REPOSITORY, ...env, ...ssh.value, GIT_TERMINAL_PROMPT: '0', LC_ALL: 'C' },
+        input,
+        encoding: encoding as 'utf8',
+        // Bytes are read by length, and stripping would take a final CR with the newline.
+        stripFinalNewline: encoding === 'utf8',
+        timeout: remote ? REMOTE_TIMEOUT_MS : undefined,
+        reject: false
+      }
+    );
+    if (result.timedOut) {
+      return err(problem(`the remote did not answer within ${REMOTE_TIMEOUT_MS / 1000} seconds`));
+    }
+    const stderr = String(result.stderr);
+    if (exitCodes !== 'any' && !exitCodes.includes(result.exitCode ?? -1)) {
+      // With no exit code git never ran (or was killed), so execa's own message says why.
+      const reason =
+        result.exitCode === undefined
+          ? result.shortMessage ?? 'git did not run'
+          : stderr.trim() || `exit code ${result.exitCode}`;
+      return err(failed(args[0], reason));
+    }
+    return ok({
+      stdout: result.stdout as Encoding extends 'buffer' ? Uint8Array : string,
+      stderr,
+      exitCode: result.exitCode ?? -1
+    });
+  } catch (error) {
+    if (error instanceof ExecaError && error.timedOut) {
+      return err(problem(`the remote did not answer within ${REMOTE_TIMEOUT_MS / 1000} seconds`));
+    }
+    return err(failed(args[0], error instanceof ExecaError ? error.shortMessage : errorMessage(error)));
+  }
+}
+
+/** A config value, or none when it is not set. */
+async function readConfig(cwd: DirectoryPath, key: string): Promise<Result<string | undefined, GitProblem>> {
+  const ran = await run(cwd, ['config', '--get', key], { exitCodes: [0, 1] });
+  return ran.map((result) => (result.exitCode === 0 ? result.stdout.trim() : undefined));
+}
+
+// The developer's own SSH client (GIT_SSH_COMMAND, core.sshCommand, GIT_SSH) is left alone; only the default ssh is told not to ask for a passphrase.
+async function batchSsh(cwd: DirectoryPath): Promise<Result<{ GIT_SSH_COMMAND?: string }, GitProblem>> {
+  if (process.env.GIT_SSH_COMMAND !== undefined || process.env.GIT_SSH !== undefined) {
+    return ok({});
+  }
+  const command = await readConfig(cwd, 'core.sshCommand');
+  return command.map((value) => (value === undefined ? { GIT_SSH_COMMAND: 'ssh -o BatchMode=yes' } : {}));
+}
+
+// Trees are stored with line endings normalised, so a CRLF file and its LF twin merge line by line; the attributes never enter the repository.
+async function attributesFile(temporary: DirectoryPath): Promise<Result<string, GitProblem>> {
+  const file = new FilePath(temporary, new FileName('attributes'));
+  try {
+    await fs.promises.writeFile(file.toString(), '* text=auto\n');
+    return ok(file.toString());
+  } catch (error) {
+    return err(problem(errorMessage(error)));
+  }
+}
+
+/** `text` as the value git's `command` prints there; none means a damaged repository, or a git this code does not know. */
+function read<T>(command: string, text: string, parse: (text: string) => T | undefined): Result<T, GitProblem> {
+  const value = parse(text);
+  return value === undefined
+    ? err(problem(`git ${command} printed what could not be read: ${text.trim()}`))
+    : ok(value);
+}
+
+/** Each of `texts` read as `read` does, stopping at the first that cannot be. */
+function readAll<T>(
+  command: string,
+  texts: readonly string[],
+  parse: (text: string) => T | undefined
+): Result<T[], GitProblem> {
+  const values: T[] = [];
+  for (const text of texts) {
+    const value = read(command, text, parse);
+    if (value.isErr()) {
+      return err(value.error);
+    }
+    values.push(value.value);
+  }
+  return ok(values);
+}
+
+/** What the server itself said, which git relays as `remote:` lines; failing that, git's first line. */
+function remoteSaid(stderr: string): string {
+  const lines = stderr
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line !== '');
+  const remote = lines.filter((line) => line.startsWith('remote:')).map((line) => line.slice('remote:'.length).trim());
+  return (remote.length > 0 ? remote : lines.slice(0, 1)).join(' ');
+}
+
+// Windows runs an unknown command through the shell instead, which says so on stderr and exits 1.
+function isNotFound(error: unknown): boolean {
+  return (
+    (error as { code?: string }).code === 'ENOENT' ||
+    (error instanceof ExecaError &&
+      error.exitCode === 1 &&
+      /is not recognized as an internal or external command/.test(String(error.stderr)))
+  );
+}
+
+function failed(command: string, reason: string): GitProblem {
+  return problem(`git ${command} failed: ${reason.trim()}`);
+}
+
+function problem(reason: string): GitProblem {
+  return { reason };
 }
