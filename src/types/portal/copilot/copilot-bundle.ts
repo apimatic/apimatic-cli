@@ -28,6 +28,11 @@ interface BundleDocument {
 
 const GENERATOR_NAME = 'apimatic-cli';
 
+// The service refuses a bundle with a longer title or description. An operation's description can be a whole guide,
+// but its page's Markdown carries it in full, so cutting the field loses nothing Ask AI reads.
+const TITLE_LIMIT = 500;
+const DESCRIPTION_LIMIT = 5000;
+
 /** The portal's pages as the Ask AI service ingests them, in its format version 1. */
 export class CopilotBundle {
   private constructor(
@@ -55,8 +60,8 @@ export class CopilotBundle {
       basePath: site?.path() ?? '/',
       pages: pages.map(({ path, title, description, markdown }) => ({
         path,
-        title,
-        ...(description === null ? {} : { description }),
+        title: cap(title, TITLE_LIMIT),
+        ...(description === null ? {} : { description: cap(description, DESCRIPTION_LIMIT) }),
         markdown
       }))
     });
@@ -88,6 +93,16 @@ export function bundlePageOf(value: unknown): BundlePage | null {
   if (typeof path !== 'string' || typeof title !== 'string' || typeof markdown !== 'string') return null;
   if (description !== null && typeof description !== 'string') return null;
   return { path, title, description, markdown };
+}
+
+// Cuts on a word boundary when one is near enough the limit, so the field does not end mid-word.
+function cap(value: string, limit: number): string {
+  if (value.length <= limit) {
+    return value;
+  }
+  const cut = value.slice(0, limit);
+  const lastSpace = cut.lastIndexOf(' ');
+  return (lastSpace > limit - 40 ? cut.slice(0, lastSpace) : cut).trimEnd();
 }
 
 function isBundleDocument(value: unknown): value is BundleDocument {
