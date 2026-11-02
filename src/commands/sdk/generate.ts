@@ -49,6 +49,11 @@ ${inProse(AVAILABLE_LANGUAGES)} are available; ${inProse(UPCOMING_LANGUAGES)} ar
       description: 'Stability level of the generated SDK. Defaults to the level the language offers.',
       options: Object.values(Stability).map((s) => s.valueOf())
     }),
+    'git-init': Flags.boolean({
+      default: false,
+      description:
+        'make the SDK directory a git repository when it is not one of its own, so your edits to the SDK are kept when you regenerate it'
+    }),
     ...FlagsProvider.input,
     ...FlagsProvider.force,
     ...FlagsProvider.authKey
@@ -62,7 +67,7 @@ ${inProse(AVAILABLE_LANGUAGES)} are available; ${inProse(UPCOMING_LANGUAGES)} ar
 
   async run() {
     const {
-      flags: { language, input, destination, force, stability, 'auth-key': authKey }
+      flags: { language, input, destination, force, stability, 'auth-key': authKey, 'git-init': gitInit }
     } = await this.parse(SdkGenerate);
 
     const project = ProjectContext.at(input);
@@ -83,7 +88,8 @@ ${inProse(AVAILABLE_LANGUAGES)} are available; ${inProse(UPCOMING_LANGUAGES)} ar
       language as Language,
       StabilityChoice.for(language as Language, stability).stabilityLevel(),
       force,
-      terminal.isInteractive()
+      terminal.isInteractive(),
+      gitInit
     );
     outro(result);
   }

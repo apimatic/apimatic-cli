@@ -93,45 +93,53 @@ developer declines to overwrite"; `project-context.test.ts` "sdk" cases; `publis
 ### Phase 1: the first run records
 
 With `--git-init`, the SDK directory becomes a repository of its own and the generation is
-recorded in it, so the next run has a base.
+recorded in it under the pristine ref, so the next run has a base.
 
 Behaviour:
 
 1. Git is looked for only when the SDK directory has a `.git` of its own, a folder or a
    worktree's file, or `--git-init` was given. Otherwise the SDK is saved as in phase 0, and the
    run ends with the Next steps box: rerun with `--git-init` before changing anything.
-2. Git absent, or older than 2.38: warn that customizations will not persist, then save as
-   before, keeping any `.git`. Git present but not answering: Failed.
+2. Git absent or not answering: warn that it is not available. Older than 2.38: warn, naming the
+   version found. Either way the SDK is saved as in phase 0, `.git` included in what the save
+   removes, and no next steps are given.
 3. A repository counts only when its root is the SDK directory itself. One that only encloses
-   it is treated as none, and nothing is written into it.
-4. `--git-init` on a directory with no repository of its own: `git init` on `main` after the
-   generation succeeded, say so, save, record. A failed init writes nothing.
-5. A repository of its own with no record: say it was found, save, record.
-6. Recording: the generation as a tree of every file, committed under `refs/apimatic/pristine`
-   with the CLI as author; then `.apimatic/.gitattributes` and `.apimatic/generation.json`
-   naming the commit, each written only when changed. A failure here is a warning, since the
-   SDK is on disk.
-7. The overwrite question counts every entry but `.git`, hidden ones included, since the save
-   keeps only `.git`.
+   it is treated as none, and nothing is written into it. Git that will not say what the
+   repository is: Failed, before generating.
+4. `--git-init`, or a repository of its own: after the save, `git init` on `main` in the
+   directory, say so, record. The save removes any `.git`, so a found repository is made afresh;
+   "Found a git repository" and a save that keeps `.git` come with phase 2. A failed init is a
+   warning: the SDK is written, nothing recorded.
+5. Recording: the generation as a tree of every file, committed under `refs/apimatic/pristine`
+   with the CLI as author and chained onto the last snapshot; an identical generation keeps the
+   last commit. A failure here is a warning, since the SDK is on disk. Nothing else is written:
+   the record file arrives with the phase that first reads it.
 
-Touches: `GitService` with its runner (the `-c` settings, the attributes file for normalised
-line endings, `GIT_DIR` cleared) and the methods `version`, `topLevel`, `init`, `tree` of every
-file, `commitTree`, `resolveRef`, `treeOfCommit`, `updateRef`; `GitVersion`, `CommitId`,
-`TreeId`, `SnapshotRef`, `GenerationRecord`, `GIT_DIRECTORY`; `FileService.hasEntriesExcluding`;
-the `--git-init` flag; the prompts for the warning, the two repository messages, the Next steps,
-the failed init, a failed recording and a directory git could not inspect; the ESLint rule that
-keeps `src/types/sdk/` free of file and process access.
+Touches: `GitService` with its runner (git's messages in English, nothing else set) and the
+methods `version` (a `GitVersion`, none for no git or one that does not answer), `topLevel`,
+`init` (git creates the directory and its parents), `treeOf` every file through a temporary
+index, `commitTree`, `resolveRef`, `treeOfCommit`, `updateRef`, each failing with git's words as
+a string, which the prompts take as `reason`; `GitVersion` total, with `none`, `isFound` and
+`isSupported`; `CommitId`, `TreeId`; `GitContext` on the SDK directory: `hasGitDirectory` (a
+`.git` of its own, read without git), `isRepository(git)` (as that git sees it; false, with no
+git run, without a `.git` or a git that can serve), `recordSnapshot`, with the pristine ref a constant of the module;
+`SdkContext` as in phase 0; no run flag reaches a context, and `execute` combines the facts: the
+version is read only with a `.git` of its own or `--git-init`, and the run records only with a
+usable git; the `--git-init` flag; the prompts for the two warnings, the initialised message, the
+Next steps, the failed init, a failed recording, and a repository git would not inspect.
 
-Tests from `92988f2f`: generate-destination "with no git / an older git …" (both), "does not
-look for git without a repository …", the "not a repository of its own" group, "records into
-the SDK directory's own repository …", "asks before replacing a repository … hidden files",
-the "overwrite question" group, "reports a directory git could not inspect"; generate-write
-"overwrite" and "record" groups; sdk-context "destination, by the SDK directory's own
-repository", "destination, and when git is looked for", "exists", "initRepository", "save";
-sdk-repository-context "recordPristine" group and "the generation record" (first three);
-git-service "treeOf" (every file, CRLF stored as LF), `version`, `topLevel`, `init`,
-`commitTree`, `resolveRef`; the prompts tests for the messages added; `generation-record`,
-`snapshot-ref`, `git-version`, `commit-id` value-object tests.
+Left for the phase that first reads them: `.apimatic/generation.json` (phase 2) and its
+attributes (phase 5), trees with line endings normalised and the runner's `-c` settings
+(phase 2), `GIT_DIR` cleared for a run from a hook (phase 6), the ESLint rule for the pure
+modules (phase 8).
+
+Tests: `generate-destination.test.ts` (git absent or old, not looked for, the repository cases,
+the recording and its failures); `sdk-context.test.ts` as in phase 0; `git-context.test.ts`
+("hasGitDirectory", "isRepository", "recordSnapshot"); `git-service.test.ts` (`version`,
+`topLevel`, `init`, `treeOf`, the commit, ref and tree round trip); the prompts tests for the
+messages added; `git-version` (none included) and `object-id` value-object tests. Helpers:
+`test/helpers/sdk-generation.ts` (a stubbed generation) and `test/helpers/snapshots.ts` (a
+commit described and its files, through git itself).
 
 ### Phase 2: a regeneration merges
 
@@ -146,6 +154,12 @@ Behaviour:
    question, with no further warning. The commit missing and no remote: say the snapshot is
    not available, then record afresh. Under `--force`, a recorded SDK the run cannot merge into
    is replaced, with a warning after the write that the customizations were not carried over.
+   "Found a git repository" is said only by the first run to record in it, the one that finds
+   no record; a later run, merging or recording afresh, no longer says it.
+   A run that merges does not ask to overwrite, since it writes only what changed; the question
+   stays for every save. The merge needs `.git` to survive the write, so the save that keeps it
+   and the check that counts every entry but `.git` (a `hasFilesOtherThanMetadata`, name open)
+   may move to `GitContext`; if nothing then reads `SdkContext`, it is deleted.
 2. Snapshot the generation (every file) and the directory as it is (its ignore rules honoured,
    except that every path the base holds goes in), both with line endings normalised.
 3. Merge the two over the base with `merge-tree`, renames paired both ways. From git's merge
@@ -158,13 +172,17 @@ Behaviour:
 6. A write that fails puts back what it touched from the previous snapshot and names the
    file; if that fails too, the restore command is given. Failed.
 7. Record the new generation chained on the base; an identical generation keeps the last
-   commit. Then the summary: counts of added, updated, merged and removed files, and the
-   merged and kept files by name.
+   commit, and `.apimatic/generation.json` names it, written only when changed. Then the
+   summary: counts of added, updated, merged and removed files, and the merged and kept files
+   by name.
 8. With conflicts: list them with their kinds and how to rerun; nothing written. Failed.
 
-Touches: `GitService.hasCommit`, `listTree`, `tree` of the working tree (normalised and as
-is), `readBlobs`, `mergeTree`, `diff`; `BlobId`, `RelativeFilePath`, `ValueMap`, the
-`merge-tree` and `diff-tree` output types and parsers; `FileService.getBytes`, `writeBytes`,
+Touches: `GenerationRecord` and the record file, read by the inspection and written after every
+recording; `SnapshotRef` with the previous ref; the runner's `-c` settings and the attributes
+file that store trees with line endings normalised; `GitService.hasCommit`, `listTree`, `tree`
+of the working tree (normalised and as is), `readBlobs`, `mergeTree`, `diff`; `BlobId`,
+`RelativeFilePath`, `ValueMap`, the `merge-tree` and `diff-tree` output types and parsers;
+`FileService.getBytes`, `writeBytes`,
 `removeEmptyDirectories`; the merge plan and the summary as pure data; binary and line-ending
 rules; the `recordedSdkReplaced`, `snapshotMissing` (no remote), `sdkMerged`,
 `conflictsNotAsked`, `sdkNotWritten` and `customCodeFailed` prompts.
@@ -179,7 +197,10 @@ plan lands on disk", "a write that fails partway", the content rules except "lab
 markers …" and the binary conflict, "two spec versions" for the files they keep);
 sdk-repository-context "inspect" cases for no record, another generation and a missing
 snapshot; git-service `mergeTree`, `diff`, `listTree`, `readBlobs`, "keeps every byte …";
-`merge-plan.test.ts` for writes, deletes and the summary; `file-content` rules.
+`merge-plan.test.ts` for writes, deletes and the summary; `file-content` rules;
+`generation-record` and `snapshot-ref` value-object tests; sdk-repository-context "the
+generation record" (written beside the snapshot, absent when it cannot be read); git-service
+"stores a CRLF file with LF …".
 
 ### Phase 3: conflicts are asked about
 
@@ -255,13 +276,15 @@ Behaviour:
 
 Touches: `GitService.remoteOf`, `fetchRef`, `isAncestor`, the remote options of the runner;
 `RemoteName`; the chain reconciliation as a pure rule; `snapshotMissing` for the absent and
-failed cases.
+failed cases; `.apimatic/.gitattributes` beside the record, merging it as binary and marking
+it generated, so a pull that meets a teammate's record leaves no markers in it.
 
 Tests from `92988f2f`: generate-destination "merges in a clone only once the pristine refs
 were fetched by hand …", "merges over a clone of an SDK repository named as the destination
 …"; sdk-repository-context "sharing" group; git-service "remotes" group except the hooks
 cases, "leaves an SSH client the developer configured …", "tells an ancestor from a stranger";
-`pristine-chain.test.ts`.
+`pristine-chain.test.ts`; sdk-repository-context "is written with attributes that merge it as
+binary …" and "stays yours … when a pull meets a teammate's record".
 
 ### Phase 6: every push shares the snapshots
 
@@ -280,7 +303,9 @@ Behaviour:
 4. The run says once that it wrote the hook, or what one step is still needed, or that the hook
    could not be written. Later runs are silent.
 
-Touches: `GitService.hooksDirectory`, `hooksPathConfigured`, `hooksRunFrom`;
+Touches: `GIT_DIR`, `GIT_WORK_TREE` and `GIT_INDEX_FILE` cleared from the environment of every
+git call, since a hook runs the CLI with its own repository in the environment;
+`GitService.hooksDirectory`, `hooksPathConfigured`, `hooksRunFrom`;
 `FileService.makeExecutable`; the script and the marked block as constants; the hook decision
 as a pure rule; the `shareHookInstalled`, `shareHookNeedsOneStep` and `shareHookNotInstalled`
 prompts, and the recording notice that chooses one message.
@@ -320,8 +345,9 @@ Tests from `92988f2f`: `publish.test.ts` ("uploads the SDK without the CLI's rec
    code.
 2. The design document `.ai/plans/custom-code.md` from `533bcf1a` comes back with sections 9 and
    10 rewritten for the layout the phases produced; the decisions and the lab cases stay.
-3. The README is regenerated, and the convention notes land in the `.ai` instructions and
-   skills.
+3. The README is regenerated, the convention notes land in the `.ai` instructions and
+   skills, and an ESLint rule keeps the pure modules under `src/types/git/` free of file and
+   process access, if wanted.
 4. Optional, to decide at review: the cleanups the first attempt carried that are not this
    feature. The plugin action and the not-found hooks reading the terminal check instead of
    `process.stdin.isTTY`; the unused methods on the config, plugin, portal, spec and file
@@ -339,25 +365,21 @@ time saves the question.
   type for three flags.
 - Separate parameters. For: nothing new. Against: every caller changes with every phase.
 
-**Phase 1: where the inspection lives.** Reading the `.git` on disk, asking git for its
-version and the root, then the record.
+**Phase 1: where the inspection lives.** Answered, after three reviews of the first cut:
+`GitContext` is git on the SDK directory: `hasGitDirectory` (disk), `isRepository(git)` (as the
+git it is handed sees it; false, with no git run, when there is no `.git` or that git cannot
+serve) and `recordSnapshot`; `GitService.version` answers a `GitVersion`, none for no git, and
+`execute` reads it only when the run needs git, holding `GitVersion.none()` otherwise, so every
+fact in the action is a `const` and no run flag reaches a context. A second cut had
+`repository()` fold the availability into its answer, which gave two types the same
+`gitUnavailable` case; a third had `availability` and `isRepository` side by side, with two
+`let`s in the action to carry what each branch learnt; handing the version to `isRepository`
+removed both.
 
-- On `SdkContext`, which already holds the directory. For: the directory is the only state
-  these steps need. Against: the class grows a method for each phase.
-- Module-level functions taking the directory, with no class. For: nothing to hold. Against:
-  the project's convention is a context class around a directory.
-
-**Phase 1: the repository as a fact.** Once git says the directory is a repository of its own,
-the recording needs that root.
-
-- A second class holding the root, created only when the root is found. For: "a repository was
-  found" is carried by the type, checked once; every later phase adds to it (inspect, merge,
-  settle, record, hook). Against: two classes around one directory; the first phase would give
-  it two methods.
-- Methods on `SdkContext` that take the root they were handed. For: one class. Against: every
-  caller passes the root the class could have held, which is the middleman shape in reverse.
-- Decide by the end of phase 2, when there are enough methods to see the shape. For: the
-  evidence is in. Against: phase 1 is written one way and may be moved.
+**Phase 1: the repository as a fact.** Answered for now: `GitContext` is built on the directory
+whether or not it is a repository, and `isRepository(git)` answers which; the root is the SDK
+directory itself. To revisit at the end of phase 2, when the merge, the record and the
+settlement show whether the seam between the two contexts holds.
 
 **Phase 2: what a merge answers with.** Git's merge becomes a plan of writes, removals,
 conflicts and the summary.

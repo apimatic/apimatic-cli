@@ -58,6 +58,8 @@ export class SdkPublishAction {
         stability,
         force,
         canAsk,
+        // sdk publish does not make the SDK directory a repository.
+        false,
         packageSettingsDirectory
       );
       if (sdkGenerationResult.isFailed()) {

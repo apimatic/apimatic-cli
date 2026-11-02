@@ -1,60 +1,49 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { Buffer } from 'node:buffer';
-import { Readable } from 'node:stream';
 import { expect } from 'chai';
-import { err, ok } from 'neverthrow';
+import { err } from 'neverthrow';
 import sinon from 'sinon';
 import { GenerateAction } from '../../../src/actions/sdk/generate.js';
-import { SdkGenerationService } from '../../../src/infrastructure/services/sdk-generation-service.js';
-import { ZipService } from '../../../src/infrastructure/zip-service.js';
 import { SdkGeneratePrompts } from '../../../src/prompts/sdk/generate.js';
 import { CommandMetadata } from '../../../src/types/common/command-metadata.js';
 import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
-import { FileName } from '../../../src/types/file/fileName.js';
-import { FilePath } from '../../../src/types/file/filePath.js';
 import { FileProblem } from '../../../src/types/file/file-problem.js';
 import { ProjectContext } from '../../../src/types/project-context.js';
 import { Language, Stability } from '../../../src/types/sdk/generate.js';
 import { TempContext } from '../../../src/types/temp-context.js';
+import { Files, stubSdkGeneration, writeFiles } from '../../helpers/sdk-generation.js';
 
 const COMMAND_METADATA: CommandMetadata = { commandName: 'sdk generate', shell: 'test' };
+const GENERATED: Files = { 'README.md': '# sdk' };
 
 describe('GenerateAction (sdk)', () => {
   let root: string;
-  let sdkArchive: Buffer;
+  let generates: (files: Files) => Promise<void>;
   let generateSdk: sinon.SinonStub;
 
   const sdk = () => new DirectoryPath(path.join(root, 'sdk', 'python'));
   const at = (relative: string) => path.join(sdk().toString(), relative);
+  const read = (relative: string) => fs.readFileSync(at(relative), 'utf-8');
 
-  const execute = (options: { force?: boolean; canAsk?: boolean; destination?: DirectoryPath } = {}) =>
-    new GenerateAction(new DirectoryPath(root), COMMAND_METADATA, 'auth-key').execute(
+  const execute = async (options: { force?: boolean; canAsk?: boolean; destination?: DirectoryPath } = {}) => {
+    await generates(GENERATED);
+    return new GenerateAction(new DirectoryPath(root), COMMAND_METADATA, 'auth-key').execute(
       ProjectContext.in(new DirectoryPath(root)),
       options.destination ?? sdk(),
       Language.PYTHON,
       Stability.STABLE,
       options.force ?? true,
-      options.canAsk ?? false
+      options.canAsk ?? false,
+      false
     );
+  };
 
-  beforeEach(async () => {
+  beforeEach(() => {
     root = fs.mkdtempSync(path.join(os.tmpdir(), 'sdk-generate-'));
-    fs.mkdirSync(path.join(root, 'src', 'spec'), { recursive: true });
-    fs.writeFileSync(path.join(root, 'src', 'spec', 'openapi.json'), '{}');
-
-    const generated = path.join(root, 'generated');
-    fs.mkdirSync(generated);
-    fs.writeFileSync(path.join(generated, 'README.md'), '# sdk');
-    const archive = new FilePath(new DirectoryPath(root), new FileName('sdk.zip'));
-    (await new ZipService().archive(new DirectoryPath(generated), archive))._unsafeUnwrap();
-    sdkArchive = fs.readFileSync(archive.toString());
-
-    sinon.stub(SdkGeneratePrompts.prototype, 'generateSdk').callsFake((fn) => fn);
-    generateSdk = sinon
-      .stub(SdkGenerationService.prototype, 'generateSdk')
-      .callsFake(async () => ok(Readable.from([sdkArchive])));
+    ({ generates, generateSdk } = stubSdkGeneration(root));
+    sinon.stub(SdkGeneratePrompts.prototype, 'sdkGenerated');
+    sinon.stub(SdkGeneratePrompts.prototype, 'gitInitSteps');
   });
 
   afterEach(() => {
@@ -65,7 +54,7 @@ describe('GenerateAction (sdk)', () => {
   it('expands the generated SDK into the SDK directory', async () => {
     expect((await execute()).isSuccess()).to.be.true;
 
-    expect(fs.readFileSync(at('README.md'), 'utf-8')).to.equal('# sdk');
+    expect(read('README.md')).to.equal('# sdk');
   });
 
   it('writes into the destination itself, with no language directory below it', async () => {
@@ -103,20 +92,17 @@ describe('GenerateAction (sdk)', () => {
   });
 
   it('reports a generated SDK it cannot expand, with the reason it could not', async () => {
-    sdkArchive = Buffer.from('not a zip');
+    const problem: FileProblem = { kind: 'unzipFailed', reason: 'Invalid or unsupported zip format' };
+    sinon.stub(TempContext.prototype, 'unzip').resolves(err(problem));
     const sdkNotUnzipped = sinon.stub(SdkGeneratePrompts.prototype, 'sdkNotUnzipped');
 
     expect((await execute()).isFailed()).to.be.true;
-    const problem = sdkNotUnzipped.firstCall.args[0];
-    expect(problem.kind).to.equal('unzipFailed');
-    expect(problem.reason).to.not.be.empty;
+
+    expect(sdkNotUnzipped.firstCall.args[0]).to.equal(problem);
   });
 
   describe('the overwrite question', () => {
-    beforeEach(() => {
-      fs.mkdirSync(sdk().toString(), { recursive: true });
-      fs.writeFileSync(at('README.md'), '# mine');
-    });
+    beforeEach(() => writeFiles(sdk().toString(), { 'README.md': '# mine' }));
 
     it('stops before generating when the developer declines', async () => {
       const overwriteSdk = sinon.stub(SdkGeneratePrompts.prototype, 'overwriteSdk').resolves(false);
@@ -126,7 +112,7 @@ describe('GenerateAction (sdk)', () => {
 
       expect(overwriteSdk.firstCall.args[0].isEqual(sdk())).to.be.true;
       expect(generateSdk.called).to.be.false;
-      expect(fs.readFileSync(at('README.md'), 'utf-8')).to.equal('# mine');
+      expect(read('README.md')).to.equal('# mine');
     });
 
     it('goes ahead on yes', async () => {
@@ -134,7 +120,7 @@ describe('GenerateAction (sdk)', () => {
 
       expect((await execute({ force: false, canAsk: true })).isSuccess()).to.be.true;
 
-      expect(fs.readFileSync(at('README.md'), 'utf-8')).to.equal('# sdk');
+      expect(read('README.md')).to.equal('# sdk');
     });
 
     it('is not asked where nobody can answer it: the run fails, naming --force', async () => {
@@ -146,7 +132,7 @@ describe('GenerateAction (sdk)', () => {
       expect(overwriteSdk.called).to.be.false;
       expect(cannotAsk.firstCall.args[0].isEqual(sdk())).to.be.true;
       expect(generateSdk.called).to.be.false;
-      expect(fs.readFileSync(at('README.md'), 'utf-8')).to.equal('# mine');
+      expect(read('README.md')).to.equal('# mine');
     });
 
     it('is skipped by --force', async () => {
@@ -155,7 +141,7 @@ describe('GenerateAction (sdk)', () => {
       expect((await execute({ force: true, canAsk: true })).isSuccess()).to.be.true;
 
       expect(overwriteSdk.called).to.be.false;
-      expect(fs.readFileSync(at('README.md'), 'utf-8')).to.equal('# sdk');
+      expect(read('README.md')).to.equal('# sdk');
     });
   });
 });

@@ -3,9 +3,10 @@ import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { FileProblem } from '../../types/file/file-problem.js';
 import { format as f } from '../format.js';
 import { Result } from 'neverthrow';
-import { notZippedForUpload, withSpinner } from '../prompt.js';
+import { noteWrapped, notZippedForUpload, withSpinner } from '../prompt.js';
 import { ServiceError } from '../../infrastructure/service-error.js';
 import { AVAILABLE_LANGUAGES, Language, languageLabel, UPCOMING_LANGUAGES } from '../../types/sdk/generate.js';
+import { GitVersion } from '../../types/git/git-version.js';
 
 const names = (languages: readonly Language[]) => languages.map(languageLabel).join(', ');
 
@@ -85,5 +86,58 @@ export class SdkGeneratePrompts {
 
   public sdkGenerated(sdk: DirectoryPath) {
     log.info(`The generated SDK can be found at ${f.relativePath(sdk)}.`);
+  }
+
+  /** Git is not on PATH, or does not answer: the SDK is written as before, and edits to it will not survive the next run. */
+  public gitUnavailable() {
+    log.warn(
+      'git is not available, so your customizations to the generated SDK will not persist across regenerations.'
+    );
+  }
+
+  /** The git found is older than the feature needs: the SDK is written as before, and edits to it will not survive the next run. */
+  public gitVersionNotSupported(found: GitVersion) {
+    log.warn(
+      `git ${found.toString()} was found, but ${GitVersion.required()} or newer is needed, ` +
+        'so your customizations to the generated SDK will not persist across regenerations.'
+    );
+  }
+
+  /** Git is usable and the directory has a `.git`, yet git would not say what the repository is, so the run stops before generating. */
+  public repositoryNotInspected(sdk: DirectoryPath, reason: string) {
+    log.error(`The git repository in ${f.relativePath(sdk)} could not be inspected: ${reason}`);
+  }
+
+  /** How to keep edits from now on, should the developer make any, for an SDK written without a repository of its own. */
+  public gitInitSteps(sdk: DirectoryPath) {
+    const steps = [
+      `To customize ${f.relativePath(sdk)} and keep your changes when it is regenerated:`,
+      `1. Rerun with ${f.flag('git-init')} before you change anything.` +
+        ` It makes the folder a git repository of its own, and needs git ${GitVersion.required()} or newer.`,
+      '2. Then make your changes; each later run merges them into the new generation.'
+    ];
+    noteWrapped(steps.join('\n'), 'Next steps');
+  }
+
+  public repositoryInitialised(sdk: DirectoryPath) {
+    log.info(
+      `Initialised a git repository in ${f.relativePath(sdk)}, which keeps your customizations across regenerations.`
+    );
+  }
+
+  /** The SDK is on disk; without a repository nothing was recorded, so the next run has no base to merge against. */
+  public repositoryNotInitialised(sdk: DirectoryPath, reason: string) {
+    log.warn(
+      `The SDK was written, but ${f.relativePath(sdk)} could not be made a git repository: ${reason}\n` +
+        'The next run will replace the SDK instead of merging your customizations into it.'
+    );
+  }
+
+  /** The SDK is on disk; without its snapshot the next run has no base to merge against. */
+  public snapshotNotRecorded(reason: string) {
+    log.warn(
+      `The SDK was written, but its snapshot could not be recorded: ${reason}\n` +
+        'The next run will replace the SDK instead of merging your customizations into it.'
+    );
   }
 }

@@ -408,7 +408,7 @@ Generate an SDK for your API
 ```
 USAGE
   $ apimatic sdk generate -l csharp|java|php|python|ruby|typescript|go [-d <value>] [--codegen-version v4]
-    [--stability stable|beta] [-i <value>] [-f] [-k <value>]
+    [--stability stable|beta] [--git-init] [-i <value>] [-f] [-k <value>]
 
 FLAGS
   -d, --destination=<value>       [default: <input>/sdk/<language>] directory the SDK is generated into
@@ -420,6 +420,8 @@ FLAGS
                                   <options: csharp|java|php|python|ruby|typescript|go>
       --codegen-version=<option>  [default: v4] Version of the code generator to use
                                   <options: v4>
+      --git-init                  make the SDK directory a git repository when it is not one of its own, so your edits
+                                  to the SDK are kept when you regenerate it
       --stability=<option>        Stability level of the generated SDK. Defaults to the level the language offers.
                                   <options: stable|beta>
 
