@@ -6,6 +6,10 @@ import { ServiceError } from '../../../src/infrastructure/service-error.js';
 import { SdkGeneratePrompts } from '../../../src/prompts/sdk/generate.js';
 import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
 import { GitVersion } from '../../../src/types/git/git-version.js';
+import { CommitId } from '../../../src/types/git/commit-id.js';
+import { RelativeFilePath } from '../../../src/types/file/relativeFilePath.js';
+import { Conflict, MergeFiles } from '../../../src/types/sdk/merge-plan.js';
+import { WriteProblem } from '../../../src/types/sdk/write-problem.js';
 import { Language } from '../../../src/types/sdk/generate.js';
 
 describe('SdkGeneratePrompts.languageNotAvailable', () => {
@@ -157,24 +161,38 @@ describe('SdkGeneratePrompts, about the repository', () => {
     expect(at).to.deep.equal([...at].sort((a, b) => a - b));
   });
 
-  it('says a repository was initialised, naming the SDK directory', () => {
+  it('says a repository was initialised, or found, naming the SDK directory', () => {
     const info = sinon.stub(log, 'info');
 
     new SdkGeneratePrompts().repositoryInitialised(sdk);
+    new SdkGeneratePrompts().repositoryFound(sdk);
 
     expect(stripVTControlCharacters(info.firstCall.args[0])).to.equal(
       "Initialised a git repository in './sdk/python', which keeps your customizations across regenerations."
     );
+    expect(stripVTControlCharacters(info.secondCall.args[0])).to.equal(
+      "Found a git repository in './sdk/python', which keeps your customizations across regenerations."
+    );
   });
 
-  it('says the SDK was written without a repository when one could not be made, and what the next run does', () => {
-    const warn = sinon.stub(log, 'warn');
+  it('says that nothing was written when the repository could not be made', () => {
+    const error = sinon.stub(log, 'error');
 
     new SdkGeneratePrompts().repositoryNotInitialised(sdk, 'git broke');
 
+    expect(stripVTControlCharacters(error.firstCall.args[0])).to.equal(
+      "A git repository could not be created in './sdk/python', where the SDK's snapshots would be kept: git broke\n" +
+        'Nothing was written.'
+    );
+  });
+
+  it('says the recorded snapshot is missing, and that this generation starts afresh', () => {
+    const warn = sinon.stub(log, 'warn');
+
+    new SdkGeneratePrompts().snapshotMissing(sdk);
+
     expect(stripVTControlCharacters(warn.firstCall.args[0])).to.equal(
-      "The SDK was written, but './sdk/python' could not be made a git repository: git broke\n" +
-        'The next run will replace the SDK instead of merging your customizations into it.'
+      "The snapshot './sdk/python' was last generated from is not in its repository, so this generation is recorded afresh."
     );
   });
 
@@ -186,6 +204,130 @@ describe('SdkGeneratePrompts, about the repository', () => {
     expect(stripVTControlCharacters(warn.firstCall.args[0])).to.equal(
       'The SDK was written, but its snapshot could not be recorded: git broke\n' +
         'The next run will replace the SDK instead of merging your customizations into it.'
+    );
+  });
+});
+
+describe('SdkGeneratePrompts, about a merge', () => {
+  const sdk = new DirectoryPath(process.cwd()).join('sdk', 'python');
+  const rel = (value: string) => RelativeFilePath.fromGit(value)!;
+  const files = (overrides: Partial<MergeFiles> = {}): MergeFiles => ({
+    added: [],
+    updated: [],
+    merged: [],
+    removed: [],
+    kept: [],
+    ...overrides
+  });
+
+  afterEach(() => {
+    sinon.restore();
+  });
+
+  it('sums up what the generator did and names the files of yours it merged into or left alone, or says nothing changed', () => {
+    const info = sinon.stub(log, 'info');
+    const merged = files({
+      added: [rel('models/author.py')],
+      updated: [rel('README.md'), rel('x.py')],
+      merged: [rel('models/book.py')],
+      kept: [rel('notes.txt')]
+    });
+
+    new SdkGeneratePrompts().sdkMerged(sdk, merged);
+    new SdkGeneratePrompts().sdkUnchanged(sdk);
+
+    const said = stripVTControlCharacters(info.firstCall.args[0]);
+    expect(said).to.match(
+      /^Regenerated the SDK at '\.\/sdk\/python': 1 file added, 2 files updated,? and 1 file merged\.\n/
+    );
+    expect(said).to.contain('Merged with your changes:\n').and.to.contain('book.py');
+    expect(said).to.contain('Kept as yours:\n').and.to.contain('notes.txt');
+    expect(said).to.not.contain('README.md');
+    expect(stripVTControlCharacters(info.secondCall.args[0])).to.equal(
+      "Regenerated the SDK at './sdk/python': nothing changed."
+    );
+  });
+
+  it('lists the conflicts with what each one is, and that nothing was written', () => {
+    const write = sinon.stub(process.stdout, 'write').returns(true);
+    const conflicts: Conflict[] = [
+      { path: rel('models/book.py'), kind: 'bothChanged' },
+      { path: rel('docs/book.md'), kind: 'deletedByYou' }
+    ];
+    try {
+      new SdkGeneratePrompts().conflictsNotAsked(sdk, conflicts);
+    } finally {
+      write.restore();
+    }
+    const note = stripVTControlCharacters(write.args.map(([chunk]) => String(chunk)).join(''));
+
+    expect(note).to.contain('Conflicts in 2 files');
+    expect(note).to.contain('book.py').and.to.contain('changed by you and by the generator');
+    expect(note).to.contain('book.md').and.to.contain('deleted by you, changed by the generator');
+    expect(note).to.contain('Nothing was written.');
+  });
+
+  it('says why a forced run replaced a recorded SDK, and where the committed customizations still are', () => {
+    const warn = sinon.stub(log, 'warn');
+
+    new SdkGeneratePrompts().recordedSdkReplaced(sdk);
+
+    const said = stripVTControlCharacters(warn.firstCall.args[0]);
+    expect(said).to.contain("The new SDK could not be merged into './sdk/python', so --force replaced it");
+    expect(said).to.contain("git -C './sdk/python' diff");
+  });
+
+  it('says that nothing was written when git could not work out the merge', () => {
+    const error = sinon.stub(log, 'error');
+
+    new SdkGeneratePrompts().customCodeFailed('git broke');
+
+    expect(stripVTControlCharacters(error.firstCall.args[0])).to.equal(
+      'Your customizations could not be merged into the regenerated SDK: git broke\nNothing was written.'
+    );
+  });
+
+  it('names the file a merge could not write, and says when the directory is back as it was', () => {
+    const error = sinon.stub(log, 'error');
+    const info = sinon.stub(log, 'info');
+    const problem: WriteProblem = {
+      file: rel('models/book.py'),
+      operation: 'write',
+      reason: 'EACCES: permission denied'
+    };
+
+    new SdkGeneratePrompts().sdkNotWritten(sdk, problem);
+    new SdkGeneratePrompts().sdkRestored(sdk);
+
+    expect(stripVTControlCharacters(error.firstCall.args[0])).to.match(
+      /^'.*book\.py' could not be written: EACCES: permission denied$/
+    );
+    expect(stripVTControlCharacters(info.firstCall.args[0])).to.equal(
+      "Nothing else was changed; './sdk/python' is as it was."
+    );
+  });
+
+  it('gives the restore command, from the kept snapshot, when the directory could not be put back', () => {
+    const error = sinon.stub(log, 'error');
+    const problem: WriteProblem = { file: rel('models/book.py'), operation: 'remove', reason: 'EBUSY: resource busy' };
+
+    new SdkGeneratePrompts().sdkNotWritten(sdk, problem);
+    new SdkGeneratePrompts().sdkNotRestored(sdk, CommitId.fromGit('a'.repeat(40))!, 'EACCES on README.md');
+
+    expect(stripVTControlCharacters(error.firstCall.args[0])).to.contain('could not be removed: EBUSY: resource busy');
+    const said = stripVTControlCharacters(error.secondCall.args[0]);
+    expect(said).to.contain('The files written before it could not be put back either: EACCES on README.md');
+    expect(said).to.contain(`git -C './sdk/python' restore --source=${'a'.repeat(40)} --worktree -- .`);
+  });
+
+  it('says what the next run does when the snapshot of a merge is not recorded: merge against the previous one', () => {
+    const warn = sinon.stub(log, 'warn');
+
+    new SdkGeneratePrompts().snapshotNotRecordedAfterMerge('git broke');
+
+    expect(stripVTControlCharacters(warn.firstCall.args[0])).to.equal(
+      'The SDK was merged, but the new snapshot could not be recorded: git broke\n' +
+        'The next run will merge against the previous one.'
     );
   });
 });

@@ -7,8 +7,34 @@ import { noteWrapped, notZippedForUpload, withSpinner } from '../prompt.js';
 import { ServiceError } from '../../infrastructure/service-error.js';
 import { AVAILABLE_LANGUAGES, Language, languageLabel, UPCOMING_LANGUAGES } from '../../types/sdk/generate.js';
 import { GitVersion } from '../../types/git/git-version.js';
+import { CommitId } from '../../types/git/commit-id.js';
+import { Conflict, ConflictKind, MergeFiles } from '../../types/sdk/merge-plan.js';
+import { WriteProblem } from '../../types/sdk/write-problem.js';
+import { listedInProse } from '../../utils/string-utils.js';
 
 const names = (languages: readonly Language[]) => languages.map(languageLabel).join(', ');
+
+const plural = (count: number, noun: string) => `${count} ${noun}${count === 1 ? '' : 's'}`;
+
+const CONFLICT_LABELS: Record<ConflictKind, string> = {
+  bothChanged: 'changed by you and by the generator',
+  bothAdded: 'added by you and by the generator',
+  deletedByYou: 'deleted by you, changed by the generator',
+  noLongerGenerated: 'no longer generated',
+  binary: 'binary file changed by you and by the generator',
+  other: 'placed by git where it could, with both versions on disk'
+};
+
+const OPERATION_LABELS = { write: 'written', remove: 'removed' } as const;
+
+/** The generator's own files are a count, and so are the merged ones, which are also named below; the rest of yours are named. */
+const COUNTED_FILES = ['added', 'updated', 'merged', 'removed'] as const;
+
+/** The files of yours, each kind under its heading. */
+const NAMED_FILES = [
+  ['merged', 'Merged with your changes:'],
+  ['kept', 'Kept as yours:']
+] as const;
 
 export class SdkGeneratePrompts {
   /**
@@ -125,11 +151,91 @@ export class SdkGeneratePrompts {
     );
   }
 
-  /** The SDK is on disk; without a repository nothing was recorded, so the next run has no base to merge against. */
+  public repositoryFound(sdk: DirectoryPath) {
+    log.info(`Found a git repository in ${f.relativePath(sdk)}, which keeps your customizations across regenerations.`);
+  }
+
+  /** The first run could not make the SDK directory a repository, so nothing was written. */
   public repositoryNotInitialised(sdk: DirectoryPath, reason: string) {
+    log.error(
+      `A git repository could not be created in ${f.relativePath(sdk)}, where the SDK's snapshots would be kept: ` +
+        `${reason}\nNothing was written.`
+    );
+  }
+
+  /** The record names a snapshot the repository does not hold, so this generation starts a chain of its own. */
+  public snapshotMissing(sdk: DirectoryPath) {
     log.warn(
-      `The SDK was written, but ${f.relativePath(sdk)} could not be made a git repository: ${reason}\n` +
-        'The next run will replace the SDK instead of merging your customizations into it.'
+      `The snapshot ${f.relativePath(sdk)} was last generated from is not in its repository, ` +
+        'so this generation is recorded afresh.'
+    );
+  }
+
+  /** `--force` replaced an SDK with a generation record, which may have held customizations; git still has the committed ones. */
+  public recordedSdkReplaced(sdk: DirectoryPath) {
+    log.warn(
+      `The new SDK could not be merged into ${f.relativePath(sdk)}, so ${f.flag('force')} replaced it, ` +
+        `and your customizations to it were not carried over. Those you committed are still in its git history, ` +
+        `and git -C ${f.relativePath(sdk)} diff shows what changed; uncommitted ones are gone.`
+    );
+  }
+
+  /** Git could not work out the merge, or keep the directory before the write, so nothing was written. */
+  public customCodeFailed(reason: string) {
+    log.error(`Your customizations could not be merged into the regenerated SDK: ${reason}\nNothing was written.`);
+  }
+
+  /** The conflicted files, with what each one is, for a run that writes none of them. */
+  public conflictsNotAsked(sdk: DirectoryPath, conflicts: readonly Conflict[]) {
+    const lines = conflicts.map(
+      (conflict) => `${f.relativePath(conflict.path.in(sdk))}\n  ${CONFLICT_LABELS[conflict.kind]}`
+    );
+    noteWrapped([...lines, '', 'Nothing was written.'].join('\n'), `Conflicts in ${plural(conflicts.length, 'file')}`);
+  }
+
+  /** The file the write stopped at, and why. */
+  public sdkNotWritten(sdk: DirectoryPath, problem: WriteProblem) {
+    log.error(
+      `${f.relativePath(problem.file.in(sdk))} could not be ${OPERATION_LABELS[problem.operation]}: ${problem.reason}`
+    );
+  }
+
+  /** After a failed write, the directory is back as it was. */
+  public sdkRestored(sdk: DirectoryPath) {
+    log.info(`Nothing else was changed; ${f.relativePath(sdk)} is as it was.`);
+  }
+
+  /** After a failed write, the directory could not be put back either: the command that does, from the snapshot kept before the write. */
+  public sdkNotRestored(sdk: DirectoryPath, previous: CommitId, reason: string) {
+    log.error(
+      `The files written before it could not be put back either: ${reason}\n` +
+        `To restore ${f.relativePath(sdk)} as it was before this run:\n` +
+        `  git -C ${f.relativePath(sdk)} restore --source=${previous} --worktree -- .`
+    );
+  }
+
+  /** A merge with nothing to write: the generation is the one already on disk. */
+  public sdkUnchanged(sdk: DirectoryPath) {
+    log.info(`Regenerated the SDK at ${f.relativePath(sdk)}: nothing changed.`);
+  }
+
+  /** The counts of what the generator did, and by name the files of yours it merged into or left alone. */
+  public sdkMerged(sdk: DirectoryPath, files: MergeFiles) {
+    const counted = COUNTED_FILES.filter((kind) => files[kind].length > 0).map(
+      (kind) => `${plural(files[kind].length, 'file')} ${kind}`
+    );
+    const named = NAMED_FILES.filter(([kind]) => files[kind].length > 0).flatMap(([kind, heading]) => [
+      heading,
+      ...files[kind].map((path) => `  ${f.relativePath(path.in(sdk))}`)
+    ]);
+    log.info([`Regenerated the SDK at ${f.relativePath(sdk)}: ${listedInProse(counted)}.`, ...named].join('\n'));
+  }
+
+  /** The SDK is merged and on disk; the record still names the last snapshot, which the next run merges against again. */
+  public snapshotNotRecordedAfterMerge(reason: string) {
+    log.warn(
+      `The SDK was merged, but the new snapshot could not be recorded: ${reason}\n` +
+        'The next run will merge against the previous one.'
     );
   }
 

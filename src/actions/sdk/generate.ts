@@ -9,8 +9,8 @@ import { isAvailableLanguage, Language, Stability } from '../../types/sdk/genera
 import { ProjectContext } from '../../types/project-context.js';
 import { GitContext } from '../../types/git-context.js';
 import { GitVersion } from '../../types/git/git-version.js';
-import { SdkContext } from '../../types/sdk-context.js';
 import { GitService } from '../../infrastructure/git-service.js';
+import { GenerationRecord } from '../../types/sdk/generation-record.js';
 
 export class GenerateAction {
   private readonly prompts: SdkGeneratePrompts = new SdkGeneratePrompts();
@@ -61,22 +61,37 @@ export class GenerateAction {
 
     const gitContext = new GitContext(sdk);
     const needsGit = gitInit || (await gitContext.hasGitDirectory());
-    const git = needsGit ? await this.gitService.version() : GitVersion.none();
-    if (needsGit && !git.isFound()) {
+    const gitVersion = needsGit ? await this.gitService.version() : GitVersion.none();
+    if (needsGit && !gitVersion.isFound()) {
       this.prompts.gitUnavailable();
     }
-    if (git.isFound() && !git.isSupported()) {
-      this.prompts.gitVersionNotSupported(git);
+    if (gitVersion.isFound() && !gitVersion.isSupported()) {
+      this.prompts.gitVersionNotSupported(gitVersion);
     }
-    const repository = await gitContext.isRepository(git);
-    if (repository.isErr()) {
-      this.prompts.repositoryNotInspected(sdk, repository.error);
+    const isRepository = await gitContext.isRepository(gitVersion);
+    if (isRepository.isErr()) {
+      this.prompts.repositoryNotInspected(sdk, isRepository.error);
       return ActionResult.failed();
     }
-    const records = git.isSupported() && (gitInit || repository.value);
+    const generationRecord = isRepository.value ? await gitContext.generationRecord() : GenerationRecord.none();
+    const baseCommitId = generationRecord.baseFor(language, stability);
+    const hasSnapshot = await gitContext.hasSnapshot(baseCommitId);
+    if (hasSnapshot.isErr()) {
+      this.prompts.repositoryNotInspected(sdk, hasSnapshot.error);
+      return ActionResult.failed();
+    }
+    if (baseCommitId !== undefined && !hasSnapshot.value) {
+      this.prompts.snapshotMissing(sdk);
+    }
+    // A base that is here is merged against; without one the SDK is written afresh.
+    const mergeBaseCommitId = hasSnapshot.value ? baseCommitId : undefined;
+    const shouldMakeRepository = gitVersion.isSupported() && gitInit && !isRepository.value;
+    const shouldRecord = shouldMakeRepository || isRepository.value;
+    const isRecordingFirstTime = isRepository.value && !generationRecord.isFound();
+    const shouldReplaceOldRecord = force && generationRecord.isFound() && mergeBaseCommitId === undefined;
 
-    const sdkContext = new SdkContext(sdk);
-    if (!force && (await sdkContext.exists())) {
+    // A merge writes only what changed, so it never asks; a save replaces everything, so it does.
+    if (!force && mergeBaseCommitId === undefined && (await gitContext.hasFilesBesidesGit())) {
       if (!canAsk) {
         this.prompts.cannotAskToOverwrite(sdk);
         return ActionResult.failed();
@@ -117,22 +132,69 @@ export class GenerateAction {
         return ActionResult.failed();
       }
 
-      const saved = await sdkContext.save(generated.value);
-      if (records) {
-        const initialised = await this.gitService.init(saved);
-        if (initialised.isErr()) {
-          this.prompts.repositoryNotInitialised(saved, initialised.error);
-        } else {
-          this.prompts.repositoryInitialised(saved);
-          const recorded = await gitContext.recordSnapshot(generated.value);
-          if (recorded.isErr()) {
-            this.prompts.snapshotNotRecorded(recorded.error);
+      if (mergeBaseCommitId !== undefined) {
+        const mergePlan = await gitContext.merge(mergeBaseCommitId, generated.value);
+        if (mergePlan.isErr()) {
+          this.prompts.customCodeFailed(mergePlan.error);
+          return ActionResult.failed();
+        }
+        if (mergePlan.value.hasConflicts()) {
+          this.prompts.conflictsNotAsked(sdk, mergePlan.value.conflicts);
+          return ActionResult.failed();
+        }
+        const previous = await gitContext.keepPrevious(mergeBaseCommitId);
+        if (previous.isErr()) {
+          this.prompts.customCodeFailed(previous.error);
+          return ActionResult.failed();
+        }
+        const written = await gitContext.write(mergePlan.value, generated.value);
+        if (written.isErr()) {
+          this.prompts.sdkNotWritten(sdk, written.error);
+          const restored = await gitContext.restore(previous.value, mergePlan.value);
+          if (restored.isErr()) {
+            this.prompts.sdkNotRestored(sdk, previous.value, restored.error);
+          } else {
+            this.prompts.sdkRestored(sdk);
           }
+          return ActionResult.failed();
+        }
+        const recorded = await gitContext.recordSnapshot(generated.value, language, stability);
+        if (recorded.isErr()) {
+          this.prompts.snapshotNotRecordedAfterMerge(recorded.error);
+        }
+        if (mergePlan.value.isEmpty()) {
+          this.prompts.sdkUnchanged(sdk);
+        } else {
+          this.prompts.sdkMerged(sdk, mergePlan.value.files);
+        }
+        return ActionResult.success();
+      }
+
+      // The directory becomes a repository only once there is a generation to put in it, so a failed generation leaves none behind.
+      if (shouldMakeRepository) {
+        const initialised = await this.gitService.init(sdk);
+        if (initialised.isErr()) {
+          this.prompts.repositoryNotInitialised(sdk, initialised.error);
+          return ActionResult.failed();
+        }
+      }
+      const saved = await gitContext.save(generated.value);
+      if (shouldMakeRepository) {
+        this.prompts.repositoryInitialised(saved);
+      } else if (isRecordingFirstTime) {
+        this.prompts.repositoryFound(saved);
+      } else if (shouldReplaceOldRecord) {
+        this.prompts.recordedSdkReplaced(saved);
+      }
+      if (shouldRecord) {
+        const recorded = await gitContext.recordSnapshot(generated.value, language, stability);
+        if (recorded.isErr()) {
+          this.prompts.snapshotNotRecorded(recorded.error);
         }
       }
       this.prompts.sdkGenerated(saved);
       // No repository keeps edits, none was asked for, and git is not what is missing: the steps make one.
-      if (!records && (git.isSupported() || !needsGit)) {
+      if (!shouldRecord && (gitVersion.isSupported() || !needsGit)) {
         this.prompts.gitInitSteps(saved);
       }
       return ActionResult.success();

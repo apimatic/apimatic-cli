@@ -1,3 +1,4 @@
+import { Buffer } from 'node:buffer';
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import fsExtra from 'fs-extra';
@@ -100,6 +101,16 @@ export class FileService {
     await fsExtra.emptyDir(dir.toString()); // removes everything inside, keeps the dir
   }
 
+  /** Whether the directory holds anything but the named entries, hidden ones included; one that is not there holds nothing. */
+  public async hasEntriesExcluding(dir: DirectoryPath, excludeNames: FileName[]): Promise<boolean> {
+    try {
+      const entries = await fsExtra.readdir(dir.toString());
+      return entries.some((entry) => !excludeNames.some((exclude) => exclude.toString() === entry));
+    } catch (error) {
+      return !(error instanceof Error && 'code' in error && error.code === 'ENOENT');
+    }
+  }
+
   public async cleanDirectoryExcluding(dir: DirectoryPath, excludeNames: FileName[]): Promise<void> {
     await fsExtra.ensureDir(dir.toString());
     const entries = await fsExtra.readdir(dir.toString());
@@ -111,6 +122,17 @@ export class FileService {
           return fsExtra.remove(dir.join(entry).toString());
         })
     );
+  }
+
+  /** Removes `directory` and then each parent while it is empty, stopping below `within`, which stays whatever it holds. */
+  public async removeEmptyDirectories(directory: DirectoryPath, within: DirectoryPath): Promise<void> {
+    for (let current = directory; within.isAncestorOf(current); current = current.join('..')) {
+      try {
+        await fsExtra.rmdir(current.toString());
+      } catch {
+        return;
+      }
+    }
   }
 
   public async createDirectoryIfNotExists(dir: DirectoryPath): Promise<void> {
@@ -295,6 +317,25 @@ export class FileService {
 
   public async getStream(filePath: FilePath) {
     return fs.createReadStream(filePath.toString());
+  }
+
+  public async getBytes(filePath: FilePath): Promise<Uint8Array> {
+    return new Uint8Array(await fsExtra.readFile(filePath.toString()));
+  }
+
+  /** The bytes as they are, with the directories above the file made as needed. */
+  public async writeBytes(filePath: FilePath, content: Uint8Array): Promise<void> {
+    await fsExtra.ensureDir(filePath.directory().toString());
+    await fsExtra.writeFile(filePath.toString(), content);
+  }
+
+  /** As `writeBytes`, skipped when the file already holds these bytes, so nothing reloads. */
+  public async writeBytesIfChanged(filePath: FilePath, content: Uint8Array): Promise<boolean> {
+    if ((await this.fileExists(filePath)) && Buffer.from(await this.getBytes(filePath)).equals(content)) {
+      return false;
+    }
+    await this.writeBytes(filePath, content);
+    return true;
   }
 
   public async getContents(filePath: FilePath): Promise<string> {

@@ -1,3 +1,4 @@
+import { Buffer } from 'node:buffer';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -6,9 +7,14 @@ import { execa } from 'execa';
 import { GitService } from '../../src/infrastructure/git-service.js';
 import { canonical } from '../../src/infrastructure/tmp-extensions.js';
 import { DirectoryPath } from '../../src/types/file/directoryPath.js';
+import { RelativeFilePath } from '../../src/types/file/relativeFilePath.js';
+import { CommitId } from '../../src/types/git/commit-id.js';
+import { TreeId } from '../../src/types/git/tree-id.js';
 import { describeCommit, snapshotFiles } from '../helpers/snapshots.js';
 
 const REF = 'refs/apimatic/pristine';
+
+const rel = (value: string) => RelativeFilePath.fromGit(value)!;
 
 describe('GitService', () => {
   let root: string;
@@ -25,6 +31,18 @@ describe('GitService', () => {
     fs.mkdirSync(directory.toString(), { recursive: true });
     (await git.init(directory))._unsafeUnwrap();
     return directory;
+  };
+
+  /** Every file a tree holds, by path, as text. */
+  const filesOf = async (repo: DirectoryPath, tree: TreeId | CommitId) => {
+    const entries = (await git.listTree(repo, tree))._unsafeUnwrap();
+    const contents = (
+      await git.readBlobs(
+        repo,
+        entries.map((entry) => entry.oid)
+      )
+    )._unsafeUnwrap();
+    return new Map(entries.map((entry, index) => [entry.path.toString(), Buffer.from(contents[index]).toString()]));
   };
 
   beforeEach(() => {
@@ -125,7 +143,7 @@ describe('GitService', () => {
     });
   });
 
-  it('commits a tree, moves a ref to it, and finds the commit and its tree again', async () => {
+  it('commits a tree, moves a ref to it, finds the commit and its tree again, and knows which commits it holds', async () => {
     const repo = await repository();
     write(repo, 'a.txt', 'a\n');
     const tree = (await git.treeOf(repo, repo))._unsafeUnwrap();
@@ -142,5 +160,145 @@ describe('GitService', () => {
       subject: 'second'
     });
     expect((await git.treeOfCommit(repo, first))._unsafeUnwrap().isEqual(tree)).to.be.true;
+    expect((await git.hasCommit(repo, first))._unsafeUnwrap()).to.be.true;
+    expect((await git.hasCommit(repo, CommitId.fromGit('f'.repeat(40))!))._unsafeUnwrap()).to.be.false;
+  });
+
+  describe('trees with line endings normalised', () => {
+    it('stores a CRLF file with LF, whatever the developer’s core.autocrlf says', async () => {
+      const repo = await repository();
+      write(repo, 'crlf.txt', 'one\r\ntwo\r\n');
+      write(repo, 'lf.txt', 'one\ntwo\n');
+
+      const files = await filesOf(repo, (await git.treeOf(repo, repo))._unsafeUnwrap());
+
+      expect(files.get('crlf.txt')).to.equal('one\ntwo\n');
+      expect(files.get('lf.txt')).to.equal('one\ntwo\n');
+    });
+
+    it('honours the repository’s ignore rules for its working tree, except for the paths told to include', async () => {
+      const repo = await repository();
+      write(repo, '.gitignore', 'dist/\n*.log\n');
+      write(repo, 'src/index.ts', 'export {};\n');
+      write(repo, 'dist/index.js', 'built\n');
+      write(repo, 'dist/generated.js', 'generated\n');
+      write(repo, 'debug.log', 'noise\n');
+
+      const tree = (await git.treeOfDirectory(repo, ['dist/generated.js', 'missing.txt'].map(rel)))._unsafeUnwrap();
+
+      expect([...(await filesOf(repo, tree)).keys()]).to.have.members([
+        '.gitignore',
+        'src/index.ts',
+        'dist/generated.js'
+      ]);
+    });
+
+    it('reads a blob byte for byte, a last one ending in CR whole', async () => {
+      const repo = await repository();
+      write(repo, 'cr-at-end.bin', 'x\r');
+      write(repo, 'a.txt', 'a\n');
+      const entries = (await git.listTree(repo, (await git.treeOf(repo, repo))._unsafeUnwrap()))._unsafeUnwrap();
+      const cr = entries.find((entry) => entry.path.toString() === 'cr-at-end.bin')!;
+
+      const contents = (await git.readBlobs(repo, [cr.oid]))._unsafeUnwrap();
+
+      expect([...contents[0]]).to.deep.equal([0x78, 0x0d]);
+    });
+  });
+
+  it('keeps every byte when asked for the working tree as it is', async () => {
+    const repo = await repository();
+    write(repo, 'crlf.txt', 'one\r\ntwo\r\n');
+
+    const files = await filesOf(repo, (await git.treeOfDirectoryAsIs(repo, []))._unsafeUnwrap());
+
+    expect(files.get('crlf.txt')).to.equal('one\r\ntwo\r\n');
+  });
+
+  it('diffs two trees, pairing a moved file only when asked to', async () => {
+    const repo = await repository();
+    const before = repo.join('before');
+    const after = repo.join('after');
+    write(before, 'a.txt', 'one\ntwo\nthree\n');
+    write(before, 'b.txt', 'b\n');
+    write(after, 'moved/a.txt', 'one\ntwo\nthree\n');
+    write(after, 'b.txt', 'B\n');
+    write(after, 'c.txt', 'c\n');
+    const from = (await git.treeOf(repo, before))._unsafeUnwrap();
+    const to = (await git.treeOf(repo, after))._unsafeUnwrap();
+
+    const paired = (await git.diffTreesPairingRenames(repo, from, to))._unsafeUnwrap();
+    const plain = (await git.diffTrees(repo, from, to))._unsafeUnwrap();
+
+    const byPath = (changes: typeof paired) =>
+      changes
+        .map((change) => [change.status, change.path.toString(), 'from' in change ? change.from.toString() : undefined])
+        .sort((x, y) => String(x[1]).localeCompare(String(y[1])));
+    expect(byPath(paired)).to.deep.equal([
+      ['M', 'b.txt', undefined],
+      ['A', 'c.txt', undefined],
+      ['R', 'moved/a.txt', 'a.txt']
+    ]);
+    expect(byPath(plain)).to.deep.equal([
+      ['D', 'a.txt', undefined],
+      ['M', 'b.txt', undefined],
+      ['A', 'c.txt', undefined],
+      ['A', 'moved/a.txt', undefined]
+    ]);
+    const modified = plain.find((change) => change.path.toString() === 'b.txt')!;
+    expect('blob' in modified && modified.blob.toString()).to.have.lengthOf(40);
+  });
+
+  describe('mergeTree', () => {
+    /** A commit in `repo` holding `files`, on `parent`. */
+    const commit = async (
+      repo: DirectoryPath,
+      name: string,
+      files: Record<string, string>,
+      parent: CommitId | undefined
+    ) => {
+      const work = new DirectoryPath(path.join(root, name));
+      for (const [relative, contents] of Object.entries(files)) {
+        write(work, relative, contents);
+      }
+      return (await git.commitTree(repo, (await git.treeOf(repo, work))._unsafeUnwrap(), parent, name))._unsafeUnwrap();
+    };
+
+    it('reads the merged tree, the stages of each conflicted path and the messages', async () => {
+      const repo = await repository();
+      const base = await commit(repo, 'base', { 'same.txt': 'one\n', 'gone.txt': 'gone\n' }, undefined);
+      const ours = await commit(repo, 'ours', { 'same.txt': 'ours\n', 'gone.txt': 'kept\n' }, base);
+      const theirs = await commit(repo, 'theirs', { 'same.txt': 'theirs\n' }, base);
+
+      const merged = (await git.mergeTree(repo, ours, theirs))._unsafeUnwrap();
+
+      expect(merged.stages.map(({ stage, path: staged }) => [staged.toString(), stage])).to.have.deep.members([
+        ['same.txt', 1],
+        ['same.txt', 2],
+        ['same.txt', 3],
+        ['gone.txt', 1],
+        ['gone.txt', 2]
+      ]);
+      expect(merged.messages.map(({ paths, kind }) => [paths.map(String), kind])).to.have.deep.members([
+        [['same.txt'], 'informational'],
+        [['same.txt'], 'contents'],
+        [['gone.txt'], 'modifyDelete']
+      ]);
+      expect((await filesOf(repo, merged.tree)).get('gone.txt')).to.equal('kept\n');
+    });
+
+    it('reads a clean merge as the merged tree and nothing else', async () => {
+      const repo = await repository();
+      const base = await commit(repo, 'base', { 'a.txt': 'a\n', 'b.txt': 'b\n' }, undefined);
+      const ours = await commit(repo, 'ours', { 'a.txt': 'A\n', 'b.txt': 'b\n' }, base);
+      const theirs = await commit(repo, 'theirs', { 'a.txt': 'a\n', 'b.txt': 'B\n' }, base);
+      const both = await commit(repo, 'both', { 'a.txt': 'A\n', 'b.txt': 'B\n' }, undefined);
+
+      const merged = (await git.mergeTree(repo, ours, theirs))._unsafeUnwrap();
+
+      expect(merged.tree.isEqual((await git.treeOfCommit(repo, both))._unsafeUnwrap())).to.be.true;
+      expect(merged.stages).to.deep.equal([]);
+      expect(merged.messages).to.deep.equal([]);
+    });
   });
 });

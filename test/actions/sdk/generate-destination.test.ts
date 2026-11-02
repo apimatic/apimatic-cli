@@ -11,9 +11,11 @@ import { canonical } from '../../../src/infrastructure/tmp-extensions.js';
 import { SdkGeneratePrompts } from '../../../src/prompts/sdk/generate.js';
 import { CommandMetadata } from '../../../src/types/common/command-metadata.js';
 import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
+import { CommitId } from '../../../src/types/git/commit-id.js';
 import { GitVersion } from '../../../src/types/git/git-version.js';
 import { ProjectContext } from '../../../src/types/project-context.js';
 import { Language, Stability } from '../../../src/types/sdk/generate.js';
+import { GenerationRecord, recordContents } from '../../../src/types/sdk/generation-record.js';
 import { Files, stubSdkGeneration, writeFiles } from '../../helpers/sdk-generation.js';
 import { describeCommit, snapshotFiles } from '../../helpers/snapshots.js';
 
@@ -21,6 +23,7 @@ const COMMAND_METADATA: CommandMetadata = { commandName: 'sdk generate', shell: 
 const GENERATED: Files = { 'README.md': '# sdk' };
 /** Where the SDK directory's own repository keeps each generation as the server returned it. */
 const PRISTINE_REF = 'refs/apimatic/pristine';
+const RECORD = '.apimatic/generation.json';
 
 /** How the SDK directory is written: decided before the upload, from git and what the directory holds. */
 describe('GenerateAction (sdk) — the destination', () => {
@@ -36,16 +39,21 @@ describe('GenerateAction (sdk) — the destination', () => {
   const entries = () => fs.readdirSync(sdk().toString()).sort();
   /** The commit the pristine ref names in the SDK directory's own repository, or none. */
   const pristine = async () => (await git.resolveRef(sdk(), PRISTINE_REF))._unsafeUnwrap();
+  /** The record the last run left in the SDK directory. */
+  const record = () => GenerationRecord.parse(read(RECORD));
   const refsIn = async (cwd: string) => (await execa('git', ['for-each-ref', 'refs/apimatic'], { cwd })).stdout;
   const gitInitSteps = () => SdkGeneratePrompts.prototype.gitInitSteps as sinon.SinonStub;
+  const repositoryFound = () => SdkGeneratePrompts.prototype.repositoryFound as sinon.SinonStub;
 
-  const execute = async (options: { force?: boolean; canAsk?: boolean; gitInit?: boolean; files?: Files } = {}) => {
+  const execute = async (
+    options: { force?: boolean; canAsk?: boolean; gitInit?: boolean; stability?: Stability; files?: Files } = {}
+  ) => {
     await generates(options.files ?? GENERATED);
     return new GenerateAction(new DirectoryPath(root), COMMAND_METADATA, 'auth-key').execute(
       ProjectContext.in(new DirectoryPath(root)),
       sdk(),
       Language.PYTHON,
-      Stability.STABLE,
+      options.stability ?? Stability.STABLE,
       options.force ?? true,
       options.canAsk ?? false,
       options.gitInit ?? false
@@ -58,11 +66,18 @@ describe('GenerateAction (sdk) — the destination', () => {
     (await git.init(sdk()))._unsafeUnwrap();
   };
 
+  /** The SDK directory as a repository of its own with one generation recorded in it, as a run with --git-init leaves it. */
+  const recorded = async (files: Files = GENERATED) => {
+    expect((await execute({ gitInit: true, files })).isSuccess()).to.be.true;
+    return (await pristine())!;
+  };
+
   beforeEach(() => {
     root = canonical(fs.mkdtempSync(path.join(os.tmpdir(), 'sdk-destination-')));
     ({ generates, generateSdk } = stubSdkGeneration(root));
     sinon.stub(SdkGeneratePrompts.prototype, 'sdkGenerated');
     sinon.stub(SdkGeneratePrompts.prototype, 'repositoryInitialised');
+    sinon.stub(SdkGeneratePrompts.prototype, 'repositoryFound');
     sinon.stub(SdkGeneratePrompts.prototype, 'gitInitSteps');
   });
 
@@ -101,14 +116,14 @@ describe('GenerateAction (sdk) — the destination', () => {
         expect(gitInitSteps().called).to.be.false;
       });
 
-      it(`with ${found}, warns and replaces the SDK directory's own repository, its .git included`, async () => {
+      it(`with ${found}, warns and overwrites the SDK directory's own repository, keeping its .git`, async () => {
         await ownRepository();
         const warned = unavailable();
 
         expect((await execute()).isSuccess()).to.be.true;
 
         expect(warned.calledOnce).to.be.true;
-        expect(entries()).to.deep.equal(['README.md']);
+        expect(entries()).to.deep.equal(['.git', 'README.md']);
       });
     }
   });
@@ -139,10 +154,12 @@ describe('GenerateAction (sdk) — the destination', () => {
         expect((await execute({ force, canAsk, gitInit: true })).isSuccess()).to.be.true;
 
         expect(repositoryInitialised.firstCall.args[0].isEqual(sdk())).to.be.true;
+        expect(repositoryFound().called).to.be.false;
         expect(fs.readFileSync(at('.git/HEAD'), 'utf-8').trim()).to.equal('ref: refs/heads/main');
-        const recorded = await pristine();
-        expect(recorded).to.not.be.undefined;
-        expect([...(await snapshotFiles(sdk(), recorded!)).keys()]).to.deep.equal(['README.md']);
+        const snapshot = await pristine();
+        expect(snapshot).to.not.be.undefined;
+        expect([...(await snapshotFiles(sdk(), snapshot!)).keys()]).to.deep.equal(['README.md']);
+        expect(record().baseFor(Language.PYTHON, Stability.STABLE)).to.deep.equal(snapshot);
       });
 
       it(`writes the SDK without a repository otherwise, then gives the steps that keep edits, ${how}`, async () => {
@@ -172,34 +189,71 @@ describe('GenerateAction (sdk) — the destination', () => {
       expect(await pristine()).to.not.be.undefined;
       expect(await refsIn(root)).to.equal('');
     });
+
+    it('fails with its own message, writing nothing, when the SDK directory cannot be made a repository', async () => {
+      sinon.stub(GitService.prototype, 'init').resolves(err('git broke'));
+      const notInitialised = sinon.stub(SdkGeneratePrompts.prototype, 'repositoryNotInitialised');
+
+      expect((await execute({ gitInit: true })).isFailed()).to.be.true;
+
+      expect(fs.existsSync(at('README.md'))).to.be.false;
+      expect(notInitialised.firstCall.args[0].isEqual(sdk())).to.be.true;
+      expect(notInitialised.firstCall.args[1]).to.equal('git broke');
+    });
   });
 
   describe('when the SDK directory is a repository of its own', () => {
-    it('records into it, made afresh after the save, and keeps what was there out of the snapshot', async () => {
+    it('records into it, saying it found it, and keeps what was there out of the snapshot', async () => {
       await ownRepository();
       write('old.py', 'old');
       const repositoryInitialised = SdkGeneratePrompts.prototype.repositoryInitialised as sinon.SinonStub;
 
       expect((await execute()).isSuccess()).to.be.true;
 
-      expect(repositoryInitialised.firstCall.args[0].isEqual(sdk())).to.be.true;
-      expect(entries()).to.deep.equal(['.git', 'README.md']);
+      expect(repositoryInitialised.called).to.be.false;
+      expect(repositoryFound().firstCall.args[0].isEqual(sdk())).to.be.true;
+      expect(entries()).to.deep.equal(['.apimatic', '.git', 'README.md']);
       expect([...(await snapshotFiles(sdk(), (await pristine())!)).keys()]).to.deep.equal(['README.md']);
       expect(gitInitSteps().called).to.be.false;
     });
 
-    // Until a regeneration merges, the save remakes the repository, so each run's snapshot starts a chain of its own.
-    it('starts the snapshots over on a later run', async () => {
-      await ownRepository();
-      expect((await execute()).isSuccess()).to.be.true;
-      const first = (await pristine())!;
+    it('chains the next generation onto the last snapshot, so each run has the one before as its base, saying found only the first time', async () => {
+      const first = await recorded();
 
       expect((await execute({ files: { 'README.md': '# sdk v2' } })).isSuccess()).to.be.true;
 
       const second = (await pristine())!;
-      expect(second).to.not.deep.equal(first);
-      expect((await describeCommit(sdk(), second)).parents).to.deep.equal([]);
+      expect((await describeCommit(sdk(), second)).parents).to.deep.equal([first]);
       expect(read('README.md')).to.equal('# sdk v2');
+      expect(record().baseFor(Language.PYTHON, Stability.STABLE)).to.deep.equal(second);
+      expect(repositoryFound().called).to.be.false;
+    });
+
+    it('records afresh over an SDK generated at another stability, without a word', async () => {
+      const first = await recorded();
+      const snapshotMissing = sinon.stub(SdkGeneratePrompts.prototype, 'snapshotMissing');
+
+      expect((await execute({ stability: Stability.BETA, files: { 'README.md': '# beta' } })).isSuccess()).to.be.true;
+
+      expect(repositoryFound().called).to.be.false;
+      expect(snapshotMissing.called).to.be.false;
+      expect(record().baseFor(Language.PYTHON, Stability.STABLE)).to.be.undefined;
+      expect((await describeCommit(sdk(), record().baseFor(Language.PYTHON, Stability.BETA)!)).parents).to.deep.equal([
+        first
+      ]);
+    });
+
+    it('warns when the recorded snapshot is not in the repository, then records afresh', async () => {
+      await recorded();
+      const missing = CommitId.fromGit('f'.repeat(40))!;
+      write(RECORD, recordContents(Language.PYTHON, Stability.STABLE, missing));
+      const snapshotMissing = sinon.stub(SdkGeneratePrompts.prototype, 'snapshotMissing');
+
+      expect((await execute()).isSuccess()).to.be.true;
+
+      expect(snapshotMissing.firstCall.args[0].isEqual(sdk())).to.be.true;
+      expect(repositoryFound().called).to.be.false;
+      expect(record().baseFor(Language.PYTHON, Stability.STABLE)).to.deep.equal(await pristine());
     });
 
     it('still succeeds, with a warning, when the snapshot cannot be recorded', async () => {
@@ -213,29 +267,26 @@ describe('GenerateAction (sdk) — the destination', () => {
       expect(snapshotNotRecorded.firstCall.args).to.deep.equal(['git broke']);
     });
 
-    it('reports a repository git could not inspect, before generating', async () => {
-      await ownRepository();
-      sinon.stub(GitService.prototype, 'topLevel').resolves(err('git broke'));
-      const notInspected = sinon.stub(SdkGeneratePrompts.prototype, 'repositoryNotInspected');
+    for (const [what, prepare, breaks] of [
+      ['the repository', ownRepository, () => sinon.stub(GitService.prototype, 'topLevel').resolves(err('git broke'))],
+      [
+        'the snapshot the record names',
+        recorded,
+        () => sinon.stub(GitService.prototype, 'hasCommit').resolves(err('git broke'))
+      ]
+    ] as const) {
+      it(`reports a git that will not say what ${what} is, before generating`, async () => {
+        await prepare();
+        breaks();
+        const notInspected = sinon.stub(SdkGeneratePrompts.prototype, 'repositoryNotInspected');
+        generateSdk.resetHistory();
 
-      expect((await execute()).isFailed()).to.be.true;
+        expect((await execute()).isFailed()).to.be.true;
 
-      expect(notInspected.firstCall.args[0].isEqual(sdk())).to.be.true;
-      expect(notInspected.firstCall.args[1]).to.equal('git broke');
-      expect(generateSdk.called).to.be.false;
-    });
-  });
-
-  it('still succeeds, with a warning and the SDK written, when the directory cannot be made a repository', async () => {
-    sinon.stub(GitService.prototype, 'init').resolves(err('git broke'));
-    const notInitialised = sinon.stub(SdkGeneratePrompts.prototype, 'repositoryNotInitialised');
-
-    expect((await execute({ gitInit: true })).isSuccess()).to.be.true;
-
-    expect(read('README.md')).to.equal('# sdk');
-    expect(fs.existsSync(at('.git'))).to.be.false;
-    expect(notInitialised.firstCall.args[0].isEqual(sdk())).to.be.true;
-    expect(notInitialised.firstCall.args[1]).to.equal('git broke');
-    expect(gitInitSteps().called).to.be.false;
+        expect(notInspected.firstCall.args[0].isEqual(sdk())).to.be.true;
+        expect(notInspected.firstCall.args[1]).to.equal('git broke');
+        expect(generateSdk.called).to.be.false;
+      });
+    }
   });
 });
