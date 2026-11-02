@@ -1,6 +1,7 @@
 import { Status } from '@apimatic/sdk';
 import { err, ok, Result } from 'neverthrow';
 import { REQUEST_TIMEOUT_MS } from '../config/axios-config.js';
+import { plural } from '../utils/string-utils.js';
 import { replaceHTML } from '../utils/utils.js';
 import { ServiceError } from './service-error.js';
 import { sleep } from './timer-extensions.js';
@@ -92,7 +93,7 @@ const timedOutMessage = (label: string, budgetMs: number): string => {
   if (minutes < 1) {
     return `${label} timed out.`;
   }
-  return `${label} timed out after ${minutes} ${minutes === 1 ? 'minute' : 'minutes'}.`;
+  return `${label} timed out after ${plural(minutes, 'minute')}.`;
 };
 
 // The server writes its messages as HTML; the terminal gets their text.

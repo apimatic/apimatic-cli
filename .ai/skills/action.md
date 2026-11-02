@@ -72,7 +72,7 @@ Actions live at `src/actions/` and are the single use-case orchestrators for eac
 | Standard action (auth + services + withDirPath) | `src/actions/api/validate.ts` |
 | Standard action (multiple params + overwrite guard) | `src/actions/api/transform.ts` |
 | Standard action (Context + TempContext + service) | `src/actions/portal/generate.ts` |
-| Standard action (SDK generation + version selection) | `src/actions/sdk/generate.ts` |
+| Standard action (SDK generation + git-backed regeneration) | `src/actions/sdk/generate.ts` |
 | Standard action (gate + services + withDirPath) | `src/actions/portal/generate.ts` |
 | Minimal action (configDir only, no services) | `src/actions/auth/logout.ts` |
 | Minimal action (configDir + commandMetadata, no auth) | `src/actions/auth/status.ts` |

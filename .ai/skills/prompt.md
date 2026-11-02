@@ -65,7 +65,7 @@ Prompts live at `src/prompts/` and are the sole terminal UI layer for each comma
 | Simple (log + spinner, no interactive prompts) | `src/prompts/auth/login.ts` |
 | Simple (log-only display methods) | `src/prompts/auth/status.ts` |
 | Standard (confirm + log + spinner) | `src/prompts/portal/generate.ts` |
-| Standard (confirm + select + log + spinner) | `src/prompts/sdk/generate.ts` |
+| Standard (confirm + log + spinner + noteWrapped) | `src/prompts/sdk/generate.ts` |
 | Standard (log + spinner + structured display) | `src/prompts/api/validate.ts` |
 | Delegation (select flow + welcome message) | `src/prompts/quickstart.ts` |
 | Wizard (multi-step, noteWrapped, getTree) | `src/prompts/portal/quickstart.ts` |

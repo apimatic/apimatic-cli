@@ -6,6 +6,7 @@ import { PluginReleaseData } from '../../types/plugin-config-context.js';
 import { format as f } from '../format.js';
 import { noteWrapped } from '../prompt.js';
 import { APIMATIC_CONFIG_FILE_NAME } from '../../types/apimatic-config/document.js';
+import { plural } from '../../utils/string-utils.js';
 
 const NOTE_TITLE = 'Commands to Copy and Run';
 const TAG_PREFIX = 'v';
@@ -73,8 +74,8 @@ export class PluginPublishPrompts {
   }
 
   private contentsLine(contents: PluginContents): string {
-    const files = `${contents.fileCount} ${contents.fileCount === 1 ? 'file' : 'files'}`;
-    const directories = `${contents.directoryCount} ${contents.directoryCount === 1 ? 'dir' : 'dirs'}`;
+    const files = plural(contents.fileCount, 'file');
+    const directories = plural(contents.directoryCount, 'dir');
     return `What is about to become public: ${files}, ${directories}`;
   }
 

@@ -128,7 +128,7 @@ These three layers are always created together and mirror each other in path str
 | Action with Result error handling | `src/actions/api/validate.ts` |
 | Action with simpler constructor (no authKey) | `src/actions/auth/status.ts` |
 | Action that delegates to sub-actions | `src/actions/quickstart.ts` |
-| Prompts with spinner + confirm + select | `src/prompts/sdk/generate.ts` |
+| Prompts with spinner + confirm + noteWrapped | `src/prompts/sdk/generate.ts` |
 | Prompts with error display methods | `src/prompts/portal/generate.ts` |
 | Prompts with format helpers | `src/prompts/api/transform.ts` |
 | Prompts with noteWrapped + getTree | `src/prompts/quickstart.ts` |
