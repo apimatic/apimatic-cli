@@ -10,8 +10,10 @@ The official CLI for APIMatic.
 
 # Requirements
 
-Node.js 24 or newer, for every command. npm only warns when your Node is older, so the
-install succeeds and the CLI then refuses to run, naming the version it found.
+Node.js 24 or newer, for every command. Install with `@2`: on an older Node, npm skips a
+`latest` release whose `engines` it fails and a bare `@apimatic/cli` silently installs CLI v1.
+With `@2` npm only warns, so the install succeeds and the CLI then refuses to run, naming the
+version it found.
 
 # Getting Started
 
@@ -23,7 +25,7 @@ $ apimatic quickstart
 
 # Usage
 ```sh-session
-$ npm install -g @apimatic/cli
+$ npm install -g @apimatic/cli@2
 $ apimatic COMMAND
 running command...
 $ apimatic --help [COMMAND]
