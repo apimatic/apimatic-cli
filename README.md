@@ -10,7 +10,7 @@ The official CLI for APIMatic.
 
 # Requirements
 
-Node.js 22.12 or newer, for every command. Install with `@2`: on an older Node, npm skips a
+Node.js 22.14 or newer, for every command. Install with `@2`: on an older Node, npm skips a
 `latest` release whose `engines` it fails and a bare `@apimatic/cli` silently installs CLI v1.
 With `@2` npm only warns, so the install succeeds and the CLI then refuses to run, naming the
 version it found.
