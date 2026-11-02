@@ -274,7 +274,7 @@ describe('SdkGeneratePrompts, about a merge', () => {
 
     const said = stripVTControlCharacters(warn.firstCall.args[0]);
     expect(said).to.contain("The new SDK could not be merged into './sdk/python', so --force replaced it");
-    expect(said).to.contain("git -C './sdk/python' diff");
+    expect(said).to.contain('git -C "./sdk/python" diff');
   });
 
   it('says that nothing was written when git could not work out the merge', () => {
@@ -317,7 +317,7 @@ describe('SdkGeneratePrompts, about a merge', () => {
     expect(stripVTControlCharacters(error.firstCall.args[0])).to.contain('could not be removed: EBUSY: resource busy');
     const said = stripVTControlCharacters(error.secondCall.args[0]);
     expect(said).to.contain('The files written before it could not be put back either: EACCES on README.md');
-    expect(said).to.contain(`git -C './sdk/python' restore --source=${'a'.repeat(40)} --worktree -- .`);
+    expect(said).to.contain(`git -C "./sdk/python" restore --source=${'a'.repeat(40)} --worktree -- .`);
   });
 
   it('says what the next run does when the snapshot of a merge is not recorded: merge against the previous one', () => {

@@ -1,6 +1,7 @@
 import { isCancel, confirm, log } from '@clack/prompts';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { FileProblem } from '../../types/file/file-problem.js';
+import { RelativeFilePath } from '../../types/file/relativeFilePath.js';
 import { format as f } from '../format.js';
 import { Result } from 'neverthrow';
 import { noteWrapped, notZippedForUpload, withSpinner } from '../prompt.js';
@@ -10,11 +11,12 @@ import { GitVersion } from '../../types/git/git-version.js';
 import { CommitId } from '../../types/git/commit-id.js';
 import { Conflict, ConflictKind, MergeFiles } from '../../types/sdk/merge-plan.js';
 import { WriteProblem } from '../../types/sdk/write-problem.js';
-import { listedInProse } from '../../utils/string-utils.js';
+import { listedInProse, plural } from '../../utils/string-utils.js';
 
 const names = (languages: readonly Language[]) => languages.map(languageLabel).join(', ');
 
-const plural = (count: number, noun: string) => `${count} ${noun}${count === 1 ? '' : 's'}`;
+const listed = (heading: string, paths: readonly RelativeFilePath[], sdk: DirectoryPath): string[] =>
+  paths.length === 0 ? [] : [heading, ...paths.map((path) => `  ${f.relativePath(path.in(sdk))}`)];
 
 const CONFLICT_LABELS: Record<ConflictKind, string> = {
   bothChanged: 'changed by you and by the generator',
@@ -26,15 +28,6 @@ const CONFLICT_LABELS: Record<ConflictKind, string> = {
 };
 
 const OPERATION_LABELS = { write: 'written', remove: 'removed' } as const;
-
-/** The generator's own files are a count, and so are the merged ones, which are also named below; the rest of yours are named. */
-const COUNTED_FILES = ['added', 'updated', 'merged', 'removed'] as const;
-
-/** The files of yours, each kind under its heading. */
-const NAMED_FILES = [
-  ['merged', 'Merged with your changes:'],
-  ['kept', 'Kept as yours:']
-] as const;
 
 export class SdkGeneratePrompts {
   /**
@@ -124,7 +117,7 @@ export class SdkGeneratePrompts {
   /** The git found is older than the feature needs: the SDK is written as before, and edits to it will not survive the next run. */
   public gitVersionNotSupported(found: GitVersion) {
     log.warn(
-      `git ${found.toString()} was found, but ${GitVersion.required()} or newer is needed, ` +
+      `git ${found} was found, but ${GitVersion.required()} or newer is needed, ` +
         'so your customizations to the generated SDK will not persist across regenerations.'
     );
   }
@@ -173,10 +166,11 @@ export class SdkGeneratePrompts {
 
   /** `--force` replaced an SDK with a generation record, which may have held customizations; git still has the committed ones. */
   public recordedSdkReplaced(sdk: DirectoryPath) {
+    const diff = f.cmdAlt('git', '-C', `"${f.relative(sdk)}"`, 'diff');
     log.warn(
       `The new SDK could not be merged into ${f.relativePath(sdk)}, so ${f.flag('force')} replaced it, ` +
         `and your customizations to it were not carried over. Those you committed are still in its git history, ` +
-        `and git -C ${f.relativePath(sdk)} diff shows what changed; uncommitted ones are gone.`
+        `and ${diff} shows what changed; uncommitted ones are gone.`
     );
   }
 
@@ -207,10 +201,12 @@ export class SdkGeneratePrompts {
 
   /** After a failed write, the directory could not be put back either: the command that does, from the snapshot kept before the write. */
   public sdkNotRestored(sdk: DirectoryPath, previous: CommitId, reason: string) {
+    const quotedPath = `"${f.relative(sdk)}"`;
+    const restore = f.cmdAlt('git', '-C', quotedPath, 'restore', `--source=${previous}`, '--worktree', '--', '.');
     log.error(
       `The files written before it could not be put back either: ${reason}\n` +
         `To restore ${f.relativePath(sdk)} as it was before this run:\n` +
-        `  git -C ${f.relativePath(sdk)} restore --source=${previous} --worktree -- .`
+        `  ${restore}`
     );
   }
 
@@ -221,14 +217,14 @@ export class SdkGeneratePrompts {
 
   /** The counts of what the generator did, and by name the files of yours it merged into or left alone. */
   public sdkMerged(sdk: DirectoryPath, files: MergeFiles) {
-    const counted = COUNTED_FILES.filter((kind) => files[kind].length > 0).map(
-      (kind) => `${plural(files[kind].length, 'file')} ${kind}`
-    );
-    const named = NAMED_FILES.filter(([kind]) => files[kind].length > 0).flatMap(([kind, heading]) => [
-      heading,
-      ...files[kind].map((path) => `  ${f.relativePath(path.in(sdk))}`)
-    ]);
-    log.info([`Regenerated the SDK at ${f.relativePath(sdk)}: ${listedInProse(counted)}.`, ...named].join('\n'));
+    const counts = (['added', 'updated', 'merged', 'removed'] as const)
+      .filter((kind) => files[kind].length > 0)
+      .map((kind) => `${plural(files[kind].length, 'file')} ${kind}`);
+    const named = [
+      ...listed('Merged with your changes:', files.merged, sdk),
+      ...listed('Kept as yours:', files.kept, sdk)
+    ];
+    log.info([`Regenerated the SDK at ${f.relativePath(sdk)}: ${listedInProse(counts)}.`, ...named].join('\n'));
   }
 
   /** The SDK is merged and on disk; the record still names the last snapshot, which the next run merges against again. */
