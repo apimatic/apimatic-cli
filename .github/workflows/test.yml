@@ -14,7 +14,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        node: ['22.12.0', '24', '26']
+        node: ['22.14.0', '22', '24', '26']
 
     steps:
       - name: checkout cli
@@ -37,11 +37,14 @@ jobs:
           cache: 'pnpm'
           cache-dependency-path: pnpm-lock.yaml
 
-      - name: install dependencies
-        run: pnpm install --frozen-lockfile
+      - name: install dependencies, failing on any whose engines exclude this Node
+        run: pnpm install --frozen-lockfile --engine-strict
 
       - name: build
         run: pnpm build
+
+      - name: run the built CLI through its engines gate
+        run: node bin/run.js --version
 
       # The portal build runs Vite in a temp project whose node_modules is one link per
       # dependency, so it is the step most likely to break per platform.
