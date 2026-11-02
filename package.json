@@ -133,6 +133,7 @@
         "bin": "apimatic",
         "description": "The official CLI for APIMatic. \nTo get started with APIMatic's CLI using a step by step wizard, run 'apimatic quickstart'.",
         "hooks": {
+            "init": "./lib/hooks/upgrade-notice",
             "command_not_found": "./lib/hooks/not-found"
         },
         "plugins": [
