@@ -10,7 +10,6 @@ import { FilePath } from '../../../src/types/file/filePath.js';
 import { GitVersion } from '../../../src/types/git/git-version.js';
 import { GitOperation } from '../../../src/types/git/git-operation.js';
 import { RemoteName } from '../../../src/types/git/remote-name.js';
-import { CommitId } from '../../../src/types/git/commit-id.js';
 import { MergedText } from '../../../src/types/sdk/conflict-markers.js';
 import { Conflict, MarkedConflict, MergeFiles, Settlement, WholeConflict } from '../../../src/types/sdk/conflict.js';
 import { SHARE_HOOK_CALL, ShareHook } from '../../../src/types/sdk/share-hook.js';
