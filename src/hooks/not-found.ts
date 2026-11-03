@@ -46,15 +46,16 @@ const hook: Hook.CommandNotFound = async function (opts) {
   }
 
   if (response) {
-    const confirmedSuggestion = suggestion!;
+    let command = suggestion!;
     let argv = opts.argv ?? [];
 
-    if (confirmedSuggestion.startsWith('help:')) {
-      argv = confirmedSuggestion.split(':').slice(1);
-      suggestion = 'help';
+    // `help:sdk` is the help command run for the sdk topic, not a command of its own.
+    if (command.startsWith('help:')) {
+      argv = command.split(':').slice(1);
+      command = 'help';
     }
 
-    return this.config.runCommand(confirmedSuggestion, argv);
+    return this.config.runCommand(command, argv);
   }
 
   this.error(`Run ${cyan.bold(binHelp)} for a list of available commands.`, {
