@@ -403,7 +403,8 @@ outcomes, each holding the one call to its handler for `match` (calling, written
 notShell, notWritten) and, through `toWrite`, the content for the hook file when this run writes
 it; `fileIn` names the `pre-push` beside husky's `_`. `GitContext.shareOnPush`, a step of the run
 after each recording, writes the script (its text beside the attributes in the context, joined line
-by line, standing aside when the push carries the ref itself) and the hook as the rule says, and
+by line, standing aside when the push carries the ref itself, which it reads from a copy of stdin
+the call line keeps and hands back to the rest of the hook, 2026-11-03) and the hook as the rule says, and
 answers how the hook was left, a hook that could not be written included, since nothing about it
 stops the run. `GitService.hooksDirectory` and
 `hooksRunFrom`, with `GIT_DIR`, `GIT_WORK_TREE` and `GIT_INDEX_FILE` cleared from every call;
@@ -440,9 +441,10 @@ Done, in one slice. `RelativeDirectoryPath` (`src/types/file/`) beside `Relative
 functions; `GitService.ignoredBelow`, `ls-files` for what the ignore rules keep out below a
 directory, a directory ignored whole as one entry. `GitContext.archiveForUpload(git, tempDirectory)`
 stands beside `save` as its mirror: a save keeps `.git`, an upload leaves `.git` and the record out
-and, in a repository of its own, what git's ignore rules keep out (`keptOutOfUpload`); outside one
-git is not asked. The publish action reads git's version as generate does, when the directory has a
-`.git`, and hands it over, so a `.git` without a usable git uploads everything but the two. `sdk
+and, in a repository of its own, what git's ignore rules keep out (`keptOutOfUpload`), read with any
+git found, one too old to merge included (2026-11-03); outside one, or with no git at all, git is
+not asked. The publish action reads git's version as generate does, when the directory has a
+`.git`, and hands it over, so a `.git` with no git uploads everything but the two. `sdk
 publish` takes `--git-init`, passed through in guided mode (`SdkPublish.isGuided`: no flags, or
 `--git-init` alone) and always on with flags; `FlagsProvider.sdkForce` words `--force` for both SDK
 commands as the docs do; `dryRunNotice` says what the directory holds and what an upload leaves
