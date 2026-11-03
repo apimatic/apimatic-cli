@@ -70,9 +70,10 @@ The breaking change on its own, before any git: what a run is given, and where i
 
 Behaviour:
 
-1. `sdk generate` takes `--codegen-version`, `--stability`, `--destination`, `--force`,
-   `--input`, `--auth-key`. `--api-version` and `--zip` are gone, and with them the versioned
-   build lookup.
+1. `sdk generate` takes `--stability`, `--destination`, `--force`, `--input`, `--auth-key`.
+   `--api-version` and `--zip` are gone, and with them the versioned build lookup;
+   `--codegen-version` too (2026-11-03), on both SDK commands: v4 is the one generator, so
+   neither the flag nor the record names it.
 2. The SDK directory is the `--destination` itself, else `<input>/sdk/<language>`. One
    place derives it, for both SDK commands.
 3. The run refuses a destination that contains `src`, since the write empties it.

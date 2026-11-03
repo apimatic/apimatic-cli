@@ -411,24 +411,22 @@ Generate an SDK for your API
 
 ```
 USAGE
-  $ apimatic sdk generate -l csharp|java|php|python|ruby|typescript|go [-d <value>] [--codegen-version v4]
-    [--stability stable|beta] [--git-init] [-i <value>] [-f] [-k <value>]
+  $ apimatic sdk generate -l csharp|java|php|python|ruby|typescript|go [-d <value>] [--stability stable|beta]
+    [--git-init] [-i <value>] [-f] [-k <value>]
 
 FLAGS
-  -d, --destination=<value>       [default: <input>/sdk/<language>] directory the SDK is generated into
-  -f, --force                     Never ask. Conflicts are resolved using the generator's changes, and an SDK that can't
-                                  be merged is replaced, with a warning.
-  -i, --input=<value>             [default: ./] path to the parent directory containing the 'src' directory, which
-                                  includes API specifications and configuration files.
-  -k, --auth-key=<value>          override current authentication state with an authentication key.
-  -l, --language=<option>         (required) Programming language for SDK generation
-                                  <options: csharp|java|php|python|ruby|typescript|go>
-      --codegen-version=<option>  [default: v4] Version of the code generator to use
-                                  <options: v4>
-      --git-init                  Track the SDK directory with its own git repository so your customizations survive
-                                  regeneration.
-      --stability=<option>        Stability level of the generated SDK. Defaults to the level the language offers.
-                                  <options: stable|beta>
+  -d, --destination=<value>  [default: <input>/sdk/<language>] directory the SDK is generated into
+  -f, --force                Never ask. Conflicts are resolved using the generator's changes, and an SDK that can't be
+                             merged is replaced, with a warning.
+  -i, --input=<value>        [default: ./] path to the parent directory containing the 'src' directory, which includes
+                             API specifications and configuration files.
+  -k, --auth-key=<value>     override current authentication state with an authentication key.
+  -l, --language=<option>    (required) Programming language for SDK generation
+                             <options: csharp|java|php|python|ruby|typescript|go>
+      --git-init             Track the SDK directory with its own git repository so your customizations survive
+                             regeneration.
+      --stability=<option>   Stability level of the generated SDK. Defaults to the level the language offers.
+                             <options: stable|beta>
 
 DESCRIPTION
   Generate an SDK for your API
@@ -455,8 +453,7 @@ Generate and publish an SDK to a package registry and/or source repository
 ```
 USAGE
   $ apimatic sdk publish [-p <value>] [-v <value>] [-d <value>] [-l csharp|java|php|python|ruby|typescript|go]
-    [-f] [-i <value>] [--publish-type package|sourcecode...] [--dry-run] [--codegen-version v4] [--stability
-    stable|beta] [--git-init]
+    [-f] [-i <value>] [--publish-type package|sourcecode...] [--dry-run] [--stability stable|beta] [--git-init]
 
 FLAGS
   -d, --destination=<value>       [default: <input>/sdk/<language>] path where the sdk will be generated.
@@ -468,8 +465,6 @@ FLAGS
                                   <options: csharp|java|php|python|ruby|typescript|go>
   -p, --profile-id=<value>        Id of the publishing profile to use.
   -v, --version=<value>           Semantic version of the SDK to publish (e.g. 1.0.0).
-      --codegen-version=<option>  [default: v4] Version of the code generator to use
-                                  <options: v4>
       --dry-run                   Generate the SDK locally for review without publishing.
       --git-init                  In guided mode, make the SDK directory a git repository when it isn't one of its own,
                                   so your changes to the SDK are kept. With flags, sdk publish always does this.

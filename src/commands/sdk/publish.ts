@@ -1,7 +1,7 @@
 import { Command, Flags } from '@oclif/core';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { FlagsProvider } from '../../types/flags-provider.js';
-import { CodeGenerationVersion, Language, Stability } from '../../types/sdk/generate.js';
+import { Language, Stability } from '../../types/sdk/generate.js';
 import { StabilityChoice } from '../../types/sdk/stability-choice.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { ProjectContext } from '../../types/project-context.js';
@@ -47,11 +47,6 @@ Your changes to the SDK are merged before it is published, as sdk generate does 
     'dry-run': Flags.boolean({
       default: false,
       description: 'Generate the SDK locally for review without publishing.'
-    }),
-    'codegen-version': Flags.string({
-      description: 'Version of the code generator to use',
-      options: Object.values(CodeGenerationVersion).map((v) => v.valueOf()),
-      default: CodeGenerationVersion.V4
     }),
     stability: Flags.string({
       description: 'Stability level of the generated SDK. Defaults to the level the language offers.',
@@ -102,7 +97,6 @@ Your changes to the SDK are merged before it is published, as sdk generate does 
         'publish-type': publishType,
         'dry-run': dryRun,
         stability,
-        'codegen-version': codegenVersion,
         'git-init': gitInit
       }
     } = await this.parse(SdkPublish);
@@ -132,8 +126,7 @@ Your changes to the SDK are merged before it is published, as sdk generate does 
               language,
               ...(force && { force }),
               'publish-type': publishTypes,
-              stability,
-              'codegen-version': codegenVersion
+              stability
             }),
             commandMetadata.shell
           );

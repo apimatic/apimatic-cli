@@ -3,14 +3,7 @@ import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { FlagsProvider } from '../../types/flags-provider.js';
 import { GenerateAction } from '../../actions/sdk/generate.js';
 import { terminal } from '../../infrastructure/terminal.js';
-import {
-  AVAILABLE_LANGUAGES,
-  CodeGenerationVersion,
-  Language,
-  languageLabel,
-  Stability,
-  UPCOMING_LANGUAGES
-} from '../../types/sdk/generate.js';
+import { AVAILABLE_LANGUAGES, Language, languageLabel, Stability, UPCOMING_LANGUAGES } from '../../types/sdk/generate.js';
 import { StabilityChoice } from '../../types/sdk/stability-choice.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { ProjectContext } from '../../types/project-context.js';
@@ -40,11 +33,6 @@ To keep your changes to the generated SDK when you regenerate it, install Git 2.
     destination: Flags.string({
       char: 'd',
       description: '[default: <input>/sdk/<language>] directory the SDK is generated into'
-    }),
-    'codegen-version': Flags.string({
-      description: 'Version of the code generator to use',
-      options: Object.values(CodeGenerationVersion).map((v) => v.valueOf()),
-      default: CodeGenerationVersion.V4
     }),
     stability: Flags.string({
       description: 'Stability level of the generated SDK. Defaults to the level the language offers.',

@@ -1,6 +1,6 @@
 import { expect } from 'chai';
 import SdkPublish from '../../../src/commands/sdk/publish.js';
-import { CodeGenerationVersion, Stability } from '../../../src/types/sdk/generate.js';
+import { Stability } from '../../../src/types/sdk/generate.js';
 import { flagParser } from '../flag-parser.js';
 
 const { parse, rejects } = flagParser(SdkPublish);
@@ -13,24 +13,11 @@ describe('sdk publish flags', () => {
     expect((await rejects(['--update-plugin-config'])).message).to.contain('update-plugin-config');
   });
 
-  // v3 is retired, so v4 is the only value — but the flag stays, because the next generator should
-  // be something a caller asks for rather than something a release changes underneath them.
-  it('accepts the one code generator version there is', async () => {
-    const { flags } = (await parse(['--codegen-version', 'v4'])) as never as {
-      flags: Record<string, unknown>;
-    };
-
-    expect(flags['codegen-version']).to.equal(CodeGenerationVersion.V4);
-  });
-
-  it('defaults to that version when the flag is not passed', async () => {
-    const { flags } = (await parse([])) as never as { flags: Record<string, unknown> };
-
-    expect(flags['codegen-version']).to.equal(CodeGenerationVersion.V4);
-  });
-
-  it('refuses the retired version rather than generating something else', async () => {
-    expect((await rejects(['--codegen-version', 'v3'])).message).to.contain('v3');
+  // v3 is retired and v4 is the only generator, so there is nothing to choose; a caller that still
+  // names one is told the flag is unknown rather than generating something else quietly.
+  it('no longer accepts --codegen-version', async () => {
+    expect((await rejects(['--codegen-version', 'v4'])).message).to.contain('codegen-version');
+    expect((await rejects(['--codegen-version', 'v3'])).message).to.contain('codegen-version');
   });
 
   it('still chooses a stability level, which outlived the generator version', async () => {
