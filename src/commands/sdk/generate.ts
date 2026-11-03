@@ -3,7 +3,13 @@ import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { FlagsProvider } from '../../types/flags-provider.js';
 import { GenerateAction } from '../../actions/sdk/generate.js';
 import { terminal } from '../../infrastructure/terminal.js';
-import { AVAILABLE_LANGUAGES, Language, languageLabel, Stability, UPCOMING_LANGUAGES } from '../../types/sdk/generate.js';
+import {
+  AVAILABLE_LANGUAGES,
+  Language,
+  languageLabel,
+  Stability,
+  UPCOMING_LANGUAGES
+} from '../../types/sdk/generate.js';
 import { StabilityChoice } from '../../types/sdk/stability-choice.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { ProjectContext } from '../../types/project-context.js';
