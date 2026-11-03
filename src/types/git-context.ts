@@ -103,10 +103,7 @@ export class GitContext {
 
   /** Whether the directory has a `.git` of its own, read from disk so no git is needed to know whether git will be. */
   public async hasGitDirectory(): Promise<boolean> {
-    return (
-      (await this.fileService.directoryExists(this.directory.join(GIT_DIRECTORY.toString()))) ||
-      (await this.fileService.fileExists(new FilePath(this.directory, GIT_DIRECTORY)))
-    );
+    return hasOwnGit(this.fileService, this.directory);
   }
 
   /** Whether a save would remove anything: hidden entries such as `.github` count, only `.git` stays. */
@@ -120,18 +117,10 @@ export class GitContext {
    * or a git that can serve the merge, so a directory that is not there yet is fine.
    */
   public async isRepository(git: GitVersion): Promise<Result<boolean, string>> {
-    return git.isSupported() ? this.isRootOfRepository() : ok(false);
-  }
-
-  /** Whether git says the directory is the root of its own repository; false, with no git run, without a `.git` of its own. */
-  public async isRootOfRepository(): Promise<Result<boolean, string>> {
-    if (!(await this.hasGitDirectory())) {
+    if (!git.isSupported()) {
       return ok(false);
     }
-    // Spelt as git spells the root, so an 8.3 alias on Windows still compares equal.
-    const real = new DirectoryPath(canonical(this.directory.toString()));
-    const root = await this.gitService.topLevel(real);
-    return root.map((found) => found !== undefined && found.isEqual(real));
+    return isRootOfRepository(this.fileService, this.gitService, this.directory);
   }
 
   /** The record the last recording left; none without a file, or with one a CLI did not write. */
@@ -378,7 +367,9 @@ export class GitContext {
    * one, or outside a repository of its own, git is not asked: every file but those two.
    */
   public async archiveForUpload(git: GitVersion, tempDirectory: DirectoryPath): Promise<Result<FilePath, string>> {
-    const isRepository = git.isFound() ? await this.isRootOfRepository() : ok(false);
+    const isRepository = git.isFound()
+      ? await isRootOfRepository(this.fileService, this.gitService, this.directory)
+      : ok(false);
     if (isRepository.isErr()) {
       return err(isRepository.error);
     }
@@ -579,6 +570,29 @@ async function writeExecutable(files: FileService, file: FilePath, content: stri
   if (await files.replaceContentsIfChanged(file, content)) {
     await files.makeExecutable(file);
   }
+}
+
+/** Whether `directory` has a `.git` of its own, a folder or a worktree's file, read from disk so no git is needed to know whether git will be. */
+async function hasOwnGit(files: FileService, directory: DirectoryPath): Promise<boolean> {
+  return (
+    (await files.directoryExists(directory.join(GIT_DIRECTORY.toString()))) ||
+    (await files.fileExists(new FilePath(directory, GIT_DIRECTORY)))
+  );
+}
+
+/** Whether git says `directory` is the root of its own repository; false, with no git run, without a `.git` of its own. */
+async function isRootOfRepository(
+  files: FileService,
+  git: GitService,
+  directory: DirectoryPath
+): Promise<Result<boolean, string>> {
+  if (!(await hasOwnGit(files, directory))) {
+    return ok(false);
+  }
+  // Spelt as git spells the root, so an 8.3 alias on Windows still compares equal.
+  const real = new DirectoryPath(canonical(directory.toString()));
+  const root = await git.topLevel(real);
+  return root.map((found) => found !== undefined && found.isEqual(real));
 }
 
 /** What the upload leaves out: the two the CLI names and, in a repository of its own, what git's ignore rules keep out. */
