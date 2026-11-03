@@ -1,5 +1,6 @@
 import { isCancel, confirm, log, select } from '@clack/prompts';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
+import { FilePath } from '../../types/file/filePath.js';
 import { FileProblem } from '../../types/file/file-problem.js';
 import { format as f } from '../format.js';
 import { Result } from 'neverthrow';
@@ -12,6 +13,7 @@ import { CommitId } from '../../types/git/commit-id.js';
 import { RelativeFilePath } from '../../types/file/relativeFilePath.js';
 import { Side } from '../../types/sdk/conflict-markers.js';
 import { Conflict, ConflictKind, MergeFiles } from '../../types/sdk/conflict.js';
+import { SHARE_HOOK_CALL, ShareHook } from '../../types/sdk/share-hook.js';
 import { SnapshotFetch } from '../../types/sdk/snapshot-fetch.js';
 import { WriteProblem } from '../../types/sdk/write-problem.js';
 import { listedInProse, plural } from '../../utils/string-utils.js';
@@ -90,6 +92,19 @@ const stepsNote = (
   noteWrapped(
     [resolve, ...byHand(sdk, marked, unmarked).map((line) => `   ${line}`), '2. Rerun the command.'].join('\n'),
     'Next steps'
+  );
+
+/** The "Sharing SDK snapshots needs one step" note: why the script is not run on push, the line to add to `file`, and a commit where the file is in the repository. */
+const oneStepNote = (because: string, file: FilePath, committed = false) =>
+  noteWrapped(
+    [
+      because,
+      '',
+      `1. Add this line to ${f.relativePath(file)}:`,
+      `   ${SHARE_HOOK_CALL}`,
+      ...(committed ? ['2. Commit it; every clone shares from then on.'] : [])
+    ].join('\n'),
+    'Sharing SDK snapshots needs one step'
   );
 
 export class SdkGeneratePrompts {
@@ -428,5 +443,31 @@ export class SdkGeneratePrompts {
       `The SDK was written, but its snapshot could not be recorded: ${reason}\n` +
         'The next run will replace the SDK instead of merging your customizations into it.'
     );
+  }
+
+  /** How the pre-push hook that shares the snapshots was left; one already calling the script is nothing new. */
+  public shareHook(hook: ShareHook) {
+    hook.match({
+      calling: () => undefined,
+      written: (file) =>
+        log.info(
+          `Added a pre-push hook at ${f.relativePath(file)}, so every git push also shares the SDK's snapshots.`
+        ),
+      elsewhere: (file, runFrom, script, inRepository) =>
+        oneStepNote(
+          `git runs hooks from ${f.relativePath(runFrom)}, so the hook the CLI keeps at ` +
+            `${f.relativePath(script)} is not run on push.`,
+          file,
+          inRepository
+        ),
+      notShell: (file, script) =>
+        oneStepNote(
+          `${f.relativePath(file)} is not a shell script, so the CLI left it alone and the hook it keeps at ` +
+            `${f.relativePath(script)} is not run on push.`,
+          file
+        ),
+      notWritten: (reason) =>
+        log.warn(`The pre-push hook that shares the SDK's snapshots could not be written: ${reason}`)
+    });
   }
 }

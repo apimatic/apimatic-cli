@@ -20,6 +20,7 @@ import { GenerationRecord, recordContents } from './sdk/generation-record.js';
 import { MergePlan } from './sdk/merge-plan.js';
 import { RecordedSnapshot } from './sdk/recorded-snapshot.js';
 import { RepositoryState } from './sdk/repository-state.js';
+import { ShareHook } from './sdk/share-hook.js';
 import { SnapshotFetch } from './sdk/snapshot-fetch.js';
 import { UnresolvedFile } from './sdk/unresolved-file.js';
 import { WriteProblem } from './sdk/write-problem.js';
@@ -40,6 +41,44 @@ const RECORD_FILE = new FileName('generation.json');
 /** The attributes beside the record: a pull that meets a teammate's record keeps yours whole, with no markers in it, and GitHub folds it as generated. */
 const RECORD_ATTRIBUTES_FILE = new FileName('.gitattributes');
 const RECORD_ATTRIBUTES = `# Written by the APIMatic CLI.\n${RECORD_FILE.toString()} merge=binary linguist-generated=true\n`;
+
+/**
+ * The script the `pre-push` hook calls, for the remote git passes as `$1`: pushes the pristine ref;
+ * when the remote's chain moved on, fetches it to a tracking ref, joins the two and pushes again; a
+ * second failure is one line in the server's words, and the push never fails; a push carrying the
+ * ref itself is left to itself. Joined line by line, never a template literal: a CRLF checkout
+ * would put CR into it, which sh cannot read.
+ */
+const SHARE_HOOK_SCRIPT = [
+  '#!/bin/sh',
+  `# Shares the SDK snapshots (${PRISTINE_REF}) with the remote on every push, so a clone`,
+  '# can merge its customizations. Written by the APIMatic CLI; the pre-push hook calls it.',
+  'remote="$1"',
+  `ref=${PRISTINE_REF}`,
+  'tracking="refs/apimatic/remotes/$remote/pristine"',
+  '# A push carrying the ref itself, as git lists what is pushed on stdin, needs no help.',
+  'while read -r local_ref local_sha remote_ref remote_sha; do',
+  '  [ "$remote_ref" = "$ref" ] && exit 0',
+  'done',
+  'git rev-parse -q --verify "$ref^{commit}" >/dev/null 2>&1 || exit 0',
+  'GIT_TERMINAL_PROMPT=0 git push --quiet --no-verify "$remote" "$ref:$ref" >/dev/null 2>&1 && exit 0',
+  'GIT_TERMINAL_PROMPT=0 git fetch --quiet --no-tags "$remote" "+$ref:$tracking" >/dev/null 2>&1 || true',
+  'if git rev-parse -q --verify "$tracking^{commit}" >/dev/null 2>&1; then',
+  '  if git merge-base --is-ancestor "$ref" "$tracking"; then',
+  '    git update-ref "$ref" "$tracking"',
+  '  elif ! git merge-base --is-ancestor "$tracking" "$ref"; then',
+  "    joined=$(git -c user.name='APIMatic CLI' -c user.email=developer@apimatic.io \\",
+  '      commit-tree "$ref^{tree}" -p "$ref" -p "$tracking" -m \'apimatic: pristine chains joined\')',
+  '    git update-ref "$ref" "$joined"',
+  '  fi',
+  'fi',
+  'said=$(GIT_TERMINAL_PROMPT=0 git push --quiet --no-verify "$remote" "$ref:$ref" 2>&1 >/dev/null) && exit 0',
+  "reason=$(printf '%s\\n' \"$said\" | grep -m1 '^remote:' | sed 's/^remote: *//')",
+  '[ -z "$reason" ] && reason=$(printf \'%s\\n\' "$said" | grep -m1 .)',
+  'echo "apimatic: the SDK snapshots could not be pushed to $remote: $reason" >&2',
+  'exit 0',
+  ''
+].join('\n');
 
 /**
  * The SDK directory under git: what the disk and git say about it, what its remote holds, what a run
@@ -441,6 +480,39 @@ export class GitContext {
       return err(errorMessage(error));
     }
   }
+
+  // --- How the snapshots are shared --------------------------------------------------------------
+
+  /**
+   * Makes every `git push` share the snapshots: the script goes into git's own hooks directory and
+   * the `pre-push` hook git runs is made to call it, as `ShareHook` decides from what is there; a
+   * hook git runs from elsewhere, or in another language, is left alone and the line to add named.
+   * Nothing here stops a run: a hook that could not be written is part of the answer.
+   */
+  public async shareOnPush(): Promise<ShareHook> {
+    const own = await this.gitService.hooksDirectory(this.directory);
+    if (own.isErr()) {
+      return ShareHook.notWritten(own.error);
+    }
+    const runFrom = await this.gitService.hooksRunFrom(this.directory);
+    if (runFrom.isErr()) {
+      return ShareHook.notWritten(runFrom.error);
+    }
+    const file = ShareHook.fileIn(runFrom.value);
+    try {
+      // The script is kept whatever runs the hooks, so a hook elsewhere has it to call.
+      await writeExecutable(this.fileService, ShareHook.scriptIn(own.value), SHARE_HOOK_SCRIPT);
+      const existing = (await this.fileService.fileExists(file)) ? await this.fileService.getContents(file) : '';
+      const hook = ShareHook.found({ existing, own: own.value, runFrom: runFrom.value, repository: this.directory });
+      const content = hook.toWrite();
+      if (content !== undefined) {
+        await writeExecutable(this.fileService, file, content);
+      }
+      return hook;
+    } catch (error) {
+      return ShareHook.notWritten(errorMessage(error));
+    }
+  }
 }
 
 function recordFile(directory: DirectoryPath): FilePath {
@@ -466,6 +538,13 @@ async function ending(files: FileService, content: Uint8Array, ...samples: FileP
 async function removeFile(files: FileService, file: FilePath, within: DirectoryPath): Promise<void> {
   await files.deleteFile(file);
   await files.removeEmptyDirectories(file.directory(), within);
+}
+
+/** Writes the file when its content changed, executable as git needs a hook to be. */
+async function writeExecutable(files: FileService, file: FilePath, content: string): Promise<void> {
+  if (await files.replaceContentsIfChanged(file, content)) {
+    await files.makeExecutable(file);
+  }
 }
 
 /** Each path's content at `stage`, from the entries git holds as unmerged and their blobs, read in the same order. */

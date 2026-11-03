@@ -143,6 +143,7 @@ describe('SdkPublishAction', () => {
     writeFiles(sdk().toString(), { 'models/book.py': v1['models/book.py'].replace('USD', 'USD, VAT included') });
     await generates({ ...v1, 'models/book.py': v1['models/book.py'].replace('USD', 'US dollars') });
     sinon.stub(SdkGeneratePrompts.prototype, 'repositoryFound');
+    sinon.stub(SdkGeneratePrompts.prototype, 'shareHook');
     sinon.stub(SdkGeneratePrompts.prototype, 'conflictChoice').resolves('asPlaced');
     sinon.stub(SdkGeneratePrompts.prototype, 'sdkMerged');
     sinon.stub(SdkGeneratePrompts.prototype, 'conflictSteps');

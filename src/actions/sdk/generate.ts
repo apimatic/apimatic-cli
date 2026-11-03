@@ -219,6 +219,7 @@ export class GenerateAction {
         if (recorded.isErr()) {
           this.prompts.snapshotNotRecordedAfterMerge(recorded.error);
         }
+        this.prompts.shareHook(await gitContext.shareOnPush());
         if (choice !== 'asPlaced') {
           this.prompts.conflictsResolved(sdk, choice, plan.conflictedPaths());
         }
@@ -261,6 +262,7 @@ export class GenerateAction {
         if (recorded.isErr()) {
           this.prompts.snapshotNotRecorded(recorded.error);
         }
+        this.prompts.shareHook(await gitContext.shareOnPush());
       }
       this.prompts.sdkGenerated(saved);
       // No repository keeps edits, none was asked for, and git is not what is missing: the steps make one.

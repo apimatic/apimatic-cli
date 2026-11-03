@@ -6,6 +6,7 @@ import { execa } from 'execa';
 import { err, ok } from 'neverthrow';
 import sinon from 'sinon';
 import { GenerateAction } from '../../../src/actions/sdk/generate.js';
+import { FileService } from '../../../src/infrastructure/file-service.js';
 import { GitService } from '../../../src/infrastructure/git-service.js';
 import { canonical } from '../../../src/infrastructure/tmp-extensions.js';
 import { SdkGeneratePrompts } from '../../../src/prompts/sdk/generate.js';
@@ -16,9 +17,10 @@ import { GitVersion } from '../../../src/types/git/git-version.js';
 import { ProjectContext } from '../../../src/types/project-context.js';
 import { Language, Stability } from '../../../src/types/sdk/generate.js';
 import { GenerationRecord, recordContents } from '../../../src/types/sdk/generation-record.js';
+import { emptyGlobalGitConfig } from '../../helpers/git-environment.js';
 import { leftUnmerged } from '../../helpers/merge.js';
 import { Files, stubSdkGeneration, writeFiles } from '../../helpers/sdk-generation.js';
-import { describeCommit, fetchKind, snapshotFiles } from '../../helpers/snapshots.js';
+import { describeCommit, fetchKind, hookKind, snapshotFiles } from '../../helpers/snapshots.js';
 
 const COMMAND_METADATA: CommandMetadata = { commandName: 'sdk generate', shell: 'test' };
 const GENERATED: Files = { 'README.md': '# sdk' };
@@ -45,6 +47,7 @@ describe('GenerateAction (sdk) — the destination', () => {
   const refsIn = async (cwd: string) => (await execa('git', ['for-each-ref', 'refs/apimatic'], { cwd })).stdout;
   const gitInitSteps = () => SdkGeneratePrompts.prototype.gitInitSteps as sinon.SinonStub;
   const repositoryFound = () => SdkGeneratePrompts.prototype.repositoryFound as sinon.SinonStub;
+  const shareHook = () => SdkGeneratePrompts.prototype.shareHook as sinon.SinonStub;
 
   const execute = async (
     options: {
@@ -87,6 +90,7 @@ describe('GenerateAction (sdk) — the destination', () => {
     sinon.stub(SdkGeneratePrompts.prototype, 'repositoryInitialised');
     sinon.stub(SdkGeneratePrompts.prototype, 'repositoryFound');
     sinon.stub(SdkGeneratePrompts.prototype, 'gitInitSteps');
+    sinon.stub(SdkGeneratePrompts.prototype, 'shareHook');
   });
 
   afterEach(() => {
@@ -187,6 +191,8 @@ describe('GenerateAction (sdk) — the destination', () => {
       expect(gitInitSteps().calledOnce).to.be.true;
       expect(fs.existsSync(at('.git'))).to.be.false;
       expect(await refsIn(root)).to.equal('');
+      expect(fs.readdirSync(path.join(root, '.git', 'hooks'))).to.not.include('pre-push');
+      expect(shareHook().called).to.be.false;
     });
 
     it('makes it a repository inside the project repository with --git-init, keeping the snapshots there', async () => {
@@ -307,6 +313,54 @@ describe('GenerateAction (sdk) — the destination', () => {
     }
   });
 
+  describe('the hook that shares snapshots', () => {
+    const hookFile = (name = 'pre-push') => path.join(sdk().toString(), '.git', 'hooks', name);
+    const said = () =>
+      shareHook()
+        .getCalls()
+        .map((call) => hookKind(call.args[0]));
+    let restoreConfig: () => void;
+
+    beforeEach(async () => {
+      restoreConfig = emptyGlobalGitConfig(root);
+      await ownRepository();
+    });
+
+    afterEach(() => {
+      restoreConfig();
+    });
+
+    it('is installed after recording, and announced once, when its file is written', async () => {
+      sinon.stub(SdkGeneratePrompts.prototype, 'sdkUnchanged');
+
+      expect((await execute()).isSuccess()).to.be.true;
+      expect((await execute()).isSuccess()).to.be.true;
+
+      expect(said()).to.deep.equal([`written ${hookFile()}`, 'calling']);
+      expect(fs.readFileSync(hookFile(), 'utf8')).to.contain('apimatic-pre-push');
+      expect(fs.existsSync(hookFile('apimatic-pre-push'))).to.be.true;
+    });
+
+    it('shows the one step when git runs hooks from elsewhere, and still succeeds', async () => {
+      await execa('git', ['config', 'core.hooksPath', '.husky/_'], { cwd: sdk().toString() });
+
+      expect((await execute()).isSuccess()).to.be.true;
+
+      expect(said()).to.deep.equal([
+        `elsewhere ${at('.husky/pre-push')} from ${at('.husky/_')} script ${hookFile('apimatic-pre-push')} committed`
+      ]);
+    });
+
+    it('says the hook could not be written, and still succeeds', async () => {
+      sinon.stub(FileService.prototype, 'makeExecutable').rejects(new Error('EACCES: permission denied'));
+
+      expect((await execute()).isSuccess()).to.be.true;
+
+      expect(said()).to.deep.equal(['notWritten: EACCES: permission denied']);
+      expect(read('README.md')).to.equal('# sdk');
+    });
+  });
+
   describe('in a clone of the SDK repository', () => {
     const sh = (cwd: string, ...args: string[]) =>
       execa('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...args], { cwd });
@@ -321,7 +375,8 @@ describe('GenerateAction (sdk) — the destination', () => {
       await sh(sdk().toString(), 'commit', '-qm', 'sdk');
       await sh(root, 'init', '-q', '--bare', '--initial-branch=main', origin);
       await sh(sdk().toString(), 'remote', 'add', 'origin', origin);
-      await sh(sdk().toString(), 'push', '-q', 'origin', 'main');
+      // Hooks skipped, as a tool that bypasses them pushes, so the snapshot reaches the origin only when pushed by hand.
+      await sh(sdk().toString(), 'push', '-q', '--no-verify', 'origin', 'main');
       await sh(root, 'clone', '-q', '--no-local', origin, clone);
       return { clone: new DirectoryPath(clone), base };
     };

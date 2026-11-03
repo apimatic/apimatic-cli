@@ -18,9 +18,10 @@ import { ProjectContext } from '../../../src/types/project-context.js';
 import { GENERATED_MARKER, YOURS_MARKER } from '../../../src/types/sdk/conflict-markers.js';
 import { Language, Stability } from '../../../src/types/sdk/generate.js';
 import { GenerationRecord, recordContents } from '../../../src/types/sdk/generation-record.js';
+import { emptyGlobalGitConfig } from '../../helpers/git-environment.js';
 import { kinds } from '../../helpers/merge.js';
 import { Files, stubSdkGeneration, writeFiles } from '../../helpers/sdk-generation.js';
-import { describeCommit, snapshotFiles } from '../../helpers/snapshots.js';
+import { describeCommit, hookKind, snapshotFiles } from '../../helpers/snapshots.js';
 
 const COMMAND_METADATA: CommandMetadata = { commandName: 'sdk generate', shell: 'test' };
 /** Where the SDK directory's own repository keeps each generation as the server returned it. */
@@ -98,6 +99,7 @@ describe('GenerateAction (sdk) — a regeneration merges', () => {
     sinon.stub(SdkGeneratePrompts.prototype, 'repositoryInitialised');
     sinon.stub(SdkGeneratePrompts.prototype, 'repositoryFound');
     sinon.stub(SdkGeneratePrompts.prototype, 'sdkMerged');
+    sinon.stub(SdkGeneratePrompts.prototype, 'shareHook');
   });
 
   afterEach(() => {
@@ -318,6 +320,23 @@ describe('GenerateAction (sdk) — a regeneration merges', () => {
     expect(read('README.md')).to.equal('# sdk v2');
     expect(base()).to.deep.equal(first);
     expect(sdkMerged().calledOnce).to.be.true;
+  });
+
+  it('makes the push share the snapshots after a merge too, with nothing to say once the hook is there', async () => {
+    const restoreConfig = emptyGlobalGitConfig(root);
+    try {
+      await recorded();
+      const shareHook = SdkGeneratePrompts.prototype.shareHook as sinon.SinonStub;
+
+      expect((await execute(V2)).isSuccess()).to.be.true;
+
+      expect(shareHook.getCalls().map((call) => hookKind(call.args[0]))).to.deep.equal([
+        `written ${path.join(sdk().toString(), '.git', 'hooks', 'pre-push')}`,
+        'calling'
+      ]);
+    } finally {
+      restoreConfig();
+    }
   });
 
   describe('the question when the merge conflicts', () => {

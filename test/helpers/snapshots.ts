@@ -1,6 +1,7 @@
 import { execa } from 'execa';
 import { DirectoryPath } from '../../src/types/file/directoryPath.js';
 import { CommitId } from '../../src/types/git/commit-id.js';
+import { ShareHook } from '../../src/types/sdk/share-hook.js';
 import { SnapshotFetch } from '../../src/types/sdk/snapshot-fetch.js';
 
 /** A fetch as one line: `none`, `absent <remote>` or `failed <remote>: <reason>`. */
@@ -9,6 +10,17 @@ export const fetchKind = (fetch: SnapshotFetch): string =>
     none: () => 'none',
     absent: (remote) => `absent ${remote}`,
     failed: (remote, reason) => `failed ${remote}: ${reason}`
+  });
+
+/** How the hook that shares snapshots was left, as one line. */
+export const hookKind = (hook: ShareHook): string =>
+  hook.match({
+    calling: () => 'calling',
+    written: (file) => `written ${file}`,
+    elsewhere: (file, runFrom, script, inRepository) =>
+      `elsewhere ${file} from ${runFrom} script ${script} ${inRepository ? 'committed' : 'uncommitted'}`,
+    notShell: (file, script) => `notShell ${file} script ${script}`,
+    notWritten: (reason) => `notWritten: ${reason}`
   });
 
 /** A commit's parents, author and subject, as `git show` reports them. */

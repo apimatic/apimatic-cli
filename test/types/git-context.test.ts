@@ -16,9 +16,11 @@ import { GitVersion } from '../../src/types/git/git-version.js';
 import { Language, Stability } from '../../src/types/sdk/generate.js';
 import { recordContents } from '../../src/types/sdk/generation-record.js';
 import { RecordedSnapshot } from '../../src/types/sdk/recorded-snapshot.js';
+import { SHARE_HOOK_CALL } from '../../src/types/sdk/share-hook.js';
 import { GENERATED_MARKER, Side, YOURS_MARKER } from '../../src/types/sdk/conflict-markers.js';
+import { emptyGlobalGitConfig, withHome } from '../helpers/git-environment.js';
 import { counts, kinds, leftUnmerged, rel } from '../helpers/merge.js';
-import { describeCommit, fetchKind, snapshotFiles } from '../helpers/snapshots.js';
+import { describeCommit, fetchKind, hookKind, snapshotFiles } from '../helpers/snapshots.js';
 
 /** Where the SDK directory's own repository keeps each generation as the server returned it. */
 const PRISTINE_REF = 'refs/apimatic/pristine';
@@ -605,6 +607,235 @@ describe('GitContext', () => {
       expect(recorded._unsafeUnwrapErr()).to.contain('EACCES');
       expect(await pristineAt(sdk())).to.not.be.undefined;
       expect(fs.existsSync(inRoot('sdk', 'python', RECORD))).to.be.false;
+    });
+  });
+
+  describe('shareOnPush', () => {
+    const sh = (cwd: string, ...args: string[]) =>
+      execa('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...args], { cwd });
+    const hookFile = (directory: string, name = 'pre-push') => path.join(directory, '.git', 'hooks', name);
+    const executable = (file: string) => process.platform === 'win32' || (fs.statSync(file).mode & 0o111) !== 0;
+    let restoreConfig: () => void;
+
+    beforeEach(() => {
+      restoreConfig = emptyGlobalGitConfig(root);
+    });
+
+    afterEach(() => {
+      restoreConfig();
+    });
+
+    /** The generation `files` recorded in the repository at `directory`, and the hook that shares it as the run leaves it. */
+    const shared = async (files: Files = { 'README.md': '# v1' }, directory = sdk()) => {
+      await record(files, directory);
+      return context(directory).shareOnPush();
+    };
+
+    /** An SDK repository at `name` with `origin` (made bare when it is not there yet), one recorded snapshot, the hook installed, and `main` committed. */
+    const ready = async (name = 'sdk', origin = inRoot(`${name}-origin.git`)) => {
+      if (!fs.existsSync(origin)) {
+        await sh(root, 'init', '-q', '--bare', '--initial-branch=main', origin);
+      }
+      const directory = inRoot(name);
+      await ownRepository(directory);
+      await sh(directory, 'remote', 'add', 'origin', origin);
+      await shared({ 'README.md': `# ${name}` }, directory);
+      const commit = (await pristineAt(directory))!;
+      write(path.join(directory, 'README.md'), `# ${name}`);
+      await sh(directory, 'add', '.');
+      await sh(directory, 'commit', '-qm', 'sdk');
+      return { directory, origin, commit };
+    };
+
+    /** A husky layout at `directory`: git runs `.husky/_/pre-push`, which sources the developer's `.husky/pre-push`. */
+    const husky = async (directory: string, hook: string) => {
+      await sh(directory, 'config', 'core.hooksPath', '.husky/_');
+      write(path.join(directory, '.husky', '_', 'pre-push'), '#!/bin/sh\n. "$(dirname "$0")/../pre-push"\n');
+      fs.chmodSync(path.join(directory, '.husky', '_', 'pre-push'), 0o755);
+      write(path.join(directory, '.husky', 'pre-push'), hook);
+    };
+
+    it('writes the script and a hook that calls it into .git/hooks, once', async () => {
+      await ownRepository();
+
+      const first = await shared();
+      const second = await shared({ 'README.md': '# v2' });
+
+      expect(hookKind(first)).to.equal(`written ${hookFile(sdk())}`);
+      expect(hookKind(second)).to.equal('calling');
+      const script = fs.readFileSync(hookFile(sdk(), 'apimatic-pre-push'), 'utf8');
+      expect(script.startsWith('#!/bin/sh\n')).to.be.true;
+      expect(script).to.contain(PRISTINE_REF);
+      expect(script).to.not.contain('\r');
+      expect(fs.readFileSync(hookFile(sdk()), 'utf8').split(SHARE_HOOK_CALL)).to.have.length(2);
+      expect(executable(hookFile(sdk()))).to.be.true;
+      expect(executable(hookFile(sdk(), 'apimatic-pre-push'))).to.be.true;
+    });
+
+    it('names the one line to add where git runs hooks from elsewhere, husky’s layout included, keeping the script', async () => {
+      await ownRepository();
+      await sh(sdk(), 'config', 'core.hooksPath', '.githooks');
+
+      const plain = await shared();
+
+      expect(hookKind(plain)).to.equal(
+        `elsewhere ${inRoot('sdk', 'python', '.githooks', 'pre-push')} from ${inRoot('sdk', 'python', '.githooks')} ` +
+          `script ${hookFile(sdk(), 'apimatic-pre-push')} committed`
+      );
+      expect(fs.existsSync(hookFile(sdk(), 'apimatic-pre-push'))).to.be.true;
+      expect(fs.existsSync(hookFile(sdk()))).to.be.false;
+      expect(fs.existsSync(inRoot('sdk', 'python', '.githooks'))).to.be.false;
+
+      await sh(sdk(), 'config', 'core.hooksPath', '.husky/_');
+
+      expect(hookKind(await shared())).to.contain(`elsewhere ${inRoot('sdk', 'python', '.husky', 'pre-push')} from`);
+    });
+
+    it('names the developer’s own hook file for a hooks path under the home directory, with no commit step, until that file names the script', async () => {
+      await ownRepository();
+      const home = inRoot('home');
+      await sh(sdk(), 'config', 'core.hooksPath', '~/.githooks');
+      const restoreHome = withHome(home);
+      try {
+        const needed = await shared();
+
+        expect(hookKind(needed)).to.equal(
+          `elsewhere ${path.join(home, '.githooks', 'pre-push')} from ${path.join(home, '.githooks')} ` +
+            `script ${hookFile(sdk(), 'apimatic-pre-push')} uncommitted`
+        );
+        expect(fs.existsSync(inRoot('sdk', 'python', '~'))).to.be.false;
+
+        write(path.join(home, '.githooks', 'pre-push'), `#!/bin/sh\n${SHARE_HOOK_CALL}\n`);
+
+        expect(hookKind(await shared())).to.equal('calling');
+      } finally {
+        restoreHome();
+      }
+    });
+
+    it('is quiet once the hook elsewhere runs the script', async () => {
+      await ownRepository();
+      await sh(sdk(), 'config', 'core.hooksPath', '.husky/_');
+      write(inRoot('sdk', 'python', '.husky', 'pre-push'), `npm test\n${SHARE_HOOK_CALL}\n`);
+
+      expect(hookKind(await shared())).to.equal('calling');
+    });
+
+    it('leaves a hook in another language alone, naming it, unless it runs the script already', async () => {
+      await ownRepository();
+      write(hookFile(sdk()), '#!/usr/bin/env node\nconsole.log("hi");\n');
+
+      const left = await shared();
+
+      expect(hookKind(left)).to.equal(`notShell ${hookFile(sdk())} script ${hookFile(sdk(), 'apimatic-pre-push')}`);
+      expect(fs.readFileSync(hookFile(sdk()), 'utf8')).to.not.contain(SHARE_HOOK_CALL);
+
+      write(
+        hookFile(sdk()),
+        '#!/usr/bin/env node\nrequire("child_process").execSync("sh .git/hooks/apimatic-pre-push");\n'
+      );
+
+      expect(hookKind(await shared())).to.equal('calling');
+    });
+
+    it('shares the chain when the developer pushes a branch, and is quiet about it', async () => {
+      const { directory, origin, commit } = await ready();
+
+      const pushed = await sh(directory, 'push', '-q', 'origin', 'main');
+
+      expect(pushed.stderr).to.not.contain('apimatic');
+      expect(await pristineAt(origin)).to.deep.equal(commit);
+    });
+
+    it('leaves a push that carries the ref itself alone, so pushing it by hand still works', async () => {
+      const { directory, origin, commit } = await ready();
+
+      const pushed = await sh(directory, 'push', '-q', 'origin', `${PRISTINE_REF}:${PRISTINE_REF}`);
+
+      expect(pushed.stderr).to.not.contain('apimatic');
+      expect(await pristineAt(origin)).to.deep.equal(commit);
+    });
+
+    it('shares through husky’s hook too, once it has the line', async () => {
+      const { directory, origin, commit } = await ready();
+      fs.rmSync(hookFile(directory));
+      await husky(directory, `set -e\n${SHARE_HOOK_CALL}\necho "husky ran" >&2\n`);
+
+      const pushed = await sh(directory, 'push', '-q', 'origin', 'main');
+
+      expect(pushed.stderr).to.contain('husky ran');
+      expect(pushed.stderr).to.not.contain('apimatic');
+      expect(await pristineAt(origin)).to.deep.equal(commit);
+    });
+
+    it('does not fail a push from a clone that never ran the CLI', async () => {
+      const { origin } = await ready();
+      const clone = inRoot('clone');
+      await sh(root, 'clone', '-q', '--no-local', origin, clone);
+      await husky(clone, `set -e\n${SHARE_HOOK_CALL}\n`);
+      write(path.join(clone, 'more.txt'), 'more');
+      await sh(clone, 'add', '.');
+      await sh(clone, 'commit', '-qm', 'more');
+
+      const pushed = await sh(clone, 'push', '-q', 'origin', 'HEAD:refs/heads/more');
+
+      expect(pushed.exitCode).to.equal(0);
+      expect(pushed.stderr).to.not.contain('apimatic');
+    });
+
+    it('joins a chain another machine pushed meanwhile, at push time', async () => {
+      const a = await ready('a');
+      await sh(a.directory, 'push', '-q', 'origin', 'main');
+      const b = await ready('b', a.origin);
+
+      const pushed = await sh(b.directory, 'push', '-q', 'origin', 'HEAD:refs/heads/b');
+
+      expect(pushed.stderr).to.not.contain('apimatic');
+      const joined = await describeCommit(new DirectoryPath(a.origin), (await pristineAt(a.origin))!);
+      expect(joined.subject).to.equal('apimatic: pristine chains joined');
+      expect(joined.parents.map(String)).to.have.members([b.commit.toString(), a.commit.toString()]);
+    });
+
+    it('warns in the server’s words when the remote refuses the ref, and the branch still lands', async () => {
+      const { directory, origin } = await ready();
+      write(
+        path.join(origin, 'hooks', 'pre-receive'),
+        '#!/bin/sh\nwhile read old new ref; do case "$ref" in refs/apimatic/*) echo "snapshots are not accepted here"; exit 1;; esac; done; exit 0\n'
+      );
+      fs.chmodSync(path.join(origin, 'hooks', 'pre-receive'), 0o755);
+
+      const pushed = await sh(directory, 'push', '-q', 'origin', 'main');
+
+      expect(pushed.stderr).to.contain(
+        'apimatic: the SDK snapshots could not be pushed to origin: snapshots are not accepted here'
+      );
+      expect(await pristineAt(origin)).to.be.undefined;
+      expect((await sh(origin, 'rev-parse', '--verify', 'refs/heads/main')).exitCode).to.equal(0);
+    });
+
+    it('runs ahead of a hook that was already there, which still runs', async () => {
+      const { directory, origin } = await ready();
+      write(hookFile(directory), '#!/bin/sh\necho "existing hook ran" >&2\nexit 0\n');
+      await shared({ 'README.md': '# v2' }, directory);
+      const tip = (await pristineAt(directory))!;
+
+      const pushed = await sh(directory, 'push', '-q', 'origin', 'main');
+
+      expect(pushed.stderr.match(/existing hook ran/g)).to.have.length(1);
+      expect(await pristineAt(origin)).to.deep.equal(tip);
+    });
+
+    it('reports a git here that does not answer, and a hook that cannot be written, as the hook’s own outcome', async () => {
+      await ownRepository();
+      const hooksDirectory = sinon.stub(GitService.prototype, 'hooksDirectory').resolves(err('git broke'));
+
+      expect(hookKind(await shared())).to.equal('notWritten: git broke');
+
+      hooksDirectory.restore();
+      sinon.stub(FileService.prototype, 'makeExecutable').rejects(new Error('EACCES: permission denied'));
+
+      expect(hookKind(await shared())).to.equal('notWritten: EACCES: permission denied');
+      expect(fs.existsSync(hookFile(sdk()))).to.be.false;
     });
   });
 

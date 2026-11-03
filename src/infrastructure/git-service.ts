@@ -320,9 +320,24 @@ export class GitService {
     });
     return ran.map((result) => result.exitCode === 0);
   }
+
+  /** Git's own hooks directory, shared by every worktree, whatever `core.hooksPath` says. */
+  public async hooksDirectory(root: DirectoryPath): Promise<Result<DirectoryPath, string>> {
+    const ran = await run(['rev-parse', '--git-common-dir'], { cwd: root });
+    return ran.map(({ stdout }) => root.resolve(stdout.trim()).join('hooks'));
+  }
+
+  /** Where git runs hooks from: `core.hooksPath` as git resolves it, `~` included, else its own hooks directory. */
+  public async hooksRunFrom(root: DirectoryPath): Promise<Result<DirectoryPath, string>> {
+    const ran = await run(['rev-parse', '--git-path', 'hooks'], { cwd: root });
+    return ran.map(({ stdout }) => root.resolve(stdout.trim()));
+  }
 }
 
 const AUTHOR = { name: 'APIMatic CLI', email: 'developer@apimatic.io' } as const;
+
+// A hook runs the CLI with its own repository in the environment; every command here is about the one it is given.
+const OWN_REPOSITORY = { GIT_DIR: undefined, GIT_WORK_TREE: undefined, GIT_INDEX_FILE: undefined };
 
 /** A remote that does not answer within this is reported, not waited for. */
 const REMOTE_TIMEOUT_MS = 30_000;
@@ -396,7 +411,7 @@ async function spawn<Out extends string | Uint8Array>(
       {
         cwd: cwd?.toString(),
         // Git's own messages are read here, so they have to be in English.
-        env: { ...env, ...reaching.value, LC_ALL: 'C' },
+        env: { ...OWN_REPOSITORY, ...env, ...reaching.value, LC_ALL: 'C' },
         input,
         encoding: encoding as 'utf8',
         // Bytes are read by length, and stripping would take a final CR with the newline.

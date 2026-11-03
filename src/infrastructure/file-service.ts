@@ -383,6 +383,11 @@ export class FileService {
     return true;
   }
 
+  /** Git runs a hook only when it is executable: readable and executable by all, as git's own sample hooks are. */
+  public async makeExecutable(filePath: FilePath): Promise<void> {
+    await fsExtra.chmod(filePath.toString(), 0o755);
+  }
+
   public async copy(source: FilePath, destination: FilePath) {
     await fsExtra.copyFile(source.toString(), destination.toString());
   }

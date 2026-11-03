@@ -395,6 +395,21 @@ the home directory, quiet once it calls, another language, shares on push, throu
 clone that never ran the CLI, joins at push time, the server's words, ahead of an existing
 hook); git-service hooks cases; `share-hook.test.ts`, `recording-notice.test.ts`.
 
+Done, in one slice. `ShareHook` (`src/types/sdk/share-hook.ts`) holds the call line, the markers
+and the script's name beside the rule, `found`, which reads the facts first (the hook as found on
+disk, git's own hooks directory, where git runs hooks from, the repository) and answers one of five
+outcomes, each holding the one call to its handler for `match` (calling, written, elsewhere,
+notShell, notWritten) and, through `toWrite`, the content for the hook file when this run writes
+it; `fileIn` names the `pre-push` beside husky's `_`. `GitContext.shareOnPush`, a step of the run
+after each recording, writes the script (its text beside the attributes in the context, joined line
+by line, standing aside when the push carries the ref itself) and the hook as the rule says, and
+answers how the hook was left, a hook that could not be written included, since nothing about it
+stops the run. `GitService.hooksDirectory` and
+`hooksRunFrom`, with `GIT_DIR`, `GIT_WORK_TREE` and `GIT_INDEX_FILE` cleared from every call;
+`FileService.makeExecutable`; the one `shareHook` prompt wording each outcome, a hook already
+calling the script as nothing. `recording-notice.test.ts` has no counterpart: the action picks
+nothing, the value does.
+
 ### Phase 7: `sdk publish` keeps edits too
 
 Behaviour:
@@ -494,6 +509,10 @@ pure decision and the installer both read.
   shell script as a TypeScript constant among pure functions.
 - In infrastructure, beside the git service. For: it is git's hooks directory. Against: the
   decision would import infrastructure, which the ESLint rule forbids.
+
+Answered: the script's text in `git-context.ts` beside the record's attributes, where the shell
+writes it and the pristine ref is; the call line, the markers and the script's name in
+`share-hook.ts` with the rule, which is all the rule and the prompt read.
 
 ## 5. Out of scope
 

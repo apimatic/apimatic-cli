@@ -5,12 +5,15 @@ import { log } from '@clack/prompts';
 import { ServiceError } from '../../../src/infrastructure/service-error.js';
 import { SdkGeneratePrompts } from '../../../src/prompts/sdk/generate.js';
 import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
+import { FileName } from '../../../src/types/file/fileName.js';
+import { FilePath } from '../../../src/types/file/filePath.js';
 import { GitVersion } from '../../../src/types/git/git-version.js';
 import { GitOperation } from '../../../src/types/git/git-operation.js';
 import { RemoteName } from '../../../src/types/git/remote-name.js';
 import { CommitId } from '../../../src/types/git/commit-id.js';
 import { MergedText } from '../../../src/types/sdk/conflict-markers.js';
 import { Conflict, MarkedConflict, MergeFiles, Settlement, WholeConflict } from '../../../src/types/sdk/conflict.js';
+import { SHARE_HOOK_CALL, ShareHook } from '../../../src/types/sdk/share-hook.js';
 import { SnapshotFetch } from '../../../src/types/sdk/snapshot-fetch.js';
 import { WriteProblem } from '../../../src/types/sdk/write-problem.js';
 import { Language } from '../../../src/types/sdk/generate.js';
@@ -215,6 +218,74 @@ describe('SdkGeneratePrompts, about the repository', () => {
       'The SDK was written, but its snapshot could not be recorded: git broke\n' +
         'The next run will replace the SDK instead of merging your customizations into it.'
     );
+  });
+});
+
+describe('SdkGeneratePrompts, about the hook that shares snapshots', () => {
+  const sdk = new DirectoryPath(process.cwd()).join('sdk', 'python');
+  const hooks = sdk.join('.git', 'hooks');
+  const file = new FilePath(hooks, new FileName('pre-push'));
+  const script = new FilePath(hooks, new FileName('apimatic-pre-push'));
+
+  afterEach(() => {
+    sinon.restore();
+  });
+
+  it('says it added the hook, naming the file', () => {
+    const info = sinon.stub(log, 'info');
+
+    new SdkGeneratePrompts().shareHook(ShareHook.written(file, '#!/bin/sh\n'));
+
+    expect(stripVTControlCharacters(info.firstCall.args[0])).to.equal(
+      "Added a pre-push hook at './sdk/python/.git/hooks/pre-push', so every git push also shares the SDK's snapshots."
+    );
+  });
+
+  it('names the one line to add where git runs hooks from elsewhere, with a commit step inside the repository and none outside it', () => {
+    const husky = new FilePath(sdk.join('.husky'), new FileName('pre-push'));
+    const home = new DirectoryPath(process.cwd()).join('home', '.githooks');
+
+    const inside = printed(() =>
+      new SdkGeneratePrompts().shareHook(ShareHook.elsewhere(husky, sdk.join('.husky', '_'), script, true))
+    );
+    const outside = printed(() =>
+      new SdkGeneratePrompts().shareHook(
+        ShareHook.elsewhere(new FilePath(home, new FileName('pre-push')), home, script, false)
+      )
+    );
+
+    expect(inside).to.contain('Sharing SDK snapshots needs one step');
+    expect(inside).to.contain(
+      "git runs hooks from './sdk/python/.husky/_', so the hook the CLI keeps at './sdk/python/.git/hooks/apimatic-pre-push' is not run on push."
+    );
+    expect(inside).to.contain("1. Add this line to './sdk/python/.husky/pre-push':");
+    expect(inside).to.contain(SHARE_HOOK_CALL);
+    expect(inside).to.contain('2. Commit it; every clone shares from then on.');
+    expect(outside).to.contain("1. Add this line to './home/.githooks/pre-push':");
+    expect(outside).to.not.contain('2. Commit');
+  });
+
+  it('names a hook in another language it left alone, with the line to add and no commit step', () => {
+    const note = printed(() => new SdkGeneratePrompts().shareHook(ShareHook.notShell(file, script)));
+
+    expect(note).to.contain(
+      "'./sdk/python/.git/hooks/pre-push' is not a shell script, so the CLI left it alone and the hook it keeps at './sdk/python/.git/hooks/apimatic-pre-push' is not run on push."
+    );
+    expect(note).to.contain("1. Add this line to './sdk/python/.git/hooks/pre-push':");
+    expect(note).to.contain(SHARE_HOOK_CALL);
+    expect(note).to.not.contain('2. Commit');
+  });
+
+  it('warns when the hook could not be written, and prints nothing for one already calling the script', () => {
+    const warn = sinon.stub(log, 'warn');
+
+    new SdkGeneratePrompts().shareHook(ShareHook.notWritten('EACCES: permission denied'));
+    const quiet = printed(() => new SdkGeneratePrompts().shareHook(ShareHook.calling()));
+
+    expect(stripVTControlCharacters(warn.firstCall.args[0])).to.equal(
+      "The pre-push hook that shares the SDK's snapshots could not be written: EACCES: permission denied"
+    );
+    expect(quiet).to.equal('');
   });
 });
 

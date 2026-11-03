@@ -13,6 +13,7 @@ import { StageEntry } from '../../src/types/git/merge-tree.js';
 import { GitOperation } from '../../src/types/git/git-operation.js';
 import { RemoteName } from '../../src/types/git/remote-name.js';
 import { TreeId } from '../../src/types/git/tree-id.js';
+import { emptyGlobalGitConfig, withEnvironment, withHome } from '../helpers/git-environment.js';
 import { leftUnmerged, rel } from '../helpers/merge.js';
 import { describeCommit, snapshotFiles } from '../helpers/snapshots.js';
 
@@ -102,6 +103,14 @@ describe('GitService', () => {
 
     expect((await git.topLevel(nested))._unsafeUnwrap()?.isEqual(repo)).to.be.true;
     expect((await git.topLevel(outside))._unsafeUnwrap()).to.be.undefined;
+    // A hook runs the CLI with its own repository in the environment, which must not stand in for the one asked about.
+    const restore = withEnvironment('GIT_DIR', (await repository('other')).join('.git').toString());
+    try {
+      expect((await git.topLevel(nested))._unsafeUnwrap()?.isEqual(repo)).to.be.true;
+      expect((await git.topLevel(outside))._unsafeUnwrap()).to.be.undefined;
+    } finally {
+      restore();
+    }
     expect(fs.readFileSync(path.join(repo.toString(), '.git', 'HEAD'), 'utf-8').trim()).to.equal(
       'ref: refs/heads/main'
     );
@@ -457,6 +466,45 @@ describe('GitService', () => {
 
       expect((await git.isAncestor(repo, first, second))._unsafeUnwrap()).to.be.true;
       expect((await git.isAncestor(repo, second, first))._unsafeUnwrap()).to.be.false;
+    });
+  });
+
+  describe('hooks', () => {
+    let restoreConfig: () => void;
+
+    beforeEach(() => {
+      restoreConfig = emptyGlobalGitConfig(root);
+    });
+
+    afterEach(() => {
+      restoreConfig();
+    });
+
+    it('names git’s own hooks directory and where git runs hooks from, core.hooksPath moving only the latter', async () => {
+      const repo = await repository();
+      const own = repo.join('.git', 'hooks');
+
+      expect((await git.hooksDirectory(repo))._unsafeUnwrap().isEqual(own)).to.be.true;
+      expect((await git.hooksRunFrom(repo))._unsafeUnwrap().isEqual(own)).to.be.true;
+
+      await execa('git', ['config', 'core.hooksPath', '.husky/_'], { cwd: repo.toString() });
+
+      expect((await git.hooksDirectory(repo))._unsafeUnwrap().isEqual(own)).to.be.true;
+      expect((await git.hooksRunFrom(repo))._unsafeUnwrap().isEqual(repo.join('.husky', '_'))).to.be.true;
+    });
+
+    it('resolves a hooks path under the home directory as git does, not under the repository', async () => {
+      const repo = await repository();
+      const home = path.join(root, 'home');
+      await execa('git', ['config', 'core.hooksPath', '~/.githooks'], { cwd: repo.toString() });
+      const restoreHome = withHome(home);
+      try {
+        const runFrom = (await git.hooksRunFrom(repo))._unsafeUnwrap();
+
+        expect(runFrom.isEqual(new DirectoryPath(home, '.githooks'))).to.be.true;
+      } finally {
+        restoreHome();
+      }
     });
   });
 
