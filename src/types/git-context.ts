@@ -3,20 +3,23 @@ import { FileService } from '../infrastructure/file-service.js';
 import { GitService } from '../infrastructure/git-service.js';
 import { canonical } from '../infrastructure/tmp-extensions.js';
 import { errorMessage } from '../utils/error-utils.js';
-import { ValueMap } from './common/value-map.js';
+import { ValueMap, ValueSet } from './common/value-map.js';
 import { DirectoryPath } from './file/directoryPath.js';
 import { FileName } from './file/fileName.js';
 import { FilePath } from './file/filePath.js';
 import { RelativeFilePath } from './file/relativeFilePath.js';
 import { CommitId } from './git/commit-id.js';
 import { GitVersion } from './git/git-version.js';
-import { SIDE_STAGE } from './git/merge-tree.js';
+import { SIDE_STAGE, STAGE, StageEntry } from './git/merge-tree.js';
 import { TreeEntry } from './git/tree-entry.js';
 import { TreeId } from './git/tree-id.js';
+import { Side } from './sdk/conflict-markers.js';
+import { lineEndingFor } from './sdk/file-content.js';
 import { Language, Stability } from './sdk/generate.js';
 import { GenerationRecord, recordContents } from './sdk/generation-record.js';
-import { lineEndingFor } from './sdk/file-content.js';
 import { MergePlan } from './sdk/merge-plan.js';
+import { RepositoryState } from './sdk/repository-state.js';
+import { UnresolvedFile } from './sdk/unresolved-file.js';
 import { WriteProblem } from './sdk/write-problem.js';
 
 /** The ref holding each generation as the server returned it, chained, off every branch of the SDK directory's own repository. */
@@ -33,12 +36,18 @@ const RECORD_DIRECTORY = '.apimatic';
 const RECORD_FILE = new FileName('generation.json');
 const RECORD_PATH = `${RECORD_DIRECTORY}/${RECORD_FILE.toString()}`;
 
-/** The SDK directory under git: what the disk and git answer about it, one question per method, and what a run does to it. */
+/**
+ * The SDK directory under git: what the disk and git say about it, what a run plans for it, how a
+ * plan lands on it, and the snapshots it keeps. Every plan carries the bytes that reach the disk,
+ * line endings decided, so landing one is the same whatever made it.
+ */
 export class GitContext {
   private readonly gitService = new GitService();
   private readonly fileService = new FileService();
 
   constructor(private readonly directory: DirectoryPath) {}
+
+  // --- What the disk and git say ---------------------------------------------------------------
 
   /** Whether the directory has a `.git` of its own, read from disk so no git is needed to know whether git will be. */
   public async hasGitDirectory(): Promise<boolean> {
@@ -77,21 +86,48 @@ export class GitContext {
     return GenerationRecord.parse(await this.fileService.getContents(file));
   }
 
-  /** Whether the repository holds the snapshot a record names; false for none, with no git run. */
-  public async hasSnapshot(commit: CommitId | undefined): Promise<Result<boolean, string>> {
-    return commit === undefined ? ok(false) : this.gitService.hasCommit(this.directory, commit);
+  /**
+   * What git says about the directory for a generation, read once and in order: whether it is a
+   * repository of its own as `git` sees it, the operation it is in the middle of, the paths it holds
+   * as unmerged, and the snapshot the record names for `language` at `stability`, with whether it is
+   * here. A directory that is not a repository answers with nothing, running no git past the root.
+   */
+  public async inspect(
+    git: GitVersion,
+    language: Language,
+    stability: Stability
+  ): Promise<Result<RepositoryState, string>> {
+    const isRepository = await this.isRepository(git);
+    if (isRepository.isErr()) {
+      return err(isRepository.error);
+    }
+    if (!isRepository.value) {
+      return ok(RepositoryState.notARepository());
+    }
+    const operation = await this.gitService.operationInProgress(this.directory);
+    if (operation.isErr()) {
+      return err(operation.error);
+    }
+    const unmerged = await this.gitService.unmergedStages(this.directory);
+    if (unmerged.isErr()) {
+      return err(unmerged.error);
+    }
+    const record = await this.generationRecord();
+    const base = record.baseFor(language, stability);
+    const baseHeld = base === undefined ? ok(false) : await this.gitService.hasCommit(this.directory, base);
+    if (baseHeld.isErr()) {
+      return err(baseHeld.error);
+    }
+    const unresolved = new ValueSet(unmerged.value.map((entry) => entry.path)).values();
+    return ok(RepositoryState.of(operation.value, unresolved, record.isFound(), base, baseHeld.value));
   }
 
-  /** Replaces whatever the directory holds with the generated SDK, except its `.git`. */
-  public async save(generated: DirectoryPath): Promise<DirectoryPath> {
-    await this.fileService.cleanDirectoryExcluding(this.directory, [GIT_DIRECTORY]);
-    await this.fileService.copyDirectoryContents(generated, this.directory);
-    return this.directory;
-  }
+  // --- What a run plans --------------------------------------------------------------------------
 
   /**
-   * The fresh generation at `generated` merged over the directory as it is, against `base`, by git: what
-   * to write, with its bytes, and remove, what conflicts, and what happened to every other file. Nothing is written.
+   * The fresh generation at `generated` merged over the directory as it is, against `base`, by git:
+   * what to write, each file with the bytes that reach the disk, and remove, what conflicts, and what
+   * happened to every other file. Nothing is written.
    */
   public async merge(base: CommitId, generated: DirectoryPath): Promise<Result<MergePlan, string>> {
     const generatedTree = await this.gitService.treeOf(this.directory, generated);
@@ -156,28 +192,86 @@ export class GitContext {
     if (contents.isErr()) {
       return err(contents.error);
     }
-    return ok(
-      MergePlan.from({
-        merge: merged.value,
-        // The CLI's own record is not an edit of yours.
-        yours: yourChanges.value.filter((change) => change.path.toString() !== RECORD_PATH),
-        generated: generatedChanges.value,
-        writes: changed.map((change, index) => ({ path: change.path, content: contents.value[index] })),
-        deletes: applied.value.flatMap((change) => (change.status === 'D' ? [change.path] : [])),
-        basePaths,
-        generatedVersions: new ValueMap(
-          generatorStages.map((entry, index): [RelativeFilePath, Uint8Array] => [
+    try {
+      // Each file ends its lines as it does on disk, else as the generator's own does.
+      const writes = await Promise.all(
+        changed.map(async (change, index) => ({
+          path: change.path,
+          content: await ending(
+            this.fileService,
+            contents.value[index],
+            change.path.in(this.directory),
+            change.path.in(generated)
+          )
+        }))
+      );
+      const versions = await Promise.all(
+        generatorStages.map(
+          async (entry, index): Promise<[RelativeFilePath, Uint8Array]> => [
             entry.path,
-            generatedVersions.value[index]
-          ])
+            await ending(this.fileService, generatedVersions.value[index], entry.path.in(generated))
+          ]
         )
-      })
-    );
+      );
+      return ok(
+        MergePlan.from({
+          merge: merged.value,
+          // The CLI's own record is not an edit of yours.
+          yours: yourChanges.value.filter((change) => change.path.toString() !== RECORD_PATH),
+          generated: generatedChanges.value,
+          writes,
+          deletes: applied.value.flatMap((change) => (change.status === 'D' ? [change.path] : [])),
+          basePaths,
+          generatedVersions: new ValueMap(versions)
+        })
+      );
+    } catch (error) {
+      return err(errorMessage(error));
+    }
   }
 
-  /** Marks the plan's conflicted paths in the repository's own index as a merge would leave them, so `git status` and a merge tool see them. */
-  public async stageConflicts(plan: MergePlan): Promise<Result<void, string>> {
-    return this.gitService.stageConflicts(this.directory, plan.stages);
+  /**
+   * The last run's unresolved `paths` settled for `side`, as a plan: from the disk and the two sides
+   * git kept in the index, markers settled in place and whole files taken as the side says, each
+   * with the line ending the disk has. Nothing is written.
+   */
+  public async settlementFor(side: Side, paths: readonly RelativeFilePath[]): Promise<Result<MergePlan, string>> {
+    const stages = await this.gitService.unmergedStages(this.directory);
+    if (stages.isErr()) {
+      return err(stages.error);
+    }
+    const kept = stages.value.filter((entry) => entry.stage !== STAGE.base);
+    const contents = await this.gitService.readBlobs(
+      this.directory,
+      kept.map((entry) => entry.oid)
+    );
+    if (contents.isErr()) {
+      return err(contents.error);
+    }
+    const yours = versionsAt(kept, contents.value, SIDE_STAGE.yours);
+    const generated = versionsAt(kept, contents.value, SIDE_STAGE.generated);
+    try {
+      const settlements = await Promise.all(
+        paths.map(async (path) => {
+          const disk = await firstOf(this.fileService, path.in(this.directory));
+          const version = generated.get(path);
+          const theirs = version === undefined ? undefined : lineEndingFor(version, disk);
+          return new UnresolvedFile(path, disk, yours.get(path), theirs).settledFor(side);
+        })
+      );
+      return ok(MergePlan.empty().settled(settlements));
+    } catch (error) {
+      return err(errorMessage(error));
+    }
+  }
+
+  // --- How a plan lands --------------------------------------------------------------------------
+
+  /** Replaces whatever the directory holds with the generated SDK, except its `.git`. */
+  public async save(generated: DirectoryPath): Promise<DirectoryPath> {
+    await this.fileService.cleanDirectoryExcluding(this.directory, [GIT_DIRECTORY]);
+    await this.fileService.copyDirectoryContents(generated, this.directory);
+    return this.directory;
   }
 
   /**
@@ -211,11 +305,10 @@ export class GitContext {
 
   /**
    * Lands the plan: removals before writes, so a name that changed only in case lands on a
-   * filesystem that ignores case; each file with its own line ending, else the generator's, and
-   * only when its bytes differ. A step that fails is named and nothing is undone, so the caller
-   * can put the directory back from the snapshot it kept.
+   * filesystem that ignores case, and each file only when its bytes differ. A step that fails is
+   * named and nothing is undone, so the caller can put the directory back from the snapshot it kept.
    */
-  public async write(plan: MergePlan, generated: DirectoryPath): Promise<Result<void, WriteProblem>> {
+  public async write(plan: MergePlan): Promise<Result<void, WriteProblem>> {
     for (const path of plan.deletes) {
       try {
         await removeFile(this.fileService, path.in(this.directory), this.directory);
@@ -225,9 +318,7 @@ export class GitContext {
     }
     for (const write of plan.writes) {
       try {
-        const file = write.path.in(this.directory);
-        const sample = await firstOf(this.fileService, file, write.path.in(generated));
-        await this.fileService.writeBytesIfChanged(file, lineEndingFor(write.content, sample));
+        await this.fileService.writeBytesIfChanged(write.path.in(this.directory), write.content);
       } catch (error) {
         return err({ file: write.path, operation: 'write', reason: errorMessage(error) });
       }
@@ -267,6 +358,8 @@ export class GitContext {
       return err(errorMessage(error));
     }
   }
+
+  // --- The snapshots it keeps --------------------------------------------------------------------
 
   /**
    * Commits every file of `generated` under the pristine ref, chained onto the last snapshot, and
@@ -312,7 +405,7 @@ function recordFile(directory: DirectoryPath): FilePath {
   return new FilePath(directory.join(RECORD_DIRECTORY), RECORD_FILE);
 }
 
-/** The bytes of the first of `files` that is there, for the line ending a written file follows; none when none is. */
+/** The bytes of the first of `candidates` that is there; none when none is. */
 async function firstOf(files: FileService, ...candidates: FilePath[]): Promise<Uint8Array | undefined> {
   for (const file of candidates) {
     if (await files.fileExists(file)) {
@@ -322,10 +415,26 @@ async function firstOf(files: FileService, ...candidates: FilePath[]): Promise<U
   return undefined;
 }
 
+/** `content` ending its lines as the first of `samples` on disk does; as it is when none is there. */
+async function ending(files: FileService, content: Uint8Array, ...samples: FilePath[]): Promise<Uint8Array> {
+  return lineEndingFor(content, await firstOf(files, ...samples));
+}
+
 /** Removes the file and the directories that leaves empty, below `within`. */
 async function removeFile(files: FileService, file: FilePath, within: DirectoryPath): Promise<void> {
   await files.deleteFile(file);
   await files.removeEmptyDirectories(file.directory(), within);
+}
+
+/** Each path's content at `stage`, from the entries git holds as unmerged and their blobs, read in the same order. */
+function versionsAt(
+  entries: readonly StageEntry[],
+  contents: readonly Uint8Array[],
+  stage: StageEntry['stage']
+): ValueMap<RelativeFilePath, Uint8Array> {
+  return new ValueMap(
+    entries.flatMap((entry, index) => (entry.stage === stage ? [[entry.path, contents[index]] as const] : []))
+  );
 }
 
 /** `last` when it already holds `tree`, else a commit of `tree` on `last` with `message`, which the pristine ref is moved to. */

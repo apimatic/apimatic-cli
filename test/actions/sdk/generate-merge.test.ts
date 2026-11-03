@@ -117,7 +117,7 @@ describe('GenerateAction (sdk) — a regeneration merges', () => {
     expect(read('README.md')).to.equal('# sdk v2');
     expect(read('models/author.py')).to.equal('class Author: ...');
     expect(read('notes.txt')).to.equal('mine');
-    const { files } = sdkMerged().firstCall.args[1];
+    const files = sdkMerged().firstCall.args[1];
     expect(listed(files.added)).to.deep.equal(['models/author.py']);
     expect(listed(files.updated)).to.deep.equal(['README.md']);
     expect(listed(files.merged)).to.deep.equal(['models/book.py']);
@@ -155,11 +155,11 @@ describe('GenerateAction (sdk) — a regeneration merges', () => {
     const result = await execute(V2);
 
     expect(result.isActionRequired()).to.be.true;
-    const [directory, plan, staged] = conflictSteps.firstCall.args;
+    const [directory, marked, unmarked] = conflictSteps.firstCall.args;
     expect(directory.isEqual(sdk())).to.be.true;
-    expect(kinds(plan.conflicts)).to.deep.equal([['models/book.py', 'bothChanged']]);
-    expect(staged).to.be.true;
-    expect(sdkMerged().firstCall.args[1]).to.equal(plan);
+    expect(listed(marked)).to.deep.equal(['models/book.py']);
+    expect(unmarked).to.deep.equal([]);
+    expect(sdkMerged().firstCall.args[2]).to.equal(1);
     expect(read('models/book.py')).to.equal(MODEL_MARKED);
     expect(read('README.md')).to.equal('# sdk v2');
     expect(read('models/author.py')).to.equal('class Author: ...');
@@ -180,13 +180,15 @@ describe('GenerateAction (sdk) — a regeneration merges', () => {
     sinon.stub(GitService.prototype, 'stageConflicts').resolves(err('index locked'));
     const conflictsNotStaged = sinon.stub(SdkGeneratePrompts.prototype, 'conflictsNotStaged');
     const conflictSteps = sinon.stub(SdkGeneratePrompts.prototype, 'conflictSteps');
+    const conflictStepsByHand = sinon.stub(SdkGeneratePrompts.prototype, 'conflictStepsByHand');
 
     const result = await execute(V2);
 
     expect(result.isActionRequired()).to.be.true;
     expect(conflictsNotStaged.firstCall.args).to.deep.equal(['index locked']);
-    expect(conflictSteps.firstCall.args[2]).to.be.false;
-    expect(conflictsNotStaged.calledBefore(conflictSteps)).to.be.true;
+    expect(conflictSteps.called).to.be.false;
+    expect(listed(conflictStepsByHand.firstCall.args[1])).to.deep.equal(['models/book.py']);
+    expect(conflictsNotStaged.calledBefore(conflictStepsByHand)).to.be.true;
     expect(read('models/book.py')).to.contain(YOURS_MARKER);
   });
 
@@ -346,12 +348,12 @@ describe('GenerateAction (sdk) — a regeneration merges', () => {
       expect(read('helpers/old.py')).to.equal('old, edited');
       expect(read('README.md')).to.equal('# sdk v2');
       expect(read('notes.txt')).to.equal('mine');
-      const [directory, side, conflicts] = conflictsResolved.firstCall.args;
+      const [directory, side, paths] = conflictsResolved.firstCall.args;
       expect(directory.isEqual(sdk())).to.be.true;
       expect(side).to.equal('generated');
-      expect(kinds(conflicts)).to.have.deep.members(CONFLICTS);
+      expect(listed(paths)).to.have.members(CONFLICTS.map(([path]) => path));
       expect(conflictsResolved.calledBefore(sdkMerged())).to.be.true;
-      const { files } = sdkMerged().firstCall.args[1];
+      const files = sdkMerged().firstCall.args[1];
       expect(listed(files.merged)).to.deep.equal(['models/book.py']);
       expect(listed(files.kept)).to.have.members(['helpers/old.py', 'notes.txt']);
       const previous = (await git.resolveRef(sdk(), PREVIOUS_REF))._unsafeUnwrap()!;
@@ -371,7 +373,7 @@ describe('GenerateAction (sdk) — a regeneration merges', () => {
       expect(read('README.md')).to.equal('# sdk v2');
       expect(read('notes.txt')).to.equal('mine');
       expect(conflictsResolved.firstCall.args[1]).to.equal('yours');
-      expect(kinds(conflictsResolved.firstCall.args[2])).to.have.deep.members(CONFLICTS);
+      expect(listed(conflictsResolved.firstCall.args[2])).to.have.members(CONFLICTS.map(([path]) => path));
     });
 
     it('writes nothing at all when the developer cancels at the question', async () => {
@@ -424,7 +426,7 @@ describe('GenerateAction (sdk) — a regeneration merges', () => {
         expect(read('helpers/old.py')).to.equal('old, edited');
         expect(read('notes.txt')).to.equal('mine');
         expect(conflictsResolved.firstCall.args[1]).to.equal('generated');
-        expect(kinds(conflictsResolved.firstCall.args[2])).to.have.deep.members(CONFLICTS);
+        expect(listed(conflictsResolved.firstCall.args[2])).to.have.members(CONFLICTS.map(([path]) => path));
       });
     }
 

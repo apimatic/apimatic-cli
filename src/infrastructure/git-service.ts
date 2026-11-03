@@ -1,5 +1,6 @@
 import { Buffer } from 'node:buffer';
 import fs from 'node:fs';
+import path from 'node:path';
 import { TextDecoder } from 'node:util';
 import { execa, ExecaError } from 'execa';
 import { err, ok, Result } from 'neverthrow';
@@ -9,8 +10,9 @@ import { FilePath } from '../types/file/filePath.js';
 import { RelativeFilePath } from '../types/file/relativeFilePath.js';
 import { BlobId } from '../types/git/blob-id.js';
 import { CommitId } from '../types/git/commit-id.js';
+import { GitOperation } from '../types/git/git-operation.js';
 import { GitVersion } from '../types/git/git-version.js';
-import { Change, MergeTreeOutput, parseMergeTree, StageEntry } from '../types/git/merge-tree.js';
+import { Change, MergeTreeOutput, parseMergeTree, parseStageEntry, StageEntry } from '../types/git/merge-tree.js';
 import { TreeEntry } from '../types/git/tree-entry.js';
 import { TreeId } from '../types/git/tree-id.js';
 import { ValueMap } from '../types/common/value-map.js';
@@ -199,6 +201,42 @@ export class GitService {
     const ran = await run(['update-index', '-z', '--index-info'], {
       cwd: root,
       input: [...removals, ...stages].map((line) => `${line}\0`).join('')
+    });
+    return ran.map(() => undefined);
+  }
+
+  /** The operation the repository is in the middle of, such as a `git merge` with conflicts left to resolve; none when it is not. */
+  public async operationInProgress(root: DirectoryPath): Promise<Result<GitOperation, string>> {
+    const marks = GitOperation.marks();
+    const ran = await run(['rev-parse', ...marks.flatMap((mark) => ['--git-path', mark])], { cwd: root });
+    return ran.map(({ stdout }) => {
+      const paths = stdout.trim().split('\n');
+      const found = marks.find((_, index) => fs.existsSync(path.resolve(root.toString(), paths[index].trim())));
+      return found === undefined ? GitOperation.none() : GitOperation.markedBy(found);
+    });
+  }
+
+  /** The index entries git holds as unmerged: what a merge left and `git add` has not marked resolved. */
+  public async unmergedStages(root: DirectoryPath): Promise<Result<StageEntry[], string>> {
+    const ran = await run(['ls-files', '-u', '-z'], { cwd: root });
+    if (ran.isErr()) {
+      return err(ran.error);
+    }
+    return readAll(
+      'ls-files',
+      ran.value.stdout.split('\0').filter((entry) => entry !== ''),
+      parseStageEntry
+    );
+  }
+
+  /** Takes settled `paths` out of the unmerged state, back to HEAD or forgotten where there is no HEAD yet; the disk is not touched. */
+  public async unstage(root: DirectoryPath, paths: readonly RelativeFilePath[]): Promise<Result<void, string>> {
+    if (paths.length === 0) {
+      return ok(undefined);
+    }
+    const ran = await run(['reset', '-q', '--pathspec-from-file=-', '--pathspec-file-nul'], {
+      cwd: root,
+      input: paths.map(String).join('\0')
     });
     return ran.map(() => undefined);
   }

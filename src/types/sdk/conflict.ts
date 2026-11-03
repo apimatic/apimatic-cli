@@ -35,40 +35,50 @@ export type MergeFiles = {
 
 type CountedAs = 'merged' | 'updated' | 'kept';
 
-/** How one conflict lands once a side is chosen: what the run writes for it, and what the summary says about it. */
+/** How one conflict lands once a side is chosen: what the run writes or removes for it, and what the summary says about it. */
 export class Settlement {
   private constructor(
     private readonly written: readonly FileWrite[],
+    private readonly removal: readonly RelativeFilePath[],
     private readonly counted: { as: CountedAs; path: RelativeFilePath } | undefined
   ) {}
 
   /** The chosen side's lines in each block, counted among the merged files. */
   public static merged(write: FileWrite): Settlement {
-    return new Settlement([write], { as: 'merged', path: write.path });
+    return new Settlement([write], [], { as: 'merged', path: write.path });
   }
 
   /** The generator's whole version, counted among the updated files. */
   public static updated(write: FileWrite): Settlement {
-    return new Settlement([write], { as: 'updated', path: write.path });
+    return new Settlement([write], [], { as: 'updated', path: write.path });
   }
 
   /** Your file stays as it is, named among the kept ones. */
   public static kept(path: RelativeFilePath): Settlement {
-    return new Settlement([], { as: 'kept', path });
+    return new Settlement([], [], { as: 'kept', path });
+  }
+
+  /** The file goes from the disk, with nothing said: a deletion of yours that the last run had written over. */
+  public static removed(path: RelativeFilePath): Settlement {
+    return new Settlement([], [path], undefined);
   }
 
   /** Nothing on disk changes and the summary says nothing: a deletion of yours stands. */
   public static untouched(): Settlement {
-    return new Settlement([], undefined);
+    return new Settlement([], [], undefined);
   }
 
   /** Git's placement stands, with nothing said: a conflict of another shape. */
   public static asPlaced(writes: readonly FileWrite[]): Settlement {
-    return new Settlement(writes, undefined);
+    return new Settlement(writes, [], undefined);
   }
 
   public writes(): readonly FileWrite[] {
     return this.written;
+  }
+
+  public removes(): readonly RelativeFilePath[] {
+    return this.removal;
   }
 
   /** `files` with this settlement's path added under what the summary calls it. */

@@ -6,10 +6,10 @@ import { ServiceError } from '../../../src/infrastructure/service-error.js';
 import { SdkGeneratePrompts } from '../../../src/prompts/sdk/generate.js';
 import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
 import { GitVersion } from '../../../src/types/git/git-version.js';
+import { GitOperation } from '../../../src/types/git/git-operation.js';
 import { CommitId } from '../../../src/types/git/commit-id.js';
 import { MergedText } from '../../../src/types/sdk/conflict-markers.js';
 import { Conflict, MarkedConflict, MergeFiles, Settlement, WholeConflict } from '../../../src/types/sdk/conflict.js';
-import { MergePlan } from '../../../src/types/sdk/merge-plan.js';
 import { WriteProblem } from '../../../src/types/sdk/write-problem.js';
 import { Language } from '../../../src/types/sdk/generate.js';
 import { NO_FILES, rel } from '../../helpers/merge.js';
@@ -209,8 +209,7 @@ describe('SdkGeneratePrompts, about the repository', () => {
 const marked = (path: string) => new MarkedConflict(rel(path), 'bothChanged', [], MergedText.parse(new Uint8Array()));
 const whole = (path: string, kind: 'deletedByYou' | 'noLongerGenerated' | 'binary') =>
   new WholeConflict(rel(path), kind, [], [], Settlement.untouched(), Settlement.kept(rel(path)));
-const plan = (overrides: Partial<MergeFiles> = {}, conflicts: readonly Conflict[] = []) =>
-  new MergePlan([], [], conflicts, { ...NO_FILES, ...overrides });
+const files = (overrides: Partial<MergeFiles> = {}): MergeFiles => ({ ...NO_FILES, ...overrides });
 
 describe('SdkGeneratePrompts, about a merge', () => {
   const sdk = new DirectoryPath(process.cwd()).join('sdk', 'python');
@@ -221,14 +220,14 @@ describe('SdkGeneratePrompts, about a merge', () => {
 
   it('sums up what the generator did and names the files of yours it merged into or left alone, or says nothing changed', () => {
     const info = sinon.stub(log, 'info');
-    const merged = plan({
+    const merged = files({
       added: [rel('models/author.py')],
       updated: [rel('README.md'), rel('x.py')],
       merged: [rel('models/book.py')],
       kept: [rel('notes.txt')]
     });
 
-    new SdkGeneratePrompts().sdkMerged(sdk, merged);
+    new SdkGeneratePrompts().sdkMerged(sdk, merged, 0);
     new SdkGeneratePrompts().sdkUnchanged(sdk);
 
     const said = stripVTControlCharacters(info.firstCall.args[0]);
@@ -246,11 +245,8 @@ describe('SdkGeneratePrompts, about a merge', () => {
   it('counts the conflicted files in the headline, so it never says nothing changed above a conflict', () => {
     const info = sinon.stub(log, 'info');
 
-    new SdkGeneratePrompts().sdkMerged(sdk, plan({}, [whole('src/resources/authors.py', 'noLongerGenerated')]));
-    new SdkGeneratePrompts().sdkMerged(
-      sdk,
-      plan({ updated: [rel('README.md')] }, [marked('models/book.py'), marked('models/author.py')])
-    );
+    new SdkGeneratePrompts().sdkMerged(sdk, files(), 1);
+    new SdkGeneratePrompts().sdkMerged(sdk, files({ updated: [rel('README.md')] }), 2);
 
     expect(stripVTControlCharacters(info.firstCall.args[0])).to.equal(
       "Regenerated the SDK at './sdk/python': 1 file in conflict."
@@ -263,11 +259,8 @@ describe('SdkGeneratePrompts, about a merge', () => {
   it('says which side each conflict was resolved for, naming the files', () => {
     const info = sinon.stub(log, 'info');
 
-    new SdkGeneratePrompts().conflictsResolved(sdk, 'generated', [marked('models/book.py')]);
-    new SdkGeneratePrompts().conflictsResolved(sdk, 'yours', [
-      marked('models/book.py'),
-      whole('docs/book.md', 'deletedByYou')
-    ]);
+    new SdkGeneratePrompts().conflictsResolved(sdk, 'generated', [rel('models/book.py')]);
+    new SdkGeneratePrompts().conflictsResolved(sdk, 'yours', [rel('models/book.py'), rel('docs/book.md')]);
 
     expect(stripVTControlCharacters(info.firstCall.args[0])).to.equal(
       "Resolved using the generator's changes:\n  './sdk/python/models/book.py'"
@@ -366,7 +359,6 @@ describe('SdkGeneratePrompts, about a merge', () => {
 describe('SdkGeneratePrompts, about the conflicts', () => {
   const sdk = new DirectoryPath(process.cwd()).join('sdk', 'python');
   const conflicts: readonly Conflict[] = [marked('models/book.py'), whole('resources/reviews.py', 'noLongerGenerated')];
-  const conflicted = plan({}, conflicts);
 
   afterEach(() => {
     sinon.restore();
@@ -398,7 +390,9 @@ describe('SdkGeneratePrompts, about the conflicts', () => {
   });
 
   it('offers a merge tool once git holds the files as unmerged, and names the files with markers and without', () => {
-    const note = printed(() => new SdkGeneratePrompts().conflictSteps(sdk, conflicted, true));
+    const note = printed(() =>
+      new SdkGeneratePrompts().conflictSteps(sdk, [rel('models/book.py')], [rel('resources/reviews.py')])
+    );
 
     const order = [
       'Next steps',
@@ -414,12 +408,57 @@ describe('SdkGeneratePrompts, about the conflicts', () => {
   });
 
   it('leaves the merge tool out when git does not hold the files as unmerged, and the group a plan does not have', () => {
-    const note = printed(() =>
-      new SdkGeneratePrompts().conflictSteps(sdk, plan({}, [marked('models/book.py')]), false)
-    );
+    const note = printed(() => new SdkGeneratePrompts().conflictStepsByHand(sdk, [rel('models/book.py')], []));
 
     expect(note).to.contain('1. Resolve it by hand:');
     expect(note).to.not.contain('merge tool');
     expect(note).to.not.contain('Without markers');
+  });
+});
+
+describe('SdkGeneratePrompts, about what the last run left', () => {
+  const sdk = new DirectoryPath(process.cwd()).join('sdk', 'python');
+  const paths = [rel('models/book.py'), rel('docs/book.md')];
+
+  afterEach(() => {
+    sinon.restore();
+  });
+
+  it('refuses a repository in the middle of an operation, naming it and how to abort it', () => {
+    const error = sinon.stub(log, 'error');
+
+    new SdkGeneratePrompts().operationInProgress(sdk, GitOperation.markedBy('REBASE_HEAD'));
+
+    const said = stripVTControlCharacters(error.firstCall.args[0]);
+    expect(said).to.contain("The repository at './sdk/python' is in the middle of a rebase.");
+    expect(said).to.contain('git rebase --abort');
+  });
+
+  it('lists the files still unresolved and asks for them to be staged, in the singular for one', () => {
+    const warn = sinon.stub(log, 'warn');
+
+    new SdkGeneratePrompts().conflictsUnresolved(sdk, paths);
+    new SdkGeneratePrompts().conflictsUnresolved(sdk, [paths[0]]);
+
+    expect(stripVTControlCharacters(warn.firstCall.args[0])).to.equal(
+      '2 files from the last run are still unresolved. Resolve and stage them, then rerun:\n' +
+        "  './sdk/python/models/book.py'\n  './sdk/python/docs/book.md'"
+    );
+    expect(stripVTControlCharacters(warn.secondCall.args[0])).to.match(
+      /^1 file from the last run is still unresolved\. Resolve and stage it, then rerun:\n/
+    );
+  });
+
+  it('says that nothing was done, and that the files could not be settled, in their own words', () => {
+    const info = sinon.stub(log, 'info');
+    const error = sinon.stub(log, 'error');
+
+    new SdkGeneratePrompts().resolveLater();
+    new SdkGeneratePrompts().conflictsNotSettled('git broke');
+
+    expect(stripVTControlCharacters(info.firstCall.args[0])).to.equal(
+      'Nothing was done. Rerun once the files are resolved and staged.'
+    );
+    expect(stripVTControlCharacters(error.firstCall.args[0])).to.equal('The conflicts could not be settled: git broke');
   });
 });

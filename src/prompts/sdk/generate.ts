@@ -7,24 +7,27 @@ import { noteWrapped, notZippedForUpload, withSpinner } from '../prompt.js';
 import { ServiceError } from '../../infrastructure/service-error.js';
 import { AVAILABLE_LANGUAGES, Language, languageLabel, UPCOMING_LANGUAGES } from '../../types/sdk/generate.js';
 import { GitVersion } from '../../types/git/git-version.js';
+import { GitOperation } from '../../types/git/git-operation.js';
 import { CommitId } from '../../types/git/commit-id.js';
 import { RelativeFilePath } from '../../types/file/relativeFilePath.js';
 import { Side } from '../../types/sdk/conflict-markers.js';
-import { Conflict, ConflictKind } from '../../types/sdk/conflict.js';
-import { MergePlan } from '../../types/sdk/merge-plan.js';
+import { Conflict, ConflictKind, MergeFiles } from '../../types/sdk/conflict.js';
 import { WriteProblem } from '../../types/sdk/write-problem.js';
 import { listedInProse, plural } from '../../utils/string-utils.js';
 
 /** What the developer chose for the conflicts: a side to settle them for, the files as git placed them to resolve by hand, or to stop. */
 export type ConflictChoice = Side | 'asPlaced' | 'cancel';
 
+/** How the developer answered about the last run's unresolved files: finish resolving themselves, let one side win, or back out. */
+export type UnresolvedChoice = 'resolve' | Side | 'cancel';
+
 const names = (languages: readonly Language[]) => languages.map(languageLabel).join(', ');
 
 /** The words that change between one conflicted file and several. */
 const forms = (count: number) =>
   count === 1
-    ? { them: 'it', theyAre: 'it is', files: 'file', need: 'needs' }
-    : { them: 'them', theyAre: 'they are', files: 'files', need: 'need' };
+    ? { them: 'it', theyAre: 'it is', files: 'file', need: 'needs', are: 'is' }
+    : { them: 'them', theyAre: 'they are', files: 'files', need: 'need', are: 'are' };
 
 const CONFLICT_LABELS: Record<ConflictKind, string> = {
   bothChanged: 'changed by you and by the generator',
@@ -60,7 +63,33 @@ const conflictLines = (sdk: DirectoryPath, conflicts: readonly Conflict[]) =>
 const listed = (sdk: DirectoryPath, paths: readonly RelativeFilePath[]) =>
   paths.map((path) => `  ${f.relativePath(path.in(sdk))}`);
 
-const pathsOf = (conflicts: readonly Conflict[]) => conflicts.map((conflict) => conflict.path);
+const stillUnresolved = (paths: readonly RelativeFilePath[]) =>
+  `${plural(paths.length, 'file')} from the last run ${forms(paths.length).are} still unresolved`;
+
+/** The files to resolve by hand, those with markers and those without apart, each group only when it has files. */
+const byHand = (sdk: DirectoryPath, marked: readonly RelativeFilePath[], unmarked: readonly RelativeFilePath[]) => [
+  ...(marked.length === 0
+    ? []
+    : ['With markers: keep what is right, remove the markers, and stage each file.', ...listed(sdk, marked)]),
+  ...(unmarked.length === 0
+    ? []
+    : [
+        'Without markers: decide whether each file stays or goes (delete it again, or keep it as your own), and stage that.',
+        ...listed(sdk, unmarked)
+      ])
+];
+
+/** The "Next steps" note: how to resolve, the files by hand, then a rerun. */
+const stepsNote = (
+  resolve: string,
+  sdk: DirectoryPath,
+  marked: readonly RelativeFilePath[],
+  unmarked: readonly RelativeFilePath[]
+) =>
+  noteWrapped(
+    [resolve, ...byHand(sdk, marked, unmarked).map((line) => `   ${line}`), '2. Rerun the command.'].join('\n'),
+    'Next steps'
+  );
 
 export class SdkGeneratePrompts {
   /**
@@ -253,9 +282,9 @@ export class SdkGeneratePrompts {
     log.info(`Nothing was written; ${f.relativePath(sdk)} is as it was.`);
   }
 
-  /** The files the run settled for `side`, named before the summary counts them. */
-  public conflictsResolved(sdk: DirectoryPath, side: Side, conflicts: readonly Conflict[]) {
-    log.info([RESOLVED_HEADINGS[side], ...listed(sdk, pathsOf(conflicts))].join('\n'));
+  /** The files the run settled for `side`, this run's conflicts or the last run's, named before the summary counts them. */
+  public conflictsResolved(sdk: DirectoryPath, side: Side, paths: readonly RelativeFilePath[]) {
+    log.info([RESOLVED_HEADINGS[side], ...listed(sdk, paths)].join('\n'));
   }
 
   /** The file the write stopped at, and why. */
@@ -287,13 +316,12 @@ export class SdkGeneratePrompts {
   }
 
   /** The counts of what the generator did, and of what is left in conflict, and by name the files of yours it merged into or left alone. */
-  public sdkMerged(sdk: DirectoryPath, plan: MergePlan) {
-    const { files } = plan;
+  public sdkMerged(sdk: DirectoryPath, files: MergeFiles, inConflict: number) {
     const counted = [
       ...COUNTED_FILES.filter((kind) => files[kind].length > 0).map(
         (kind) => `${plural(files[kind].length, 'file')} ${kind}`
       ),
-      ...(plan.hasConflicts() ? [`${plural(plan.conflicts.length, 'file')} in conflict`] : [])
+      ...(inConflict > 0 ? [`${plural(inConflict, 'file')} in conflict`] : [])
     ];
     const named = NAMED_FILES.filter(([kind]) => files[kind].length > 0).flatMap(([kind, heading]) => [
       heading,
@@ -310,26 +338,73 @@ export class SdkGeneratePrompts {
     );
   }
 
-  /** How to finish a merge left to the developer: a merge tool only where git holds the files as unmerged, the files with markers and without apart, then a rerun. */
-  public conflictSteps(sdk: DirectoryPath, plan: MergePlan, staged: boolean) {
-    const { them } = forms(plan.conflicts.length);
-    const tool = staged ? `in a merge tool, such as ${f.var('git mergetool')} or your editor's merge view, or ` : '';
-    const byHand = [
-      {
-        conflicts: plan.conflicts.filter((conflict) => conflict.leavesMarkers()),
-        what: 'With markers: keep what is right, remove the markers, and stage each file.'
-      },
-      {
-        conflicts: plan.conflicts.filter((conflict) => !conflict.leavesMarkers()),
-        what: 'Without markers: decide whether each file stays or goes (delete it again, or keep it as your own), and stage that.'
-      }
-    ].flatMap(({ conflicts, what }) => (conflicts.length === 0 ? [] : [what, ...listed(sdk, pathsOf(conflicts))]));
-    const steps = [
-      `1. Resolve ${them} ${tool}by hand:`,
-      ...byHand.map((line) => `   ${line}`),
-      '2. Rerun the command.'
-    ];
-    noteWrapped(steps.join('\n'), 'Next steps');
+  /** How to finish a merge left to the developer, once git holds the files as unmerged: a merge tool or by hand, the files with markers and without apart, then a rerun. */
+  public conflictSteps(sdk: DirectoryPath, marked: readonly RelativeFilePath[], unmarked: readonly RelativeFilePath[]) {
+    const { them } = forms(marked.length + unmarked.length);
+    const tool = `in a merge tool, such as ${f.var('git mergetool')} or your editor's merge view, or by hand:`;
+    stepsNote(`1. Resolve ${them} ${tool}`, sdk, marked, unmarked);
+  }
+
+  /** As `conflictSteps`, for files git does not hold as unmerged, where no merge tool will find them. */
+  public conflictStepsByHand(
+    sdk: DirectoryPath,
+    marked: readonly RelativeFilePath[],
+    unmarked: readonly RelativeFilePath[]
+  ) {
+    const { them } = forms(marked.length + unmarked.length);
+    stepsNote(`1. Resolve ${them} by hand:`, sdk, marked, unmarked);
+  }
+
+  /** The repository is busy with an operation of the developer's own, which the run would get in the way of. */
+  public operationInProgress(sdk: DirectoryPath, operation: GitOperation) {
+    const abort = f.cmdAlt('git', operation.toString(), '--abort');
+    log.error(
+      `The repository at ${f.relativePath(sdk)} is in the middle of a ${operation}. ` +
+        `Finish it, or abort it with ${abort}, then rerun.`
+    );
+  }
+
+  /** The files the last run left unresolved, for a run that cannot settle them: nothing is done until they are staged. */
+  public conflictsUnresolved(sdk: DirectoryPath, paths: readonly RelativeFilePath[]) {
+    const { them } = forms(paths.length);
+    log.warn([`${stillUnresolved(paths)}. Resolve and stage ${them}, then rerun:`, ...listed(sdk, paths)].join('\n'));
+  }
+
+  /** The files still unresolved, then the three ways the run can go on; backing out is cancelling. */
+  public async unresolvedChoice(sdk: DirectoryPath, paths: readonly RelativeFilePath[]): Promise<UnresolvedChoice> {
+    const { them } = forms(paths.length);
+    log.warn([`${stillUnresolved(paths)}:`, ...listed(sdk, paths)].join('\n'));
+    const choice = await select<UnresolvedChoice>({
+      message: 'What should happen?',
+      options: [
+        {
+          value: 'resolve',
+          label: `I'll finish resolving ${them}`,
+          hint: `nothing is done now; resolve and stage ${them}, then rerun`
+        },
+        {
+          value: 'generated',
+          label: 'Resolve remaining conflicts using generator changes',
+          hint: "where markers remain, the generator's lines win; what you already resolved stays"
+        },
+        {
+          value: 'yours',
+          label: 'Resolve remaining conflicts using my changes',
+          hint: 'where markers remain, your lines win; what you already resolved stays'
+        }
+      ]
+    });
+    return isCancel(choice) ? 'cancel' : choice;
+  }
+
+  /** Nothing was done about the unresolved files: the developer will finish them, or backed out. */
+  public resolveLater() {
+    log.info('Nothing was done. Rerun once the files are resolved and staged.');
+  }
+
+  /** The unresolved files could not be settled, so the run stops before generating. */
+  public conflictsNotSettled(reason: string) {
+    log.error(`The conflicts could not be settled: ${reason}`);
   }
 
   /** The SDK is merged and on disk; the record still names the last snapshot, which the next run merges against again. */

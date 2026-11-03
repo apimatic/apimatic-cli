@@ -1,4 +1,7 @@
 import { Buffer } from 'node:buffer';
+import { execa } from 'execa';
+import { GitService } from '../../src/infrastructure/git-service.js';
+import { DirectoryPath } from '../../src/types/file/directoryPath.js';
 import { RelativeFilePath } from '../../src/types/file/relativeFilePath.js';
 import { BlobId } from '../../src/types/git/blob-id.js';
 import { StageEntry } from '../../src/types/git/merge-tree.js';
@@ -45,3 +48,32 @@ export const kinds = (conflicts: readonly Conflict[]): [string, string][] =>
 /** Each write as `[path, content]`, the content as text. */
 export const written = (writes: readonly FileWrite[]): [string, string][] =>
   writes.map((write) => [String(write.path), text(write.content)]);
+
+/** The id of `contents` written into the repository at `root` as a blob. */
+export const blobOf = async (root: DirectoryPath, contents: string): Promise<BlobId> => {
+  const { stdout } = await execa('git', ['hash-object', '-w', '--stdin'], { cwd: root.toString(), input: contents });
+  return BlobId.fromGit(stdout.trim())!;
+};
+
+/**
+ * Leaves `path` unmerged in the repository's own index, as a merge would: a base, and each side given
+ * (`null` for a side that has no file), so a test can put any pair of versions in git's hands.
+ */
+export async function leftUnmerged(
+  root: DirectoryPath,
+  path: string,
+  { yours = 'yours', generated = 'generated' }: { yours?: string | null; generated?: string | null } = {}
+): Promise<void> {
+  const versions: readonly (readonly [StageEntry['stage'], string | null])[] = [
+    [1, 'base'],
+    [2, yours],
+    [3, generated]
+  ];
+  const entries: StageEntry[] = [];
+  for (const [at, contents] of versions) {
+    if (contents !== null) {
+      entries.push({ mode: '100644', oid: await blobOf(root, contents), stage: at, path: rel(path) });
+    }
+  }
+  (await new GitService().stageConflicts(root, entries))._unsafeUnwrap();
+}

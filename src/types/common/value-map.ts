@@ -51,4 +51,8 @@ export class ValueSet<K extends Spelled> {
   public has(key: K): boolean {
     return this.members.has(key);
   }
+
+  public values(): K[] {
+    return this.members.values();
+  }
 }

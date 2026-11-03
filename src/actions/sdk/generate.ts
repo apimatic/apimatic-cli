@@ -2,7 +2,7 @@ import { SdkGenerationService } from '../../infrastructure/services/sdk-generati
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { ActionResult } from '../action-result.js';
 import { withDirPath } from '../../infrastructure/tmp-extensions.js';
-import { ConflictChoice, SdkGeneratePrompts } from '../../prompts/sdk/generate.js';
+import { ConflictChoice, SdkGeneratePrompts, UnresolvedChoice } from '../../prompts/sdk/generate.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { TempContext } from '../../types/temp-context.js';
 import { isAvailableLanguage, Language, Stability } from '../../types/sdk/generate.js';
@@ -10,7 +10,6 @@ import { ProjectContext } from '../../types/project-context.js';
 import { GitContext } from '../../types/git-context.js';
 import { GitVersion } from '../../types/git/git-version.js';
 import { GitService } from '../../infrastructure/git-service.js';
-import { GenerationRecord } from '../../types/sdk/generation-record.js';
 
 export class GenerateAction {
   private readonly prompts: SdkGeneratePrompts = new SdkGeneratePrompts();
@@ -68,30 +67,70 @@ export class GenerateAction {
     if (gitVersion.isFound() && !gitVersion.isSupported()) {
       this.prompts.gitVersionNotSupported(gitVersion);
     }
-    const isRepository = await gitContext.isRepository(gitVersion);
-    if (isRepository.isErr()) {
-      this.prompts.repositoryNotInspected(sdk, isRepository.error);
+    const inspected = await gitContext.inspect(gitVersion, language, stability);
+    if (inspected.isErr()) {
+      this.prompts.repositoryNotInspected(sdk, inspected.error);
       return ActionResult.failed();
     }
-    const generationRecord = isRepository.value ? await gitContext.generationRecord() : GenerationRecord.none();
-    const baseCommitId = generationRecord.baseFor(language, stability);
-    const hasSnapshot = await gitContext.hasSnapshot(baseCommitId);
-    if (hasSnapshot.isErr()) {
-      this.prompts.repositoryNotInspected(sdk, hasSnapshot.error);
+    const repository = inspected.value;
+    if (repository.operation.isUnderWay()) {
+      this.prompts.operationInProgress(sdk, repository.operation);
       return ActionResult.failed();
     }
-    if (baseCommitId !== undefined && !hasSnapshot.value) {
+    if (repository.hasUnresolved()) {
+      if (!force && !canAsk) {
+        this.prompts.conflictsUnresolved(sdk, repository.unresolved);
+        return ActionResult.actionRequired();
+      }
+      const choice: UnresolvedChoice = force
+        ? 'generated'
+        : await this.prompts.unresolvedChoice(sdk, repository.unresolved);
+      if (choice === 'cancel') {
+        this.prompts.resolveLater();
+        return ActionResult.cancelled();
+      }
+      if (choice === 'resolve') {
+        this.prompts.resolveLater();
+        return ActionResult.actionRequired();
+      }
+      const settlement = await gitContext.settlementFor(choice, repository.unresolved);
+      if (settlement.isErr()) {
+        this.prompts.conflictsNotSettled(settlement.error);
+        return ActionResult.failed();
+      }
+      const written = await gitContext.write(settlement.value);
+      if (written.isErr()) {
+        this.prompts.sdkNotWritten(sdk, written.error);
+        return ActionResult.failed();
+      }
+      const marked = await this.gitService.unstage(sdk, repository.unresolved);
+      if (marked.isErr()) {
+        this.prompts.conflictsNotSettled(marked.error);
+        return ActionResult.failed();
+      }
+      this.prompts.conflictsResolved(sdk, choice, repository.unresolved);
+      // Once more, so a file the settling could not clear stops the run before anything is generated.
+      const again = await gitContext.inspect(gitVersion, language, stability);
+      if (again.isErr()) {
+        this.prompts.repositoryNotInspected(sdk, again.error);
+        return ActionResult.failed();
+      }
+      if (again.value.hasUnresolved()) {
+        this.prompts.conflictsUnresolved(sdk, again.value.unresolved);
+        return ActionResult.actionRequired();
+      }
+    }
+    if (repository.isSnapshotMissing()) {
       this.prompts.snapshotMissing(sdk);
     }
-    // A base that is here is merged against; without one the SDK is written afresh.
-    const mergeBaseCommitId = hasSnapshot.value ? baseCommitId : undefined;
-    const shouldMakeRepository = gitVersion.isSupported() && gitInit && !isRepository.value;
-    const shouldRecord = shouldMakeRepository || isRepository.value;
-    const isRecordingFirstTime = isRepository.value && !generationRecord.isFound();
-    const shouldReplaceOldRecord = force && generationRecord.isFound() && mergeBaseCommitId === undefined;
+    const mergeBase = repository.mergeBase();
+    const shouldMakeRepository = gitVersion.isSupported() && gitInit && !repository.isRepository();
+    const shouldRecord = shouldMakeRepository || repository.isRepository();
+    const isRecordingFirstTime = repository.isRepository() && !repository.isRecorded();
+    const shouldReplaceOldRecord = force && repository.isRecorded() && mergeBase === undefined;
 
     // A merge writes only what changed, so it never asks; a save replaces everything, so it does.
-    if (!force && mergeBaseCommitId === undefined && (await gitContext.hasFilesBesidesGit())) {
+    if (!force && mergeBase === undefined && (await gitContext.hasFilesBesidesGit())) {
       if (!canAsk) {
         this.prompts.cannotAskToOverwrite(sdk);
         return ActionResult.failed();
@@ -132,8 +171,8 @@ export class GenerateAction {
         return ActionResult.failed();
       }
 
-      if (mergeBaseCommitId !== undefined) {
-        const mergePlan = await gitContext.merge(mergeBaseCommitId, generated.value);
+      if (mergeBase !== undefined) {
+        const mergePlan = await gitContext.merge(mergeBase, generated.value);
         if (mergePlan.isErr()) {
           this.prompts.customCodeFailed(mergePlan.error);
           return ActionResult.failed();
@@ -153,12 +192,12 @@ export class GenerateAction {
           return ActionResult.cancelled();
         }
         const landing = choice === 'asPlaced' ? plan : plan.taking(choice);
-        const previous = await gitContext.keepPrevious(mergeBaseCommitId);
+        const previous = await gitContext.keepPrevious(mergeBase);
         if (previous.isErr()) {
           this.prompts.customCodeFailed(previous.error);
           return ActionResult.failed();
         }
-        const written = await gitContext.write(landing, generated.value);
+        const written = await gitContext.write(landing);
         if (written.isErr()) {
           this.prompts.sdkNotWritten(sdk, written.error);
           const restored = await gitContext.restore(previous.value, landing);
@@ -174,21 +213,23 @@ export class GenerateAction {
           this.prompts.snapshotNotRecordedAfterMerge(recorded.error);
         }
         if (choice !== 'asPlaced') {
-          this.prompts.conflictsResolved(sdk, choice, plan.conflicts);
+          this.prompts.conflictsResolved(sdk, choice, plan.conflictedPaths());
         }
         if (landing.isEmpty()) {
           this.prompts.sdkUnchanged(sdk);
         } else {
-          this.prompts.sdkMerged(sdk, landing);
+          this.prompts.sdkMerged(sdk, landing.files, landing.conflicts.length);
         }
         if (!landing.hasConflicts()) {
           return ActionResult.success();
         }
-        const staged = await gitContext.stageConflicts(landing);
+        const staged = await this.gitService.stageConflicts(sdk, landing.stages);
         if (staged.isErr()) {
           this.prompts.conflictsNotStaged(staged.error);
+          this.prompts.conflictStepsByHand(sdk, landing.markedPaths(), landing.unmarkedPaths());
+        } else {
+          this.prompts.conflictSteps(sdk, landing.markedPaths(), landing.unmarkedPaths());
         }
-        this.prompts.conflictSteps(sdk, landing, staged.isOk());
         return ActionResult.actionRequired();
       }
 

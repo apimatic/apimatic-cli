@@ -99,6 +99,15 @@ describe('PlacedConflict', () => {
 });
 
 describe('Settlement', () => {
+  it('removes its path for a deletion of yours the last run wrote over, counting nothing', () => {
+    const removed = Settlement.removed(rel('a.ts'));
+
+    expect(removed.writes()).to.deep.equal([]);
+    expect(removed.removes().map(String)).to.deep.equal(['a.ts']);
+    expect(removed.countedIn(NO_FILES)).to.deep.equal(NO_FILES);
+    expect(Settlement.kept(rel('b.ts')).removes()).to.deep.equal([]);
+  });
+
   it('counts its path into the summary after the paths already there, leaving the summary given as it was', () => {
     const files: MergeFiles = { ...NO_FILES, kept: [rel('mine.ts')] };
 

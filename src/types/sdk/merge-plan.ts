@@ -179,9 +179,9 @@ export class MergePlan {
     this.writes = [...uncontested, ...conflicts.flatMap((conflict) => conflict.asPlaced())];
   }
 
-  /** Every conflicted path's versions as git keeps them, for the index to hold as a merge would leave it. */
-  public get stages(): readonly StageEntry[] {
-    return this.conflicts.flatMap((conflict) => conflict.stages);
+  /** A plan that touches nothing, for settlements to land on. */
+  public static empty(): MergePlan {
+    return new MergePlan([], [], [], { added: [], updated: [], merged: [], removed: [], kept: [] });
   }
 
   /** What git's merge means for the SDK directory: writes, deletions, conflicts, and the summary. */
@@ -204,15 +204,24 @@ export class MergePlan {
     );
   }
 
-  /** Every conflict settled for `side`, as the question's answer is, with the summary counting each as it lands. */
-  public taking(side: Side): MergePlan {
-    const settled = this.conflicts.map((conflict) => conflict.settledFor(side));
+  /** Every conflicted path's versions as git keeps them, for the index to hold as a merge would leave it. */
+  public get stages(): readonly StageEntry[] {
+    return this.conflicts.flatMap((conflict) => conflict.stages);
+  }
+
+  /** This plan with `settlements` landed beside its own writes and removals, its conflicts gone, each settlement counted into the summary. */
+  public settled(settlements: readonly Settlement[]): MergePlan {
     return new MergePlan(
-      [...this.uncontested, ...settled.flatMap((settlement) => settlement.writes())],
-      this.deletes,
+      [...this.uncontested, ...settlements.flatMap((settlement) => settlement.writes())],
+      [...this.deletes, ...settlements.flatMap((settlement) => settlement.removes())],
       [],
-      settled.reduce((files, settlement) => settlement.countedIn(files), this.files)
+      settlements.reduce((files, settlement) => settlement.countedIn(files), this.files)
     );
+  }
+
+  /** Every conflict settled for `side`, as the question's answer is. */
+  public taking(side: Side): MergePlan {
+    return this.settled(this.conflicts.map((conflict) => conflict.settledFor(side)));
   }
 
   public hasConflicts(): boolean {
@@ -222,5 +231,19 @@ export class MergePlan {
   /** Whether the run would write nothing, remove nothing, and leave nothing in conflict. */
   public isEmpty(): boolean {
     return this.writes.length === 0 && this.deletes.length === 0 && this.conflicts.length === 0;
+  }
+
+  public conflictedPaths(): RelativeFilePath[] {
+    return this.conflicts.map((conflict) => conflict.path);
+  }
+
+  /** The conflicted files written with markers in them, for a merge tool to find. */
+  public markedPaths(): RelativeFilePath[] {
+    return this.conflicts.filter((conflict) => conflict.leavesMarkers()).map((conflict) => conflict.path);
+  }
+
+  /** The conflicted files left whole, for you to keep or remove. */
+  public unmarkedPaths(): RelativeFilePath[] {
+    return this.conflicts.filter((conflict) => !conflict.leavesMarkers()).map((conflict) => conflict.path);
   }
 }

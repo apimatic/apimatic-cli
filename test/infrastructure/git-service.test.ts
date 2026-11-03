@@ -10,8 +10,9 @@ import { DirectoryPath } from '../../src/types/file/directoryPath.js';
 import { BlobId } from '../../src/types/git/blob-id.js';
 import { CommitId } from '../../src/types/git/commit-id.js';
 import { StageEntry } from '../../src/types/git/merge-tree.js';
+import { GitOperation } from '../../src/types/git/git-operation.js';
 import { TreeId } from '../../src/types/git/tree-id.js';
-import { rel } from '../helpers/merge.js';
+import { leftUnmerged, rel } from '../helpers/merge.js';
 import { describeCommit, snapshotFiles } from '../helpers/snapshots.js';
 
 const REF = 'refs/apimatic/pristine';
@@ -366,6 +367,78 @@ describe('GitService', () => {
 
       expect((await git.stageConflicts(repo, [])).isOk()).to.be.true;
       expect((await indexOf(repo)).map(([relative, stage]) => [relative, stage])).to.deep.equal([['a.txt', 0]]);
+    });
+  });
+
+  describe('unmergedStages', () => {
+    it('lists the sides git kept for each unmerged path, and nothing for a merged one or an empty index', async () => {
+      const repo = await repository();
+      expect((await git.unmergedStages(repo))._unsafeUnwrap()).to.deep.equal([]);
+      write(repo, 'merged.txt', 'fine\n');
+      await execa('git', ['add', '.'], { cwd: repo.toString() });
+      await leftUnmerged(repo, 'both.txt');
+      await leftUnmerged(repo, 'dropped.txt', { generated: null });
+
+      const listed = (await git.unmergedStages(repo))._unsafeUnwrap();
+
+      expect(listed.map((entry) => [entry.path.toString(), entry.stage])).to.have.deep.members([
+        ['both.txt', 1],
+        ['both.txt', 2],
+        ['both.txt', 3],
+        ['dropped.txt', 1],
+        ['dropped.txt', 2]
+      ]);
+      expect(listed.every((entry) => entry.mode === '100644')).to.be.true;
+    });
+  });
+
+  describe('operationInProgress', () => {
+    it('names the operation by the file git leaves while it is under way, and none otherwise', async () => {
+      const repo = await repository();
+      const gitFile = (name: string) => path.join(repo.toString(), '.git', name);
+
+      expect((await git.operationInProgress(repo))._unsafeUnwrap().isUnderWay()).to.be.false;
+      for (const [mark, name] of [
+        ['MERGE_HEAD', 'merge'],
+        ['REBASE_HEAD', 'rebase'],
+        ['CHERRY_PICK_HEAD', 'cherry-pick'],
+        ['REVERT_HEAD', 'revert']
+      ]) {
+        fs.writeFileSync(gitFile(mark), `${'a'.repeat(40)}\n`);
+        const operation = (await git.operationInProgress(repo))._unsafeUnwrap();
+        expect(operation.isUnderWay(), mark).to.be.true;
+        expect(operation.toString(), mark).to.equal(name);
+        fs.rmSync(gitFile(mark));
+      }
+      expect(GitOperation.marks()).to.deep.equal(['MERGE_HEAD', 'REBASE_HEAD', 'CHERRY_PICK_HEAD', 'REVERT_HEAD']);
+      expect(GitOperation.markedBy('HEAD').isUnderWay()).to.be.false;
+    });
+  });
+
+  describe('unstage', () => {
+    it('takes the paths out of the unmerged state and leaves the files on disk, with or without a HEAD', async () => {
+      const repo = await repository();
+      write(repo, 'a.txt', 'settled\n');
+      await leftUnmerged(repo, 'a.txt');
+      await leftUnmerged(repo, 'b.txt');
+
+      (await git.unstage(repo, [rel('a.txt')]))._unsafeUnwrap();
+
+      const left = (await git.unmergedStages(repo))._unsafeUnwrap();
+      expect(left.map((entry) => entry.path.toString())).to.deep.equal(['b.txt', 'b.txt', 'b.txt']);
+      expect(fs.readFileSync(path.join(repo.toString(), 'a.txt'), 'utf8')).to.equal('settled\n');
+
+      const tree = (await git.treeOf(repo, repo))._unsafeUnwrap();
+      const head = (await git.commitTree(repo, tree, undefined, 'first'))._unsafeUnwrap();
+      (await git.updateRef(repo, 'HEAD', head))._unsafeUnwrap();
+      await leftUnmerged(repo, 'a.txt');
+
+      (await git.unstage(repo, [rel('a.txt'), rel('b.txt')]))._unsafeUnwrap();
+
+      expect((await git.unmergedStages(repo))._unsafeUnwrap()).to.deep.equal([]);
+      const { stdout } = await execa('git', ['ls-files', '--stage'], { cwd: repo.toString() });
+      expect(stdout.split('\n').map((line) => line.split('\t')[1])).to.deep.equal(['a.txt']);
+      expect((await git.unstage(repo, [])).isOk()).to.be.true;
     });
   });
 });

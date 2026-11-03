@@ -122,7 +122,9 @@ index, `commitTree`, `resolveRef`, `treeOfCommit`, `updateRef`, each failing wit
 a string, which the prompts take as `reason`; `GitVersion` total, with `none`, `isFound` and
 `isSupported`; `CommitId`, `TreeId`; `GitContext` on the SDK directory: `hasGitDirectory` (a
 `.git` of its own, read without git), `isRepository(git)` (as that git sees it; false, with no
-git run, without a `.git` or a git that can serve), `recordSnapshot`, with the pristine ref a constant of the module;
+git run, without a `.git` or a git that can serve), `recordSnapshot`, with the pristine ref a constant of the module
+(since Phase 4's refactor, the questions a run asks of a repository, the operation under way, the
+unmerged paths, the record and its snapshot, are answered together by `inspect` as a `RepositoryState`);
 `SdkContext` as in phase 0; no run flag reaches a context, and `execute` combines the facts: the
 version is read only with a `.git` of its own or `--git-init`, and the run records only with a
 usable git; the `--git-init` flag; the prompts for the two warnings, the initialised message, the
@@ -181,7 +183,7 @@ Slices: 2.1, done, the record and the save that keeps `.git`: `GenerationRecord`
 `.apimatic/generation.json` written by every recording (the snapshot's message names the
 generation) and read before the question, "Found" only on the first record, the
 snapshot-missing warning without a remote, init before the save again, the hidden-entries
-count, `GitContext.save`, `hasFilesBesidesGit`, `generationRecord` (none when there is no record, the file written by `recordContents`) and `hasSnapshot`, `SdkContext`
+count, `GitContext.save`, `hasFilesBesidesGit`, `generationRecord` (none when there is no record, the file written by `recordContents`) and `hasSnapshot` (folded into `inspect` with Phase 4's refactor), `SdkContext`
 deleted. 2.2, done, the merge: items 2, 3, 7 and 8 and the writes and removals of item 5, the
 question skipped, the `--force` replacement and its warning; `GitContext.merge` (both trees,
 `merge-tree`, the diffs, the plan) and `write` (removals, then writes whose bytes differ);
@@ -310,6 +312,21 @@ conflicts are unresolved" group, "refuses while the repository is in the middle 
 sdk-repository-context "settling what the last run left unresolved", the "inspect" cases about
 unmerged files and the operation in progress; git-service `unmergedStages`;
 `unresolved-file.test.ts`; `repository-facts.test.ts` for the order of the facts.
+
+Slices: 4.1, done, what is in the way: `GitOperation` (a value, none-able) and
+`GitService.operationInProgress`, `unmergedStages`, and the block in the action before the record is
+read that refuses an operation in progress and lists what is unmerged as Action required; the
+`operationInProgress` and `conflictsUnresolved` prompts. 4.2, done, settling what was left:
+`UnresolvedFile.settledFor` answering a `Settlement`, `GitContext.settlementFor` as the plan over the
+index's two sides and the disk, landed by the same `write` as a merge and followed by
+`GitService.unstage`, the question (`unresolvedChoice`, backing out cancels) with `--force` answering
+for the generator, and the second look; the `resolveLater` and `conflictsNotSettled` prompts, and
+`conflictsResolved` over paths for this run's conflicts and the last run's alike. Refactored with
+Phase 3 afterwards: `GitContext.inspect` answers every question a run asks of the repository as one
+`RepositoryState`; every plan carries the bytes that reach the disk, line endings decided by `merge`
+and `settlementFor`, so `write(plan)` lands any plan; the prompts render what they are handed
+(`sdkMerged` given its counts, `conflictSteps` and `conflictStepsByHand` picked by the action).
+`repository-facts.test.ts` has `repository-state.test.ts` as its counterpart.
 
 ### Phase 5: a clone merges against a snapshot it fetches
 

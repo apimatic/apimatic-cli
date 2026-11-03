@@ -3,7 +3,7 @@ import { ValueMap } from '../../../src/types/common/value-map.js';
 import { MergeMessage, MergeTreeOutput } from '../../../src/types/git/merge-tree.js';
 import { TreeId } from '../../../src/types/git/tree-id.js';
 import { GENERATED_MARKER, YOURS_MARKER } from '../../../src/types/sdk/conflict-markers.js';
-import { FileWrite } from '../../../src/types/sdk/conflict.js';
+import { FileWrite, Settlement } from '../../../src/types/sdk/conflict.js';
 import { MergeInputs, MergePlan } from '../../../src/types/sdk/merge-plan.js';
 import { blob, bytes, counts, kinds, markedByGit, named, rel, SIDES, stage, written } from '../../helpers/merge.js';
 
@@ -336,5 +336,35 @@ describe('MergePlan.taking', () => {
     expect(written(plan.taking('generated').writes)).to.deep.equal([['new.ts', 'n']]);
     expect(plan.taking('generated').deletes).to.deep.equal([]);
     expect(written(plan.taking('yours').writes)).to.deep.equal([]);
+  });
+});
+
+describe('MergePlan.settled', () => {
+  it('starts empty and lands settlements beside its own writes and removals, counting each', () => {
+    const plan = MergePlan.empty().settled([
+      Settlement.merged({ path: rel('a.ts'), content: bytes('a') }),
+      Settlement.removed(rel('b.ts')),
+      Settlement.kept(rel('c.ts'))
+    ]);
+
+    expect(written(plan.writes)).to.deep.equal([['a.ts', 'a']]);
+    expect(plan.deletes.map(String)).to.deep.equal(['b.ts']);
+    expect(plan.hasConflicts()).to.be.false;
+    expect(named(plan.files)).to.deep.equal({ added: [], updated: [], merged: ['a.ts'], removed: [], kept: ['c.ts'] });
+    expect(MergePlan.empty().isEmpty()).to.be.true;
+  });
+
+  it('names the conflicted paths, and tells those whose file carries markers from the rest', () => {
+    const plan = conflicted();
+
+    expect(plan.conflictedPaths().map(String)).to.deep.equal([
+      'same.ts',
+      'added.ts',
+      'logo.png',
+      'deleted-by-you.ts',
+      'dropped.ts'
+    ]);
+    expect(plan.markedPaths().map(String)).to.deep.equal(['same.ts', 'added.ts']);
+    expect(plan.unmarkedPaths().map(String)).to.deep.equal(['logo.png', 'deleted-by-you.ts', 'dropped.ts']);
   });
 });
