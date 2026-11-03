@@ -92,7 +92,7 @@ Supporting: **Types** (`src/types/`) for value objects, context objects, and dom
 - **Temp directories** — always use `withDirPath()` wrapper, never `tmp-promise` directly
 - **`authKey` typed as `string | null = null`**, not `undefined`
 - **Exit via `outro(result)`** — sets `process.exitCode`; never call `process.exit()` directly
-- **`ActionResult` variants** — `success()`, `failed()`, `cancelled()`, `stopped()` (for long-running server commands); exit codes 0 / 1 / 130 respectively
+- **`ActionResult` variants** — `success()`, `failed()`, `cancelled()`, `stopped()` (for long-running server commands), `actionRequired()` (the developer has something left to do, such as conflicts to resolve; yellow outro); exit codes 0 / 1 / 130 / 130 / 1 respectively
 - **Constructor pattern**: `private readonly` properties, `public readonly execute = async (...) => { ... }`
 - **`static cmdTxt`** on every Command using `format.cmd(...)` for example rendering
 - **Commands use `export default class`** — oclif requires default export; actions, prompts, and services use named exports (`export class`)
@@ -102,7 +102,7 @@ Supporting: **Types** (`src/types/`) for value objects, context objects, and dom
 - **Reuse infra** — network, file I/O, OS calls, sleep, time: use existing services, Node.js standard libraries and built-in JS APIs.
 - **Readability is king** — simple names, simple domain models, composed with simple functions that turn one type into another instead of passing primitives around.
 - **Validate once, up front** — no repeated runtime type checks; later code works with guaranteed types.
-- **Telemetry** — After `outro(result)`, commands optionally track failures via `result.mapAll(() => {}, async () => { await new TelemetryService(configDir).trackEvent(new SomeFailedEvent(...), shell) }, () => {})`. Event classes extend `DomainEvent` (`src/types/events/`). Only the failure callback is populated; success/cancel are no-ops.
+- **Telemetry** — After `outro(result)`, commands optionally track failures via `result.match({ success: () => {}, failed: async () => { await new TelemetryService(configDir).trackEvent(new SomeFailedEvent(...), shell) }, cancelled: () => {}, actionRequired: () => {} })`. Event classes extend `DomainEvent` (`src/types/events/`). Only the `failed` handler is populated; the others are no-ops.
 
 ## Branching
 

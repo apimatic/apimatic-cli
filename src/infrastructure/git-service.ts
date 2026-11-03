@@ -10,9 +10,10 @@ import { RelativeFilePath } from '../types/file/relativeFilePath.js';
 import { BlobId } from '../types/git/blob-id.js';
 import { CommitId } from '../types/git/commit-id.js';
 import { GitVersion } from '../types/git/git-version.js';
-import { Change, MergeTreeOutput, parseMergeTree } from '../types/git/merge-tree.js';
+import { Change, MergeTreeOutput, parseMergeTree, StageEntry } from '../types/git/merge-tree.js';
 import { TreeEntry } from '../types/git/tree-entry.js';
 import { TreeId } from '../types/git/tree-id.js';
+import { ValueMap } from '../types/common/value-map.js';
 import { errorMessage } from '../utils/error-utils.js';
 import { canonical, withDirPath } from './tmp-extensions.js';
 
@@ -183,6 +184,25 @@ export class GitService {
     });
   }
 
+  /**
+   * Puts the paths into the repository's own index as a merge would leave them, so `git status` and a
+   * merge tool see them; a stage-0 entry is dropped first, or git keeps it beside the others.
+   */
+  public async stageConflicts(root: DirectoryPath, entries: readonly StageEntry[]): Promise<Result<void, string>> {
+    if (entries.length === 0) {
+      return ok(undefined);
+    }
+    // A mode-0 line drops every stage of its path; git only asks that its id be well formed, so the path's own serves.
+    const byPath = new ValueMap(entries.map((entry) => [entry.path, entry] as const));
+    const removals = byPath.values().map((entry) => `0 ${entry.oid}\t${entry.path}`);
+    const stages = entries.map((entry) => `${entry.mode} ${entry.oid} ${entry.stage}\t${entry.path}`);
+    const ran = await run(['update-index', '-z', '--index-info'], {
+      cwd: root,
+      input: [...removals, ...stages].map((line) => `${line}\0`).join('')
+    });
+    return ran.map(() => undefined);
+  }
+
   /** How `to` differs from `from`, file by file; a moved file is a deletion and an addition. */
   public diffTrees(
     root: DirectoryPath,
@@ -210,6 +230,7 @@ const SETTINGS: readonly (readonly [string, string])[] = [
   ['core.safecrlf', 'false'],
   ['core.quotePath', 'false'],
   ['merge.conflictStyle', 'merge'],
+  ['merge.directoryRenames', 'conflict'],
   ['merge.renormalize', 'true'],
   ['merge.renameLimit', '10000'],
   ['diff.renameLimit', '10000'],

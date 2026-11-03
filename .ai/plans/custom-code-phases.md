@@ -241,8 +241,34 @@ Behaviour:
    not be marked, warn and leave the merge tool out.
 5. The run ends as Action required: a yellow outro, exit 1, so a chained command does not run.
 
+Done, in one slice. `ActionResult.actionRequired()` and `isActionRequired()`, the yellow outro,
+and `match({ success, failed, cancelled, actionRequired })` in place of `mapAll`;
+`GitService.stageConflicts` (a stage-0 entry dropped first, then every stage merge-tree
+reported, through `update-index --index-info`), reached through `GitContext.stageConflicts(plan)`
+like every other git operation on the SDK directory; `merge.directoryRenames=conflict` pinned
+beside `merge.conflictStyle`, so a file added inside a directory the generator renamed follows
+it whatever the developer's global config says; `MergedText` in `conflict-markers.ts` (git's
+labels read, `id` and `id:path` alike, relabelled with the CLI's, settled for a side line by
+line, a malformed sequence leaving the file whole); `conflict.ts` with `Settlement` (how one
+conflict lands for a side: what is written and what the summary calls it) and three conflicts
+behind one interface, each carrying the stage entries git kept for its path, `MarkedConflict`
+for the files git marked, `WholeConflict` for a file a side deleted or a binary one (the
+generator's version where it has one, else yours stays), `PlacedConflict` for the other shapes
+(git's placement stands); `MergePlan.taking(side)` and `stages` derived from the conflicts,
+built from the stage-3 blobs `GitContext.merge` reads beside the merged tree. The only switch
+on a conflict's kind is where git's facts become objects. A path git names in a conflict
+message that the merge leaves nowhere (neither staged nor written), such as the old name of a
+file the generator renamed and you deleted, or of one the merge moved into a directory the
+generator renamed, is left out of the conflicts and of the summary: it is no file to settle.
+The `conflictChoice` (answering a side, `asPlaced` for the files as git left them, or `cancel`,
+which backing out answers too), `conflictsResolved`, `conflictSteps`, `conflictsNotStaged` and
+`runCancelled` prompts; `conflictsNotAsked` titled "N files need your attention" and saying how
+to rerun. Phase 7's item 3 was pulled forward: `sdk publish` says `conflictsNotPublished` and
+ends as Action required when the generation does.
+
 Touches: `ActionResult.actionRequired()` and `isActionRequired()`, the yellow outro and the
-fourth `mapAll` callback; `GitService.stageConflicts`; conflict kinds completed (both changed,
+fourth `match` handler; `GitService.stageConflicts` and `GitContext.stageConflicts`;
+`merge.directoryRenames` pinned; conflict kinds completed (both changed,
 both added, deleted by you, no longer generated, binary, other), settling markers for a side,
 the plan with a side taken; the `conflictChoice`, `conflictsResolved`, `conflictSteps`,
 `conflictsNotStaged` and `runCancelled` prompts.
@@ -250,8 +276,11 @@ the plan with a side taken; the `conflictChoice`, `conflictsResolved`, `conflict
 Tests from `92988f2f`: generate-write "the question when the merge conflicts" group, "writes
 markers …", "leaves the merge tool out …"; the merge table's marker cases, "settled for a side"
 group, the binary conflict and the two-spec conflicts; `conflict-markers.test.ts`,
-`settlement.test.ts`, `merge-plan.test.ts` for `taking`; `action-result.test.ts`,
-`format.test.ts`; the prompts tests about the conflicts.
+`settlement.test.ts` (folded into `merge-plan.test.ts`, since the settlement is
+`MergePlan.taking`), `merge-plan.test.ts` for `taking`; `action-result.test.ts`,
+`format.test.ts`; the prompts tests about the conflicts; `conflict.test.ts` for the three
+conflicts and `Settlement`; git-service `stageConflicts`; publish "publishes nothing, and ends
+as Action required …".
 
 ### Phase 4: the next run after conflicts were left
 
@@ -348,7 +377,7 @@ Behaviour:
    own ignore rules keep out. Outside a repository of its own, everything but `.git` and
    `.apimatic`.
 3. A generation that ends as Action required publishes nothing, and says the SDK still has
-   conflicts.
+   conflicts. Done in phase 3.
 
 Touches: `GitService.ignoredBelow`; `RelativeDirectoryPath` and `RelativePaths`;
 `ZipService.archiveWithout` and `TempContext.zipWithout`; the `--git-init` flag on publish and
@@ -423,7 +452,8 @@ write fails.
 
 - A new `ActionRequired` kind with exit 1 and a yellow outro, as the product review chose. For:
   not a success, since the SDK will not build; not a failure, since the run did what was
-  chosen. Against: every `mapAll` caller gains a callback.
+  chosen. Against: every `mapAll` caller gains a callback. Taken, with `mapAll` renamed
+  `match` over named handlers, so a caller that leaves one out fails to compile.
 - Reuse `failed` with a message. For: no new kind. Against: `sdk publish` could not tell a
   conflict from a failure, and the outro would be red for a run that did what was asked.
 

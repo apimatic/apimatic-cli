@@ -1,7 +1,6 @@
-import { isCancel, confirm, log } from '@clack/prompts';
+import { isCancel, confirm, log, select } from '@clack/prompts';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { FileProblem } from '../../types/file/file-problem.js';
-import { RelativeFilePath } from '../../types/file/relativeFilePath.js';
 import { format as f } from '../format.js';
 import { Result } from 'neverthrow';
 import { noteWrapped, notZippedForUpload, withSpinner } from '../prompt.js';
@@ -9,14 +8,23 @@ import { ServiceError } from '../../infrastructure/service-error.js';
 import { AVAILABLE_LANGUAGES, Language, languageLabel, UPCOMING_LANGUAGES } from '../../types/sdk/generate.js';
 import { GitVersion } from '../../types/git/git-version.js';
 import { CommitId } from '../../types/git/commit-id.js';
-import { Conflict, ConflictKind, MergeFiles } from '../../types/sdk/merge-plan.js';
+import { RelativeFilePath } from '../../types/file/relativeFilePath.js';
+import { Side } from '../../types/sdk/conflict-markers.js';
+import { Conflict, ConflictKind } from '../../types/sdk/conflict.js';
+import { MergePlan } from '../../types/sdk/merge-plan.js';
 import { WriteProblem } from '../../types/sdk/write-problem.js';
 import { listedInProse, plural } from '../../utils/string-utils.js';
 
+/** What the developer chose for the conflicts: a side to settle them for, the files as git placed them to resolve by hand, or to stop. */
+export type ConflictChoice = Side | 'asPlaced' | 'cancel';
+
 const names = (languages: readonly Language[]) => languages.map(languageLabel).join(', ');
 
-const listed = (heading: string, paths: readonly RelativeFilePath[], sdk: DirectoryPath): string[] =>
-  paths.length === 0 ? [] : [heading, ...paths.map((path) => `  ${f.relativePath(path.in(sdk))}`)];
+/** The words that change between one conflicted file and several. */
+const forms = (count: number) =>
+  count === 1
+    ? { them: 'it', theyAre: 'it is', files: 'file', need: 'needs' }
+    : { them: 'them', theyAre: 'they are', files: 'files', need: 'need' };
 
 const CONFLICT_LABELS: Record<ConflictKind, string> = {
   bothChanged: 'changed by you and by the generator',
@@ -27,7 +35,32 @@ const CONFLICT_LABELS: Record<ConflictKind, string> = {
   other: 'placed by git where it could, with both versions on disk'
 };
 
+const RESOLVED_HEADINGS: Record<Side, string> = {
+  generated: "Resolved using the generator's changes:",
+  yours: 'Resolved using your changes:'
+};
+
 const OPERATION_LABELS = { write: 'written', remove: 'removed' } as const;
+
+/** The generator's own files are a count, and so are the merged ones, which are also named below; the rest of yours are named. */
+const COUNTED_FILES = ['added', 'updated', 'merged', 'removed'] as const;
+
+/** The files of yours, each kind under its heading. */
+const NAMED_FILES = [
+  ['merged', 'Merged with your changes:'],
+  ['kept', 'Kept as yours:']
+] as const;
+
+const attentionTitle = (conflicts: readonly Conflict[]) =>
+  `${plural(conflicts.length, 'file')} ${forms(conflicts.length).need} your attention`;
+
+const conflictLines = (sdk: DirectoryPath, conflicts: readonly Conflict[]) =>
+  conflicts.map((conflict) => `${f.relativePath(conflict.path.in(sdk))}\n  ${CONFLICT_LABELS[conflict.kind]}`);
+
+const listed = (sdk: DirectoryPath, paths: readonly RelativeFilePath[]) =>
+  paths.map((path) => `  ${f.relativePath(path.in(sdk))}`);
+
+const pathsOf = (conflicts: readonly Conflict[]) => conflicts.map((conflict) => conflict.path);
 
 export class SdkGeneratePrompts {
   /**
@@ -179,12 +212,50 @@ export class SdkGeneratePrompts {
     log.error(`Your customizations could not be merged into the regenerated SDK: ${reason}\nNothing was written.`);
   }
 
-  /** The conflicted files, with what each one is, for a run that writes none of them. */
+  /** The conflicted files, with what each one is, for a run that cannot ask about them and so writes none. */
   public conflictsNotAsked(sdk: DirectoryPath, conflicts: readonly Conflict[]) {
-    const lines = conflicts.map(
-      (conflict) => `${f.relativePath(conflict.path.in(sdk))}\n  ${CONFLICT_LABELS[conflict.kind]}`
-    );
-    noteWrapped([...lines, '', 'Nothing was written.'].join('\n'), `Conflicts in ${plural(conflicts.length, 'file')}`);
+    const { them, theyAre } = forms(conflicts.length);
+    const howToRerun =
+      `Nothing was written. Rerun in a terminal to choose how ${theyAre} resolved, ` +
+      `or with ${f.flag('force')} to resolve ${them} using the generator's changes.`;
+    noteWrapped([...conflictLines(sdk, conflicts), '', howToRerun].join('\n'), attentionTitle(conflicts));
+  }
+
+  /** The conflicted files, with what each one is, then the four ways the run can go on; backing out is cancelling. */
+  public async conflictChoice(sdk: DirectoryPath, conflicts: readonly Conflict[]): Promise<ConflictChoice> {
+    const { them, files } = forms(conflicts.length);
+    noteWrapped(conflictLines(sdk, conflicts).join('\n'), attentionTitle(conflicts));
+    const choice = await select<ConflictChoice>({
+      message: 'What should happen?',
+      options: [
+        {
+          value: 'asPlaced',
+          label: `I'll resolve ${them} myself`,
+          hint: `markers go into the ${files}; resolve and stage ${them}, then rerun`
+        },
+        {
+          value: 'generated',
+          label: 'Resolve using generator changes',
+          hint: "where you both changed the same lines, the generator's lines win; your other edits stay"
+        },
+        {
+          value: 'yours',
+          label: 'Resolve using my changes',
+          hint: "where you both changed the same lines, your lines win; the generator's other changes still apply"
+        },
+        { value: 'cancel', label: 'Cancel this run', hint: 'nothing is written; the SDK stays as it is' }
+      ]
+    });
+    return isCancel(choice) ? 'cancel' : choice;
+  }
+
+  public runCancelled(sdk: DirectoryPath) {
+    log.info(`Nothing was written; ${f.relativePath(sdk)} is as it was.`);
+  }
+
+  /** The files the run settled for `side`, named before the summary counts them. */
+  public conflictsResolved(sdk: DirectoryPath, side: Side, conflicts: readonly Conflict[]) {
+    log.info([RESOLVED_HEADINGS[side], ...listed(sdk, pathsOf(conflicts))].join('\n'));
   }
 
   /** The file the write stopped at, and why. */
@@ -215,16 +286,50 @@ export class SdkGeneratePrompts {
     log.info(`Regenerated the SDK at ${f.relativePath(sdk)}: nothing changed.`);
   }
 
-  /** The counts of what the generator did, and by name the files of yours it merged into or left alone. */
-  public sdkMerged(sdk: DirectoryPath, files: MergeFiles) {
-    const counts = (['added', 'updated', 'merged', 'removed'] as const)
-      .filter((kind) => files[kind].length > 0)
-      .map((kind) => `${plural(files[kind].length, 'file')} ${kind}`);
-    const named = [
-      ...listed('Merged with your changes:', files.merged, sdk),
-      ...listed('Kept as yours:', files.kept, sdk)
+  /** The counts of what the generator did, and of what is left in conflict, and by name the files of yours it merged into or left alone. */
+  public sdkMerged(sdk: DirectoryPath, plan: MergePlan) {
+    const { files } = plan;
+    const counted = [
+      ...COUNTED_FILES.filter((kind) => files[kind].length > 0).map(
+        (kind) => `${plural(files[kind].length, 'file')} ${kind}`
+      ),
+      ...(plan.hasConflicts() ? [`${plural(plan.conflicts.length, 'file')} in conflict`] : [])
     ];
-    log.info([`Regenerated the SDK at ${f.relativePath(sdk)}: ${listedInProse(counts)}.`, ...named].join('\n'));
+    const named = NAMED_FILES.filter(([kind]) => files[kind].length > 0).flatMap(([kind, heading]) => [
+      heading,
+      ...listed(sdk, files[kind])
+    ]);
+    log.info([`Regenerated the SDK at ${f.relativePath(sdk)}: ${listedInProse(counted)}.`, ...named].join('\n'));
+  }
+
+  /** The conflicted files could not be put in the index, so the next run will have no sign of them. */
+  public conflictsNotStaged(reason: string) {
+    log.warn(
+      `The conflicted files could not be marked in git's index: ${reason}\n` +
+        'The markers are in the files, but the next run will not know about them: resolve them before rerunning.'
+    );
+  }
+
+  /** How to finish a merge left to the developer: a merge tool only where git holds the files as unmerged, the files with markers and without apart, then a rerun. */
+  public conflictSteps(sdk: DirectoryPath, plan: MergePlan, staged: boolean) {
+    const { them } = forms(plan.conflicts.length);
+    const tool = staged ? `in a merge tool, such as ${f.var('git mergetool')} or your editor's merge view, or ` : '';
+    const byHand = [
+      {
+        conflicts: plan.conflicts.filter((conflict) => conflict.leavesMarkers()),
+        what: 'With markers: keep what is right, remove the markers, and stage each file.'
+      },
+      {
+        conflicts: plan.conflicts.filter((conflict) => !conflict.leavesMarkers()),
+        what: 'Without markers: decide whether each file stays or goes (delete it again, or keep it as your own), and stage that.'
+      }
+    ].flatMap(({ conflicts, what }) => (conflicts.length === 0 ? [] : [what, ...listed(sdk, pathsOf(conflicts))]));
+    const steps = [
+      `1. Resolve ${them} ${tool}by hand:`,
+      ...byHand.map((line) => `   ${line}`),
+      '2. Rerun the command.'
+    ];
+    noteWrapped(steps.join('\n'), 'Next steps');
   }
 
   /** The SDK is merged and on disk; the record still names the last snapshot, which the next run merges against again. */

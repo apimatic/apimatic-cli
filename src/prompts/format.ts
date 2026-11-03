@@ -35,7 +35,8 @@ export const format = {
   intro: (text: string) => pc.bgCyan(text),
   outroSuccess: (text: string) => pc.bgGreen(text),
   outroFailure: (text: string) => pc.bgRed(text),
-  outroCancelled: (text: string) => pc.bgWhite(pc.blackBright(text))
+  outroCancelled: (text: string) => pc.bgWhite(pc.blackBright(text)),
+  outroActionRequired: (text: string) => pc.bgYellow(pc.black(text))
 };
 
 export function intro(text: string) {
@@ -45,11 +46,12 @@ export function outro<T, E>(result: ActionResult<T, E>) {
   const exitCode = result.getExitCode();
   const message = result.getMessage();
 
-  const outroMessage = result.mapAll(
-    () => format.outroSuccess(message),
-    () => format.outroFailure(message),
-    () => format.outroCancelled(message)
-  );
+  const outroMessage = result.match({
+    success: () => format.outroSuccess(message),
+    failed: () => format.outroFailure(message),
+    cancelled: () => format.outroCancelled(message),
+    actionRequired: () => format.outroActionRequired(message)
+  });
 
   o(outroMessage);
   process.exitCode = exitCode;

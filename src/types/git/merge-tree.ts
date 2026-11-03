@@ -11,6 +11,9 @@ export type Change =
 /** The stage each side of a conflicted path is kept at, as git numbers them. */
 export const STAGE = { base: 1, ours: 2, theirs: 3 } as const;
 
+/** The CLI merges with your tree as git's "ours" and the generation as its "theirs". */
+export const SIDE_STAGE = { yours: STAGE.ours, generated: STAGE.theirs } as const;
+
 /** One conflicted path's version on one side. */
 export type StageEntry = { mode: string; oid: BlobId; stage: 1 | 2 | 3; path: RelativeFilePath };
 

@@ -7,14 +7,14 @@ import { execa } from 'execa';
 import { GitService } from '../../src/infrastructure/git-service.js';
 import { canonical } from '../../src/infrastructure/tmp-extensions.js';
 import { DirectoryPath } from '../../src/types/file/directoryPath.js';
-import { RelativeFilePath } from '../../src/types/file/relativeFilePath.js';
+import { BlobId } from '../../src/types/git/blob-id.js';
 import { CommitId } from '../../src/types/git/commit-id.js';
+import { StageEntry } from '../../src/types/git/merge-tree.js';
 import { TreeId } from '../../src/types/git/tree-id.js';
+import { rel } from '../helpers/merge.js';
 import { describeCommit, snapshotFiles } from '../helpers/snapshots.js';
 
 const REF = 'refs/apimatic/pristine';
-
-const rel = (value: string) => RelativeFilePath.fromGit(value)!;
 
 describe('GitService', () => {
   let root: string;
@@ -299,6 +299,73 @@ describe('GitService', () => {
       expect(merged.tree.isEqual((await git.treeOfCommit(repo, both))._unsafeUnwrap())).to.be.true;
       expect(merged.stages).to.deep.equal([]);
       expect(merged.messages).to.deep.equal([]);
+    });
+  });
+
+  describe('stageConflicts', () => {
+    const blobOf = async (repo: DirectoryPath, contents: string) => {
+      const { stdout } = await execa('git', ['hash-object', '-w', '--stdin'], {
+        cwd: repo.toString(),
+        input: contents
+      });
+      return BlobId.fromGit(stdout.trim())!;
+    };
+    const entry = (relative: string, stage: StageEntry['stage'], oid: BlobId): StageEntry => ({
+      mode: '100644',
+      oid,
+      stage,
+      path: rel(relative)
+    });
+    /** Every index entry as `[path, stage, oid]`. */
+    const indexOf = async (repo: DirectoryPath) => {
+      const { stdout } = await execa('git', ['ls-files', '--stage'], { cwd: repo.toString() });
+      return stdout
+        .trim()
+        .split('\n')
+        .map((line) => {
+          const [entry, relative] = line.split('\t');
+          const [, oid, stage] = entry.split(' ');
+          return [relative, Number(stage), oid];
+        });
+    };
+
+    it("puts each path into the repository's own index at the stages given, replacing what the index held for it", async () => {
+      const repo = await repository();
+      write(repo, 'same.txt', 'resolved\n');
+      write(repo, 'other.txt', 'other\n');
+      await execa('git', ['add', '.'], { cwd: repo.toString() });
+      const base = await blobOf(repo, 'base\n');
+      const ours = await blobOf(repo, 'ours\n');
+      const theirs = await blobOf(repo, 'theirs\n');
+
+      const staged = await git.stageConflicts(repo, [
+        entry('same.txt', 1, base),
+        entry('same.txt', 2, ours),
+        entry('same.txt', 3, theirs)
+      ]);
+
+      expect(staged.isOk()).to.be.true;
+      const index = await indexOf(repo);
+      expect(index.map(([relative, stage]) => [relative, stage])).to.have.deep.members([
+        ['other.txt', 0],
+        ['same.txt', 1],
+        ['same.txt', 2],
+        ['same.txt', 3]
+      ]);
+      expect(index.filter(([relative]) => relative === 'same.txt')).to.have.deep.members([
+        ['same.txt', 1, base.toString()],
+        ['same.txt', 2, ours.toString()],
+        ['same.txt', 3, theirs.toString()]
+      ]);
+    });
+
+    it('leaves the index alone when there is nothing to stage', async () => {
+      const repo = await repository();
+      write(repo, 'a.txt', 'a\n');
+      await execa('git', ['add', '.'], { cwd: repo.toString() });
+
+      expect((await git.stageConflicts(repo, [])).isOk()).to.be.true;
+      expect((await indexOf(repo)).map(([relative, stage]) => [relative, stage])).to.deep.equal([['a.txt', 0]]);
     });
   });
 });

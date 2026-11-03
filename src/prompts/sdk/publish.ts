@@ -28,6 +28,11 @@ export class SdkPublishPrompts {
     log.error(`The SDK in ${f.path(sdkDirectory)} could not be zipped for upload: ${problem.reason}`);
   }
 
+  /** The generation left conflicts for the developer, so nothing is uploaded until they are gone. */
+  public conflictsNotPublished() {
+    log.warn('Nothing was published, since the SDK still has conflicts. Rerun once they are resolved and staged.');
+  }
+
   public dryRunNotice(publishingSummary: string): void {
     log.info(
       `You can publish this SDK by removing the --dry-run flag. It will be published for the following:` +

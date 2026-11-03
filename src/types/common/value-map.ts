@@ -35,6 +35,9 @@ export class ValueMap<K extends Spelled, V> {
   }
 }
 
+/** A value map to read, for an input handed over whole. */
+export type ReadonlyValueMap<K extends Spelled, V> = Omit<ValueMap<K, V>, 'set'>;
+
 /** A set of value objects, by what they spell. */
 export class ValueSet<K extends Spelled> {
   private readonly members = new ValueMap<K, K>();

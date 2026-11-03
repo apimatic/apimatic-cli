@@ -10,13 +10,13 @@ import { FileService } from '../../src/infrastructure/file-service.js';
 import { GitService } from '../../src/infrastructure/git-service.js';
 import { canonical } from '../../src/infrastructure/tmp-extensions.js';
 import { DirectoryPath } from '../../src/types/file/directoryPath.js';
-import { RelativeFilePath } from '../../src/types/file/relativeFilePath.js';
 import { GitContext } from '../../src/types/git-context.js';
 import { CommitId } from '../../src/types/git/commit-id.js';
 import { GitVersion } from '../../src/types/git/git-version.js';
 import { Language, Stability } from '../../src/types/sdk/generate.js';
 import { recordContents } from '../../src/types/sdk/generation-record.js';
-import { MergePlan } from '../../src/types/sdk/merge-plan.js';
+import { GENERATED_MARKER, Side, YOURS_MARKER } from '../../src/types/sdk/conflict-markers.js';
+import { counts, kinds } from '../helpers/merge.js';
 import { describeCommit, snapshotFiles } from '../helpers/snapshots.js';
 
 /** Where the SDK directory's own repository keeps each generation as the server returned it. */
@@ -56,10 +56,6 @@ const MODEL_V2 = [
 ].join('\n');
 const HELPER = '\nexport function formatPrice(book: Book): string {\n  return `$${book.price.toFixed(2)}`;\n}\n';
 const MODEL_V1_WITH_HELPER = MODEL_V1 + HELPER;
-
-const rel = (value: string) => RelativeFilePath.fromGit(value)!;
-const counts = (plan: MergePlan) =>
-  Object.fromEntries(Object.entries(plan.files).map(([kind, paths]) => [kind, paths.length]));
 
 describe('GitContext', () => {
   let root: string;
@@ -340,13 +336,15 @@ describe('GitContext', () => {
     /**
      * `base` was generated last time, `disk` is the SDK directory now, `fresh` is the generator's new
      * output: the plan, and the directory once the plan is written, unless the test reads the plan alone.
-     * `beforeWrite` runs once the plan is made, for a test that breaks the write, which is then not unwrapped.
+     * `favour` settles the conflicts for that side, as the question's answer does, and the settled plan is the
+     * one written and returned. `beforeWrite` runs once the plan is made, for a test that breaks the write,
+     * which is then not unwrapped.
      */
     const merged = async (
       base: Files,
       disk: Files,
       fresh: Files,
-      { written = true, beforeWrite }: { written?: boolean; beforeWrite?: () => void } = {}
+      { written = true, favour, beforeWrite }: { written?: boolean; favour?: Side; beforeWrite?: () => void } = {}
     ) => {
       const directory = inRoot(`sdk-${counter++}`);
       await ownRepository(directory);
@@ -355,7 +353,8 @@ describe('GitContext', () => {
         write(path.join(directory, relative), contents);
       }
       const freshDirectory = generated(fresh);
-      const plan = (await context(directory).merge(baseCommit, freshDirectory))._unsafeUnwrap();
+      const made = (await context(directory).merge(baseCommit, freshDirectory))._unsafeUnwrap();
+      const plan = favour === undefined ? made : made.taking(favour);
       beforeWrite?.();
       const previous = (await context(directory).keepPrevious(baseCommit))._unsafeUnwrap();
       const landed =
@@ -413,19 +412,45 @@ describe('GitContext', () => {
       expect(plan.hasConflicts()).to.be.false;
     });
 
-    it('reports the lines you and the generator both changed as a conflict', async () => {
+    it('marks the lines you and the generator both changed, with the CLI’s labels, and keeps the rest merged', async () => {
+      const yours = MODEL_V1.replace('Price in USD.', 'Price in USD, VAT included.');
+
+      const { plan, read } = await merged({ 'book.ts': MODEL_V1 }, { 'book.ts': yours }, { 'book.ts': MODEL_V2 });
+
+      expect(read('book.ts')).to.equal(
+        [
+          'export type Book = {',
+          ...MODEL_FIELDS,
+          YOURS_MARKER,
+          '  /** Price in USD, VAT included. */',
+          '=======',
+          '  /** Retail price in US dollars. */',
+          GENERATED_MARKER,
+          '  price: number;',
+          '  isbn?: string;',
+          '};',
+          ''
+        ].join('\n')
+      );
+      expect(kinds(plan.conflicts)).to.deep.equal([['book.ts', 'bothChanged']]);
+      expect(plan.stages.map(({ stage, path: staged }) => [String(staged), stage])).to.deep.equal([
+        ['book.ts', 1],
+        ['book.ts', 2],
+        ['book.ts', 3]
+      ]);
+    });
+
+    it('leaves the directory alone when the plan is only read', async () => {
       const yours = MODEL_V1.replace('Price in USD.', 'Price in USD, VAT included.');
 
       const { plan, read } = await merged(
         { 'book.ts': MODEL_V1 },
         { 'book.ts': yours },
         { 'book.ts': MODEL_V2 },
-        {
-          written: false
-        }
+        { written: false }
       );
 
-      expect(plan.conflicts).to.deep.equal([{ path: rel('book.ts'), kind: 'bothChanged' }]);
+      expect(plan.hasConflicts()).to.be.true;
       expect(read('book.ts')).to.equal(yours);
     });
 
@@ -443,12 +468,11 @@ describe('GitContext', () => {
       expect(plan.files.kept.map(String)).to.deep.equal(['custom/format.ts']);
     });
 
-    it('reports a path you and the generator both added with different content as a conflict, and accepts one with the same', async () => {
+    it('marks a path you and the generator both added with different content, and accepts one with the same', async () => {
       const differ = await merged(
         { 'a.ts': 'a\n' },
         { 'a.ts': 'a\n', 'retry.ts': 'yours\n' },
-        { 'a.ts': 'a\n', 'retry.ts': 'generated\n' },
-        { written: false }
+        { 'a.ts': 'a\n', 'retry.ts': 'generated\n' }
       );
       const same = await merged(
         { 'a.ts': 'a\n' },
@@ -456,7 +480,10 @@ describe('GitContext', () => {
         { 'a.ts': 'a\n', 'retry.ts': 'same\n' }
       );
 
-      expect(differ.plan.conflicts).to.deep.equal([{ path: rel('retry.ts'), kind: 'bothAdded' }]);
+      expect(differ.read('retry.ts')).to.equal(
+        [YOURS_MARKER, 'yours', '=======', 'generated', GENERATED_MARKER, ''].join('\n')
+      );
+      expect(kinds(differ.plan.conflicts)).to.deep.equal([['retry.ts', 'bothAdded']]);
       expect(same.plan.writes).to.be.empty;
       expect(same.plan.hasConflicts()).to.be.false;
     });
@@ -471,6 +498,19 @@ describe('GitContext', () => {
       expect(read('models/catalog/book.ts')).to.equal(MODEL_V2 + HELPER);
       expect(exists('models/book.ts')).to.be.false;
       expect(plan.hasConflicts()).to.be.false;
+    });
+
+    it('labels the markers in a file you moved with the sides, where git names the old path too', async () => {
+      const { plan, read } = await merged(
+        { 'models/book.ts': MODEL_V1, 'b.ts': 'b\n' },
+        { 'models/catalog/book.ts': MODEL_V1.replace('Price in USD.', 'Price in USD, VAT included.'), 'b.ts': 'b\n' },
+        { 'models/book.ts': MODEL_V2, 'b.ts': 'b\n' }
+      );
+
+      const content = read('models/catalog/book.ts')!;
+      expect(content).to.contain(`${YOURS_MARKER}\n`).and.to.contain(`${GENERATED_MARKER}\n`);
+      expect(content).to.not.match(/^[<>]{7} [0-9a-f]{40}/m);
+      expect(kinds(plan.conflicts)).to.deep.equal([['models/catalog/book.ts', 'bothChanged']]);
     });
 
     it('carries your edit to a file the generator renamed, and removes the old name', async () => {
@@ -496,6 +536,100 @@ describe('GitContext', () => {
       expect(read('models/User.ts')).to.equal('user\n');
     });
 
+    it('neither lists nor brings back the old name of a file the generator renamed and you deleted', async () => {
+      const { plan, paths, read } = await merged(
+        { 'models/book.ts': MODEL_V1, 'b.ts': 'b\n' },
+        { 'b.ts': 'b\n' },
+        { 'models/book-model.ts': MODEL_V2, 'b.ts': 'b\n' }
+      );
+
+      expect(kinds(plan.conflicts)).to.deep.equal([['models/book-model.ts', 'deletedByYou']]);
+      expect(paths()).to.deep.equal(['b.ts', 'models/book-model.ts']);
+      expect(read('models/book-model.ts')).to.equal(MODEL_V2);
+    });
+
+    describe('settled for a side, as the question’s answer is', () => {
+      it('settles each overlapping hunk for that side and merges the rest, with the file’s own line ending', async () => {
+        const base = 'a\r\nb\r\nc\r\nd\r\ne\r\nf\r\ng\r\n';
+        const yours = 'A\r\nb\r\nc\r\nd\r\ne\r\nf\r\ng yours\r\n';
+        const generated = 'a\nb\nc\nD\ne\nf\ng generated\n';
+        const expected = {
+          generated: 'A\r\nb\r\nc\r\nD\r\ne\r\nf\r\ng generated\r\n',
+          yours: 'A\r\nb\r\nc\r\nD\r\ne\r\nf\r\ng yours\r\n'
+        };
+        for (const favour of ['generated', 'yours'] as const) {
+          const { plan, read } = await merged({ 'a.ts': base }, { 'a.ts': yours }, { 'a.ts': generated }, { favour });
+
+          expect(read('a.ts'), favour).to.equal(expected[favour]);
+          expect(plan.hasConflicts(), favour).to.be.false;
+          expect(plan.files.merged.map(String), favour).to.deep.equal(['a.ts']);
+        }
+      });
+
+      it('keeps an edited file the generator stopped producing, for the generator’s side too', async () => {
+        const { plan, read } = await merged(
+          { 'models/book.ts': MODEL_V1, 'helper.ts': 'helper\n' },
+          { 'models/book.ts': MODEL_V1_WITH_HELPER, 'helper.ts': 'helper, edited\n' },
+          { 'models/book.ts': MODEL_V2 },
+          { favour: 'generated' }
+        );
+
+        expect(read('helper.ts')).to.equal('helper, edited\n');
+        expect(read('models/book.ts')).to.equal(MODEL_V2 + HELPER);
+        expect(plan.files.kept.map(String)).to.deep.equal(['helper.ts']);
+        expect(plan.hasConflicts()).to.be.false;
+      });
+
+      it('keeps a file you added inside a directory the generator renamed, for either side', async () => {
+        for (const favour of ['generated', 'yours'] as const) {
+          const { plan, paths, read } = await merged(
+            { 'models/book.ts': MODEL_V1, 'b.ts': 'b\n' },
+            { 'models/book.ts': MODEL_V1, 'models/custom.ts': 'custom\n', 'b.ts': 'b\n' },
+            { 'model/book.ts': MODEL_V2, 'b.ts': 'b\n' },
+            { favour }
+          );
+
+          expect(paths(), favour).to.deep.equal(['b.ts', 'model/book.ts', 'model/custom.ts']);
+          expect(read('model/custom.ts')).to.equal('custom\n');
+          expect(read('model/book.ts')).to.equal(MODEL_V2);
+          expect(plan.hasConflicts(), favour).to.be.false;
+        }
+      });
+
+      it('reports a file you added inside a directory the generator renamed as a conflict of another shape, placed in the new directory', async () => {
+        const { plan, paths, read } = await merged(
+          { 'models/book.ts': MODEL_V1, 'b.ts': 'b\n' },
+          { 'models/book.ts': MODEL_V1, 'models/custom.ts': 'custom\n', 'b.ts': 'b\n' },
+          { 'model/book.ts': MODEL_V2, 'b.ts': 'b\n' }
+        );
+
+        expect(kinds(plan.conflicts)).to.deep.equal([['model/custom.ts', 'other']]);
+        expect(paths()).to.deep.equal(['b.ts', 'model/book.ts', 'model/custom.ts']);
+        expect(read('model/custom.ts')).to.equal('custom\n');
+        expect(counts(plan.files)).to.deep.equal({ added: 0, updated: 1, merged: 0, removed: 1, kept: 0 });
+      });
+    });
+
+    describe('stageConflicts', () => {
+      it('marks the conflicted paths in the repository’s own index at stages 1, 2 and 3, and nothing else', async () => {
+        const yours = MODEL_V1.replace('Price in USD.', 'Price in USD, VAT included.');
+        const { plan, directory } = await merged(
+          { 'book.ts': MODEL_V1, 'b.ts': 'b\n' },
+          { 'book.ts': yours, 'b.ts': 'b\n' },
+          { 'book.ts': MODEL_V2, 'b.ts': 'b\n' }
+        );
+
+        (await context(directory).stageConflicts(plan))._unsafeUnwrap();
+
+        const { stdout } = await execa('git', ['ls-files', '--stage'], { cwd: directory });
+        expect(stdout.split('\n').map((line) => [line.split('\t')[1], line.split(/\s+/)[2]])).to.deep.equal([
+          ['book.ts', '1'],
+          ['book.ts', '2'],
+          ['book.ts', '3']
+        ]);
+      });
+    });
+
     describe('two spec versions in a row, as a generator ships them', () => {
       const v1: Files = {
         'src/models/book.ts': MODEL_V1,
@@ -509,37 +643,45 @@ describe('GitContext', () => {
         'docs/models/book.md': '# Book\n\nprice\nisbn\n'
       };
 
-      it('counts a helper, a new file and a custom file through the v2 spec, and reports a deleted docs page as a conflict', async () => {
-        const { plan } = await merged(
+      it('keeps a helper, a new file and a custom file through the v2 spec, and writes back a deleted docs page as a conflict', async () => {
+        const { plan, read, paths } = await merged(
           v1,
           {
             'src/models/book.ts': MODEL_V1_WITH_HELPER,
             'src/sdk/authors.ts': 'export class Authors {}\n',
             'src/custom/format.ts': 'mine\n'
           },
-          v2,
-          { written: false }
+          v2
         );
 
-        expect(plan.conflicts).to.deep.equal([{ path: rel('docs/models/book.md'), kind: 'deletedByYou' }]);
-        expect(counts(plan)).to.deep.equal({ added: 1, updated: 0, merged: 1, removed: 0, kept: 1 });
+        expect(paths()).to.deep.equal([
+          'docs/models/book.md',
+          'src/custom/format.ts',
+          'src/funcs/delete-book.ts',
+          'src/models/book.ts',
+          'src/sdk/authors.ts'
+        ]);
+        expect(read('src/models/book.ts')).to.equal(MODEL_V2 + HELPER);
+        expect(kinds(plan.conflicts)).to.deep.equal([['docs/models/book.md', 'deletedByYou']]);
+        expect(counts(plan.files)).to.deep.equal({ added: 1, updated: 0, merged: 1, removed: 0, kept: 1 });
       });
 
-      it('reports an edited file the v3 spec drops as a conflict, and removes nothing else it did not produce', async () => {
+      it('keeps an edited file the v3 spec drops, and removes nothing else it did not produce', async () => {
         const v3: Files = { 'src/models/book.ts': MODEL_V2, 'docs/models/book.md': '# Book\n\nprice\nisbn\n' };
 
-        const { plan } = await merged(
+        const { plan, read, exists } = await merged(
           v1,
           {
             'src/models/book.ts': MODEL_V1,
             'src/sdk/authors.ts': 'export class Authors { getMany() {} }\n',
             'docs/models/book.md': '# Book\n\nprice\n'
           },
-          v3,
-          { written: false }
+          v3
         );
 
-        expect(plan.conflicts).to.deep.equal([{ path: rel('src/sdk/authors.ts'), kind: 'noLongerGenerated' }]);
+        expect(exists('src/sdk/authors.ts')).to.be.true;
+        expect(read('src/models/book.ts')).to.equal(MODEL_V2);
+        expect(kinds(plan.conflicts)).to.deep.equal([['src/sdk/authors.ts', 'noLongerGenerated']]);
         expect(plan.files.updated).to.have.length(2);
         expect(plan.deletes).to.deep.equal([]);
       });
@@ -651,24 +793,36 @@ describe('GitContext', () => {
         expect(read('d.cs')).to.equal('new\r\n');
       });
 
-      it('replaces an unedited binary and reports an edited one the generator changed too as a conflict', async () => {
+      it('labels the markers of a CRLF file on CRLF lines', async () => {
+        const { read } = await merged(
+          { 'a.cs': 'one\r\ntwo\r\n' },
+          { 'a.cs': 'one\r\nmine\r\n' },
+          { 'a.cs': 'one\r\ntheirs\r\n' }
+        );
+
+        expect(read('a.cs')).to.equal(`one\r\n${YOURS_MARKER}\r\nmine\r\n=======\r\ntheirs\r\n${GENERATED_MARKER}\r\n`);
+      });
+
+      it('replaces an unedited binary and keeps an edited one, as a conflict when the generator changed it too', async () => {
         const changed = Buffer.concat([BINARY, Buffer.from([1])]);
         const edited = Buffer.concat([BINARY, Buffer.from([2])]);
 
         const replaced = await merged({ 'logo.png': BINARY }, { 'logo.png': BINARY }, { 'logo.png': changed });
-        const both = await merged(
+        const both = await merged({ 'logo.png': BINARY }, { 'logo.png': edited }, { 'logo.png': changed });
+        const settled = await merged(
           { 'logo.png': BINARY },
           { 'logo.png': edited },
           { 'logo.png': changed },
-          {
-            written: false
-          }
+          { favour: 'generated' }
         );
 
         expect(replaced.bytes('logo.png')).to.deep.equal(changed);
         expect(replaced.plan.files.updated).to.have.length(1);
         expect(both.bytes('logo.png')).to.deep.equal(edited);
-        expect(both.plan.conflicts).to.deep.equal([{ path: rel('logo.png'), kind: 'binary' }]);
+        expect(kinds(both.plan.conflicts)).to.deep.equal([['logo.png', 'binary']]);
+        expect(settled.bytes('logo.png')).to.deep.equal(changed);
+        expect(settled.plan.files.updated.map(String)).to.deep.equal(['logo.png']);
+        expect(settled.plan.hasConflicts()).to.be.false;
       });
     });
   });

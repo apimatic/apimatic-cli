@@ -2,7 +2,7 @@ import { SdkGenerationService } from '../../infrastructure/services/sdk-generati
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { ActionResult } from '../action-result.js';
 import { withDirPath } from '../../infrastructure/tmp-extensions.js';
-import { SdkGeneratePrompts } from '../../prompts/sdk/generate.js';
+import { ConflictChoice, SdkGeneratePrompts } from '../../prompts/sdk/generate.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { TempContext } from '../../types/temp-context.js';
 import { isAvailableLanguage, Language, Stability } from '../../types/sdk/generate.js';
@@ -138,19 +138,30 @@ export class GenerateAction {
           this.prompts.customCodeFailed(mergePlan.error);
           return ActionResult.failed();
         }
-        if (mergePlan.value.hasConflicts()) {
-          this.prompts.conflictsNotAsked(sdk, mergePlan.value.conflicts);
+        const plan = mergePlan.value;
+        if (plan.hasConflicts() && !force && !canAsk) {
+          this.prompts.conflictsNotAsked(sdk, plan.conflicts);
           return ActionResult.failed();
         }
+        const choice: ConflictChoice = !plan.hasConflicts()
+          ? 'asPlaced'
+          : force
+          ? 'generated'
+          : await this.prompts.conflictChoice(sdk, plan.conflicts);
+        if (choice === 'cancel') {
+          this.prompts.runCancelled(sdk);
+          return ActionResult.cancelled();
+        }
+        const landing = choice === 'asPlaced' ? plan : plan.taking(choice);
         const previous = await gitContext.keepPrevious(mergeBaseCommitId);
         if (previous.isErr()) {
           this.prompts.customCodeFailed(previous.error);
           return ActionResult.failed();
         }
-        const written = await gitContext.write(mergePlan.value, generated.value);
+        const written = await gitContext.write(landing, generated.value);
         if (written.isErr()) {
           this.prompts.sdkNotWritten(sdk, written.error);
-          const restored = await gitContext.restore(previous.value, mergePlan.value);
+          const restored = await gitContext.restore(previous.value, landing);
           if (restored.isErr()) {
             this.prompts.sdkNotRestored(sdk, previous.value, restored.error);
           } else {
@@ -162,12 +173,23 @@ export class GenerateAction {
         if (recorded.isErr()) {
           this.prompts.snapshotNotRecordedAfterMerge(recorded.error);
         }
-        if (mergePlan.value.isEmpty()) {
+        if (choice !== 'asPlaced') {
+          this.prompts.conflictsResolved(sdk, choice, plan.conflicts);
+        }
+        if (landing.isEmpty()) {
           this.prompts.sdkUnchanged(sdk);
         } else {
-          this.prompts.sdkMerged(sdk, mergePlan.value.files);
+          this.prompts.sdkMerged(sdk, landing);
         }
-        return ActionResult.success();
+        if (!landing.hasConflicts()) {
+          return ActionResult.success();
+        }
+        const staged = await gitContext.stageConflicts(landing);
+        if (staged.isErr()) {
+          this.prompts.conflictsNotStaged(staged.error);
+        }
+        this.prompts.conflictSteps(sdk, landing, staged.isOk());
+        return ActionResult.actionRequired();
       }
 
       // The directory becomes a repository only once there is a generation to put in it, so a failed generation leaves none behind.

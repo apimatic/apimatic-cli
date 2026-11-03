@@ -10,6 +10,7 @@ import { FilePath } from './file/filePath.js';
 import { RelativeFilePath } from './file/relativeFilePath.js';
 import { CommitId } from './git/commit-id.js';
 import { GitVersion } from './git/git-version.js';
+import { SIDE_STAGE } from './git/merge-tree.js';
 import { TreeEntry } from './git/tree-entry.js';
 import { TreeId } from './git/tree-id.js';
 import { Language, Stability } from './sdk/generate.js';
@@ -111,7 +112,6 @@ export class GitContext {
     if (disk.isErr()) {
       return err(disk.error);
     }
-    // Yours is git's "ours" and the generation its "theirs", which is what the plan reads the stages by.
     const yours = await this.gitService.commitTree(this.directory, disk.value, base, 'apimatic: your changes');
     if (yours.isErr()) {
       return err(yours.error);
@@ -123,6 +123,14 @@ export class GitContext {
     const merged = await this.gitService.mergeTree(this.directory, yours.value, theirs.value);
     if (merged.isErr()) {
       return err(merged.error);
+    }
+    const generatorStages = merged.value.stages.filter((entry) => entry.stage === SIDE_STAGE.generated);
+    const generatedVersions = await this.gitService.readBlobs(
+      this.directory,
+      generatorStages.map((entry) => entry.oid)
+    );
+    if (generatedVersions.isErr()) {
+      return err(generatedVersions.error);
     }
     const yourChanges = await this.gitService.diffTreesPairingRenames(this.directory, baseTree.value, disk.value);
     if (yourChanges.isErr()) {
@@ -156,9 +164,20 @@ export class GitContext {
         generated: generatedChanges.value,
         writes: changed.map((change, index) => ({ path: change.path, content: contents.value[index] })),
         deletes: applied.value.flatMap((change) => (change.status === 'D' ? [change.path] : [])),
-        basePaths
+        basePaths,
+        generatedVersions: new ValueMap(
+          generatorStages.map((entry, index): [RelativeFilePath, Uint8Array] => [
+            entry.path,
+            generatedVersions.value[index]
+          ])
+        )
       })
     );
+  }
+
+  /** Marks the plan's conflicted paths in the repository's own index as a merge would leave them, so `git status` and a merge tool see them. */
+  public async stageConflicts(plan: MergePlan): Promise<Result<void, string>> {
+    return this.gitService.stageConflicts(this.directory, plan.stages);
   }
 
   /**

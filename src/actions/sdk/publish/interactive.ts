@@ -140,11 +140,8 @@ export class SdkPublishInteractiveAction {
       publishingSummary,
       onPublishSdkError
     );
-    if (publishResult.isFailed()) {
-      return ActionResult.failed();
-    }
-    if (publishResult.isCancelled()) {
-      return ActionResult.cancelled();
+    if (!publishResult.isSuccess()) {
+      return publishResult.discardValue();
     }
 
     await new RecordPublishedSdkAction().execute(project, language, publishingProfile, publishTypes, version);

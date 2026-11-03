@@ -30,4 +30,32 @@ describe('ActionResult', () => {
     expect(result.isFailed()).to.be.true;
     expect(result.getError()).to.be.undefined;
   });
+
+  const kindOf = (result: ActionResult) =>
+    result.match({
+      success: () => 'success',
+      failed: () => 'failed',
+      cancelled: () => 'cancelled',
+      actionRequired: () => 'actionRequired'
+    });
+
+  it('is neither a failure nor a cancellation when action is required, yet exits 1 as git merge does on conflicts', () => {
+    const result = ActionResult.actionRequired();
+
+    expect(result.isActionRequired()).to.be.true;
+    expect(result.isFailed()).to.be.false;
+    expect(result.isCancelled()).to.be.false;
+    expect(result.isSuccess()).to.be.false;
+    expect(result.getMessage()).to.equal('Action required');
+    expect(result.getExitCode()).to.equal(1);
+    expect(kindOf(result)).to.equal('actionRequired');
+    expect(kindOf(result.discardValue())).to.equal('actionRequired');
+  });
+
+  it('keeps 130 for a cancellation and 0 for a success', () => {
+    expect(ActionResult.cancelled().getExitCode()).to.equal(130);
+    expect(ActionResult.success().getExitCode()).to.equal(0);
+    expect(kindOf(ActionResult.cancelled())).to.equal('cancelled');
+    expect(kindOf(ActionResult.success())).to.equal('success');
+  });
 });

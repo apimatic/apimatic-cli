@@ -123,11 +123,8 @@ export class SdkPublishNonInteractiveAction {
       publishingSummary,
       onPublishSdkError
     );
-    if (publishResult.isFailed()) {
-      return ActionResult.failed();
-    }
-    if (publishResult.isCancelled()) {
-      return ActionResult.cancelled();
+    if (!publishResult.isSuccess()) {
+      return publishResult.discardValue();
     }
 
     // A dry run publishes nothing, so recording it would claim an SDK that does not exist anywhere.

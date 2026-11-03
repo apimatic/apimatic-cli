@@ -62,11 +62,11 @@ export class SdkPublishAction {
         false,
         packageSettingsDirectory
       );
-      if (sdkGenerationResult.isFailed()) {
-        return ActionResult.failed();
+      if (sdkGenerationResult.isActionRequired()) {
+        this.prompts.conflictsNotPublished();
       }
-      if (sdkGenerationResult.isCancelled()) {
-        return ActionResult.cancelled();
+      if (!sdkGenerationResult.isSuccess()) {
+        return sdkGenerationResult.discardValue();
       }
 
       if (dryRun) {
@@ -104,11 +104,8 @@ export class SdkPublishAction {
       return ActionResult.success(publishSdkResponse.value);
     });
 
-    if (publishResult.isFailed()) {
-      return ActionResult.failed();
-    }
-    if (publishResult.isCancelled()) {
-      return ActionResult.cancelled();
+    if (!publishResult.isSuccess()) {
+      return publishResult.discardValue();
     }
 
     // Since publishing was not initiated, skip the next steps for polling.
