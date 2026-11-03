@@ -15,9 +15,10 @@ import { CommitId } from '../../src/types/git/commit-id.js';
 import { GitVersion } from '../../src/types/git/git-version.js';
 import { Language, Stability } from '../../src/types/sdk/generate.js';
 import { recordContents } from '../../src/types/sdk/generation-record.js';
+import { RecordedSnapshot } from '../../src/types/sdk/recorded-snapshot.js';
 import { GENERATED_MARKER, Side, YOURS_MARKER } from '../../src/types/sdk/conflict-markers.js';
 import { counts, kinds, leftUnmerged, rel } from '../helpers/merge.js';
-import { describeCommit, snapshotFiles } from '../helpers/snapshots.js';
+import { describeCommit, fetchKind, snapshotFiles } from '../helpers/snapshots.js';
 
 /** Where the SDK directory's own repository keeps each generation as the server returned it. */
 const PRISTINE_REF = 'refs/apimatic/pristine';
@@ -226,7 +227,7 @@ describe('GitContext', () => {
       expect(state.operation.isUnderWay()).to.be.false;
       expect(state.hasUnresolved()).to.be.false;
       expect(state.isRecorded()).to.be.false;
-      expect(state.mergeBase()).to.be.undefined;
+      expect(state.snapshot.mergeBase()).to.be.undefined;
       expect(operationInProgress.called).to.be.false;
     });
 
@@ -270,13 +271,13 @@ describe('GitContext', () => {
       const missing = await inspect();
 
       expect(recorded.isRecorded()).to.be.true;
-      expect(recorded.mergeBase()).to.deep.equal(commit);
-      expect(recorded.isSnapshotMissing()).to.be.false;
+      expect(recorded.snapshot.mergeBase()).to.deep.equal(commit);
+      expect(recorded.snapshot.isMissing()).to.be.false;
       expect(other.isRecorded()).to.be.true;
-      expect(other.mergeBase()).to.be.undefined;
-      expect(other.isSnapshotMissing()).to.be.false;
-      expect(missing.mergeBase()).to.be.undefined;
-      expect(missing.isSnapshotMissing()).to.be.true;
+      expect(other.snapshot.mergeBase()).to.be.undefined;
+      expect(other.snapshot.isMissing()).to.be.false;
+      expect(missing.snapshot.mergeBase()).to.be.undefined;
+      expect(missing.snapshot.isMissing()).to.be.true;
     });
 
     it('reports a git that does not answer, whichever question it was', async () => {
@@ -291,6 +292,161 @@ describe('GitContext', () => {
         const broken = breaks();
 
         expect((await context().inspect(USABLE, Language.PYTHON, Stability.STABLE))._unsafeUnwrapErr()).to.equal(
+          'git broke'
+        );
+
+        broken.restore();
+      }
+    });
+  });
+
+  describe('fetchSnapshot', () => {
+    const sh = (cwd: string, ...args: string[]) =>
+      execa('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...args], { cwd });
+    const REFSPEC = `${PRISTINE_REF}:${PRISTINE_REF}`;
+
+    /** A bare repository the SDK directory's own repository pushes to as `origin`. */
+    const withOrigin = async () => {
+      const origin = inRoot('origin.git');
+      await sh(root, 'init', '-q', '--bare', '--initial-branch=main', origin);
+      await ownRepository();
+      await sh(sdk(), 'remote', 'add', 'origin', origin);
+      return origin;
+    };
+
+    /** The generation `files` recorded, committed on `main` and pushed, as a developer leaves a project for a teammate; the pristine ref stays behind. */
+    const published = async (files: Files) => {
+      const base = await record(files);
+      await sh(sdk(), 'add', '.');
+      await sh(sdk(), 'commit', '-qm', 'sdk');
+      await sh(sdk(), 'push', '-q', 'origin', 'main');
+      return base;
+    };
+
+    const cloneOf = async (origin: string, name: string) => {
+      const clone = inRoot(name);
+      await sh(root, 'clone', '-q', '--no-local', origin, clone);
+      return clone;
+    };
+
+    /** The snapshot the record at `directory` names, as `inspect` finds it and the fetch leaves it. */
+    const fetched = async (directory: string) => {
+      const state = (await context(directory).inspect(USABLE, Language.PYTHON, Stability.STABLE))._unsafeUnwrap();
+      return (await context(directory).fetchSnapshot(state.snapshot))._unsafeUnwrap();
+    };
+
+    it('lets a clone merge against a snapshot it fetched, once the origin has it', async () => {
+      const origin = await withOrigin();
+      const base = await published({ 'README.md': '# v1' });
+      const clone = await cloneOf(origin, 'clone');
+
+      const before = await fetched(clone);
+      await sh(sdk(), 'push', '-q', 'origin', REFSPEC);
+      const after = await fetched(clone);
+
+      expect(before.isMissing()).to.be.true;
+      expect(fetchKind(before.fetch)).to.equal('absent origin');
+      expect(after.mergeBase()).to.deep.equal(base);
+      expect(await pristineAt(clone)).to.deep.equal(base);
+    });
+
+    it('moves its ref forward to a chain the remote continued, without a join', async () => {
+      const origin = await withOrigin();
+      const first = await published({ 'README.md': '# v1' });
+      await sh(sdk(), 'push', '-q', 'origin', REFSPEC);
+      const clone = await cloneOf(origin, 'clone');
+      expect((await fetched(clone)).mergeBase()).to.deep.equal(first);
+      const second = await record({ 'README.md': '# v2' });
+      await sh(sdk(), 'push', '-q', 'origin', REFSPEC);
+      write(path.join(clone, RECORD), recordContents(Language.PYTHON, Stability.STABLE, second));
+
+      const snapshot = await fetched(clone);
+
+      expect(snapshot.mergeBase()).to.deep.equal(second);
+      expect(await pristineAt(clone)).to.deep.equal(second);
+      expect((await describeCommit(new DirectoryPath(clone), second)).parents).to.deep.equal([first]);
+    });
+
+    it('keeps its own chain when the remote’s is behind it', async () => {
+      await withOrigin();
+      await published({ 'README.md': '# v1' });
+      await sh(sdk(), 'push', '-q', 'origin', REFSPEC);
+      const second = await record({ 'README.md': '# v2' });
+      write(
+        inRoot('sdk', 'python', RECORD),
+        recordContents(Language.PYTHON, Stability.STABLE, CommitId.fromGit('f'.repeat(40))!)
+      );
+
+      const snapshot = await fetched(sdk());
+
+      expect(snapshot.isMissing()).to.be.true;
+      expect(fetchKind(snapshot.fetch)).to.equal('absent origin');
+      expect(await pristineAt(sdk())).to.deep.equal(second);
+    });
+
+    it('joins its own chain with the remote’s when the two diverged, keeping both', async () => {
+      const origin = await withOrigin();
+      const theirs = await published({ 'README.md': '# theirs' });
+      await sh(sdk(), 'push', '-q', 'origin', REFSPEC);
+      const other = inRoot('other');
+      await ownRepository(other);
+      await sh(other, 'remote', 'add', 'origin', origin);
+      const mine = await record({ 'README.md': '# mine' }, other);
+      write(path.join(other, RECORD), recordContents(Language.PYTHON, Stability.STABLE, theirs));
+
+      const snapshot = await fetched(other);
+
+      expect(snapshot.mergeBase()).to.deep.equal(theirs);
+      const tip = (await pristineAt(other))!;
+      const joined = await describeCommit(new DirectoryPath(other), tip);
+      expect(joined.parents).to.deep.equal([mine, theirs]);
+      expect(joined.subject).to.equal('apimatic: pristine chains joined');
+      expect((await snapshotFiles(new DirectoryPath(other), tip)).get('README.md')).to.equal('# mine');
+    });
+
+    it('reports a remote it cannot reach, and no remote at all', async () => {
+      const origin = await withOrigin();
+      await published({ 'README.md': '# v1' });
+      const clone = await cloneOf(origin, 'clone');
+      fs.rmSync(origin, { recursive: true, force: true });
+
+      const unreachable = await fetched(clone);
+      await sh(clone, 'remote', 'remove', 'origin');
+      const none = await fetched(clone);
+
+      expect(unreachable.isMissing()).to.be.true;
+      expect(fetchKind(unreachable.fetch)).to.match(/^failed origin: .+/);
+      expect(none.isMissing()).to.be.true;
+      expect(fetchKind(none.fetch)).to.equal('none');
+    });
+
+    it('runs no git for a snapshot the repository holds, or when nothing is recorded for the generation', async () => {
+      await ownRepository();
+      const commit = await record({ 'README.md': '# v1' });
+      const remoteOf = sinon.stub(GitService.prototype, 'remoteOf');
+
+      const held = await fetched(sdk());
+      const none = (await context().fetchSnapshot(RecordedSnapshot.none()))._unsafeUnwrap();
+
+      expect(held.mergeBase()).to.deep.equal(commit);
+      expect(none.mergeBase()).to.be.undefined;
+      expect(remoteOf.called).to.be.false;
+    });
+
+    it('reports a git here that does not answer, before the remote is asked and after', async () => {
+      const origin = await withOrigin();
+      const base = await published({ 'README.md': '# v1' });
+      await sh(sdk(), 'push', '-q', 'origin', REFSPEC);
+      const clone = await cloneOf(origin, 'clone');
+      const breaking = [
+        () => sinon.stub(GitService.prototype, 'remoteOf').resolves(err('git broke')),
+        () => sinon.stub(GitService.prototype, 'updateRef').resolves(err('git broke')),
+        () => sinon.stub(GitService.prototype, 'hasCommit').resolves(err('git broke'))
+      ];
+      for (const breaks of breaking) {
+        const broken = breaks();
+
+        expect((await context(clone).fetchSnapshot(RecordedSnapshot.of(base, false)))._unsafeUnwrapErr()).to.equal(
           'git broke'
         );
 
@@ -369,6 +525,63 @@ describe('GitContext', () => {
       expect(again).to.deep.equal(first);
       expect((await describeCommit(new DirectoryPath(sdk()), changed)).parents).to.deep.equal([first]);
       expect(fs.existsSync(inRoot('sdk', 'python', RECORD))).to.be.true;
+    });
+
+    it('writes attributes beside the record that merge it as binary and mark it generated', async () => {
+      await ownRepository();
+
+      await record({ 'README.md': '# v1' });
+
+      expect(fs.readFileSync(inRoot('sdk', 'python', '.apimatic', '.gitattributes'), 'utf-8')).to.equal(
+        '# Written by the APIMatic CLI.\ngeneration.json merge=binary linguist-generated=true\n'
+      );
+      const checked = await execa(
+        'git',
+        ['check-attr', 'merge', 'linguist-generated', '--', '.apimatic/generation.json'],
+        { cwd: sdk() }
+      );
+      expect(checked.stdout.split('\n')).to.deep.equal([
+        '.apimatic/generation.json: merge: binary',
+        '.apimatic/generation.json: linguist-generated: true'
+      ]);
+    });
+
+    it('leaves the record yours, whole and without markers, when a pull meets a teammate’s record', async () => {
+      const sh = (cwd: string, ...args: string[]) =>
+        execa('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', '-c', 'core.autocrlf=false', ...args], {
+          cwd,
+          reject: false
+        });
+      /** A generation of `files` recorded in the repository at `directory` and committed; the record as written. */
+      const regenerate = async (directory: string, files: Files, message: string) => {
+        await record(files, directory);
+        await sh(directory, 'add', '-A');
+        await sh(directory, 'commit', '-qm', message);
+        return fs.readFileSync(path.join(directory, RECORD), 'utf8');
+      };
+      await ownRepository();
+      const origin = inRoot('origin.git');
+      const teammate = inRoot('teammate');
+      await regenerate(sdk(), { 'README.md': '# v1' }, 'v1');
+      await sh(root, 'init', '-q', '--bare', '--initial-branch=main', origin);
+      await sh(sdk(), 'remote', 'add', 'origin', origin);
+      await sh(sdk(), 'push', '-q', 'origin', 'main');
+      await sh(root, 'clone', '-q', origin, teammate);
+      await regenerate(teammate, { 'README.md': '# v2 for them' }, 'theirs');
+      await sh(teammate, 'push', '-q', 'origin', 'main');
+      const yours = await regenerate(sdk(), { 'README.md': '# v2 for me' }, 'mine');
+
+      const pulled = await sh(sdk(), '-c', 'pull.rebase=false', 'pull', '-q', 'origin', 'main');
+
+      const recordNow = fs.readFileSync(inRoot('sdk', 'python', RECORD), 'utf8');
+      expect(pulled.exitCode).to.not.equal(0);
+      expect(recordNow).to.equal(yours);
+      expect(recordNow).to.not.contain('<<<<<<<');
+      expect((await sh(sdk(), 'status', '--porcelain', '--', '.apimatic')).stdout).to.equal(
+        'UU .apimatic/generation.json'
+      );
+      await sh(sdk(), 'add', '--', '.apimatic/generation.json');
+      expect((await sh(sdk(), 'commit', '-q', '--no-edit')).exitCode).to.equal(0);
     });
 
     it('leaves the repository’s own index alone', async () => {
@@ -591,7 +804,7 @@ describe('GitContext', () => {
       expect(read('book.ts')).to.equal(yours);
     });
 
-    it('adds a file the generator produced for the first time, and never touches one that is yours alone, nor its own record', async () => {
+    it('adds a file the generator produced for the first time, and never touches one that is yours alone, nor its own record and the attributes beside it', async () => {
       const { plan, read } = await merged(
         { 'a.ts': 'a\n' },
         { 'a.ts': 'a\n', 'custom/format.ts': 'mine\n' },
@@ -865,7 +1078,13 @@ describe('GitContext', () => {
 
         const kept = await snapshotFiles(new DirectoryPath(directory), previous);
         expect(kept.get('a.ts')).to.equal('1\r\n');
-        expect([...kept.keys()]).to.have.members(['a.ts', 'b.ts', 'c.ts', '.apimatic/generation.json']);
+        expect([...kept.keys()]).to.have.members([
+          'a.ts',
+          'b.ts',
+          'c.ts',
+          '.apimatic/generation.json',
+          '.apimatic/.gitattributes'
+        ]);
       });
     });
 

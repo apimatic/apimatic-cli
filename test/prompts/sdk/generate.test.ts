@@ -7,9 +7,11 @@ import { SdkGeneratePrompts } from '../../../src/prompts/sdk/generate.js';
 import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
 import { GitVersion } from '../../../src/types/git/git-version.js';
 import { GitOperation } from '../../../src/types/git/git-operation.js';
+import { RemoteName } from '../../../src/types/git/remote-name.js';
 import { CommitId } from '../../../src/types/git/commit-id.js';
 import { MergedText } from '../../../src/types/sdk/conflict-markers.js';
 import { Conflict, MarkedConflict, MergeFiles, Settlement, WholeConflict } from '../../../src/types/sdk/conflict.js';
+import { SnapshotFetch } from '../../../src/types/sdk/snapshot-fetch.js';
 import { WriteProblem } from '../../../src/types/sdk/write-problem.js';
 import { Language } from '../../../src/types/sdk/generate.js';
 import { NO_FILES, rel } from '../../helpers/merge.js';
@@ -183,14 +185,25 @@ describe('SdkGeneratePrompts, about the repository', () => {
     );
   });
 
-  it('says the recorded snapshot is missing, and that this generation starts afresh', () => {
+  it('says where the recorded snapshot was looked for, and that this generation starts afresh', () => {
     const warn = sinon.stub(log, 'warn');
+    const origin = RemoteName.origin();
 
-    new SdkGeneratePrompts().snapshotMissing(sdk);
-
-    expect(stripVTControlCharacters(warn.firstCall.args[0])).to.equal(
-      "The snapshot './sdk/python' was last generated from is not in its repository, so this generation is recorded afresh."
+    new SdkGeneratePrompts().snapshotMissing(sdk, SnapshotFetch.none());
+    new SdkGeneratePrompts().snapshotMissing(sdk, SnapshotFetch.absent(origin));
+    new SdkGeneratePrompts().snapshotMissing(
+      sdk,
+      SnapshotFetch.failed(origin, 'the remote did not answer within 30 seconds')
     );
+
+    expect(warn.getCalls().map((call) => stripVTControlCharacters(call.args[0]))).to.deep.equal([
+      "The snapshot './sdk/python' was last generated from is not in its repository, and there is no remote to fetch it from, " +
+        'so this generation is recorded afresh.',
+      "The snapshot './sdk/python' was last generated from is not in its repository, nor on 'origin', " +
+        'so this generation is recorded afresh.',
+      "The snapshot './sdk/python' was last generated from is not in its repository, and could not be fetched from 'origin': " +
+        'the remote did not answer within 30 seconds\nThis generation is recorded afresh.'
+    ]);
   });
 
   it('says what the next run does without the snapshot: replace the SDK', () => {

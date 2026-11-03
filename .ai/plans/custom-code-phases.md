@@ -353,6 +353,18 @@ cases, "leaves an SSH client the developer configured …", "tells an ancestor f
 `pristine-chain.test.ts`; sdk-repository-context "is written with attributes that merge it as
 binary …" and "stays yours … when a pull meets a teammate's record".
 
+Done, in one slice. `GitService.remoteOf`, `fetchRef` (a remote call: no terminal prompt,
+`credential.interactive` off, the default ssh in batch mode unless the developer's own client is
+configured, a 30-second limit) and `isAncestor`, with `commitTree` taking any number of parents;
+`RemoteName`; `RecordedSnapshot` on the `RepositoryState`, the snapshot the record names with
+whether it is held and, once the remote was tried, where else it was looked for as a `SnapshotFetch`
+(none, absent, failed); `GitContext.fetchSnapshot`, a step of the run after the refusals and the
+unresolved block, which brings the remote's chain over and meets it with the local one in
+`meetChains` (adopted, kept or joined; the three outcomes are proven through git in the context's
+tests, which stand in for `pristine-chain.test.ts`); `snapshotMissing` wording each outcome through
+`match` on the fetch; `.apimatic/.gitattributes` written beside the record by every recording, and
+the whole `.apimatic/` directory kept out of "yours" by `merge`.
+
 ### Phase 6: every push shares the snapshots
 
 Behaviour:
@@ -412,9 +424,10 @@ Tests from `92988f2f`: `publish.test.ts` ("uploads the SDK without the CLI's rec
    code.
 2. The design document `.ai/plans/custom-code.md` from `533bcf1a` comes back with sections 9 and
    10 rewritten for the layout the phases produced; the decisions and the lab cases stay.
-3. The README is regenerated, the convention notes land in the `.ai` instructions and
-   skills, and an ESLint rule keeps the pure modules under `src/types/git/` free of file and
-   process access, if wanted.
+3. The `--git-init` flag's description becomes "Track the SDK directory with its own git
+   repository so your customizations survive regeneration." and the README is regenerated; the
+   convention notes land in the `.ai` instructions and skills, and an ESLint rule keeps the pure
+   modules under `src/types/git/` free of file and process access, if wanted.
 4. Optional, to decide at review: the cleanups the first attempt carried that are not this
    feature. The plugin action and the not-found hooks reading the terminal check instead of
    `process.stdin.isTTY`; the unused methods on the config, plugin, portal, spec and file

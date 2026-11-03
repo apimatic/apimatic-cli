@@ -1,11 +1,12 @@
 import { RelativeFilePath } from '../file/relativeFilePath.js';
 import { CommitId } from '../git/commit-id.js';
 import { GitOperation } from '../git/git-operation.js';
+import { RecordedSnapshot } from './recorded-snapshot.js';
 
 /**
  * What git says about the SDK directory for one generation, read once: whether it is a repository
  * of its own, the operation it is in the middle of, the paths the last run left unmerged, and the
- * snapshot the record names for this generation, with whether the repository still holds it.
+ * snapshot the record names for this generation, with whether the repository holds it.
  */
 export class RepositoryState {
   private constructor(
@@ -13,13 +14,12 @@ export class RepositoryState {
     public readonly operation: GitOperation,
     public readonly unresolved: readonly RelativeFilePath[],
     private readonly recorded: boolean,
-    private readonly base: CommitId | undefined,
-    private readonly baseHeld: boolean
+    public readonly snapshot: RecordedSnapshot
   ) {}
 
   /** A directory that is not a repository of its own: nothing is under way, unresolved or recorded. */
   public static notARepository(): RepositoryState {
-    return new RepositoryState(false, GitOperation.none(), [], false, undefined, false);
+    return new RepositoryState(false, GitOperation.none(), [], false, RecordedSnapshot.none());
   }
 
   /** A repository of its own, as git answered: `base` is the snapshot recorded for this generation, `baseHeld` whether it is here. */
@@ -30,7 +30,8 @@ export class RepositoryState {
     base: CommitId | undefined,
     baseHeld: boolean
   ): RepositoryState {
-    return new RepositoryState(true, operation, unresolved, recorded, base, baseHeld);
+    const snapshot = base === undefined ? RecordedSnapshot.none() : RecordedSnapshot.of(base, baseHeld);
+    return new RepositoryState(true, operation, unresolved, recorded, snapshot);
   }
 
   public isRepository(): boolean {
@@ -44,15 +45,5 @@ export class RepositoryState {
   /** Whether a run recorded into the repository before, for this generation or another. */
   public isRecorded(): boolean {
     return this.recorded;
-  }
-
-  /** Recorded for this generation, but the repository no longer holds the snapshot: the run records afresh, with a warning. */
-  public isSnapshotMissing(): boolean {
-    return this.base !== undefined && !this.baseHeld;
-  }
-
-  /** The snapshot to merge against, when the repository holds the one recorded for this generation; none writes the SDK afresh. */
-  public mergeBase(): CommitId | undefined {
-    return this.baseHeld ? this.base : undefined;
   }
 }

@@ -13,6 +13,7 @@ import { CommitId } from '../types/git/commit-id.js';
 import { GitOperation } from '../types/git/git-operation.js';
 import { GitVersion } from '../types/git/git-version.js';
 import { Change, MergeTreeOutput, parseMergeTree, parseStageEntry, StageEntry } from '../types/git/merge-tree.js';
+import { RemoteName } from '../types/git/remote-name.js';
 import { TreeEntry } from '../types/git/tree-entry.js';
 import { TreeId } from '../types/git/tree-id.js';
 import { ValueMap } from '../types/common/value-map.js';
@@ -69,11 +70,11 @@ export class GitService {
     return tree(root, root, including, 'asIs');
   }
 
-  /** A commit of `tree` by the CLI, on `parent` where there is one. */
+  /** A commit of `tree` by the CLI, on `parents` where there are any. */
   public async commitTree(
     root: DirectoryPath,
     tree: TreeId,
-    parent: CommitId | undefined,
+    parents: readonly CommitId[],
     message: string
   ): Promise<Result<CommitId, string>> {
     const env = {
@@ -83,7 +84,7 @@ export class GitService {
       GIT_COMMITTER_EMAIL: AUTHOR.email
     };
     const ran = await run(
-      ['commit-tree', tree.toString(), ...(parent === undefined ? [] : ['-p', parent.toString()]), '-m', message],
+      ['commit-tree', tree.toString(), ...parents.flatMap((parent) => ['-p', parent.toString()]), '-m', message],
       { cwd: root, env }
     );
     if (ran.isErr()) {
@@ -258,9 +259,77 @@ export class GitService {
   ): Promise<Result<Change[], string>> {
     return diff(root, from, to, '--find-renames');
   }
+
+  /** The remote the current branch is set to push to, else `origin` when there is one, else none. */
+  public async remoteOf(root: DirectoryPath): Promise<Result<RemoteName | undefined, string>> {
+    // No branch yet, or a detached HEAD, is exit 128 here and means no configured remote.
+    const head = await run(['symbolic-ref', '--short', 'HEAD'], { cwd: root, exitCodes: [0, 128] });
+    if (head.isErr()) {
+      return err(head.error);
+    }
+    if (head.value.exitCode === 0) {
+      const configured = await readConfig(`branch.${head.value.stdout.trim()}.remote`, root);
+      if (configured.isErr()) {
+        return err(configured.error);
+      }
+      // `.` names this repository itself, which is no remote to fetch from.
+      if (configured.value !== undefined && configured.value !== '.') {
+        return read('config', configured.value, RemoteName.fromGit);
+      }
+    }
+    const remotes = await run(['remote'], { cwd: root });
+    const origin = RemoteName.origin();
+    return remotes.map(({ stdout }) => (stdout.split('\n').includes(origin.toString()) ? origin : undefined));
+  }
+
+  /** Brings `ref` and its objects over from `remote` and answers with its tip, or none when the remote has no such ref. */
+  public async fetchRef(
+    root: DirectoryPath,
+    remote: RemoteName,
+    ref: string
+  ): Promise<Result<CommitId | undefined, string>> {
+    const fetched = await run(['fetch', '--quiet', '--no-tags', remote.toString(), ref], {
+      cwd: root,
+      remote: true,
+      exitCodes: 'any'
+    });
+    if (fetched.isErr()) {
+      return err(fetched.error);
+    }
+    if (fetched.value.exitCode !== 0) {
+      return /couldn't find remote ref|no such ref/i.test(fetched.value.stderr)
+        ? ok(undefined)
+        : err(remoteSaid(fetched.value.stderr) || `exit code ${fetched.value.exitCode}`);
+    }
+    const head = await run(['rev-parse', '--verify', '--quiet', 'FETCH_HEAD'], { cwd: root });
+    if (head.isErr()) {
+      return err(head.error);
+    }
+    return read('rev-parse', head.value.stdout.trim(), CommitId.fromGit);
+  }
+
+  /** Whether `ancestor` is in `descendant`'s history: a chain holding the one goes on from the other. */
+  public async isAncestor(
+    root: DirectoryPath,
+    ancestor: CommitId,
+    descendant: CommitId
+  ): Promise<Result<boolean, string>> {
+    const ran = await run(['merge-base', '--is-ancestor', ancestor.toString(), descendant.toString()], {
+      cwd: root,
+      exitCodes: [0, 1]
+    });
+    return ran.map((result) => result.exitCode === 0);
+  }
 }
 
 const AUTHOR = { name: 'APIMatic CLI', email: 'developer@apimatic.io' } as const;
+
+/** A remote that does not answer within this is reported, not waited for. */
+const REMOTE_TIMEOUT_MS = 30_000;
+const REMOTE_SILENT = `the remote did not answer within ${REMOTE_TIMEOUT_MS / 1000} seconds`;
+
+// A remote is given no credential dialogue, so an unauthorised one is reported rather than waited on.
+const REMOTE_SETTINGS: readonly (readonly [string, string])[] = [['credential.interactive', 'false']];
 
 // The developer's own configuration must not change a tree, a merge or its markers.
 const SETTINGS: readonly (readonly [string, string])[] = [
@@ -282,8 +351,10 @@ type RunOptions = {
   /** Where to put the attributes file that normalises line endings; none leaves the repository's own rules. */
   attributesIn?: DirectoryPath;
   input?: string;
-  /** Exit codes that are an answer rather than a failure. */
-  exitCodes?: readonly number[];
+  /** Exit codes that are an answer rather than a failure; `any` when the caller reads the code itself. */
+  exitCodes?: readonly number[] | 'any';
+  /** A command that reaches a remote: no prompts, a batch-mode ssh and a timeout. */
+  remote?: boolean;
 };
 
 type Ran<Out> = { stdout: Out; stderr: string; exitCode: number };
@@ -303,7 +374,7 @@ async function spawn<Out extends string | Uint8Array>(
   options: RunOptions,
   encoding: 'utf8' | 'buffer'
 ): Promise<Result<Ran<Out>, string>> {
-  const { cwd, env = {}, attributesIn, input, exitCodes = [0] } = options;
+  const { cwd, env = {}, attributesIn, input, exitCodes = [0], remote = false } = options;
   const settings: Result<readonly (readonly [string, string])[], string> =
     attributesIn === undefined
       ? ok(SETTINGS)
@@ -311,31 +382,41 @@ async function spawn<Out extends string | Uint8Array>(
   if (settings.isErr()) {
     return err(settings.error);
   }
+  const reaching: Result<Record<string, string>, string> = remote ? await remoteEnvironment(cwd) : ok({});
+  if (reaching.isErr()) {
+    return err(reaching.error);
+  }
   try {
     const result = await execa(
       'git',
-      [...settings.value.flatMap(([key, value]) => ['-c', `${key}=${value}`]), ...args],
+      [
+        ...[...settings.value, ...(remote ? REMOTE_SETTINGS : [])].flatMap(([key, value]) => ['-c', `${key}=${value}`]),
+        ...args
+      ],
       {
         cwd: cwd?.toString(),
         // Git's own messages are read here, so they have to be in English.
-        env: { ...env, LC_ALL: 'C' },
+        env: { ...env, ...reaching.value, LC_ALL: 'C' },
         input,
         encoding: encoding as 'utf8',
         // Bytes are read by length, and stripping would take a final CR with the newline.
         stripFinalNewline: encoding === 'utf8',
+        timeout: remote ? REMOTE_TIMEOUT_MS : undefined,
         reject: false
       }
     );
-    const stderr = String(result.stderr);
-    if (!exitCodes.includes(result.exitCode ?? -1)) {
-      // With no exit code git never ran (or was killed), so execa's own message says why.
-      const reason =
-        result.exitCode === undefined
-          ? result.shortMessage ?? 'git did not run'
-          : stderr.trim() || `exit code ${result.exitCode}`;
-      return err(failed(args[0], reason));
+    if (result.timedOut) {
+      return err(REMOTE_SILENT);
     }
-    return ok({ stdout: result.stdout as Out, stderr, exitCode: result.exitCode ?? -1 });
+    if (result.exitCode === undefined) {
+      // With no exit code git never ran (or was killed), so execa's own message says why.
+      return err(failed(args[0], result.shortMessage ?? 'git did not run'));
+    }
+    const stderr = String(result.stderr);
+    if (exitCodes !== 'any' && !exitCodes.includes(result.exitCode)) {
+      return err(failed(args[0], stderr.trim() || `exit code ${result.exitCode}`));
+    }
+    return ok({ stdout: result.stdout as Out, stderr, exitCode: result.exitCode });
   } catch (error) {
     return err(failed(args[0], error instanceof ExecaError ? error.shortMessage : errorMessage(error)));
   }
@@ -350,6 +431,38 @@ async function attributesFile(temporary: DirectoryPath): Promise<Result<string, 
   } catch (error) {
     return err(errorMessage(error));
   }
+}
+
+/** A configuration value, or none when it is not set. */
+async function readConfig(key: string, cwd: DirectoryPath | undefined): Promise<Result<string | undefined, string>> {
+  const ran = await run(['config', '--get', key], { cwd, exitCodes: [0, 1] });
+  return ran.map((result) => (result.exitCode === 0 ? result.stdout.trim() : undefined));
+}
+
+/**
+ * The environment of a command that reaches a remote: no terminal prompt, and the default ssh told not
+ * to ask for a passphrase. An SSH client the developer configured, through `GIT_SSH_COMMAND`, `GIT_SSH`
+ * or `core.sshCommand`, is left in charge of the connection.
+ */
+async function remoteEnvironment(cwd: DirectoryPath | undefined): Promise<Result<Record<string, string>, string>> {
+  const quiet = { GIT_TERMINAL_PROMPT: '0' };
+  if (process.env.GIT_SSH_COMMAND !== undefined || process.env.GIT_SSH !== undefined) {
+    return ok(quiet);
+  }
+  const configured = await readConfig('core.sshCommand', cwd);
+  return configured.map((command) =>
+    command === undefined ? { ...quiet, GIT_SSH_COMMAND: 'ssh -o BatchMode=yes' } : quiet
+  );
+}
+
+/** What the server itself said, which git relays as `remote:` lines; failing that, git's first line. */
+function remoteSaid(stderr: string): string {
+  const lines = stderr
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line !== '');
+  const said = lines.filter((line) => line.startsWith('remote:')).map((line) => line.slice('remote:'.length).trim());
+  return (said.length > 0 ? said : lines.slice(0, 1)).join(' ');
 }
 
 /**

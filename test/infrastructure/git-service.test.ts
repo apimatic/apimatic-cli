@@ -11,6 +11,7 @@ import { BlobId } from '../../src/types/git/blob-id.js';
 import { CommitId } from '../../src/types/git/commit-id.js';
 import { StageEntry } from '../../src/types/git/merge-tree.js';
 import { GitOperation } from '../../src/types/git/git-operation.js';
+import { RemoteName } from '../../src/types/git/remote-name.js';
 import { TreeId } from '../../src/types/git/tree-id.js';
 import { leftUnmerged, rel } from '../helpers/merge.js';
 import { describeCommit, snapshotFiles } from '../helpers/snapshots.js';
@@ -126,7 +127,7 @@ describe('GitService', () => {
 
       const tree = (await git.treeOf(repo, generated))._unsafeUnwrap();
 
-      const commit = (await git.commitTree(repo, tree, undefined, 'generated'))._unsafeUnwrap();
+      const commit = (await git.commitTree(repo, tree, [], 'generated'))._unsafeUnwrap();
       const files = await snapshotFiles(repo, commit);
       expect([...files.keys()]).to.have.members(['.gitignore', 'dist/index.js', 'README.md']);
       expect(files.get('README.md')).to.equal('# sdk\n');
@@ -138,19 +139,19 @@ describe('GitService', () => {
 
       const tree = (await git.treeOf(repo, repo))._unsafeUnwrap();
 
-      const commit = (await git.commitTree(repo, tree, undefined, 'own'))._unsafeUnwrap();
+      const commit = (await git.commitTree(repo, tree, [], 'own'))._unsafeUnwrap();
       expect([...(await snapshotFiles(repo, commit)).keys()]).to.deep.equal(['README.md']);
       expect((await execa('git', ['ls-files'], { cwd: repo.toString() })).stdout).to.equal('');
     });
   });
 
-  it('commits a tree, moves a ref to it, finds the commit and its tree again, and knows which commits it holds', async () => {
+  it('commits a tree on any parents, moves a ref to it, finds the commit and its tree again, and knows which commits it holds', async () => {
     const repo = await repository();
     write(repo, 'a.txt', 'a\n');
     const tree = (await git.treeOf(repo, repo))._unsafeUnwrap();
 
-    const first = (await git.commitTree(repo, tree, undefined, 'first'))._unsafeUnwrap();
-    const second = (await git.commitTree(repo, tree, first, 'second'))._unsafeUnwrap();
+    const first = (await git.commitTree(repo, tree, [], 'first'))._unsafeUnwrap();
+    const second = (await git.commitTree(repo, tree, [first], 'second'))._unsafeUnwrap();
     (await git.updateRef(repo, REF, second))._unsafeUnwrap();
 
     expect((await git.resolveRef(repo, REF))._unsafeUnwrap()).to.deep.equal(second);
@@ -161,6 +162,8 @@ describe('GitService', () => {
       subject: 'second'
     });
     expect((await git.treeOfCommit(repo, first))._unsafeUnwrap().isEqual(tree)).to.be.true;
+    const joined = (await git.commitTree(repo, tree, [first, second], 'joined'))._unsafeUnwrap();
+    expect((await describeCommit(repo, joined)).parents).to.deep.equal([first, second]);
     expect((await git.hasCommit(repo, first))._unsafeUnwrap()).to.be.true;
     expect((await git.hasCommit(repo, CommitId.fromGit('f'.repeat(40))!))._unsafeUnwrap()).to.be.false;
   });
@@ -256,20 +259,22 @@ describe('GitService', () => {
       repo: DirectoryPath,
       name: string,
       files: Record<string, string>,
-      parent: CommitId | undefined
+      parents: readonly CommitId[]
     ) => {
       const work = new DirectoryPath(path.join(root, name));
       for (const [relative, contents] of Object.entries(files)) {
         write(work, relative, contents);
       }
-      return (await git.commitTree(repo, (await git.treeOf(repo, work))._unsafeUnwrap(), parent, name))._unsafeUnwrap();
+      return (
+        await git.commitTree(repo, (await git.treeOf(repo, work))._unsafeUnwrap(), parents, name)
+      )._unsafeUnwrap();
     };
 
     it('reads the merged tree, the stages of each conflicted path and the messages', async () => {
       const repo = await repository();
-      const base = await commit(repo, 'base', { 'same.txt': 'one\n', 'gone.txt': 'gone\n' }, undefined);
-      const ours = await commit(repo, 'ours', { 'same.txt': 'ours\n', 'gone.txt': 'kept\n' }, base);
-      const theirs = await commit(repo, 'theirs', { 'same.txt': 'theirs\n' }, base);
+      const base = await commit(repo, 'base', { 'same.txt': 'one\n', 'gone.txt': 'gone\n' }, []);
+      const ours = await commit(repo, 'ours', { 'same.txt': 'ours\n', 'gone.txt': 'kept\n' }, [base]);
+      const theirs = await commit(repo, 'theirs', { 'same.txt': 'theirs\n' }, [base]);
 
       const merged = (await git.mergeTree(repo, ours, theirs))._unsafeUnwrap();
 
@@ -290,10 +295,10 @@ describe('GitService', () => {
 
     it('reads a clean merge as the merged tree and nothing else', async () => {
       const repo = await repository();
-      const base = await commit(repo, 'base', { 'a.txt': 'a\n', 'b.txt': 'b\n' }, undefined);
-      const ours = await commit(repo, 'ours', { 'a.txt': 'A\n', 'b.txt': 'b\n' }, base);
-      const theirs = await commit(repo, 'theirs', { 'a.txt': 'a\n', 'b.txt': 'B\n' }, base);
-      const both = await commit(repo, 'both', { 'a.txt': 'A\n', 'b.txt': 'B\n' }, undefined);
+      const base = await commit(repo, 'base', { 'a.txt': 'a\n', 'b.txt': 'b\n' }, []);
+      const ours = await commit(repo, 'ours', { 'a.txt': 'A\n', 'b.txt': 'b\n' }, [base]);
+      const theirs = await commit(repo, 'theirs', { 'a.txt': 'a\n', 'b.txt': 'B\n' }, [base]);
+      const both = await commit(repo, 'both', { 'a.txt': 'A\n', 'b.txt': 'B\n' }, []);
 
       const merged = (await git.mergeTree(repo, ours, theirs))._unsafeUnwrap();
 
@@ -370,6 +375,91 @@ describe('GitService', () => {
     });
   });
 
+  describe('remotes', () => {
+    const bare = async (name = 'origin.git'): Promise<DirectoryPath> => {
+      const directory = new DirectoryPath(path.join(root, name));
+      await execa('git', ['init', '-q', '--bare', '--initial-branch=main', directory.toString()]);
+      return directory;
+    };
+
+    const withRemote = async (name: string, origin: DirectoryPath): Promise<DirectoryPath> => {
+      const repo = await repository(name);
+      await execa('git', ['remote', 'add', 'origin', origin.toString()], { cwd: repo.toString() });
+      return repo;
+    };
+
+    /** One more snapshot on the pristine ref in `repo`, holding `content`. */
+    const snapshot = async (repo: DirectoryPath, content: string) => {
+      const work = new DirectoryPath(path.join(root, `work-${content}`));
+      write(work, 'a.txt', content);
+      const tree = (await git.treeOf(repo, work))._unsafeUnwrap();
+      const parent = (await git.resolveRef(repo, REF))._unsafeUnwrap();
+      const commit = (
+        await git.commitTree(repo, tree, parent === undefined ? [] : [parent], 'snapshot')
+      )._unsafeUnwrap();
+      (await git.updateRef(repo, REF, commit))._unsafeUnwrap();
+      return commit;
+    };
+
+    it('names the remote the current branch pushes to, else origin, else none', async () => {
+      const repo = await repository();
+      expect((await git.remoteOf(repo))._unsafeUnwrap()).to.be.undefined;
+
+      await execa('git', ['remote', 'add', 'origin', (await bare()).toString()], { cwd: repo.toString() });
+      expect((await git.remoteOf(repo))._unsafeUnwrap()?.toString()).to.equal('origin');
+
+      await execa('git', ['remote', 'add', 'fork', (await bare('fork.git')).toString()], { cwd: repo.toString() });
+      await execa('git', ['config', 'branch.main.remote', 'fork'], { cwd: repo.toString() });
+      expect((await git.remoteOf(repo))._unsafeUnwrap()?.toString()).to.equal('fork');
+    });
+
+    it('fetches a ref with its objects, and answers with nothing for a ref the remote lacks', async () => {
+      const origin = await bare();
+      const a = await withRemote('a', origin);
+      const b = await withRemote('b', origin);
+      const first = await snapshot(a, 'one');
+      await execa('git', ['push', '-q', 'origin', `${REF}:${REF}`], { cwd: a.toString() });
+
+      expect((await git.fetchRef(b, RemoteName.origin(), 'refs/apimatic/previous'))._unsafeUnwrap()).to.be.undefined;
+      const tip = (await git.fetchRef(b, RemoteName.origin(), REF))._unsafeUnwrap();
+
+      expect(tip).to.deep.equal(first);
+      expect((await git.hasCommit(b, first))._unsafeUnwrap()).to.be.true;
+    });
+
+    it('reports a remote it cannot reach in git’s words', async () => {
+      const origin = await bare();
+      const repo = await withRemote('a', origin);
+      fs.rmSync(origin.toString(), { recursive: true, force: true });
+
+      const fetched = await git.fetchRef(repo, RemoteName.origin(), REF);
+
+      expect(fetched._unsafeUnwrapErr()).to.match(/does not appear to be a git repository|not found|no such/i);
+    });
+
+    it('leaves an SSH client the developer configured in charge of the connection', async () => {
+      const repo = await repository();
+      const marker = path.join(root, 'ssh-ran').replace(/\\/g, '/');
+      const script = path.join(root, 'ssh.sh').replace(/\\/g, '/');
+      fs.writeFileSync(script, `printf x > "${marker}"\nexit 1\n`);
+      await execa('git', ['config', 'core.sshCommand', `sh "${script}"`], { cwd: repo.toString() });
+
+      const fetched = await git.fetchRef(repo, RemoteName.fromGit('ssh://example.invalid/sdk.git')!, REF);
+
+      expect(fetched.isErr()).to.be.true;
+      expect(fs.existsSync(marker)).to.be.true;
+    });
+
+    it('tells an ancestor from a stranger', async () => {
+      const repo = await repository();
+      const first = await snapshot(repo, 'one');
+      const second = await snapshot(repo, 'two');
+
+      expect((await git.isAncestor(repo, first, second))._unsafeUnwrap()).to.be.true;
+      expect((await git.isAncestor(repo, second, first))._unsafeUnwrap()).to.be.false;
+    });
+  });
+
   describe('unmergedStages', () => {
     it('lists the sides git kept for each unmerged path, and nothing for a merged one or an empty index', async () => {
       const repo = await repository();
@@ -429,7 +519,7 @@ describe('GitService', () => {
       expect(fs.readFileSync(path.join(repo.toString(), 'a.txt'), 'utf8')).to.equal('settled\n');
 
       const tree = (await git.treeOf(repo, repo))._unsafeUnwrap();
-      const head = (await git.commitTree(repo, tree, undefined, 'first'))._unsafeUnwrap();
+      const head = (await git.commitTree(repo, tree, [], 'first'))._unsafeUnwrap();
       (await git.updateRef(repo, 'HEAD', head))._unsafeUnwrap();
       await leftUnmerged(repo, 'a.txt');
 

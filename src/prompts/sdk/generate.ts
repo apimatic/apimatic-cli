@@ -12,6 +12,7 @@ import { CommitId } from '../../types/git/commit-id.js';
 import { RelativeFilePath } from '../../types/file/relativeFilePath.js';
 import { Side } from '../../types/sdk/conflict-markers.js';
 import { Conflict, ConflictKind, MergeFiles } from '../../types/sdk/conflict.js';
+import { SnapshotFetch } from '../../types/sdk/snapshot-fetch.js';
 import { WriteProblem } from '../../types/sdk/write-problem.js';
 import { listedInProse, plural } from '../../utils/string-utils.js';
 
@@ -218,11 +219,17 @@ export class SdkGeneratePrompts {
     );
   }
 
-  /** The record names a snapshot the repository does not hold, so this generation starts a chain of its own. */
-  public snapshotMissing(sdk: DirectoryPath) {
+  /** The record names a snapshot the repository does not hold, and where else it was looked for: this generation starts a chain of its own. */
+  public snapshotMissing(sdk: DirectoryPath, fetch: SnapshotFetch) {
+    const notHere = `The snapshot ${f.relativePath(sdk)} was last generated from is not in its repository`;
     log.warn(
-      `The snapshot ${f.relativePath(sdk)} was last generated from is not in its repository, ` +
-        'so this generation is recorded afresh.'
+      fetch.match({
+        none: () => `${notHere}, and there is no remote to fetch it from, so this generation is recorded afresh.`,
+        absent: (remote) => `${notHere}, nor on ${f.var(remote.toString())}, so this generation is recorded afresh.`,
+        failed: (remote, reason) =>
+          `${notHere}, and could not be fetched from ${f.var(remote.toString())}: ${reason}\n` +
+          'This generation is recorded afresh.'
+      })
     );
   }
 

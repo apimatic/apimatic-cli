@@ -18,7 +18,7 @@ import { Language, Stability } from '../../../src/types/sdk/generate.js';
 import { GenerationRecord, recordContents } from '../../../src/types/sdk/generation-record.js';
 import { leftUnmerged } from '../../helpers/merge.js';
 import { Files, stubSdkGeneration, writeFiles } from '../../helpers/sdk-generation.js';
-import { describeCommit, snapshotFiles } from '../../helpers/snapshots.js';
+import { describeCommit, fetchKind, snapshotFiles } from '../../helpers/snapshots.js';
 
 const COMMAND_METADATA: CommandMetadata = { commandName: 'sdk generate', shell: 'test' };
 const GENERATED: Files = { 'README.md': '# sdk' };
@@ -47,12 +47,19 @@ describe('GenerateAction (sdk) — the destination', () => {
   const repositoryFound = () => SdkGeneratePrompts.prototype.repositoryFound as sinon.SinonStub;
 
   const execute = async (
-    options: { force?: boolean; canAsk?: boolean; gitInit?: boolean; stability?: Stability; files?: Files } = {}
+    options: {
+      force?: boolean;
+      canAsk?: boolean;
+      gitInit?: boolean;
+      stability?: Stability;
+      files?: Files;
+      destination?: DirectoryPath;
+    } = {}
   ) => {
     await generates(options.files ?? GENERATED);
     return new GenerateAction(new DirectoryPath(root), COMMAND_METADATA, 'auth-key').execute(
       ProjectContext.in(new DirectoryPath(root)),
-      sdk(),
+      options.destination ?? sdk(),
       Language.PYTHON,
       options.stability ?? Stability.STABLE,
       options.force ?? true,
@@ -244,7 +251,7 @@ describe('GenerateAction (sdk) — the destination', () => {
       ]);
     });
 
-    it('warns when the recorded snapshot is not in the repository, then records afresh', async () => {
+    it('warns when the recorded snapshot is not in the repository and there is no remote, then records afresh', async () => {
       await recorded();
       const missing = CommitId.fromGit('f'.repeat(40))!;
       write(RECORD, recordContents(Language.PYTHON, Stability.STABLE, missing));
@@ -253,6 +260,7 @@ describe('GenerateAction (sdk) — the destination', () => {
       expect((await execute()).isSuccess()).to.be.true;
 
       expect(snapshotMissing.firstCall.args[0].isEqual(sdk())).to.be.true;
+      expect(fetchKind(snapshotMissing.firstCall.args[1])).to.equal('none');
       expect(repositoryFound().called).to.be.false;
       expect(record().baseFor(Language.PYTHON, Stability.STABLE)).to.deep.equal(await pristine());
     });
@@ -274,6 +282,14 @@ describe('GenerateAction (sdk) — the destination', () => {
         'the snapshot the record names',
         recorded,
         () => sinon.stub(GitService.prototype, 'hasCommit').resolves(err('git broke'))
+      ],
+      [
+        'the remote a missing snapshot is fetched from',
+        async () => {
+          await recorded();
+          write(RECORD, recordContents(Language.PYTHON, Stability.STABLE, CommitId.fromGit('f'.repeat(40))!));
+        },
+        () => sinon.stub(GitService.prototype, 'remoteOf').resolves(err('git broke'))
       ]
     ] as const) {
       it(`reports a git that will not say what ${what} is, before generating`, async () => {
@@ -289,6 +305,67 @@ describe('GenerateAction (sdk) — the destination', () => {
         expect(generateSdk.called).to.be.false;
       });
     }
+  });
+
+  describe('in a clone of the SDK repository', () => {
+    const sh = (cwd: string, ...args: string[]) =>
+      execa('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...args], { cwd });
+    const REFSPEC = `${PRISTINE_REF}:${PRISTINE_REF}`;
+
+    /** The recorded SDK committed and pushed to a bare origin, its pristine ref staying behind, and a clone of it. */
+    const published = async () => {
+      const origin = path.join(root, 'origin.git');
+      const clone = path.join(root, 'clone');
+      const base = await recorded();
+      await sh(sdk().toString(), 'add', '.');
+      await sh(sdk().toString(), 'commit', '-qm', 'sdk');
+      await sh(root, 'init', '-q', '--bare', '--initial-branch=main', origin);
+      await sh(sdk().toString(), 'remote', 'add', 'origin', origin);
+      await sh(sdk().toString(), 'push', '-q', 'origin', 'main');
+      await sh(root, 'clone', '-q', '--no-local', origin, clone);
+      return { clone: new DirectoryPath(clone), base };
+    };
+
+    it('merges only once the pristine ref was shared, saying until then that the origin lacks the snapshot', async () => {
+      const { clone } = await published();
+      const snapshotMissing = sinon.stub(SdkGeneratePrompts.prototype, 'snapshotMissing');
+      sinon.stub(SdkGeneratePrompts.prototype, 'overwriteSdk').resolves(false);
+      sinon.stub(SdkGeneratePrompts.prototype, 'destinationDirNotEmpty');
+      sinon.stub(SdkGeneratePrompts.prototype, 'sdkMerged');
+      generateSdk.resetHistory();
+
+      expect((await execute({ force: false, canAsk: true, destination: clone })).isCancelled()).to.be.true;
+      expect(fetchKind(snapshotMissing.firstCall.args[1])).to.equal('absent origin');
+      expect(generateSdk.called).to.be.false;
+
+      await sh(sdk().toString(), 'push', '-q', 'origin', REFSPEC);
+      const merged = await execute({
+        force: false,
+        canAsk: true,
+        destination: clone,
+        files: { 'README.md': '# sdk v2' }
+      });
+
+      expect(merged.isSuccess()).to.be.true;
+      expect(fs.readFileSync(path.join(clone.toString(), 'README.md'), 'utf8')).to.equal('# sdk v2');
+      expect(snapshotMissing.calledOnce).to.be.true;
+    });
+
+    it('merges over a clone named as the destination, fetching the snapshot the origin shared', async () => {
+      const { clone, base } = await published();
+      await sh(sdk().toString(), 'push', '-q', 'origin', REFSPEC);
+      writeFiles(clone.toString(), { 'README.md': '# edited' });
+      const snapshotMissing = sinon.stub(SdkGeneratePrompts.prototype, 'snapshotMissing');
+      sinon.stub(SdkGeneratePrompts.prototype, 'sdkUnchanged');
+
+      expect((await execute({ destination: clone })).isSuccess()).to.be.true;
+
+      expect(fs.readFileSync(path.join(clone.toString(), 'README.md'), 'utf8')).to.equal('# edited');
+      expect(snapshotMissing.called).to.be.false;
+      const recordedInClone = GenerationRecord.parse(fs.readFileSync(path.join(clone.toString(), RECORD), 'utf8'));
+      expect(recordedInClone.baseFor(Language.PYTHON, Stability.STABLE)).to.deep.equal(base);
+      expect((await git.resolveRef(clone, PRISTINE_REF))._unsafeUnwrap()).to.deep.equal(base);
+    });
   });
 
   describe('what the last run left', () => {

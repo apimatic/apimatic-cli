@@ -1,6 +1,15 @@
 import { execa } from 'execa';
 import { DirectoryPath } from '../../src/types/file/directoryPath.js';
 import { CommitId } from '../../src/types/git/commit-id.js';
+import { SnapshotFetch } from '../../src/types/sdk/snapshot-fetch.js';
+
+/** A fetch as one line: `none`, `absent <remote>` or `failed <remote>: <reason>`. */
+export const fetchKind = (fetch: SnapshotFetch): string =>
+  fetch.match({
+    none: () => 'none',
+    absent: (remote) => `absent ${remote}`,
+    failed: (remote, reason) => `failed ${remote}: ${reason}`
+  });
 
 /** A commit's parents, author and subject, as `git show` reports them. */
 export async function describeCommit(

@@ -120,10 +120,17 @@ export class GenerateAction {
         return ActionResult.actionRequired();
       }
     }
-    if (repository.isSnapshotMissing()) {
-      this.prompts.snapshotMissing(sdk);
+    // A clone lacks what its origin's runs recorded: fetched from the remote, once nothing is in the way.
+    const fetched = await gitContext.fetchSnapshot(repository.snapshot);
+    if (fetched.isErr()) {
+      this.prompts.repositoryNotInspected(sdk, fetched.error);
+      return ActionResult.failed();
     }
-    const mergeBase = repository.mergeBase();
+    const snapshot = fetched.value;
+    if (snapshot.isMissing()) {
+      this.prompts.snapshotMissing(sdk, snapshot.fetch);
+    }
+    const mergeBase = snapshot.mergeBase();
     const shouldMakeRepository = gitVersion.isSupported() && gitInit && !repository.isRepository();
     const shouldRecord = shouldMakeRepository || repository.isRepository();
     const isRecordingFirstTime = repository.isRepository() && !repository.isRecorded();

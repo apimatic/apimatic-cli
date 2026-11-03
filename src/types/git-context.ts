@@ -18,7 +18,9 @@ import { lineEndingFor } from './sdk/file-content.js';
 import { Language, Stability } from './sdk/generate.js';
 import { GenerationRecord, recordContents } from './sdk/generation-record.js';
 import { MergePlan } from './sdk/merge-plan.js';
+import { RecordedSnapshot } from './sdk/recorded-snapshot.js';
 import { RepositoryState } from './sdk/repository-state.js';
+import { SnapshotFetch } from './sdk/snapshot-fetch.js';
 import { UnresolvedFile } from './sdk/unresolved-file.js';
 import { WriteProblem } from './sdk/write-problem.js';
 
@@ -34,12 +36,15 @@ const GIT_DIRECTORY = new FileName('.git');
 /** Where the CLI keeps its record inside the SDK directory, and the file holding it. */
 const RECORD_DIRECTORY = '.apimatic';
 const RECORD_FILE = new FileName('generation.json');
-const RECORD_PATH = `${RECORD_DIRECTORY}/${RECORD_FILE.toString()}`;
+
+/** The attributes beside the record: a pull that meets a teammate's record keeps yours whole, with no markers in it, and GitHub folds it as generated. */
+const RECORD_ATTRIBUTES_FILE = new FileName('.gitattributes');
+const RECORD_ATTRIBUTES = `# Written by the APIMatic CLI.\n${RECORD_FILE.toString()} merge=binary linguist-generated=true\n`;
 
 /**
- * The SDK directory under git: what the disk and git say about it, what a run plans for it, how a
- * plan lands on it, and the snapshots it keeps. Every plan carries the bytes that reach the disk,
- * line endings decided, so landing one is the same whatever made it.
+ * The SDK directory under git: what the disk and git say about it, what its remote holds, what a run
+ * plans for it, how a plan lands on it, and the snapshots it keeps. Every plan carries the bytes that
+ * reach the disk, line endings decided, so landing one is the same whatever made it.
  */
 export class GitContext {
   private readonly gitService = new GitService();
@@ -122,6 +127,44 @@ export class GitContext {
     return ok(RepositoryState.of(operation.value, unresolved, record.isFound(), base, baseHeld.value));
   }
 
+  // --- What the remote holds ---------------------------------------------------------------------
+
+  /**
+   * The snapshot fetched when the repository lacks it and has a remote, the branch's else `origin`:
+   * the remote's pristine chain is brought over and met with the local one, so neither machine's
+   * generations are lost. As it is when it is held, or nothing is recorded. A remote that lacks it or
+   * does not answer is part of the answer; only a git here that does not answer fails.
+   */
+  public async fetchSnapshot(snapshot: RecordedSnapshot): Promise<Result<RecordedSnapshot, string>> {
+    const wanted = snapshot.toFetch();
+    if (wanted === undefined) {
+      return ok(snapshot);
+    }
+    const remote = await this.gitService.remoteOf(this.directory);
+    if (remote.isErr()) {
+      return err(remote.error);
+    }
+    if (remote.value === undefined) {
+      return ok(snapshot.stillMissing(SnapshotFetch.none()));
+    }
+    const tip = await this.gitService.fetchRef(this.directory, remote.value, PRISTINE_REF);
+    if (tip.isErr()) {
+      return ok(snapshot.stillMissing(SnapshotFetch.failed(remote.value, tip.error)));
+    }
+    if (tip.value === undefined) {
+      return ok(snapshot.stillMissing(SnapshotFetch.absent(remote.value)));
+    }
+    const met = await meetChains(this.gitService, this.directory, tip.value);
+    if (met.isErr()) {
+      return err(met.error);
+    }
+    const held = await this.gitService.hasCommit(this.directory, wanted);
+    if (held.isErr()) {
+      return err(held.error);
+    }
+    return ok(held.value ? snapshot.brought() : snapshot.stillMissing(SnapshotFetch.absent(remote.value)));
+  }
+
   // --- What a run plans --------------------------------------------------------------------------
 
   /**
@@ -148,11 +191,11 @@ export class GitContext {
     if (disk.isErr()) {
       return err(disk.error);
     }
-    const yours = await this.gitService.commitTree(this.directory, disk.value, base, 'apimatic: your changes');
+    const yours = await this.gitService.commitTree(this.directory, disk.value, [base], 'apimatic: your changes');
     if (yours.isErr()) {
       return err(yours.error);
     }
-    const theirs = await this.gitService.commitTree(this.directory, generatedTree.value, base, 'apimatic: generated');
+    const theirs = await this.gitService.commitTree(this.directory, generatedTree.value, [base], 'apimatic: generated');
     if (theirs.isErr()) {
       return err(theirs.error);
     }
@@ -216,8 +259,8 @@ export class GitContext {
       return ok(
         MergePlan.from({
           merge: merged.value,
-          // The CLI's own record is not an edit of yours.
-          yours: yourChanges.value.filter((change) => change.path.toString() !== RECORD_PATH),
+          // The CLI's own record, and the attributes beside it, are not edits of yours.
+          yours: yourChanges.value.filter((change) => !change.path.toString().startsWith(`${RECORD_DIRECTORY}/`)),
           generated: generatedChanges.value,
           writes,
           deletes: applied.value.flatMap((change) => (change.status === 'D' ? [change.path] : [])),
@@ -290,12 +333,7 @@ export class GitContext {
     if (disk.isErr()) {
       return err(disk.error);
     }
-    const commit = await this.gitService.commitTree(
-      this.directory,
-      disk.value,
-      undefined,
-      'apimatic: before regeneration'
-    );
+    const commit = await this.gitService.commitTree(this.directory, disk.value, [], 'apimatic: before regeneration');
     if (commit.isErr()) {
       return err(commit.error);
     }
@@ -363,8 +401,8 @@ export class GitContext {
 
   /**
    * Commits every file of `generated` under the pristine ref, chained onto the last snapshot, and
-   * writes the record naming it, so the next run for the same generation has this one as its base.
-   * An identical generation keeps the last snapshot.
+   * writes the record naming it, with the attributes beside it, so the next run for the same
+   * generation has this one as its base. An identical generation keeps the last snapshot.
    */
   public async recordSnapshot(
     generated: DirectoryPath,
@@ -390,6 +428,10 @@ export class GitContext {
       return err(snapshot.error);
     }
     try {
+      await this.fileService.replaceContentsIfChanged(
+        new FilePath(this.directory.join(RECORD_DIRECTORY), RECORD_ATTRIBUTES_FILE),
+        RECORD_ATTRIBUTES
+      );
       await this.fileService.replaceContents(
         recordFile(this.directory),
         recordContents(language, stability, snapshot.value)
@@ -454,9 +496,47 @@ async function snapshotOf(
       return ok(last);
     }
   }
-  const commit = await git.commitTree(root, tree, last, message);
+  const commit = await git.commitTree(root, tree, last === undefined ? [] : [last], message);
   if (commit.isErr()) {
     return err(commit.error);
   }
   return (await git.updateRef(root, PRISTINE_REF, commit.value)).map(() => commit.value);
+}
+
+/**
+ * The remote's pristine chain at `tip` met with the local one, so neither machine's generations are
+ * lost: the ref adopts the tip when there is no chain here or the remote's continues it, keeps its own
+ * when the remote's is behind, and moves to a two-parent commit over its own tree when the two diverged.
+ */
+async function meetChains(git: GitService, root: DirectoryPath, tip: CommitId): Promise<Result<void, string>> {
+  const local = await git.resolveRef(root, PRISTINE_REF);
+  if (local.isErr()) {
+    return err(local.error);
+  }
+  if (local.value === undefined) {
+    return git.updateRef(root, PRISTINE_REF, tip);
+  }
+  const continued = await git.isAncestor(root, local.value, tip);
+  if (continued.isErr()) {
+    return err(continued.error);
+  }
+  const behind = await git.isAncestor(root, tip, local.value);
+  if (behind.isErr()) {
+    return err(behind.error);
+  }
+  if (continued.value) {
+    return git.updateRef(root, PRISTINE_REF, tip);
+  }
+  if (behind.value) {
+    return ok(undefined);
+  }
+  const tree = await git.treeOfCommit(root, local.value);
+  if (tree.isErr()) {
+    return err(tree.error);
+  }
+  const joined = await git.commitTree(root, tree.value, [local.value, tip], 'apimatic: pristine chains joined');
+  if (joined.isErr()) {
+    return err(joined.error);
+  }
+  return git.updateRef(root, PRISTINE_REF, joined.value);
 }
