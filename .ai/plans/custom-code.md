@@ -119,8 +119,13 @@ The CLI never pushes.
 
 The call is one line that finds the script through git, does nothing where the script is not
 there (a clone that never ran the CLI) and never fails the push:
-`f="$(git rev-parse --git-common-dir)/hooks/apimatic-pre-push"; [ -f "$f" ] && sh "$f" "$@" || true`.
-That is what makes the other cases a one-step note rather than a warning with nothing to do.
+`d="$(git rev-parse --git-common-dir)" && f="$d/hooks/apimatic-pre-push" && [ -f "$f" ] && { t="$d/apimatic-pre-push.$$"; cat >"$t" && sh "$f" "$@" <"$t"; [ -r "$t" ] && command exec <"$t"; rm -f "$t"; } || true`.
+Git lists the refs being pushed on stdin and the script reads them, so the line keeps a copy in
+the git directory, runs the script on the copy, then hands the copy to the rest of the hook as its
+stdin and removes it (2026-11-03): a hook that reads the refs itself, git-lfs's or git's own
+sample, still sees them. `command exec` rather than `exec`, and one `&&` chain, keep a `sh -e`
+hook from exiting on a redirection error or a git missing from its PATH. That is what makes the
+other cases a one-step note rather than a warning with nothing to do.
 
 The script, for the remote git passes as `$1`: nothing when the push carries the ref itself (git
 lists what is pushed on the hook's stdin, so pushing it by hand still works); else push

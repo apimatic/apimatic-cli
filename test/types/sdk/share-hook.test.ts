@@ -23,15 +23,18 @@ describe('ShareHook', () => {
     return hook.toWrite()!;
   };
 
-  it('calls the script through git, wherever the hook lives, and never fails the push', () => {
+  it('calls the script through git on a copy of stdin, hands the copy to the rest of the hook, and never fails the push', () => {
     expect(SHARE_HOOK_CALL).to.equal(
-      'f="$(git rev-parse --git-common-dir)/hooks/apimatic-pre-push"; [ -f "$f" ] && sh "$f" "$@" || true'
+      'd="$(git rev-parse --git-common-dir)" && f="$d/hooks/apimatic-pre-push" && [ -f "$f" ] && ' +
+        '{ t="$d/apimatic-pre-push.$$"; cat >"$t" && sh "$f" "$@" <"$t"; [ -r "$t" ] && command exec <"$t"; rm -f "$t"; } || true'
     );
   });
 
   it('is a whole shell hook when there was none', () => {
     expect(written('')).to.equal(
-      `#!/bin/sh\n\n# >>> apimatic snapshots\n${SHARE_HOOK_CALL}\n# <<< apimatic snapshots\n`
+      '#!/bin/sh\n\n# >>> apimatic snapshots\n' +
+        '# Hands the refs git lists on stdin to the script, then back to the rest of this hook.\n' +
+        `${SHARE_HOOK_CALL}\n# <<< apimatic snapshots\n`
     );
     expect(written('\n')).to.equal(written(''));
   });

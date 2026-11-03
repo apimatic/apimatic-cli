@@ -5,17 +5,32 @@ import { FilePath } from '../file/filePath.js';
 /** The script the CLI keeps in git's own hooks directory; the `pre-push` hook, wherever it lives, only calls it. */
 export const SHARE_HOOK_SCRIPT_NAME = 'apimatic-pre-push';
 
-/** Finds the script through git, so the line is the same wherever the hook lives; does nothing where the CLI never ran, and never fails the push. */
+/**
+ * Finds the script through git, so the line is the same wherever the hook lives; does nothing where
+ * the CLI never ran, and never fails the push. Git lists what is pushed on stdin, which the script
+ * reads: the line keeps a copy in the git directory, runs the script on it, then hands the copy to the
+ * rest of the hook as its stdin and removes it, so a hook that reads the refs itself still sees them.
+ * `command exec`, not `exec`: a redirection error on the special built-in would exit the shell under
+ * `sh -e`, and the one `&&` chain is for the same reason, so a git missing from the hook's PATH fails
+ * nothing either. The script reads the copy, never the hook's own stdin, so the two share no offset.
+ */
 export const SHARE_HOOK_CALL =
-  `f="$(git rev-parse --git-common-dir)/hooks/${SHARE_HOOK_SCRIPT_NAME}"; ` + '[ -f "$f" ] && sh "$f" "$@" || true';
+  `d="$(git rev-parse --git-common-dir)" && f="$d/hooks/${SHARE_HOOK_SCRIPT_NAME}" && [ -f "$f" ] && ` +
+  `{ t="$d/${SHARE_HOOK_SCRIPT_NAME}.$$"; cat >"$t" && sh "$f" "$@" <"$t"; ` +
+  '[ -r "$t" ] && command exec <"$t"; rm -f "$t"; } || true';
 
 const HOOK_FILE = new FileName('pre-push');
 const DEFAULT_SHEBANG = '#!/bin/sh';
 const SHELL_SHEBANG =
   /^#!\s*(?:\/usr\/bin\/env\s+)?(?:\/usr\/local\/bin\/|\/usr\/bin\/|\/bin\/)?(?:sh|bash|dash|zsh)(?:\s|$)/;
 
-/** The marked block a `pre-push` hook carries: the call, and nothing the CLI will ever need to update. */
-const BLOCK = ['# >>> apimatic snapshots', SHARE_HOOK_CALL, '# <<< apimatic snapshots'].join('\n');
+/** The marked block a `pre-push` hook carries: a line saying what the call does, the call, and nothing the CLI will ever need to update. */
+const BLOCK = [
+  '# >>> apimatic snapshots',
+  '# Hands the refs git lists on stdin to the script, then back to the rest of this hook.',
+  SHARE_HOOK_CALL,
+  '# <<< apimatic snapshots'
+].join('\n');
 
 /** What the rule reads: the hook git runs as found on disk, empty when there is none, git's own hooks directory, where it runs hooks from, and the repository. */
 export type HookFacts = {

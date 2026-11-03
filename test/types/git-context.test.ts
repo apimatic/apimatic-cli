@@ -853,13 +853,17 @@ describe('GitContext', () => {
       expect(await pristineAt(origin)).to.deep.equal(commit);
     });
 
-    it('shares through husky’s hook too, once it has the line', async () => {
+    it('shares through husky’s hook too, once it has the line, and the rest of the hook still sees the refs', async () => {
       const { directory, origin, commit } = await ready();
       fs.rmSync(hookFile(directory));
-      await husky(directory, `set -e\n${SHARE_HOOK_CALL}\necho "husky ran" >&2\n`);
+      await husky(
+        directory,
+        `set -e\n${SHARE_HOOK_CALL}\nwhile read -r l ls r rs; do echo "husky saw $r" >&2; done\necho "husky ran" >&2\n`
+      );
 
       const pushed = await sh(directory, 'push', '-q', 'origin', 'main');
 
+      expect(pushed.stderr).to.contain('husky saw refs/heads/main');
       expect(pushed.stderr).to.contain('husky ran');
       expect(pushed.stderr).to.not.contain('apimatic');
       expect(await pristineAt(origin)).to.deep.equal(commit);
@@ -910,16 +914,22 @@ describe('GitContext', () => {
       expect((await sh(origin, 'rev-parse', '--verify', 'refs/heads/main')).exitCode).to.equal(0);
     });
 
-    it('runs ahead of a hook that was already there, which still runs', async () => {
+    it('runs ahead of a hook that was already there, which still runs and still sees the refs, leaving no copy behind', async () => {
       const { directory, origin } = await ready();
-      write(hookFile(directory), '#!/bin/sh\necho "existing hook ran" >&2\nexit 0\n');
+      write(
+        hookFile(directory),
+        '#!/bin/sh\nwhile read -r l ls r rs; do echo "existing hook saw $r" >&2; done\necho "existing hook ran" >&2\nexit 0\n'
+      );
       await shared({ 'README.md': '# v2' }, directory);
       const tip = (await pristineAt(directory))!;
 
       const pushed = await sh(directory, 'push', '-q', 'origin', 'main');
 
+      expect(pushed.stderr.match(/existing hook saw refs\/heads\/main/g)).to.have.length(1);
       expect(pushed.stderr.match(/existing hook ran/g)).to.have.length(1);
       expect(await pristineAt(origin)).to.deep.equal(tip);
+      expect(fs.readdirSync(path.join(directory, '.git')).filter((name) => name.startsWith('apimatic-pre-push'))).to.be
+        .empty;
     });
 
     it('reports a git here that does not answer, and a hook that cannot be written, as the hook’s own outcome', async () => {

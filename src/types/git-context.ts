@@ -64,7 +64,7 @@ const SHARE_HOOK_SCRIPT = [
   'remote="$1"',
   `ref=${PRISTINE_REF}`,
   'tracking="refs/apimatic/remotes/$remote/pristine"',
-  '# A push carrying the ref itself, as git lists what is pushed on stdin, needs no help.',
+  '# A push carrying the ref itself needs no help; the hook hands this script a copy of what git lists on stdin.',
   'while read -r local_ref local_sha remote_ref remote_sha; do',
   '  [ "$remote_ref" = "$ref" ] && exit 0',
   'done',
