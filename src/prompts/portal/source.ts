@@ -3,6 +3,7 @@ import { APIMATIC_CONFIG_FILE_NAME } from '../../types/apimatic-config/document.
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { listedInProse } from '../../utils/string-utils.js';
 import { ContentNotices, NoTabsListed } from '../../types/portal/content-notices.js';
+import { LeftOutHtml } from '../../types/portal/left-out-html.js';
 import { API_REFERENCE_TOKEN, NAVIGATION_FILE_NAME, TabEntry } from '../../types/portal/portal-navigation.js';
 import {
   ContentProblem,
@@ -430,6 +431,7 @@ export function reportIgnoredNavigationFiles(files: FilePath[], sourceDirectory:
 }
 
 export function reportContentNotices(notices: ContentNotices, sourceDirectory: DirectoryPath): void {
+  reportLeftOutHtml(notices.leftOutHtml, sourceDirectory);
   reportHiddenPages(notices.hiddenPages, sourceDirectory);
   reportIgnoredNavigationFiles(notices.ignoredNavigationFiles, sourceDirectory);
   reportSharedTabNames(notices.sharedTabNames, sourceDirectory);
@@ -510,6 +512,28 @@ export function reportSharedTabNames(shared: SharedTabName[], sourceDirectory: D
     `Rename all but one tab of each name with a ${f.var('title')} in its folder's ` +
       `${f.var(NAVIGATION_FILE_NAME)}, or in ${f.var(ROOT_NAVIGATION_FILE)} for the Home tab; the SDKs and ` +
       `Context Plugin sections keep their names.`
+  );
+}
+
+export function reportLeftOutHtml(pages: LeftOutHtml[], sourceDirectory: DirectoryPath): void {
+  if (pages.length === 0) {
+    return;
+  }
+  const one = pages.length === 1;
+  const lines = pages.flatMap((html) => {
+    const page = relative(html.page, sourceDirectory);
+    const shown = html.shown().map(({ line, text }) => `  • ${page}, line ${line}: ${f.var(text)}`);
+    const unshown = html.unshown();
+    return unshown === 0 ? shown : [...shown, `    and ${unshown} more on this page`];
+  });
+  const holding = one
+    ? `A ${f.var('.md')} page in ${f.path(sourceDirectory)} has`
+    : `Some ${f.var('.md')} pages in ${f.path(sourceDirectory)} have`;
+  log.warn(`${holding} HTML or components, which the portal leaves out:`);
+  log.message(lines.join('\n'));
+  log.message(
+    `Rename ${one ? 'the page' : 'each page'} to ${f.var('.mdx')} to keep them. MDX needs empty tags closed, ` +
+      `such as ${f.var('<br />')}, and comments written as ${f.var('{/* … */}')}.`
   );
 }
 

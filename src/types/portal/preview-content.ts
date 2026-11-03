@@ -33,6 +33,9 @@ export class PreviewContent {
 
   private static since(current: ContentNotices, previous: ContentNotices): ContentNotices {
     return {
+      leftOutHtml: whenAnyNew(current.leftOutHtml, previous.leftOutHtml, (html, earlier) =>
+        html.addsNothingTo(earlier)
+      ),
       hiddenPages: whenAnyNew(current.hiddenPages, previous.hiddenPages, (left, right) => left.isEqual(right)),
       ignoredNavigationFiles: whenAnyNew(
         current.ignoredNavigationFiles,
