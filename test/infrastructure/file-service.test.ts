@@ -101,6 +101,52 @@ describe('FileService', () => {
     });
   });
 
+  describe('makeExecutable', () => {
+    const fileService = new FileService();
+    const permissionsOf = (file: FilePath) => fs.statSync(file.toString()).mode & 0o777;
+    let root: string;
+    let hook: FilePath;
+
+    beforeEach(() => {
+      root = fs.mkdtempSync(path.join(os.tmpdir(), 'file-service-'));
+      hook = new FilePath(new DirectoryPath(root), new FileName('pre-push'));
+      fs.writeFileSync(hook.toString(), '#!/bin/sh');
+    });
+
+    afterEach(() => {
+      fs.rmSync(root, { recursive: true, force: true });
+    });
+
+    it('keeps the file writable, so a later run can rewrite it', async () => {
+      await fileService.makeExecutable(hook);
+
+      expect(() => fs.accessSync(hook.toString(), fs.constants.W_OK)).not.to.throw();
+    });
+
+    describe('where the file system keeps execute bits', () => {
+      // Windows keeps none: git runs a hook there whatever its mode.
+      before(function () {
+        if (process.platform === 'win32') this.skip();
+      });
+
+      it('lets whoever may read the file run it', async () => {
+        fs.chmodSync(hook.toString(), 0o644);
+
+        await fileService.makeExecutable(hook);
+
+        expect(permissionsOf(hook)).to.equal(0o755);
+      });
+
+      it('keeps a hook only its owner may read to its owner', async () => {
+        fs.chmodSync(hook.toString(), 0o600);
+
+        await fileService.makeExecutable(hook);
+
+        expect(permissionsOf(hook)).to.equal(0o700);
+      });
+    });
+  });
+
   describe('hasEntriesExcluding', () => {
     const fileService = new FileService();
     let root: string;

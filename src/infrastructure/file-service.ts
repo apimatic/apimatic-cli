@@ -33,6 +33,15 @@ function spelling<T>(name: string, entries: T[], nameOf: (entry: T) => string): 
   );
 }
 
+/**
+ * `mode` with the execute bit set beside each read bit, as a script runs only where it can be read.
+ * The rest of the permissions stay as they were; the file's type, which `stat` adds, is dropped.
+ */
+function executableWhereReadable(mode: number): number {
+  const permissions = mode & 0o7777;
+  return permissions | ((permissions & 0o444) >> 2);
+}
+
 export class FileService {
   public async fileExists(file: FilePath): Promise<boolean> {
     try {
@@ -383,9 +392,13 @@ export class FileService {
     return true;
   }
 
-  /** Git runs a hook only when it is executable: readable and executable by all, as git's own sample hooks are. */
+  /**
+   * Git runs a hook only when it is executable. Whoever may read the file may now run it; who may read
+   * or write it stays as the file had it, a developer's own hook included.
+   */
   public async makeExecutable(filePath: FilePath): Promise<void> {
-    await fsExtra.chmod(filePath.toString(), 0o755);
+    const { mode } = await fsExtra.stat(filePath.toString());
+    await fsExtra.chmod(filePath.toString(), executableWhereReadable(mode));
   }
 
   public async copy(source: FilePath, destination: FilePath) {
