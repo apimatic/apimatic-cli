@@ -21,6 +21,7 @@ export class SdkPublishInteractiveAction {
 
   public readonly execute = async (
     defaultProjectDirectory: DirectoryPath,
+    gitInit: boolean,
     onPublishSdkError: (errorMessage: string) => void
   ): Promise<ActionResult> => {
     const workingDirectory = await this.prompts.inputWorkingDirectory(
@@ -133,6 +134,7 @@ export class SdkPublishInteractiveAction {
       publishTypes,
       false,
       true,
+      gitInit,
       publishingProfileId,
       version,
       publishingProfile,

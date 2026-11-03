@@ -7,6 +7,8 @@ import { err, ok, Result } from 'neverthrow';
 import { DirectoryPath } from '../types/file/directoryPath.js';
 import { FileName } from '../types/file/fileName.js';
 import { FilePath } from '../types/file/filePath.js';
+import { RelativePaths } from '../types/file/relative-paths.js';
+import { RelativeDirectoryPath } from '../types/file/relativeDirectoryPath.js';
 import { RelativeFilePath } from '../types/file/relativeFilePath.js';
 import { BlobId } from '../types/git/blob-id.js';
 import { CommitId } from '../types/git/commit-id.js';
@@ -50,6 +52,28 @@ export class GitService {
   /** A repository of its own in `directory`, on `main`; git creates the directory, and its parents, when they are not there yet. */
   public async init(directory: DirectoryPath): Promise<Result<void, string>> {
     return (await run(['init', '--quiet', '--initial-branch=main', directory.toString()])).map(() => undefined);
+  }
+
+  /** Everything below `directory` its ignore rules keep out, such as `node_modules`: a directory ignored whole as one entry, a file beside something tracked on its own. */
+  public async ignoredBelow(directory: DirectoryPath): Promise<Result<RelativePaths, string>> {
+    const ran = await run(['ls-files', '-z', '--others', '--ignored', '--exclude-standard', '--directory', '--', '.'], {
+      cwd: directory
+    });
+    if (ran.isErr()) {
+      return err(ran.error);
+    }
+    const entries = ran.value.stdout.split('\0').filter((entry) => entry !== '');
+    const isDirectory = (entry: string) => entry.endsWith('/');
+    const files = readAll(
+      'ls-files',
+      entries.filter((entry) => !isDirectory(entry)),
+      RelativeFilePath.fromGit
+    );
+    if (files.isErr()) {
+      return err(files.error);
+    }
+    const directories = readAll('ls-files', entries.filter(isDirectory), RelativeDirectoryPath.fromGit);
+    return directories.map((found) => ({ files: files.value, directories: found }));
   }
 
   /** Every file below `directory`, whatever any ignore rule says, as a tree in the repository at `root`, with line endings normalised. */

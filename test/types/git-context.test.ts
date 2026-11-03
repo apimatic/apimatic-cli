@@ -2,6 +2,7 @@ import { Buffer } from 'node:buffer';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import AdmZip from 'adm-zip';
 import { expect } from 'chai';
 import { execa } from 'execa';
 import { err } from 'neverthrow';
@@ -10,6 +11,8 @@ import { FileService } from '../../src/infrastructure/file-service.js';
 import { GitService } from '../../src/infrastructure/git-service.js';
 import { canonical } from '../../src/infrastructure/tmp-extensions.js';
 import { DirectoryPath } from '../../src/types/file/directoryPath.js';
+import { FileProblem } from '../../src/types/file/file-problem.js';
+import { FilePath } from '../../src/types/file/filePath.js';
 import { GitContext } from '../../src/types/git-context.js';
 import { CommitId } from '../../src/types/git/commit-id.js';
 import { GitVersion } from '../../src/types/git/git-version.js';
@@ -18,6 +21,7 @@ import { recordContents } from '../../src/types/sdk/generation-record.js';
 import { RecordedSnapshot } from '../../src/types/sdk/recorded-snapshot.js';
 import { SHARE_HOOK_CALL } from '../../src/types/sdk/share-hook.js';
 import { GENERATED_MARKER, Side, YOURS_MARKER } from '../../src/types/sdk/conflict-markers.js';
+import { TempContext } from '../../src/types/temp-context.js';
 import { emptyGlobalGitConfig, withHome } from '../helpers/git-environment.js';
 import { counts, kinds, leftUnmerged, rel } from '../helpers/merge.js';
 import { describeCommit, fetchKind, hookKind, snapshotFiles } from '../helpers/snapshots.js';
@@ -468,6 +472,82 @@ describe('GitContext', () => {
       expect(saved.toString()).to.equal(sdk());
       expect(fs.readdirSync(sdk()).sort()).to.deep.equal(['.git', 'README.md']);
       expect(fs.readFileSync(inRoot('sdk', 'python', '.git', 'HEAD'), 'utf-8')).to.equal('ref: refs/heads/main');
+    });
+  });
+
+  describe('archiveForUpload', () => {
+    let restoreConfig: () => void;
+    const entriesOf = (archive: FilePath) =>
+      new AdmZip(archive.toString()).getEntries().map((entry) => entry.entryName);
+    const temp = () => {
+      fs.mkdirSync(inRoot('temp'), { recursive: true });
+      return new DirectoryPath(inRoot('temp'));
+    };
+
+    beforeEach(() => {
+      restoreConfig = emptyGlobalGitConfig(root);
+    });
+
+    afterEach(() => {
+      restoreConfig();
+    });
+
+    it('zips what git would commit: not .git, the record, or what the SDK’s .gitignore keeps out', async () => {
+      await ownRepository();
+      write(inRoot('sdk', 'python', 'models', 'book.py'), 'class Book: ...');
+      await execa('git', ['add', '.'], { cwd: sdk() });
+      write(inRoot('sdk', 'python', 'README.md'), '# sdk');
+      write(inRoot('sdk', 'python', '.gitignore'), 'dist/\n');
+      write(inRoot('sdk', 'python', 'dist', 'built.py'), 'built');
+      write(inRoot('sdk', 'python', RECORD), '{}');
+
+      const archive = (await context().archiveForUpload(USABLE, temp()))._unsafeUnwrap();
+
+      expect(entriesOf(archive)).to.have.members(['.gitignore', 'README.md', 'models/book.py']);
+    });
+
+    it('zips every file but .git and the record outside a repository of its own, without asking git', async () => {
+      write(inRoot('sdk', 'python', '.git', 'HEAD'), 'ref: refs/heads/main');
+      write(inRoot('sdk', 'python', 'README.md'), '# sdk');
+      write(inRoot('sdk', 'python', 'models', 'book.py'), 'class Book: ...');
+      write(inRoot('sdk', 'python', RECORD), '{}');
+      const topLevel = sinon.spy(GitService.prototype, 'topLevel');
+
+      const archive = (await context().archiveForUpload(GitVersion.none(), temp()))._unsafeUnwrap();
+
+      expect(entriesOf(archive)).to.have.members(['README.md', 'models/book.py']);
+      expect(topLevel.called).to.be.false;
+    });
+
+    it('leaves the ignore rules of a repository that only encloses the directory alone', async () => {
+      await ownRepository(root);
+      write(inRoot('.gitignore'), 'sdk/\n');
+      write(inRoot('sdk', 'python', 'README.md'), '# sdk');
+      write(inRoot('sdk', 'python', 'dist', 'built.py'), 'built');
+
+      const archive = (await context().archiveForUpload(USABLE, temp()))._unsafeUnwrap();
+
+      expect(entriesOf(archive)).to.have.members(['README.md', 'dist/built.py']);
+    });
+
+    it('reports a git that does not answer', async () => {
+      await ownRepository();
+      write(inRoot('sdk', 'python', 'README.md'), '# sdk');
+      sinon.stub(GitService.prototype, 'ignoredBelow').resolves(err('git ls-files failed: index.lock exists'));
+
+      const archive = await context().archiveForUpload(USABLE, temp());
+
+      expect(archive._unsafeUnwrapErr()).to.equal('git ls-files failed: index.lock exists');
+    });
+
+    it('reports a zip that failed, in the file system’s words', async () => {
+      write(inRoot('sdk', 'python', 'README.md'), '# sdk');
+      const problem: FileProblem = { kind: 'zipFailed', reason: 'EACCES: permission denied' };
+      sinon.stub(TempContext.prototype, 'zip').resolves(err(problem));
+
+      const archive = await context().archiveForUpload(GitVersion.none(), temp());
+
+      expect(archive._unsafeUnwrapErr()).to.equal('EACCES: permission denied');
     });
   });
 

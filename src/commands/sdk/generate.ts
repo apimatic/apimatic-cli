@@ -55,7 +55,7 @@ ${inProse(AVAILABLE_LANGUAGES)} are available; ${inProse(UPCOMING_LANGUAGES)} ar
         'make the SDK directory a git repository when it is not one of its own, so your edits to the SDK are kept when you regenerate it'
     }),
     ...FlagsProvider.input,
-    ...FlagsProvider.force,
+    ...FlagsProvider.sdkForce,
     ...FlagsProvider.authKey
   };
 

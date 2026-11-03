@@ -433,6 +433,20 @@ Tests from `92988f2f`: `publish.test.ts` ("uploads the SDK without the CLI's rec
 `publish-flags.test.ts`; sdk-context "archive" group; git-service `ignoredBelow`;
 `zip-service.test.ts` for the exclusions; `relativeDirectoryPath.test.ts`.
 
+Done, in one slice. `RelativeDirectoryPath` (`src/types/file/`) beside `RelativeFilePath`, with
+`RelativePaths` holding files and directories below one root; `ZipService.archive` and
+`TempContext.zip` take what to leave out, nothing by default, the zip service's helpers as module
+functions; `GitService.ignoredBelow`, `ls-files` for what the ignore rules keep out below a
+directory, a directory ignored whole as one entry. `GitContext.archiveForUpload(git, tempDirectory)`
+stands beside `save` as its mirror: a save keeps `.git`, an upload leaves `.git` and the record out
+and, in a repository of its own, what git's ignore rules keep out (`keptOutOfUpload`); outside one
+git is not asked. The publish action reads git's version as generate does, when the directory has a
+`.git`, and hands it over, so a `.git` without a usable git uploads everything but the two. `sdk
+publish` takes `--git-init`, passed through in guided mode (`SdkPublish.isGuided`: no flags, or
+`--git-init` alone) and always on with flags; `FlagsProvider.sdkForce` words `--force` for both SDK
+commands as the docs do; `dryRunNotice` says what the directory holds and what an upload leaves
+out; `sdkNotZipped` takes the reason.
+
 ### Phase 8: docs and leftovers
 
 1. `CONTEXT.md` gains the terms: SDK directory, pristine snapshot, generation record, custom
@@ -513,6 +527,21 @@ pure decision and the installer both read.
 Answered: the script's text in `git-context.ts` beside the record's attributes, where the shell
 writes it and the pristine ref is; the call line, the markers and the script's name in
 `share-hook.ts` with the rule, which is all the rule and the prompt read.
+
+**Phase 7: where the upload rule lives.** The upload holds what git would commit, without `.git`
+or the record.
+
+- On `GitContext` beside `save`, as `archiveForUpload(git, tempDirectory)`. For: the two file
+  rules of the directory (what a save keeps, what an upload leaves out) share one class and its
+  constants, and the repository check is there; the publish action reads git's version as
+  generate does and hands it over. Against: the name `GitContext` undersells a class that also
+  saves and zips the directory.
+- An `SdkContext` over `GitContext`, as the injection branch had. Against: the split Phase 1
+  folded; the archive still needs the repository check and the ignore rules from the other class.
+- The context asking git itself, with no version handed in. Against: a `.git` without a usable
+  git fails the upload where generate only warned.
+
+Answered: the first, one context.
 
 ## 5. Out of scope
 

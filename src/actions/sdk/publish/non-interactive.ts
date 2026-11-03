@@ -107,7 +107,7 @@ export class SdkPublishNonInteractiveAction {
       // Named only when the user chose it, so a run that took the default reads as the doc does.
       stability: stability.chosenLevel()
     });
-    // A run with flags is the CI flow: it never waits on a question, whether a terminal is attached or not.
+    // A run with flags is the CI flow: it never waits on a question, whether a terminal is attached or not, and always keeps the SDK's edits.
     const publishResult = await new SdkPublishAction(this.configDir, this.commandMetadata).execute(
       project,
       sdkDirectory,
@@ -116,6 +116,7 @@ export class SdkPublishNonInteractiveAction {
       publishTypes,
       force,
       false,
+      true,
       publishingProfileId,
       semVersion,
       publishingProfile,

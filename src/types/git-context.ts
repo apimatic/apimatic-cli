@@ -7,6 +7,8 @@ import { ValueMap, ValueSet } from './common/value-map.js';
 import { DirectoryPath } from './file/directoryPath.js';
 import { FileName } from './file/fileName.js';
 import { FilePath } from './file/filePath.js';
+import { RelativePaths } from './file/relative-paths.js';
+import { RelativeDirectoryPath } from './file/relativeDirectoryPath.js';
 import { RelativeFilePath } from './file/relativeFilePath.js';
 import { CommitId } from './git/commit-id.js';
 import { GitVersion } from './git/git-version.js';
@@ -24,6 +26,7 @@ import { ShareHook } from './sdk/share-hook.js';
 import { SnapshotFetch } from './sdk/snapshot-fetch.js';
 import { UnresolvedFile } from './sdk/unresolved-file.js';
 import { WriteProblem } from './sdk/write-problem.js';
+import { TempContext } from './temp-context.js';
 
 /** The ref holding each generation as the server returned it, chained, off every branch of the SDK directory's own repository. */
 const PRISTINE_REF = 'refs/apimatic/pristine';
@@ -37,6 +40,11 @@ const GIT_DIRECTORY = new FileName('.git');
 /** Where the CLI keeps its record inside the SDK directory, and the file holding it. */
 const RECORD_DIRECTORY = '.apimatic';
 const RECORD_FILE = new FileName('generation.json');
+
+// An upload holds the SDK as git would commit it, and the record is the CLI's.
+const KEPT_OUT_OF_UPLOAD = [GIT_DIRECTORY.toString(), RECORD_DIRECTORY].map(
+  (name) => RelativeDirectoryPath.fromGit(name)!
+);
 
 /** The attributes beside the record: a pull that meets a teammate's record keeps yours whole, with no markers in it, and GitHub folds it as generated. */
 const RECORD_ATTRIBUTES_FILE = new FileName('.gitattributes');
@@ -357,6 +365,24 @@ export class GitContext {
   }
 
   /**
+   * The directory zipped for upload into `tempDirectory`, holding what git would commit: not `.git`,
+   * not the CLI's record and, in a repository of its own, not what its ignore rules keep out, such as
+   * `node_modules`. Outside one, git is not asked: every file but those two.
+   */
+  public async archiveForUpload(git: GitVersion, tempDirectory: DirectoryPath): Promise<Result<FilePath, string>> {
+    const isRepository = await this.isRepository(git);
+    if (isRepository.isErr()) {
+      return err(isRepository.error);
+    }
+    const keptOut = await keptOutOfUpload(this.gitService, this.directory, isRepository.value);
+    if (keptOut.isErr()) {
+      return err(keptOut.error);
+    }
+    const archive = await new TempContext(tempDirectory).zip(this.directory, keptOut.value);
+    return archive.mapErr((problem) => problem.reason);
+  }
+
+  /**
    * Keeps the directory as it is, byte for byte, under the previous ref, replacing what the last run
    * kept, so a write can be undone; every path `base` holds goes in, ignore rules or not.
    */
@@ -545,6 +571,19 @@ async function writeExecutable(files: FileService, file: FilePath, content: stri
   if (await files.replaceContentsIfChanged(file, content)) {
     await files.makeExecutable(file);
   }
+}
+
+/** What the upload leaves out: the two the CLI names and, in a repository of its own, what git's ignore rules keep out. */
+async function keptOutOfUpload(
+  git: GitService,
+  directory: DirectoryPath,
+  ownRepository: boolean
+): Promise<Result<RelativePaths, string>> {
+  if (!ownRepository) {
+    return ok({ files: [], directories: KEPT_OUT_OF_UPLOAD });
+  }
+  const ignored = await git.ignoredBelow(directory);
+  return ignored.map(({ files, directories }) => ({ files, directories: [...KEPT_OUT_OF_UPLOAD, ...directories] }));
 }
 
 /** Each path's content at `stage`, from the entries git holds as unmerged and their blobs, read in the same order. */

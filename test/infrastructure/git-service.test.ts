@@ -126,6 +126,39 @@ describe('GitService', () => {
     );
   });
 
+  describe('ignoredBelow', () => {
+    let restoreConfig: () => void;
+
+    beforeEach(() => {
+      restoreConfig = emptyGlobalGitConfig(root);
+    });
+
+    afterEach(() => {
+      restoreConfig();
+    });
+
+    it('lists what the ignore rules keep out below a directory: a directory whole unless something in it is tracked', async () => {
+      const repo = await repository();
+      const sdk = repo.join('sdk');
+      write(sdk, '.gitignore', 'dist/\nbuild/\n*.log\n');
+      write(sdk, 'tracked.py', 'tracked');
+      write(sdk, 'build/keep.py', 'kept');
+      await execa('git', ['add', '.'], { cwd: repo.toString() });
+      await execa('git', ['add', '-f', 'sdk/build/keep.py'], { cwd: repo.toString() });
+      write(sdk, 'untracked.py', 'untracked');
+      write(sdk, 'debug.log', 'noise');
+      write(sdk, 'build/out.py', 'built');
+      write(sdk, 'dist/built.py', 'built');
+      write(sdk, 'dist/nested/deep.py', 'built');
+      write(repo, 'outside.log', 'outside');
+
+      const ignored = (await git.ignoredBelow(sdk))._unsafeUnwrap();
+
+      expect(ignored.files.map(String)).to.have.members(['build/out.py', 'debug.log']);
+      expect(ignored.directories.map(String)).to.deep.equal(['dist']);
+    });
+  });
+
   describe('treeOf', () => {
     it('takes every file below a directory outside the repository, ignore rules or not', async () => {
       const repo = await repository();

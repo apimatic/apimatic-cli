@@ -11,7 +11,6 @@ import { noteWrapped, withSpinner } from '../prompt.js';
 import { format as f } from '../format.js';
 import { PublishingProfile } from '../../types/publish/publishing-profile.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
-import { FileProblem } from '../../types/file/file-problem.js';
 
 export type PublishingOutcome = 'succeeded' | 'failed' | 'cancelled';
 
@@ -24,8 +23,8 @@ export class SdkPublishPrompts {
     log.error(serviceError.errorMessage);
   }
 
-  public sdkNotZipped(sdkDirectory: DirectoryPath, problem: FileProblem) {
-    log.error(`The SDK in ${f.path(sdkDirectory)} could not be zipped for upload: ${problem.reason}`);
+  public sdkNotZipped(sdkDirectory: DirectoryPath, reason: string) {
+    log.error(`The SDK in ${f.path(sdkDirectory)} could not be zipped for upload: ${reason}`);
   }
 
   /** The generation left conflicts for the developer, so nothing is uploaded until they are gone. */
@@ -33,9 +32,12 @@ export class SdkPublishPrompts {
     log.warn('Nothing was published, since the SDK still has conflicts. Rerun once they are resolved and staged.');
   }
 
-  public dryRunNotice(publishingSummary: string): void {
+  /** The directory holds exactly what a run without the flag uploads. */
+  public dryRunNotice(sdk: DirectoryPath, publishingSummary: string): void {
     log.info(
-      `You can publish this SDK by removing the --dry-run flag. It will be published for the following:` +
+      `The SDK in ${f.path(sdk)} is what a run without ${f.flag('dry-run')} uploads: the files git would commit, ` +
+        `so .git, .apimatic and anything its .gitignore excludes stay out. ` +
+        `You can publish it by removing the flag. It will be published for the following:` +
         publishingSummary
     );
   }

@@ -15,7 +15,8 @@ import { SdkPublishNonInteractiveAction } from '../../actions/sdk/publish/non-in
 export default class SdkPublish extends Command {
   static readonly summary = 'Generate and publish an SDK to a package registry and/or source repository';
 
-  static readonly description = `Generate and publish an SDK using a publishing profile configured in the APIMatic App. Requires an input directory containing the API specification. Run without flags for a step-by-step interactive experience, or pass all required flags for CI/CD automation.`;
+  static readonly description = `Generate and publish an SDK using a publishing profile configured in the APIMatic App. Requires an input directory containing the API specification. Run it with no flags, or with only --git-init, for guided mode, or pass flags for CI/CD. When you pass flags, --profile-id, --language, --version, and --publish-type are required.
+Your changes to the SDK are merged before it is published, as sdk generate does with git 2.38 or later: with flags, always; in guided mode, add --git-init. Nothing is published while conflicts are left to resolve.`;
 
   static readonly cmdTxt = format.cmd('apimatic', 'sdk', 'publish');
 
@@ -34,7 +35,7 @@ export default class SdkPublish extends Command {
       description: 'Language of the SDK to generate and publish.',
       options: Object.values(Language).map((l) => l.valueOf())
     }),
-    ...FlagsProvider.force,
+    ...FlagsProvider.sdkForce,
     ...FlagsProvider.input,
     'publish-type': Flags.string({
       description:
@@ -55,6 +56,11 @@ export default class SdkPublish extends Command {
     stability: Flags.string({
       description: 'Stability level of the generated SDK. Defaults to the level the language offers.',
       options: Object.values(Stability).map((s) => s.valueOf())
+    }),
+    'git-init': Flags.boolean({
+      default: false,
+      description:
+        "In guided mode, make the SDK directory a git repository when it isn't one of its own, so your changes to the SDK are kept. With flags, sdk publish always does this."
     })
   };
 
@@ -79,6 +85,11 @@ export default class SdkPublish extends Command {
     )}`
   ];
 
+  /** Guided mode is asked for by no flags, or `--git-init` alone. */
+  static isGuided(argv: readonly string[]): boolean {
+    return argv.every((arg) => arg === '--git-init');
+  }
+
   async run() {
     const {
       flags: {
@@ -91,12 +102,13 @@ export default class SdkPublish extends Command {
         'publish-type': publishType,
         'dry-run': dryRun,
         stability,
-        'codegen-version': codegenVersion
+        'codegen-version': codegenVersion,
+        'git-init': gitInit
       }
     } = await this.parse(SdkPublish);
 
     const publishTypes = [...new Set(publishType)] as PublishType[];
-    const interactive = this.argv.length === 0;
+    const interactive = SdkPublish.isGuided(this.argv);
     const commandMetadata: CommandMetadata = {
       commandName: SdkPublish.id,
       shell: this.config.shell
@@ -130,6 +142,7 @@ export default class SdkPublish extends Command {
     const result = interactive
       ? await new SdkPublishInteractiveAction(configDir, commandMetadata).execute(
           DirectoryPath.createInput(input),
+          gitInit,
           onPublishSdkError
         )
       : await new SdkPublishNonInteractiveAction(configDir, commandMetadata).execute(

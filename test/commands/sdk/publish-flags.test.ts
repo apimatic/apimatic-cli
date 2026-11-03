@@ -57,6 +57,21 @@ describe('sdk publish flags', () => {
     expect(flags.stability).to.equal(Stability.BETA);
   });
 
+  it('accepts --git-init for guided mode, off unless passed', async () => {
+    const given = (await parse(['--git-init'])) as never as { flags: Record<string, unknown> };
+    const omitted = (await parse([])) as never as { flags: Record<string, unknown> };
+
+    expect(given.flags['git-init']).to.be.true;
+    expect(omitted.flags['git-init']).to.be.false;
+  });
+
+  it('runs guided with no flags or --git-init alone, and with flags otherwise', () => {
+    expect(SdkPublish.isGuided([])).to.be.true;
+    expect(SdkPublish.isGuided(['--git-init'])).to.be.true;
+    expect(SdkPublish.isGuided(['--git-init', '--dry-run'])).to.be.false;
+    expect(SdkPublish.isGuided(['--language', 'python'])).to.be.false;
+  });
+
   it('still parses the flags a publish is actually made of', async () => {
     const { flags } = (await parse([
       '--profile-id',
