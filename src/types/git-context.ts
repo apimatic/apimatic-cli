@@ -180,7 +180,8 @@ export class GitContext {
    * The snapshot fetched when the repository lacks it and has a remote, the branch's else `origin`:
    * the remote's pristine chain is brought over and met with the local one, so neither machine's
    * generations are lost. As it is when it is held, or nothing is recorded. A remote that lacks it or
-   * does not answer is part of the answer; only a git here that does not answer fails.
+   * does not answer is part of the answer, and so is a git here that fails once the remote has
+   * answered; only one that fails before the remote is asked fails the run.
    */
   public async fetchSnapshot(snapshot: RecordedSnapshot): Promise<Result<RecordedSnapshot, string>> {
     const wanted = snapshot.toFetch();
@@ -201,13 +202,14 @@ export class GitContext {
     if (tip.value === undefined) {
       return ok(snapshot.stillMissing(SnapshotFetch.absent(remote.value)));
     }
+    // Past the fetch, a git here that does not answer is a fetch that failed: this generation starts afresh, as when the remote lacks the snapshot.
     const met = await meetChains(this.gitService, this.directory, tip.value);
     if (met.isErr()) {
-      return err(met.error);
+      return ok(snapshot.stillMissing(SnapshotFetch.failed(remote.value, met.error)));
     }
     const held = await this.gitService.hasCommit(this.directory, wanted);
     if (held.isErr()) {
-      return err(held.error);
+      return ok(snapshot.stillMissing(SnapshotFetch.failed(remote.value, held.error)));
     }
     return ok(held.value ? snapshot.brought() : snapshot.stillMissing(SnapshotFetch.absent(remote.value)));
   }

@@ -271,6 +271,20 @@ describe('GenerateAction (sdk) — the destination', () => {
       expect(record().baseFor(Language.PYTHON, Stability.STABLE)).to.deep.equal(await pristine());
     });
 
+    it('warns, and records afresh, when a git here fails after the remote answered the fetch', async () => {
+      await recorded();
+      write(RECORD, recordContents(Language.PYTHON, Stability.STABLE, CommitId.fromGit('f'.repeat(40))!));
+      await execa('git', ['remote', 'add', 'origin', 'https://example.invalid/sdk.git'], { cwd: sdk().toString() });
+      sinon.stub(GitService.prototype, 'fetchRef').resolves(ok(CommitId.fromGit('e'.repeat(40))!));
+      sinon.stub(GitService.prototype, 'isAncestor').resolves(err('git broke'));
+      const snapshotMissing = sinon.stub(SdkGeneratePrompts.prototype, 'snapshotMissing');
+
+      expect((await execute()).isSuccess()).to.be.true;
+
+      expect(fetchKind(snapshotMissing.firstCall.args[1])).to.equal('failed origin: git broke');
+      expect(record().baseFor(Language.PYTHON, Stability.STABLE)).to.deep.equal(await pristine());
+    });
+
     it('still succeeds, with a warning, when the snapshot cannot be recorded', async () => {
       await ownRepository();
       sinon.stub(GitService.prototype, 'commitTree').resolves(err('git broke'));

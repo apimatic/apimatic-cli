@@ -439,23 +439,30 @@ describe('GitContext', () => {
       expect(remoteOf.called).to.be.false;
     });
 
-    it('reports a git here that does not answer, before the remote is asked and after', async () => {
+    it('reports a git here that does not answer before the remote is asked, and a failed fetch when it fails after', async () => {
       const origin = await withOrigin();
       const base = await published({ 'README.md': '# v1' });
       await sh(sdk(), 'push', '-q', 'origin', REFSPEC);
       const clone = await cloneOf(origin, 'clone');
+      const remoteOf = sinon.stub(GitService.prototype, 'remoteOf').resolves(err('git broke'));
+
+      expect((await context(clone).fetchSnapshot(RecordedSnapshot.of(base, false)))._unsafeUnwrapErr()).to.equal(
+        'git broke'
+      );
+
+      remoteOf.restore();
+      // The join of the two chains, then the look for the snapshot once joined: the run goes on without it.
       const breaking = [
-        () => sinon.stub(GitService.prototype, 'remoteOf').resolves(err('git broke')),
         () => sinon.stub(GitService.prototype, 'updateRef').resolves(err('git broke')),
         () => sinon.stub(GitService.prototype, 'hasCommit').resolves(err('git broke'))
       ];
       for (const breaks of breaking) {
         const broken = breaks();
 
-        expect((await context(clone).fetchSnapshot(RecordedSnapshot.of(base, false)))._unsafeUnwrapErr()).to.equal(
-          'git broke'
-        );
+        const snapshot = (await context(clone).fetchSnapshot(RecordedSnapshot.of(base, false)))._unsafeUnwrap();
 
+        expect(snapshot.isMissing()).to.be.true;
+        expect(fetchKind(snapshot.fetch)).to.equal('failed origin: git broke');
         broken.restore();
       }
     });
