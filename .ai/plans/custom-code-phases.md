@@ -462,6 +462,19 @@ out; `sdkNotZipped` takes the reason.
    `process.stdin.isTTY`; the unused methods on the config, plugin, portal, spec and file
    classes; the error map on `ServiceError`.
 
+Done, in one slice. `CONTEXT.md` names the SDK directory, the pristine snapshot, the generation
+record and custom code; `.ai/plans/custom-code.md` is back from `533bcf1a` and made true for this
+branch (its phases in §8, the files in §9, the architecture in §10, every name the first attempt
+had replaced, a reversed decision amended with its date); the four SDK flag descriptions say what
+their rows in the docs' CLI Reference say, `--force` through `FlagsProvider.sdkForce`, both
+commands carry the docs' sentence on keeping your changes, the README names git under
+Requirements and is regenerated; the conventions these phases followed are in
+`.ai/instructions.md` and the skills; an ESLint rule keeps `src/types/sdk`, `src/types/git` and
+`src/types/file` free of file, process and infrastructure imports; `terminal.isInteractive()` is
+the one TTY check (the plugin action, the not-found hooks and portal serve read it, the plugin
+prompts' `canAsk` gone); `PluginConfigContext.hasNoSourceRepository`, which only a test called, is
+gone, as is `ServiceError`'s error map, which nothing read.
+
 ## 4. Questions each phase will raise
 
 Each is asked when its phase reaches it, with these options. An answer written here ahead of
@@ -542,6 +555,17 @@ or the record.
   git fails the upload where generate only warned.
 
 Answered: the first, one context.
+
+**Phase 8: the leftovers.** Four cleanups the first attempt carried that are not this feature.
+
+- All four: the ESLint purity rule over the three pure directories, one terminal check, the
+  unused method a reference scan finds, `ServiceError` without its error map. For: what the
+  review already judged lands with the feature. Against: files outside the feature in its PR.
+- The rule and the terminal check only. Against: two known leftovers stay.
+- None. Against: the review's findings are lost.
+
+Answered: all four, with `--force` brought to the docs' row as well as `--git-init`, and the git
+sentence on both commands and under the README's Requirements.
 
 ## 5. Out of scope
 

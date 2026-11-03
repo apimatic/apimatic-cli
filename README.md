@@ -13,6 +13,10 @@ The official CLI for APIMatic.
 Node.js 24 or newer, for every command. npm only warns when your Node is older, so the
 install succeeds and the CLI then refuses to run, naming the version it found.
 
+Git 2.38 or newer on your `PATH`, for `sdk generate` and `sdk publish` to keep your changes to a
+generated SDK across regenerations. Without it the commands still generate, and warn that your
+customizations will not persist.
+
 # Getting Started
 
 To get started with APIMatic's CLI using a step by step wizard, run the following command: 
@@ -421,8 +425,8 @@ FLAGS
                                   <options: csharp|java|php|python|ruby|typescript|go>
       --codegen-version=<option>  [default: v4] Version of the code generator to use
                                   <options: v4>
-      --git-init                  make the SDK directory a git repository when it is not one of its own, so your edits
-                                  to the SDK are kept when you regenerate it
+      --git-init                  Track the SDK directory with its own git repository so your customizations survive
+                                  regeneration.
       --stability=<option>        Stability level of the generated SDK. Defaults to the level the language offers.
                                   <options: stable|beta>
 
@@ -431,6 +435,8 @@ DESCRIPTION
 
   Generate a Software Development Kit (SDK) from an API specification.
   C#, TypeScript and Python are available; Java, Ruby, Go and PHP are coming soon.
+  To keep your changes to the generated SDK when you regenerate it, install Git 2.38 or later and make the SDK directory
+  its own Git repository (--git-init does this for you).
 
 EXAMPLES
   apimatic sdk generate --language=typescript

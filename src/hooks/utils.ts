@@ -2,16 +2,17 @@
 import readline from 'node:readline';
 import { blueBright, reset } from 'ansis';
 import levenshtein from 'fast-levenshtein';
+import { terminal } from '../infrastructure/terminal.js';
 
 const getConfirmation = async (suggestion: string): Promise<boolean> => {
-  if (!process.stdin.isTTY) return false;
+  if (!terminal.isInteractive()) return false;
 
   const question = `${reset('Did you mean ' + blueBright(suggestion) + '?')} (Y/n) `;
 
   return new Promise<boolean>((resolve) => {
     const rl = readline.createInterface({
       input: process.stdin,
-      output: process.stdout,
+      output: process.stdout
     });
 
     let settled = false;
@@ -57,5 +58,5 @@ const closest = (target: string, possibilities: string[]): string | null => {
 
 export default {
   closest,
-  getConfirmation,
+  getConfirmation
 };

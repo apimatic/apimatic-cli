@@ -29,6 +29,34 @@ export default [
     }
   },
   {
+    // The functional core of the SDK work: data and pure functions only. Anything that reaches
+    // a process or the disk belongs in a context or in infrastructure.
+    files: ['src/types/sdk/**/*.ts', 'src/types/git/**/*.ts', 'src/types/file/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            'fs',
+            'node:fs',
+            'fs/promises',
+            'node:fs/promises',
+            'fs-extra',
+            'child_process',
+            'node:child_process',
+            'execa'
+          ].map((name) => ({ name, message: 'src/types/sdk, git and file are pure: no file or process access.' })),
+          patterns: [
+            {
+              group: ['**/infrastructure/**'],
+              message: 'src/types/sdk, git and file are pure: they do not import infrastructure.'
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
     // Test files use Mocha's global TDD/BDD functions and chai assertion
     // expressions (e.g. `expect(x).to.be.true`), which the base config would
     // otherwise flag as undefined globals / unused expressions.

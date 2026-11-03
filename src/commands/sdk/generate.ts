@@ -23,7 +23,8 @@ export default class SdkGenerate extends Command {
   static readonly summary = 'Generate an SDK for your API';
 
   static readonly description = `Generate a Software Development Kit (SDK) from an API specification.
-${inProse(AVAILABLE_LANGUAGES)} are available; ${inProse(UPCOMING_LANGUAGES)} are coming soon.`;
+${inProse(AVAILABLE_LANGUAGES)} are available; ${inProse(UPCOMING_LANGUAGES)} are coming soon.
+To keep your changes to the generated SDK when you regenerate it, install Git 2.38 or later and make the SDK directory its own Git repository (--git-init does this for you).`;
 
   static readonly cmdTxt = format.cmd('apimatic', 'sdk', 'generate');
 
@@ -51,8 +52,7 @@ ${inProse(AVAILABLE_LANGUAGES)} are available; ${inProse(UPCOMING_LANGUAGES)} ar
     }),
     'git-init': Flags.boolean({
       default: false,
-      description:
-        'make the SDK directory a git repository when it is not one of its own, so your edits to the SDK are kept when you regenerate it'
+      description: 'Track the SDK directory with its own git repository so your customizations survive regeneration.'
     }),
     ...FlagsProvider.input,
     ...FlagsProvider.sdkForce,
