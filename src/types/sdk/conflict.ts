@@ -23,54 +23,64 @@ export type FileWrite = { path: RelativeFilePath; content: Uint8Array };
 export type MergeFiles = {
   /** Files the generator produced for the first time. */
   added: readonly RelativeFilePath[];
-  /** Unedited files replaced by their new version, or moved to the generator's new name. */
+  /** Unedited files replaced by their new version, or moved to the generator's new name, and conflicts of another shape left as git placed them. */
   updated: readonly RelativeFilePath[];
   /** Edited files the generator also changed, merged without conflict. */
   merged: readonly RelativeFilePath[];
-  /** Unedited files the generator stopped producing. */
+  /** Unedited files the generator stopped producing, and deletions of yours settled by removing the file again. */
   removed: readonly RelativeFilePath[];
   /** Files you edited or added that the generator left alone. */
   kept: readonly RelativeFilePath[];
 };
 
-type CountedAs = 'merged' | 'updated' | 'kept';
+type CountedAs = 'merged' | 'updated' | 'removed' | 'kept';
 
-/** How one conflict lands once a side is chosen: what the run writes or removes for it, and what the summary says about it. */
+type Counted = { as: CountedAs; path: RelativeFilePath };
+
+/**
+ * How one conflict lands once a side is chosen: what the run writes or removes for it, and what the
+ * summary says about it. Whatever lands on disk is counted, so the summary never reads as empty above
+ * a file the run wrote or removed.
+ */
 export class Settlement {
   private constructor(
     private readonly written: readonly FileWrite[],
     private readonly removal: readonly RelativeFilePath[],
-    private readonly counted: { as: CountedAs; path: RelativeFilePath } | undefined
+    private readonly counted: readonly Counted[]
   ) {}
 
   /** The chosen side's lines in each block, counted among the merged files. */
   public static merged(write: FileWrite): Settlement {
-    return new Settlement([write], [], { as: 'merged', path: write.path });
+    return new Settlement([write], [], [{ as: 'merged', path: write.path }]);
   }
 
   /** The generator's whole version, counted among the updated files. */
   public static updated(write: FileWrite): Settlement {
-    return new Settlement([write], [], { as: 'updated', path: write.path });
+    return new Settlement([write], [], [{ as: 'updated', path: write.path }]);
   }
 
   /** Your file stays as it is, named among the kept ones. */
   public static kept(path: RelativeFilePath): Settlement {
-    return new Settlement([], [], { as: 'kept', path });
+    return new Settlement([], [], [{ as: 'kept', path }]);
   }
 
-  /** The file goes from the disk, with nothing said: a deletion of yours that the last run had written over. */
+  /** The file goes from the disk, counted among the removed files: a deletion of yours that the last run had written over. */
   public static removed(path: RelativeFilePath): Settlement {
-    return new Settlement([], [path], undefined);
+    return new Settlement([], [path], [{ as: 'removed', path }]);
   }
 
   /** Nothing on disk changes and the summary says nothing: a deletion of yours stands. */
   public static untouched(): Settlement {
-    return new Settlement([], [], undefined);
+    return new Settlement([], [], []);
   }
 
-  /** Git's placement stands, with nothing said: a conflict of another shape. */
+  /** Git's placement stands, each file it placed counted among the updated ones: a conflict of another shape. */
   public static asPlaced(writes: readonly FileWrite[]): Settlement {
-    return new Settlement(writes, [], undefined);
+    return new Settlement(
+      writes,
+      [],
+      writes.map((write): Counted => ({ as: 'updated', path: write.path }))
+    );
   }
 
   public writes(): readonly FileWrite[] {
@@ -81,11 +91,12 @@ export class Settlement {
     return this.removal;
   }
 
-  /** `files` with this settlement's path added under what the summary calls it. */
+  /** `files` with this settlement's paths added under what the summary calls each. */
   public countedIn(files: MergeFiles): MergeFiles {
-    return this.counted === undefined
-      ? files
-      : { ...files, [this.counted.as]: [...files[this.counted.as], this.counted.path] };
+    return this.counted.reduce(
+      (counted, { as, path }): MergeFiles => ({ ...counted, [as]: [...counted[as], path] }),
+      files
+    );
   }
 }
 

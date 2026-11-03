@@ -317,7 +317,7 @@ describe('MergePlan.taking', () => {
     expect(named(taken.files).removed).to.deep.equal(['gone.ts']);
   });
 
-  it('leaves a conflict of another shape as git placed it, for either side', () => {
+  it('leaves a conflict of another shape as git placed it, for either side, counting the file as updated', () => {
     const plan = movedWithDirectory();
 
     for (const side of SIDES) {
@@ -326,7 +326,10 @@ describe('MergePlan.taking', () => {
       expect(taken.writes, side).to.deep.equal(plan.writes);
       expect(taken.deletes, side).to.deep.equal(plan.deletes);
       expect(taken.hasConflicts(), side).to.be.false;
-      expect(taken.files, side).to.deep.equal(plan.files);
+      expect(named(taken.files), side).to.deep.equal({
+        ...named(plan.files),
+        updated: [...named(plan.files).updated, 'model/custom.ts']
+      });
     }
   });
 
@@ -350,7 +353,13 @@ describe('MergePlan.settled', () => {
     expect(written(plan.writes)).to.deep.equal([['a.ts', 'a']]);
     expect(plan.deletes.map(String)).to.deep.equal(['b.ts']);
     expect(plan.hasConflicts()).to.be.false;
-    expect(named(plan.files)).to.deep.equal({ added: [], updated: [], merged: ['a.ts'], removed: [], kept: ['c.ts'] });
+    expect(named(plan.files)).to.deep.equal({
+      added: [],
+      updated: [],
+      merged: ['a.ts'],
+      removed: ['b.ts'],
+      kept: ['c.ts']
+    });
     expect(MergePlan.empty().isEmpty()).to.be.true;
   });
 

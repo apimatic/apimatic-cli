@@ -84,7 +84,7 @@ describe('WholeConflict', () => {
 });
 
 describe('PlacedConflict', () => {
-  it('keeps git’s placement for either side, counting nothing', () => {
+  it('keeps git’s placement for either side, counting each file placed as updated', () => {
     const placed: FileWrite = { path: rel('model/custom.ts'), content: bytes('custom') };
     const other: Conflict = new PlacedConflict(rel('model/custom.ts'), [], [placed]);
 
@@ -93,19 +93,23 @@ describe('PlacedConflict', () => {
     expect(other.asPlaced()).to.deep.equal([placed]);
     for (const side of SIDES) {
       expect(other.settledFor(side).writes()).to.deep.equal([placed]);
-      expect(other.settledFor(side).countedIn(NO_FILES)).to.deep.equal(NO_FILES);
+      expect(named(other.settledFor(side).countedIn(NO_FILES))).to.deep.equal({
+        ...named(NO_FILES),
+        updated: ['model/custom.ts']
+      });
     }
   });
 });
 
 describe('Settlement', () => {
-  it('removes its path for a deletion of yours the last run wrote over, counting nothing', () => {
+  it('removes its path for a deletion of yours the last run wrote over, counting it as removed', () => {
     const removed = Settlement.removed(rel('a.ts'));
 
     expect(removed.writes()).to.deep.equal([]);
     expect(removed.removes().map(String)).to.deep.equal(['a.ts']);
-    expect(removed.countedIn(NO_FILES)).to.deep.equal(NO_FILES);
+    expect(named(removed.countedIn(NO_FILES))).to.deep.equal({ ...named(NO_FILES), removed: ['a.ts'] });
     expect(Settlement.kept(rel('b.ts')).removes()).to.deep.equal([]);
+    expect(Settlement.untouched().countedIn(NO_FILES)).to.deep.equal(NO_FILES);
   });
 
   it('counts its path into the summary after the paths already there, leaving the summary given as it was', () => {
