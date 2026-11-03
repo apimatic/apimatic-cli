@@ -117,10 +117,15 @@ export class GitContext {
   /**
    * Whether the directory is a repository as `git` sees it: the root of its own, not inside one that
    * only encloses it, which is the developer's. False, with no git run, without a `.git` of its own
-   * or a git that can serve, so a directory that is not there yet is fine.
+   * or a git that can serve the merge, so a directory that is not there yet is fine.
    */
   public async isRepository(git: GitVersion): Promise<Result<boolean, string>> {
-    if (!git.isSupported() || !(await this.hasGitDirectory())) {
+    return git.isSupported() ? this.isRootOfRepository() : ok(false);
+  }
+
+  /** Whether git says the directory is the root of its own repository; false, with no git run, without a `.git` of its own. */
+  public async isRootOfRepository(): Promise<Result<boolean, string>> {
+    if (!(await this.hasGitDirectory())) {
       return ok(false);
     }
     // Spelt as git spells the root, so an 8.3 alias on Windows still compares equal.
@@ -369,10 +374,11 @@ export class GitContext {
   /**
    * The directory zipped for upload into `tempDirectory`, holding what git would commit: not `.git`,
    * not the CLI's record and, in a repository of its own, not what its ignore rules keep out, such as
-   * `node_modules`. Outside one, git is not asked: every file but those two.
+   * `node_modules`. Any git that is found reads the rules, one too old to merge included; without
+   * one, or outside a repository of its own, git is not asked: every file but those two.
    */
   public async archiveForUpload(git: GitVersion, tempDirectory: DirectoryPath): Promise<Result<FilePath, string>> {
-    const isRepository = await this.isRepository(git);
+    const isRepository = git.isFound() ? await this.isRootOfRepository() : ok(false);
     if (isRepository.isErr()) {
       return err(isRepository.error);
     }

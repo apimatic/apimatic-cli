@@ -131,6 +131,26 @@ describe('SdkPublishAction', () => {
     expect(fs.readFileSync(path.join(sdk().toString(), '.git', 'HEAD'), 'utf8')).to.equal('ref: refs/heads/main');
   });
 
+  it('leaves out what the ignore rules keep out with a git too old to merge, which still reads them', async () => {
+    fs.mkdirSync(sdk().toString(), { recursive: true });
+    (await new GitService().init(sdk()))._unsafeUnwrap();
+    await generates({
+      'README.md': '# sdk',
+      '.gitignore': 'node_modules/\n',
+      'node_modules/dep.js': 'module.exports = {};'
+    });
+    sinon.stub(GitService.prototype, 'version').resolves(GitVersion.parse('git version 2.37.0'));
+    sinon.stub(SdkGeneratePrompts.prototype, 'gitVersionNotSupported');
+    quietGeneration();
+    stubPublishing();
+    const uploaded: string[] = [];
+    uploads(uploaded);
+
+    expect((await execute()).isSuccess()).to.be.true;
+
+    expect(uploaded).to.have.members(['.gitignore', 'README.md']);
+  });
+
   it('generates into the SDK directory on a dry run and opens it, uploading nothing', async () => {
     quietGeneration();
     const dryRunNotice = sinon.stub(SdkPublishPrompts.prototype, 'dryRunNotice');

@@ -513,6 +513,19 @@ describe('GitContext', () => {
       expect(entriesOf(archive)).to.have.members(['.gitignore', 'README.md', 'models/book.py']);
     });
 
+    it('reads the ignore rules with a git too old to merge, which can still say what they keep out', async () => {
+      await ownRepository();
+      write(inRoot('sdk', 'python', 'README.md'), '# sdk');
+      write(inRoot('sdk', 'python', '.gitignore'), 'dist/\n');
+      write(inRoot('sdk', 'python', 'dist', 'built.py'), 'built');
+
+      const archive = (
+        await context().archiveForUpload(GitVersion.parse('git version 2.37.0'), temp())
+      )._unsafeUnwrap();
+
+      expect(entriesOf(archive)).to.have.members(['.gitignore', 'README.md']);
+    });
+
     it('zips every file but .git and the record outside a repository of its own, without asking git', async () => {
       write(inRoot('sdk', 'python', '.git', 'HEAD'), 'ref: refs/heads/main');
       write(inRoot('sdk', 'python', 'README.md'), '# sdk');
