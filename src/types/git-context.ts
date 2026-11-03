@@ -31,8 +31,8 @@ import { TempContext } from './temp-context.js';
 /** The ref holding each generation as the server returned it, chained, off every branch of the SDK directory's own repository. */
 const PRISTINE_REF = 'refs/apimatic/pristine';
 
-/** The ref holding the directory as it was before the last merge wrote, byte for byte, so that write can be undone. */
-const PREVIOUS_REF = 'refs/apimatic/previous';
+/** The ref holding the directory as it was before the last merge wrote, byte for byte, so that write can be undone; named to the developer when the CLI could not undo it. */
+export const PREVIOUS_REF = 'refs/apimatic/previous';
 
 /** The sign that git has a say in the directory, a folder or a worktree's file, and the one entry a save keeps. */
 const GIT_DIRECTORY = new FileName('.git');

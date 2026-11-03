@@ -209,7 +209,7 @@ export class GenerateAction {
           this.prompts.sdkNotWritten(sdk, written.error);
           const restored = await gitContext.restore(previous.value, landing);
           if (restored.isErr()) {
-            this.prompts.sdkNotRestored(sdk, previous.value, restored.error);
+            this.prompts.sdkNotRestored(sdk, restored.error);
           } else {
             this.prompts.sdkRestored(sdk);
           }

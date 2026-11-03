@@ -420,12 +420,12 @@ describe('SdkGeneratePrompts, about a merge', () => {
     const problem: WriteProblem = { file: rel('models/book.py'), operation: 'remove', reason: 'EBUSY: resource busy' };
 
     new SdkGeneratePrompts().sdkNotWritten(sdk, problem);
-    new SdkGeneratePrompts().sdkNotRestored(sdk, CommitId.fromGit('a'.repeat(40))!, 'EACCES on README.md');
+    new SdkGeneratePrompts().sdkNotRestored(sdk, 'EACCES on README.md');
 
     expect(stripVTControlCharacters(error.firstCall.args[0])).to.contain('could not be removed: EBUSY: resource busy');
     const said = stripVTControlCharacters(error.secondCall.args[0]);
     expect(said).to.contain('The files written before it could not be put back either: EACCES on README.md');
-    expect(said).to.contain(`git -C "./sdk/python" restore --source=${'a'.repeat(40)} --worktree -- .`);
+    expect(said).to.contain('git -C "./sdk/python" restore --source=refs/apimatic/previous --worktree -- .');
   });
 
   it('says what the next run does when the snapshot of a merge is not recorded: merge against the previous one', () => {

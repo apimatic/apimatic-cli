@@ -300,10 +300,11 @@ describe('GenerateAction (sdk) — a regeneration merges', () => {
 
     expect((await execute(V2)).isFailed()).to.be.true;
 
-    const [directory, previous, reason] = sdkNotRestored.firstCall.args;
+    const [directory, reason] = sdkNotRestored.firstCall.args;
     expect(directory.isEqual(sdk())).to.be.true;
-    expect(previous).to.deep.equal((await git.resolveRef(sdk(), PREVIOUS_REF))._unsafeUnwrap());
     expect(reason).to.equal('EBUSY: resource busy');
+    // The command the developer is given names the ref, which still holds the directory as it was.
+    expect((await git.resolveRef(sdk(), PREVIOUS_REF))._unsafeUnwrap()).to.not.be.undefined;
   });
 
   it('warns, keeping the old record, when the new snapshot cannot be recorded after a merge', async () => {

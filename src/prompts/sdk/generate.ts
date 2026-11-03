@@ -9,7 +9,7 @@ import { ServiceError } from '../../infrastructure/service-error.js';
 import { AVAILABLE_LANGUAGES, Language, languageLabel, UPCOMING_LANGUAGES } from '../../types/sdk/generate.js';
 import { GitVersion } from '../../types/git/git-version.js';
 import { GitOperation } from '../../types/git/git-operation.js';
-import { CommitId } from '../../types/git/commit-id.js';
+import { PREVIOUS_REF } from '../../types/git-context.js';
 import { RelativeFilePath } from '../../types/file/relativeFilePath.js';
 import { Side } from '../../types/sdk/conflict-markers.js';
 import { Conflict, ConflictKind, MergeFiles } from '../../types/sdk/conflict.js';
@@ -322,9 +322,9 @@ export class SdkGeneratePrompts {
   }
 
   /** After a failed write, the directory could not be put back either: the command that does, from the snapshot kept before the write. */
-  public sdkNotRestored(sdk: DirectoryPath, previous: CommitId, reason: string) {
+  public sdkNotRestored(sdk: DirectoryPath, reason: string) {
     const quotedPath = `"${f.relative(sdk)}"`;
-    const restore = f.cmdAlt('git', '-C', quotedPath, 'restore', `--source=${previous}`, '--worktree', '--', '.');
+    const restore = f.cmdAlt('git', '-C', quotedPath, 'restore', `--source=${PREVIOUS_REF}`, '--worktree', '--', '.');
     log.error(
       `The files written before it could not be put back either: ${reason}\n` +
         `To restore ${f.relativePath(sdk)} as it was before this run:\n` +
