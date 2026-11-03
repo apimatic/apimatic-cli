@@ -609,6 +609,16 @@ describe('GitContext', () => {
       expect(fs.existsSync(inRoot('sdk', 'python', RECORD))).to.be.true;
     });
 
+    it('leaves a record that already names the snapshot untouched, so nothing watching the file sees a change', async () => {
+      await ownRepository();
+      await record({ 'README.md': '# v1' });
+      const replaceContents = sinon.spy(FileService.prototype, 'replaceContents');
+
+      await record({ 'README.md': '# v1' });
+
+      expect(replaceContents.called).to.be.false;
+    });
+
     it('writes attributes beside the record that merge it as binary and mark it generated', async () => {
       await ownRepository();
 

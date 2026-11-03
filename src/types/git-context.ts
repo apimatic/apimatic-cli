@@ -497,7 +497,7 @@ export class GitContext {
         new FilePath(this.directory.join(RECORD_DIRECTORY), RECORD_ATTRIBUTES_FILE),
         RECORD_ATTRIBUTES
       );
-      await this.fileService.replaceContents(
+      await this.fileService.replaceContentsIfChanged(
         recordFile(this.directory),
         recordContents(language, stability, snapshot.value)
       );
