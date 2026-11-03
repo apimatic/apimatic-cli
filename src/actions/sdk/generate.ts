@@ -10,6 +10,7 @@ import { ProjectContext } from '../../types/project-context.js';
 import { GitContext } from '../../types/git-context.js';
 import { GitVersion } from '../../types/git/git-version.js';
 import { GitService } from '../../infrastructure/git-service.js';
+import { MergePlan } from '../../types/sdk/merge-plan.js';
 
 export class GenerateAction {
   private readonly prompts: SdkGeneratePrompts = new SdkGeneratePrompts();
@@ -189,11 +190,7 @@ export class GenerateAction {
           this.prompts.conflictsNotAsked(sdk, plan.conflicts);
           return ActionResult.failed();
         }
-        const choice: ConflictChoice = !plan.hasConflicts()
-          ? 'asPlaced'
-          : force
-          ? 'generated'
-          : await this.prompts.conflictChoice(sdk, plan.conflicts);
+        const choice = unaskedChoice(plan, force) ?? (await this.prompts.conflictChoice(sdk, plan.conflicts));
         if (choice === 'cancel') {
           this.prompts.runCancelled(sdk);
           return ActionResult.cancelled();
@@ -272,4 +269,12 @@ export class GenerateAction {
       return ActionResult.success();
     });
   };
+}
+
+/** What a run takes without asking: the plan as placed when nothing conflicts, the generator's side under `--force`; nothing when you are to choose. */
+function unaskedChoice(plan: MergePlan, force: boolean): ConflictChoice | undefined {
+  if (!plan.hasConflicts()) {
+    return 'asPlaced';
+  }
+  return force ? 'generated' : undefined;
 }

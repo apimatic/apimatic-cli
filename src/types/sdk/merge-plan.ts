@@ -137,14 +137,14 @@ function filesOf(
     added: [],
     updated: [],
     merged: [],
-    removed: [],
-    kept: []
+    removed: inputs.deletes.filter((path) => !inConflict.has(path)),
+    kept: [...yours]
+      .filter(
+        ([path, change]) =>
+          (change.status === 'M' || change.status === 'A') && !generated.has(path) && !inConflict.has(path)
+      )
+      .map(([, change]) => change.path)
   };
-  for (const path of inputs.deletes) {
-    if (!inConflict.has(path)) {
-      files.removed.push(path);
-    }
-  }
   for (const { path } of inputs.writes) {
     if (inConflict.has(path)) {
       continue;
@@ -155,11 +155,6 @@ function filesOf(
       files.merged.push(path);
     } else {
       files.updated.push(path);
-    }
-  }
-  for (const [path, change] of yours) {
-    if ((change.status === 'M' || change.status === 'A') && !generated.has(path) && !inConflict.has(path)) {
-      files.kept.push(change.path);
     }
   }
   return files;

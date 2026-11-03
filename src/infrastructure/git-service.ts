@@ -565,28 +565,39 @@ async function diff(
   for (let index = 0; index < fields.length && fields[index] !== ''; ) {
     const [, , , dstBlob, statusWithScore] = fields[index].slice(1).split(' ');
     const status = statusWithScore[0] as Change['status'];
-    const renamed = status === 'R' || status === 'C';
-    const paths = readAll('diff-tree', fields.slice(index + 1, index + (renamed ? 3 : 2)), RelativeFilePath.fromGit);
+    const pathCount = status === 'R' || status === 'C' ? 2 : 1;
+    const paths = readAll('diff-tree', fields.slice(index + 1, index + 1 + pathCount), RelativeFilePath.fromGit);
     if (paths.isErr()) {
       return err(paths.error);
     }
-    const [first, second] = paths.value;
-    if (status === 'D') {
-      entries.push({ status, path: first });
-    } else {
-      const blob = read('diff-tree', dstBlob, BlobId.fromGit);
-      if (blob.isErr()) {
-        return err(blob.error);
-      }
-      entries.push(
-        status === 'R' || status === 'C'
-          ? { status, from: first, path: second, blob: blob.value }
-          : { status, path: first, blob: blob.value }
-      );
+    const change = changeOf(status, paths.value, dstBlob);
+    if (change.isErr()) {
+      return err(change.error);
     }
+    entries.push(change.value);
     index += paths.value.length + 1;
   }
   return ok(entries);
+}
+
+/** The change one `diff-tree` record describes: a deletion has no blob; a rename or copy names the old path first. */
+function changeOf(
+  status: Change['status'],
+  paths: readonly RelativeFilePath[],
+  dstBlob: string
+): Result<Change, string> {
+  const [first, second] = paths;
+  if (status === 'D') {
+    return ok({ status, path: first });
+  }
+  const blob = read('diff-tree', dstBlob, BlobId.fromGit);
+  if (blob.isErr()) {
+    return err(blob.error);
+  }
+  if (status === 'R' || status === 'C') {
+    return ok({ status, from: first, path: second, blob: blob.value });
+  }
+  return ok({ status, path: first, blob: blob.value });
 }
 
 /** `text` as the value git's `command` prints there; none means a damaged repository, or a git this code does not know. */
