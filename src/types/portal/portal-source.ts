@@ -6,6 +6,7 @@ import { SuggestedSite } from './config/site-config.js';
 import { ContentNotices } from './content-notices.js';
 import { GeneratedPages } from './generated-pages.js';
 import { ParseFailure } from './openapi-document.js';
+import { PageSyntaxError } from './page.js';
 import { PortalConfig } from './portal-config.js';
 import { Shared } from './shared.js';
 import { UnresolvableReference } from './spec-bundle.js';
@@ -96,6 +97,11 @@ export interface MissingImage {
   missing: MissingFile | null;
 }
 
+/** A page that is not valid MDX, at its first mistake. */
+export interface InvalidPage extends PageSyntaxError {
+  page: FilePath;
+}
+
 /** Why `content/` cannot be built; each variant maps to its own message. */
 export type ContentProblem =
   | { kind: 'unreadableContent' }
@@ -104,7 +110,8 @@ export type ContentProblem =
   | { kind: 'sharedAddresses'; addresses: SharedAddress[] }
   | { kind: 'invalidFrontMatter'; errors: string[] }
   | { kind: 'invalidNavigation'; errors: string[] }
-  | { kind: 'missingImages'; images: MissingImage[] };
+  | { kind: 'missingImages'; images: MissingImage[] }
+  | { kind: 'invalidMdx'; pages: InvalidPage[] };
 
 /** How `api transform` would turn the first document in a directory into one the portal reads. */
 export interface SpecConversion {
