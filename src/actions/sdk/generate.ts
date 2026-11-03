@@ -69,7 +69,7 @@ export class GenerateAction {
     }
     const inspected = await gitContext.inspect(gitVersion, language, stability);
     if (inspected.isErr()) {
-      this.prompts.repositoryNotInspected(sdk, inspected.error);
+      this.prompts.repositoryNotInspected(inspected.error);
       return ActionResult.failed();
     }
     const repository = inspected.value;
@@ -112,7 +112,7 @@ export class GenerateAction {
       // Once more, so a file the settling could not clear stops the run before anything is generated.
       const again = await gitContext.inspect(gitVersion, language, stability);
       if (again.isErr()) {
-        this.prompts.repositoryNotInspected(sdk, again.error);
+        this.prompts.repositoryNotInspected(again.error);
         return ActionResult.failed();
       }
       if (again.value.hasUnresolved()) {
@@ -123,7 +123,7 @@ export class GenerateAction {
     // A clone lacks what its origin's runs recorded: fetched from the remote, once nothing is in the way.
     const fetched = await gitContext.fetchSnapshot(repository.snapshot);
     if (fetched.isErr()) {
-      this.prompts.repositoryNotInspected(sdk, fetched.error);
+      this.prompts.repositoryNotInspected(fetched.error);
       return ActionResult.failed();
     }
     const snapshot = fetched.value;

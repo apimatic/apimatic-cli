@@ -201,8 +201,8 @@ export class SdkGeneratePrompts {
   }
 
   /** Git is usable and the directory has a `.git`, yet git would not say what the repository is, so the run stops before generating. */
-  public repositoryNotInspected(sdk: DirectoryPath, reason: string) {
-    log.error(`The git repository in ${f.relativePath(sdk)} could not be inspected: ${reason}`);
+  public repositoryNotInspected(reason: string) {
+    log.error(`The SDK directory could not be inspected for your customizations: ${reason}`);
   }
 
   /** How to keep edits from now on, should the developer make any, for an SDK written without a repository of its own. */

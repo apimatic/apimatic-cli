@@ -306,8 +306,7 @@ describe('GenerateAction (sdk) — the destination', () => {
 
         expect((await execute()).isFailed()).to.be.true;
 
-        expect(notInspected.firstCall.args[0].isEqual(sdk())).to.be.true;
-        expect(notInspected.firstCall.args[1]).to.equal('git broke');
+        expect(notInspected.firstCall.args[0]).to.equal('git broke');
         expect(generateSdk.called).to.be.false;
       });
     }

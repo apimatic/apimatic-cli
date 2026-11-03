@@ -138,13 +138,13 @@ describe('SdkGeneratePrompts, about the repository', () => {
     sinon.restore();
   });
 
-  it('says which repository could not be inspected, in git’s words', () => {
+  it('says the SDK directory could not be inspected for customizations, in git’s words', () => {
     const error = sinon.stub(log, 'error');
 
-    new SdkGeneratePrompts().repositoryNotInspected(sdk, 'git rev-parse failed: bad config');
+    new SdkGeneratePrompts().repositoryNotInspected('git rev-parse failed: bad config');
 
     expect(stripVTControlCharacters(error.firstCall.args[0])).to.equal(
-      "The git repository in './sdk/python' could not be inspected: git rev-parse failed: bad config"
+      'The SDK directory could not be inspected for your customizations: git rev-parse failed: bad config'
     );
   });
 
