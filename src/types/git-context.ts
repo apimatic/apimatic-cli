@@ -81,8 +81,8 @@ const SHARE_HOOK_SCRIPT = [
   '  fi',
   'fi',
   'said=$(GIT_TERMINAL_PROMPT=0 git push --quiet --no-verify "$remote" "$ref:$ref" 2>&1 >/dev/null) && exit 0',
-  "reason=$(printf '%s\\n' \"$said\" | grep -m1 '^remote:' | sed 's/^remote: *//')",
-  '[ -z "$reason" ] && reason=$(printf \'%s\\n\' "$said" | grep -m1 .)',
+  String.raw`reason=$(printf '%s\n' "$said" | grep -m1 '^remote:' | sed 's/^remote: *//')`,
+  String.raw`[ -z "$reason" ] && reason=$(printf '%s\n' "$said" | grep -m1 .)`,
   'echo "apimatic: the SDK snapshots could not be pushed to $remote: $reason" >&2',
   'exit 0',
   ''

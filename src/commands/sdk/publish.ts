@@ -131,6 +131,7 @@ Your changes to the SDK are merged before it is published, as sdk generate does 
             commandMetadata.shell
           );
 
+    const sdkDirectory = destination === undefined ? undefined : DirectoryPath.fromUserInput(destination);
     intro('Publish SDK');
     const result = interactive
       ? await new SdkPublishInteractiveAction(configDir, commandMetadata).execute(
@@ -140,7 +141,7 @@ Your changes to the SDK are merged before it is published, as sdk generate does 
         )
       : await new SdkPublishNonInteractiveAction(configDir, commandMetadata).execute(
           project,
-          destination === undefined ? undefined : DirectoryPath.fromUserInput(destination),
+          sdkDirectory,
           language as Language,
           publishTypes,
           force,

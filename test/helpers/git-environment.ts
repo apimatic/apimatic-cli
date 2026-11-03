@@ -1,5 +1,5 @@
-import fs from 'fs';
-import path from 'path';
+import fs from 'node:fs';
+import path from 'node:path';
 
 /** `name` set to `value` for a test; answers the call that puts it back as it was. */
 export function withEnvironment(name: string, value: string): () => void {

@@ -69,11 +69,16 @@ export async function leftUnmerged(
     [2, yours],
     [3, generated]
   ];
-  const entries: StageEntry[] = [];
-  for (const [at, contents] of versions) {
-    if (contents !== null) {
-      entries.push({ mode: '100644', oid: await blobOf(root, contents), stage: at, path: rel(path) });
-    }
-  }
+  const present = versions.flatMap(([at, contents]) => (contents === null ? [] : [[at, contents] as const]));
+  const entries = await Promise.all(
+    present.map(
+      async ([at, contents]): Promise<StageEntry> => ({
+        mode: '100644',
+        oid: await blobOf(root, contents),
+        stage: at,
+        path: rel(path)
+      })
+    )
+  );
   (await new GitService().stageConflicts(root, entries))._unsafeUnwrap();
 }

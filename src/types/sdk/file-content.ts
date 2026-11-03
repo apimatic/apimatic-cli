@@ -15,5 +15,5 @@ export function lineEndingFor(content: Uint8Array, sample: Uint8Array | undefine
   if (sample === undefined || keepsLineEndings(content) || !asText(sample).includes('\r\n')) {
     return content;
   }
-  return asBytes(asText(content).replace(/\n/g, '\r\n'));
+  return asBytes(asText(content).replaceAll('\n', '\r\n'));
 }

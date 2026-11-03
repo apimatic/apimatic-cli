@@ -22,7 +22,7 @@ export class UnresolvedFile {
    */
   public settledFor(side: Side): Settlement {
     const marked = this.disk === undefined ? undefined : MergedText.parse(this.disk);
-    if (marked !== undefined && marked.hasMarkers()) {
+    if (marked?.hasMarkers()) {
       return Settlement.merged({ path: this.path, content: marked.settledFor(side) });
     }
     const whole =

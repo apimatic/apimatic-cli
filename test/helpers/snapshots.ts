@@ -43,10 +43,12 @@ export async function describeCommit(
 export async function snapshotFiles(root: DirectoryPath, commit: CommitId): Promise<Map<string, string>> {
   const cwd = root.toString();
   const listed = await execa('git', ['ls-tree', '-r', '-z', '--name-only', commit.toString()], { cwd });
-  const files = new Map<string, string>();
-  for (const file of listed.stdout.split('\0').filter((entry) => entry !== '')) {
-    const shown = await execa('git', ['cat-file', '-p', `${commit}:${file}`], { cwd, stripFinalNewline: false });
-    files.set(file, shown.stdout);
-  }
-  return files;
+  const names = listed.stdout.split('\0').filter((entry) => entry !== '');
+  const shown = await Promise.all(
+    names.map(async (file): Promise<[string, string]> => {
+      const contents = await execa('git', ['cat-file', '-p', `${commit}:${file}`], { cwd, stripFinalNewline: false });
+      return [file, contents.stdout];
+    })
+  );
+  return new Map(shown);
 }
