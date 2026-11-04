@@ -35,6 +35,19 @@ describe('PreparePortalProjectPrompts', () => {
     );
   });
 
+  it('names the source directory it could not zip, and why', () => {
+    const error = sinon.stub(log, 'error');
+
+    new PreparePortalProjectPrompts().sourceNotZipped(
+      { kind: 'zipFailed', reason: 'EBUSY: resource busy or locked' },
+      new DirectoryPath('project').join('src')
+    );
+
+    expect(stripVTControlCharacters(String(error.firstCall.args[0]))).to.contain(
+      "src' could not be zipped for upload: EBUSY: resource busy or locked"
+    );
+  });
+
   describe('a source the build refuses', () => {
     const source = new DirectoryPath('project').join('src');
     const example =

@@ -178,6 +178,17 @@ describe('PluginGenerateAction', () => {
       expect(uploaded['spec/openapi.json']).to.equal('{"openapi": "3.0.0"}');
     });
 
+    it('keeps content/ and leaves out static/', async () => {
+      generated();
+      await fsExtra.outputFile(path.join(sourceDirectory, 'content', 'index.md'), '# Home');
+      await fsExtra.outputFile(path.join(sourceDirectory, 'static', 'images', 'logo.png'), 'png');
+
+      await execute();
+
+      expect(uploaded['content/index.md']).to.equal('# Home');
+      expect(Object.keys(uploaded).filter((entry) => entry.startsWith('static/'))).to.be.empty;
+    });
+
     it('synthesizes nothing: no plugin-config.json is written for the server', async () => {
       generated();
 

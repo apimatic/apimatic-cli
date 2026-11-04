@@ -11,9 +11,9 @@ export interface PageFrontMatter {
   title: string;
 }
 
-/** A Markdown image the build imports, where it looks for the file, and the path it looks up there. */
+/** An image the build imports, where it looks for the file, and the path it looks up there. */
 export interface PageImage {
-  /** As the page writes it. */
+  /** As the page writes it: a Markdown image's address, or the `src` of an `<img>` in an `.mdx` page, trimmed. */
   url: string;
   line: number;
   /** An image written as `/…` is read from the static directory, any other from beside its page. */
@@ -36,6 +36,8 @@ interface MarkdownNode {
   type: string;
   url?: string;
   identifier?: string;
+  name?: string | null;
+  attributes?: { type: string; name?: string; value?: unknown }[];
   position?: { start: { line: number } };
   children?: MarkdownNode[];
 }
@@ -128,12 +130,7 @@ async function imagesIn(body: string, isMdx: boolean): Promise<PageImage[]> {
 
   const images: PageImage[] = [];
   const visit = (node: MarkdownNode) => {
-    const url =
-      node.type === 'image'
-        ? node.url
-        : node.type === 'imageReference'
-        ? definitions.get(node.identifier ?? '')
-        : undefined;
+    const url = addressOf(node, definitions);
     const image = url !== undefined ? located(url) : null;
     if (image !== null) {
       images.push({ ...image, line: node.position?.start.line ?? 0 });
@@ -144,13 +141,33 @@ async function imagesIn(body: string, isMdx: boolean): Promise<PageImage[]> {
   return images;
 }
 
+function addressOf(node: MarkdownNode, definitions: Map<string, string>): string | undefined {
+  switch (node.type) {
+    case 'image':
+      return node.url;
+    case 'imageReference':
+      return definitions.get(node.identifier ?? '');
+    // remark-jsx-images.ts imports these too.
+    case 'mdxJsxFlowElement':
+    case 'mdxJsxTextElement': {
+      const src = node.attributes?.find(({ type, name }) => type === 'mdxJsxAttribute' && name === 'src')?.value;
+      // A browser drops the spaces around an `<img>`'s address; `remarkImage` keeps a Markdown image's.
+      return node.name === 'img' && typeof src === 'string' ? src.trim() : undefined;
+    }
+    default:
+      return undefined;
+  }
+}
+
 function located(url: string): Omit<PageImage, 'line'> | null {
   const address = url.split(/[?#]/, 1)[0];
   if (address.length === 0 || address.endsWith('/') || NOT_A_FILE.test(address)) {
     return null;
   }
-  const path = decodedAddress(address);
-  return path.startsWith('/') ? { url, from: 'static', path: path.replace(/^\/+/, '') } : { url, from: 'page', path };
+  const decoded = decodedAddress(address);
+  return decoded.startsWith('/')
+    ? { url, from: 'static', path: decoded.replace(/^\/+/, '') }
+    : { url, from: 'page', path: decoded };
 }
 
 function decodedAddress(address: string): string {

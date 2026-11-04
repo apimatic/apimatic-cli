@@ -11,7 +11,6 @@ import {
   PortalSourceProblem,
   ReservedAddressPage,
   SharedAddress,
-  SharedEndpoint,
   SpecConversion,
   UnreadableSpecReason
 } from '../../types/portal/portal-source.js';
@@ -57,7 +56,7 @@ const relative = (file: FilePath, sourceDirectory: DirectoryPath): string => f.v
 const listed = (files: FilePath[], sourceDirectory: DirectoryPath): string =>
   listedInProse(files.map((file) => relative(file, sourceDirectory)));
 
-const sharedLines = <Key>(claims: Shared<Key>[], sourceDirectory: DirectoryPath): string =>
+export const sharedLines = <Key>(claims: Shared<Key>[], sourceDirectory: DirectoryPath): string =>
   claims.map(({ key, files }) => `  • ${f.var(String(key))}: ${listed(files, sourceDirectory)}`).join('\n');
 
 const spelt = (found: FilePath, sourceDirectory: DirectoryPath): string =>
@@ -415,18 +414,6 @@ export function reportLeftOutSpecs(files: FilePath[], sourceDirectory: Directory
       `${f.var(METADATA_FILE_NAME)} merges only the folders beside it. To include ${pronoun}, move ${moved} into ` +
       `a folder of its own, ${addingToMergeOrder(`the ${folders}`)}.`
   );
-}
-
-export function reportSharedEndpoints(shared: SharedEndpoint[], sourceDirectory: DirectoryPath): void {
-  if (shared.length === 0) {
-    return;
-  }
-  const one = shared.length === 1;
-  log.warn(
-    `More than one API definition declares ${one ? 'this operation' : 'these operations'}, so the portal shows no ` +
-      `SDK sample on ${one ? 'it' : 'them'}:`
-  );
-  log.message(sharedLines(shared, sourceDirectory));
 }
 
 export function reportIgnoredNavigationFiles(files: FilePath[], sourceDirectory: DirectoryPath): void {
