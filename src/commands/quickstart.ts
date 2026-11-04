@@ -32,11 +32,12 @@ export default class Quickstart extends Command {
     outro(result);
 
     // TODO: Remove this, find a solution for tracking.
-    await result.mapAll(
-      async () => await telemetryService.trackEvent(new QuickstartCompletedEvent(), commandMetadata.shell),
-      async () => {},
-      async () => {}
-    );
+    await result.match({
+      success: async () => await telemetryService.trackEvent(new QuickstartCompletedEvent(), commandMetadata.shell),
+      failed: async () => {},
+      cancelled: async () => {},
+      actionRequired: async () => {}
+    });
   }
 
   private readonly getConfigDir = () => {

@@ -12,6 +12,7 @@ Value objects live at `src/types/file/` and wrap a single primitive (`string`, `
 - **DO** have methods that produce derived values return rich types — a method extracting a leaf name returns `FileName`, not `string`.
 - **DO** compose rich types through each other — `FilePath` holds `DirectoryPath` and `FileName` as objects; both are passed as objects in constructors and methods.
 - **DO** use `static create()` returning `T | undefined` for construction from user input or external data that can fail validation.
+- **DO** use `static fromGit()` returning `T | undefined` for a value git printed (an id, a path, a ref): it validates as `create()` does, and the service turns `undefined` into an `err`, never a throw.
 - **DO** use `static createInput()` for the flag-value-to-rich-type pattern when a sensible fallback exists (e.g. `DirectoryPath.default`).
 - **DO** use `static readonly` for well-known singleton instances (e.g., `DirectoryPath.default`).
 - **DO** access the private field directly inside methods — write `this.directoryPath` not `this.toString()`.
@@ -75,7 +76,7 @@ Anything not in this table is a violation. In particular: domain methods, contex
 
 ### Context class exposure rule
 
-Context classes (`PortalContext`, `SdkContext`, etc.) may expose a rich-type field via a public getter or method **only** when the caller needs it for **logging or prompting display** — never for path computation, I/O, or construction of other paths. Add an inline comment when you do:
+Context classes (`PortalContext`, `GitContext`, etc.) may expose a rich-type field via a public getter or method **only** when the caller needs it for **logging or prompting display** — never for path computation, I/O, or construction of other paths. Add an inline comment when you do:
 
 ```ts
 // Exposed for display in prompts — callers must not use this for path computation
@@ -93,7 +94,6 @@ These patterns exist in the current codebase and are flagged for awareness:
 | File | Issue |
 |---|---|
 | `src/types/file/directoryPath.ts:31` | `leafName()` returns `string` — should return `FileName` |
-| `src/types/sdk-context.ts` | `sdkLanguageDirectory` getter exposes `DirectoryPath` — needs justification comment if kept |
 
 
 ---
@@ -125,7 +125,7 @@ These patterns exist in the current codebase and are flagged for awareness:
 | Rich predicate (`hasExtension`) and transform (`normalize`) returning rich type | `src/types/file/fileName.ts` |
 | Composed value object — holds two rich types, `static create()` splits at boundary | `src/types/file/filePath.ts` |
 | Correct boundary unwrapping — all `.toString()` calls at `fs.*` / `path.*` sites | `src/infrastructure/file-service.ts` |
-| Context with flagged public getter (display use) | `src/types/sdk-context.ts` |
+| Values git printed, through `static fromGit()` | `src/types/file/relativeFilePath.ts`, `src/types/git/commit-id.ts` |
 
 ---
 

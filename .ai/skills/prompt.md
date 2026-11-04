@@ -25,6 +25,7 @@ Prompts live at `src/prompts/` and are the sole terminal UI layer for each comma
 
 - **DON'T** use a constructor — no parameters, no fields.
 - **DON'T** put business logic in Prompts — only UI rendering and user interaction. This is a wrapper around `@clack/prompts`, nothing more.
+- **DON'T** decide anything from what a value means — a prompt handed a value with several outcomes (`ShareHook`, `SnapshotFetch`) calls its `match` with one handler per outcome and words each; the deciding was done where the value was made.
 - **DON'T** use `console.log` — use `log.*` from `@clack/prompts`.
 - **DON'T** skip the `isCancel()` guard on interactive prompts — omitting it causes a crash when the user presses Ctrl+C.
 - **DON'T** return the raw `symbol` value from interactive prompts — always guard with `isCancel()` first.
@@ -65,7 +66,7 @@ Prompts live at `src/prompts/` and are the sole terminal UI layer for each comma
 | Simple (log + spinner, no interactive prompts) | `src/prompts/auth/login.ts` |
 | Simple (log-only display methods) | `src/prompts/auth/status.ts` |
 | Standard (confirm + log + spinner) | `src/prompts/portal/generate.ts` |
-| Standard (confirm + select + log + spinner) | `src/prompts/sdk/generate.ts` |
+| Standard (confirm + log + spinner + noteWrapped) | `src/prompts/sdk/generate.ts` |
 | Standard (log + spinner + structured display) | `src/prompts/api/validate.ts` |
 | Delegation (select flow + welcome message) | `src/prompts/quickstart.ts` |
 | Wizard (multi-step, noteWrapped, getTree) | `src/prompts/portal/quickstart.ts` |
