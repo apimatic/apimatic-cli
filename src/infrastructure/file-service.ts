@@ -1,3 +1,4 @@
+import { Buffer } from 'node:buffer';
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import fsExtra from 'fs-extra';
@@ -30,6 +31,15 @@ function spelling<T>(name: string, entries: T[], nameOf: (entry: T) => string): 
     entries.find((entry) => nameOf(entry) === name) ??
     entries.find((entry) => nameOf(entry).toLowerCase() === name.toLowerCase())
   );
+}
+
+/**
+ * `mode` with the execute bit set beside each read bit, as a script runs only where it can be read.
+ * The rest of the permissions stay as they were; the file's type, which `stat` adds, is dropped.
+ */
+function executableWhereReadable(mode: number): number {
+  const permissions = mode & 0o7777;
+  return permissions | ((permissions & 0o444) >> 2);
 }
 
 export class FileService {
@@ -100,6 +110,16 @@ export class FileService {
     await fsExtra.emptyDir(dir.toString()); // removes everything inside, keeps the dir
   }
 
+  /** Whether the directory holds anything but the named entries, hidden ones included; one that is not there holds nothing. */
+  public async hasEntriesExcluding(dir: DirectoryPath, excludeNames: FileName[]): Promise<boolean> {
+    try {
+      const entries = await fsExtra.readdir(dir.toString());
+      return entries.some((entry) => !excludeNames.some((exclude) => exclude.toString() === entry));
+    } catch (error) {
+      return !(error instanceof Error && 'code' in error && error.code === 'ENOENT');
+    }
+  }
+
   public async cleanDirectoryExcluding(dir: DirectoryPath, excludeNames: FileName[]): Promise<void> {
     await fsExtra.ensureDir(dir.toString());
     const entries = await fsExtra.readdir(dir.toString());
@@ -111,6 +131,17 @@ export class FileService {
           return fsExtra.remove(dir.join(entry).toString());
         })
     );
+  }
+
+  /** Removes `directory` and then each parent while it is empty, stopping below `within`, which stays whatever it holds. */
+  public async removeEmptyDirectories(directory: DirectoryPath, within: DirectoryPath): Promise<void> {
+    for (let current = directory; within.isAncestorOf(current); current = current.join('..')) {
+      try {
+        await fsExtra.rmdir(current.toString());
+      } catch {
+        return;
+      }
+    }
   }
 
   public async createDirectoryIfNotExists(dir: DirectoryPath): Promise<void> {
@@ -297,6 +328,25 @@ export class FileService {
     return fs.createReadStream(filePath.toString());
   }
 
+  public async getBytes(filePath: FilePath): Promise<Uint8Array> {
+    return new Uint8Array(await fsExtra.readFile(filePath.toString()));
+  }
+
+  /** The bytes as they are, with the directories above the file made as needed. */
+  public async writeBytes(filePath: FilePath, content: Uint8Array): Promise<void> {
+    await fsExtra.ensureDir(filePath.directory().toString());
+    await fsExtra.writeFile(filePath.toString(), content);
+  }
+
+  /** As `writeBytes`, skipped when the file already holds these bytes, so nothing reloads. */
+  public async writeBytesIfChanged(filePath: FilePath, content: Uint8Array): Promise<boolean> {
+    if ((await this.fileExists(filePath)) && Buffer.from(await this.getBytes(filePath)).equals(content)) {
+      return false;
+    }
+    await this.writeBytes(filePath, content);
+    return true;
+  }
+
   public async getContents(filePath: FilePath): Promise<string> {
     return await fsExtra.readFile(filePath.toString(), 'utf-8');
   }
@@ -342,6 +392,15 @@ export class FileService {
     return true;
   }
 
+  /**
+   * Git runs a hook only when it is executable. Whoever may read the file may now run it; who may read
+   * or write it stays as the file had it, a developer's own hook included.
+   */
+  public async makeExecutable(filePath: FilePath): Promise<void> {
+    const { mode } = await fsExtra.stat(filePath.toString());
+    await fsExtra.chmod(filePath.toString(), executableWhereReadable(mode));
+  }
+
   public async copy(source: FilePath, destination: FilePath) {
     await fsExtra.copyFile(source.toString(), destination.toString());
   }
@@ -372,33 +431,6 @@ export class FileService {
     } catch {
       return false;
     }
-  }
-
-  public async getAvailableDirectoryPath(currentPath: DirectoryPath): Promise<DirectoryPath> {
-    if (!(await this.directoryExists(currentPath))) return currentPath;
-
-    const dir = path.dirname(currentPath.toString());
-    let baseName = path.basename(currentPath.toString());
-
-    // Strip existing " (n)" suffix using string methods
-    if (baseName.endsWith(')')) {
-      const open = baseName.lastIndexOf('(');
-      if (open !== -1 && baseName[open - 1] === ' ') {
-        const inner = baseName.slice(open + 1, -1);
-        if (inner.length > 0 && !isNaN(Number(inner))) {
-          baseName = baseName.slice(0, open - 1);
-        }
-      }
-    }
-
-    let counter = 1;
-    let newPath: string;
-
-    do {
-      newPath = path.join(dir, `${baseName} (${counter++})`);
-    } while (await this.directoryExists(new DirectoryPath(newPath)));
-
-    return new DirectoryPath(newPath);
   }
 }
 

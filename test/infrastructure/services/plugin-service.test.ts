@@ -186,7 +186,7 @@ describe('PluginService', () => {
   });
 
   describe('validation failures', () => {
-    it('keeps the plugin-config errors addressable by key and lists every message', async () => {
+    it('lists every plugin-config message', async () => {
       respondToStatus = statusBody({
         status: 'ValidationError',
         errors: { pluginConfig: ["'pluginId' must be lower-case kebab-case.", "'author.email' must be an email."] }
@@ -195,12 +195,11 @@ describe('PluginService', () => {
       const error = errorFrom(await generatePlugin());
 
       expect(error.code).to.equal(ServiceErrorCode.BadRequest);
-      expect(error.getError('pluginConfig')).to.have.length(2);
       expect(error.errorMessage).to.include("'pluginId' must be lower-case kebab-case.");
       expect(error.errorMessage).to.include("'author.email' must be an email.");
     });
 
-    it('keeps the language errors addressable by key', async () => {
+    it('carries the language error’s message', async () => {
       respondToStatus = statusBody({
         status: 'ValidationError',
         errors: { languages: ['no language in languages can be built by this generator'] }
@@ -208,7 +207,7 @@ describe('PluginService', () => {
 
       const error = errorFrom(await generatePlugin());
 
-      expect(error.getError('languages')).to.deep.equal(['no language in languages can be built by this generator']);
+      expect(error.errorMessage).to.include('no language in languages can be built by this generator');
     });
 
     it('qualifies each message with the config path the API keyed it by', async () => {

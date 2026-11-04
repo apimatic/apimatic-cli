@@ -25,10 +25,11 @@ Context objects live at `src/types/` and encapsulate path derivation, validation
 - **DON'T** expose derived file names — methods like `getScriptFileName()` leak internal naming logic.
 - **DON'T** add public properties for internal state — constructor parameters are `private readonly`, not exposed.
 - **DON'T** use `console.log` or any prompt output — contexts are silent.
-- **DON'T** use `Result<T, E>` for a plain file operation — return `boolean`, `undefined` or the value. A context returns a `Result` only when it does network I/O (rare) or reports a structured problem the prompts switch on, as `PortalSourceContext.resolve()` does with `PortalSourceProblem`.
+- **DON'T** use `Result<T, E>` for a plain file operation — return `boolean`, `undefined` or the value. A context returns a `Result` only when it does network I/O (rare) or reports a structured problem the prompts switch on, as `PortalSourceContext.resolve()` does with `PortalSourceProblem`. An async one is `Promise<Result<T, E>>`, written with `await` and early returns — never `ResultAsync` or `safeTry`.
 - **DON'T** use raw string paths — always wrap in `DirectoryPath`, `FilePath`, `FileName`.
 - **DON'T** add methods that only use infrastructure services (`fileService`, `zipService`) without touching domain-specific private fields — these are stateless utilities, not context behavior. Every public method must use at least one constructor-derived private field (e.g., `sdkDirectory`, `language`). If a method takes all its inputs as parameters and never reads context state, it belongs in a service or a different context.
-- **DON'T** embed the context's own domain subject in method names — if the class is `SdkContext`, a method named `cleanUpSdkDirectory()` is redundant. Prefer concise behavioral verbs: `cleanUp()`, `getChanges()`, `save()`.
+- **DON'T** embed the context's own domain subject in method names — if the class is `PortalContext`, a method named `cleanUpPortalDirectory()` is redundant. Prefer concise behavioral verbs: `cleanUp()`, `getChanges()`, `save()`.
+- **DON'T** keep a private instance method — a helper is a `private static` method or a module-level function, and every public method does something with each of its arguments.
 - **DON'T** pass internal paths through callback parameters — `onSomething: (path: DirectoryPath) => void` is the same leakage as a public getter. If the caller needs the path, return it as the result of the operation (`Promise<DirectoryPath | undefined>` etc.).
 
 ### Variant-specific rules
@@ -83,8 +84,8 @@ Context objects live at `src/types/` and encapsulate path derivation, validation
 | Input context (validate + file ops) | `src/types/spec-context.ts` | Good — zip detection internal |
 | Temp context (zip + save stream) | `src/types/temp-context.ts` | Good — UUID naming internal |
 | Temp context (download + resolve) | `src/types/resource-context.ts` | Good — URL/file decision internal |
-| Composite (delegates to other contexts) | `src/types/project-context.ts` | Good — hands back `PortalSourceContext`, `PluginConfigContext` and `SdkContext`; knows the layout so no caller joins `src` |
-| Output context (leaky — avoid pattern) | `src/types/sdk-context.ts` | Avoid — exposes `sdkLanguageDirectory`, has methods that only use infrastructure services without touching domain state |
+| Composite (delegates to other contexts) | `src/types/project-context.ts` | Good — hands back `PortalSourceContext` and `PluginConfigContext`, and derives the SDK directory; knows the layout so no caller joins `src` |
+| Directory under git (facts, plans, snapshots) | `src/types/git-context.ts` | Good — one directory, git and the disk; every method reads the directory, and answers values (`RepositoryState`, `MergePlan`, `ShareHook`) the prompts word |
 | Input context (validate + typed result) | `src/types/portal-source-context.ts` | Good — reports problems, exposes no paths |
 
 ---
@@ -96,7 +97,7 @@ Use when creating a new Context class. Choose the variant that matches the domai
 ### What to determine
 
 1. **Context name** — lowercase hyphenated (e.g., `portal`, `sdk`, `build`). File will be `{name}-context.ts`
-2. **Class name** — PascalCase (e.g., `PortalContext`, `SdkContext`)
+2. **Class name** — PascalCase (e.g., `PortalContext`, `GitContext`)
 3. **Variant** — one of:
    - `output` — save/exists pattern for command outputs (portals, SDKs, transformed files)
    - `input` — validate/read pattern for user-provided input directories

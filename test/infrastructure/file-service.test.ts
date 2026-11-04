@@ -101,6 +101,136 @@ describe('FileService', () => {
     });
   });
 
+  describe('makeExecutable', () => {
+    const fileService = new FileService();
+    const permissionsOf = (file: FilePath) => fs.statSync(file.toString()).mode & 0o777;
+    let root: string;
+    let hook: FilePath;
+
+    beforeEach(() => {
+      root = fs.mkdtempSync(path.join(os.tmpdir(), 'file-service-'));
+      hook = new FilePath(new DirectoryPath(root), new FileName('pre-push'));
+      fs.writeFileSync(hook.toString(), '#!/bin/sh');
+    });
+
+    afterEach(() => {
+      fs.rmSync(root, { recursive: true, force: true });
+    });
+
+    it('keeps the file writable, so a later run can rewrite it', async () => {
+      await fileService.makeExecutable(hook);
+
+      expect(() => fs.accessSync(hook.toString(), fs.constants.W_OK)).not.to.throw();
+    });
+
+    describe('where the file system keeps execute bits', () => {
+      // Windows keeps none: git runs a hook there whatever its mode.
+      before(function () {
+        if (process.platform === 'win32') this.skip();
+      });
+
+      it('lets whoever may read the file run it', async () => {
+        fs.chmodSync(hook.toString(), 0o644);
+
+        await fileService.makeExecutable(hook);
+
+        expect(permissionsOf(hook)).to.equal(0o755);
+      });
+
+      it('keeps a hook only its owner may read to its owner', async () => {
+        fs.chmodSync(hook.toString(), 0o600);
+
+        await fileService.makeExecutable(hook);
+
+        expect(permissionsOf(hook)).to.equal(0o700);
+      });
+    });
+  });
+
+  describe('hasEntriesExcluding', () => {
+    const fileService = new FileService();
+    let root: string;
+
+    beforeEach(() => {
+      root = fs.mkdtempSync(path.join(os.tmpdir(), 'file-service-'));
+    });
+
+    afterEach(() => {
+      fs.rmSync(root, { recursive: true, force: true });
+    });
+
+    it('counts every entry but the named ones, hidden ones included, and none for a directory that is not there', async () => {
+      const directory = new DirectoryPath(path.join(root, 'sdk'));
+      const git = [new FileName('.git')];
+      expect(await fileService.hasEntriesExcluding(directory, git)).to.be.false;
+
+      fs.mkdirSync(path.join(root, 'sdk', '.git'), { recursive: true });
+      expect(await fileService.hasEntriesExcluding(directory, git)).to.be.false;
+
+      fs.mkdirSync(path.join(root, 'sdk', '.github'));
+      expect(await fileService.hasEntriesExcluding(directory, git)).to.be.true;
+    });
+  });
+
+  describe('writeBytesIfChanged', () => {
+    const fileService = new FileService();
+    let root: string;
+
+    beforeEach(() => {
+      root = fs.mkdtempSync(path.join(os.tmpdir(), 'file-service-'));
+    });
+
+    afterEach(() => {
+      sinon.restore();
+      fs.rmSync(root, { recursive: true, force: true });
+    });
+
+    it('writes the bytes, making the directories above, and skips a file that already holds them', async () => {
+      const file = new FilePath(new DirectoryPath(path.join(root, 'deep', 'er')), new FileName('a.bin'));
+      const bytes = new Uint8Array([0x78, 0x0d, 0x00]);
+
+      expect(await fileService.writeBytesIfChanged(file, bytes)).to.be.true;
+      expect(await fileService.writeBytesIfChanged(file, bytes)).to.be.false;
+      expect(await fileService.writeBytesIfChanged(file, new Uint8Array([0x78]))).to.be.true;
+
+      expect([...fs.readFileSync(file.toString())]).to.deep.equal([0x78]);
+    });
+  });
+
+  describe('removeEmptyDirectories', () => {
+    const fileService = new FileService();
+    let root: string;
+
+    beforeEach(() => {
+      root = fs.mkdtempSync(path.join(os.tmpdir(), 'file-service-'));
+    });
+
+    afterEach(() => {
+      fs.rmSync(root, { recursive: true, force: true });
+    });
+
+    it('removes the directory and each empty parent below the root, stopping at one that holds something', async () => {
+      const within = new DirectoryPath(path.join(root, 'sdk'));
+      fs.mkdirSync(path.join(root, 'sdk', 'models', 'old', 'deep'), { recursive: true });
+      fs.writeFileSync(path.join(root, 'sdk', 'models', 'keep.ts'), 'k');
+
+      await fileService.removeEmptyDirectories(within.join('models', 'old', 'deep'), within);
+
+      expect(fs.existsSync(path.join(root, 'sdk', 'models', 'old'))).to.be.false;
+      expect(fs.existsSync(path.join(root, 'sdk', 'models', 'keep.ts'))).to.be.true;
+    });
+
+    it('leaves the root itself, even when it is empty', async () => {
+      const within = new DirectoryPath(path.join(root, 'sdk'));
+      fs.mkdirSync(path.join(root, 'sdk', 'only'), { recursive: true });
+
+      await fileService.removeEmptyDirectories(within.join('only'), within);
+
+      expect(fs.existsSync(path.join(root, 'sdk'))).to.be.true;
+      expect(fs.readdirSync(path.join(root, 'sdk'))).to.deep.equal([]);
+    });
+  });
+
   describe('spelledOnDisk', () => {
     const fileService = new FileService();
     let root: DirectoryPath;

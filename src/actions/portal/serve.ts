@@ -16,6 +16,7 @@ import { PreviewSpecs } from '../../types/portal/preview-specs.js';
 import { FileWatch, FileWatchService } from '../../infrastructure/file-watch-service.js';
 import { NetworkService } from '../../infrastructure/network-service.js';
 import { LauncherService } from '../../infrastructure/launcher-service.js';
+import { terminal } from '../../infrastructure/terminal.js';
 import { PortalDevServerService } from '../../infrastructure/portal-dev-server-service.js';
 import { PortalProjectService } from '../../infrastructure/portal-project-service.js';
 import { errorMessage } from '../../utils/error-utils.js';
@@ -253,7 +254,7 @@ export class PortalServeAction {
 
   // Clack leaves stdin in raw mode, which swallows CTRL+C until it is released.
   private clearStandardInput() {
-    if (process.platform !== 'darwin' && process.stdin.isTTY) {
+    if (process.platform !== 'darwin' && terminal.isInteractive()) {
       process.stdin.setRawMode(false);
       process.stdin.pause();
     }
