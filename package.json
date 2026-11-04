@@ -1,7 +1,7 @@
 {
     "name": "@apimatic/cli",
     "description": "The official CLI for APIMatic.",
-    "version": "2.0.0-beta.2",
+    "version": "0.0.0-semantically-released",
     "author": "APIMatic",
     "bin": {
         "apimatic": "./bin/run.js"
@@ -14,7 +14,7 @@
         "access": "public"
     },
     "engines": {
-        "node": ">=24.0.0"
+        "node": ">=22.14.0"
     },
     "packageManager": "pnpm@11.0.8",
     "files": [
@@ -43,7 +43,7 @@
         "build": "rimraf lib tsconfig.tsbuildinfo oclif.manifest.json && tsc",
         "build:watch": "rimraf oclif.manifest.json && tsc --watch",
         "apimatic": "node ./bin/run.js",
-        "prepack": "oclif manifest",
+        "prepack": "oclif manifest && oclif readme",
         "pretest": "tsc -p test/tsconfig.json",
         "posttest": "eslint .",
         "prettier": "prettier \"src/**/*.{js,ts}\" \"portal-template/**/*.{ts,tsx}\"",
@@ -119,7 +119,7 @@
         "@types/fs-extra": "^9.0.13",
         "@types/mocha": "^10.0.10",
         "@types/mustache": "^4.2.6",
-        "@types/node": "^24.13.4",
+        "@types/node": "22.14.1",
         "@types/prettier": "^2.7.3",
         "@types/react": "^19.3.0",
         "@types/react-dom": "^19.3.0",
@@ -155,6 +155,7 @@
         "commands": "./lib/commands",
         "dirname": "apimatic",
         "bin": "apimatic",
+        "repositoryPrefix": "<%- repo %>/blob/<%- version === '0.0.0-semantically-released' ? 'dev' : 'v' + version %>/<%- commandPath %>",
         "description": "The official CLI for APIMatic. \nTo get started with APIMatic's CLI using a step by step wizard, run 'apimatic quickstart'.",
         "hooks": {
             "init": "./lib/hooks/node-version",

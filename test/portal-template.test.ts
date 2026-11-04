@@ -10,10 +10,12 @@ import {
   PortalBuildPaths,
   TEMPLATE_DEPENDENCIES
 } from '../src/infrastructure/portal-project-service';
+import { CodeSample, CodeSamplesFile } from '../src/types/portal/code-samples';
 import { GENERATED_DIRECTORY_NAME, PAGE_TEMPLATES } from '../src/types/portal/generated-pages';
 import { GENERATED_INCLUDES_DIRECTORY_NAME } from '../src/types/portal/page-fragments';
 import { PortalIdentity } from '../src/types/portal/portal-config';
 import type { BuildPaths } from '../portal-template/portal-config';
+import type { CodeSamplesFile as TemplateCodeSamplesFile } from '../portal-template/src/lib/code-samples.server';
 import type { Portal } from '../portal-template/src/lib/portal-types';
 
 /** True only when the two types are identical, every nested field and union member included. */
@@ -204,9 +206,11 @@ describe('portal template packaging', () => {
   it('declares exactly what the CLI writes for it', () => {
     const identity: Equal<Portal, PortalIdentity> = true;
     const paths: Equal<BuildPaths, PortalBuildPaths> = true;
+    const codeSamples: Equal<TemplateCodeSamplesFile<CodeSample>, CodeSamplesFile> = true;
 
     expect(identity).to.equal(true);
     expect(paths).to.equal(true);
+    expect(codeSamples).to.equal(true);
   });
 
   // The CLI writes these into the prepared project; a copy in the template would be a second

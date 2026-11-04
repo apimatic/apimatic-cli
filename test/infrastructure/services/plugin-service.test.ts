@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { Buffer } from 'node:buffer';
+import { text } from 'node:stream/consumers';
 import { PluginService } from '../../../src/infrastructure/services/plugin-service';
 import { DirectoryPath } from '../../../src/types/file/directoryPath';
 import { FilePath } from '../../../src/types/file/filePath';
@@ -46,12 +47,6 @@ describe('PluginService', () => {
   const redirect = (res: http.ServerResponse) => {
     res.writeHead(302, { Location: `/plugin/${GENERATION_ID}/download` });
     res.end();
-  };
-
-  const drain = async (stream: NodeJS.ReadableStream) => {
-    const chunks: Buffer[] = [];
-    for await (const chunk of stream) chunks.push(Buffer.from(chunk));
-    return Buffer.concat(chunks).toString();
   };
 
   const clearBaseUrlCache = () => {
@@ -132,7 +127,7 @@ describe('PluginService', () => {
       const result = await generatePlugin();
 
       expect(result.isOk()).to.be.true;
-      expect(await drain(result._unsafeUnwrap())).to.equal('PK context-plugin');
+      expect(await text(result._unsafeUnwrap())).to.equal('PK context-plugin');
       expect(generateRequests).to.have.length(1);
       expect(statusRequests[0].url).to.equal(`/plugin/${GENERATION_ID}/status`);
     });
