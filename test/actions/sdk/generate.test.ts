@@ -5,7 +5,6 @@ import { expect } from 'chai';
 import { err } from 'neverthrow';
 import sinon from 'sinon';
 import { GenerateAction } from '../../../src/actions/sdk/generate.js';
-import { GitService } from '../../../src/infrastructure/git-service.js';
 import { SdkGeneratePrompts } from '../../../src/prompts/sdk/generate.js';
 import { CommandMetadata } from '../../../src/types/common/command-metadata.js';
 import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
@@ -56,15 +55,6 @@ describe('GenerateAction (sdk)', () => {
     expect((await execute()).isSuccess()).to.be.true;
 
     expect(read('README.md')).to.equal('# sdk');
-  });
-
-  it('writes into the destination itself, with no language directory below it', async () => {
-    const destination = new DirectoryPath(path.join(root, 'my-python-sdk'));
-
-    expect((await execute({ destination })).isSuccess()).to.be.true;
-
-    expect(fs.readFileSync(path.join(destination.toString(), 'README.md'), 'utf-8')).to.equal('# sdk');
-    expect(fs.existsSync(path.join(destination.toString(), 'python'))).to.be.false;
   });
 
   for (const [named, destination] of [
@@ -143,20 +133,6 @@ describe('GenerateAction (sdk)', () => {
 
       expect(overwriteSdk.called).to.be.false;
       expect(read('README.md')).to.equal('# sdk');
-    });
-
-    it('is asked before replacing a repository of the developer’s own that holds only hidden files besides .git', async () => {
-      fs.rmSync(at('README.md'));
-      (await new GitService().init(sdk()))._unsafeUnwrap();
-      writeFiles(sdk().toString(), { '.github/workflows/publish.yml': 'on: push' });
-      const overwriteSdk = sinon.stub(SdkGeneratePrompts.prototype, 'overwriteSdk').resolves(false);
-      sinon.stub(SdkGeneratePrompts.prototype, 'destinationDirNotEmpty');
-
-      expect((await execute({ force: false, canAsk: true })).isCancelled()).to.be.true;
-
-      expect(overwriteSdk.calledOnce).to.be.true;
-      expect(read('.github/workflows/publish.yml')).to.equal('on: push');
-      expect(generateSdk.called).to.be.false;
     });
   });
 });

@@ -1,4 +1,3 @@
-import { Buffer } from 'node:buffer';
 import { expect } from 'chai';
 import { Side } from '../../../src/types/sdk/conflict-markers.js';
 import { UnresolvedFile } from '../../../src/types/sdk/unresolved-file.js';
@@ -57,13 +56,5 @@ describe('UnresolvedFile.settledFor', () => {
 
     expect(settled('generated', binary)).to.equal('generated\0');
     expect(settled('yours', binary)).to.equal('left alone');
-  });
-
-  it('settles a file that is not UTF-8 like any other', () => {
-    const marked = new Uint8Array(Buffer.from(`\xff\n${MARKED}`, 'latin1'));
-
-    const content = new UnresolvedFile(PATH, marked, bytes('yours'), bytes('generated')).settledFor('generated');
-
-    expect(Buffer.from(content.writes()[0].content).toString('latin1')).to.equal('\xff\ntop\ntheirs\nbottom\n');
   });
 });

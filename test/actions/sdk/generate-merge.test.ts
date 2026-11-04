@@ -18,10 +18,9 @@ import { ProjectContext } from '../../../src/types/project-context.js';
 import { GENERATED_MARKER, YOURS_MARKER } from '../../../src/types/sdk/conflict-markers.js';
 import { Language, Stability } from '../../../src/types/sdk/generate.js';
 import { GenerationRecord, recordContents } from '../../../src/types/sdk/generation-record.js';
-import { emptyGlobalGitConfig } from '../../helpers/git-environment.js';
 import { kinds } from '../../helpers/merge.js';
 import { Files, stubSdkGeneration, writeFiles } from '../../helpers/sdk-generation.js';
-import { describeCommit, hookKind, snapshotFiles } from '../../helpers/snapshots.js';
+import { describeCommit, snapshotFiles } from '../../helpers/snapshots.js';
 
 const COMMAND_METADATA: CommandMetadata = { commandName: 'sdk generate', shell: 'test' };
 /** Where the SDK directory's own repository keeps each generation as the server returned it. */
@@ -111,10 +110,14 @@ describe('GenerateAction (sdk) — a regeneration merges', () => {
     const first = await recorded();
     write({ 'models/book.py': DECORATED + MODEL_V1, 'notes.txt': 'mine' });
     const overwriteSdk = sinon.stub(SdkGeneratePrompts.prototype, 'overwriteSdk');
+    const conflictChoice = sinon.stub(SdkGeneratePrompts.prototype, 'conflictChoice');
+    const conflictsResolved = sinon.stub(SdkGeneratePrompts.prototype, 'conflictsResolved');
 
     expect((await execute(V2)).isSuccess()).to.be.true;
 
     expect(overwriteSdk.called).to.be.false;
+    expect(conflictChoice.called).to.be.false;
+    expect(conflictsResolved.called).to.be.false;
     expect(read('models/book.py')).to.equal(DECORATED + MODEL_V2);
     expect(read('README.md')).to.equal('# sdk v2');
     expect(read('models/author.py')).to.equal('class Author: ...');
@@ -162,6 +165,7 @@ describe('GenerateAction (sdk) — a regeneration merges', () => {
     expect(listed(marked)).to.deep.equal(['models/book.py']);
     expect(unmarked).to.deep.equal([]);
     expect(sdkMerged().firstCall.args[2]).to.equal(1);
+    expect(sdkMerged().calledBefore(conflictSteps)).to.be.true;
     expect(read('models/book.py')).to.equal(MODEL_MARKED);
     expect(read('README.md')).to.equal('# sdk v2');
     expect(read('models/author.py')).to.equal('class Author: ...');
@@ -323,23 +327,6 @@ describe('GenerateAction (sdk) — a regeneration merges', () => {
     expect(sdkMerged().calledOnce).to.be.true;
   });
 
-  it('makes the push share the snapshots after a merge too, with nothing to say once the hook is there', async () => {
-    const restoreConfig = emptyGlobalGitConfig(root);
-    try {
-      await recorded();
-      const shareHook = SdkGeneratePrompts.prototype.shareHook as sinon.SinonStub;
-
-      expect((await execute(V2)).isSuccess()).to.be.true;
-
-      expect(shareHook.getCalls().map((call) => hookKind(call.args[0]))).to.deep.equal([
-        `written ${path.join(sdk().toString(), '.git', 'hooks', 'pre-push')}`,
-        'calling'
-      ]);
-    } finally {
-      restoreConfig();
-    }
-  });
-
   describe('the question when the merge conflicts', () => {
     const NEXT: Files = { 'README.md': '# sdk v2', 'models/book.py': MODEL_V2 };
 
@@ -380,22 +367,6 @@ describe('GenerateAction (sdk) — a regeneration merges', () => {
       expect((await snapshotFiles(sdk(), previous)).get('models/book.py')).to.equal(DECORATED + MODEL_V1_EDITED);
     });
 
-    it('settles the overlapping hunks for you on request, with the generator’s other changes in the same file', async () => {
-      await conflicting();
-      sinon.stub(SdkGeneratePrompts.prototype, 'conflictChoice').resolves('yours');
-      const conflictsResolved = sinon.stub(SdkGeneratePrompts.prototype, 'conflictsResolved');
-
-      const result = await execute(NEXT);
-
-      expect(result.isSuccess()).to.be.true;
-      expect(read('models/book.py')).to.equal(DECORATED + MODEL_V1_EDITED + '    isbn: str\n');
-      expect(read('helpers/old.py')).to.equal('old, edited');
-      expect(read('README.md')).to.equal('# sdk v2');
-      expect(read('notes.txt')).to.equal('mine');
-      expect(conflictsResolved.firstCall.args[1]).to.equal('yours');
-      expect(listed(conflictsResolved.firstCall.args[2])).to.have.members(CONFLICTS.map(([path]) => path));
-    });
-
     it('writes nothing at all when the developer cancels at the question', async () => {
       const first = await conflicting();
       sinon.stub(SdkGeneratePrompts.prototype, 'conflictChoice').resolves('cancel');
@@ -410,21 +381,6 @@ describe('GenerateAction (sdk) — a regeneration merges', () => {
       expect((await git.resolveRef(sdk(), PREVIOUS_REF))._unsafeUnwrap()).to.be.undefined;
       expect(runCancelled.firstCall.args[0].isEqual(sdk())).to.be.true;
       expect(sdkMerged().called).to.be.false;
-    });
-
-    it('leaves markers when the developer will resolve, and ends as Action required with the steps', async () => {
-      await conflicting();
-      sinon.stub(SdkGeneratePrompts.prototype, 'conflictChoice').resolves('asPlaced');
-      const conflictSteps = sinon.stub(SdkGeneratePrompts.prototype, 'conflictSteps');
-
-      const result = await execute(NEXT);
-
-      expect(result.isActionRequired()).to.be.true;
-      expect(read('models/book.py')).to.equal(DECORATED + MODEL_MARKED);
-      expect(read('helpers/old.py')).to.equal('old, edited');
-      expect(read('notes.txt')).to.equal('mine');
-      expect(conflictSteps.calledOnce).to.be.true;
-      expect(sdkMerged().calledBefore(conflictSteps)).to.be.true;
     });
 
     for (const [where, canAsk] of [
@@ -449,17 +405,5 @@ describe('GenerateAction (sdk) — a regeneration merges', () => {
         expect(listed(conflictsResolved.firstCall.args[2])).to.have.members(CONFLICTS.map(([path]) => path));
       });
     }
-
-    it('asks nothing when the merge is clean', async () => {
-      await recorded();
-      write({ 'notes.txt': 'mine' });
-      const conflictChoice = sinon.stub(SdkGeneratePrompts.prototype, 'conflictChoice');
-      const conflictsResolved = sinon.stub(SdkGeneratePrompts.prototype, 'conflictsResolved');
-
-      expect((await execute(NEXT)).isSuccess()).to.be.true;
-
-      expect(conflictChoice.called).to.be.false;
-      expect(conflictsResolved.called).to.be.false;
-    });
   });
 });

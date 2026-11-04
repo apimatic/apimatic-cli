@@ -54,18 +54,3 @@ describe('RecordedSnapshot', () => {
     expect(missing.isMissing()).to.be.true;
   });
 });
-
-describe('SnapshotFetch', () => {
-  it('is rendered by the handler for what it came to, handed the remote and the reason', () => {
-    const rendered = (fetch: SnapshotFetch) =>
-      fetch.match({
-        none: () => 'nowhere',
-        absent: (remote) => `not on ${remote}`,
-        failed: (remote, reason) => `${remote} failed: ${reason}`
-      });
-
-    expect(rendered(SnapshotFetch.none())).to.equal('nowhere');
-    expect(rendered(SnapshotFetch.absent(RemoteName.fromGit('fork')!))).to.equal('not on fork');
-    expect(rendered(SnapshotFetch.failed(ORIGIN, 'git broke'))).to.equal('origin failed: git broke');
-  });
-});

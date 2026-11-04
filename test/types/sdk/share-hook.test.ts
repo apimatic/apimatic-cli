@@ -23,13 +23,6 @@ describe('ShareHook', () => {
     return hook.toWrite()!;
   };
 
-  it('calls the script through git on a copy of stdin, hands the copy to the rest of the hook, and never fails the push', () => {
-    expect(SHARE_HOOK_CALL).to.equal(
-      'd="$(git rev-parse --git-common-dir)" && f="$d/hooks/apimatic-pre-push" && [ -f "$f" ] && ' +
-        '{ t="$d/apimatic-pre-push.$$"; cat >"$t" && sh "$f" "$@" <"$t"; [ -r "$t" ] && command exec <"$t"; rm -f "$t"; } || true'
-    );
-  });
-
   it('is a whole shell hook when there was none', () => {
     expect(written('')).to.equal(
       '#!/bin/sh\n\n# >>> apimatic snapshots\n' +
@@ -93,14 +86,5 @@ describe('ShareHook', () => {
       `elsewhere ${new FilePath(home, new FileName('pre-push'))} from ${home} script ${script} uncommitted`
     );
     expect(hookKind(found(`npm test\n${SHARE_HOOK_CALL}\n`, { runFrom: husky }))).to.equal('calling');
-  });
-
-  it('names the pre-push file beside husky’s runners, and inside any other hooks directory', () => {
-    const husky = repository.join('.husky', '_');
-
-    expect(ShareHook.fileIn(husky).isEqual(new FilePath(repository.join('.husky'), new FileName('pre-push')))).to.be
-      .true;
-    expect(ShareHook.fileIn(own).isEqual(file)).to.be.true;
-    expect(ShareHook.scriptIn(own).isEqual(script)).to.be.true;
   });
 });

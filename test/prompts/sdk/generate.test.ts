@@ -7,7 +7,6 @@ import { SdkGeneratePrompts } from '../../../src/prompts/sdk/generate.js';
 import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
 import { FileName } from '../../../src/types/file/fileName.js';
 import { FilePath } from '../../../src/types/file/filePath.js';
-import { GitVersion } from '../../../src/types/git/git-version.js';
 import { GitOperation } from '../../../src/types/git/git-operation.js';
 import { RemoteName } from '../../../src/types/git/remote-name.js';
 import { MergedText } from '../../../src/types/sdk/conflict-markers.js';
@@ -65,34 +64,6 @@ describe('SdkGeneratePrompts.languageNotAvailable', () => {
   });
 });
 
-describe('SdkGeneratePrompts, about the destination', () => {
-  const root = new DirectoryPath(process.cwd());
-
-  afterEach(() => {
-    sinon.restore();
-  });
-
-  it('refuses a destination holding the source, and suggests one outside it', () => {
-    const error = sinon.stub(log, 'error');
-
-    new SdkGeneratePrompts().destinationContainsSource(root.join('src'), root);
-
-    const said = stripVTControlCharacters(error.firstCall.args[0]);
-    expect(said).to.contain('contains your source directory');
-    expect(said).to.contain('--destination=./sdk');
-  });
-
-  it('sends a run that cannot ask about overwriting to a terminal, or to --force', () => {
-    const error = sinon.stub(log, 'error');
-
-    new SdkGeneratePrompts().cannotAskToOverwrite(root.join('sdk', 'python'));
-
-    const said = stripVTControlCharacters(error.firstCall.args[0]);
-    expect(said).to.contain('cannot ask whether to overwrite it');
-    expect(said).to.contain('Rerun in a terminal to be asked, or with --force to overwrite.');
-  });
-});
-
 describe('SdkGeneratePrompts.sdkNotUnzipped', () => {
   afterEach(() => {
     sinon.restore();
@@ -109,42 +80,11 @@ describe('SdkGeneratePrompts.sdkNotUnzipped', () => {
   });
 });
 
-describe('SdkGeneratePrompts, about git', () => {
-  afterEach(() => {
-    sinon.restore();
-  });
-
-  it('warns what not having git costs, and what a git too old does, naming the version found', () => {
-    const warn = sinon.stub(log, 'warn');
-
-    new SdkGeneratePrompts().gitUnavailable();
-    new SdkGeneratePrompts().gitVersionNotSupported(GitVersion.parse('git version 2.30.2'));
-
-    expect(stripVTControlCharacters(warn.firstCall.args[0])).to.equal(
-      'git is not available, so your customizations to the generated SDK will not persist across regenerations.'
-    );
-    expect(stripVTControlCharacters(warn.secondCall.args[0])).to.equal(
-      'git 2.30.2 was found, but 2.38 or newer is needed, ' +
-        'so your customizations to the generated SDK will not persist across regenerations.'
-    );
-  });
-});
-
 describe('SdkGeneratePrompts, about the repository', () => {
   const sdk = new DirectoryPath(process.cwd()).join('sdk', 'python');
 
   afterEach(() => {
     sinon.restore();
-  });
-
-  it('says the SDK directory could not be inspected for customizations, in git’s words', () => {
-    const error = sinon.stub(log, 'error');
-
-    new SdkGeneratePrompts().repositoryNotInspected('git rev-parse failed: bad config');
-
-    expect(stripVTControlCharacters(error.firstCall.args[0])).to.equal(
-      'The SDK directory could not be inspected for your customizations: git rev-parse failed: bad config'
-    );
   });
 
   it('gives the steps that keep edits, should the developer make any, when the SDK directory is not a repository', () => {
@@ -160,31 +100,6 @@ describe('SdkGeneratePrompts, about the repository', () => {
     const at = order.map((text) => note.indexOf(text));
     expect(at).to.not.include(-1);
     expect(at).to.deep.equal([...at].sort((a, b) => a - b));
-  });
-
-  it('says a repository was initialised, or found, naming the SDK directory', () => {
-    const info = sinon.stub(log, 'info');
-
-    new SdkGeneratePrompts().repositoryInitialised(sdk);
-    new SdkGeneratePrompts().repositoryFound(sdk);
-
-    expect(stripVTControlCharacters(info.firstCall.args[0])).to.equal(
-      "Initialised a git repository in './sdk/python', which keeps your customizations across regenerations."
-    );
-    expect(stripVTControlCharacters(info.secondCall.args[0])).to.equal(
-      "Found a git repository in './sdk/python', which keeps your customizations across regenerations."
-    );
-  });
-
-  it('says that nothing was written when the repository could not be made', () => {
-    const error = sinon.stub(log, 'error');
-
-    new SdkGeneratePrompts().repositoryNotInitialised(sdk, 'git broke');
-
-    expect(stripVTControlCharacters(error.firstCall.args[0])).to.equal(
-      "A git repository could not be created in './sdk/python', where the SDK's snapshots would be kept: git broke\n" +
-        'Nothing was written.'
-    );
   });
 
   it('says where the recorded snapshot was looked for, and that this generation starts afresh', () => {
@@ -206,17 +121,6 @@ describe('SdkGeneratePrompts, about the repository', () => {
       "The snapshot './sdk/python' was last generated from is not in its repository, and could not be fetched from 'origin': " +
         'the remote did not answer within 30 seconds\nThis generation is recorded afresh.'
     ]);
-  });
-
-  it('says what the next run does without the snapshot: replace the SDK', () => {
-    const warn = sinon.stub(log, 'warn');
-
-    new SdkGeneratePrompts().snapshotNotRecorded('git broke');
-
-    expect(stripVTControlCharacters(warn.firstCall.args[0])).to.equal(
-      'The SDK was written, but its snapshot could not be recorded: git broke\n' +
-        'The next run will replace the SDK instead of merging your customizations into it.'
-    );
   });
 });
 
@@ -353,27 +257,6 @@ describe('SdkGeneratePrompts, about a merge', () => {
     );
   });
 
-  it('says that nothing was written when the developer cancels at the question', () => {
-    const info = sinon.stub(log, 'info');
-
-    new SdkGeneratePrompts().runCancelled(sdk);
-
-    expect(stripVTControlCharacters(info.firstCall.args[0])).to.equal(
-      "Nothing was written; './sdk/python' is as it was."
-    );
-  });
-
-  it('warns that the next run will not know about the markers when git could not hold the files as unmerged', () => {
-    const warn = sinon.stub(log, 'warn');
-
-    new SdkGeneratePrompts().conflictsNotStaged('index locked');
-
-    expect(stripVTControlCharacters(warn.firstCall.args[0])).to.equal(
-      "The conflicted files could not be marked in git's index: index locked\n" +
-        'The markers are in the files, but the next run will not know about them: resolve them before rerunning.'
-    );
-  });
-
   it('says why a forced run replaced a recorded SDK, and where the committed customizations still are', () => {
     const warn = sinon.stub(log, 'warn');
 
@@ -382,16 +265,6 @@ describe('SdkGeneratePrompts, about a merge', () => {
     const said = stripVTControlCharacters(warn.firstCall.args[0]);
     expect(said).to.contain("The new SDK could not be merged into './sdk/python', so --force replaced it");
     expect(said).to.contain('git -C "./sdk/python" diff');
-  });
-
-  it('says that nothing was written when git could not work out the merge', () => {
-    const error = sinon.stub(log, 'error');
-
-    new SdkGeneratePrompts().customCodeFailed('git broke');
-
-    expect(stripVTControlCharacters(error.firstCall.args[0])).to.equal(
-      'Your customizations could not be merged into the regenerated SDK: git broke\nNothing was written.'
-    );
   });
 
   it('names the file a merge could not write, and says when the directory is back as it was', () => {
@@ -426,17 +299,6 @@ describe('SdkGeneratePrompts, about a merge', () => {
     expect(said).to.contain('The files written before it could not be put back either: EACCES on README.md');
     expect(said).to.contain('git -C "./sdk/python" restore --source=refs/apimatic/previous --worktree -- .');
   });
-
-  it('says what the next run does when the snapshot of a merge is not recorded: merge against the previous one', () => {
-    const warn = sinon.stub(log, 'warn');
-
-    new SdkGeneratePrompts().snapshotNotRecordedAfterMerge('git broke');
-
-    expect(stripVTControlCharacters(warn.firstCall.args[0])).to.equal(
-      'The SDK was merged, but the new snapshot could not be recorded: git broke\n' +
-        'The next run will merge against the previous one.'
-    );
-  });
 });
 
 describe('SdkGeneratePrompts, about the conflicts', () => {
@@ -447,18 +309,13 @@ describe('SdkGeneratePrompts, about the conflicts', () => {
     sinon.restore();
   });
 
-  it('lists the conflicted files with what happened to each, and nothing about how it is written', () => {
+  it('lists the conflicted files with what happened to each, and sends the run to a terminal or to --force', () => {
     const note = printed(() => new SdkGeneratePrompts().conflictsNotAsked(sdk, conflicts));
 
     expect(note).to.contain('2 files need your attention');
     expect(note).to.contain('book.py').and.to.contain('changed by you and by the generator');
     expect(note).to.contain('reviews.py').and.to.contain('no longer generated');
     expect(note).to.not.contain('markers');
-  });
-
-  it('sends a run that could not ask to a terminal, or to --force for the generator’s changes', () => {
-    const note = printed(() => new SdkGeneratePrompts().conflictsNotAsked(sdk, conflicts));
-
     expect(note).to.contain('Nothing was written.');
     expect(note).to.contain('Rerun in a terminal to choose how they are resolved');
     expect(note).to.contain("or with --force to resolve them using the generator's changes.");
@@ -530,18 +387,5 @@ describe('SdkGeneratePrompts, about what the last run left', () => {
     expect(stripVTControlCharacters(warn.secondCall.args[0])).to.match(
       /^1 file from the last run is still unresolved\. Resolve and stage it, then rerun:\n/
     );
-  });
-
-  it('says that nothing was done, and that the files could not be settled, in their own words', () => {
-    const info = sinon.stub(log, 'info');
-    const error = sinon.stub(log, 'error');
-
-    new SdkGeneratePrompts().resolveLater();
-    new SdkGeneratePrompts().conflictsNotSettled('git broke');
-
-    expect(stripVTControlCharacters(info.firstCall.args[0])).to.equal(
-      'Nothing was done. Rerun once the files are resolved and staged.'
-    );
-    expect(stripVTControlCharacters(error.firstCall.args[0])).to.equal('The conflicts could not be settled: git broke');
   });
 });

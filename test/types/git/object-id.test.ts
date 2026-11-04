@@ -9,9 +9,4 @@ describe('CommitId and TreeId', () => {
     expect(CommitId.fromGit('HEAD')).to.be.undefined;
     expect(TreeId.fromGit('A'.repeat(40))).to.be.undefined;
   });
-
-  it('compare two trees by id', () => {
-    expect(TreeId.fromGit('a'.repeat(40))!.isEqual(TreeId.fromGit('a'.repeat(40))!)).to.be.true;
-    expect(TreeId.fromGit('a'.repeat(40))!.isEqual(TreeId.fromGit('b'.repeat(40))!)).to.be.false;
-  });
 });

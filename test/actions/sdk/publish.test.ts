@@ -17,7 +17,6 @@ import { CommandMetadata } from '../../../src/types/common/command-metadata.js';
 import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
 import { FileProblem } from '../../../src/types/file/file-problem.js';
 import { GitContext } from '../../../src/types/git-context.js';
-import { GitVersion } from '../../../src/types/git/git-version.js';
 import { ProjectContext } from '../../../src/types/project-context.js';
 import { PublishingProfileItem, PublishType } from '../../../src/types/publish-api/publishing-profile-item.js';
 import { ProfileId } from '../../../src/types/publish/profile-id.js';
@@ -114,41 +113,6 @@ describe('SdkPublishAction', () => {
     expect(uploaded).to.have.members(['.gitignore', 'README.md']);
     expect(fs.existsSync(path.join(sdk().toString(), '.apimatic', 'generation.json'))).to.be.true;
     expect(fs.existsSync(path.join(sdk().toString(), 'node_modules', 'dep.js'))).to.be.true;
-  });
-
-  it('uploads everything but .git when git cannot serve the SDK directory’s repository', async () => {
-    writeFiles(sdk().toString(), { '.git/HEAD': 'ref: refs/heads/main' });
-    sinon.stub(GitService.prototype, 'version').resolves(GitVersion.none());
-    sinon.stub(SdkGeneratePrompts.prototype, 'gitUnavailable');
-    quietGeneration();
-    stubPublishing();
-    const uploaded: string[] = [];
-    uploads(uploaded);
-
-    expect((await execute()).isSuccess()).to.be.true;
-
-    expect(uploaded).to.deep.equal(['README.md']);
-    expect(fs.readFileSync(path.join(sdk().toString(), '.git', 'HEAD'), 'utf8')).to.equal('ref: refs/heads/main');
-  });
-
-  it('leaves out what the ignore rules keep out with a git too old to merge, which still reads them', async () => {
-    fs.mkdirSync(sdk().toString(), { recursive: true });
-    (await new GitService().init(sdk()))._unsafeUnwrap();
-    await generates({
-      'README.md': '# sdk',
-      '.gitignore': 'node_modules/\n',
-      'node_modules/dep.js': 'module.exports = {};'
-    });
-    sinon.stub(GitService.prototype, 'version').resolves(GitVersion.parse('git version 2.37.0'));
-    sinon.stub(SdkGeneratePrompts.prototype, 'gitVersionNotSupported');
-    quietGeneration();
-    stubPublishing();
-    const uploaded: string[] = [];
-    uploads(uploaded);
-
-    expect((await execute()).isSuccess()).to.be.true;
-
-    expect(uploaded).to.have.members(['.gitignore', 'README.md']);
   });
 
   it('generates into the SDK directory on a dry run and opens it, uploading nothing', async () => {

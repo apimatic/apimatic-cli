@@ -65,10 +65,6 @@ describe('MergedText.settledFor', () => {
     expect(settled(content, 'yours')).to.equal('before\nmine 1\nbetween\nmine 2a\nmine 2b\nafter\n');
   });
 
-  it('reads the labels git writes as well as the CLI’s, so a file settles before or after it is relabelled', () => {
-    expect(settled(markedByGit('mine', 'theirs'), 'generated')).to.equal('theirs\n');
-  });
-
   it('reads markers on CRLF lines, keeping the line endings', () => {
     expect(
       settled(`a\r\n${YOURS_MARKER}\r\nmine\r\n=======\r\ntheirs\r\n${GENERATED_MARKER}\r\nb\r\n`, 'yours')

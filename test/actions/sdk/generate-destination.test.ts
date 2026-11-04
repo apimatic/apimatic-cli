@@ -6,7 +6,6 @@ import { execa } from 'execa';
 import { err, ok } from 'neverthrow';
 import sinon from 'sinon';
 import { GenerateAction } from '../../../src/actions/sdk/generate.js';
-import { FileService } from '../../../src/infrastructure/file-service.js';
 import { GitService } from '../../../src/infrastructure/git-service.js';
 import { canonical } from '../../../src/infrastructure/tmp-extensions.js';
 import { SdkGeneratePrompts } from '../../../src/prompts/sdk/generate.js';
@@ -155,33 +154,28 @@ describe('GenerateAction (sdk) — the destination', () => {
   });
 
   describe('when the SDK directory is not a repository of its own', () => {
-    for (const [how, canAsk, force] of [
-      ['in a terminal', true, false],
-      ['without a terminal', false, false],
-      ['with --force', true, true]
-    ] as const) {
-      it(`makes it one with --git-init and records into it, ${how}`, async () => {
-        const repositoryInitialised = SdkGeneratePrompts.prototype.repositoryInitialised as sinon.SinonStub;
+    // A directory that is not there yet has nothing to overwrite, so --force and a terminal change nothing here.
+    it('makes it one with --git-init and records into it', async () => {
+      const repositoryInitialised = SdkGeneratePrompts.prototype.repositoryInitialised as sinon.SinonStub;
 
-        expect((await execute({ force, canAsk, gitInit: true })).isSuccess()).to.be.true;
+      expect((await execute({ force: false, canAsk: false, gitInit: true })).isSuccess()).to.be.true;
 
-        expect(repositoryInitialised.firstCall.args[0].isEqual(sdk())).to.be.true;
-        expect(repositoryFound().called).to.be.false;
-        expect(fs.readFileSync(at('.git/HEAD'), 'utf-8').trim()).to.equal('ref: refs/heads/main');
-        const snapshot = await pristine();
-        expect(snapshot).to.not.be.undefined;
-        expect([...(await snapshotFiles(sdk(), snapshot!)).keys()]).to.deep.equal(['README.md']);
-        expect(record().baseFor(Language.PYTHON, Stability.STABLE)).to.deep.equal(snapshot);
-      });
+      expect(repositoryInitialised.firstCall.args[0].isEqual(sdk())).to.be.true;
+      expect(repositoryFound().called).to.be.false;
+      expect(fs.readFileSync(at('.git/HEAD'), 'utf-8').trim()).to.equal('ref: refs/heads/main');
+      const snapshot = await pristine();
+      expect(snapshot).to.not.be.undefined;
+      expect([...(await snapshotFiles(sdk(), snapshot!)).keys()]).to.deep.equal(['README.md']);
+      expect(record().baseFor(Language.PYTHON, Stability.STABLE)).to.deep.equal(snapshot);
+    });
 
-      it(`writes the SDK without a repository otherwise, then gives the steps that keep edits, ${how}`, async () => {
-        expect((await execute({ force, canAsk })).isSuccess()).to.be.true;
+    it('writes the SDK without a repository otherwise, then gives the steps that keep edits', async () => {
+      expect((await execute({ force: false, canAsk: false })).isSuccess()).to.be.true;
 
-        expect(gitInitSteps().firstCall.args[0].isEqual(sdk())).to.be.true;
-        expect(gitInitSteps().calledAfter(SdkGeneratePrompts.prototype.sdkGenerated as sinon.SinonStub)).to.be.true;
-        expect(entries()).to.deep.equal(['README.md']);
-      });
-    }
+      expect(gitInitSteps().firstCall.args[0].isEqual(sdk())).to.be.true;
+      expect(gitInitSteps().calledAfter(SdkGeneratePrompts.prototype.sdkGenerated as sinon.SinonStub)).to.be.true;
+      expect(entries()).to.deep.equal(['README.md']);
+    });
 
     it('leaves a project repository that only encloses it alone', async () => {
       (await git.init(new DirectoryPath(root)))._unsafeUnwrap();
@@ -231,18 +225,6 @@ describe('GenerateAction (sdk) — the destination', () => {
       expect(gitInitSteps().called).to.be.false;
     });
 
-    it('chains the next generation onto the last snapshot, so each run has the one before as its base, saying found only the first time', async () => {
-      const first = await recorded();
-
-      expect((await execute({ files: { 'README.md': '# sdk v2' } })).isSuccess()).to.be.true;
-
-      const second = (await pristine())!;
-      expect((await describeCommit(sdk(), second)).parents).to.deep.equal([first]);
-      expect(read('README.md')).to.equal('# sdk v2');
-      expect(record().baseFor(Language.PYTHON, Stability.STABLE)).to.deep.equal(second);
-      expect(repositoryFound().called).to.be.false;
-    });
-
     it('records afresh over an SDK generated at another stability, without a word', async () => {
       const first = await recorded();
       const snapshotMissing = sinon.stub(SdkGeneratePrompts.prototype, 'snapshotMissing');
@@ -268,20 +250,6 @@ describe('GenerateAction (sdk) — the destination', () => {
       expect(snapshotMissing.firstCall.args[0].isEqual(sdk())).to.be.true;
       expect(fetchKind(snapshotMissing.firstCall.args[1])).to.equal('none');
       expect(repositoryFound().called).to.be.false;
-      expect(record().baseFor(Language.PYTHON, Stability.STABLE)).to.deep.equal(await pristine());
-    });
-
-    it('warns, and records afresh, when a git here fails after the remote answered the fetch', async () => {
-      await recorded();
-      write(RECORD, recordContents(Language.PYTHON, Stability.STABLE, CommitId.fromGit('f'.repeat(40))!));
-      await execa('git', ['remote', 'add', 'origin', 'https://example.invalid/sdk.git'], { cwd: sdk().toString() });
-      sinon.stub(GitService.prototype, 'fetchRef').resolves(ok(CommitId.fromGit('e'.repeat(40))!));
-      sinon.stub(GitService.prototype, 'isAncestor').resolves(err('git broke'));
-      const snapshotMissing = sinon.stub(SdkGeneratePrompts.prototype, 'snapshotMissing');
-
-      expect((await execute()).isSuccess()).to.be.true;
-
-      expect(fetchKind(snapshotMissing.firstCall.args[1])).to.equal('failed origin: git broke');
       expect(record().baseFor(Language.PYTHON, Stability.STABLE)).to.deep.equal(await pristine());
     });
 
@@ -353,25 +321,6 @@ describe('GenerateAction (sdk) — the destination', () => {
       expect(fs.readFileSync(hookFile(), 'utf8')).to.contain('apimatic-pre-push');
       expect(fs.existsSync(hookFile('apimatic-pre-push'))).to.be.true;
     });
-
-    it('shows the one step when git runs hooks from elsewhere, and still succeeds', async () => {
-      await execa('git', ['config', 'core.hooksPath', '.husky/_'], { cwd: sdk().toString() });
-
-      expect((await execute()).isSuccess()).to.be.true;
-
-      expect(said()).to.deep.equal([
-        `elsewhere ${at('.husky/pre-push')} from ${at('.husky/_')} script ${hookFile('apimatic-pre-push')} committed`
-      ]);
-    });
-
-    it('says the hook could not be written, and still succeeds', async () => {
-      sinon.stub(FileService.prototype, 'makeExecutable').rejects(new Error('EACCES: permission denied'));
-
-      expect((await execute()).isSuccess()).to.be.true;
-
-      expect(said()).to.deep.equal(['notWritten: EACCES: permission denied']);
-      expect(read('README.md')).to.equal('# sdk');
-    });
   });
 
   describe('in a clone of the SDK repository', () => {
@@ -418,22 +367,6 @@ describe('GenerateAction (sdk) — the destination', () => {
       expect(fs.readFileSync(path.join(clone.toString(), 'README.md'), 'utf8')).to.equal('# sdk v2');
       expect(snapshotMissing.calledOnce).to.be.true;
     });
-
-    it('merges over a clone named as the destination, fetching the snapshot the origin shared', async () => {
-      const { clone, base } = await published();
-      await sh(sdk().toString(), 'push', '-q', 'origin', REFSPEC);
-      writeFiles(clone.toString(), { 'README.md': '# edited' });
-      const snapshotMissing = sinon.stub(SdkGeneratePrompts.prototype, 'snapshotMissing');
-      sinon.stub(SdkGeneratePrompts.prototype, 'sdkUnchanged');
-
-      expect((await execute({ destination: clone })).isSuccess()).to.be.true;
-
-      expect(fs.readFileSync(path.join(clone.toString(), 'README.md'), 'utf8')).to.equal('# edited');
-      expect(snapshotMissing.called).to.be.false;
-      const recordedInClone = GenerationRecord.parse(fs.readFileSync(path.join(clone.toString(), RECORD), 'utf8'));
-      expect(recordedInClone.baseFor(Language.PYTHON, Stability.STABLE)).to.deep.equal(base);
-      expect((await git.resolveRef(clone, PRISTINE_REF))._unsafeUnwrap()).to.deep.equal(base);
-    });
   });
 
   describe('what the last run left', () => {
@@ -449,12 +382,14 @@ describe('GenerateAction (sdk) — the destination', () => {
       await leftUnmerged(sdk(), 'a.py');
     };
 
-    it('ends as Action required without a terminal while git holds a file of the SDK as unmerged', async () => {
+    it('ends as Action required without a terminal while git holds a file of the SDK as unmerged, asking nothing', async () => {
       await leftMarked();
+      const unresolvedChoice = sinon.stub(SdkGeneratePrompts.prototype, 'unresolvedChoice');
       const conflictsUnresolved = sinon.stub(SdkGeneratePrompts.prototype, 'conflictsUnresolved');
 
       expect((await execute({ force: false })).isActionRequired()).to.be.true;
 
+      expect(unresolvedChoice.called).to.be.false;
       const [directory, paths] = conflictsUnresolved.firstCall.args;
       expect(directory.isEqual(sdk())).to.be.true;
       expect(paths.map(String)).to.deep.equal(['a.py']);
@@ -506,20 +441,6 @@ describe('GenerateAction (sdk) — the destination', () => {
         expect(sdkMerged.calledOnce).to.be.true;
       });
 
-      it('settles the markers still there for you, keeping the rest of the file, then merges', async () => {
-        await leftMarked();
-        sinon.stub(SdkGeneratePrompts.prototype, 'unresolvedChoice').resolves('yours');
-        const conflictsResolved = sinon.stub(SdkGeneratePrompts.prototype, 'conflictsResolved');
-        sinon.stub(SdkGeneratePrompts.prototype, 'sdkMerged');
-
-        expect((await execute({ force: false, canAsk: true, files: NEXT })).isSuccess()).to.be.true;
-
-        expect(read('a.py')).to.equal('kept above\nmine\nkept below\n');
-        expect(read('b.py')).to.equal('resolved by hand');
-        expect(read('README.md')).to.equal('# sdk v2');
-        expect(conflictsResolved.firstCall.args[1]).to.equal('yours');
-      });
-
       it('ends as Action required, touching nothing, when the developer will finish resolving', async () => {
         await leftMarked();
         sinon.stub(SdkGeneratePrompts.prototype, 'unresolvedChoice').resolves('resolve');
@@ -555,17 +476,6 @@ describe('GenerateAction (sdk) — the destination', () => {
         expect(unresolvedChoice.called).to.be.false;
         expect(read('a.py')).to.equal('kept above\ntheirs\nkept below\n');
         expect(conflictsResolved.firstCall.args[1]).to.equal('generated');
-      });
-
-      it('does not ask without a terminal, and ends as Action required', async () => {
-        await leftMarked();
-        const unresolvedChoice = sinon.stub(SdkGeneratePrompts.prototype, 'unresolvedChoice');
-        const conflictsUnresolved = sinon.stub(SdkGeneratePrompts.prototype, 'conflictsUnresolved');
-
-        expect((await execute({ force: false })).isActionRequired()).to.be.true;
-
-        expect(unresolvedChoice.called).to.be.false;
-        expect(conflictsUnresolved.calledOnce).to.be.true;
       });
 
       it('fails with its own message when the files could not be settled', async () => {

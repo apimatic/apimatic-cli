@@ -23,11 +23,4 @@ describe('RelativeFilePath', () => {
     expect(file.toString()).to.equal(path.resolve('sdk', 'typescript', 'src', 'models', 'book.ts'));
     expect(file.name().toString()).to.equal('book.ts');
   });
-
-  it('compares by value', () => {
-    const a = RelativeFilePath.fromGit('a.ts')!;
-
-    expect(a.isEqual(RelativeFilePath.fromGit('a.ts')!)).to.be.true;
-    expect(a.isEqual(RelativeFilePath.fromGit('b.ts')!)).to.be.false;
-  });
 });

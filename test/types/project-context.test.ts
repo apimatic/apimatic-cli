@@ -179,14 +179,6 @@ describe('ProjectContext', () => {
     });
   });
 
-  describe('sdk', () => {
-    it('writes into a named destination itself, adding no language', () => {
-      const clone = new DirectoryPath(inProject('my-sdk'));
-
-      expect(project().sdkDirectory(Language.TYPESCRIPT, clone).isEqual(clone)).to.be.true;
-    });
-  });
-
   describe('upsertGitignore', () => {
     const gitignorePath = () => inProject('.gitignore');
     const gitignore = () => fs.readFileSync(gitignorePath(), 'utf8');

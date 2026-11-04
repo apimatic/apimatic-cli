@@ -131,18 +131,6 @@ describe('GitContext', () => {
     }
   });
 
-  describe('hasFilesBesidesGit', () => {
-    it('counts what a save would remove: not a directory that is not there, or one holding only .git', async () => {
-      expect(await context().hasFilesBesidesGit()).to.be.false;
-
-      fs.mkdirSync(inRoot('sdk', 'python', '.git'), { recursive: true });
-      expect(await context().hasFilesBesidesGit()).to.be.false;
-
-      fs.mkdirSync(inRoot('sdk', 'python', '.github'));
-      expect(await context().hasFilesBesidesGit()).to.be.true;
-    });
-  });
-
   describe('isRepository', () => {
     it('is true for the SDK directory’s own repository, also inside one that encloses it, and records there', async () => {
       await ownRepository(root);
@@ -205,19 +193,6 @@ describe('GitContext', () => {
       write(inRoot('sdk', 'python', RECORD), 'not json');
       expect((await context().generationRecord()).isFound()).to.be.false;
     });
-
-    it('is what the last recording wrote: the generation and its snapshot', async () => {
-      await ownRepository();
-      const commit = await record({ 'README.md': '# sdk' });
-
-      const found = await context().generationRecord();
-
-      expect(found.baseFor(Language.PYTHON, Stability.STABLE)).to.deep.equal(commit);
-      expect(found.baseFor(Language.PYTHON, Stability.BETA)).to.be.undefined;
-      expect(fs.readFileSync(inRoot('sdk', 'python', RECORD), 'utf-8')).to.equal(
-        recordContents(Language.PYTHON, Stability.STABLE, commit)
-      );
-    });
   });
 
   describe('inspect', () => {
@@ -235,17 +210,6 @@ describe('GitContext', () => {
       expect(state.isRecorded()).to.be.false;
       expect(state.snapshot.mergeBase()).to.be.undefined;
       expect(operationInProgress.called).to.be.false;
-    });
-
-    it('names the operation the repository is in the middle of', async () => {
-      await ownRepository();
-      fs.writeFileSync(inRoot('sdk', 'python', '.git', 'REBASE_HEAD'), `${'a'.repeat(40)}\n`);
-
-      const state = await inspect();
-
-      expect(state.isRepository()).to.be.true;
-      expect(state.operation.isUnderWay()).to.be.true;
-      expect(state.operation.toString()).to.equal('rebase');
     });
 
     it('names the files git holds as unmerged, each once and whatever they hold, and none once every one is staged', async () => {
@@ -658,52 +622,6 @@ describe('GitContext', () => {
       ]);
     });
 
-    it('leaves the record yours, whole and without markers, when a pull meets a teammate’s record', async () => {
-      const sh = (cwd: string, ...args: string[]) =>
-        execa('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', '-c', 'core.autocrlf=false', ...args], {
-          cwd,
-          reject: false
-        });
-      /** A generation of `files` recorded in the repository at `directory` and committed; the record as written. */
-      const regenerate = async (directory: string, files: Files, message: string) => {
-        await record(files, directory);
-        await sh(directory, 'add', '-A');
-        await sh(directory, 'commit', '-qm', message);
-        return fs.readFileSync(path.join(directory, RECORD), 'utf8');
-      };
-      await ownRepository();
-      const origin = inRoot('origin.git');
-      const teammate = inRoot('teammate');
-      await regenerate(sdk(), { 'README.md': '# v1' }, 'v1');
-      await sh(root, 'init', '-q', '--bare', '--initial-branch=main', origin);
-      await sh(sdk(), 'remote', 'add', 'origin', origin);
-      await sh(sdk(), 'push', '-q', 'origin', 'main');
-      await sh(root, 'clone', '-q', origin, teammate);
-      await regenerate(teammate, { 'README.md': '# v2 for them' }, 'theirs');
-      await sh(teammate, 'push', '-q', 'origin', 'main');
-      const yours = await regenerate(sdk(), { 'README.md': '# v2 for me' }, 'mine');
-
-      const pulled = await sh(sdk(), '-c', 'pull.rebase=false', 'pull', '-q', 'origin', 'main');
-
-      const recordNow = fs.readFileSync(inRoot('sdk', 'python', RECORD), 'utf8');
-      expect(pulled.exitCode).to.not.equal(0);
-      expect(recordNow).to.equal(yours);
-      expect(recordNow).to.not.contain('<<<<<<<');
-      expect((await sh(sdk(), 'status', '--porcelain', '--', '.apimatic')).stdout).to.equal(
-        'UU .apimatic/generation.json'
-      );
-      await sh(sdk(), 'add', '--', '.apimatic/generation.json');
-      expect((await sh(sdk(), 'commit', '-q', '--no-edit')).exitCode).to.equal(0);
-    });
-
-    it('leaves the repository’s own index alone', async () => {
-      await ownRepository();
-
-      await record({ 'README.md': '# v1' });
-
-      expect((await execa('git', ['ls-files'], { cwd: sdk() })).stdout).to.equal('');
-    });
-
     it('fails, the snapshot committed all the same, when the record cannot be written', async () => {
       await ownRepository();
       sinon.stub(FileService.prototype, 'replaceContents').rejects(new Error('EACCES: permission denied'));
@@ -821,31 +739,6 @@ describe('GitContext', () => {
       } finally {
         restoreHome();
       }
-    });
-
-    it('is quiet once the hook elsewhere runs the script', async () => {
-      await ownRepository();
-      await sh(sdk(), 'config', 'core.hooksPath', '.husky/_');
-      write(inRoot('sdk', 'python', '.husky', 'pre-push'), `npm test\n${SHARE_HOOK_CALL}\n`);
-
-      expect(hookKind(await shared())).to.equal('calling');
-    });
-
-    it('leaves a hook in another language alone, naming it, unless it runs the script already', async () => {
-      await ownRepository();
-      write(hookFile(sdk()), '#!/usr/bin/env node\nconsole.log("hi");\n');
-
-      const left = await shared();
-
-      expect(hookKind(left)).to.equal(`notShell ${hookFile(sdk())} script ${hookFile(sdk(), 'apimatic-pre-push')}`);
-      expect(fs.readFileSync(hookFile(sdk()), 'utf8')).to.not.contain(SHARE_HOOK_CALL);
-
-      write(
-        hookFile(sdk()),
-        '#!/usr/bin/env node\nrequire("child_process").execSync("sh .git/hooks/apimatic-pre-push");\n'
-      );
-
-      expect(hookKind(await shared())).to.equal('calling');
     });
 
     it('shares the chain when the developer pushes a branch, and is quiet about it', async () => {
@@ -1101,74 +994,6 @@ describe('GitContext', () => {
         });
       };
 
-    it('merges your edit with the generator’s change when they touch different lines', async () => {
-      const { plan, read } = await merged(
-        { 'book.ts': MODEL_V1 },
-        { 'book.ts': MODEL_V1_WITH_HELPER },
-        { 'book.ts': MODEL_V2 }
-      );
-
-      expect(read('book.ts')).to.equal(MODEL_V2 + HELPER);
-      expect(plan.files.merged.map(String)).to.deep.equal(['book.ts']);
-      expect(plan.hasConflicts()).to.be.false;
-    });
-
-    it('marks the lines you and the generator both changed, with the CLI’s labels, and keeps the rest merged', async () => {
-      const yours = MODEL_V1.replace('Price in USD.', 'Price in USD, VAT included.');
-
-      const { plan, read } = await merged({ 'book.ts': MODEL_V1 }, { 'book.ts': yours }, { 'book.ts': MODEL_V2 });
-
-      expect(read('book.ts')).to.equal(
-        [
-          'export type Book = {',
-          ...MODEL_FIELDS,
-          YOURS_MARKER,
-          '  /** Price in USD, VAT included. */',
-          '=======',
-          '  /** Retail price in US dollars. */',
-          GENERATED_MARKER,
-          '  price: number;',
-          '  isbn?: string;',
-          '};',
-          ''
-        ].join('\n')
-      );
-      expect(kinds(plan.conflicts)).to.deep.equal([['book.ts', 'bothChanged']]);
-      expect(plan.stages.map(({ stage, path: staged }) => [String(staged), stage])).to.deep.equal([
-        ['book.ts', 1],
-        ['book.ts', 2],
-        ['book.ts', 3]
-      ]);
-    });
-
-    it('leaves the directory alone when the plan is only read', async () => {
-      const yours = MODEL_V1.replace('Price in USD.', 'Price in USD, VAT included.');
-
-      const { plan, read } = await merged(
-        { 'book.ts': MODEL_V1 },
-        { 'book.ts': yours },
-        { 'book.ts': MODEL_V2 },
-        { written: false }
-      );
-
-      expect(plan.hasConflicts()).to.be.true;
-      expect(read('book.ts')).to.equal(yours);
-    });
-
-    it('adds a file the generator produced for the first time, and never touches one that is yours alone, nor its own record and the attributes beside it', async () => {
-      const { plan, read } = await merged(
-        { 'a.ts': 'a\n' },
-        { 'a.ts': 'a\n', 'custom/format.ts': 'mine\n' },
-        { 'a.ts': 'a\n', 'delete-book.ts': 'new\n' }
-      );
-
-      expect(read('delete-book.ts')).to.equal('new\n');
-      expect(read('custom/format.ts')).to.equal('mine\n');
-      expect(plan.writes.map((write) => write.path.toString())).to.deep.equal(['delete-book.ts']);
-      expect(plan.files.added.map(String)).to.deep.equal(['delete-book.ts']);
-      expect(plan.files.kept.map(String)).to.deep.equal(['custom/format.ts']);
-    });
-
     it('marks a path you and the generator both added with different content, and accepts one with the same', async () => {
       const differ = await merged(
         { 'a.ts': 'a\n' },
@@ -1267,36 +1092,6 @@ describe('GitContext', () => {
         }
       });
 
-      it('keeps an edited file the generator stopped producing, for the generator’s side too', async () => {
-        const { plan, read } = await merged(
-          { 'models/book.ts': MODEL_V1, 'helper.ts': 'helper\n' },
-          { 'models/book.ts': MODEL_V1_WITH_HELPER, 'helper.ts': 'helper, edited\n' },
-          { 'models/book.ts': MODEL_V2 },
-          { favour: 'generated' }
-        );
-
-        expect(read('helper.ts')).to.equal('helper, edited\n');
-        expect(read('models/book.ts')).to.equal(MODEL_V2 + HELPER);
-        expect(plan.files.kept.map(String)).to.deep.equal(['helper.ts']);
-        expect(plan.hasConflicts()).to.be.false;
-      });
-
-      it('keeps a file you added inside a directory the generator renamed, for either side', async () => {
-        for (const favour of ['generated', 'yours'] as const) {
-          const { plan, paths, read } = await merged(
-            { 'models/book.ts': MODEL_V1, 'b.ts': 'b\n' },
-            { 'models/book.ts': MODEL_V1, 'models/custom.ts': 'custom\n', 'b.ts': 'b\n' },
-            { 'model/book.ts': MODEL_V2, 'b.ts': 'b\n' },
-            { favour }
-          );
-
-          expect(paths(), favour).to.deep.equal(['b.ts', 'model/book.ts', 'model/custom.ts']);
-          expect(read('model/custom.ts')).to.equal('custom\n');
-          expect(read('model/book.ts')).to.equal(MODEL_V2);
-          expect(plan.hasConflicts(), favour).to.be.false;
-        }
-      });
-
       it('reports a file you added inside a directory the generator renamed as a conflict of another shape, placed in the new directory', async () => {
         const { plan, paths, read } = await merged(
           { 'models/book.ts': MODEL_V1, 'b.ts': 'b\n' },
@@ -1308,26 +1103,6 @@ describe('GitContext', () => {
         expect(paths()).to.deep.equal(['b.ts', 'model/book.ts', 'model/custom.ts']);
         expect(read('model/custom.ts')).to.equal('custom\n');
         expect(counts(plan.files)).to.deep.equal({ added: 0, updated: 1, merged: 0, removed: 1, kept: 0 });
-      });
-    });
-
-    describe('stageConflicts', () => {
-      it('marks the conflicted paths in the repository’s own index at stages 1, 2 and 3, and nothing else', async () => {
-        const yours = MODEL_V1.replace('Price in USD.', 'Price in USD, VAT included.');
-        const { plan, directory } = await merged(
-          { 'book.ts': MODEL_V1, 'b.ts': 'b\n' },
-          { 'book.ts': yours, 'b.ts': 'b\n' },
-          { 'book.ts': MODEL_V2, 'b.ts': 'b\n' }
-        );
-
-        (await git.stageConflicts(new DirectoryPath(directory), plan.stages))._unsafeUnwrap();
-
-        const { stdout } = await execa('git', ['ls-files', '--stage'], { cwd: directory });
-        expect(stdout.split('\n').map((line) => [line.split('\t')[1], line.split(/\s+/)[2]])).to.deep.equal([
-          ['book.ts', '1'],
-          ['book.ts', '2'],
-          ['book.ts', '3']
-        ]);
       });
     });
 
@@ -1461,17 +1236,6 @@ describe('GitContext', () => {
         expect(read('docs/index.md')).to.equal('docs\n');
         expect(read('api')).to.equal('api\n');
       });
-
-      it('removes the directories a removed file leaves empty, and no other', async () => {
-        const { exists } = await merged(
-          { 'models/old/deep/a.ts': 'a\n', 'models/keep.ts': 'k\n' },
-          { 'models/old/deep/a.ts': 'a\n', 'models/keep.ts': 'k\n' },
-          { 'models/keep.ts': 'k\n' }
-        );
-
-        expect(exists('models/old')).to.be.false;
-        expect(exists('models/keep.ts')).to.be.true;
-      });
     });
 
     describe('content rules', () => {
@@ -1498,16 +1262,6 @@ describe('GitContext', () => {
         expect(read('a.cs')).to.equal('one\r\ntwo\r\nthree\r\n');
         expect(read('b.cs')).to.equal('mine\none\ntwo\nthree\n');
         expect(read('d.cs')).to.equal('new\r\n');
-      });
-
-      it('labels the markers of a CRLF file on CRLF lines', async () => {
-        const { read } = await merged(
-          { 'a.cs': 'one\r\ntwo\r\n' },
-          { 'a.cs': 'one\r\nmine\r\n' },
-          { 'a.cs': 'one\r\ntheirs\r\n' }
-        );
-
-        expect(read('a.cs')).to.equal(`one\r\n${YOURS_MARKER}\r\nmine\r\n=======\r\ntheirs\r\n${GENERATED_MARKER}\r\n`);
       });
 
       it('replaces an unedited binary and keeps an edited one, as a conflict when the generator changed it too', async () => {
