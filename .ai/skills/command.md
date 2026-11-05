@@ -84,6 +84,7 @@ These three layers are always created together and mirror each other in path str
 - **DO** use typed path objects (`DirectoryPath`, `FilePath`, `FileName`, `UrlPath`) instead of raw strings.
 - **DO** use `ActionResult.success(value?)`, `ActionResult.failed(message?)`, or `ActionResult.cancelled()` as return values.
 - **DO** use neverthrow `Result<T, E>` for service returns — check with `.isErr()` / `.isOk()`.
+- **DO** type an async `Result` as `Promise<Result<T, E>>` and `await` it before checking — never `ResultAsync`, `safeTry`, `okAsync` or `errAsync`.
 
 ### General — DON'T
 
@@ -128,7 +129,7 @@ These three layers are always created together and mirror each other in path str
 | Action with Result error handling | `src/actions/api/validate.ts` |
 | Action with simpler constructor (no authKey) | `src/actions/auth/status.ts` |
 | Action that delegates to sub-actions | `src/actions/quickstart.ts` |
-| Prompts with spinner + confirm + select | `src/prompts/sdk/generate.ts` |
+| Prompts with spinner + confirm + noteWrapped | `src/prompts/sdk/generate.ts` |
 | Prompts with error display methods | `src/prompts/portal/generate.ts` |
 | Prompts with format helpers | `src/prompts/api/transform.ts` |
 | Prompts with noteWrapped + getTree | `src/prompts/quickstart.ts` |

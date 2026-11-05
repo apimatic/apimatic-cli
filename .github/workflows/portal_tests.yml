@@ -166,6 +166,17 @@ jobs:
           PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}\.playwright-browsers
         run: pnpm test:visual
 
+      # The nav.json layouts that build. Each scenario generates its own copy
+      # of the suite's petstore build with this CLI and serves it on its
+      # worker's port (8090-8092), three at a time, so this needs neither the
+      # generate step above nor its server, and runs even if they failed.
+      - name: visual — nav.json
+        if: ${{ !cancelled() }}
+        working-directory: tests
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}\.playwright-browsers
+        run: pnpm test:nav:visual
+
       # Functional runs against the suite's auth build, whose playground calls
       # the API Tester (tests/api-tester/) on localhost:3000.
       # Playwright starts the API Tester itself (webServer in playwright.config.ts),

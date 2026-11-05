@@ -73,7 +73,7 @@ export class {PascalName}Event extends DomainEvent {
 - **DO** place the file at `src/types/events/{kebab-name}.ts`.
 - **DO** use `.js` extension in the import: `import { DomainEvent } from "./domain-event.js"`.
 - **DO** fire events from the Command layer only — never from Actions or Services.
-- **DO** fire success events inside the `mapAll` success callback (first arg); failure events in the failure callback (second arg).
+- **DO** fire success events inside the `success` handler of `result.match(...)`; failure events in its `failed` handler.
 
 ### DON'T
 
@@ -92,7 +92,7 @@ export class {PascalName}Event extends DomainEvent {
 - [ ] `message` and `commandName` are `private static readonly ... as const` (self-contained variant)
 - [ ] Named export (not default)
 - [ ] Import uses `.js` extension: `"./domain-event.js"`
-- [ ] Fired from Command layer only, inside `result.mapAll(...)` callback
+- [ ] Fired from Command layer only, inside a `result.match(...)` handler
 
 ---
 

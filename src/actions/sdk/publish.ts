@@ -12,30 +12,35 @@ import { Language, Stability } from '../../types/sdk/generate.js';
 import { PublishingProfile } from '../../types/publish/publishing-profile.js';
 import { PackageSettingsContext } from '../../types/package-settings-context.js';
 import { ProjectContext } from '../../types/project-context.js';
-import { TempContext } from '../../types/temp-context.js';
 import { ActionResult } from '../action-result.js';
 import { GenerateAction } from './generate.js';
 import { FileName } from '../../types/file/fileName.js';
 import { FilePath } from '../../types/file/filePath.js';
+import { GitContext } from '../../types/git-context.js';
+import { GitVersion } from '../../types/git/git-version.js';
+import { GitService } from '../../infrastructure/git-service.js';
 
 export class SdkPublishAction {
   private readonly prompts: SdkPublishPrompts = new SdkPublishPrompts();
   private readonly publishingApiService: PublishingApiService = new PublishingApiService();
   private readonly launcherService: LauncherService = new LauncherService();
+  private readonly gitService: GitService = new GitService();
 
   public constructor(private readonly configDir: DirectoryPath, private readonly commandMetadata: CommandMetadata) {}
 
   public readonly execute = async (
     project: ProjectContext,
-    outputDirectory: DirectoryPath,
+    sdkDirectory: DirectoryPath,
     language: Language,
+    stability: Stability,
     publishType: PublishType[],
     force: boolean,
+    canAsk: boolean,
+    gitInit: boolean,
     profileId: ProfileId,
     semVersion: SemVersion,
     publishingProfile: PublishingProfile,
     dryRun: boolean,
-    stability: Stability,
     publishingSummary: string,
     onPublishSdkError: (errorMessage: string) => void
   ): Promise<ActionResult> => {
@@ -52,34 +57,33 @@ export class SdkPublishAction {
       const sdkGenerateAction = new GenerateAction(this.configDir, this.commandMetadata);
       const sdkGenerationResult = await sdkGenerateAction.execute(
         project,
-        outputDirectory,
+        sdkDirectory,
         language,
         stability,
         force,
-        false,
-        undefined,
+        canAsk,
+        gitInit,
         packageSettingsDirectory
       );
-      if (sdkGenerationResult.isFailed()) {
-        return ActionResult.failed();
+      if (sdkGenerationResult.isActionRequired()) {
+        this.prompts.conflictsNotPublished();
       }
-      if (sdkGenerationResult.isCancelled()) {
-        return ActionResult.cancelled();
+      if (!sdkGenerationResult.isSuccess()) {
+        return sdkGenerationResult.discardValue();
       }
-
-      const sdkLanguageDirectory = outputDirectory.join(language);
 
       if (dryRun) {
-        this.prompts.dryRunNotice(publishingSummary);
-        const readmeFilePath = new FilePath(sdkLanguageDirectory, new FileName('README.md'));
-        await this.launcherService.openDirectoryInEditorOrFileExplorer(sdkLanguageDirectory, readmeFilePath);
+        this.prompts.dryRunNotice(sdkDirectory, publishingSummary);
+        const readmeFilePath = new FilePath(sdkDirectory, new FileName('README.md'));
+        await this.launcherService.openDirectoryInEditorOrFileExplorer(sdkDirectory, readmeFilePath);
         return ActionResult.success();
       }
 
-      const tempContext = new TempContext(tempDirectory);
-      const sdkFile = await tempContext.zip(sdkLanguageDirectory);
+      const gitContext = new GitContext(sdkDirectory);
+      const git = (await gitContext.hasGitDirectory()) ? await this.gitService.version() : GitVersion.none();
+      const sdkFile = await gitContext.archiveForUpload(git, tempDirectory);
       if (sdkFile.isErr()) {
-        this.prompts.sdkNotZipped(sdkLanguageDirectory, sdkFile.error);
+        this.prompts.sdkNotZipped(sdkDirectory, sdkFile.error);
         return ActionResult.failed();
       }
 
@@ -104,11 +108,8 @@ export class SdkPublishAction {
       return ActionResult.success(publishSdkResponse.value);
     });
 
-    if (publishResult.isFailed()) {
-      return ActionResult.failed();
-    }
-    if (publishResult.isCancelled()) {
-      return ActionResult.cancelled();
+    if (!publishResult.isSuccess()) {
+      return publishResult.discardValue();
     }
 
     // Since publishing was not initiated, skip the next steps for polling.

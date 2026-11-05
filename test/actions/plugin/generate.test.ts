@@ -21,6 +21,7 @@ import { FilePath } from '../../../src/types/file/filePath.js';
 import { FileProblem } from '../../../src/types/file/file-problem.js';
 import { ZipService } from '../../../src/infrastructure/zip-service.js';
 import { FileService } from '../../../src/infrastructure/file-service.js';
+import { terminal } from '../../../src/infrastructure/terminal.js';
 import { CommandMetadata } from '../../../src/types/common/command-metadata.js';
 import { PublishingApiService } from '../../../src/infrastructure/services/publishing-api-service.js';
 import { ProjectContext } from '../../../src/types/project-context.js';
@@ -37,7 +38,7 @@ describe('PluginGenerateAction', () => {
 
   let pluginArchive: Buffer;
   let selectLanguages: sinon.SinonStub;
-  let canAsk: sinon.SinonStub;
+  let isInteractive: sinon.SinonStub;
   let getPublishingProfiles: sinon.SinonStub;
   /** Every file in the last zip handed to the service, by entry name. */
   let uploaded: Record<string, string>;
@@ -96,7 +97,7 @@ describe('PluginGenerateAction', () => {
     // the quiet case — the prompt's own every-language default, no profile — so a test that is not
     // about either says nothing about them. Mocha runs without a terminal, which the prompt needs.
     selectLanguages = sinon.stub(PluginGeneratePrompts.prototype, 'selectLanguages').resolves([...AVAILABLE_LANGUAGES]);
-    canAsk = sinon.stub(PluginGeneratePrompts.prototype, 'canAsk').returns(true);
+    isInteractive = sinon.stub(terminal, 'isInteractive').returns(true);
     getPublishingProfiles = sinon.stub(PublishingApiService.prototype, 'getPublishingProfiles').resolves(ok([]));
 
     action = new PluginGenerateAction(new DirectoryPath(tmpDirResult.path), COMMAND_METADATA, 'auth-key');
@@ -389,7 +390,7 @@ describe('PluginGenerateAction', () => {
       // Otherwise Node ends the run with a warning about an unsettled await and nothing more.
       it('fails before asking anything when it has to ask and there is no terminal', async () => {
         await fsExtra.remove(configPath());
-        canAsk.returns(false);
+        isInteractive.returns(false);
         const needsTerminal = sinon.stub(PluginGeneratePrompts.prototype, 'setupNeedsTerminal');
         const inputPluginMetadata = PluginRecordMetadataPrompts.prototype.inputPluginMetadata as sinon.SinonStub;
         const generatePlugin = sinon.stub(PluginService.prototype, 'generatePlugin');
@@ -405,7 +406,7 @@ describe('PluginGenerateAction', () => {
 
       it('fails without a terminal when only the plugin identity is missing, and says so', async () => {
         await writeConfig({ languages: { csharp: {} } });
-        canAsk.returns(false);
+        isInteractive.returns(false);
         const needsTerminal = sinon.stub(PluginGeneratePrompts.prototype, 'setupNeedsTerminal');
         const generatePlugin = sinon.stub(PluginService.prototype, 'generatePlugin');
 
@@ -419,7 +420,7 @@ describe('PluginGenerateAction', () => {
 
       it('fails without a terminal when only the languages are missing, and says so', async () => {
         await writeConfig({ plugin: METADATA, languages: {} });
-        canAsk.returns(false);
+        isInteractive.returns(false);
         const needsTerminal = sinon.stub(PluginGeneratePrompts.prototype, 'setupNeedsTerminal');
         const generatePlugin = sinon.stub(PluginService.prototype, 'generatePlugin');
 
@@ -431,7 +432,7 @@ describe('PluginGenerateAction', () => {
       });
 
       it('generates without a terminal for a project set up for a plugin', async () => {
-        canAsk.returns(false);
+        isInteractive.returns(false);
         generated();
 
         expect((await execute()).isSuccess()).to.be.true;
@@ -686,12 +687,8 @@ describe('PluginGenerateAction', () => {
     });
 
     it('reports every message the response carries, whatever key it arrived under', async () => {
-      // The service assembles one message from every key, so no key can be dropped for
-      // being one the CLI does not recognise.
-      const error = ServiceError.badRequest('One or more validation errors occurred.\n- a\n- b', {
-        pluginConfig: ['a'],
-        someKeyTheCliDoesNotKnow: ['b']
-      });
+      // The service assembles one message from every key, so a key the CLI does not know is a line too.
+      const error = ServiceError.badRequest('One or more validation errors occurred.\n- a\n- b');
       sinon.stub(PluginService.prototype, 'generatePlugin').resolves(err(error));
       const printed = sinon.stub(log, 'error');
 

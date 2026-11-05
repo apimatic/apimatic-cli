@@ -85,11 +85,6 @@ export class PluginGeneratePrompts {
     log.error(message);
   }
 
-  // Without a terminal a prompt never answers, and Node exits with nothing said.
-  public canAsk(): boolean {
-    return process.stdin.isTTY === true;
-  }
-
   public setupNeedsTerminal(sourceDirectory: DirectoryPath, config: PluginConfig) {
     const command = `'${f.cmdAlt('apimatic', 'plugin', 'generate')}'`;
     const configFile = `${f.var(APIMATIC_CONFIG_FILE_NAME)} in ${f.path(sourceDirectory)}`;

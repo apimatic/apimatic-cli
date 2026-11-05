@@ -1,7 +1,24 @@
 import path from 'node:path';
 import { expect } from 'chai';
-import { format } from '../../src/prompts/format.js';
+import { ActionResult } from '../../src/actions/action-result.js';
+import { format, outro } from '../../src/prompts/format.js';
 import { DirectoryPath } from '../../src/types/file/directoryPath.js';
+import { printed } from '../helpers/printed.js';
+
+describe('outro', () => {
+  it('closes a run that leaves the developer something to do as Action required, exiting 1', () => {
+    const exitCode = process.exitCode;
+
+    const said = printed(() => outro(ActionResult.actionRequired()));
+
+    try {
+      expect(said).to.contain('Action required');
+      expect(process.exitCode).to.equal(1);
+    } finally {
+      process.exitCode = exitCode;
+    }
+  });
+});
 
 // `DirectoryPath` resolves on construction, so every path the CLI holds is absolute. The commands
 // that print one for a reader to read or paste — `sdk generate`'s destination, the `cd` line in

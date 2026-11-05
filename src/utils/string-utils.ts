@@ -25,3 +25,8 @@ const PROSE_LISTS = {
 export function listedInProse(items: readonly string[], joiner: keyof typeof PROSE_LISTS = 'and'): string {
   return PROSE_LISTS[joiner].format(items);
 }
+
+/** `1 file`, `2 files`: a count with its noun, for nouns that pluralise with an `s`. */
+export function plural(count: number, noun: string): string {
+  return `${count} ${noun}${count === 1 ? '' : 's'}`;
+}

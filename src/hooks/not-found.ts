@@ -1,8 +1,9 @@
 // This code was originally forked from https://github.com/oclif/plugin-not-found/blob/main/src/index.ts
-import { Hook, toConfiguredId } from "@oclif/core";
-import { cyan, yellow } from "ansis";
+import { Hook, toConfiguredId } from '@oclif/core';
+import { cyan, yellow } from 'ansis';
+import { terminal } from '../infrastructure/terminal.js';
 
-import utils from "./utils.js";
+import utils from './utils.js';
 
 const hook: Hook.CommandNotFound = async function (opts) {
   const hiddenCommandIds = new Set(opts.config.commands.filter((c) => c.hidden).map((c) => c.id));
@@ -14,14 +15,14 @@ const hook: Hook.CommandNotFound = async function (opts) {
   if (commandIDs.length === 0) return;
 
   let binHelp = `${opts.config.bin} help`;
-  const idSplit = opts.id.split(":");
+  const idSplit = opts.id.split(':');
   if (opts.config.findTopic(idSplit[0])) {
     binHelp = `${binHelp} ${idSplit[0]}`;
   }
 
   let suggestion: string | null;
   if (/:?help:?/.test(opts.id)) {
-    suggestion = ["help", ...opts.id.split(":").filter((cmd) => cmd !== "help")].join(":");
+    suggestion = ['help', ...opts.id.split(':').filter((cmd) => cmd !== 'help')].join(':');
   } else {
     suggestion = utils.closest(opts.id, commandIDs);
   }
@@ -31,7 +32,7 @@ const hook: Hook.CommandNotFound = async function (opts) {
   const originalCmd = toConfiguredId(opts.id, this.config);
   this.warn(`${yellow(originalCmd)} is not a ${opts.config.bin} command.`);
 
-  if (!process.stdin.isTTY || !suggestion) {
+  if (!terminal.isInteractive() || !suggestion) {
     this.error(`Run ${cyan.bold(binHelp)} for a list of available commands.`, {
       exit: 127
     });
@@ -45,21 +46,21 @@ const hook: Hook.CommandNotFound = async function (opts) {
   }
 
   if (response) {
-    const confirmedSuggestion = suggestion!;
+    let command = suggestion!;
     let argv = opts.argv ?? [];
 
-    if (confirmedSuggestion.startsWith("help:")) {
-      argv = confirmedSuggestion.split(":").slice(1);
-      suggestion = "help";
+    // `help:sdk` is the help command run for the sdk topic, not a command of its own.
+    if (command.startsWith('help:')) {
+      argv = command.split(':').slice(1);
+      command = 'help';
     }
 
-    return this.config.runCommand(confirmedSuggestion, argv);
+    return this.config.runCommand(command, argv);
   }
 
   this.error(`Run ${cyan.bold(binHelp)} for a list of available commands.`, {
     exit: 127
   });
-
 };
 
 export default hook;

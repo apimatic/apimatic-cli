@@ -7,6 +7,7 @@ import { SiteAddress } from '../../types/portal/config/site-address.js';
 import { Result } from 'neverthrow';
 import { format as f } from '../format.js';
 import { logTail, noteWrapped, withSpinner } from '../prompt.js';
+import { plural } from '../../utils/string-utils.js';
 
 function describeSaveProblem(problem: PortalSaveProblem): string {
   switch (problem.kind) {
@@ -61,7 +62,7 @@ export class PortalGeneratePrompts {
   public buildPortal(fn: Promise<Result<PortalBuildResult, PortalBuildFailure>>) {
     return withSpinner(
       'Building the portal',
-      ({ pageCount }) => `Built ${pageCount} ${pageCount === 1 ? 'page' : 'pages'}.`,
+      ({ pageCount }) => `Built ${plural(pageCount, 'page')}.`,
       (failure) => failure.message,
       fn,
       { indicator: 'timer' }
