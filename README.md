@@ -455,7 +455,8 @@ Generate and publish an SDK to a package registry and/or source repository
 ```
 USAGE
   $ apimatic sdk publish [-p <value>] [-v <value>] [-d <value>] [-l csharp|java|php|python|ruby|typescript|go]
-    [-f] [-i <value>] [--publish-type package|sourcecode...] [--dry-run] [--stability stable|beta] [--git-init]
+    [-f] [-i <value>] [--publish-type package|sourcecode...] [--dry-run] [--stability stable|beta] [--git-init] [-k
+    <value>]
 
 FLAGS
   -d, --destination=<value>       [default: <input>/sdk/<language>] path where the sdk will be generated.
@@ -463,6 +464,7 @@ FLAGS
                                   be merged is replaced, with a warning.
   -i, --input=<value>             [default: ./] path to the parent directory containing the 'src' directory, which
                                   includes API specifications and configuration files.
+  -k, --auth-key=<value>          override current authentication state with an authentication key.
   -l, --language=<option>         Language of the SDK to generate and publish.
                                   <options: csharp|java|php|python|ruby|typescript|go>
   -p, --profile-id=<value>        Id of the publishing profile to use.
@@ -480,8 +482,8 @@ DESCRIPTION
   Generate and publish an SDK to a package registry and/or source repository
 
   Generate and publish an SDK using a publishing profile configured in the APIMatic App. Requires an input directory
-  containing the API specification. Run it with no flags, or with only --git-init, for guided mode, or pass flags for
-  CI/CD. When you pass flags, --profile-id, --language, --version, and --publish-type are required.
+  containing the API specification. Run it with no flags, or with only --git-init or --auth-key, for guided mode, or
+  pass flags for CI/CD. When you pass flags, --profile-id, --language, --version, and --publish-type are required.
   Your changes to the SDK are merged before it is published, as sdk generate does with git 2.38 or later: with flags,
   always; in guided mode, add --git-init. Nothing is published while conflicts are left to resolve.
 
