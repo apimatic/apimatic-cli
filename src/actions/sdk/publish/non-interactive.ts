@@ -18,7 +18,11 @@ export class SdkPublishNonInteractiveAction {
   private readonly prompts: SdkPublishNonInteractivePrompts = new SdkPublishNonInteractivePrompts();
   private readonly publishingApiService: PublishingApiService = new PublishingApiService();
 
-  public constructor(private readonly configDir: DirectoryPath, private readonly commandMetadata: CommandMetadata) {}
+  public constructor(
+    private readonly configDir: DirectoryPath,
+    private readonly commandMetadata: CommandMetadata,
+    private readonly authKey: string | null = null
+  ) {}
 
   public readonly execute = async (
     project: ProjectContext,
@@ -63,7 +67,7 @@ export class SdkPublishNonInteractiveAction {
     }
 
     const publishingProfilesResponse = await this.prompts.getPublishingProfiles(
-      this.publishingApiService.getPublishingProfiles(this.configDir, this.commandMetadata.shell)
+      this.publishingApiService.getPublishingProfiles(this.configDir, this.commandMetadata.shell, this.authKey)
     );
     if (publishingProfilesResponse.isErr()) {
       this.prompts.getPublishingProfilesServiceError(publishingProfilesResponse.error);
@@ -108,7 +112,7 @@ export class SdkPublishNonInteractiveAction {
       stability: stability.chosenLevel()
     });
     // A run with flags is the CI flow: it never waits on a question, whether a terminal is attached or not, and always keeps the SDK's edits.
-    const publishResult = await new SdkPublishAction(this.configDir, this.commandMetadata).execute(
+    const publishResult = await new SdkPublishAction(this.configDir, this.commandMetadata, this.authKey).execute(
       project,
       sdkDirectory,
       language,

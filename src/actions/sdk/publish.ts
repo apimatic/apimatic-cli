@@ -26,7 +26,11 @@ export class SdkPublishAction {
   private readonly launcherService: LauncherService = new LauncherService();
   private readonly gitService: GitService = new GitService();
 
-  public constructor(private readonly configDir: DirectoryPath, private readonly commandMetadata: CommandMetadata) {}
+  public constructor(
+    private readonly configDir: DirectoryPath,
+    private readonly commandMetadata: CommandMetadata,
+    private readonly authKey: string | null = null
+  ) {}
 
   public readonly execute = async (
     project: ProjectContext,
@@ -54,7 +58,7 @@ export class SdkPublishAction {
         await packageSettingsContext.writeConfiguration(packageConfigurationData, language);
       }
 
-      const sdkGenerateAction = new GenerateAction(this.configDir, this.commandMetadata);
+      const sdkGenerateAction = new GenerateAction(this.configDir, this.commandMetadata, this.authKey);
       const sdkGenerationResult = await sdkGenerateAction.execute(
         project,
         sdkDirectory,
@@ -95,7 +99,8 @@ export class SdkPublishAction {
           semVersion,
           publishType,
           this.configDir,
-          this.commandMetadata.shell
+          this.commandMetadata.shell,
+          this.authKey
         )
       );
 
@@ -125,7 +130,8 @@ export class SdkPublishAction {
       this.publishingApiService.getSdkPublishingLog(
         publishingInfo.publishLogId,
         this.configDir,
-        this.commandMetadata.shell
+        this.commandMetadata.shell,
+        this.authKey
       )
     );
 
