@@ -17,6 +17,8 @@ overrides:
   oclif: 4.17.34
   browserslist: 4.24.4
   '@scalar/json-magic>undici': 7.29.1
+  fumadocs-openapi>chokidar: ^5.0.0
+  fumadocs-openapi>undici: 7.29.1
   '@types/node': 22.14.1
 
 importers:
@@ -3285,10 +3287,6 @@ packages:
     resolution: {integrity: sha512-TQMmc3w+5AxjpL8iIiwebF73dRDF4fBIieAqGn9RGCWaEVwQ6Fb2cGe31Yns0RRIzii5goJ1Y7xbMwo1TxMplw==}
     engines: {node: '>= 20.19.0'}
 
-  chokidar@6.0.0:
-    resolution: {integrity: sha512-Ec2Z7wpcKBiMpR7DxteoqS/sq5G5d2A4fpxzPv6+fD7xNNdrTghn7L11YwV5EN1B3i72Erc3XVT5FkWIDx90+A==}
-    engines: {node: '>= 22.22'}
-
   class-variance-authority@0.7.1:
     resolution: {integrity: sha512-Ka+9Trutv7G8M6WT6SeiRWz792K5qEqIGEGzXKhAE6xOWAY6pPH8U+9IY3oCMv6kqTmLsv7Xh/2w2RigkePMsg==}
 
@@ -6545,10 +6543,6 @@ packages:
   undici@7.29.1:
     resolution: {integrity: sha512-RYONW2MeafgYlkVOKYKkA/Ag7BmXqgIWCa8t1m0JcxrQg9pI9lEqRhAOruOBCbAohOa/gkCF+iPi9hrgvTzu6Q==}
     engines: {node: '>=20.18.1'}
-
-  undici@8.12.4:
-    resolution: {integrity: sha512-8Mx+uNKKER2bA4AdtedkqRbwUCIJFr2nJckXRe5yrDqzePqwLP7VNcctN8/XdmDSbF7mS+jJKIszlL+vbam1VA==}
-    engines: {node: '>=22.19.0'}
 
   unicode-emoji-modifier-base@1.0.0:
     resolution: {integrity: sha512-yLSH4py7oFH3oG/9K+XWrz1pSi3dfUrWEnInbxMfArOfc1+33BlGPQtLsOYwvdMy11AwUBetYuaRxSPqgkq+8g==}
@@ -10383,10 +10377,6 @@ snapshots:
     dependencies:
       readdirp: 5.1.1
 
-  chokidar@6.0.0:
-    dependencies:
-      readdirp: 5.1.1
-
   class-variance-authority@0.7.1:
     dependencies:
       clsx: 2.1.1
@@ -11321,7 +11311,7 @@ snapshots:
       '@fumari/stf': 1.1.2(@types/react@19.3.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@scalar/json-magic': 0.16.1
       '@scalar/openapi-upgrader': 0.4.7
-      chokidar: 6.0.0
+      chokidar: 5.0.0
       class-variance-authority: 0.7.1
       cn: 0.5.2
       fumadocs-core: 16.18.4(@mdx-js/mdx@3.1.1)(@tanstack/react-router@1.170.33(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/estree-jsx@1.0.5)(@types/hast@3.0.5)(@types/mdast@4.0.4)(@types/react@19.3.0)(lucide-react@1.54.0(@types/react@19.3.0)(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(zod@4.6.5)
@@ -11333,7 +11323,7 @@ snapshots:
       remark: 15.0.1
       remark-rehype: 11.1.2
       shiki: 4.5.0
-      undici: 8.12.4
+      undici: 7.29.1
       yaml: 2.9.1
     optionalDependencies:
       '@types/react': 19.3.0
@@ -14209,8 +14199,6 @@ snapshots:
   undici@6.26.0: {}
 
   undici@7.29.1: {}
-
-  undici@8.12.4: {}
 
   unicode-emoji-modifier-base@1.0.0: {}
 
