@@ -1,0 +1,27 @@
+[
+  {
+    "name": "headerSendUnixDatetimeArray 200",
+    "operation": "headerSendUnixDatetimeArray",
+    "description": "The spec declares no parameters here; the stub follows what the SDK sends.",
+    "request": {
+      "method": "POST",
+      "path": "/header/datetime/unix/array",
+      "headers": {
+        "datetime": "784111777, 784111777"
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": {
+          "passed": true,
+          "message": "request received",
+          "input": {}
+        }
+      }
+    }
+  }
+]

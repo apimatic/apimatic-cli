@@ -1,0 +1,49 @@
+[
+  {
+    "name": "getUnixDateTime 200 text/plain",
+    "operation": "getUnixDateTime",
+    "description": "The text/plain example, chosen by Accept.",
+    "request": {
+      "method": "POST",
+      "path": "/response/unixdatetime",
+      "headers": {
+        "Accept": {
+          "startsWith": "text/plain"
+        }
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "text/plain"
+      },
+      "body": {
+        "text": "1484719381"
+      }
+    }
+  },
+  {
+    "name": "getUnixDateTime 200 array",
+    "operation": "getUnixDateTime",
+    "description": "The application/json example, chosen by ?array=true.",
+    "request": {
+      "method": "POST",
+      "path": "/response/unixdatetime",
+      "query": {
+        "array": "true"
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": [
+          1484719381,
+          1484719381
+        ]
+      }
+    }
+  }
+]

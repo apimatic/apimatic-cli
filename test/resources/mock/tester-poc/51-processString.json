@@ -1,0 +1,27 @@
+[
+  {
+    "name": "processString 200",
+    "operation": "processString",
+    "request": {
+      "method": "POST",
+      "path": "/string",
+      "headers": {
+        "Content-Type": {
+          "startsWith": "application/json"
+        }
+      },
+      "body": {
+        "json": "example string"
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": "example string"
+      }
+    }
+  }
+]

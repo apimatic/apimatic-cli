@@ -1,0 +1,25 @@
+[
+  {
+    "name": "getOAuth2AuthorizationCode 200",
+    "operation": "getOAuth2AuthorizationCode",
+    "description": "The spec gives this operation no operationId; it is named after the SDK method. The 200 is declared with no content.",
+    "request": {
+      "method": "GET",
+      "path": "/oauth2-authorization-code",
+      "auth": {
+        "anyOf": [
+          {
+            "OAuth2AuthCode": {
+              "in": "header",
+              "name": "Authorization",
+              "startsWith": "Bearer ac-access-token-"
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 200
+    }
+  }
+]

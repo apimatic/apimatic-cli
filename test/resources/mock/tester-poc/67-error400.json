@@ -1,0 +1,48 @@
+[
+  {
+    "name": "error400 400",
+    "operation": "error400",
+    "kind": "error",
+    "description": "The response has no media-level example; the body is built from the property-level examples.",
+    "request": {
+      "method": "GET",
+      "path": "/error-400"
+    },
+    "response": {
+      "status": 400,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": {
+          "code": 400,
+          "message": "Bad Request occurred",
+          "invalidParam": "username"
+        }
+      }
+    }
+  },
+  {
+    "name": "error400 403",
+    "operation": "error400",
+    "kind": "error",
+    "description": "The response has no media-level example; the body is built from the property-level examples.",
+    "request": {
+      "method": "GET",
+      "path": "/error-400"
+    },
+    "response": {
+      "status": 403,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": {
+          "code": 403,
+          "message": "Forbidden access",
+          "roleRequired": "admin"
+        }
+      }
+    }
+  }
+]

@@ -1,0 +1,46 @@
+[
+  {
+    "name": "downloadDocumentBundle 200",
+    "description": "A multipart response: the document's metadata as a JSON part and its content as a file part, served in this order under the default boundary.",
+    "operation": "downloadDocumentBundle",
+    "request": {
+      "method": "GET",
+      "path": "/v1/documents/d0c5e1a2-6b7c-4d8e-9f01-a2b3c4d5e6f7/bundle",
+      "headers": {
+        "Accept": "multipart/form-data"
+      },
+      "auth": {
+        "anyOf": [
+          {
+            "bearerAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Bearer test-bearer-token"
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 200,
+      "body": {
+        "multipart": {
+          "parts": {
+            "metadata": {
+              "json": {
+                "id": "d0c5e1a2-6b7c-4d8e-9f01-a2b3c4d5e6f7",
+                "title": "February statement",
+                "content_type": "application/pdf"
+              }
+            },
+            "file": {
+              "filename": "statement-2026-02.pdf",
+              "contentType": "application/pdf",
+              "bytes": "JVBERi0xLjcK"
+            }
+          }
+        }
+      }
+    }
+  }
+]

@@ -1,0 +1,37 @@
+[
+  {
+    "name": "bodySendStringArray 200",
+    "operation": "bodySendStringArray",
+    "request": {
+      "method": "POST",
+      "path": "/body/string",
+      "query": {
+        "array": "true"
+      },
+      "headers": {
+        "Content-Type": {
+          "startsWith": "application/json"
+        }
+      },
+      "body": {
+        "json": [
+          "abc",
+          "def"
+        ]
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": {
+          "passed": true,
+          "message": "request received",
+          "input": {}
+        }
+      }
+    }
+  }
+]

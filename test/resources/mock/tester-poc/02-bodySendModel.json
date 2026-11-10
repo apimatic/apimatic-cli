@@ -1,0 +1,32 @@
+[
+  {
+    "name": "bodySendModel 200",
+    "operation": "bodySendModel",
+    "description": "The body is optional and left unset, which the SDK sends as JSON null.",
+    "request": {
+      "method": "POST",
+      "path": "/body/model",
+      "headers": {
+        "Content-Type": {
+          "startsWith": "application/json"
+        }
+      },
+      "body": {
+        "json": null
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": {
+          "passed": true,
+          "message": "request received",
+          "input": {}
+        }
+      }
+    }
+  }
+]

@@ -1,0 +1,49 @@
+[
+  {
+    "name": "formSendUnixDatetimeArrayDict 200",
+    "operation": "formSendUnixDatetimeArrayDict",
+    "description": "The form schema is a free-form object; the stub follows what the SDK sends.",
+    "request": {
+      "method": "POST",
+      "path": "/form/datetime/unix/array-dict",
+      "headers": {
+        "Content-Type": {
+          "startsWith": "application/x-www-form-urlencoded"
+        }
+      },
+      "body": {
+        "form": {
+          "dates[key1]": [
+            {
+              "dateTime": "784111777"
+            },
+            {
+              "dateTime": "784111777"
+            }
+          ],
+          "dates[key2]": [
+            {
+              "dateTime": "784111777"
+            },
+            {
+              "dateTime": "784111777"
+            }
+          ]
+        }
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": {
+          "passed": true,
+          "message": "request received",
+          "input": {}
+        }
+      }
+    }
+  }
+]

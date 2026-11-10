@@ -1,0 +1,34 @@
+[
+  {
+    "name": "getOrdersHeaderLinked 200 page1",
+    "operation": "getOrdersHeaderLinked",
+    "description": "The Link header has no example; a first link without next is synthesized, so a walk ends on this page.",
+    "request": {
+      "method": "GET",
+      "path": "/orders/header-links",
+      "query": {
+        "page": "1",
+        "size": "20"
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json",
+        "Link": "<{{origin}}/orders/header-links?page=1&size=20>; rel=\"first\""
+      },
+      "body": {
+        "json": {
+          "data": [
+            {
+              "id": "ord_1A2B",
+              "createdAt": "2026-01-15T08:12:31Z",
+              "total": 129.99,
+              "status": "paid"
+            }
+          ]
+        }
+      }
+    }
+  }
+]

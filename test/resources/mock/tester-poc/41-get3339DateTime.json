@@ -1,0 +1,49 @@
+[
+  {
+    "name": "get3339DateTime 200 text/plain",
+    "operation": "get3339DateTime",
+    "description": "The text/plain example, chosen by Accept.",
+    "request": {
+      "method": "POST",
+      "path": "/response/3339datetime",
+      "headers": {
+        "Accept": {
+          "startsWith": "text/plain"
+        }
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "text/plain"
+      },
+      "body": {
+        "text": "2016-03-13T12:52:32.123Z"
+      }
+    }
+  },
+  {
+    "name": "get3339DateTime 200 array",
+    "operation": "get3339DateTime",
+    "description": "The application/json example, chosen by ?array=true.",
+    "request": {
+      "method": "POST",
+      "path": "/response/3339datetime",
+      "query": {
+        "array": "true"
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": [
+          "2016-03-13T12:52:32.123Z",
+          "2016-03-13T12:52:32.123Z"
+        ]
+      }
+    }
+  }
+]

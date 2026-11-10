@@ -1,0 +1,24 @@
+[
+  {
+    "name": "formSendModelWithExtras 200",
+    "operation": "formSendModelWithExtras",
+    "description": "The optional form body is left unset, so the SDK sends an empty one.",
+    "request": {
+      "method": "POST",
+      "path": "/form/model-with-extras"
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": {
+          "passed": true,
+          "message": "request received",
+          "input": {}
+        }
+      }
+    }
+  }
+]

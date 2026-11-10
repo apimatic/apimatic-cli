@@ -1,0 +1,61 @@
+[
+  {
+    "name": "createChatCompletion 200 synthesized",
+    "operation": "createChatCompletion",
+    "description": "Synthesized from the schema; the spec has no example. The stream ends with the [DONE] sentinel the spec describes.",
+    "request": {
+      "method": "POST",
+      "path": "/v1/chat/completions",
+      "headers": {
+        "Content-Type": {
+          "startsWith": "application/json"
+        }
+      },
+      "auth": {
+        "anyOf": [
+          {
+            "bearer": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Bearer test-bearer-token"
+            }
+          }
+        ]
+      },
+      "body": {
+        "json": {
+          "model": "abc",
+          "content": "abc",
+          "stream": true
+        }
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "text/event-stream"
+      },
+      "body": {
+        "sse": [
+          {
+            "data": {
+              "id": "chatcmpl-1",
+              "object": "chat.completion.chunk",
+              "content": "Hello"
+            }
+          },
+          {
+            "data": {
+              "id": "chatcmpl-1",
+              "object": "chat.completion.chunk",
+              "content": null
+            }
+          },
+          {
+            "data": "[DONE]"
+          }
+        ]
+      }
+    }
+  }
+]

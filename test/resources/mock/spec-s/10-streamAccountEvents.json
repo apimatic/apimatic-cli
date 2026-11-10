@@ -1,0 +1,202 @@
+[
+  {
+    "name": "streamAccountEvents 200 live",
+    "operation": "streamAccountEvents",
+    "description": "Live stream: no resume point. Three events, the last typed done.",
+    "request": {
+      "method": "GET",
+      "path": "/v1/accounts/7a1b9d2e-3c4f-4a5b-8c6d-9e0f1a2b3c4d/events",
+      "auth": {
+        "anyOf": [
+          {
+            "bearerAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Bearer test-bearer-token"
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "text/event-stream"
+      },
+      "body": {
+        "sse": [
+          {
+            "id": "1",
+            "data": {
+              "type": "transaction.posted",
+              "transaction": {
+                "id": "9e8d7c6b-5a4f-4e3d-9c2b-1a0f9e8d7c6b",
+                "account_id": "7a1b9d2e-3c4f-4a5b-8c6d-9e0f1a2b3c4d",
+                "amount": "250.00",
+                "posted_at": "2026-03-02T14:04:58Z",
+                "object": "transaction",
+                "kind": "transfer",
+                "status": "posted",
+                "sequence": 9007199254740993
+              }
+            }
+          },
+          {
+            "id": "2",
+            "data": {
+              "type": "balance.updated",
+              "balance": "1000.75",
+              "at": "2026-03-02T14:04:59Z"
+            }
+          },
+          {
+            "id": "3",
+            "data": {
+              "type": "done",
+              "last_sequence": 9007199254740993
+            }
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "streamAccountEvents 200 resume",
+    "operation": "streamAccountEvents",
+    "description": "Resume after a sequence beyond 2^53: an SDK that routes int64 through a double sends ...992 and misses this. The stream also carries an event type the spec does not list, which clients must skip.",
+    "request": {
+      "method": "GET",
+      "path": "/v1/accounts/7a1b9d2e-3c4f-4a5b-8c6d-9e0f1a2b3c4d/events",
+      "query": {
+        "since_sequence": "9007199254740993"
+      },
+      "auth": {
+        "anyOf": [
+          {
+            "bearerAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Bearer test-bearer-token"
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "text/event-stream"
+      },
+      "body": {
+        "sse": [
+          {
+            "id": "4",
+            "data": {
+              "type": "transaction.posted",
+              "transaction": {
+                "id": "1f2e3d4c-5b6a-4978-8695-a4b3c2d1e0f9",
+                "account_id": "7a1b9d2e-3c4f-4a5b-8c6d-9e0f1a2b3c4d",
+                "amount": "40.00",
+                "posted_at": "2026-03-05T10:00:00Z",
+                "object": "transaction",
+                "kind": "deposit",
+                "status": "pending",
+                "sequence": 9007199254740995
+              }
+            }
+          },
+          {
+            "id": "5",
+            "data": {
+              "type": "statement.ready",
+              "statement_id": "2b7c9e10-4d3a-4f6b-9c8d-7e6f5a4b3c21"
+            }
+          },
+          {
+            "id": "6",
+            "data": {
+              "type": "balance.updated",
+              "balance": "1040.75",
+              "at": "2026-03-05T10:00:01Z"
+            }
+          },
+          {
+            "id": "7",
+            "data": {
+              "type": "done",
+              "last_sequence": 9007199254740995
+            }
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "streamAccountEvents 404",
+    "operation": "streamAccountEvents",
+    "kind": "error",
+    "request": {
+      "method": "GET",
+      "path": "/v1/accounts/{account_id}/events",
+      "auth": {
+        "anyOf": [
+          {
+            "bearerAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Bearer test-bearer-token"
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 404,
+      "headers": {
+        "Content-Type": "application/json",
+        "X-Request-Id": "req_err_404"
+      },
+      "body": {
+        "json": {
+          "code": "not_found",
+          "message": "No resource exists at this identifier.",
+          "request_id": "req_err_404"
+        }
+      }
+    }
+  },
+  {
+    "name": "streamAccountEvents 500 (default)",
+    "operation": "streamAccountEvents",
+    "kind": "error",
+    "request": {
+      "method": "GET",
+      "path": "/v1/accounts/{account_id}/events",
+      "auth": {
+        "anyOf": [
+          {
+            "bearerAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Bearer test-bearer-token"
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 500,
+      "headers": {
+        "Content-Type": "application/json",
+        "X-Request-Id": "req_err_500"
+      },
+      "body": {
+        "json": {
+          "code": "internal_error",
+          "message": "Something went wrong on our side.",
+          "request_id": "req_err_500"
+        }
+      }
+    }
+  }
+]

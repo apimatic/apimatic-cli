@@ -1,0 +1,27 @@
+[
+  {
+    "name": "headerSendUnixDatetimeDict 200",
+    "operation": "headerSendUnixDatetimeDict",
+    "description": "The spec declares no parameters here; the stub follows what the SDK sends.",
+    "request": {
+      "method": "POST",
+      "path": "/header/datetime/unix/dict",
+      "headers": {
+        "dates": "{\"key1\":784111777,\"key2\":784111777}"
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": {
+          "passed": true,
+          "message": "request received",
+          "input": {}
+        }
+      }
+    }
+  }
+]

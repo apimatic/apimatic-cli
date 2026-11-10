@@ -1,0 +1,34 @@
+[
+  {
+    "name": "querySendUnixDatetimeArray 200",
+    "operation": "querySendUnixDatetimeArray",
+    "description": "The spec declares no parameters here; the stub follows what the SDK sends.",
+    "request": {
+      "method": "GET",
+      "path": "/query/datetime/unix/array",
+      "query": {
+        "datetime": [
+          {
+            "dateTime": "784111777"
+          },
+          {
+            "dateTime": "784111777"
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": {
+          "passed": true,
+          "message": "request received",
+          "input": {}
+        }
+      }
+    }
+  }
+]

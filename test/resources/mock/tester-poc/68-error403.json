@@ -1,0 +1,24 @@
+[
+  {
+    "name": "error403 403",
+    "operation": "error403",
+    "kind": "error",
+    "request": {
+      "method": "GET",
+      "path": "/error-403"
+    },
+    "response": {
+      "status": 403,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": {
+          "code": 403,
+          "message": "Forbidden access",
+          "roleRequired": "superAdmin"
+        }
+      }
+    }
+  }
+]

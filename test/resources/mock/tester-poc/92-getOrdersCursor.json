@@ -1,0 +1,39 @@
+[
+  {
+    "name": "getOrdersCursor 200 page1",
+    "operation": "getOrdersCursor",
+    "request": {
+      "method": "GET",
+      "path": "/orders/cursor",
+      "query": {
+        "limit": "20"
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": {
+          "data": [
+            {
+              "id": "ord_1A2B",
+              "createdAt": "2026-01-15T08:12:31Z",
+              "total": 129.99,
+              "status": "paid"
+            },
+            {
+              "id": "ord_1A2C",
+              "createdAt": "2026-01-15T08:13:10Z",
+              "total": 42.0,
+              "status": "pending"
+            }
+          ],
+          "nextCursor": "eyJpZCI6Im9yZF8xQTJDIn0=",
+          "hasMore": true
+        }
+      }
+    }
+  }
+]

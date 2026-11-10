@@ -1,0 +1,42 @@
+[
+  {
+    "name": "createShipment 200",
+    "operation": "createShipment",
+    "request": {
+      "method": "POST",
+      "path": "/shipment",
+      "headers": {
+        "Content-Type": {
+          "startsWith": "application/json"
+        }
+      },
+      "body": {
+        "json": {
+          "destination": "NYC",
+          "carrier": "standard",
+          "priority": 1,
+          "request_version": "v1",
+          "channel": "api",
+          "sort_order": "asc"
+        }
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": {
+          "destination": "NYC",
+          "notes": "fragile",
+          "carrier": "standard",
+          "priority": 1,
+          "request_version": "v1",
+          "channel": "api",
+          "sort_order": "asc"
+        }
+      }
+    }
+  }
+]

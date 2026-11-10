@@ -1,0 +1,27 @@
+[
+  {
+    "name": "headerSendRfc1123DatetimeArray 200",
+    "operation": "headerSendRfc1123DatetimeArray",
+    "description": "The spec declares no parameters here; the stub follows what the SDK sends.",
+    "request": {
+      "method": "POST",
+      "path": "/header/datetime/rfc1123/array",
+      "headers": {
+        "datetime": "Sun, 06 Nov 1994 08:49:37 GMT, Sun, 06 Nov 1994 08:49:37 GMT"
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": {
+          "passed": true,
+          "message": "request received",
+          "input": {}
+        }
+      }
+    }
+  }
+]
