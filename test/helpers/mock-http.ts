@@ -26,12 +26,23 @@ export type HostSettings = Partial<Omit<MockHostOptions, 'stubs'>>;
 export class Answered {
   public readonly status: number;
   public readonly body: Buffer;
+  /** How long after the first piece of the body its last piece arrived: about nothing for a body sent whole. */
+  public readonly spreadMs: number;
   private readonly lines: readonly (readonly [string, string])[];
 
-  public constructor(status: number, lines: readonly (readonly [string, string])[], body: Buffer) {
+  public constructor(status: number, lines: readonly (readonly [string, string])[], body: Buffer, spreadMs = 0) {
     this.status = status;
     this.lines = lines;
     this.body = body;
+    this.spreadMs = spreadMs;
+  }
+
+  /** The `data:` lines of a text/event-stream, one entry per line. */
+  public sseData(): string[] {
+    return this.text()
+      .split('\n')
+      .filter((line) => line.startsWith('data: '))
+      .map((line) => line.slice('data: '.length));
   }
 
   /** Every value sent under the name, joined with a comma, or empty when the header is absent. */
@@ -90,7 +101,12 @@ export function jsonDifferences(expected: string, actual: string): string[] {
 }
 
 /** Sends the request as built, with no header added but Host and the body's framing, and no redirect followed. */
-export function send(origin: string, request: TestRequest): Promise<Answered> {
+function dispatch(
+  origin: string,
+  request: TestRequest,
+  answered: (response: http.IncomingMessage) => void,
+  failed: (error: Error) => void
+): http.ClientRequest {
   const { method, target, headers, body, chunked } = request.toWire();
   const { hostname, port, host } = new URL(origin);
   const names = headers.map(([name]) => name.toLowerCase());
@@ -104,28 +120,74 @@ export function send(origin: string, request: TestRequest): Promise<Answered> {
     ...headers,
     ...framing
   ];
+  const sent = http.request(
+    {
+      host: unbracketed(hostname),
+      port,
+      method,
+      path: target,
+      headers: linesByName(lines),
+      setHost: false,
+      agent: false
+    },
+    answered
+  );
+  sent.on('error', failed);
+  sent.end(body.length > 0 ? body : undefined);
+  return sent;
+}
+
+export function send(origin: string, request: TestRequest): Promise<Answered> {
   return new Promise((resolve, reject) => {
-    const sent = http.request(
-      {
-        host: unbracketed(hostname),
-        port,
-        method,
-        path: target,
-        headers: linesByName(lines),
-        setHost: false,
-        agent: false
-      },
+    dispatch(
+      origin,
+      request,
       (response) => {
         const chunks: Buffer[] = [];
-        response.on('data', (chunk: Buffer) => chunks.push(chunk));
-        response.on('end', () =>
-          resolve(new Answered(response.statusCode ?? 0, pairsOf(response.rawHeaders), Buffer.concat(chunks)))
-        );
+        const arrivals: number[] = [];
+        response.on('data', (chunk: Buffer) => {
+          chunks.push(chunk);
+          arrivals.push(Date.now());
+        });
+        response.on('end', () => {
+          const spreadMs = arrivals.length === 0 ? 0 : arrivals[arrivals.length - 1] - arrivals[0];
+          resolve(
+            new Answered(response.statusCode ?? 0, pairsOf(response.rawHeaders), Buffer.concat(chunks), spreadMs)
+          );
+        });
         response.on('error', reject);
-      }
+      },
+      reject
     );
-    sent.on('error', reject);
-    sent.end(body.length > 0 ? body : undefined);
+  });
+}
+
+/** A body being read as it arrives: its first piece, the rest once the body ends however it ends, and a way to walk out. */
+export interface OpenStream {
+  readonly first: string;
+  readonly rest: Promise<string>;
+  leave(): void;
+}
+
+/** Resolves as soon as the first piece of the body is in, so a test can act while the stream is still open. */
+export function openStream(origin: string, request: TestRequest): Promise<OpenStream> {
+  return new Promise((resolve, reject) => {
+    const sent = dispatch(
+      origin,
+      request,
+      (response) => {
+        response.once('data', (first: Buffer) => {
+          const chunks: Buffer[] = [];
+          response.on('data', (chunk: Buffer) => chunks.push(chunk));
+          response.on('error', () => undefined);
+          const rest = new Promise<string>((ended) => {
+            response.on('close', () => ended(Buffer.concat(chunks).toString('utf8')));
+          });
+          resolve({ first: first.toString('utf8'), rest, leave: () => sent.destroy() });
+        });
+      },
+      reject
+    );
   });
 }
 
@@ -201,6 +263,10 @@ export class TestMock {
 
   public send(request: TestRequest): Promise<Answered> {
     return send(this.url, request);
+  }
+
+  public stream(request: TestRequest): Promise<OpenStream> {
+    return openStream(this.url, request);
   }
 
   public sendHead(...head: string[]): Promise<string> {

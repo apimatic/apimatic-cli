@@ -3,12 +3,13 @@ import { createServer, IncomingMessage, Server, ServerOptions, ServerResponse } 
 import { Duplex } from 'node:stream';
 import { err, Result } from 'neverthrow';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
-import { isAnswer, responseOn } from '../../types/mock/matching/verdict.js';
+import { RequestLog } from '../../types/mock/routing/request-log.js';
 import { requestOrigin, unreadableHost } from '../../types/mock/routing/request-origin.js';
+import { respond } from '../../types/mock/routing/respond.js';
 import { StubRouter } from '../../types/mock/routing/stub-router.js';
 import { TokenLifetime } from '../../types/mock/routing/token-lifetime.js';
 import { headerValues, requestModelOf } from '../../types/mock/routing/wire-request.js';
-import { wireMismatch, wireRefusal, WireResponse, wireResponseOf } from '../../types/mock/routing/wire-response.js';
+import { wireRefusal, WireResponse } from '../../types/mock/routing/wire-response.js';
 import { StubProblem } from '../../types/mock/stub-format/stub-problem.js';
 import { StubSet } from '../../types/mock/stub-format/stub.js';
 import { decodeUtf8 } from '../../types/mock/text/utf8.js';
@@ -16,6 +17,7 @@ import { errorMessage } from '../../utils/error-utils.js';
 import { sleep } from '../timer-extensions.js';
 import { describeListen, fixedPlace, FixedPlace, Listen, LOCALHOST, originOf } from './listen.js';
 import { addressesOf, busyReason, closed, Listening, listenOnAll } from './listeners.js';
+import { writePaced } from './paced-body.js';
 import { readBody } from './request-body.js';
 import { StubDirectoryService } from './stub-directory-service.js';
 
@@ -96,11 +98,12 @@ export class MockHost {
     pick: () => number = () => 0
   ): Promise<StartResult> {
     const router = new StubRouter(stubs, options.tokenLifetime);
+    const log = new RequestLog();
     const exchanges = new Set<Promise<void>>();
     const stopping = new AbortController();
     const create = () =>
       createServer(SERVER_OPTIONS, (request, response) => {
-        const exchange = answer(router, request, response, stopping.signal);
+        const exchange = answer(router, log, request, response, stopping.signal);
         exchanges.add(exchange);
         void exchange.finally(() => exchanges.delete(exchange));
       }).on('clientError', refuseUnreadable);
@@ -150,12 +153,13 @@ async function openFree(create: () => Server, pick: () => number): Promise<Resul
 /** Settles when the response is done, whatever came of it, so a stop can wait for it. */
 async function answer(
   router: StubRouter,
+  log: RequestLog,
   request: IncomingMessage,
   response: ServerResponse,
   stopping: AbortSignal
 ): Promise<void> {
   try {
-    await send(response, await decide(router, request), stopping);
+    await send(response, await decide(router, log, request), stopping);
   } catch (error) {
     if (response.headersSent || response.destroyed) {
       response.destroy();
@@ -166,7 +170,7 @@ async function answer(
   }
 }
 
-async function decide(router: StubRouter, request: IncomingMessage): Promise<WireResponse> {
+async function decide(router: StubRouter, log: RequestLog, request: IncomingMessage): Promise<WireResponse> {
   const lines = headerLines(request.rawHeaders);
   const hosts = headerValues(lines, 'Host');
   const origin = requestOrigin(hosts);
@@ -177,9 +181,7 @@ async function decide(router: StubRouter, request: IncomingMessage): Promise<Wir
   if (body.isErr()) {
     return wireRefusal(413, body.error);
   }
-  const model = requestModelOf(request.method ?? '', request.url ?? '', lines, body.value);
-  const verdict = router.decide(model);
-  return isAnswer(verdict) ? wireResponseOf(responseOn(verdict, origin), model.method) : wireMismatch(model, verdict);
+  return respond(router, log, requestModelOf(request.method ?? '', request.url ?? '', lines, body.value), origin);
 }
 
 /** Header lines one by one: Node's own `headers` joins or drops a header sent twice, and a stub must see both. */
@@ -204,35 +206,9 @@ async function send(response: ServerResponse, wire: WireResponse, stopping: Abor
   if (wire.body.kind === 'whole') {
     response.end(wire.body.bytes);
   } else {
-    await sendPaced(response, wire.body.chunks, wire.body.delayMs, stopping);
+    await writePaced(response, wire.body.chunks, wire.body.delayMs, stopping);
   }
   await done;
-}
-
-/**
- * Each chunk is written on its own with a pause before the next, so a client that buffers the
- * whole body is told apart from one that streams. The body ends early when the client leaves or
- * the host stops: a stream no one reads would keep its connection, and a stop would wait for it.
- */
-async function sendPaced(
-  response: ServerResponse,
-  chunks: readonly string[],
-  delayMs: number,
-  stopping: AbortSignal
-): Promise<void> {
-  const left = new AbortController();
-  response.once('close', () => left.abort());
-  const ended = AbortSignal.any([stopping, left.signal]);
-  for (const [index, chunk] of chunks.entries()) {
-    if (index > 0) {
-      await sleep(delayMs, ended);
-    }
-    if (ended.aborted) {
-      break;
-    }
-    response.write(chunk);
-  }
-  response.end();
 }
 
 /**

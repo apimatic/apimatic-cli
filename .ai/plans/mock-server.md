@@ -1,7 +1,7 @@
 # The v4 mock server, ported from C#
 
 Status: in progress on `feat/mock-server`, cut from `dev` at `4b748d5d` on 2026-11-10.
-Phases 0 to 5a are done and committed on the branch.
+Phases 0 to 5b are done and committed on the branch.
 
 The mock that v4 SDK test suites run against exists as a C#/.NET proof of concept in
 `apimatic/mock-server-poc-v4` (reference commit `0d5a84f`: about 4,800 lines of source and 1,220
@@ -112,7 +112,7 @@ array with its comparer stated.
 | 3 | Request model, matchers, JSON diff, closest stub, verdict, the 418 report | `Matching/` | its 14 test files | Done |
 | 4 | The OAuth2 authorization server | `Auth/` | `OAuth2ServerTests` | Done |
 | 5a | The host on `node:http`: listening, adapters, router | `Engine/` except streams and admin | `MockHostTests`, `ListenTests`, `RoutingTests`, `ResponseAdapterTests`, `BodyLimitTests`, `OAuth2FlowTests`, `TokenLifetimeTests`, the Spec S suites without a stream | Done |
-| 5b | Streams, multipart and binary answers, the request log | `PacedBody`, `PerRequestQueue`, `AdminApi` | `StreamingTests`, `PacedBodyTests`, `AdminApiTests`, the remaining Spec S suites | All 132 Spec S cases pass; the reference's own Spec S suite passes against this host, differences listed |
+| 5b | Streams, multipart and binary answers, the request log | `PacedBody`, `PerRequestQueue`, `AdminApi` | `StreamingTests`, `PacedBodyTests`, `AdminApiTests`, the remaining Spec S suites | Done |
 | 6 | Command, action, prompts | `Program.cs` | `CommandLineTests`, `ExitCodeTests` (as a gated e2e test) | The command runs hidden |
 | 7 | Acceptance: the C# SDK's contract suite on :4010; docs; the command shown | n/a | n/a | 103 contract tests pass |
 
@@ -214,6 +214,49 @@ Phase 5a:
   gets the 418 report like any other.
 - The host answers 500 with its reason when it cannot write what a stub states. No stub the loader
   accepts gets there; the test hands the host a stub set the loader would refuse.
+
+Phase 5b:
+
+- The request log and the admin API are pure, in `types/mock/routing` (`request-log.ts`,
+  `admin-api.ts`, `respond.ts`): `respond` lets the admin API answer first, then asks the router
+  and logs the request with what came of it. The host only calls it.
+- `GET /__admin/requests` serves the newest 10,000 requests that reached the router, oldest first,
+  and `DELETE` clears them with a 204. Any other method there is a 405 with `Allow: GET, DELETE`,
+  and any other path under `/__admin`, in any letter case, is a 404. A request to the admin API is
+  not logged, nor one the host refused before the router (400, 413). One entry:
+
+  ```json
+  {
+    "request": {
+      "method": "POST",
+      "path": "/v1/accounts",
+      "query": { "limit": ["2"] },
+      "headers": { "prefer": ["code=500, test-run=7f3a"] },
+      "body": "{\"name\":\"Travel card\"}"
+    },
+    "response": { "status": 500, "stub": "createAccount 500" }
+  }
+  ```
+
+  The path and query are as decoded for matching. Header names are in lower case, so a harness in
+  any language finds `headers.prefer` whatever the client's spelling. `body` is the text of a UTF-8
+  body, `bodyBase64` takes its place for any other bytes, and neither is there for an empty one.
+  `response.stub` names the stub that answered; `response.mismatch` holds the summary of a 418
+  report and is what tells a miss from a 418 a stub declares; an answer the OAuth2 server composed
+  has neither. A body is kept once, as bytes.
+- The paced body is `infrastructure/mock/paced-body.ts`, tested on a plain stream without a
+  server and over HTTP: the stub's status, the pause between chunks and none after the last, a
+  stream ended where it stands when the host stops or the client leaves. The reference's
+  `PerRequestQueue` and its 31-second explicit test guarded its engine's read loop and have no
+  counterpart: a pause here is a timer between two writes.
+- All 132 Spec S cases pass (130 over HTTP, two over the stub files in phase 2).
+- **The reference's own tests were run against this host**, from a scratch copy of the reference
+  whose fixtures take the mock's URL from the environment, so its .NET `HttpClient` talks to the
+  TypeScript server. Spec S: 130 of 132 pass. The two that fail are differences taken on purpose:
+  `GetAccount_M2LowercaseMethod` (400 from the HTTP parser, section 4 item 3) and
+  `AdminApi_Requests_CountsRetryAttemptsByMarker` (it reads WireMock's log shape). The sample-set
+  `RoutingTests` and `OAuth2FlowTests`: 48 of 50 pass; the two that fail are the path decoded once
+  (section 4 item 2) and `Misses`, which reads the in-process host.
 
 ## 7. Risks
 
