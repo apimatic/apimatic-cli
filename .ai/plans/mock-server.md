@@ -1,7 +1,7 @@
 # The v4 mock server, ported from C#
 
 Status: in progress on `feat/mock-server`, cut from `dev` at `4b748d5d` on 2026-11-10.
-Phases 0 to 3 are done; nothing is committed yet.
+Phases 0 to 4 are done and committed on the branch.
 
 The mock that v4 SDK test suites run against exists as a C#/.NET proof of concept in
 `apimatic/mock-server-poc-v4` (reference commit `0d5a84f`: about 4,800 lines of source and 1,220
@@ -100,7 +100,7 @@ array with its comparer stated.
 | 1 | `json/`, `text/`, the date-time grammar | `JsonDiff` (numbers), `SentJson`, `TextDistance`, `Difference`, `DateTimeText` | `SentJsonTests`, number rows of `JsonDiffTests`, `DateTimeTextTests`, `DifferenceTests` | Done |
 | 2 | Stub model, schema problems, parser, loader, stub directory reader | `StubFormat/` | `StubLoaderTests`, `StubSchemaTests`, `PathTemplateTests`, `JsonRuleTests`, `StubResponseTests`, `MultipartResponseTests`, `SseEventTests`, `StubProblemTests` | Done |
 | 3 | Request model, matchers, JSON diff, closest stub, verdict, the 418 report | `Matching/` | its 14 test files | Done |
-| 4 | The OAuth2 authorization server | `Auth/` | `OAuth2ServerTests` | Every grant and flow passes |
+| 4 | The OAuth2 authorization server | `Auth/` | `OAuth2ServerTests` | Done |
 | 5a | The host on `node:http`: listening, adapters, router | `Engine/` except streams and admin | `MockHostTests`, `ListenTests`, `RoutingTests`, `ResponseAdapterTests`, `BodyLimitTests`, `OAuth2FlowTests`, `TokenLifetimeTests`, the Spec S suites without a stream | Those suites pass over HTTP |
 | 5b | Streams, multipart and binary answers, the request log | `PacedBody`, `PerRequestQueue`, `AdminApi` | `StreamingTests`, `PacedBodyTests`, `AdminApiTests`, the remaining Spec S suites | All 132 Spec S cases pass; the reference's own Spec S suite passes against this host, differences listed |
 | 6 | Command, action, prompts | `Program.cs` | `CommandLineTests`, `ExitCodeTests` (as a gated e2e test) | The command runs hidden |
@@ -165,6 +165,16 @@ Phase 3:
   Content-Disposition, quoted values included.
 - The seven wire mutations pass without a server (`wire-mutations.test.ts`). m2 with a lower-case
   method is named by the matcher; whether such a request reaches it over HTTP is phase 5a's question.
+
+Phase 4:
+
+- The OAuth2 server is `auth/oauth2-server.ts` with `Fields`, PKCE, the issued code and client
+  authentication beside it. `OAuth2Server.answer` returns a verdict, or nothing for a path that is
+  not its own. Every row of `OAuth2ServerTests` passes, the exact token documents and redirect
+  locations included.
+- A redirect URI is checked by its own rule where the reference asked its URI parser: a scheme of
+  two or more characters that is not `file`, printable ASCII without a space, no fragment. A
+  one-letter scheme is a Windows drive (`C:callback`) and is refused, as the reference refuses it.
 
 ## 7. Risks
 
