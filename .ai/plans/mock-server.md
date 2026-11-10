@@ -1,7 +1,7 @@
 # The v4 mock server, ported from C#
 
 Status: in progress on `feat/mock-server`, cut from `dev` at `4b748d5d` on 2026-11-10.
-Phases 0 to 4 are done and committed on the branch.
+Phases 0 to 5a are done and committed on the branch.
 
 The mock that v4 SDK test suites run against exists as a C#/.NET proof of concept in
 `apimatic/mock-server-poc-v4` (reference commit `0d5a84f`: about 4,800 lines of source and 1,220
@@ -45,6 +45,7 @@ src/types/mock/
   stub-format/                    stub model, schema problems, parser, loader over (name, bytes) pairs
   matching/                       request model, matchers, JSON diff, closest stub, verdict, the 418 report
   auth/                           the OAuth2 authorization server
+  routing/                        the router, a request and a response as they cross the wire, the body limit
 src/infrastructure/mock/          stub directory reader; the node:http host, its adapters, streams, request log
 src/actions/mock/serve.ts         MockServeAction
 src/prompts/mock/serve.ts         MockServePrompts
@@ -68,13 +69,22 @@ array with its comparer stated.
    not UTF-8 are refused. Stub files also allow comments and trailing commas.
 2. **A path is percent-decoded once**, leniently. The reference decoded it twice and read `+` as a
    space, both effects of its engine. The loader still refuses `%` and `+` in a stub path.
-3. **A request Node's HTTP parser rejects never reaches the router** (a lower-case method, a
-   malformed request line, oversized headers) and is answered 400 with the reason. The reference
-   answered 418 for a lower-case method. To be confirmed in phase 5a.
+3. **A request Node's HTTP parser rejects never reaches the router** and is answered 400 with the
+   parser's reason (431 for headers past its limit): a method in lower case or one the parser does
+   not know, a malformed request line, a byte outside ASCII in the target. The reference answered
+   418 for a lower-case method. Confirmed in phase 5a: `get /x HTTP/1.1` is refused with
+   `Parse Error: Invalid method encountered`.
 4. **`localhost` is two listeners**, 127.0.0.1 and ::1 on one port; a machine without an IPv6
-   loopback serves IPv4 alone. A holder of the port on every interface is found by a loopback
-   connect probe: Node has no table of listeners, and a wildcard bind would raise a firewall prompt.
+   loopback serves IPv4 alone. Any other host is bound as written: `127.0.0.1` is that address
+   alone (the reference bound both loopbacks for it), and a name is bound as it resolves (the
+   reference bound every interface). A free port is the system's choice at the first bind, with no
+   moment between choosing and binding. Before a fixed port is bound, a connect probe asks whether
+   something already answers there, which finds a holder on every interface: Node has no table of
+   listeners, and a wildcard bind would raise a firewall prompt.
 5. **A chunked body past 30,000,000 bytes answers 413**, as a declared length over the limit does.
+   A refused body is still received, and dropped as it arrives, before the 413 goes out: a server
+   that answers and closes in the middle of an upload resets the connection, and the client then
+   never reads the answer.
 6. **The 418 body uses LF on every platform.**
 7. **Exit codes are the CLI's**: 130 when stopped, 1 for stub problems or a port that cannot be
    opened, 2 for a bad flag. A line holding `MOCKSERVER_URL=<origin>` is printed on stdout for a
@@ -101,7 +111,7 @@ array with its comparer stated.
 | 2 | Stub model, schema problems, parser, loader, stub directory reader | `StubFormat/` | `StubLoaderTests`, `StubSchemaTests`, `PathTemplateTests`, `JsonRuleTests`, `StubResponseTests`, `MultipartResponseTests`, `SseEventTests`, `StubProblemTests` | Done |
 | 3 | Request model, matchers, JSON diff, closest stub, verdict, the 418 report | `Matching/` | its 14 test files | Done |
 | 4 | The OAuth2 authorization server | `Auth/` | `OAuth2ServerTests` | Done |
-| 5a | The host on `node:http`: listening, adapters, router | `Engine/` except streams and admin | `MockHostTests`, `ListenTests`, `RoutingTests`, `ResponseAdapterTests`, `BodyLimitTests`, `OAuth2FlowTests`, `TokenLifetimeTests`, the Spec S suites without a stream | Those suites pass over HTTP |
+| 5a | The host on `node:http`: listening, adapters, router | `Engine/` except streams and admin | `MockHostTests`, `ListenTests`, `RoutingTests`, `ResponseAdapterTests`, `BodyLimitTests`, `OAuth2FlowTests`, `TokenLifetimeTests`, the Spec S suites without a stream | Done |
 | 5b | Streams, multipart and binary answers, the request log | `PacedBody`, `PerRequestQueue`, `AdminApi` | `StreamingTests`, `PacedBodyTests`, `AdminApiTests`, the remaining Spec S suites | All 132 Spec S cases pass; the reference's own Spec S suite passes against this host, differences listed |
 | 6 | Command, action, prompts | `Program.cs` | `CommandLineTests`, `ExitCodeTests` (as a gated e2e test) | The command runs hidden |
 | 7 | Acceptance: the C# SDK's contract suite on :4010; docs; the command shown | n/a | n/a | 103 contract tests pass |
@@ -175,6 +185,35 @@ Phase 4:
 - A redirect URI is checked by its own rule where the reference asked its URI parser: a scheme of
   two or more characters that is not `file`, printable ASCII without a space, no fragment. A
   one-letter scheme is a Windows drive (`C:callback`) and is refused, as the reference refuses it.
+
+Phase 5a:
+
+- The host is `infrastructure/mock/mock-host.ts`: `MockHost.start` returns `running`,
+  `stubProblems` or `notListening`, and `stop` ends streams, waits up to 5 seconds for the
+  requests being answered and then closes what is left. It reads and writes; every decision is in
+  `types/mock/routing`, which is pure and tested without a socket: `StubRouter` (the OAuth2 servers
+  first, then the stubs), `requestModelOf`, `requestOrigin`, `wireResponseOf`, `wireMismatch` and
+  the body limit.
+- All 113 stream-free Spec S cases and the reference's routing, OAuth2 flow, response and body
+  limit cases pass over HTTP, on `node:http` with no framework.
+- A request without a readable Host is answered 400 in the reference's words, including an
+  HTTP/1.1 request without the header, which Node would otherwise answer with an empty 400
+  (`requireHostHeader` is off). `{{origin}}` is read from the Host header by a rule of its own:
+  the host in lower case, port 80 dropped, an IPv6 literal kept in its brackets.
+- Node hands a header value over as Latin-1; one that is valid UTF-8 is read as UTF-8, so a report
+  quotes what the client wrote. A header sent twice reaches the matcher as two values.
+- A response without a body states `Content-Length: 0`, a 204 or 304 states none, and a HEAD
+  answer states the length of the body it leaves out. Node adds `Date`, `Connection` and
+  `Keep-Alive`; no `Server` header is sent.
+- Streams are already served here, chunk by chunk with the stub's pause, and end when the client
+  leaves or the host stops, because the routing cases need them. Their own tests (pacing, a client
+  that leaves, a stop mid-stream) are phase 5b's, with the request log and the admin API.
+- Reference cases without a counterpart: the listener-table rows of `WildcardReason` (the connect
+  probe is tested instead), `/__admin/mappings` and `/__admin/settings` (no WireMock admin API),
+  and `Misses`, which becomes the request log in phase 5b. Until then a request under `/__admin`
+  gets the 418 report like any other.
+- The host answers 500 with its reason when it cannot write what a stub states. No stub the loader
+  accepts gets there; the test hands the host a stub set the loader would refuse.
 
 ## 7. Risks
 

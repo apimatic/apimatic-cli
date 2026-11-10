@@ -1,6 +1,7 @@
 import { Buffer } from 'node:buffer';
 import { URLSearchParams } from 'node:url';
 import { RequestModel } from '../../src/types/mock/matching/request-model.js';
+import { percentEncode } from '../../src/types/mock/text/percent.js';
 
 /** The reference's fixed test credentials and the identifiers its sample stubs follow across operations. */
 export const ledger = {
@@ -37,6 +38,15 @@ export const ledger = {
   ] as [string, string][]
 } as const;
 
+/** A request as a client writes it: the target with its query percent-encoded, and whether the body goes out without its length. */
+export interface WireRequest {
+  readonly method: string;
+  readonly target: string;
+  readonly headers: readonly [string, string][];
+  readonly body: Uint8Array;
+  readonly chunked: boolean;
+}
+
 export interface SentPart {
   readonly name: string;
   readonly fileName?: string;
@@ -51,6 +61,7 @@ export class TestRequest {
   private readonly pairs: [string, string][] = [];
   private readonly headers: [string, string][] = [];
   private body: Uint8Array = new Uint8Array();
+  private sentChunked = false;
 
   private constructor(method: string, path: string) {
     this.method = method;
@@ -97,6 +108,23 @@ export class TestRequest {
 
   public multipart(parts: readonly SentPart[], boundary = 'test-boundary'): this {
     return this.bytes(multipartBody(parts, boundary), `multipart/form-data; boundary=${boundary}`);
+  }
+
+  /** The body sent without its length declared, as a client streaming it would. */
+  public chunked(): this {
+    this.sentChunked = true;
+    return this;
+  }
+
+  public toWire(): WireRequest {
+    const pairs = this.pairs.map(([key, value]) => `${percentEncode(key)}=${percentEncode(value)}`);
+    return {
+      method: this.method,
+      target: pairs.length === 0 ? this.path : `${this.path}?${pairs.join('&')}`,
+      headers: this.headers,
+      body: this.body,
+      chunked: this.sentChunked
+    };
   }
 
   public build(): RequestModel {

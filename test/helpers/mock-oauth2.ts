@@ -1,5 +1,9 @@
 import { Buffer } from 'node:buffer';
 import { createHash } from 'node:crypto';
+import { URL } from 'node:url';
+import { parseQuery } from '../../src/types/mock/matching/query-string.js';
+import { percentEncode } from '../../src/types/mock/text/percent.js';
+import type { TestMock } from './mock-http.js';
 import { ledger, TestRequest } from './mock-requests.js';
 
 type Pairs = readonly (readonly [string, string])[];
@@ -36,6 +40,23 @@ const replaced = (parameters: Pairs, key: string, value: string): Pairs =>
 const without = (parameters: Pairs, keys: readonly string[]): Pairs =>
   parameters.filter(([name]) => !keys.includes(name));
 const token = (...fields: Pairs): TestRequest => TestRequest.post(TOKEN_PATH).form(...fields);
+const formEncoded = (value: string): string => percentEncode(value).replaceAll('%20', '+');
+
+/** A missing Location would otherwise fail as a bare invalid URL, which does not say the consent was never redirected. */
+function redirect(location: string): URL {
+  if (location === '') {
+    throw new Error('The consent response has no Location header.');
+  }
+  return new URL(location);
+}
+
+function valueIn(encoded: string, name: string): string {
+  const values = parseQuery(encoded).filter(([key]) => key === name);
+  if (values.length !== 1) {
+    throw new Error(`Expected one '${name}' in '${encoded}' but found ${values.length}.`);
+  }
+  return values[0][1];
+}
 
 /** The requests an OAuth2 client sends to the sample authorization server, each right unless a test changes one thing. */
 export const oauth2 = {
@@ -89,6 +110,12 @@ export const oauth2 = {
     authorizeWith(key === undefined ? implicitParameters : replaced(implicitParameters, key, value)),
   authorizeImplicitWithout: (...keys: string[]): TestRequest => authorizeWith(without(implicitParameters, keys)),
 
+  /** The consent request as Python, Go, JS and Ruby form encoders write it: a space as `+`, which `query` would send as `%20`. */
+  authorizeFormEncoded: (): TestRequest =>
+    TestRequest.get(
+      `${AUTHORIZE_PATH}?${codeParameters.map(([key, value]) => `${formEncoded(key)}=${formEncoded(value)}`).join('&')}`
+    ),
+
   exchange: (code: string, verifier: string = VERIFIER): TestRequest =>
     token(
       ['grant_type', 'authorization_code'],
@@ -101,5 +128,21 @@ export const oauth2 = {
   refresh: (refreshToken: string, ...fields: Pairs): TestRequest =>
     token(['grant_type', 'refresh_token'], ['refresh_token', refreshToken], ['client_id', ledger.clientId], ...fields),
 
-  challengeOf: (verifier: string): string => createHash('sha256').update(verifier, 'ascii').digest('base64url')
+  challengeOf: (verifier: string): string => createHash('sha256').update(verifier, 'ascii').digest('base64url'),
+
+  codeIn: (location: string): string => valueIn(redirect(location).search, 'code'),
+
+  /** The access token in a redirect's fragment, where the implicit flow puts it. */
+  tokenIn: (location: string): string => valueIn(redirect(location).hash.slice(1), 'access_token')
 };
+
+export async function clientCredentialsToken(mock: TestMock): Promise<string> {
+  return (await mock.send(oauth2.clientCredentials())).expectJson(200).access_token;
+}
+
+/** Authorize with PKCE, follow the consent redirect by hand, exchange the code. */
+export async function authorizationCodeToken(mock: TestMock): Promise<string> {
+  const consent = await mock.send(oauth2.authorize());
+  consent.expect(302);
+  return (await mock.send(oauth2.exchange(oauth2.codeIn(consent.header('Location'))))).expectJson(200).access_token;
+}
