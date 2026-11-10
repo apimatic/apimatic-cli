@@ -116,8 +116,9 @@ describe('navigationTransformer', () => {
 
   describe('a nav.json it cannot use', () => {
     // The CLI reports these, but under `portal serve` a half-typed file still reloads into the transformer.
-    it('leaves the order alone for a file that is null, a string or an array', () => {
-      for (const data of [null, 'hi', ['index']]) {
+    // Not `null`: Fumadocs' loader reads a metadata file's data itself before any transformer runs.
+    it('leaves the order alone for a file that is a string or an array', () => {
+      for (const data of ['hi', ['index']]) {
         const docs = [...CONTENT, { type: 'meta' as const, path: 'nav.json', data: data as never }];
 
         expect(treeOf({ docs, openapi: API })).to.deep.equal(['Welcome', 'Authentication', 'API Reference']);

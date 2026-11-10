@@ -501,15 +501,11 @@ describe('openApiSection', () => {
     );
   });
 
-  // Fumadocs writes a page for each tag an operation lists, the same one twice included.
-  it('refuses an operation that lists one tag twice, naming the tag', async () => {
+  // Fumadocs writes one page for the operation however often it repeats a tag, so there is nothing to refuse.
+  it('documents an operation that lists one tag twice on one page', async () => {
     expect(
-      await failureFor({ '/pets': { post: { operationId: 'createPet', tags: ['pets', 'pets'], responses: ok } } })
-    ).to.equal(
-      ["The operation POST /pets in 'api.json' lists the tag 'pets' more than once.", 'Remove the repeated tag.'].join(
-        '\n'
-      )
-    );
+      await pagesFor({ '/pets': { post: { operationId: 'createPet', tags: ['pets', 'pets'], responses: ok } } })
+    ).to.deep.equal(['api/pets/pets/createPet.mdx']);
   });
 
   // A tag's folder is its slug, so these two tags share one; the repeated 'x' has a folder of its own.

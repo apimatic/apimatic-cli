@@ -1,6 +1,5 @@
 import { expect } from 'chai';
-import type { ParameterObject } from 'fumadocs-openapi';
-import type { OperationParameters } from 'fumadocs-openapi/operation';
+import type { OperationParameter, OperationParameters } from 'fumadocs-openapi/operation';
 import { Parameter, requestExamples, type RequestExample } from '../../portal-template/src/lib/request-examples';
 
 type Location = OperationParameters['in'];
@@ -8,7 +7,7 @@ type Location = OperationParameters['in'];
 const example = (id: string): RequestExample => ({ id, name: id });
 
 // Fumadocs groups an operation's parameters by location.
-const group = (location: Location, item: Omit<ParameterObject, 'in'>): OperationParameters => ({
+const group = (location: Location, item: Omit<OperationParameter, 'in'>): OperationParameters => ({
   in: location,
   items: [{ ...item, in: location }]
 });

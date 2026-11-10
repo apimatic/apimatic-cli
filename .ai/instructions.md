@@ -38,7 +38,7 @@ pnpm apimatic <command> -i <abs-path-to-dir-containing-src>   # -i: for commands
 
 `pnpm-workspace.yaml` sets `minimumReleaseAge: 10080` (7 days) as a supply-chain defense. Brand-new package versions are blocked from install until they've been on the registry for at least a week. `@apimatic/*` is exempt via `minimumReleaseAgeExclude`.
 
-If you hit `ERR_PNPM_PACKAGE_RECENTLY_PUBLISHED` adding a fresh release, either wait it out or run a one-off install with `pnpm install --ignore-minimum-release-age` (CI uses `--frozen-lockfile`, which bypasses the check entirely, so this only blocks manual `pnpm add` / `pnpm update`).
+If you hit `ERR_PNPM_PACKAGE_RECENTLY_PUBLISHED` adding a fresh release, either wait it out or run a one-off install with `pnpm install --config.minimumReleaseAge=0` (pnpm 11 has no `--ignore-minimum-release-age` flag; CI uses `--frozen-lockfile`, which bypasses the check entirely, so this only blocks manual `pnpm add` / `pnpm update`).
 
 ## TypeScript toolchain — two compilers, on purpose
 

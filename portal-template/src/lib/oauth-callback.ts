@@ -5,9 +5,8 @@
  */
 export const oauthCallbackPath = '/oauth/callback';
 
-/** The cookie the playground writes before it leaves, naming the page that started the flow. */
-const PAGE_COOKIE_NAME = 'fumadocs-openapi-oauth';
-const PAGE_COOKIE = new RegExp(`(?:^|;\\s*)${PAGE_COOKIE_NAME}=([^;]+)`);
+/** Where the playground notes the path of the page that started the flow before it leaves: this tab's session storage. */
+export const STARTING_PAGE_KEY = 'fumadocs-openapi-oauth';
 
 /** What the callback does with the browser that lands on it. */
 export type OAuthCallback =
@@ -15,9 +14,9 @@ export type OAuthCallback =
   | { kind: 'return'; url: string }
   /** Stays, to show the error the provider ended the authorization with, and a link back to that page. */
   | { kind: 'providerError'; error: string; description: string | null; page: string }
-  /** Stays, since the cookie names no page: no authorization was started in this browser. */
+  /** Stays, since no page is noted: no authorization was started in this tab. */
   | { kind: 'notStarted' }
-  /** Stays, since the cookie names a page on another site, or one that cannot be read. */
+  /** Stays, since the noted page is on another site, or cannot be read as an address. */
   | { kind: 'unknownPage' };
 
 /** Every outcome but sending the browser on, which leaves the callback before it renders again. */
@@ -25,16 +24,18 @@ export type OAuthCallbackFailure = Exclude<OAuthCallback, { kind: 'return' }>;
 
 /**
  * The provider answers in the query for the authorization code flow and in the fragment for the
- * implicit one, an error included. Only an authorization this browser started is answered with
+ * implicit one, an error included. Only an authorization this tab started is answered with
  * the provider's error: anyone can link here with an `error_description` of their own.
  */
-export function oauthCallback(cookie: string, location: Pick<Location, 'origin' | 'search' | 'hash'>): OAuthCallback {
-  const value = PAGE_COOKIE.exec(cookie)?.[1];
-  if (value === undefined) return { kind: 'notStarted' };
+export function oauthCallback(
+  startingPage: string | null,
+  location: Pick<Location, 'origin' | 'search' | 'hash'>
+): OAuthCallback {
+  if (startingPage === null) return { kind: 'notStarted' };
 
   let page: URL;
   try {
-    page = new URL(decodeURIComponent(value), location.origin);
+    page = new URL(startingPage, location.origin);
   } catch {
     return { kind: 'unknownPage' };
   }
@@ -55,9 +56,9 @@ export function oauthCallback(cookie: string, location: Pick<Location, 'origin' 
 }
 
 /**
- * The playground leaves the cookie for the session, so a later visit would be sent back to the
- * last page that started an authorization. Forgotten once read, it names only the flow just started.
+ * The playground leaves the note for the tab's session, so a later arrival would be sent back to
+ * the last page that started an authorization. Forgotten once read, it names only the flow just started.
  */
 export function forgetStartingPage(): void {
-  document.cookie = `${PAGE_COOKIE_NAME}=; path=/; max-age=0`;
+  sessionStorage.removeItem(STARTING_PAGE_KEY);
 }
