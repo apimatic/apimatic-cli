@@ -16,7 +16,7 @@ const OAUTH_ANSWER = [
 
 /** Query parameters a reported address keeps: campaign, ad-click and cross-domain tags, which attribution reads from the address. */
 const KEPT_PREFIXES = ['utm_', 'hsa_'];
-const KEPT_NAMES = [
+const KEPT_NAMES = new Set([
   '_gl',
   'gclid',
   'gbraid',
@@ -32,7 +32,7 @@ const KEPT_NAMES = [
   '_hsenc',
   '_hsmi',
   'ref'
-];
+]);
 
 /**
  * Each event's keys, besides the `page_location` every report adds. Customers' GTM triggers
@@ -62,7 +62,7 @@ export function pageLocation(href: string, keep: readonly string[], base?: strin
   // A static host may answer `/oauth/callback` at `/oauth/callback/` and keep the query.
   if (url.pathname.replace(/\/$/, '') === withBasePath(oauthCallbackPath, base)) return null;
   const kept = (name: string) =>
-    KEPT_PREFIXES.some((prefix) => name.startsWith(prefix)) || KEPT_NAMES.includes(name) || keep.includes(name);
+    KEPT_PREFIXES.some((prefix) => name.startsWith(prefix)) || KEPT_NAMES.has(name) || keep.includes(name);
   url.search = new URLSearchParams([...url.searchParams].filter(([name]) => kept(name))).toString();
   url.hash = '';
   return url.href;
