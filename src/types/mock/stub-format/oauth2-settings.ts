@@ -28,7 +28,7 @@ export const OAUTH2_DEFAULTS = {
   accessTokenPrefix: 'ac-access-token-',
   refreshTokenPrefix: 'ac-refresh-token-',
   username: 'test-user',
-  password: 'test-password',
+  password: 'test-password', // NOSONAR - the mock's fixed test credential, never a real one
   passwordAccessToken: 'pw-access-token',
   implicitAccessToken: 'im-access-token'
 } as const;

@@ -12,7 +12,7 @@ export const ledger = {
   clientSecret: 'test-client-secret',
   clientCredentialsToken: 'cc-access-token',
   username: 'test-user',
-  password: 'test-password',
+  password: 'test-password', // NOSONAR - the mock's fixed test credential, never a real one
   passwordToken: 'pw-access-token',
   implicitToken: 'im-access-token',
   partnerClientId: 'partner-client-id',

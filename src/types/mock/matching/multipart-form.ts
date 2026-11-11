@@ -1,5 +1,5 @@
 import { Buffer } from 'node:buffer';
-import { equalsIgnoringAsciiCase } from '../text/ascii.js';
+import { compareOrdinal, equalsIgnoringAsciiCase } from '../text/ascii.js';
 import { parseMediaType, parseParameterizedValue } from '../text/media-type.js';
 import { percentDecode } from '../text/percent.js';
 
@@ -36,7 +36,7 @@ export function parseMultipartForm(contentType: string, body: Uint8Array): Multi
   }
   try {
     const parts = sections(Buffer.from(body), `--${boundary}`).map(partOf);
-    const names = [...new Set(parts.map((part) => part.name))].sort();
+    const names = [...new Set(parts.map((part) => part.name))].sort(compareOrdinal);
     return { kind: 'parts', byName: new Map(names.map((name) => [name, parts.filter((part) => part.name === name)])) };
   } catch (fault) {
     if (fault instanceof Malformed) {

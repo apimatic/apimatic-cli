@@ -164,7 +164,8 @@ function closest(branches: Fault[][], location: string): Fault[] {
     const differing = one.findIndex((part, index) => part !== other[index]);
     return differing >= 0 && other[differing] < one[differing] ? second : first;
   };
-  return branches.reduce(closer);
+  const [first, ...others] = branches;
+  return others.reduce((best, next) => closer(best, next), first);
 }
 
 function ownFaults(schema: Schema, value: JsonValue): { keyword: string; message: string }[] {
