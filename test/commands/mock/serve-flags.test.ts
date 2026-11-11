@@ -76,8 +76,4 @@ describe('mock serve flags', () => {
       expect(error.message).to.contain(named);
     });
   }
-
-  it('is hidden until the SDK contract suites pass against it', () => {
-    expect(MockServe.hidden).to.equal(true);
-  });
 });

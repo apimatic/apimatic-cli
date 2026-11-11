@@ -9,9 +9,6 @@ import { LIFETIME_FROM_STUB, lifetimeOfSeconds } from '../../types/mock/routing/
 const defaultPortText = String(DEFAULT_MOCK_PORT);
 
 export default class MockServe extends Command {
-  // Shown once the SDK contract suites pass against it.
-  static readonly hidden = true;
-
   static readonly summary = 'Serve a mock of your API from stub files, for SDK tests to run against.';
 
   static readonly description = `Answers exactly the requests its stub files describe. A request no stub describes is answered 418 with the difference from the closest stub, so a failing test explains itself. An 'oauth2' stub adds an authorization server on the same origin.
