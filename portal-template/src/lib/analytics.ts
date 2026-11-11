@@ -1,5 +1,6 @@
 import { withBasePath } from './base-path';
 import { oauthCallbackPath } from './oauth-callback';
+import type { PortalAnalytics } from './portal-types';
 
 /** Names the OAuth standard puts in an answer. While one is in the address, the loader inserts nothing. */
 const OAUTH_ANSWER = [
@@ -56,6 +57,58 @@ export type DataLayerEntry =
   | { docs: null }
   | { event: PortalEventName; docs: Readonly<Record<string, string | number>> };
 
+type Gtag = (...command: unknown[]) => void;
+
+declare global {
+  interface Window {
+    dataLayer?: unknown[];
+    gtag?: Gtag;
+  }
+}
+
+/** Our code for one vendor. The shared adapter suite runs against each. */
+export interface Adapter {
+  setup(dataLayer: unknown[]): void;
+  scripts(): string[];
+  /** GTM needs nothing here: it reads the data layer. */
+  send(name: PortalEventName, params: Record<string, unknown>): void;
+}
+
+type Vendor = 'googleTagManager' | 'googleAnalytics';
+const GOOGLE = 'https://www.googletagmanager.com';
+
+/** Keyed by every vendor in the union: a vendor without an adapter does not compile. */
+export const adapters: { [V in Vendor]: (setting: NonNullable<PortalAnalytics[V]>) => Adapter } = {
+  googleTagManager: (setting) => {
+    const env = setting.environment;
+    const environment = env ? `&gtm_auth=${env.auth}&gtm_preview=${env.preview}&gtm_cookies_win=x` : '';
+    return {
+      setup: (dataLayer) => dataLayer.push({ 'gtm.start': Date.now(), event: 'gtm.js' }),
+      scripts: () => [`${GOOGLE}/gtm.js?id=${setting.containerId}${environment}`],
+      send: () => {}
+    };
+  },
+  googleAnalytics: (setting) => {
+    let gtag: Gtag;
+    return {
+      setup: (dataLayer) => {
+        // gtag.js reads only Arguments objects from the data layer, never an array of the same values.
+        gtag = window.gtag ??= function () {
+          dataLayer.push(arguments);
+        };
+        gtag('js', new Date());
+        gtag('config', setting.measurementId, {
+          send_page_view: false,
+          ...(setting.debugMode ? { debug_mode: true } : {})
+        });
+      },
+      scripts: () => [`${GOOGLE}/gtag/js?id=${setting.measurementId}`],
+      // GA4 gets its own names: the `docs_` prefix comes off.
+      send: (name, params) => gtag('event', name.replace(/^docs_/, ''), params)
+    };
+  }
+};
+
 /** The address as reported: no `#` part, no query but the kept tags, and null on the OAuth callback. */
 export function pageLocation(href: string, keep: readonly string[], base?: string): string | null {
   const url = new URL(href);
@@ -73,4 +126,59 @@ export function holdsOAuthAnswer(href: string): boolean {
   const url = new URL(href);
   const hash = new URLSearchParams(url.hash.slice(1));
   return OAUTH_ANSWER.some((name) => url.searchParams.has(name) || hash.has(name));
+}
+
+export function analyticsFor(settings: PortalAnalytics) {
+  const live: Adapter[] = [];
+  if (settings.googleTagManager) live.push(adapters.googleTagManager(settings.googleTagManager));
+  if (settings.googleAnalytics) live.push(adapters.googleAnalytics(settings.googleAnalytics));
+  const events: PortalEvent[] = [];
+  let set = false;
+  let lastPageView: string | null = null;
+
+  function startAnalytics(): void {
+    if (set) return;
+    set = true;
+    const dataLayer = (window.dataLayer ??= []);
+    for (const adapter of live) adapter.setup(dataLayer);
+    if (!holdsOAuthAnswer(window.location.href)) insert();
+  }
+
+  function insert(): void {
+    for (const adapter of live) for (const src of adapter.scripts()) add(src);
+  }
+
+  function report<E extends PortalEventName>(name: E, params: PortalEvents[E]): void {
+    const page_location = pageLocation(window.location.href, settings.keepQueryParams);
+    if (page_location === null) return;
+    const all = { ...params, page_location };
+    const dataLayer = (window.dataLayer ??= []);
+    // GTM keeps every key from earlier pushes and merges objects, so clear ours first: a shared GA4 tag never sends the last event's details.
+    const reset: DataLayerEntry = { docs: null };
+    const entry: DataLayerEntry = { event: name, docs: all };
+    dataLayer.push(reset);
+    dataLayer.push(entry);
+    for (const adapter of live) adapter.send(name, all);
+    events.push(Object.freeze({ name, params: Object.freeze(all), time: Date.now(), version: 1 }));
+  }
+
+  function reportPageViews(router: { subscribe(event: 'onRendered', listener: () => void): () => void }): () => void {
+    const pageView = () => {
+      const page = pageLocation(window.location.href, settings.keepQueryParams);
+      if (page === null || page === lastPageView) return;
+      lastPageView = page;
+      report('docs_page_view', { page_title: document.title });
+    };
+    pageView();
+    return router.subscribe('onRendered', pageView);
+  }
+
+  return { startAnalytics, report, reportPageViews, events };
+}
+
+function add(src: string): void {
+  const script = document.createElement('script');
+  script.async = true;
+  script.src = src;
+  document.head.append(script);
 }

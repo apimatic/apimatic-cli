@@ -22,6 +22,24 @@ export interface PortalFavicon {
   type: string | null;
 }
 
+export interface GoogleTagManagerSetting {
+  containerId: string;
+  environment: { auth: string; preview: string } | null;
+}
+
+/** `debugMode` is set by the CLI under `portal serve`. */
+export interface GoogleAnalyticsSetting {
+  measurementId: string;
+  debugMode: boolean;
+}
+
+/** Public values: they sit in every page's scripts. */
+export interface PortalAnalytics {
+  googleTagManager: GoogleTagManagerSetting | null;
+  googleAnalytics: GoogleAnalyticsSetting | null;
+  keepQueryParams: string[];
+}
+
 export interface Portal {
   name: string;
   description: string | null;
