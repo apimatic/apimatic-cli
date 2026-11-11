@@ -1,7 +1,7 @@
 # The v4 mock server, ported from C#
 
 Status: in progress on `feat/mock-server`, cut from `dev` at `4b748d5d` on 2026-11-10.
-Phases 0 to 6 are done and committed on the branch.
+Phases 0 to 6 are done, committed and pushed as `feat/mock-server`. Phase 7 is done but for the CLI Reference rows in apimatic-docs, which wait for the release; its changes are not committed yet.
 
 The mock that v4 SDK test suites run against exists as a C#/.NET proof of concept in
 `apimatic/mock-server-poc-v4` (reference commit `0d5a84f`: about 4,800 lines of source and 1,220
@@ -285,6 +285,53 @@ Phase 6:
   POSIX signal, so they have not run yet: this branch has only been built on Windows.
 - Not carried over from `CommandLineTests`: `--help` after an unknown flag as a usage error (oclif
   prints the help), and the reference's own wording of each usage error (oclif's names the flag).
+
+Phase 7:
+
+- `docs/mock/stub-format.md` is the reference's stub format document with what differs here
+  written in (the path decoded once, a lower-case method refused by the HTTP parser, the wording
+  of the response header rules) and two sections added: the request log's shape, and the requests
+  the mock answers itself (400, 413, 404, 405, 500).
+- `docs/mock/generator-handoff.md` is the handoff for the new model: the mock ships in the CLI and
+  an SDK holds stub files only; how a test starts `apimatic mock serve` and finds the origin; and a
+  table of what changed from the proof of concept. Its sections on rendering stubs are the
+  reference's, since the format did not change.
+- `CONTEXT.md` has the mock's terms: stub, stub file, stubs directory, miss, mismatch report,
+  request log, origin.
+- **The C# SDK's contract suite passes against the command** (2026-11-11): `tests/TesterPoc.ContractTests`
+  of csharp-sdk-poc-v4 at `c266b88a` (branch `Shield-Jaguar/mock-server-v4`), against
+  `apimatic mock serve --stubs test/resources/mock/tester-poc --port 4010`: 103 of 103 on net10.0
+  and on net8.0. Each run logged 107 requests (103 answered 200, one 302, two 400 and one 403 from
+  the OAuth2 server) and no 418. Built with the .NET SDK 11.0.100; its restore did not fetch the
+  .NET 8 app host pack until given `-p:AppHostRuntimeIdentifier=win-x64 -p:EnableAppHostPackDownload=true`.
+- The command and its topic are shown, and the README has its section (`pnpm readme`).
+- **Not done: the CLI Reference rows in apimatic-docs.** That repository documents released
+  commands only and asks for placement to be agreed before a page is changed, so the rows wait for
+  the release. The proposal is a `## Mock commands` section after "Plugin commands" in
+  `v4/src/content/apimatic-cli/cli-reference.mdx`, with one line in "Commands overview":
+
+  ```md
+  - [Mock commands](#mock-commands): Serve a mock of your API for SDK tests to run against.
+
+  ## Mock commands
+
+  ### `mock serve`
+
+  Serves a mock of your API from stub files, for SDK tests to run against. A request that no stub describes gets a 418 response that names the difference from the closest stub.
+
+  | Flag | What it does |
+  | --- | --- |
+  | `-p, --port` | Port to serve the mock on. Defaults to `4010`. `0` picks a free port on localhost. |
+  | `--host` | `localhost` or an IP address to listen on. An IP address needs a port other than `0`. Use `0.0.0.0` in a container. Defaults to `localhost`. |
+  | `-s, --stubs` | Path to the directory containing the stub files. Defaults to `./stubs`. |
+  | `--token-ttl` | Seconds the OAuth2 tokens live for, sent as `expires_in`. Defaults to an `oauth2` stub's own `expiresIn`. |
+  | `--verbose` | Log every request to stderr. |
+  ```
+- Not run anywhere yet: exit 130 on a real SIGINT or SIGTERM (the gated end-to-end cases skip on
+  Windows, the only platform tried so far; the CI matrix runs them).
+- Two things a harness author should know, both in the handoff: the marker line is not the first
+  line of stdout, and on Windows stopping the `apimatic.cmd` shim does not stop the Node process
+  behind it.
 
 ## 7. Risks
 
