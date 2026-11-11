@@ -22,6 +22,8 @@ export type Outcome =
 
 /** One request that reached the router, as decoded for matching, with the status it was answered with. */
 export interface LoggedRequest {
+  /** `GET /v1/accounts?limit=2`, as a mismatch report quotes the request. */
+  readonly line: string;
   readonly method: string;
   readonly path: string;
   readonly query: readonly NamedValues[];
@@ -37,13 +39,20 @@ export interface LoggedRequest {
  */
 export class RequestLog {
   private readonly capacity: number;
+  private readonly added: (request: LoggedRequest) => void;
   private readonly kept: LoggedRequest[] = [];
 
-  public constructor(capacity: number = REQUEST_LOG_CAPACITY) {
+  /** `added` hears of every request as it is logged, which is how the command prints its --verbose lines. */
+  public constructor(
+    capacity: number = REQUEST_LOG_CAPACITY,
+    added: (request: LoggedRequest) => void = () => undefined
+  ) {
     this.capacity = capacity;
+    this.added = added;
   }
 
   public add(request: LoggedRequest): void {
+    this.added(request);
     this.kept.push(request);
     if (this.kept.length > this.capacity) {
       this.kept.shift();
@@ -63,7 +72,7 @@ export class RequestLog {
 /** The fields are copied out of the model, which also holds its body read as JSON or as a form: the log keeps a body once. */
 export function loggedRequest(request: RequestModel, verdict: Verdict): LoggedRequest {
   const { method, path, query, headers, body } = request;
-  return { method, path, query, headers, body, ...answerOf(verdict) };
+  return { line: request.line(), method, path, query, headers, body, ...answerOf(verdict) };
 }
 
 /**

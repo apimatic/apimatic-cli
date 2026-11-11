@@ -3,7 +3,7 @@ import { createServer, IncomingMessage, Server, ServerOptions, ServerResponse } 
 import { Duplex } from 'node:stream';
 import { err, Result } from 'neverthrow';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
-import { RequestLog } from '../../types/mock/routing/request-log.js';
+import { LoggedRequest, REQUEST_LOG_CAPACITY, RequestLog } from '../../types/mock/routing/request-log.js';
 import { requestOrigin, unreadableHost } from '../../types/mock/routing/request-origin.js';
 import { respond } from '../../types/mock/routing/respond.js';
 import { StubRouter } from '../../types/mock/routing/stub-router.js';
@@ -43,6 +43,8 @@ export interface MockHostOptions {
   readonly stubs: DirectoryPath;
   readonly listen: Listen;
   readonly tokenLifetime: TokenLifetime;
+  /** Hears of every request that reached the router, with what came of it. */
+  readonly onRequest?: (request: LoggedRequest) => void;
 }
 
 /** What starting the mock came to: a running host, or one of the two failures a harness tells apart. */
@@ -98,7 +100,7 @@ export class MockHost {
     pick: () => number = () => 0
   ): Promise<StartResult> {
     const router = new StubRouter(stubs, options.tokenLifetime);
-    const log = new RequestLog();
+    const log = new RequestLog(REQUEST_LOG_CAPACITY, options.onRequest);
     const exchanges = new Set<Promise<void>>();
     const stopping = new AbortController();
     const create = () =>

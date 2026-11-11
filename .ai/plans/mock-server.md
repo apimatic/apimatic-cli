@@ -1,7 +1,7 @@
 # The v4 mock server, ported from C#
 
 Status: in progress on `feat/mock-server`, cut from `dev` at `4b748d5d` on 2026-11-10.
-Phases 0 to 5b are done and committed on the branch.
+Phases 0 to 6 are done and committed on the branch.
 
 The mock that v4 SDK test suites run against exists as a C#/.NET proof of concept in
 `apimatic/mock-server-poc-v4` (reference commit `0d5a84f`: about 4,800 lines of source and 1,220
@@ -113,7 +113,7 @@ array with its comparer stated.
 | 4 | The OAuth2 authorization server | `Auth/` | `OAuth2ServerTests` | Done |
 | 5a | The host on `node:http`: listening, adapters, router | `Engine/` except streams and admin | `MockHostTests`, `ListenTests`, `RoutingTests`, `ResponseAdapterTests`, `BodyLimitTests`, `OAuth2FlowTests`, `TokenLifetimeTests`, the Spec S suites without a stream | Done |
 | 5b | Streams, multipart and binary answers, the request log | `PacedBody`, `PerRequestQueue`, `AdminApi` | `StreamingTests`, `PacedBodyTests`, `AdminApiTests`, the remaining Spec S suites | Done |
-| 6 | Command, action, prompts | `Program.cs` | `CommandLineTests`, `ExitCodeTests` (as a gated e2e test) | The command runs hidden |
+| 6 | Command, action, prompts | `Program.cs` | `CommandLineTests`, `ExitCodeTests` (as a gated e2e test) | Done |
 | 7 | Acceptance: the C# SDK's contract suite on :4010; docs; the command shown | n/a | n/a | 103 contract tests pass |
 
 ## 6. Findings
@@ -257,6 +257,34 @@ Phase 5b:
   `AdminApi_Requests_CountsRetryAttemptsByMarker` (it reads WireMock's log shape). The sample-set
   `RoutingTests` and `OAuth2FlowTests`: 48 of 50 pass; the two that fail are the path decoded once
   (section 4 item 2) and `Misses`, which reads the in-process host.
+
+Phase 6:
+
+- `apimatic mock serve` is `commands/mock/serve.ts`, `actions/mock/serve.ts` and
+  `prompts/mock/serve.ts`, hidden (the command and its topic) until phase 7. Flags: `--port`
+  (`-p`, default 4010, 0 for a free port), `--host` (default localhost), `--stubs` (`-s`, default
+  `./stubs`), `--token-ttl` and `--verbose`.
+- `--host` takes localhost in any letter case or an IP address, kept in its canonical spelling
+  (`[::1]` and `0:0:0:0:0:0:0:1` are `::1`). A name is refused, as in the reference, although the
+  host could bind one: where a name resolves is not something a command line should leave open.
+  An IP address with port 0 is refused too, since a free port is found on localhost alone. Both
+  are exit 2, with oclif's own flag errors.
+- Output goes through the prompts class to stdout as every command's does, the stub problems and
+  a refused port included; the reference wrote those to stderr. The marker line is
+  `MOCKSERVER_URL=<origin>` with nothing after the origin, inside clack's gutter, so a harness
+  searches for the marker and reads to the end of the line. Only the `--verbose` request lines go
+  to stderr: `GET /v1/x?q=1 -> 418 closest 'the stub': …`.
+- The stop signals are taken over before the marker line is printed, because a harness may stop
+  the mock the moment it reads it. Exit codes: 130 once stopped, 1 for stub problems and for a
+  port that cannot be opened (the reference used 1 and 3), 2 for a bad flag.
+- The host gained `onRequest`, which hears of every logged request; the action passes the
+  prompt that prints the verbose line.
+- `test/e2e/mock-serve.test.ts` runs the built CLI as a harness would, behind `APIMATIC_E2E=1`:
+  the marker and the origin, `--verbose` on stderr alone, `--token-ttl`, and exits 1 and 2. Its two
+  signal cases (exit 130 on SIGINT and SIGTERM) are skipped on Windows, which cannot deliver a
+  POSIX signal, so they have not run yet: this branch has only been built on Windows.
+- Not carried over from `CommandLineTests`: `--help` after an unknown flag as a usage error (oclif
+  prints the help), and the reference's own wording of each usage error (oclif's names the flag).
 
 ## 7. Risks
 

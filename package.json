@@ -173,6 +173,10 @@
             "auth": {
                 "description": "Login using your APIMatic credentials, or view your authentication status."
             },
+            "mock": {
+                "description": "Serve a mock of your API from stub files, for SDK tests to run against.",
+                "hidden": true
+            },
             "plugin": {
                 "description": "Generate context plugins that teach AI coding assistants to use your SDKs."
             },
