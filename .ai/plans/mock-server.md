@@ -1,7 +1,7 @@
 # The v4 mock server, ported from C#
 
 Status: in progress on `feat/mock-server`, cut from `dev` at `4b748d5d` on 2026-11-10.
-Phases 0 to 6 are done, committed and pushed as `feat/mock-server`. Phase 7 is done but for the CLI Reference rows in apimatic-docs, which wait for the release; its changes are not committed yet.
+Phases 0 to 6 are done, committed and pushed as `feat/mock-server`. Phase 7 is done but for the CLI Reference rows in apimatic-docs, which wait for the release.
 
 The mock that v4 SDK test suites run against exists as a C#/.NET proof of concept in
 `apimatic/mock-server-poc-v4` (reference commit `0d5a84f`: about 4,800 lines of source and 1,220
