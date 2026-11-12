@@ -17,10 +17,12 @@ overrides:
   '@oclif/core': "4.11.0"
   oclif: "4.17.34"
   browserslist: "4.24.4"
-  '@scalar/json-magic>undici': 7.29.1
-  # Their engines start above the CLI's Node floor, and the CLI loads neither: one serves `generateFiles()` in watch mode, the other the server proxy.
+  # fumadocs-openapi 12.6 asks for chokidar 6 (Node 22.22 and up) and undici 8 (22.19 and up), above
+  # the CLI's 22.14 floor, which fails CI's `--engine-strict` install. The CLI loads neither: chokidar
+  # serves `generateFiles()` in watch mode, undici the server proxy. Held at chokidar 5, which 12.5.0
+  # shipped with, and at the patched undici 7.30.1 that @scalar/json-magic 0.16 pins as well. The
+  # overrides reach CI alone: `npm install -g` ignores them, prints an EBADENGINE warning for each of
+  # the two on Node 22.14, and installs all the same.
   'fumadocs-openapi>chokidar': ^5.0.0
-  'fumadocs-openapi>undici': 7.29.1
-  # json-magic 0.17 raised its floor for undici 8, which the override above replaces anyway; fumadocs-openapi uses only its magic proxy, the same in 0.16.
-  'fumadocs-openapi>@scalar/json-magic': ^0.16.1
+  'fumadocs-openapi>undici': 7.30.1
   '@types/node': $@types/node
