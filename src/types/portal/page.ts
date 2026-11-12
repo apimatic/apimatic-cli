@@ -22,10 +22,18 @@ export interface PageImage {
   path: string;
 }
 
-/** A page as the build parses it: its front matter held to the build's schema, and the images the build imports. */
+/** A piece of HTML in a `.md` page, by the line it starts on and that line as written. */
+export interface HtmlPiece {
+  line: number;
+  text: string;
+}
+
+/** A page as the build parses it. */
 export interface ParsedPage {
   frontMatter: Result<PageFrontMatter, string[]>;
   images: PageImage[];
+  /** None in an `.mdx` page, which renders its HTML. */
+  leftOutHtml: HtmlPiece[];
 }
 
 type SchemaIssue = NonNullable<ReturnType<typeof pageSchema.safeParse>['error']>['issues'][number];
@@ -38,12 +46,17 @@ interface MarkdownNode {
   identifier?: string;
   name?: string | null;
   attributes?: { type: string; name?: string; value?: unknown }[];
+  value?: string;
   position?: { start: { line: number } };
   children?: MarkdownNode[];
 }
 
 // A scheme, a drive letter or a network path: none of them names a file the build imports.
 const NOT_A_FILE = /^(?:[a-z][a-z\d+.-]*:|\/\/)/i;
+
+// As CommonMark reads one, where `<!-->` and `<!--->` are whole comments.
+const COMMENT = /<!--(?:-?>|[\s\S]*?(?:-->|$))/g;
+const CLOSING_TAG = /<\/[a-z][a-z\d-]*\s*>/gi;
 
 /** Parsed once, as the build parses it, `.mdx` as MDX; a body that does not parse is the build's to report. */
 export async function parsePage(contents: string, fileName: FileName, label: string): Promise<ParsedPage> {
@@ -52,13 +65,21 @@ export async function parsePage(contents: string, fileName: FileName, label: str
     parsed = frontmatter(contents);
   } catch (error) {
     const reason = errorMessage(error).split('\n')[0];
-    return { frontMatter: err([`${label}: its front matter is not valid YAML. ${reason}`]), images: [] };
+    return {
+      frontMatter: err([`${label}: its front matter is not valid YAML. ${reason}`]),
+      images: [],
+      leftOutHtml: []
+    };
   }
   // Blanked rather than cut, so every line keeps its number.
   const body = '\n'.repeat(parsed.matter.split('\n').length - 1) + contents.slice(parsed.matter.length);
+  const isMdx = fileName.hasExactExtension('.mdx');
+  const tree = await parsedBody(body, isMdx);
+  const nodes = tree === null ? [] : nodesOf(tree);
   return {
     frontMatter: await checkedFrontMatter(parsed, label),
-    images: await imagesIn(body, fileName.hasExactExtension('.mdx'))
+    images: imagesIn(nodes),
+    leftOutHtml: isMdx ? [] : htmlIn(nodes)
   };
 }
 
@@ -106,39 +127,43 @@ function titleError(title: unknown, label: string): string {
   return `${label}: 'title' must be text. Put it in quotes if it looks like a number or true or false.`;
 }
 
-async function imagesIn(body: string, isMdx: boolean): Promise<PageImage[]> {
+async function parsedBody(body: string, isMdx: boolean): Promise<MarkdownNode | null> {
   // On first use, as the schema is: most commands never read a page.
   const { remark } = await import('remark');
   const processor = isMdx ? remark().use((await import('remark-mdx')).default) : remark();
-  let tree: MarkdownNode;
   try {
-    tree = processor.parse(body) as MarkdownNode;
+    return processor.parse(body) as MarkdownNode;
   } catch {
-    return [];
+    return null;
   }
+}
 
+function nodesOf(node: MarkdownNode): MarkdownNode[] {
+  return [node, ...(node.children ?? []).flatMap(nodesOf)];
+}
+
+function imagesIn(nodes: MarkdownNode[]): PageImage[] {
   // The template writes `![a][ref]` as `![a](url)` before the build imports it (remark-image-references.ts).
   const definitions = new Map<string, string>();
-  const define = (node: MarkdownNode) => {
+  for (const node of nodes) {
     // The first definition of a label wins, as CommonMark reads them.
     if (node.type === 'definition' && node.identifier !== undefined && !definitions.has(node.identifier)) {
       definitions.set(node.identifier, node.url ?? '');
     }
-    node.children?.forEach(define);
-  };
-  define(tree);
-
-  const images: PageImage[] = [];
-  const visit = (node: MarkdownNode) => {
+  }
+  return nodes.flatMap((node) => {
     const url = addressOf(node, definitions);
     const image = url !== undefined ? located(url) : null;
-    if (image !== null) {
-      images.push({ ...image, line: node.position?.start.line ?? 0 });
-    }
-    node.children?.forEach(visit);
-  };
-  visit(tree);
-  return images;
+    return image === null ? [] : [{ ...image, line: node.position?.start.line ?? 0 }];
+  });
+}
+
+function htmlIn(nodes: MarkdownNode[]): HtmlPiece[] {
+  // Comments and closing tags leave out nothing a reader would see.
+  const shows = (html: string) => html.replace(COMMENT, '').replace(CLOSING_TAG, '').trim() !== '';
+  return nodes.flatMap(({ type, value = '', position }) =>
+    type === 'html' && shows(value) ? [{ line: position?.start.line ?? 0, text: value.split('\n')[0].trim() }] : []
+  );
 }
 
 function addressOf(node: MarkdownNode, definitions: Map<string, string>): string | undefined {
