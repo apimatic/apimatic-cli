@@ -227,7 +227,9 @@ const stylesheetOf = (output: DirectoryPath) => {
 
   it('writes the one OAuth redirect URI every endpoint page authorizes through, kept out of search', () => {
     expect(read('oauth/callback/index.html')).to.contain('<meta name="robots" content="noindex"');
-    // The cookie it reads is the browser's, so the page is built to wait for it.
+    // The provider's answer is in its address: the page it returns to must not get it as the referrer.
+    expect(read('oauth/callback/index.html')).to.contain('<meta name="referrer" content="no-referrer"');
+    // The page it returns to is noted in the browser's session storage, so the page is built to wait for it.
     expect(read('oauth/callback/index.html')).to.contain('Completing authorization…');
     expect(read('sitemap.xml')).to.not.contain('/oauth/callback');
   });
@@ -521,6 +523,7 @@ const stylesheetOf = (output: DirectoryPath) => {
 
   // Tailwind reads the template and the copy of the pages, and nothing else. A scan that missed the
   // template stacked the SDK cards; one that took in node_modules grew this from 93 KB to 134 KB.
+  // Fumadocs UI 16.18 and fumadocs-openapi 12.6 brought it to 119 KB with their own components.
   it('builds the stylesheet from the template and the pages alone', () => {
     const css = stylesheetOf(portal.output());
 
@@ -528,7 +531,7 @@ const stylesheetOf = (output: DirectoryPath) => {
     expect(css).to.contain('.\\@2xl\\:grid-cols-2');
     expect(read('authentication/index.html')).to.contain('class="tracking-[0.3125em]"');
     expect(css).to.contain('.tracking-\\[0\\.3125em\\]');
-    expect(css.length).to.be.below(100 * 1024);
+    expect(css.length).to.be.below(128 * 1024);
   });
 
   // The counterpart of the branded portal's forced mode: the same label, present here.
@@ -877,7 +880,11 @@ const stylesheetOf = (output: DirectoryPath) => {
     const page = read('api/apimatic-calculator/simple-calculator/Calculate/index.html');
 
     expect(page).to.match(/<img[^>]* src="\/api\/images\/diagram\.png"/);
-    expect(page).to.match(/<pre[^>]*><code><span class="line">\{ &quot;calculated&quot;: 9 \}<\/span><\/code><\/pre>/);
+    // Highlighted, so the text is spread over spans: read as text, the block is what the description wrote.
+    const codeBlocks = (page.match(/<pre[^>]*><code>[\s\S]*?<\/code><\/pre>/g) ?? []).map((block) =>
+      block.replace(/<[^>]+>/g, '')
+    );
+    expect(codeBlocks).to.include('{ &quot;calculated&quot;: 9 }');
   });
 
   // The dialog would load a result's image from the host's root, as Fumadocs prefixes none.

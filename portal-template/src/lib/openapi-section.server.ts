@@ -1,5 +1,5 @@
 import path from 'node:path';
-import type { DistributiveOmit, OperationOutput, PagesBuilder, WebhookOutput } from 'fumadocs-openapi';
+import type { OperationOutput, PagesBuilder, WebhookOutput } from 'fumadocs-openapi';
 import { createOpenAPI, type OpenAPIPageData } from 'fumadocs-openapi/server';
 import { bundleSpec } from './openapi-bundle.server';
 import { placeCodeSamples, readCodeSamples } from './code-samples.server';
@@ -70,7 +70,7 @@ function slugify(name: string): string {
   return name.replace(/\s+/g, '-').toLowerCase();
 }
 
-type PageOutput = DistributiveOmit<OperationOutput | WebhookOutput, 'path'>;
+type PageOutput = Omit<OperationOutput, 'path'> | Omit<WebhookOutput, 'path'>;
 
 /** Fumadocs' own page name with its spaces made hyphens, noting in `unsafe` what else it cannot hold. */
 function pageName(this: PagesBuilder, output: PageOutput, unsafe: Set<string>): string {
@@ -107,7 +107,7 @@ type SectionFile = Awaited<ReturnType<ReturnType<typeof createOpenAPI>['staticSo
  * Fumadocs writes a page per tag an operation lists, in the tag's folder and named after the
  * operationId, so two pages land at one path, and one is left out without a word, when two
  * operations share an operationId (or have none, and paths that read alike), or when one
- * operation lists a tag twice, or two tags that differ only in case or spacing.
+ * operation lists two tags that differ only in case or spacing.
  */
 function refuseSharedPages(files: SectionFile[], specName: string): void {
   const pages = new Map<string, OpenAPIPageData>();
@@ -191,16 +191,12 @@ function sameLocation(a: DocumentedOperation['location'], b: DocumentedOperation
   return a.in === b.in && a.key === b.key && a.method === b.method;
 }
 
-/** One operation lands twice on a page when two of its tags name the page's folder. */
+/**
+ * One operation lands twice on a page when two of its tags name the page's folder. A tag listed
+ * twice is not one of them: Fumadocs writes one page for it, so each tag is named once.
+ */
 function sharedTagFolderMessage(folder: string, operation: DocumentedOperation, specName: string): string {
-  const tags = operation.tags.filter((tag) => slugify(tag) === folder);
-  const repeated = tags.find((tag, index) => tags.indexOf(tag) !== index);
-  if (repeated !== undefined) {
-    return [
-      `The operation ${operation.label} in '${specName}' lists the tag '${repeated}' more than once.`,
-      'Remove the repeated tag.'
-    ].join('\n');
-  }
+  const tags = [...new Set(operation.tags)].filter((tag) => slugify(tag) === folder);
   if (tags.length >= 2) {
     return [
       `The operation ${operation.label} in '${specName}' lists the tags '${tags[0]}' and '${tags[1]}', which the portal shows as one section.`,
