@@ -2,23 +2,6 @@ import { withBasePath } from './base-path';
 import { oauthCallbackPath } from './oauth-callback';
 import type { PortalAnalytics } from './portal-types';
 
-/** 5 seconds in all: long enough for a slow page chunk to run the playground's effect that removes the answer. */
-const ANSWER_CHECKS = 50;
-const ANSWER_CHECK_MS = 100;
-
-/** Names the OAuth standard puts in an answer. While one is in the address, the loader inserts nothing. */
-const OAUTH_ANSWER = [
-  'code',
-  'state',
-  'access_token',
-  'id_token',
-  'token_type',
-  'expires_in',
-  'error',
-  'session_state',
-  'iss'
-];
-
 /** Query parameters a reported address keeps: campaign, ad-click and cross-domain tags, which attribution reads from the address. */
 const KEPT_PREFIXES = ['utm_', 'hsa_'];
 const KEPT_NAMES = new Set([
@@ -119,19 +102,10 @@ export function pageLocation(href: string, keep: readonly string[], base?: strin
   return url.href;
 }
 
-/** True while the query or the `#` part holds a name the OAuth standard puts in an answer. */
-export function holdsOAuthAnswer(href: string): boolean {
-  const url = new URL(href);
-  const hash = new URLSearchParams(url.hash.slice(1));
-  return OAUTH_ANSWER.some((name) => url.searchParams.has(name) || hash.has(name));
-}
-
 /** The one instance a portal runs: started when the bundle evaluates, reporting from the root effect and the components. */
 export class Analytics {
   private readonly live: Adapter[] = [];
   private started = false;
-  private inserted = false;
-  private waiting = false;
   private lastPageView: string | null = null;
 
   public constructor(private readonly settings: PortalAnalytics) {
@@ -145,27 +119,6 @@ export class Analytics {
     this.started = true;
     const dataLayer = (window.dataLayer ??= []);
     for (const adapter of this.live) adapter.setup(dataLayer);
-    this.insertWhenClean();
-  }
-
-  /** The vendor tags: at once on a clean address, else once the OAuth answer is out of it, within 5 seconds. */
-  public insertWhenClean(): void {
-    if (this.inserted || this.waiting) return;
-    if (holdsOAuthAnswer(window.location.href)) {
-      // The playground's effect that removes the answer can run after ours, and vendor tags read the address themselves.
-      this.waiting = true;
-      let checks = 0;
-      const timer = setInterval(() => {
-        const answered = holdsOAuthAnswer(window.location.href);
-        if (answered && ++checks < ANSWER_CHECKS) return;
-        // After the last check the next page change calls this again, so a page never cleaned loads nothing.
-        clearInterval(timer);
-        this.waiting = false;
-        if (!answered) this.insertWhenClean();
-      }, ANSWER_CHECK_MS);
-      return;
-    }
-    this.inserted = true;
     for (const src of this.live.flatMap((adapter) => adapter.scripts())) {
       const script = document.createElement('script');
       script.async = true;

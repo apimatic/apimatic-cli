@@ -1,28 +1,15 @@
 import { expect } from 'chai';
-import sinon from 'sinon';
 import {
   Adapter,
   adapters,
   Analytics,
-  holdsOAuthAnswer,
   pageLocation,
   PortalEventName,
   PortalEvents
 } from '../../portal-template/src/lib/analytics';
 import type { PortalAnalytics } from '../../portal-template/src/lib/portal-types';
 
-// The lists are written out here, not imported: the test is the contract, and a name the module drops fails it.
-const OAUTH_ANSWER = [
-  'code',
-  'state',
-  'access_token',
-  'id_token',
-  'token_type',
-  'expires_in',
-  'error',
-  'session_state',
-  'iss'
-];
+// The list is written out here, not imported: the test is the contract, and a name the module drops fails it.
 const KEPT_NAMES = [
   '_gl',
   'gclid',
@@ -101,38 +88,6 @@ describe('pageLocation', () => {
     expect(pageLocation('http://localhost:3000/guides/quickstart', [])).to.equal(
       'http://localhost:3000/guides/quickstart'
     );
-  });
-});
-
-describe('holdsOAuthAnswer', () => {
-  const page = 'https://docs.test/api/pets/listPets';
-
-  it('is true for each OAuth answer name on its own, in the query', () => {
-    for (const name of OAUTH_ANSWER) {
-      expect(holdsOAuthAnswer(`${page}?${name}=x`), name).to.be.true;
-    }
-  });
-
-  it('is true for each OAuth answer name on its own, after the #', () => {
-    for (const name of OAUTH_ANSWER) {
-      expect(holdsOAuthAnswer(`${page}#${name}=x`), name).to.be.true;
-    }
-  });
-
-  it('is true with the answer beside other parameters', () => {
-    expect(holdsOAuthAnswer(`${page}?utm_source=newsletter&code=abc&state=123`)).to.be.true;
-    expect(holdsOAuthAnswer(`${page}?tab=python#access_token=xyz&state=123`)).to.be.true;
-  });
-
-  it("is false for a campaign tag or a name of the customer's own", () => {
-    expect(holdsOAuthAnswer(`${page}?utm_source=newsletter`)).to.be.false;
-    expect(holdsOAuthAnswer(`${page}?campaign_id=7`)).to.be.false;
-    expect(holdsOAuthAnswer(`${page}#campaign_id=7`)).to.be.false;
-  });
-
-  it('is false for a clean address', () => {
-    expect(holdsOAuthAnswer(page)).to.be.false;
-    expect(holdsOAuthAnswer(`${page}#install`)).to.be.false;
   });
 });
 
@@ -233,15 +188,8 @@ describe('Analytics', () => {
     docs: { page_title: 'Quickstart | Acme API', page_location: quickstart }
   };
   const global = globalThis as { window?: unknown; document?: unknown };
-  let clock: sinon.SinonFakeTimers;
-
-  // A start on an address with an OAuth answer leaves a timer, which must never fire for real once the fakes are gone.
-  beforeEach(() => {
-    clock = sinon.useFakeTimers();
-  });
 
   afterEach(() => {
-    clock.restore();
     delete global.window;
     delete global.document;
   });
@@ -408,96 +356,20 @@ describe('Analytics', () => {
     });
   });
 
-  describe('while the address holds an OAuth answer', () => {
-    const listPets = 'https://docs.test/api/pets/listPets';
-    const answered = `${listPets}?code=abc&state=123`;
-
-    it('pushes the setup entries at once and inserts no script while the answer stays', () => {
-      const page = browser(answered);
-
-      new Analytics(withBoth).start();
-
-      expect(page.dataLayer()).to.have.length(3);
-      clock.tick(100 * 10);
-      expect(page.scripts).to.be.empty;
-    });
-
-    it('still reports meanwhile, at once, with a clean page_location', () => {
-      const page = browser(`${listPets}#access_token=xyz&state=123`, 'List pets');
+  describe('after a playground sign-in', () => {
+    it('reports with the OAuth answer stripped from page_location', () => {
+      const page = browser('https://docs.test/api/pets/listPets#access_token=xyz&state=123', 'List pets');
       const analytics = new Analytics(withBoth);
 
       analytics.start();
       analytics.reportPageView();
 
       expect(pageViews(page.dataLayer())).to.deep.equal([
-        { event: 'docs_page_view', docs: { page_title: 'List pets', page_location: listPets } }
+        {
+          event: 'docs_page_view',
+          docs: { page_title: 'List pets', page_location: 'https://docs.test/api/pets/listPets' }
+        }
       ]);
-    });
-
-    it('inserts at the next check once the playground has taken the answer out of the address', () => {
-      const page = browser(answered);
-      new Analytics(withBoth).start();
-
-      clock.tick(300);
-      page.go(listPets);
-      expect(page.scripts).to.be.empty;
-      clock.tick(100);
-
-      expect(page.scripts.map((script) => script.src)).to.deep.equal([GTM_SCRIPT, GA4_SCRIPT]);
-      expect(clock.countTimers()).to.equal(0);
-    });
-
-    it('inserts at the next check after a page change while it waits', () => {
-      const page = browser(answered);
-      new Analytics(withBoth).start();
-
-      clock.tick(1000);
-      page.go(quickstart);
-      clock.tick(100);
-
-      expect(page.scripts).to.have.length(2);
-    });
-
-    it('stops checking after 5 seconds, and a later call on a clean address inserts at once', () => {
-      const page = browser(answered);
-      const analytics = new Analytics(withBoth);
-      analytics.start();
-
-      clock.tick(100 * 50);
-      expect(page.scripts).to.be.empty;
-      expect(clock.countTimers()).to.equal(0);
-      page.go(listPets);
-      clock.tick(100 * 50);
-      expect(page.scripts).to.be.empty;
-      analytics.insertWhenClean();
-
-      expect(page.scripts).to.have.length(2);
-      expect(clock.countTimers()).to.equal(0);
-    });
-
-    it('starts no second timer for a call while it waits, and inserts once', () => {
-      const page = browser(answered);
-      const analytics = new Analytics(withBoth);
-      analytics.start();
-
-      analytics.insertWhenClean();
-      analytics.insertWhenClean();
-      expect(clock.countTimers()).to.equal(1);
-      page.go(listPets);
-      clock.tick(100);
-
-      expect(page.scripts).to.have.length(2);
-    });
-
-    it('adds nothing on a call after the insert', () => {
-      const page = browser(listPets);
-      const analytics = new Analytics(withBoth);
-      analytics.start();
-
-      analytics.insertWhenClean();
-
-      expect(page.scripts).to.have.length(2);
-      expect(clock.countTimers()).to.equal(0);
     });
   });
 
@@ -516,7 +388,6 @@ describe('Analytics', () => {
 
         expect(page.dataLayer()).to.have.length(3);
         expect(pageViews(page.dataLayer())).to.be.empty;
-        expect(page.scripts).to.be.empty;
       });
     }
   });

@@ -52,11 +52,7 @@ function RootComponent() {
   const router = useRouter();
   useEffect(() => {
     analytics.reportPageView();
-    // Each page change: a start that outwaited an OAuth answer, then the new page's view.
-    return router.subscribe('onRendered', () => {
-      analytics.insertWhenClean();
-      analytics.reportPageView();
-    });
+    return router.subscribe('onRendered', () => analytics.reportPageView());
   }, [router]);
   return (
     <html lang="en" suppressHydrationWarning>
