@@ -21,4 +21,6 @@ overrides:
   # Their engines start above the CLI's Node floor, and the CLI loads neither: one serves `generateFiles()` in watch mode, the other the server proxy.
   'fumadocs-openapi>chokidar': ^5.0.0
   'fumadocs-openapi>undici': 7.29.1
+  # json-magic 0.17 raised its floor for undici 8, which the override above replaces anyway; fumadocs-openapi uses only its magic proxy, the same in 0.16.
+  'fumadocs-openapi>@scalar/json-magic': ^0.16.1
   '@types/node': $@types/node
