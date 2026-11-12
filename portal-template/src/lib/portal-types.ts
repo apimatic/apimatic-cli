@@ -40,6 +40,11 @@ export interface PortalAnalytics {
   keepQueryParams: string[];
 }
 
+export interface PortalSeo {
+  /** The content value of Google's site verification meta tag, for Search Console. */
+  googleSiteVerification: string | null;
+}
+
 export interface Portal {
   name: string;
   description: string | null;
@@ -52,4 +57,5 @@ export interface Portal {
   /** Whether each page offers to open itself in an external AI assistant. */
   pageActions: boolean;
   analytics: PortalAnalytics;
+  seo: PortalSeo;
 }

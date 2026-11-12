@@ -41,6 +41,10 @@ export interface PortalIdentity {
     googleAnalytics: { measurementId: string; debugMode: boolean } | null;
     keepQueryParams: string[];
   };
+  seo: {
+    /** The content value of Google's site verification meta tag, for Search Console. */
+    googleSiteVerification: string | null;
+  };
 }
 
 const BLOCK = 'portal';
@@ -132,7 +136,8 @@ export class PortalConfig {
       colorMode: this.brand.mode(),
       links: this.navigation.headerLinks().map(portalLink),
       pageActions: this.ai.offersPageActions(),
-      analytics: { googleTagManager: null, googleAnalytics: null, keepQueryParams: [] }
+      analytics: { googleTagManager: null, googleAnalytics: null, keepQueryParams: [] },
+      seo: { googleSiteVerification: null }
     };
   }
 

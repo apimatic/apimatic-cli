@@ -41,7 +41,10 @@ export const Route = createRootRoute({
       { charSet: 'utf-8' },
       { name: 'viewport', content: 'width=device-width, initial-scale=1' },
       { title: portal.name },
-      ...(portal.description ? [{ name: 'description', content: portal.description }] : [])
+      ...(portal.description ? [{ name: 'description', content: portal.description }] : []),
+      ...(portal.seo.googleSiteVerification
+        ? [{ name: 'google-site-verification', content: portal.seo.googleSiteVerification }]
+        : [])
     ],
     links: [{ rel: 'stylesheet', href: appCss }, ...iconLinks]
   }),

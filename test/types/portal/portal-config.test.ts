@@ -487,7 +487,8 @@ describe('PortalConfig', () => {
           { label: 'Changelog', url: '/changelog', external: false }
         ],
         pageActions: false,
-        analytics: { googleTagManager: null, googleAnalytics: null, keepQueryParams: [] }
+        analytics: { googleTagManager: null, googleAnalytics: null, keepQueryParams: [] },
+        seo: { googleSiteVerification: null }
       });
     });
 
@@ -501,7 +502,8 @@ describe('PortalConfig', () => {
         colorMode: 'both',
         links: [],
         pageActions: true,
-        analytics: { googleTagManager: null, googleAnalytics: null, keepQueryParams: [] }
+        analytics: { googleTagManager: null, googleAnalytics: null, keepQueryParams: [] },
+        seo: { googleSiteVerification: null }
       });
     });
 
