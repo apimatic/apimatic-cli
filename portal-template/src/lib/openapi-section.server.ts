@@ -191,9 +191,12 @@ function sameLocation(a: DocumentedOperation['location'], b: DocumentedOperation
   return a.in === b.in && a.key === b.key && a.method === b.method;
 }
 
-/** One operation lands twice on a page when two of its tags name the page's folder. */
+/**
+ * One operation lands twice on a page when two of its tags name the page's folder. A tag listed
+ * twice is not one of them: Fumadocs writes one page for it, so each tag is named once.
+ */
 function sharedTagFolderMessage(folder: string, operation: DocumentedOperation, specName: string): string {
-  const tags = operation.tags.filter((tag) => slugify(tag) === folder);
+  const tags = [...new Set(operation.tags)].filter((tag) => slugify(tag) === folder);
   if (tags.length >= 2) {
     return [
       `The operation ${operation.label} in '${specName}' lists the tags '${tags[0]}' and '${tags[1]}', which the portal shows as one section.`,

@@ -83,11 +83,11 @@ describe('the OAuth callback when it cannot complete the authorization', functio
     expect(text).to.contain('The provider ended the authorization with server_error.');
   });
 
-  it('says no authorization was started in this browser, and leads to the home page', () => {
+  it('says no authorization was started in this tab, and leads to the home page', () => {
     expect(shown({ kind: 'notStarted' })).to.deep.equal({
       text:
         "Authorization could not be completed This page completes an authorization started from an endpoint's playground, and none " +
-        "was started in this browser. Open the endpoint's page and authorize from there. Go to the home page",
+        "was started in this tab. Open the endpoint's page and authorize from there. Go to the home page",
       link: { label: 'Go to the home page', href: '/docs/' }
     });
   });

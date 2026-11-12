@@ -6,7 +6,7 @@
 export const oauthCallbackPath = '/oauth/callback';
 
 /** Where the playground notes the path of the page that started the flow before it leaves: this tab's session storage. */
-export const STARTING_PAGE_KEY = 'fumadocs-openapi-oauth';
+const STARTING_PAGE_KEY = 'fumadocs-openapi-oauth';
 
 /** What the callback does with the browser that lands on it. */
 export type OAuthCallback =
@@ -56,9 +56,12 @@ export function oauthCallback(
 }
 
 /**
- * The playground leaves the note for the tab's session, so a later arrival would be sent back to
- * the last page that started an authorization. Forgotten once read, it names only the flow just started.
+ * The page the playground noted, taken from the tab's session: left there, a later arrival would
+ * be sent back to the last page that started an authorization, so once read it names only the
+ * flow just started.
  */
-export function forgetStartingPage(): void {
+export function takeStartingPage(): string | null {
+  const page = sessionStorage.getItem(STARTING_PAGE_KEY);
   sessionStorage.removeItem(STARTING_PAGE_KEY);
+  return page;
 }

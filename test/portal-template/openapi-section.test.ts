@@ -522,6 +522,20 @@ describe('openApiSection', () => {
     );
   });
 
+  // Fumadocs writes one page for the repeated 'pets', so the collision is with 'Pets', and the message names each once.
+  it('names a repeated tag once, against the one it collides with', async () => {
+    expect(
+      await failureFor({
+        '/pets': { post: { operationId: 'createPet', tags: ['pets', 'pets', 'Pets'], responses: ok } }
+      })
+    ).to.equal(
+      [
+        "The operation POST /pets in 'api.json' lists the tags 'pets' and 'Pets', which the portal shows as one section.",
+        'Rename one of them so they differ in more than case or spacing.'
+      ].join('\n')
+    );
+  });
+
   /** The pages a section builds for these paths. */
   const pagesFor = async (paths: Record<string, unknown>, extra: Record<string, unknown> = {}) => {
     writeSpec(paths, extra);

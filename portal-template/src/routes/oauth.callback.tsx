@@ -3,23 +3,17 @@ import { HomeLayout } from 'fumadocs-ui/layouts/home';
 import { useEffect, useState } from 'react';
 import { AuthorizationFailure } from '@/components/authorization-failure';
 import { baseOptions } from '@/lib/layout.shared';
-import {
-  forgetStartingPage,
-  oauthCallback,
-  STARTING_PAGE_KEY,
-  type OAuthCallback,
-  type OAuthCallbackFailure
-} from '@/lib/oauth-callback';
+import { oauthCallback, takeStartingPage, type OAuthCallback, type OAuthCallbackFailure } from '@/lib/oauth-callback';
 import { portal } from '@/lib/portal';
 
 // Published portals are static, so this page does in the browser what Fumadocs'
-// `createOAuthHandler()` route does on a server, its referrer policy included: the provider's
-// answer sits in this page's address, and a referrer would carry it to the page it returns to.
+// `createOAuthHandler()` route does on a server.
 export const Route = createFileRoute('/oauth/callback')({
   head: () => ({
     meta: [
       { title: `Authorization | ${portal.name}` },
       { name: 'robots', content: 'noindex' },
+      // The provider's answer is in this page's address, which a referrer would carry on.
       { name: 'referrer', content: 'no-referrer' }
     ]
   }),
@@ -37,8 +31,7 @@ let completion: OAuthCallback | undefined;
  */
 function completeAuthorization(): OAuthCallback {
   if (completion === undefined) {
-    completion = oauthCallback(sessionStorage.getItem(STARTING_PAGE_KEY), window.location);
-    forgetStartingPage();
+    completion = oauthCallback(takeStartingPage(), window.location);
     if (completion.kind === 'return') window.location.replace(completion.url);
   }
   return completion;

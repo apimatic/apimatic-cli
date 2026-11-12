@@ -1,5 +1,7 @@
 import { expect } from 'chai';
-import { oauthCallback, oauthCallbackPath, STARTING_PAGE_KEY } from '../../portal-template/src/lib/oauth-callback';
+import type { SecuritySchemeObject } from 'fumadocs-openapi';
+import { requestOAuthToken } from 'fumadocs-openapi/playground';
+import { oauthCallback, oauthCallbackPath, takeStartingPage } from '../../portal-template/src/lib/oauth-callback';
 import { OAUTH_CALLBACK_ADDRESS } from '../../src/types/portal/content-tree';
 
 // The CLI refuses a page of the user's at the address the template serves the callback at.
@@ -9,10 +11,73 @@ describe('oauthCallbackPath', () => {
   });
 });
 
-// The playground notes the starting page under this key before it leaves (fumadocs-openapi `leavePage()`).
-describe('STARTING_PAGE_KEY', () => {
-  it('is the session storage key the playground writes', () => {
-    expect(STARTING_PAGE_KEY).to.equal('fumadocs-openapi-oauth');
+/**
+ * The playground notes the page under a key of its own before it leaves for the provider, and the
+ * callback takes the note from the same place. The playground's flow is run here, in a stand-in
+ * tab, so a move of the note, as 12.5.7 made from a cookie, fails this test and not a portal.
+ */
+describe('takeStartingPage', () => {
+  const origin = 'https://docs.test';
+  const pathname = '/api/pets/pets/listPets';
+  const scheme: SecuritySchemeObject = {
+    type: 'oauth2',
+    flows: {
+      authorizationCode: {
+        authorizationUrl: 'https://provider.test/authorize',
+        tokenUrl: 'https://provider.test/token',
+        scopes: {}
+      }
+    }
+  };
+  // As the template starts a flow: the callback page as the redirect URL, see `api-page.tsx`.
+  const flow = {
+    schemeId: 'oauth',
+    scopes: [],
+    clientId: 'client',
+    serverUrl: 'https://api.test',
+    redirectUrl: oauthCallbackPath
+  };
+
+  const tab = globalThis as Record<string, unknown>;
+  const before: Record<string, unknown> = {};
+  let storage: Map<string, string>;
+  let leftFor: URL | undefined;
+
+  beforeEach(() => {
+    storage = new Map();
+    leftFor = undefined;
+    for (const name of ['sessionStorage', 'window']) before[name] = tab[name];
+    tab.sessionStorage = {
+      getItem: (key: string) => storage.get(key) ?? null,
+      setItem: (key: string, value: string) => void storage.set(key, value),
+      removeItem: (key: string) => void storage.delete(key)
+    };
+    tab.window = { location: { origin, pathname, replace: (url: URL) => void (leftFor = url) } };
+  });
+
+  afterEach(() => {
+    for (const name of ['sessionStorage', 'window']) {
+      if (before[name] === undefined) delete tab[name];
+      else tab[name] = before[name];
+    }
+  });
+
+  it("sends the provider's answer back to the page the playground noted before it left", async () => {
+    await requestOAuthToken(scheme, 'authorizationCode', flow);
+    expect(leftFor?.origin, 'left for the provider').to.equal('https://provider.test');
+    expect(leftFor?.searchParams.get('redirect_uri')).to.equal(`${origin}${oauthCallbackPath}`);
+    const state = leftFor?.searchParams.get('state');
+
+    const callback = oauthCallback(takeStartingPage(), { origin, search: `?code=abc&state=${state}`, hash: '' });
+
+    expect(callback).to.deep.equal({ kind: 'return', url: `${origin}${pathname}?code=abc&state=${state}` });
+  });
+
+  it('takes the note once', async () => {
+    await requestOAuthToken(scheme, 'authorizationCode', flow);
+
+    expect(takeStartingPage()).to.equal(pathname);
+    expect(takeStartingPage()).to.equal(null);
   });
 });
 
@@ -90,8 +155,9 @@ describe('oauthCallback', () => {
     expect(callback).to.deep.equal({ kind: 'notStarted' });
   });
 
-  it('refuses to send the code to another site', () => {
-    for (const page of ['https://evil.test/steal', '//evil.test/steal']) {
+  // The last is the path of a page at `//a b/x`, which does not read as an address at all.
+  it('refuses to send the code to another site, or to a page that does not read as one', () => {
+    for (const page of ['https://evil.test/steal', '//evil.test/steal', '//a%20b/x']) {
       expect(oauthCallback(page, answered('?code=abc')), page).to.deep.equal({ kind: 'unknownPage' });
     }
   });
