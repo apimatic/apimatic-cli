@@ -1,10 +1,10 @@
 # Portal analytics: docs draft
 
 A draft for the analytics page under docs.apimatic.io/v4 and the two rows of the CLI reference,
-covering what PR 1 ships (apimatic/apimatic-io#2348, "Docs", and #2349's additions). It is not a
-docs PR: the reviewer takes it to the apimatic-docs repository. Lines starting with
-`> Reviewer:` are notes for that step, not page text. PR 2 (`portal.scripts`) and PR 3 (the
-other seven events) each add to this page in their own docs step.
+covering what PR 1 and PR 3 ship in #473 (apimatic/apimatic-io#2348, "Docs" and the PR 3 event
+table, and #2349's additions). It is not a docs PR: the reviewer takes it to the apimatic-docs
+repository. Lines starting with `> Reviewer:` are notes for that step, not page text. PR 2
+(`portal.scripts`) adds to this page in its own docs step.
 
 ---
 
@@ -58,16 +58,31 @@ event with its details under one `docs` key.
 { event: 'docs_page_view', docs: { page_title: 'Quickstart | Acme API', page_location: 'https://docs.acme.com/guides/quickstart' } }
 ```
 
+Every event carries `page_location`, the address of the page it happened on, cleaned as above.
+The table lists the keys each adds.
+
 | Event | Keys under `docs` | When |
 |---|---|---|
-| `docs_page_view` | `page_title`, `page_location` | The first page renders, and each later page change, once the new page's title is in place. Never twice for the same address, and never on `/oauth/callback`. |
+| `docs_page_view` | `page_title` | The first page renders, and each later page change, once the new page's title is in place. Never twice for the same address, and never on `/oauth/callback`. |
+| `docs_markdown_copy` | none | The page's "Copy Markdown" button, when the copy succeeded. |
+| `docs_plugin_install` | none | The Context Plugin page's install command, as its copy button is clicked. |
+| `docs_sdk_download` | `language` | A "Download SDK" link, on the SDKs page's cards or an SDK's own page. `language` is the SDK's, as `languages` names it in `apimatic.json`. |
+| `docs_code_copy` | `language` | The copy button of a code block on any page, the API reference's examples included. `language` is the block's title, such as `TypeScript` or `Terminal`, or the selected tab's name in a tabbed block. A block with neither reports nothing, and neither does the install command's block, which has its own event. |
+| `docs_search` | `search_term`, `result`, `result_count` | The search dialog closes after the reader typed in it: the term, the address of the result picked or empty when none was, and how many results the list showed. Reopening the dialog and closing it without typing again reports nothing. |
+| `docs_not_found` | `page_referrer` | The not-found page renders. `page_referrer` is the portal page the reader left for it after a portal link, or on a first load the browser's referrer without its query, or empty when the browser sends none. The page's own `docs_page_view` is sent too. |
+| `docs_api_request` | `endpoint`, `status`, `duration_ms` | The API playground shows a result. `endpoint` is the method and path as the specification writes them, such as `GET /users/{id}`; `status` the HTTP status, or `client_error` for a request that never reached the API; `duration_ms` how long it took. It never carries the request's address, headers or body: those hold what the reader typed, keys included. |
 
-With `googleAnalytics` set, the portal also sends each event to GA4 directly, under GA4's own
-name: `docs_page_view` arrives as `page_view` with the same two parameters.
+With `googleAnalytics` set, the portal also sends each event to GA4 directly, under its name
+without the `docs_` prefix: `docs_page_view` arrives as `page_view` and `docs_search` as
+`search`, which are GA4's own events with these same parameters, and the rest as custom
+events.
 
-> Reviewer: PR 3 adds the other seven events (`docs_markdown_copy`, `docs_plugin_install`,
-> `docs_sdk_download`, `docs_code_copy`, `docs_search`, `docs_not_found`, `docs_api_request`)
-> and extends this table in its own docs step.
+#### Registering the keys in GA4
+
+GA4 reports a custom parameter only once it is registered (Admin → Custom definitions). Register
+five custom dimensions, `search_term`, `result`, `language`, `endpoint` and `status`, and two
+custom metrics, `result_count` and `duration_ms`. Each appears in reports a day or two after.
+`page_title`, `page_location` and `page_referrer` are GA4's own parameters and need nothing.
 
 ### Google Analytics 4
 
@@ -101,6 +116,9 @@ The container gets the events as GTM-format data layer pushes, so the usual reci
 - **A GA4 Event tag** with the event name `page_view`, the parameters `page_location` and
   `page_title` from those variables, and a Custom Event trigger on `docs_page_view`.
 - Any other tag that should know about a page change triggers on `docs_page_view` the same way.
+- **The other events** follow the same pattern: a Custom Event trigger on the event's name, and
+  a Data Layer Variable `docs.<key>` for each key the table above lists, so a GA4 Event tag for
+  `docs_search` reads `docs.search_term`, `docs.result` and `docs.result_count`.
 
 A staging build that must still be checked in GTM sets `environment` to the staging
 environment's values, and loads that version of the container.
