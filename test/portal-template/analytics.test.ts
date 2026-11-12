@@ -3,7 +3,7 @@ import sinon from 'sinon';
 import {
   Adapter,
   adapters,
-  analyticsFor,
+  Analytics,
   holdsOAuthAnswer,
   pageLocation,
   PortalEventName,
@@ -190,20 +190,6 @@ function browser(href: string, title = 'Quickstart | Acme API') {
   };
 }
 
-/** The router's `onRendered` subscription, fired by the test with `render()`. */
-function fakeRouter() {
-  let listener: (() => void) | null = null;
-  return {
-    subscribe: (_event: 'onRendered', next: () => void) => {
-      listener = next;
-      return () => {
-        listener = null;
-      };
-    },
-    render: () => listener?.()
-  };
-}
-
 const isArguments = (entry: unknown) => Object.prototype.toString.call(entry) === '[object Arguments]';
 const isPlainObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value) && !isArguments(value);
@@ -240,7 +226,7 @@ const withBoth: PortalAnalytics = {
 const GTM_SCRIPT = 'https://www.googletagmanager.com/gtm.js?id=GTM-ABC123';
 const GA4_SCRIPT = 'https://www.googletagmanager.com/gtag/js?id=G-ABC123';
 
-describe('analyticsFor', () => {
+describe('Analytics', () => {
   const quickstart = 'https://docs.test/guides/quickstart';
   const quickstartView = {
     event: 'docs_page_view',
@@ -263,10 +249,10 @@ describe('analyticsFor', () => {
   describe('with neither vendor set', () => {
     it('pushes a reset entry and one clean page view entry, and nothing else', () => {
       const page = browser(`${quickstart}?utm_source=newsletter&tab=python#install`);
-      const analytics = analyticsFor(none);
+      const analytics = new Analytics(none);
 
-      analytics.startAnalytics();
-      analytics.reportPageViews(fakeRouter());
+      analytics.start();
+      analytics.reportPageView();
 
       expect(page.dataLayer()).to.deep.equal([
         { docs: null },
@@ -283,10 +269,10 @@ describe('analyticsFor', () => {
       const page = browser(quickstart);
       const existing = { 'host-tag': true };
       page.window.dataLayer = [existing];
-      const analytics = analyticsFor(none);
+      const analytics = new Analytics(none);
 
-      analytics.startAnalytics();
-      analytics.reportPageViews(fakeRouter());
+      analytics.start();
+      analytics.reportPageView();
 
       expect(page.dataLayer()).to.deep.equal([existing, { docs: null }, quickstartView]);
     });
@@ -295,10 +281,10 @@ describe('analyticsFor', () => {
   describe('with Google Tag Manager', () => {
     it('pushes the gtm.start entry first, inserts gtm.js, then pushes the page view', () => {
       const page = browser(quickstart);
-      const analytics = analyticsFor(withGtm());
+      const analytics = new Analytics(withGtm());
 
-      analytics.startAnalytics();
-      analytics.reportPageViews(fakeRouter());
+      analytics.start();
+      analytics.reportPageView();
 
       const [start, reset, view, ...rest] = page.dataLayer();
       expect(start).to.have.property('event', 'gtm.js');
@@ -314,7 +300,7 @@ describe('analyticsFor', () => {
     it("loads the container's environment when one is set", () => {
       const page = browser(quickstart);
 
-      analyticsFor(withGtm({ auth: 'abc123', preview: 'env-3' })).startAnalytics();
+      new Analytics(withGtm({ auth: 'abc123', preview: 'env-3' })).start();
 
       expect(page.scripts.map((script) => script.src)).to.deep.equal([
         `${GTM_SCRIPT}&gtm_auth=abc123&gtm_preview=env-3&gtm_cookies_win=x`
@@ -326,7 +312,7 @@ describe('analyticsFor', () => {
     it('pushes js and config with its own page view off, and inserts gtag.js', () => {
       const page = browser(quickstart);
 
-      analyticsFor(withGa4()).startAnalytics();
+      new Analytics(withGa4()).start();
 
       const [js, config, ...rest] = gtagCalls(page.dataLayer());
       expect(js[0]).to.equal('js');
@@ -339,10 +325,10 @@ describe('analyticsFor', () => {
 
     it('sends each page view as page_view, without the prefix, after the reset and event entries', () => {
       const page = browser(quickstart);
-      const analytics = analyticsFor(withGa4());
+      const analytics = new Analytics(withGa4());
 
-      analytics.startAnalytics();
-      analytics.reportPageViews(fakeRouter());
+      analytics.start();
+      analytics.reportPageView();
 
       const entries = page.dataLayer();
       expect(entries).to.have.length(5);
@@ -353,10 +339,10 @@ describe('analyticsFor', () => {
 
     it('pushes Arguments objects, which gtag.js reads, never arrays of the same values', () => {
       const page = browser(quickstart);
-      const analytics = analyticsFor(withGa4());
+      const analytics = new Analytics(withGa4());
 
-      analytics.startAnalytics();
-      analytics.reportPageViews(fakeRouter());
+      analytics.start();
+      analytics.reportPageView();
 
       expect(page.dataLayer().filter(isArguments)).to.have.length(3);
       expect(page.dataLayer().some(Array.isArray)).to.be.false;
@@ -365,7 +351,7 @@ describe('analyticsFor', () => {
     it('marks events as debug traffic in a preview', () => {
       const page = browser(quickstart);
 
-      analyticsFor(withGa4(true)).startAnalytics();
+      new Analytics(withGa4(true)).start();
 
       expect(gtagCalls(page.dataLayer())[1]).to.deep.equal([
         'config',
@@ -381,10 +367,10 @@ describe('analyticsFor', () => {
         calls.push(command);
       };
       page.window.gtag = existing;
-      const analytics = analyticsFor(withGa4());
+      const analytics = new Analytics(withGa4());
 
-      analytics.startAnalytics();
-      analytics.reportPageViews(fakeRouter());
+      analytics.start();
+      analytics.reportPageView();
 
       expect(page.window.gtag).to.equal(existing);
       expect(calls.map((command) => command[0])).to.deep.equal(['js', 'config', 'event']);
@@ -395,10 +381,10 @@ describe('analyticsFor', () => {
   describe('with both vendors', () => {
     it('pushes every setup entry once, gtm.start first, before the first event', () => {
       const page = browser(quickstart);
-      const analytics = analyticsFor(withBoth);
+      const analytics = new Analytics(withBoth);
 
-      analytics.startAnalytics();
-      analytics.reportPageViews(fakeRouter());
+      analytics.start();
+      analytics.reportPageView();
 
       const entries = page.dataLayer();
       expect(entries).to.have.length(6);
@@ -412,10 +398,10 @@ describe('analyticsFor', () => {
 
     it('starts once: a second start adds no entry and no script', () => {
       const page = browser(quickstart);
-      const analytics = analyticsFor(withBoth);
+      const analytics = new Analytics(withBoth);
 
-      analytics.startAnalytics();
-      analytics.startAnalytics();
+      analytics.start();
+      analytics.start();
 
       expect(page.dataLayer()).to.have.length(3);
       expect(page.scripts).to.have.length(2);
@@ -429,7 +415,7 @@ describe('analyticsFor', () => {
     it('pushes the setup entries at once and inserts no script while the answer stays', () => {
       const page = browser(answered);
 
-      analyticsFor(withBoth).startAnalytics();
+      new Analytics(withBoth).start();
 
       expect(page.dataLayer()).to.have.length(3);
       clock.tick(100 * 10);
@@ -438,10 +424,10 @@ describe('analyticsFor', () => {
 
     it('still reports meanwhile, at once, with a clean page_location', () => {
       const page = browser(`${listPets}#access_token=xyz&state=123`, 'List pets');
-      const analytics = analyticsFor(withBoth);
+      const analytics = new Analytics(withBoth);
 
-      analytics.startAnalytics();
-      analytics.reportPageViews(fakeRouter());
+      analytics.start();
+      analytics.reportPageView();
 
       expect(pageViews(page.dataLayer())).to.deep.equal([
         { event: 'docs_page_view', docs: { page_title: 'List pets', page_location: listPets } }
@@ -450,7 +436,7 @@ describe('analyticsFor', () => {
 
     it('inserts at the next check once the playground has taken the answer out of the address', () => {
       const page = browser(answered);
-      analyticsFor(withBoth).startAnalytics();
+      new Analytics(withBoth).start();
 
       clock.tick(300);
       page.go(listPets);
@@ -463,7 +449,7 @@ describe('analyticsFor', () => {
 
     it('inserts at the next check after a page change while it waits', () => {
       const page = browser(answered);
-      analyticsFor(withBoth).startAnalytics();
+      new Analytics(withBoth).start();
 
       clock.tick(1000);
       page.go(quickstart);
@@ -474,8 +460,8 @@ describe('analyticsFor', () => {
 
     it('stops checking after 5 seconds, and a later call on a clean address inserts at once', () => {
       const page = browser(answered);
-      const analytics = analyticsFor(withBoth);
-      analytics.startAnalytics();
+      const analytics = new Analytics(withBoth);
+      analytics.start();
 
       clock.tick(100 * 50);
       expect(page.scripts).to.be.empty;
@@ -491,8 +477,8 @@ describe('analyticsFor', () => {
 
     it('starts no second timer for a call while it waits, and inserts once', () => {
       const page = browser(answered);
-      const analytics = analyticsFor(withBoth);
-      analytics.startAnalytics();
+      const analytics = new Analytics(withBoth);
+      analytics.start();
 
       analytics.insertWhenClean();
       analytics.insertWhenClean();
@@ -505,8 +491,8 @@ describe('analyticsFor', () => {
 
     it('adds nothing on a call after the insert', () => {
       const page = browser(listPets);
-      const analytics = analyticsFor(withBoth);
-      analytics.startAnalytics();
+      const analytics = new Analytics(withBoth);
+      analytics.start();
 
       analytics.insertWhenClean();
 
@@ -523,10 +509,10 @@ describe('analyticsFor', () => {
     ]) {
       it(`pushes the setup entries and no page view at ${href}`, () => {
         const page = browser(href);
-        const analytics = analyticsFor(withBoth);
+        const analytics = new Analytics(withBoth);
 
-        analytics.startAnalytics();
-        analytics.reportPageViews(fakeRouter());
+        analytics.start();
+        analytics.reportPageView();
 
         expect(page.dataLayer()).to.have.length(3);
         expect(pageViews(page.dataLayer())).to.be.empty;
@@ -579,10 +565,10 @@ describe('analyticsFor', () => {
 
         it('maps docs_page_view to its page view call', () => {
           const page = browser(quickstart);
-          const analytics = analyticsFor(settings);
+          const analytics = new Analytics(settings);
 
-          analytics.startAnalytics();
-          analytics.reportPageViews(fakeRouter());
+          analytics.start();
+          analytics.reportPageView();
 
           expect(pageViews(page.dataLayer())).to.have.length(1);
           pageViewCall(page.dataLayer());
@@ -590,9 +576,9 @@ describe('analyticsFor', () => {
 
         it('receives nothing holding code=, token= or a # part from a report made with an OAuth answer in the address', () => {
           const page = browser('https://docs.test/api/pets/listPets?code=x&state=y#access_token=z', 'List pets');
-          const analytics = analyticsFor(settings);
+          const analytics = new Analytics(settings);
 
-          analytics.startAnalytics();
+          analytics.start();
           analytics.report('docs_page_view', { page_title: 'List pets' });
 
           const received = JSON.stringify(
@@ -604,10 +590,10 @@ describe('analyticsFor', () => {
 
         it('turns on no session recording or input capture', () => {
           const page = browser(quickstart);
-          const analytics = analyticsFor(settings);
+          const analytics = new Analytics(settings);
 
-          analytics.startAnalytics();
-          analytics.reportPageViews(fakeRouter());
+          analytics.start();
+          analytics.reportPageView();
 
           const everything = JSON.stringify([
             ...page.dataLayer().map((entry) => (isArguments(entry) ? Array.from(entry as ArrayLike<unknown>) : entry)),
@@ -621,7 +607,7 @@ describe('analyticsFor', () => {
           for (const src of adapter().scripts()) expect(src).to.match(/^https:\/\//);
           const page = browser(quickstart);
 
-          analyticsFor(settings).startAnalytics();
+          new Analytics(settings).start();
 
           expect(page.scripts).to.not.be.empty;
           for (const script of page.scripts) {
@@ -636,8 +622,8 @@ describe('analyticsFor', () => {
   describe('report', () => {
     it('pushes a reset entry right before every event entry, which holds event and docs only', () => {
       const page = browser(quickstart);
-      const analytics = analyticsFor(none);
-      analytics.startAnalytics();
+      const analytics = new Analytics(none);
+      analytics.start();
 
       analytics.report('docs_page_view', { page_title: 'A' });
       analytics.report('docs_page_view', { page_title: 'B' });
@@ -652,8 +638,8 @@ describe('analyticsFor', () => {
 
     it("clears the previous event's details for a tag that reads the merged data layer", () => {
       const page = browser(quickstart);
-      const analytics = analyticsFor(none);
-      analytics.startAnalytics();
+      const analytics = new Analytics(none);
+      analytics.start();
       // PR 3's events differ in their keys; until one lands, an extra key on a page view stands in for that.
       const withExtraKey = { page_title: 'A', language: 'python' };
 
@@ -666,18 +652,18 @@ describe('analyticsFor', () => {
     });
   });
 
-  describe('reportPageViews', () => {
+  // The root effect calls this once on mount and once per page change the router renders.
+  describe('reportPageView', () => {
     const components = 'https://docs.test/guides/components';
 
-    it('sends the first page at once, then one per onRendered, each with its own title', () => {
+    it('sends the current page, each with its own title', () => {
       const page = browser(quickstart);
-      const router = fakeRouter();
-      const analytics = analyticsFor(none);
-      analytics.startAnalytics();
+      const analytics = new Analytics(none);
+      analytics.start();
 
-      analytics.reportPageViews(router);
+      analytics.reportPageView();
       page.go(components, 'Components | Acme API');
-      router.render();
+      analytics.reportPageView();
 
       expect(pageViews(page.dataLayer())).to.deep.equal([
         quickstartView,
@@ -685,51 +671,35 @@ describe('analyticsFor', () => {
       ]);
     });
 
-    it('sends none when only the # part or the query changed', () => {
+    it('sends none when only the # part or the query changed, or nothing changed', () => {
       const page = browser(quickstart);
-      const router = fakeRouter();
-      const analytics = analyticsFor(none);
-      analytics.startAnalytics();
+      const analytics = new Analytics(none);
+      analytics.start();
 
-      analytics.reportPageViews(router);
+      analytics.reportPageView();
       page.go(`${quickstart}#install`);
-      router.render();
+      analytics.reportPageView();
       page.go(`${quickstart}?tab=python`);
-      router.render();
-      router.render();
+      analytics.reportPageView();
+      analytics.reportPageView();
 
       expect(pageViews(page.dataLayer())).to.have.length(1);
     });
 
     it('sends three for A, then B, then A', () => {
       const page = browser(quickstart);
-      const router = fakeRouter();
-      const analytics = analyticsFor(none);
-      analytics.startAnalytics();
+      const analytics = new Analytics(none);
+      analytics.start();
 
-      analytics.reportPageViews(router);
+      analytics.reportPageView();
       page.go(components);
-      router.render();
+      analytics.reportPageView();
       page.go(quickstart);
-      router.render();
+      analytics.reportPageView();
 
       expect(
         pageViews(page.dataLayer()).map((view) => (view as { docs: { page_location: string } }).docs.page_location)
       ).to.deep.equal([quickstart, components, quickstart]);
-    });
-
-    it('stops when the function it returns is called', () => {
-      const page = browser(quickstart);
-      const router = fakeRouter();
-      const analytics = analyticsFor(none);
-      analytics.startAnalytics();
-
-      const stop = analytics.reportPageViews(router);
-      stop();
-      page.go(components);
-      router.render();
-
-      expect(pageViews(page.dataLayer())).to.have.length(1);
     });
   });
 });

@@ -110,9 +110,11 @@ export function pageLocation(href: string, keep: readonly string[], base?: strin
   const url = new URL(href);
   // A static host may answer `/oauth/callback` at `/oauth/callback/` and keep the query.
   if (url.pathname.replace(/\/$/, '') === withBasePath(oauthCallbackPath, base)) return null;
-  const kept = (name: string) =>
-    KEPT_PREFIXES.some((prefix) => name.startsWith(prefix)) || KEPT_NAMES.has(name) || keep.includes(name);
-  url.search = new URLSearchParams([...url.searchParams].filter(([name]) => kept(name))).toString();
+  url.search = new URLSearchParams(
+    [...url.searchParams].filter(
+      ([name]) => KEPT_PREFIXES.some((prefix) => name.startsWith(prefix)) || KEPT_NAMES.has(name) || keep.includes(name)
+    )
+  ).toString();
   url.hash = '';
   return url.href;
 }
@@ -124,77 +126,70 @@ export function holdsOAuthAnswer(href: string): boolean {
   return OAUTH_ANSWER.some((name) => url.searchParams.has(name) || hash.has(name));
 }
 
-export function analyticsFor(settings: PortalAnalytics) {
-  const live: Adapter[] = [];
-  if (settings.googleTagManager) live.push(adapters.googleTagManager(settings.googleTagManager));
-  if (settings.googleAnalytics) live.push(adapters.googleAnalytics(settings.googleAnalytics));
-  let set = false;
-  let inserted = false;
-  let waiting = false;
-  let lastPageView: string | null = null;
+/** The one instance a portal runs: started when the bundle evaluates, reporting from the root effect and the components. */
+export class Analytics {
+  private readonly live: Adapter[] = [];
+  private started = false;
+  private inserted = false;
+  private waiting = false;
+  private lastPageView: string | null = null;
 
-  function startAnalytics(): void {
-    if (set) return;
-    set = true;
-    const dataLayer = (window.dataLayer ??= []);
-    for (const adapter of live) adapter.setup(dataLayer);
-    insertWhenClean();
+  public constructor(private readonly settings: PortalAnalytics) {
+    if (settings.googleTagManager) this.live.push(adapters.googleTagManager(settings.googleTagManager));
+    if (settings.googleAnalytics) this.live.push(adapters.googleAnalytics(settings.googleAnalytics));
   }
 
-  function insertWhenClean(): void {
-    if (inserted || waiting) return;
-    if (!holdsOAuthAnswer(window.location.href)) {
-      insert();
+  /** Once, when the bundle starts: the data layer, every vendor's setup entries, then the vendor tags. */
+  public start(): void {
+    if (this.started) return;
+    this.started = true;
+    const dataLayer = (window.dataLayer ??= []);
+    for (const adapter of this.live) adapter.setup(dataLayer);
+    this.insertWhenClean();
+  }
+
+  /** The vendor tags: at once on a clean address, else once the OAuth answer is out of it, within 5 seconds. */
+  public insertWhenClean(): void {
+    if (this.inserted || this.waiting) return;
+    if (holdsOAuthAnswer(window.location.href)) {
+      // The playground's effect that removes the answer can run after ours, and vendor tags read the address themselves.
+      this.waiting = true;
+      let checks = 0;
+      const timer = setInterval(() => {
+        const answered = holdsOAuthAnswer(window.location.href);
+        if (answered && ++checks < ANSWER_CHECKS) return;
+        // After the last check the next page change calls this again, so a page never cleaned loads nothing.
+        clearInterval(timer);
+        this.waiting = false;
+        if (!answered) this.insertWhenClean();
+      }, ANSWER_CHECK_MS);
       return;
     }
-    // The playground's effect that removes the answer can run after ours, and vendor tags read the address themselves.
-    waiting = true;
-    let checks = 0;
-    const timer = setInterval(() => {
-      const answered = holdsOAuthAnswer(window.location.href);
-      if (answered && ++checks < ANSWER_CHECKS) return;
-      // After the last check the next page change calls this again, so a page never cleaned loads nothing.
-      clearInterval(timer);
-      waiting = false;
-      if (!answered) insert();
-    }, ANSWER_CHECK_MS);
+    this.inserted = true;
+    for (const src of this.live.flatMap((adapter) => adapter.scripts())) {
+      const script = document.createElement('script');
+      script.async = true;
+      script.src = src;
+      document.head.append(script);
+    }
   }
 
-  function insert(): void {
-    inserted = true;
-    for (const adapter of live) for (const src of adapter.scripts()) add(src);
-  }
-
-  function report<E extends PortalEventName>(name: E, params: PortalEvents[E]): void {
-    const page_location = pageLocation(window.location.href, settings.keepQueryParams);
+  public report<E extends PortalEventName>(name: E, params: PortalEvents[E]): void {
+    const page_location = pageLocation(window.location.href, this.settings.keepQueryParams);
     if (page_location === null) return;
-    const all = { ...params, page_location };
+    const docs = { ...params, page_location };
     const dataLayer = (window.dataLayer ??= []);
     // GTM keeps every key from earlier pushes and merges objects, so clear ours first: a shared GA4 tag never sends the last event's details.
-    const reset: DataLayerEntry = { docs: null };
-    const entry: DataLayerEntry = { event: name, docs: all };
-    dataLayer.push(reset);
-    dataLayer.push(entry);
-    for (const adapter of live) adapter.send(name, all);
+    dataLayer.push({ docs: null } satisfies DataLayerEntry);
+    dataLayer.push({ event: name, docs } satisfies DataLayerEntry);
+    for (const adapter of this.live) adapter.send(name, docs);
   }
 
-  function reportPageViews(router: { subscribe(event: 'onRendered', listener: () => void): () => void }): () => void {
-    const pageView = () => {
-      const page = pageLocation(window.location.href, settings.keepQueryParams);
-      if (page === null || page === lastPageView) return;
-      lastPageView = page;
-      report('docs_page_view', { page_title: document.title });
-    };
-    pageView();
-    return router.subscribe('onRendered', pageView);
+  /** `docs_page_view` for the current page, unless its cleaned address is the one last reported: a `#` jump sends none. */
+  public reportPageView(): void {
+    const page = pageLocation(window.location.href, this.settings.keepQueryParams);
+    if (page === null || page === this.lastPageView) return;
+    this.lastPageView = page;
+    this.report('docs_page_view', { page_title: document.title });
   }
-
-  return { startAnalytics, insertWhenClean, report, reportPageViews };
-}
-
-function add(src: string): void {
-  const script = document.createElement('script');
-  script.async = true;
-  script.src = src;
-  document.head.append(script);
 }

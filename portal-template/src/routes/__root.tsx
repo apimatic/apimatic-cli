@@ -8,7 +8,7 @@ import { RootProvider } from 'fumadocs-ui/provider/tanstack';
 import SearchDialog from '@/components/search';
 import { withBasePath } from '@/lib/base-path';
 import { portal } from '@/lib/portal';
-import { insertWhenClean, reportPageViews } from '@/lib/portal-analytics';
+import { analytics } from '@/lib/portal-analytics';
 
 // The sidebar tree is the same on every page. Loaded here, once, it is written to a single
 // cache file instead of being repeated in every page's own loader payload.
@@ -51,13 +51,12 @@ export const Route = createRootRoute({
 function RootComponent() {
   const router = useRouter();
   useEffect(() => {
-    // A start that outwaited an OAuth answer runs on the next page change.
-    const stopInserting = router.subscribe('onRendered', insertWhenClean);
-    const stopPageViews = reportPageViews(router);
-    return () => {
-      stopInserting();
-      stopPageViews();
-    };
+    analytics.reportPageView();
+    // Each page change: a start that outwaited an OAuth answer, then the new page's view.
+    return router.subscribe('onRendered', () => {
+      analytics.insertWhenClean();
+      analytics.reportPageView();
+    });
   }, [router]);
   return (
     <html lang="en" suppressHydrationWarning>
