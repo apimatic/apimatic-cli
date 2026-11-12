@@ -409,17 +409,17 @@ describe('PortalConfig', () => {
       expect(JSON.parse(JSON.stringify(config({})))).to.not.have.property('analytics');
     });
 
-    it('keeps both vendors with their IDs trimmed, the environment and the kept names', () => {
+    it('keeps both vendors with their IDs trimmed, the environment and every kept name, an OAuth answer’s included', () => {
       const analytics = {
         googleTagManager: { containerId: ' GTM-ABC123 ', environment: { auth: 'a1_b-2', preview: 'env-3' } },
         googleAnalytics: { measurementId: ' G-ABC123 ' },
-        keepQueryParams: ['campaign_id', 'ref.1']
+        keepQueryParams: ['campaign_id', ' code ']
       };
 
       expect(config({ analytics }).identity().analytics).to.deep.equal({
         googleTagManager: { containerId: 'GTM-ABC123', environment: { auth: 'a1_b-2', preview: 'env-3' } },
         googleAnalytics: { measurementId: 'G-ABC123', debugMode: false },
-        keepQueryParams: ['campaign_id', 'ref.1']
+        keepQueryParams: ['campaign_id', 'code']
       });
     });
 
@@ -436,22 +436,23 @@ describe('PortalConfig', () => {
       ).to.deep.equal([`'${gtm}.environment' must be a JSON object with 'auth' and 'preview'.`]);
     });
 
-    it('requires each ID and holds it to the vendor’s shape', () => {
+    it('requires each ID as a non-empty string, and leaves its format to the vendor', () => {
       expect(errorsOf({ analytics: { googleTagManager: {}, googleAnalytics: {} } })).to.deep.equal([
         `'${gtm}.containerId' is required.`,
         `'${ga}.measurementId' is required.`
       ]);
       expect(
-        errorsOf({
-          analytics: { googleTagManager: { containerId: 'gtm-abc123' }, googleAnalytics: { measurementId: 'UA-1' } }
-        })
+        errorsOf({ analytics: { googleTagManager: { containerId: ' ' }, googleAnalytics: { measurementId: 1 } } })
       ).to.deep.equal([
-        `'${gtm}.containerId' must look like 'GTM-ABC123'.`,
-        `'${ga}.measurementId' must look like 'G-ABC123'.`
+        `'${gtm}.containerId' must be a non-empty string.`,
+        `'${ga}.measurementId' must be a non-empty string.`
       ]);
+      expect(
+        config({ analytics: { googleTagManager: { containerId: 'gtm-abc123' } } }).identity().analytics.googleTagManager
+      ).to.deep.equal({ containerId: 'gtm-abc123', environment: null });
     });
 
-    it('requires both environment values and holds each to the snippet’s shape', () => {
+    it('requires both environment values as non-empty strings', () => {
       const withEnvironment = (environment: unknown) =>
         errorsOf({ analytics: { googleTagManager: { containerId: 'GTM-ABC123', environment } } });
 
@@ -459,9 +460,9 @@ describe('PortalConfig', () => {
         `'${gtm}.environment.auth' is required.`,
         `'${gtm}.environment.preview' is required.`
       ]);
-      expect(withEnvironment({ auth: 'a b', preview: 'env3' })).to.deep.equal([
-        `'${gtm}.environment.auth' must be the gtm_auth value from the environment's snippet, with no spaces.`,
-        `'${gtm}.environment.preview' must look like 'env-3'.`
+      expect(withEnvironment({ auth: '', preview: 3 })).to.deep.equal([
+        `'${gtm}.environment.auth' must be a non-empty string.`,
+        `'${gtm}.environment.preview' must be a non-empty string.`
       ]);
     });
 
@@ -486,14 +487,13 @@ describe('PortalConfig', () => {
       ]);
     });
 
-    it('keeps only query parameter names, and never an OAuth answer’s', () => {
+    it('takes a list of kept names, each a non-empty string', () => {
       expect(errorsOf({ analytics: { keepQueryParams: 'campaign_id' } })).to.deep.equal([
         `'${keep}' must be a list of query parameter names.`
       ]);
-      expect(errorsOf({ analytics: { keepQueryParams: ['a b', 'code', 1] } })).to.deep.equal([
-        `'${keep}[0]' must be a query parameter name, for example 'campaign_id'.`,
-        `'${keep}[1]' must not be 'code': the portal never reports an OAuth answer.`,
-        `'${keep}[2]' must be a query parameter name, for example 'campaign_id'.`
+      expect(errorsOf({ analytics: { keepQueryParams: ['', 1] } })).to.deep.equal([
+        `'${keep}[0]' must be a non-empty string.`,
+        `'${keep}[1]' must be a non-empty string.`
       ]);
     });
 
@@ -502,16 +502,16 @@ describe('PortalConfig', () => {
         errorsOf({
           analytics: {
             posthog: {},
-            googleTagManager: { containerId: 'x' },
+            googleTagManager: { containerId: '' },
             googleAnalytics: 'G-1',
-            keepQueryParams: ['code']
+            keepQueryParams: [1]
           }
         })
       ).to.deep.equal([
         "'portal.analytics.posthog' is not a 'portal' setting.",
-        `'${gtm}.containerId' must look like 'GTM-ABC123'.`,
+        `'${gtm}.containerId' must be a non-empty string.`,
         `'${ga}' must be a JSON object with 'measurementId'.`,
-        `'${keep}[0]' must not be 'code': the portal never reports an OAuth answer.`
+        `'${keep}[0]' must be a non-empty string.`
       ]);
     });
 
@@ -547,10 +547,10 @@ describe('PortalConfig', () => {
       expect(config({}).identity().seo).to.deep.equal({ googleSiteVerification: null });
     });
 
-    it('refuses a block that is not an object, and a value with anything but a token’s characters', () => {
+    it('refuses a block that is not an object, and a blank value', () => {
       expect(errorsOf({ seo: 'abc' })).to.deep.equal(["'portal.seo' must be a JSON object."]);
-      expect(errorsOf({ seo: { googleSiteVerification: 'abc 123' } })).to.deep.equal([
-        "'portal.seo.googleSiteVerification' must be the content value of Google's verification meta tag, with no spaces."
+      expect(errorsOf({ seo: { googleSiteVerification: ' ' } })).to.deep.equal([
+        "'portal.seo.googleSiteVerification' must be a non-empty string."
       ]);
     });
 

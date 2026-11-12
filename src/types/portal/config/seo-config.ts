@@ -1,5 +1,5 @@
-import { err, ok, Result } from 'neverthrow';
-import { allOf, namespace, optional, Parsed, unknownKeys } from './fields.js';
+import { Result } from 'neverthrow';
+import { allOf, namespace, nonEmptyString, optional, Parsed, unknownKeys } from './fields.js';
 
 export interface PortalSeo {
   /** The content value of Google's site verification meta tag, for Search Console. */
@@ -22,15 +22,7 @@ export class SeoConfig {
       allOf(
         unknownKeys(data, KNOWN, path),
         Result.combineWithAllErrors([
-          optional(
-            data.googleSiteVerification,
-            (given): Parsed<string> =>
-              typeof given === 'string' && /^[A-Za-z0-9_-]+$/.test(given)
-                ? ok(given)
-                : err([
-                    `'${path}.googleSiteVerification' must be the content value of Google's verification meta tag, with no spaces.`
-                  ])
-          )
+          optional(data.googleSiteVerification, (given) => nonEmptyString(given, `${path}.googleSiteVerification`))
         ])
       ).map(([googleSiteVerification]) => new SeoConfig(googleSiteVerification))
     );

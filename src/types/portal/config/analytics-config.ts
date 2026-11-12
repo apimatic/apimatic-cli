@@ -1,6 +1,6 @@
 import { err, ok, Result } from 'neverthrow';
 import { isJsonObject } from '../../../utils/json-utils.js';
-import { allOf, namespace, optional, Parsed, unknownKeys } from './fields.js';
+import { allOf, namespace, nonEmptyString, optional, Parsed, unknownKeys } from './fields.js';
 
 export interface GoogleTagManagerSetting {
   containerId: string;
@@ -23,19 +23,6 @@ export interface AnalyticsBlock {
 }
 
 const KNOWN = ['googleTagManager', 'googleAnalytics', 'keepQueryParams'];
-
-/** Names the OAuth standard puts in an answer: never kept, whatever the customer lists. */
-const OAUTH_ANSWER = new Set([
-  'code',
-  'state',
-  'access_token',
-  'id_token',
-  'token_type',
-  'expires_in',
-  'error',
-  'session_state',
-  'iss'
-]);
 
 export class AnalyticsConfig {
   private constructor(
@@ -98,10 +85,10 @@ function googleTagManager(value: unknown, path: string): Parsed<GoogleTagManager
   return allOf(
     unknownKeys(value, ['containerId', 'environment'], path),
     Result.combineWithAllErrors([
-      required(value.containerId, `${path}.containerId`, /^\s*GTM-[A-Z0-9]+\s*$/, "must look like 'GTM-ABC123'"),
+      required(value.containerId, `${path}.containerId`),
       optional(value.environment, (given) => environment(given, `${path}.environment`))
     ])
-  ).map(([containerId, environment]) => ({ containerId: containerId.trim(), environment }));
+  ).map(([containerId, environment]) => ({ containerId, environment }));
 }
 
 function environment(value: unknown, path: string): Parsed<{ auth: string; preview: string }> {
@@ -110,15 +97,7 @@ function environment(value: unknown, path: string): Parsed<{ auth: string; previ
   }
   return allOf(
     unknownKeys(value, ['auth', 'preview'], path),
-    Result.combineWithAllErrors([
-      required(
-        value.auth,
-        `${path}.auth`,
-        /^[A-Za-z0-9_-]+$/,
-        "must be the gtm_auth value from the environment's snippet, with no spaces"
-      ),
-      required(value.preview, `${path}.preview`, /^env-\d+$/, "must look like 'env-3'")
-    ])
+    Result.combineWithAllErrors([required(value.auth, `${path}.auth`), required(value.preview, `${path}.preview`)])
   ).map(([auth, preview]) => ({ auth, preview }));
 }
 
@@ -128,21 +107,16 @@ function googleAnalytics(value: unknown, path: string): Parsed<string> {
   }
   return allOf(
     unknownKeys(value, ['measurementId'], path),
-    Result.combineWithAllErrors([
-      required(value.measurementId, `${path}.measurementId`, /^\s*G-[A-Z0-9]+\s*$/, "must look like 'G-ABC123'")
-    ])
-  ).map(([measurementId]) => measurementId.trim());
+    Result.combineWithAllErrors([required(value.measurementId, `${path}.measurementId`)])
+  ).map(([measurementId]) => measurementId);
 }
 
-/** A value pasted from the vendor's console: present, and shaped as the vendor writes it. */
-function required(given: unknown, path: string, shape: RegExp, otherwise: string): Parsed<string> {
-  if (given === undefined) {
-    return err([`'${path}' is required.`]);
-  }
-  return typeof given === 'string' && shape.test(given) ? ok(given) : err([`'${path}' ${otherwise}.`]);
+/** Present and a non-empty string; its format is the vendor's to check, since a wrong value fails there, not here. */
+function required(given: unknown, path: string): Parsed<string> {
+  return given === undefined ? err([`'${path}' is required.`]) : nonEmptyString(given, path);
 }
 
-/** Names a reported address keeps; an OAuth answer's names are refused, whatever the customer lists. */
+/** Names a reported address keeps, beyond the campaign names it always keeps. */
 function keptQueryParams(value: unknown, path: string): Parsed<string[]> {
   if (value === undefined) {
     return ok([]);
@@ -150,14 +124,7 @@ function keptQueryParams(value: unknown, path: string): Parsed<string[]> {
   if (!Array.isArray(value)) {
     return err([`'${path}' must be a list of query parameter names.`]);
   }
-  return Result.combineWithAllErrors(
-    value.map((name, index): Parsed<string> => {
-      if (typeof name !== 'string' || !/^[A-Za-z0-9_.-]+$/.test(name)) {
-        return err([`'${path}[${index}]' must be a query parameter name, for example 'campaign_id'.`]);
-      }
-      return OAUTH_ANSWER.has(name)
-        ? err([`'${path}[${index}]' must not be '${name}': the portal never reports an OAuth answer.`])
-        : ok(name);
-    })
-  ).mapErr((errors) => errors.flat());
+  return Result.combineWithAllErrors(value.map((name, index) => nonEmptyString(name, `${path}[${index}]`))).mapErr(
+    (errors) => errors.flat()
+  );
 }
