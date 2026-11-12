@@ -177,6 +177,79 @@
             }
           }
         },
+        "analytics": {
+          "type": "object",
+          "description": "Analytics the portal loads. Every page view goes to window.dataLayer as docs_page_view, and to GA4 when a measurement ID is set. The portal counts page changes itself: with googleAnalytics set, turn off the GA4 stream's 'Page changes based on browser history events', or every page change counts twice.",
+          "additionalProperties": false,
+          "properties": {
+            "googleTagManager": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["containerId"],
+              "properties": {
+                "containerId": {
+                  "allOf": [
+                    {
+                      "$ref": "#/definitions/nonBlank"
+                    }
+                  ],
+                  "description": "The container's ID, for example 'GTM-ABC123'."
+                },
+                "environment": {
+                  "type": "object",
+                  "description": "A GTM environment, so a staging build loads the container's staging version: the gtm_auth and gtm_preview values from the environment's snippet.",
+                  "additionalProperties": false,
+                  "required": ["auth", "preview"],
+                  "properties": {
+                    "auth": {
+                      "$ref": "#/definitions/nonBlank"
+                    },
+                    "preview": {
+                      "$ref": "#/definitions/nonBlank"
+                    }
+                  }
+                }
+              }
+            },
+            "googleAnalytics": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["measurementId"],
+              "properties": {
+                "measurementId": {
+                  "allOf": [
+                    {
+                      "$ref": "#/definitions/nonBlank"
+                    }
+                  ],
+                  "description": "The GA4 web stream's measurement ID, for example 'G-ABC123'. The portal sends its own page views, so turn off the stream's 'Page changes based on browser history events'. Don't also add a GA4 tag to the GTM container: every hit would count twice."
+                }
+              }
+            },
+            "keepQueryParams": {
+              "type": "array",
+              "description": "Your own link tags to keep in reported page addresses. Campaign (utm_), ad-click and cross-domain tags are kept already; every other query parameter is dropped.",
+              "items": {
+                "$ref": "#/definitions/nonBlank"
+              }
+            }
+          }
+        },
+        "seo": {
+          "type": "object",
+          "description": "Search engine settings.",
+          "additionalProperties": false,
+          "properties": {
+            "googleSiteVerification": {
+              "allOf": [
+                {
+                  "$ref": "#/definitions/nonBlank"
+                }
+              ],
+              "description": "The content value of Google's site verification meta tag, for Search Console. Not needed for a Domain property verified by DNS."
+            }
+          }
+        },
         "pluginUrl": {
           "type": "string",
           "description": "Where the context plugin is hosted, starting with 'https://' and with no spaces. The Context Plugin page installs it from here, and the portal carries no copy of its own.",

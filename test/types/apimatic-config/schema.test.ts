@@ -99,7 +99,13 @@ describe('apimatic.schema.json', () => {
               { label: 'Home', url: '/' }
             ]
           },
-          ai: { pageActions: false }
+          ai: { pageActions: false },
+          analytics: {
+            googleTagManager: { containerId: 'GTM-ABC123', environment: { auth: 'abc', preview: 'env-3' } },
+            googleAnalytics: { measurementId: 'G-ABC123' },
+            keepQueryParams: ['campaign_id']
+          },
+          seo: { googleSiteVerification: 'abc' }
         }
       ],
       ['an address with a port', { site: { url: 'https://docs.example.com:8443' } }],
@@ -117,7 +123,36 @@ describe('apimatic.schema.json', () => {
       ['a link through a parent segment', { navigation: { links: [{ label: 'Start', url: '/guides/../start' }] } }],
       ['a link with two slashes in its query', { navigation: { links: [{ label: 'Next', url: '/start?next=//x' }] } }],
       ['a context plugin hosted elsewhere', { pluginUrl: 'https://plugins.acme.test/calc.zip?v=2' }],
-      ['a plugin address with several query parameters', { pluginUrl: 'https://s3.test/calc.zip?a=1&b=2' }]
+      ['a plugin address with several query parameters', { pluginUrl: 'https://s3.test/calc.zip?a=1&b=2' }],
+      ['a GTM container', { analytics: { googleTagManager: { containerId: 'GTM-ABC123' } } }],
+      [
+        'a GTM container with an environment',
+        {
+          analytics: { googleTagManager: { containerId: 'GTM-ABC123', environment: { auth: 'abc', preview: 'env-3' } } }
+        }
+      ],
+      ['a GA4 stream', { analytics: { googleAnalytics: { measurementId: 'G-ABC123' } } }],
+      [
+        'both vendors, with spaces around the IDs',
+        {
+          analytics: {
+            googleTagManager: { containerId: ' GTM-ABC123 ' },
+            googleAnalytics: { measurementId: ' G-ABC123 ' }
+          }
+        }
+      ],
+      ['a kept query parameter name', { analytics: { keepQueryParams: ['campaign_id'] } }],
+      ['an empty analytics block', { analytics: {} }],
+      ['a verification value', { seo: { googleSiteVerification: 'abc_123-XYZ' } }],
+      // The vendors' formats are theirs to check, so each ID and value is any non-blank string.
+      ['a lowercase container ID', { analytics: { googleTagManager: { containerId: 'gtm-abc123' } } }],
+      [
+        'an environment value with a space, and a preview without env-',
+        { analytics: { googleTagManager: { containerId: 'GTM-1', environment: { auth: 'a b', preview: '3' } } } }
+      ],
+      ['a Universal Analytics ID as the measurement ID', { analytics: { googleAnalytics: { measurementId: 'UA-1' } } }],
+      ['a kept name with a space, and an OAuth answer name', { analytics: { keepQueryParams: ['a b', 'code'] } }],
+      ['a verification value with a space', { seo: { googleSiteVerification: 'abc 123' } }]
     ];
 
     const invalid: [string, object][] = [
@@ -219,7 +254,30 @@ describe('apimatic.schema.json', () => {
       ['a plugin address without a host', { pluginUrl: 'https://' }],
       ['a plugin address that is not a string', { pluginUrl: 7 }],
       ['a plugin address with a space', { pluginUrl: 'https://plugins.acme.test/my plugin.zip' }],
-      ['a plugin address with trailing whitespace', { pluginUrl: 'https://plugins.acme.test/calc.zip ' }]
+      ['a plugin address with trailing whitespace', { pluginUrl: 'https://plugins.acme.test/calc.zip ' }],
+      ['analytics that is not an object', { analytics: 'GTM-ABC123' }],
+      ['an unknown vendor', { analytics: { posthog: {} } }],
+      ['a bare container ID', { analytics: { googleTagManager: 'GTM-ABC123' } }],
+      ['a GTM block without its ID', { analytics: { googleTagManager: {} } }],
+      ['a blank container ID', { analytics: { googleTagManager: { containerId: ' ' } } }],
+      [
+        'a key beside the container ID',
+        { analytics: { googleTagManager: { containerId: 'GTM-ABC123', serverUrl: 'x' } } }
+      ],
+      [
+        'an environment that is not an object',
+        { analytics: { googleTagManager: { containerId: 'GTM-ABC123', environment: 'env-3' } } }
+      ],
+      [
+        'an environment without its preview',
+        { analytics: { googleTagManager: { containerId: 'GTM-ABC123', environment: { auth: 'abc' } } } }
+      ],
+      ['a GA4 block without its ID', { analytics: { googleAnalytics: {} } }],
+      ['a measurement ID that is not a string', { analytics: { googleAnalytics: { measurementId: 7 } } }],
+      ['kept names that are not a list', { analytics: { keepQueryParams: 'campaign_id' } }],
+      ['a kept name that is not a string', { analytics: { keepQueryParams: [1] } }],
+      ['seo that is not an object', { seo: 'abc' }],
+      ['a blank verification value', { seo: { googleSiteVerification: ' ' } }]
     ];
 
     for (const [label, block] of valid) {
