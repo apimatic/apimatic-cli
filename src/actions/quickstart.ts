@@ -244,6 +244,7 @@ export class QuickstartAction {
       project,
       DEFAULT_PORTAL_PORT,
       true,
+      true,
       () => this.prompts.nextSteps(configFile)
     );
 

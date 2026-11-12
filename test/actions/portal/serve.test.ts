@@ -45,11 +45,12 @@ describe('PortalServeAction', () => {
   /** Stands in for the preview process dying, with what it printed on the way out. */
   let exit: (output: string) => void;
 
-  const execute = (projectDirectory = FIXTURE, openInBrowser = false) =>
+  const execute = (projectDirectory = FIXTURE, openInBrowser = false, enableAnalytics = true) =>
     new PortalServeAction(new DirectoryPath(root), COMMAND_METADATA, 'auth-key').execute(
       ProjectContext.in(projectDirectory),
       PORT,
-      openInBrowser
+      openInBrowser,
+      enableAnalytics
     );
 
   /** Stands in for the watch on `directory`, answered by `watching`; any other tree's watch is left alone. */
@@ -608,8 +609,8 @@ describe('PortalServeAction', () => {
       fs.writeFileSync(path.join(source.toString(), 'apimatic.json'), JSON.stringify(config));
 
     /** Runs the preview until `body` is done with it, then stops it as CTRL+C would. */
-    const whileServing = async (body: () => Promise<void>) => {
-      const running = execute(new DirectoryPath(root));
+    const whileServing = async (body: () => Promise<void>, enableAnalytics = true) => {
+      const running = execute(new DirectoryPath(root), false, enableAnalytics);
       const { onChange } = await watched;
       save = async (config: object) => {
         writeConfig(config);
@@ -630,10 +631,10 @@ describe('PortalServeAction', () => {
       // `prepare` is stubbed above; this one writes the files an edit can change, as a real one
       // would, so the test can see what an edit changes.
       (PortalProjectService.prototype.prepare as sinon.SinonStub).callsFake(
-        async (directory: DirectoryPath, portal: PortalSource) => {
+        async (directory: DirectoryPath, portal: PortalSource, _artifacts: unknown, enableAnalytics: boolean) => {
           projectDirectory = directory;
           fs.mkdirSync(path.join(directory.toString(), 'src/styles'), { recursive: true });
-          (await new PortalProjectService().applyConfig(directory, portal))._unsafeUnwrap();
+          (await new PortalProjectService().applyConfig(directory, portal, enableAnalytics))._unsafeUnwrap();
           return ok({
             projectDirectory: directory,
             viteBinary: new FilePath(directory, new FileName('vite.js')),
@@ -888,6 +889,18 @@ describe('PortalServeAction', () => {
         expect(prompts.staticDirectoryNotServed.called).to.be.false;
         expect(appliedSaid()).to.equal(1);
       });
+    });
+
+    it('keeps --no-analytics for the rewrite when the block changes', async () => {
+      const applyConfig = sinon.spy(PortalProjectService.prototype, 'applyConfig');
+
+      await whileServing(async () => {
+        const config = originalConfig();
+        config.portal.site.name = 'Renamed API';
+        await save(config);
+      }, false);
+
+      expect(applyConfig.lastCall.args[2]).to.be.false;
     });
 
     it('reports a change it could not write to the preview', async () => {

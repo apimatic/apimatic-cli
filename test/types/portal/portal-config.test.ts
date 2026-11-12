@@ -28,7 +28,7 @@ describe('PortalConfig', () => {
 
     it('builds a portal from an empty block, with every default', () => {
       const portal = config({});
-      const identity = portal.identity();
+      const identity = portal.identity(true);
 
       expect(portal.siteTitle()).to.equal('Spec Title');
       expect(identity.description).to.equal('What the spec says.');
@@ -120,17 +120,17 @@ describe('PortalConfig', () => {
     });
 
     it('has no description with several specifications unless the block gives one', () => {
-      expect(config({ site: { name: 'Calc' } }, null).identity().description).to.be.null;
+      expect(config({ site: { name: 'Calc' } }, null).identity(true).description).to.be.null;
     });
 
     it('trims the description', () => {
-      expect(config({ site: { description: '  Docs  ' } }).identity().description).to.equal('Docs');
+      expect(config({ site: { description: '  Docs  ' } }).identity(true).description).to.equal('Docs');
     });
 
     // Blank is how the block turns the specification's description off.
     it('treats a blank description as none, not as absent', () => {
       for (const description of ['', '   ', '\n\t']) {
-        expect(config({ site: { description } }).identity().description, JSON.stringify(description)).to.be.null;
+        expect(config({ site: { description } }).identity(true).description, JSON.stringify(description)).to.be.null;
       }
     });
 
@@ -139,13 +139,13 @@ describe('PortalConfig', () => {
     });
 
     it('keeps the path of the address, dropping a trailing slash and keeping a port', () => {
-      expect(config({ site: { url: 'https://docs.example.com/' } }).identity().siteUrl).to.equal(
+      expect(config({ site: { url: 'https://docs.example.com/' } }).identity(true).siteUrl).to.equal(
         'https://docs.example.com'
       );
-      expect(config({ site: { url: 'https://docs.example.com:8443' } }).identity().siteUrl).to.equal(
+      expect(config({ site: { url: 'https://docs.example.com:8443' } }).identity(true).siteUrl).to.equal(
         'https://docs.example.com:8443'
       );
-      expect(config({ site: { url: 'HTTPS://Example.com/Docs/v2/' } }).identity().siteUrl).to.equal(
+      expect(config({ site: { url: 'HTTPS://Example.com/Docs/v2/' } }).identity(true).siteUrl).to.equal(
         'https://example.com/Docs/v2'
       );
     });
@@ -319,7 +319,7 @@ describe('PortalConfig', () => {
             { label: 'Auth', url: '/authentication' }
           ]
         }
-      }).identity();
+      }).identity(true);
 
       expect(links).to.deep.equal([
         { label: 'Status', url: 'https://status.example.com', external: true },
@@ -367,7 +367,7 @@ describe('PortalConfig', () => {
     it('writes a page of the portal as the browser resolves it', () => {
       const [link] = config({
         navigation: { links: [{ label: 'x', url: '/guides/../start here?tab=1#top' }] }
-      }).identity().links;
+      }).identity(true).links;
 
       expect(link.url).to.equal('/start%20here?tab=1#top');
     });
@@ -390,7 +390,7 @@ describe('PortalConfig', () => {
     // Each page offers to open itself in ChatGPT, Claude, Cursor or Scira. A portal
     // published under someone else's brand carries that endorsement, so it can be refused.
     it('offers the page actions unless the block turns them off', () => {
-      expect(config({ ai: { pageActions: false } }).identity().pageActions).to.be.false;
+      expect(config({ ai: { pageActions: false } }).identity(true).pageActions).to.be.false;
       expect(errorsOf({ ai: { pageActions: 'no' } })).to.deep.equal(["'portal.ai.pageActions' must be true or false."]);
     });
   });
@@ -401,7 +401,7 @@ describe('PortalConfig', () => {
     const keep = 'portal.analytics.keepQueryParams';
 
     it('tells the browser to load nothing when the block sets nothing', () => {
-      expect(config({}).identity().analytics).to.deep.equal({
+      expect(config({}).identity(true).analytics).to.deep.equal({
         googleTagManager: null,
         googleAnalytics: null,
         keepQueryParams: []
@@ -416,9 +416,9 @@ describe('PortalConfig', () => {
         keepQueryParams: ['campaign_id', ' code ']
       };
 
-      expect(config({ analytics }).identity().analytics).to.deep.equal({
+      expect(config({ analytics }).identity(true).analytics).to.deep.equal({
         googleTagManager: { containerId: 'GTM-ABC123', environment: { auth: 'a1_b-2', preview: 'env-3' } },
-        googleAnalytics: { measurementId: 'G-ABC123', debugMode: false },
+        googleAnalytics: { measurementId: 'G-ABC123' },
         keepQueryParams: ['campaign_id', 'code']
       });
     });
@@ -448,7 +448,8 @@ describe('PortalConfig', () => {
         `'${ga}.measurementId' must be a non-empty string.`
       ]);
       expect(
-        config({ analytics: { googleTagManager: { containerId: 'gtm-abc123' } } }).identity().analytics.googleTagManager
+        config({ analytics: { googleTagManager: { containerId: 'gtm-abc123' } } }).identity(true).analytics
+          .googleTagManager
       ).to.deep.equal({ containerId: 'gtm-abc123', environment: null });
     });
 
@@ -515,6 +516,20 @@ describe('PortalConfig', () => {
       ]);
     });
 
+    it('tells the browser to load neither vendor under --no-analytics, and still which names to keep', () => {
+      const analytics = {
+        googleTagManager: { containerId: 'GTM-ABC123' },
+        googleAnalytics: { measurementId: 'G-ABC123' },
+        keepQueryParams: ['campaign_id']
+      };
+
+      expect(config({ analytics }).identity(false).analytics).to.deep.equal({
+        googleTagManager: null,
+        googleAnalytics: null,
+        keepQueryParams: ['campaign_id']
+      });
+    });
+
     it('uses Google Analytics only with a measurement ID', () => {
       expect(config({}).usesGoogleAnalytics()).to.be.false;
       expect(config({ analytics: { googleTagManager: { containerId: 'GTM-ABC123' } } }).usesGoogleAnalytics()).to.be
@@ -541,10 +556,10 @@ describe('PortalConfig', () => {
 
   describe('seo', () => {
     it('carries the verification value to the browser, or null without one', () => {
-      expect(config({ seo: { googleSiteVerification: 'abc_123-XYZ' } }).identity().seo).to.deep.equal({
+      expect(config({ seo: { googleSiteVerification: 'abc_123-XYZ' } }).identity(true).seo).to.deep.equal({
         googleSiteVerification: 'abc_123-XYZ'
       });
-      expect(config({}).identity().seo).to.deep.equal({ googleSiteVerification: null });
+      expect(config({}).identity(true).seo).to.deep.equal({ googleSiteVerification: null });
     });
 
     it('refuses a block that is not an object, and a blank value', () => {
@@ -613,7 +628,9 @@ describe('PortalConfig', () => {
     });
 
     it('is kept out of what the browser is told', () => {
-      expect(config({ pluginUrl: 'https://plugins.acme.test/calc.zip' }).identity()).to.not.have.property('pluginUrl');
+      expect(config({ pluginUrl: 'https://plugins.acme.test/calc.zip' }).identity(true)).to.not.have.property(
+        'pluginUrl'
+      );
     });
 
     it('is serialised only when the block gives one', () => {
@@ -642,7 +659,7 @@ describe('PortalConfig', () => {
         ai: { pageActions: false }
       });
 
-      expect(portal.identity()).to.deep.equal({
+      expect(portal.identity(true)).to.deep.equal({
         name: 'My API',
         description: 'Docs',
         siteUrl: 'https://docs.example.com',
@@ -660,7 +677,7 @@ describe('PortalConfig', () => {
     });
 
     it('reports absent settings as null rather than leaving them out', () => {
-      expect(PortalConfig.scaffolded({ name: 'My API', description: null }).identity()).to.deep.equal({
+      expect(PortalConfig.scaffolded({ name: 'My API', description: null }).identity(true)).to.deep.equal({
         name: 'My API',
         description: null,
         siteUrl: null,
@@ -677,21 +694,22 @@ describe('PortalConfig', () => {
     // One image serves both modes, so the browser is told the same address twice rather than
     // having to know that a missing dark variant means the light one.
     it('names one logo for both modes when the block names one', () => {
-      expect(config({ brand: { logo: 'static/logo.svg' } }).identity().logo).to.deep.equal({
+      expect(config({ brand: { logo: 'static/logo.svg' } }).identity(true).logo).to.deep.equal({
         light: '/logo.svg',
         dark: '/logo.svg'
       });
     });
 
     it('takes the favicon from the light logo when the block names none', () => {
-      const favicon = config({ brand: { logo: { light: 'static/light.png', dark: 'static/dark.png' } } }).identity()
-        .favicon;
+      const favicon = config({ brand: { logo: { light: 'static/light.png', dark: 'static/dark.png' } } }).identity(
+        true
+      ).favicon;
 
       expect(favicon).to.deep.equal({ url: '/light.png', type: 'image/png' });
     });
 
     it('types the favicon by its extension, whatever its case, and leaves an unknown one untyped', () => {
-      const typeOf = (favicon: string) => config({ brand: { favicon } }).identity().favicon?.type;
+      const typeOf = (favicon: string) => config({ brand: { favicon } }).identity(true).favicon?.type;
 
       expect(typeOf('static/favicon.ICO')).to.equal('image/x-icon');
       expect(typeOf('static/icons/app.jpeg')).to.equal('image/jpeg');

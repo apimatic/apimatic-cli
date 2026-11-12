@@ -75,7 +75,7 @@ async function buildFixture(name: string, delivered: Delivered = {}): Promise<Bu
   fs.mkdirSync(project.toString(), { recursive: true });
   const artifacts = deliveredInto(path.join(root, 'delivered'), delivered);
   expect(source.generatedPages.missingFrom(artifacts), 'the artifacts back every page').to.be.null;
-  const prepared = (await new PortalProjectService().prepare(project, source, artifacts))._unsafeUnwrap();
+  const prepared = (await new PortalProjectService().prepare(project, source, artifacts, true))._unsafeUnwrap();
 
   const build = await new PortalBuildService().build(prepared);
   if (build.isErr()) {

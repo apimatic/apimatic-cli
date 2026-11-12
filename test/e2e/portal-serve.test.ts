@@ -44,7 +44,7 @@ const enabled = process.env.APIMATIC_E2E === '1';
 
     const project = new DirectoryPath(root).join('build');
     fs.mkdirSync(project.toString(), { recursive: true });
-    const prepared = (await new PortalProjectService().prepare(project, resolved, artifacts))._unsafeUnwrap();
+    const prepared = (await new PortalProjectService().prepare(project, resolved, artifacts, true))._unsafeUnwrap();
 
     const started = await new PortalDevServerService().start(prepared, await getPort());
     if (started.isErr()) {

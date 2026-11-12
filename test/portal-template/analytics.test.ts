@@ -169,14 +169,11 @@ const withGtm = (environment: { auth: string; preview: string } | null = null): 
   ...none,
   googleTagManager: { containerId: 'GTM-ABC123', environment }
 });
-const withGa4 = (debugMode = false): PortalAnalytics => ({
-  ...none,
-  googleAnalytics: { measurementId: 'G-ABC123', debugMode }
-});
+const withGa4: PortalAnalytics = { ...none, googleAnalytics: { measurementId: 'G-ABC123' } };
 const withBoth: PortalAnalytics = {
   ...none,
   googleTagManager: withGtm().googleTagManager,
-  googleAnalytics: withGa4().googleAnalytics
+  googleAnalytics: withGa4.googleAnalytics
 };
 const GTM_SCRIPT = 'https://www.googletagmanager.com/gtm.js?id=GTM-ABC123';
 const GA4_SCRIPT = 'https://www.googletagmanager.com/gtag/js?id=G-ABC123';
@@ -260,7 +257,7 @@ describe('Analytics', () => {
     it('pushes js and config with its own page view off, and inserts gtag.js', () => {
       const page = browser(quickstart);
 
-      new Analytics(withGa4()).start();
+      new Analytics(withGa4).start();
 
       const [js, config, ...rest] = gtagCalls(page.dataLayer());
       expect(js[0]).to.equal('js');
@@ -273,7 +270,7 @@ describe('Analytics', () => {
 
     it('sends each page view as page_view, without the prefix, after the reset and event entries', () => {
       const page = browser(quickstart);
-      const analytics = new Analytics(withGa4());
+      const analytics = new Analytics(withGa4);
 
       analytics.start();
       analytics.reportPageView();
@@ -287,25 +284,13 @@ describe('Analytics', () => {
 
     it('pushes Arguments objects, which gtag.js reads, never arrays of the same values', () => {
       const page = browser(quickstart);
-      const analytics = new Analytics(withGa4());
+      const analytics = new Analytics(withGa4);
 
       analytics.start();
       analytics.reportPageView();
 
       expect(page.dataLayer().filter(isArguments)).to.have.length(3);
       expect(page.dataLayer().some(Array.isArray)).to.be.false;
-    });
-
-    it('marks events as debug traffic in a preview', () => {
-      const page = browser(quickstart);
-
-      new Analytics(withGa4(true)).start();
-
-      expect(gtagCalls(page.dataLayer())[1]).to.deep.equal([
-        'config',
-        'G-ABC123',
-        { send_page_view: false, debug_mode: true }
-      ]);
     });
 
     it('uses a gtag the page already defines, rather than replacing it', () => {
@@ -315,7 +300,7 @@ describe('Analytics', () => {
         calls.push(command);
       };
       page.window.gtag = existing;
-      const analytics = new Analytics(withGa4());
+      const analytics = new Analytics(withGa4);
 
       analytics.start();
       analytics.reportPageView();
@@ -408,8 +393,8 @@ describe('Analytics', () => {
       },
       {
         vendor: 'googleAnalytics',
-        settings: withGa4(),
-        adapter: () => adapters.googleAnalytics({ measurementId: 'G-ABC123', debugMode: false }),
+        settings: withGa4,
+        adapter: () => adapters.googleAnalytics({ measurementId: 'G-ABC123' }),
         pageViewCall: (entries) => expect(gtagCalls(entries).at(-1)?.slice(0, 2)).to.deep.equal(['event', 'page_view'])
       }
     ];

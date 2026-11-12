@@ -128,7 +128,7 @@ export class PortalConfig {
     return this.analytics.usesGoogleAnalytics();
   }
 
-  public identity(): PortalIdentity {
+  public identity(enableAnalytics: boolean): PortalIdentity {
     const address = this.site.siteAddress();
     const logo = this.brand.logoImages();
     const favicon = this.brand.faviconImage();
@@ -141,7 +141,7 @@ export class PortalConfig {
       colorMode: this.brand.mode(),
       links: this.navigation.headerLinks().map(portalLink),
       pageActions: this.ai.offersPageActions(),
-      analytics: this.analytics.identity(),
+      analytics: this.analytics.identity(enableAnalytics),
       seo: this.seo.identity()
     };
   }

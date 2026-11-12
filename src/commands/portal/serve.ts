@@ -36,13 +36,18 @@ Nothing is written to disk; run 'apimatic portal generate' to produce the static
       description: 'open the portal in the default browser.',
       default: false
     }),
+    'no-analytics': Flags.boolean({
+      default: false,
+      description:
+        'leave out Google Tag Manager, Google Analytics and every analytics or marketing script, for staging.'
+    }),
     ...FlagsProvider.input,
     ...FlagsProvider.authKey
   };
 
   public async run() {
     const {
-      flags: { input, port, open, 'auth-key': authKey }
+      flags: { input, port, open, 'no-analytics': noAnalytics, 'auth-key': authKey }
     } = await this.parse(PortalServe);
 
     const commandMetadata: CommandMetadata = {
@@ -52,7 +57,7 @@ Nothing is written to disk; run 'apimatic portal generate' to produce the static
 
     intro('Portal Serve');
     const action = new PortalServeAction(this.getConfigDir(), commandMetadata, authKey);
-    const result = await action.execute(ProjectContext.at(input), port, open);
+    const result = await action.execute(ProjectContext.at(input), port, open, !noAnalytics);
     outro(result);
   }
 

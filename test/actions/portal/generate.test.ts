@@ -38,12 +38,13 @@ describe('GenerateAction', () => {
   let authorize: sinon.SinonStub;
   let build: sinon.SinonStub;
 
-  const execute = (projectDirectory = FIXTURE, force = false, zip = false) =>
+  const execute = (projectDirectory = FIXTURE, force = false, zip = false, enableAnalytics = true) =>
     new GenerateAction(new DirectoryPath(root), COMMAND_METADATA, 'auth-key').execute(
       ProjectContext.in(projectDirectory),
       portalDirectory,
       force,
-      zip
+      zip,
+      enableAnalytics
     );
 
   const inPortal = (relative: string) => fs.existsSync(path.join(portalDirectory.toString(), relative));
@@ -119,7 +120,7 @@ describe('GenerateAction', () => {
   it('fails when the source and destination are the same directory', async () => {
     const action = new GenerateAction(new DirectoryPath(root), COMMAND_METADATA);
 
-    const result = await action.execute(ProjectContext.in(FIXTURE), FIXTURE.join('src'), false, false);
+    const result = await action.execute(ProjectContext.in(FIXTURE), FIXTURE.join('src'), false, false, true);
 
     expect(result.isFailed()).to.be.true;
     expect(prompts.directoryCannotBeSame.calledOnce).to.be.true;
@@ -315,6 +316,13 @@ describe('GenerateAction', () => {
 
     expect(result.isSuccess()).to.be.true;
     expect(shared.prompts.filesShadowedByStatic.firstCall.args[0].map(String)).to.deep.equal(['robots.txt']);
+  });
+
+  it('hands --no-analytics to the project it prepares', async () => {
+    const result = await execute(FIXTURE, false, false, false);
+
+    expect(result.isSuccess()).to.be.true;
+    expect(shared.prepare.firstCall.args[3]).to.be.false;
   });
 
   it('warns that Google Analytics counts page changes, before the build, when it is set', async () => {

@@ -31,6 +31,7 @@ describe('PreparePortalProjectAction', () => {
 
     const result = await new PreparePortalProjectAction(new DirectoryPath(os.tmpdir()), COMMAND_METADATA).execute(
       ProjectContext.in(share),
+      true,
       { onPrepared }
     );
 
@@ -45,9 +46,10 @@ describe('PreparePortalProjectAction', () => {
     let shared: PreparePortalProjectStubs;
     let onPrepared: sinon.SinonStub;
 
-    const execute = () =>
+    const execute = (enableAnalytics = true) =>
       new PreparePortalProjectAction(new DirectoryPath(os.tmpdir()), COMMAND_METADATA).execute(
         ProjectContext.in(FIXTURE),
+        enableAnalytics,
         { onPrepared }
       );
 
@@ -69,6 +71,12 @@ describe('PreparePortalProjectAction', () => {
 
       expect(uploaded).to.include.members(['apimatic.json', 'content/index.md']);
       expect(uploaded.filter((entry) => entry.startsWith('static/'))).to.be.empty;
+    });
+
+    it('hands --no-analytics to the project it prepares', async () => {
+      await execute(false);
+
+      expect(shared.prepare.firstCall.args[3]).to.be.false;
     });
 
     it('reports a source it could not zip, without asking for the artifacts', async () => {

@@ -27,10 +27,8 @@ export interface GoogleTagManagerSetting {
   environment: { auth: string; preview: string } | null;
 }
 
-/** `debugMode` is set by the CLI under `portal serve`. */
 export interface GoogleAnalyticsSetting {
   measurementId: string;
-  debugMode: boolean;
 }
 
 /** Public values: they sit in every page's scripts. */

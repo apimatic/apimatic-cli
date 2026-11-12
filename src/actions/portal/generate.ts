@@ -26,7 +26,8 @@ export class GenerateAction {
     project: ProjectContext,
     portalDirectory: DirectoryPath,
     force: boolean,
-    zipPortal: boolean
+    zipPortal: boolean,
+    enableAnalytics: boolean
   ): Promise<ActionResult> => {
     if (project.isSourceDirectory(portalDirectory)) {
       this.prompts.directoryCannotBeSame(portalDirectory);
@@ -41,7 +42,8 @@ export class GenerateAction {
     }
 
     const portalContext = new PortalContext(portalDirectory);
-    return await new PreparePortalProjectAction(this.configDir, this.commandMetadata, this.authKey).execute(project, {
+    const prepare = new PreparePortalProjectAction(this.configDir, this.commandMetadata, this.authKey);
+    return await prepare.execute(project, enableAnalytics, {
       confirm: () => this.confirmOverwrite(portalContext, portalDirectory, force),
       onPrepared: (portalProject, source) => {
         if (source.config.usesGoogleAnalytics()) {

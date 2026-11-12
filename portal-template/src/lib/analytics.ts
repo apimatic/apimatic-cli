@@ -76,10 +76,7 @@ export const adapters: { [V in Vendor]: (setting: NonNullable<PortalAnalytics[V]
           dataLayer.push(arguments);
         };
         gtag('js', new Date());
-        gtag('config', setting.measurementId, {
-          send_page_view: false,
-          ...(setting.debugMode ? { debug_mode: true } : {})
-        });
+        gtag('config', setting.measurementId, { send_page_view: false });
       },
       scripts: () => [`${GOOGLE}/gtag/js?id=${setting.measurementId}`],
       // GA4 gets its own names: the `docs_` prefix comes off.

@@ -45,9 +45,11 @@ export class PortalServeAction {
     project: ProjectContext,
     port: number,
     openInBrowser: boolean,
+    enableAnalytics: boolean,
     onServing?: () => void
   ): Promise<ActionResult> => {
-    return await new PreparePortalProjectAction(this.configDir, this.commandMetadata, this.authKey).execute(project, {
+    const prepare = new PreparePortalProjectAction(this.configDir, this.commandMetadata, this.authKey);
+    return await prepare.execute(project, enableAnalytics, {
       onPrepared: async (portalProject, source, artifacts) => {
         const servePort = await this.networkService.getServerPort([port, 3000, 3001, 3002]);
         if (servePort !== port) {
@@ -73,13 +75,20 @@ export class PortalServeAction {
         // adds and removes, and which the root nav.json makes tabs of or places in Home.
         let generatedPages = source.generatedPages;
         const contentWatch = this.watchContent(project, source, () => generatedPages, portalProject.projectDirectory);
-        const configWatch = this.watchConfig(project, source, artifacts, portalProject.projectDirectory, (settings) => {
-          const sectionsChanged = !settings.generatedPages.makesSameSectionsAs(generatedPages);
-          generatedPages = settings.generatedPages;
-          if (sectionsChanged) {
-            contentWatch?.recheck();
+        const configWatch = this.watchConfig(
+          project,
+          source,
+          artifacts,
+          portalProject.projectDirectory,
+          enableAnalytics,
+          (settings) => {
+            const sectionsChanged = !settings.generatedPages.makesSameSectionsAs(generatedPages);
+            generatedPages = settings.generatedPages;
+            if (sectionsChanged) {
+              contentWatch?.recheck();
+            }
           }
-        });
+        );
         const specWatch = this.watchSpecs(project, source);
         const closeWatches = async () => {
           await specWatch?.close();
@@ -122,6 +131,7 @@ export class PortalServeAction {
     source: PortalSource,
     artifacts: PortalArtifacts,
     portalProjectDirectory: DirectoryPath,
+    enableAnalytics: boolean,
     onApplied: (settings: PortalSettings) => void
   ): FileWatch | undefined {
     const sourceDirectory = project.sourceDirectory();
@@ -149,7 +159,7 @@ export class PortalServeAction {
         this.prompts.staticDirectoryNotServed(sourceDirectory);
       }
 
-      const applied = await this.projectService.applyConfig(portalProjectDirectory, settings);
+      const applied = await this.projectService.applyConfig(portalProjectDirectory, settings, enableAnalytics);
       if (applied.isErr()) {
         this.prompts.notApplied('config', applied.error, sourceDirectory);
         return;

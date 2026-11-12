@@ -107,7 +107,8 @@ export class PortalProjectService {
   public async prepare(
     projectDirectory: DirectoryPath,
     source: PortalSource,
-    artifacts: PortalArtifacts
+    artifacts: PortalArtifacts,
+    enableAnalytics: boolean
   ): Promise<Result<PortalProjectPaths, string>> {
     const template = this.templateDirectory();
     if (template === undefined) {
@@ -131,6 +132,7 @@ export class PortalProjectService {
       await this.writeCodeSamples(projectDirectory, source, artifacts.codeSampleCatalogs),
       await this.writeDownloads(projectDirectory, artifacts)
     );
+    await this.writeAppearance(projectDirectory, source.config, enableAnalytics);
 
     const pages = await this.pagesService.write(projectDirectory.join(GENERATED_DIRECTORY_NAME), source.generatedPages);
     if (pages.isErr()) {
@@ -297,8 +299,6 @@ export class PortalProjectService {
       new FilePath(projectDirectory, new FileName('portal.config.json')),
       JSON.stringify(configuration, null, 2)
     );
-
-    await this.writeAppearance(projectDirectory, source.config);
   }
 
   /**
@@ -308,11 +308,12 @@ export class PortalProjectService {
    */
   public async applyConfig(
     projectDirectory: DirectoryPath,
-    settings: PortalSettings
+    settings: PortalSettings,
+    enableAnalytics: boolean
   ): Promise<Result<boolean, string>> {
     let written = false;
     try {
-      for (const [file, contents] of this.appearanceFiles(projectDirectory, settings.config)) {
+      for (const [file, contents] of this.appearanceFiles(projectDirectory, settings.config, enableAnalytics)) {
         if (await this.fileService.replaceContentsIfChanged(file, contents)) {
           written = true;
         }
@@ -372,8 +373,12 @@ export class PortalProjectService {
       .filter((file) => !isSkippedWithin(file, directory));
   }
 
-  private async writeAppearance(projectDirectory: DirectoryPath, config: PortalConfig): Promise<void> {
-    for (const [file, contents] of this.appearanceFiles(projectDirectory, config)) {
+  private async writeAppearance(
+    projectDirectory: DirectoryPath,
+    config: PortalConfig,
+    enableAnalytics: boolean
+  ): Promise<void> {
+    for (const [file, contents] of this.appearanceFiles(projectDirectory, config, enableAnalytics)) {
       await this.fileService.writeContents(file, contents);
     }
   }
@@ -382,9 +387,16 @@ export class PortalProjectService {
    * The browser imports `portal.identity.json` whole, since a retained JSON module is not
    * tree-shaken per property, which is why it holds nothing that addresses this machine.
    */
-  private appearanceFiles(projectDirectory: DirectoryPath, config: PortalConfig): [FilePath, string][] {
+  private appearanceFiles(
+    projectDirectory: DirectoryPath,
+    config: PortalConfig,
+    enableAnalytics: boolean
+  ): [FilePath, string][] {
     return [
-      [new FilePath(projectDirectory, new FileName(IDENTITY_FILE_NAME)), JSON.stringify(config.identity(), null, 2)],
+      [
+        new FilePath(projectDirectory, new FileName(IDENTITY_FILE_NAME)),
+        JSON.stringify(config.identity(enableAnalytics), null, 2)
+      ],
       [
         new FilePath(projectDirectory.join('src').join('styles'), new FileName(STYLESHEET_FILE_NAME)),
         PortalStylesheet.of(config).toString()

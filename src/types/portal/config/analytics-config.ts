@@ -11,8 +11,7 @@ export interface GoogleTagManagerSetting {
 /** Public values: they sit in every page's scripts. */
 export interface PortalAnalytics {
   googleTagManager: GoogleTagManagerSetting | null;
-  /** `debugMode` is set by the CLI under `portal serve`. */
-  googleAnalytics: { measurementId: string; debugMode: boolean } | null;
+  googleAnalytics: { measurementId: string } | null;
   keepQueryParams: string[];
 }
 
@@ -51,10 +50,10 @@ export class AnalyticsConfig {
     return this.measurementId !== null;
   }
 
-  public identity(): PortalAnalytics {
+  public identity(enableAnalytics: boolean): PortalAnalytics {
     return {
-      googleTagManager: this.googleTagManager,
-      googleAnalytics: this.measurementId === null ? null : { measurementId: this.measurementId, debugMode: false },
+      googleTagManager: enableAnalytics ? this.googleTagManager : null,
+      googleAnalytics: enableAnalytics && this.measurementId !== null ? { measurementId: this.measurementId } : null,
       keepQueryParams: this.keepQueryParams
     };
   }

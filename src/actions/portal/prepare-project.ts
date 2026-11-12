@@ -36,6 +36,7 @@ export class PreparePortalProjectAction {
   /** Takes the caller's next step rather than returning, because its temporary directories must outlive this call. */
   public readonly execute = async (
     project: ProjectContext,
+    enableAnalytics: boolean,
     { confirm = async () => true, onPrepared }: PreparationSteps
   ): Promise<ActionResult> => {
     const sourceDirectory = project.sourceDirectory();
@@ -110,7 +111,12 @@ export class PreparePortalProjectAction {
       }
 
       return await withDirPath(async (tempDirectory) => {
-        const portalProject = await this.projectService.prepare(tempDirectory, source.value, artifacts.value);
+        const portalProject = await this.projectService.prepare(
+          tempDirectory,
+          source.value,
+          artifacts.value,
+          enableAnalytics
+        );
         if (portalProject.isErr()) {
           this.prompts.runtimeUnsupported(portalProject.error);
           return ActionResult.failed();
