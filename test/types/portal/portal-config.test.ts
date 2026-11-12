@@ -395,6 +395,173 @@ describe('PortalConfig', () => {
     });
   });
 
+  describe('analytics', () => {
+    const gtm = 'portal.analytics.googleTagManager';
+    const ga = 'portal.analytics.googleAnalytics';
+    const keep = 'portal.analytics.keepQueryParams';
+
+    it('tells the browser to load nothing when the block sets nothing', () => {
+      expect(config({}).identity().analytics).to.deep.equal({
+        googleTagManager: null,
+        googleAnalytics: null,
+        keepQueryParams: []
+      });
+      expect(JSON.parse(JSON.stringify(config({})))).to.not.have.property('analytics');
+    });
+
+    it('keeps both vendors with their IDs trimmed, the environment and the kept names', () => {
+      const analytics = {
+        googleTagManager: { containerId: ' GTM-ABC123 ', environment: { auth: 'a1_b-2', preview: 'env-3' } },
+        googleAnalytics: { measurementId: ' G-ABC123 ' },
+        keepQueryParams: ['campaign_id', 'ref.1']
+      };
+
+      expect(config({ analytics }).identity().analytics).to.deep.equal({
+        googleTagManager: { containerId: 'GTM-ABC123', environment: { auth: 'a1_b-2', preview: 'env-3' } },
+        googleAnalytics: { measurementId: 'G-ABC123', debugMode: false },
+        keepQueryParams: ['campaign_id', 'ref.1']
+      });
+    });
+
+    it('refuses a block, a vendor or an environment that is not an object, as a bare ID is the likely slip', () => {
+      expect(errorsOf({ analytics: 'GTM-ABC123' })).to.deep.equal(["'portal.analytics' must be a JSON object."]);
+      expect(errorsOf({ analytics: { googleTagManager: 'GTM-ABC123' } })).to.deep.equal([
+        `'${gtm}' must be a JSON object with 'containerId'.`
+      ]);
+      expect(errorsOf({ analytics: { googleAnalytics: 'G-ABC123' } })).to.deep.equal([
+        `'${ga}' must be a JSON object with 'measurementId'.`
+      ]);
+      expect(
+        errorsOf({ analytics: { googleTagManager: { containerId: 'GTM-ABC123', environment: 'env-3' } } })
+      ).to.deep.equal([`'${gtm}.environment' must be a JSON object with 'auth' and 'preview'.`]);
+    });
+
+    it('requires each ID and holds it to the vendor’s shape', () => {
+      expect(errorsOf({ analytics: { googleTagManager: {}, googleAnalytics: {} } })).to.deep.equal([
+        `'${gtm}.containerId' is required.`,
+        `'${ga}.measurementId' is required.`
+      ]);
+      expect(
+        errorsOf({
+          analytics: { googleTagManager: { containerId: 'gtm-abc123' }, googleAnalytics: { measurementId: 'UA-1' } }
+        })
+      ).to.deep.equal([
+        `'${gtm}.containerId' must look like 'GTM-ABC123'.`,
+        `'${ga}.measurementId' must look like 'G-ABC123'.`
+      ]);
+    });
+
+    it('requires both environment values and holds each to the snippet’s shape', () => {
+      const withEnvironment = (environment: unknown) =>
+        errorsOf({ analytics: { googleTagManager: { containerId: 'GTM-ABC123', environment } } });
+
+      expect(withEnvironment({})).to.deep.equal([
+        `'${gtm}.environment.auth' is required.`,
+        `'${gtm}.environment.preview' is required.`
+      ]);
+      expect(withEnvironment({ auth: 'a b', preview: 'env3' })).to.deep.equal([
+        `'${gtm}.environment.auth' must be the gtm_auth value from the environment's snippet, with no spaces.`,
+        `'${gtm}.environment.preview' must look like 'env-3'.`
+      ]);
+    });
+
+    it('names an unknown key beside a vendor or an environment like any other', () => {
+      expect(
+        errorsOf({
+          analytics: {
+            posthog: {},
+            googleTagManager: {
+              containerId: 'GTM-ABC123',
+              serverUrl: 'x',
+              environment: { auth: 'a', preview: 'env-1', url: 'x' }
+            },
+            googleAnalytics: { measurementId: 'G-ABC123', debug: true }
+          }
+        })
+      ).to.deep.equal([
+        "'portal.analytics.posthog' is not a 'portal' setting.",
+        `'${gtm}.serverUrl' is not a 'portal' setting.`,
+        `'${gtm}.environment.url' is not a 'portal' setting.`,
+        `'${ga}.debug' is not a 'portal' setting.`
+      ]);
+    });
+
+    it('keeps only query parameter names, and never an OAuth answer’s', () => {
+      expect(errorsOf({ analytics: { keepQueryParams: 'campaign_id' } })).to.deep.equal([
+        `'${keep}' must be a list of query parameter names.`
+      ]);
+      expect(errorsOf({ analytics: { keepQueryParams: ['a b', 'code', 1] } })).to.deep.equal([
+        `'${keep}[0]' must be a query parameter name, for example 'campaign_id'.`,
+        `'${keep}[1]' must not be 'code': the portal never reports an OAuth answer.`,
+        `'${keep}[2]' must be a query parameter name, for example 'campaign_id'.`
+      ]);
+    });
+
+    it('reports every fault at once, unknown keys first', () => {
+      expect(
+        errorsOf({
+          analytics: {
+            posthog: {},
+            googleTagManager: { containerId: 'x' },
+            googleAnalytics: 'G-1',
+            keepQueryParams: ['code']
+          }
+        })
+      ).to.deep.equal([
+        "'portal.analytics.posthog' is not a 'portal' setting.",
+        `'${gtm}.containerId' must look like 'GTM-ABC123'.`,
+        `'${ga}' must be a JSON object with 'measurementId'.`,
+        `'${keep}[0]' must not be 'code': the portal never reports an OAuth answer.`
+      ]);
+    });
+
+    it('uses Google Analytics only with a measurement ID', () => {
+      expect(config({}).usesGoogleAnalytics()).to.be.false;
+      expect(config({ analytics: { googleTagManager: { containerId: 'GTM-ABC123' } } }).usesGoogleAnalytics()).to.be
+        .false;
+      expect(config({ analytics: { googleAnalytics: { measurementId: 'G-ABC123' } } }).usesGoogleAnalytics()).to.be
+        .true;
+    });
+
+    it('serialises what it was given, and nothing when given nothing', () => {
+      const analytics = {
+        googleTagManager: { containerId: 'GTM-ABC123', environment: { auth: 'a', preview: 'env-1' } },
+        googleAnalytics: { measurementId: 'G-ABC123' },
+        keepQueryParams: ['campaign_id']
+      };
+      const written = (block: unknown) => JSON.parse(JSON.stringify(config(block)));
+
+      expect(written({ analytics }).analytics).to.deep.equal(analytics);
+      expect(written({ analytics: { googleTagManager: { containerId: 'GTM-1' } } }).analytics).to.deep.equal({
+        googleTagManager: { containerId: 'GTM-1' }
+      });
+      expect(written({ analytics: {} })).to.not.have.property('analytics');
+    });
+  });
+
+  describe('seo', () => {
+    it('carries the verification value to the browser, or null without one', () => {
+      expect(config({ seo: { googleSiteVerification: 'abc_123-XYZ' } }).identity().seo).to.deep.equal({
+        googleSiteVerification: 'abc_123-XYZ'
+      });
+      expect(config({}).identity().seo).to.deep.equal({ googleSiteVerification: null });
+    });
+
+    it('refuses a block that is not an object, and a value with anything but a token’s characters', () => {
+      expect(errorsOf({ seo: 'abc' })).to.deep.equal(["'portal.seo' must be a JSON object."]);
+      expect(errorsOf({ seo: { googleSiteVerification: 'abc 123' } })).to.deep.equal([
+        "'portal.seo.googleSiteVerification' must be the content value of Google's verification meta tag, with no spaces."
+      ]);
+    });
+
+    it('is serialised only when set', () => {
+      const written = (block: unknown) => JSON.parse(JSON.stringify(config(block)));
+
+      expect(written({ seo: { googleSiteVerification: 'abc' } }).seo).to.deep.equal({ googleSiteVerification: 'abc' });
+      expect(written({ seo: {} })).to.not.have.property('seo');
+    });
+  });
+
   describe('pluginUrl', () => {
     const REFUSED =
       "'portal.pluginUrl' must be an address starting with 'https://', with no spaces, for example " +

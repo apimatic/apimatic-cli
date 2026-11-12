@@ -1,4 +1,5 @@
 import { stripVTControlCharacters } from 'node:util';
+import { log } from '@clack/prompts';
 import { expect } from 'chai';
 import sinon from 'sinon';
 import { PortalGeneratePrompts } from '../../../src/prompts/portal/generate.js';
@@ -6,6 +7,24 @@ import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
 import { SiteAddress } from '../../../src/types/portal/config/site-address.js';
 
 describe('PortalGeneratePrompts', () => {
+  describe('the GA4 warning', () => {
+    it('says what to turn off, where, and why', () => {
+      const warn = sinon.stub(log, 'warn');
+      try {
+        new PortalGeneratePrompts().googleAnalyticsCountsPageChanges();
+      } finally {
+        warn.restore();
+      }
+
+      expect(stripVTControlCharacters(String(warn.firstCall.args[0]))).to.equal(
+        "Google Analytics is set, so the portal sends its own page views. In GA4, turn off the stream's " +
+          '"Page changes based on browser history events" (Admin → Data streams → your stream → Enhanced ' +
+          'measurement → Page views → advanced settings), or every page change counts twice. ' +
+          'See the analytics page on docs.apimatic.io/v4.'
+      );
+    });
+  });
+
   describe('the next steps', () => {
     const portal = new DirectoryPath('portal');
 
