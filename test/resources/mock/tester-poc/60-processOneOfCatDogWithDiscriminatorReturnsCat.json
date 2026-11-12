@@ -1,0 +1,35 @@
+[
+  {
+    "name": "processOneOfCatDogWithDiscriminatorReturnsCat 200",
+    "operation": "processOneOfCatDogWithDiscriminatorReturnsCat",
+    "request": {
+      "method": "POST",
+      "path": "/oneof-cat-dog-returns-cat",
+      "headers": {
+        "Content-Type": {
+          "startsWith": "application/json"
+        }
+      },
+      "body": {
+        "json": {
+          "name": "Whiskers",
+          "color": "White",
+          "type": "Cat"
+        }
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": {
+          "type": "Cat",
+          "name": "Whiskers",
+          "color": "White"
+        }
+      }
+    }
+  }
+]

@@ -1,0 +1,38 @@
+[
+  {
+    "name": "processAllOfAddressDetails 200",
+    "operation": "processAllOfAddressDetails",
+    "request": {
+      "method": "POST",
+      "path": "/allof-address-details",
+      "headers": {
+        "Content-Type": {
+          "startsWith": "application/json"
+        }
+      },
+      "body": {
+        "json": {
+          "email": "user@example.com",
+          "addressLine1": "House 12",
+          "firstName": "John",
+          "lastName": "Doe"
+        }
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": {
+          "email": "user@example.com",
+          "addressLine1": "House 12",
+          "addressLine2": "Street ABC",
+          "firstName": "John",
+          "lastName": "Doe"
+        }
+      }
+    }
+  }
+]

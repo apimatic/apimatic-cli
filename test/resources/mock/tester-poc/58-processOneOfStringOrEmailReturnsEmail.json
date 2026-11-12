@@ -1,0 +1,27 @@
+[
+  {
+    "name": "processOneOfStringOrEmailReturnsEmail 200",
+    "operation": "processOneOfStringOrEmailReturnsEmail",
+    "request": {
+      "method": "POST",
+      "path": "/oneof-string-or-email-returns-email",
+      "headers": {
+        "Content-Type": {
+          "startsWith": "application/json"
+        }
+      },
+      "body": {
+        "json": "user@example.com"
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": "user@example.com"
+      }
+    }
+  }
+]

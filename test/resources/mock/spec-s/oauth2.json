@@ -1,0 +1,23 @@
+[
+  {
+    "name": "oauth2 authorization server",
+    "kind": "oauth2",
+    "description": "The spec's tokenUrl and authorizationUrl (auth.ledger.example.com/oauth2/*), served on the mock's origin: the client-credentials and authorization-code flows with the scopes of both. SDKs must let the token server's base URL be overridden.",
+    "oauth2": {
+      "tokenPath": "/oauth2/token",
+      "flows": {
+        "clientCredentials": {},
+        "authorizationCode": {
+          "authorizePath": "/oauth2/authorize"
+        }
+      },
+      "clientId": "test-client-id",
+      "clientSecret": "test-client-secret",
+      "scopes": [
+        "ledger:read",
+        "ledger:write",
+        "audit:read"
+      ]
+    }
+  }
+]

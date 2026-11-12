@@ -1,0 +1,51 @@
+[
+  {
+    "name": "getProductsOffsetOptional 200 page1",
+    "operation": "getProductsOffsetOptional",
+    "request": {
+      "method": "GET",
+      "path": "/products/offset-optional",
+      "query": {
+        "offset": "0",
+        "limit": "20"
+      },
+      "auth": {
+        "anyOf": [
+          {
+            "BearerAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Bearer test-bearer-token"
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": {
+          "data": [
+            {
+              "id": 1,
+              "name": "Aeron Chair",
+              "price": 1395.0,
+              "category": "furniture"
+            },
+            {
+              "id": 2,
+              "name": "Standing Desk",
+              "price": 599.0,
+              "category": "furniture"
+            }
+          ],
+          "totalItems": 1240,
+          "hasMore": true
+        }
+      }
+    }
+  }
+]

@@ -1,0 +1,224 @@
+[
+  {
+    "name": "listTransactions 200 page 1",
+    "operation": "listTransactions",
+    "description": "tags is form/explode=true (tags=rent&tags=shared); filter is deepObject (filter[min_amount]=10.00); type is a reserved word.",
+    "request": {
+      "method": "GET",
+      "path": "/v1/accounts/7a1b9d2e-3c4f-4a5b-8c6d-9e0f1a2b3c4d/transactions",
+      "query": {
+        "limit": "2",
+        "type": "transfer",
+        "tags": [
+          "rent",
+          "shared"
+        ],
+        "filter[min_amount]": "10.00",
+        "filter[since]": "2026-01-01"
+      },
+      "auth": {
+        "anyOf": [
+          {
+            "bearerAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Bearer test-bearer-token"
+            }
+          },
+          {
+            "apiKeyHeader": {
+              "in": "header",
+              "name": "X-API-Key",
+              "value": "test-api-key"
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json",
+        "X-Request-Id": "req_list_transactions_p1"
+      },
+      "body": {
+        "json": {
+          "items": [
+            {
+              "id": "9e8d7c6b-5a4f-4e3d-9c2b-1a0f9e8d7c6b",
+              "account_id": "7a1b9d2e-3c4f-4a5b-8c6d-9e0f1a2b3c4d",
+              "amount": "250.00",
+              "posted_at": "2026-03-02T14:04:58Z",
+              "object": "transaction",
+              "kind": "transfer",
+              "status": "posted",
+              "sequence": 9007199254740993
+            },
+            {
+              "id": "4a5b6c7d-8e9f-4a0b-9c1d-2e3f4a5b6c7d",
+              "account_id": "7a1b9d2e-3c4f-4a5b-8c6d-9e0f1a2b3c4d",
+              "amount": "75.50",
+              "posted_at": "2026-02-27T08:15:00Z",
+              "value_date": "2026-02-27",
+              "object": "transaction",
+              "kind": "transfer",
+              "status": "posted",
+              "priority": 2,
+              "sequence": 9007199254740991,
+              "labels": {
+                "split": "rent"
+              }
+            }
+          ],
+          "next_cursor": "cur_7f3a",
+          "has_more": true
+        }
+      }
+    }
+  },
+  {
+    "name": "listTransactions 200 page 2",
+    "operation": "listTransactions",
+    "description": "The paginator must carry every filter forward and add the cursor. next_cursor null ends the list.",
+    "request": {
+      "method": "GET",
+      "path": "/v1/accounts/7a1b9d2e-3c4f-4a5b-8c6d-9e0f1a2b3c4d/transactions",
+      "query": {
+        "cursor": "cur_7f3a",
+        "limit": "2",
+        "type": "transfer",
+        "tags": [
+          "rent",
+          "shared"
+        ],
+        "filter[min_amount]": "10.00",
+        "filter[since]": "2026-01-01"
+      },
+      "auth": {
+        "anyOf": [
+          {
+            "bearerAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Bearer test-bearer-token"
+            }
+          },
+          {
+            "apiKeyHeader": {
+              "in": "header",
+              "name": "X-API-Key",
+              "value": "test-api-key"
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json",
+        "X-Request-Id": "req_list_transactions_p2"
+      },
+      "body": {
+        "json": {
+          "items": [
+            {
+              "id": "6c7d8e9f-0a1b-4c2d-8e3f-4a5b6c7d8e9f",
+              "account_id": "7a1b9d2e-3c4f-4a5b-8c6d-9e0f1a2b3c4d",
+              "amount": "120.00",
+              "posted_at": "2026-02-14T19:30:00Z",
+              "object": "transaction",
+              "kind": "transfer",
+              "status": "reversed",
+              "sequence": 9007199254740989
+            }
+          ],
+          "next_cursor": null,
+          "has_more": false
+        }
+      }
+    }
+  },
+  {
+    "name": "listTransactions 404",
+    "operation": "listTransactions",
+    "kind": "error",
+    "request": {
+      "method": "GET",
+      "path": "/v1/accounts/{account_id}/transactions",
+      "auth": {
+        "anyOf": [
+          {
+            "bearerAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Bearer test-bearer-token"
+            }
+          },
+          {
+            "apiKeyHeader": {
+              "in": "header",
+              "name": "X-API-Key",
+              "value": "test-api-key"
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 404,
+      "headers": {
+        "Content-Type": "application/json",
+        "X-Request-Id": "req_err_404"
+      },
+      "body": {
+        "json": {
+          "code": "not_found",
+          "message": "No resource exists at this identifier.",
+          "request_id": "req_err_404"
+        }
+      }
+    }
+  },
+  {
+    "name": "listTransactions 500 (default)",
+    "operation": "listTransactions",
+    "kind": "error",
+    "request": {
+      "method": "GET",
+      "path": "/v1/accounts/{account_id}/transactions",
+      "auth": {
+        "anyOf": [
+          {
+            "bearerAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Bearer test-bearer-token"
+            }
+          },
+          {
+            "apiKeyHeader": {
+              "in": "header",
+              "name": "X-API-Key",
+              "value": "test-api-key"
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 500,
+      "headers": {
+        "Content-Type": "application/json",
+        "X-Request-Id": "req_err_500"
+      },
+      "body": {
+        "json": {
+          "code": "internal_error",
+          "message": "Something went wrong on our side.",
+          "request_id": "req_err_500"
+        }
+      }
+    }
+  }
+]

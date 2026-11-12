@@ -1,0 +1,27 @@
+[
+  {
+    "name": "processLongValue 200",
+    "operation": "processLongValue",
+    "request": {
+      "method": "POST",
+      "path": "/long",
+      "headers": {
+        "Content-Type": {
+          "startsWith": "application/json"
+        }
+      },
+      "body": {
+        "json": 123456789
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": 123456789
+      }
+    }
+  }
+]

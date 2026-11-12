@@ -1,0 +1,24 @@
+[
+  {
+    "name": "sendIntegerArray 200",
+    "operation": "sendIntegerArray",
+    "description": "Declared identically by openapi-tester.yaml and openapi.yaml; the path parameter is not declared.",
+    "request": {
+      "method": "GET",
+      "path": "/template/integers/1,2,3,4,5"
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": {
+          "passed": true,
+          "message": "integers received",
+          "input": "1,2,3,4,5"
+        }
+      }
+    }
+  }
+]

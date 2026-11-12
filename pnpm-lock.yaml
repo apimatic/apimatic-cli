@@ -72,6 +72,9 @@ importers:
       adm-zip:
         specifier: ^0.5.17
         version: 0.5.17
+      ajv:
+        specifier: ^8.20.0
+        version: 8.20.0
       ansis:
         specifier: ^3.17.0
         version: 3.17.0
@@ -250,9 +253,6 @@ importers:
       '@typescript/native':
         specifier: npm:typescript@^7.0.2
         version: typescript@7.0.2
-      ajv:
-        specifier: ^8.20.0
-        version: 8.20.0
       chai:
         specifier: ^4.5.0
         version: 4.5.0

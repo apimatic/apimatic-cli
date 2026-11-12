@@ -1,0 +1,36 @@
+[
+  {
+    "name": "formSendUnixDatetime 200",
+    "operation": "formSendUnixDatetime",
+    "description": "The form schema is a free-form object; the stub follows what the SDK sends.",
+    "request": {
+      "method": "POST",
+      "path": "/form/datetime/unix",
+      "headers": {
+        "Content-Type": {
+          "startsWith": "application/x-www-form-urlencoded"
+        }
+      },
+      "body": {
+        "form": {
+          "datetime": {
+            "dateTime": "784111777"
+          }
+        }
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": {
+          "passed": true,
+          "message": "request received",
+          "input": {}
+        }
+      }
+    }
+  }
+]

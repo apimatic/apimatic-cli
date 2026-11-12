@@ -1,0 +1,25 @@
+[
+  {
+    "name": "getApiKeyHeader 200",
+    "operation": "getApiKeyHeader",
+    "description": "The spec gives this operation no operationId; it is named after the SDK method. The 200 is declared with no content.",
+    "request": {
+      "method": "GET",
+      "path": "/api-key-header",
+      "auth": {
+        "anyOf": [
+          {
+            "ApiKeyHeader": {
+              "in": "header",
+              "name": "X-API-Key",
+              "value": "test-api-key"
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 200
+    }
+  }
+]

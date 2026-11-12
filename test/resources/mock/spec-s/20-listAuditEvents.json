@@ -1,0 +1,165 @@
+[
+  {
+    "name": "listAuditEvents 200 page 1",
+    "operation": "listAuditEvents",
+    "description": "Bare array body; the next page is the absolute URL in the Link header. in is form/explode=false and a reserved word; ledger_session is a cookie parameter.",
+    "request": {
+      "method": "GET",
+      "path": "/v1/audit-events",
+      "query": {
+        "in": "svc-ledger,avery",
+        "limit": "2"
+      },
+      "cookies": {
+        "ledger_session": "replica-2"
+      },
+      "auth": {
+        "anyOf": [
+          {
+            "oauth2AuthCode": {
+              "in": "header",
+              "name": "Authorization",
+              "startsWith": "Bearer ac-access-token-"
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json",
+        "X-Request-Id": "req_audit_p1",
+        "Link": "<{{origin}}/v1/audit-events?in=svc-ledger,avery&limit=2&page_token=pt_2>; rel=\"next\""
+      },
+      "body": {
+        "json": [
+          {
+            "id": "e1a00001-0000-4000-8000-000000000001",
+            "actor": "avery",
+            "action": "account.updated",
+            "occurred_at": "2026-03-01T10:00:00Z",
+            "target": "7a1b9d2e-3c4f-4a5b-8c6d-9e0f1a2b3c4d"
+          },
+          {
+            "id": "e1a00002-0000-4000-8000-000000000002",
+            "actor": "svc-ledger",
+            "action": "transaction.posted",
+            "occurred_at": "2026-03-02T14:04:58Z",
+            "target": "9e8d7c6b-5a4f-4e3d-9c2b-1a0f9e8d7c6b"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "listAuditEvents 200 page 2 (from the Link header)",
+    "operation": "listAuditEvents",
+    "description": "The URL the Link header handed out. page_token is opaque server state, not a spec parameter. The cookie is left undeclared: codegen-v2's link paginator sends the first request again, headers included, with the link's query merged in, while a client that requests the whole link may send no cookie, and both must match.",
+    "request": {
+      "method": "GET",
+      "path": "/v1/audit-events",
+      "query": {
+        "in": "svc-ledger,avery",
+        "limit": "2",
+        "page_token": "pt_2"
+      },
+      "auth": {
+        "anyOf": [
+          {
+            "oauth2AuthCode": {
+              "in": "header",
+              "name": "Authorization",
+              "startsWith": "Bearer ac-access-token-"
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json",
+        "X-Request-Id": "req_audit_p2"
+      },
+      "body": {
+        "json": [
+          {
+            "id": "e1a00003-0000-4000-8000-000000000003",
+            "actor": "avery",
+            "action": "document.uploaded",
+            "occurred_at": "2026-03-03T08:00:00Z"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "listAuditEvents 403",
+    "operation": "listAuditEvents",
+    "kind": "error",
+    "description": "The token lacks audit:read. Scopes are not encoded in mock tokens, so this is only reachable with Prefer: code=403.",
+    "request": {
+      "method": "GET",
+      "path": "/v1/audit-events",
+      "auth": {
+        "anyOf": [
+          {
+            "oauth2AuthCode": {
+              "in": "header",
+              "name": "Authorization",
+              "startsWith": "Bearer ac-access-token-"
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 403,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": {
+          "code": "insufficient_scope",
+          "message": "The token lacks the audit:read scope.",
+          "request_id": "req_err_403"
+        }
+      }
+    }
+  },
+  {
+    "name": "listAuditEvents 500 (default)",
+    "operation": "listAuditEvents",
+    "kind": "error",
+    "request": {
+      "method": "GET",
+      "path": "/v1/audit-events",
+      "auth": {
+        "anyOf": [
+          {
+            "oauth2AuthCode": {
+              "in": "header",
+              "name": "Authorization",
+              "startsWith": "Bearer ac-access-token-"
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 500,
+      "headers": {
+        "Content-Type": "application/json",
+        "X-Request-Id": "req_err_500"
+      },
+      "body": {
+        "json": {
+          "code": "internal_error",
+          "message": "Something went wrong on our side.",
+          "request_id": "req_err_500"
+        }
+      }
+    }
+  }
+]

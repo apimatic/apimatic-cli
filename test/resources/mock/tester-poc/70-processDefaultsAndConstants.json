@@ -1,0 +1,47 @@
+[
+  {
+    "name": "processDefaultsAndConstants 200",
+    "operation": "processDefaultsAndConstants",
+    "description": "The query defaults are always sent, and so are the body const and the model defaults.",
+    "request": {
+      "method": "POST",
+      "path": "/defaults-and-constants",
+      "query": {
+        "userId": "u1",
+        "format": "json",
+        "pageSize": "20",
+        "includeArchived": "false",
+        "sortOrder": "asc",
+        "apiVersion": "2"
+      },
+      "headers": {
+        "Content-Type": {
+          "startsWith": "application/json"
+        }
+      },
+      "body": {
+        "json": {
+          "environment": "production",
+          "version": 1
+        }
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": {
+          "username": "john_doe",
+          "role": "user",
+          "environment": "production",
+          "version": 1,
+          "isActive": true,
+          "score": 0.0,
+          "priority": 2
+        }
+      }
+    }
+  }
+]

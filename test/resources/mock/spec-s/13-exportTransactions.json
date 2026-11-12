@@ -1,0 +1,149 @@
+[
+  {
+    "name": "exportTransactions 200 since 2026-03-01 with imports",
+    "operation": "exportTransactions",
+    "description": "ndjson export: one transaction per line, no outer array, no trailer.",
+    "request": {
+      "method": "GET",
+      "path": "/v1/transaction-exports",
+      "query": {
+        "since": "2026-03-01T00:00:00Z",
+        "import": "true"
+      },
+      "auth": {
+        "anyOf": [
+          {
+            "bearerAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Bearer test-bearer-token"
+            }
+          },
+          {
+            "apiKeyHeader": {
+              "in": "header",
+              "name": "X-API-Key",
+              "value": "test-api-key"
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/x-ndjson"
+      },
+      "body": {
+        "ndjson": [
+          {
+            "id": "7d8e9f0a-1b2c-4d3e-8f4a-5b6c7d8e9f0a",
+            "account_id": "7a1b9d2e-3c4f-4a5b-8c6d-9e0f1a2b3c4d",
+            "amount": "1000.00",
+            "posted_at": "2026-03-01T06:00:00Z",
+            "value_date": "2026-03-01",
+            "object": "transaction",
+            "kind": "deposit",
+            "status": "posted",
+            "sequence": 9007199254740990,
+            "metadata": {
+              "imported_from": "statement"
+            }
+          },
+          {
+            "id": "9e8d7c6b-5a4f-4e3d-9c2b-1a0f9e8d7c6b",
+            "account_id": "7a1b9d2e-3c4f-4a5b-8c6d-9e0f1a2b3c4d",
+            "amount": "250.00",
+            "posted_at": "2026-03-02T14:04:58Z",
+            "object": "transaction",
+            "kind": "transfer",
+            "status": "posted",
+            "sequence": 9007199254740993
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "exportTransactions 401",
+    "operation": "exportTransactions",
+    "kind": "error",
+    "request": {
+      "method": "GET",
+      "path": "/v1/transaction-exports",
+      "auth": {
+        "anyOf": [
+          {
+            "bearerAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Bearer test-bearer-token"
+            }
+          },
+          {
+            "apiKeyHeader": {
+              "in": "header",
+              "name": "X-API-Key",
+              "value": "test-api-key"
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 401,
+      "headers": {
+        "Content-Type": "application/json",
+        "X-Request-Id": "req_err_401"
+      },
+      "body": {
+        "json": {
+          "code": "unauthorized",
+          "message": "The credentials are missing, expired or invalid.",
+          "request_id": "req_err_401"
+        }
+      }
+    }
+  },
+  {
+    "name": "exportTransactions 500 (default)",
+    "operation": "exportTransactions",
+    "kind": "error",
+    "request": {
+      "method": "GET",
+      "path": "/v1/transaction-exports",
+      "auth": {
+        "anyOf": [
+          {
+            "bearerAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Bearer test-bearer-token"
+            }
+          },
+          {
+            "apiKeyHeader": {
+              "in": "header",
+              "name": "X-API-Key",
+              "value": "test-api-key"
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 500,
+      "headers": {
+        "Content-Type": "application/json",
+        "X-Request-Id": "req_err_500"
+      },
+      "body": {
+        "json": {
+          "code": "internal_error",
+          "message": "Something went wrong on our side.",
+          "request_id": "req_err_500"
+        }
+      }
+    }
+  }
+]

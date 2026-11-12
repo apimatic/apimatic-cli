@@ -1,0 +1,30 @@
+[
+  {
+    "name": "paragraphs 200 synthesized",
+    "operation": "paragraphs",
+    "description": "Synthesized from the schema; the spec has no example.",
+    "request": {
+      "method": "GET",
+      "path": "/v1/paragraphs"
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "text/event-stream"
+      },
+      "body": {
+        "sse": [
+          {
+            "data": "The first paragraph."
+          },
+          {
+            "data": "The second paragraph."
+          },
+          {
+            "data": "The third paragraph."
+          }
+        ]
+      }
+    }
+  }
+]

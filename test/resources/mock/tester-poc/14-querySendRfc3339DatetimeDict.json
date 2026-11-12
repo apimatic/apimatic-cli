@@ -1,0 +1,32 @@
+[
+  {
+    "name": "querySendRfc3339DatetimeDict 200",
+    "operation": "querySendRfc3339DatetimeDict",
+    "description": "The spec declares no parameters here; the stub follows what the SDK sends.",
+    "request": {
+      "method": "GET",
+      "path": "/query/datetime/rfc3339/dict",
+      "query": {
+        "dates[key1]": {
+          "dateTime": "1994-11-06T08:49:37.000Z"
+        },
+        "dates[key2]": {
+          "dateTime": "1994-11-06T08:49:37.000Z"
+        }
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": {
+          "passed": true,
+          "message": "request received",
+          "input": {}
+        }
+      }
+    }
+  }
+]

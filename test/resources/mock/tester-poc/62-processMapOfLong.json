@@ -1,0 +1,33 @@
+[
+  {
+    "name": "processMapOfLong 200",
+    "operation": "processMapOfLong",
+    "request": {
+      "method": "POST",
+      "path": "/map-long",
+      "headers": {
+        "Content-Type": {
+          "startsWith": "application/json"
+        }
+      },
+      "body": {
+        "json": {
+          "key1": 123,
+          "key2": 456
+        }
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": {
+          "key1": 123,
+          "key2": 456
+        }
+      }
+    }
+  }
+]

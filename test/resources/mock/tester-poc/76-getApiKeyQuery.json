@@ -1,0 +1,25 @@
+[
+  {
+    "name": "getApiKeyQuery 200",
+    "operation": "getApiKeyQuery",
+    "description": "The spec gives this operation no operationId; it is named after the SDK method. The 200 is declared with no content.",
+    "request": {
+      "method": "GET",
+      "path": "/api-key-query",
+      "auth": {
+        "anyOf": [
+          {
+            "ApiKeyQuery": {
+              "in": "query",
+              "name": "api_key",
+              "value": "test-api-key"
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 200
+    }
+  }
+]

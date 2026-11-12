@@ -23,7 +23,8 @@
         "./portal-template",
         "./portal-pages",
         "/oclif.manifest.json",
-        "/apimatic.schema.json"
+        "/apimatic.schema.json",
+        "/mock-stubs.schema.json"
     ],
     "repository": "git://github.com/apimatic/apimatic-cli.git",
     "homepage": "https://docs.apimatic.io/v4/quickstart/",
@@ -70,6 +71,7 @@
         "@tanstack/start-static-server-functions": "1.167.33",
         "@vitejs/plugin-react": "6.1.1",
         "adm-zip": "^0.5.17",
+        "ajv": "^8.20.0",
         "ansis": "^3.17.0",
         "async-mutex": "^0.5.0",
         "axios": "^1.8.1",
@@ -131,7 +133,6 @@
         "@typescript-eslint/eslint-plugin": "^8.0.0",
         "@typescript-eslint/parser": "^8.0.0",
         "@typescript/native": "npm:typescript@^7.0.2",
-        "ajv": "^8.20.0",
         "chai": "^4.5.0",
         "conventional-changelog-conventionalcommits": "^9.3.1",
         "eslint": "^9.21.0",
@@ -171,6 +172,9 @@
             },
             "auth": {
                 "description": "Login using your APIMatic credentials, or view your authentication status."
+            },
+            "mock": {
+                "description": "Serve a mock of your API from stub files, for SDK tests to run against."
             },
             "plugin": {
                 "description": "Generate context plugins that teach AI coding assistants to use your SDKs."

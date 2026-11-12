@@ -1,0 +1,20 @@
+[
+  {
+    "name": "partner oauth2 server",
+    "kind": "oauth2",
+    "description": "A second authorization server on its own token path, as a spec whose oauth2 schemes name two token URLs needs; it issues its own token to its own client.",
+    "oauth2": {
+      "tokenPath": "/partner/oauth2/token",
+      "flows": {
+        "clientCredentials": {
+          "accessToken": "partner-access-token"
+        }
+      },
+      "clientId": "partner-client-id",
+      "clientSecret": "partner-client-secret",
+      "scopes": [
+        "partner:read"
+      ]
+    }
+  }
+]

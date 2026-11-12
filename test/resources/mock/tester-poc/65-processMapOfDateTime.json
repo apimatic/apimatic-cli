@@ -1,0 +1,37 @@
+[
+  {
+    "name": "processMapOfDateTime 200",
+    "operation": "processMapOfDateTime",
+    "request": {
+      "method": "POST",
+      "path": "/map-datetime",
+      "headers": {
+        "Content-Type": {
+          "startsWith": "application/json"
+        }
+      },
+      "body": {
+        "json": {
+          "key1": {
+            "$dateTime": "2025-12-09T14:30:00.000Z"
+          },
+          "key2": {
+            "$dateTime": "2025-12-10T09:00:00.000Z"
+          }
+        }
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": {
+          "key1": "2025-12-09T14:30:00Z",
+          "key2": "2025-12-10T09:00:00Z"
+        }
+      }
+    }
+  }
+]

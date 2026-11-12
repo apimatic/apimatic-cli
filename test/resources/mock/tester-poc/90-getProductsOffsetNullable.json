@@ -1,0 +1,81 @@
+[
+  {
+    "name": "getProductsOffsetNullable 200 page1",
+    "operation": "getProductsOffsetNullable",
+    "example": "page1",
+    "description": "Named example page1 of two; a request without Prefer: example= gets this one, the first in file order.",
+    "request": {
+      "method": "GET",
+      "path": "/products/offset-nullable",
+      "query": {
+        "offset": "0",
+        "limit": "20"
+      },
+      "auth": {
+        "anyOf": [
+          {
+            "BearerAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Bearer test-bearer-token"
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": {
+          "data": [
+            {
+              "id": 1,
+              "name": "Aeron Chair",
+              "price": 1395.0,
+              "category": "furniture"
+            }
+          ],
+          "totalItems": 1240,
+          "hasMore": true
+        }
+      }
+    }
+  },
+  {
+    "name": "getProductsOffsetNullable 200 nullPage",
+    "operation": "getProductsOffsetNullable",
+    "example": "nullPage",
+    "description": "Named example nullPage, selected with Prefer: example=nullPage: the JSON literal null, a page that holds no items.",
+    "request": {
+      "method": "GET",
+      "path": "/products/offset-nullable",
+      "query": {
+        "offset": "0",
+        "limit": "20"
+      },
+      "auth": {
+        "anyOf": [
+          {
+            "BearerAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Bearer test-bearer-token"
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": null
+      }
+    }
+  }
+]

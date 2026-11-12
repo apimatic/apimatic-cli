@@ -1,0 +1,33 @@
+[
+  {
+    "name": "processMapOfString 200",
+    "operation": "processMapOfString",
+    "request": {
+      "method": "POST",
+      "path": "/map-string",
+      "headers": {
+        "Content-Type": {
+          "startsWith": "application/json"
+        }
+      },
+      "body": {
+        "json": {
+          "key1": "foo",
+          "key2": "bar"
+        }
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": {
+          "key1": "foo",
+          "key2": "bar"
+        }
+      }
+    }
+  }
+]

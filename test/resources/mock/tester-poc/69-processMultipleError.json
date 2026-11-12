@@ -1,0 +1,170 @@
+[
+  {
+    "name": "processMultipleError 200 synthesized",
+    "operation": "processMultipleError",
+    "description": "The spec declares neither a request body nor Prefer; the SDK always sends the JSON string \"value\" and Prefer: code=200, which a success stub answers. The 200 has a schema-level example only.",
+    "request": {
+      "method": "POST",
+      "path": "/multiple-error",
+      "headers": {
+        "Content-Type": {
+          "startsWith": "application/json"
+        }
+      },
+      "body": {
+        "json": "value"
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": "success"
+      }
+    }
+  },
+  {
+    "name": "processMultipleError 400",
+    "operation": "processMultipleError",
+    "kind": "error",
+    "request": {
+      "method": "POST",
+      "path": "/multiple-error"
+    },
+    "response": {
+      "status": 400,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": {
+          "name": "Alice",
+          "level": 2
+        }
+      }
+    }
+  },
+  {
+    "name": "processMultipleError 401",
+    "operation": "processMultipleError",
+    "kind": "error",
+    "request": {
+      "method": "POST",
+      "path": "/multiple-error"
+    },
+    "response": {
+      "status": 401,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": {
+          "status": 401,
+          "title": "Unauthorized",
+          "detail": "Authentication required",
+          "instance": "/multiple-error"
+        }
+      }
+    }
+  },
+  {
+    "name": "processMultipleError 402",
+    "operation": "processMultipleError",
+    "kind": "error",
+    "description": "Declared with no content.",
+    "request": {
+      "method": "POST",
+      "path": "/multiple-error"
+    },
+    "response": {
+      "status": 402
+    }
+  },
+  {
+    "name": "processMultipleError 403",
+    "operation": "processMultipleError",
+    "kind": "error",
+    "request": {
+      "method": "POST",
+      "path": "/multiple-error"
+    },
+    "response": {
+      "status": 403,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": {
+          "status": 403,
+          "title": "Forbidden",
+          "detail": "You do not have permission",
+          "instance": "/multiple-error"
+        }
+      }
+    }
+  },
+  {
+    "name": "processMultipleError 423",
+    "operation": "processMultipleError",
+    "kind": "error",
+    "description": "The spec's 4XX range, served as 423, the status its example names. Its '40X' key is not a valid status range and has no stub.",
+    "request": {
+      "method": "POST",
+      "path": "/multiple-error"
+    },
+    "response": {
+      "status": 423,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": {
+          "status": 423,
+          "title": "Forbidden",
+          "detail": "You do not have permission",
+          "instance": "/multiple-error"
+        }
+      }
+    }
+  },
+  {
+    "name": "processMultipleError 500",
+    "operation": "processMultipleError",
+    "kind": "error",
+    "description": "Synthesized from the schema; the spec has no example.",
+    "request": {
+      "method": "POST",
+      "path": "/multiple-error"
+    },
+    "response": {
+      "status": 500,
+      "headers": {
+        "Content-Type": "text/plain"
+      },
+      "body": {
+        "text": "Internal Server Error"
+      }
+    }
+  },
+  {
+    "name": "processMultipleError 501",
+    "operation": "processMultipleError",
+    "kind": "error",
+    "description": "Synthesized from the schema; the spec has no example.",
+    "request": {
+      "method": "POST",
+      "path": "/multiple-error"
+    },
+    "response": {
+      "status": 501,
+      "headers": {
+        "Content-Type": "text/plain"
+      },
+      "body": {
+        "text": "501"
+      }
+    }
+  }
+]

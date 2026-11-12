@@ -1,0 +1,266 @@
+[
+  {
+    "name": "searchTransactions 200 page 1",
+    "operation": "searchTransactions",
+    "description": "account_id takes the array branch of its anyOf; rules is an array of three union variants. The first page omits cursor.",
+    "request": {
+      "method": "POST",
+      "path": "/v1/transaction-searches",
+      "headers": {
+        "Content-Type": {
+          "startsWith": "application/json"
+        }
+      },
+      "auth": {
+        "anyOf": [
+          {
+            "bearerAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Bearer test-bearer-token"
+            }
+          },
+          {
+            "apiKeyHeader": {
+              "in": "header",
+              "name": "X-API-Key",
+              "value": "test-api-key"
+            }
+          }
+        ]
+      },
+      "body": {
+        "json": {
+          "account_id": [
+            "7a1b9d2e-3c4f-4a5b-8c6d-9e0f1a2b3c4d",
+            "0b1c2d3e-4f5a-4b6c-8d7e-9f0a1b2c3d4e"
+          ],
+          "rules": [
+            {
+              "field": "amount",
+              "min": "50.00",
+              "max": "300.00"
+            },
+            {
+              "field": "posted_at",
+              "after": "2026-02-01T00:00:00Z"
+            },
+            {
+              "field": "memo",
+              "contains": "rent"
+            }
+          ],
+          "limit": 2
+        }
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": {
+          "items": [
+            {
+              "id": "9e8d7c6b-5a4f-4e3d-9c2b-1a0f9e8d7c6b",
+              "account_id": "7a1b9d2e-3c4f-4a5b-8c6d-9e0f1a2b3c4d",
+              "amount": "250.00",
+              "posted_at": "2026-03-02T14:04:58Z",
+              "object": "transaction",
+              "kind": "transfer",
+              "status": "posted",
+              "sequence": 9007199254740993
+            },
+            {
+              "id": "4a5b6c7d-8e9f-4a0b-9c1d-2e3f4a5b6c7d",
+              "account_id": "7a1b9d2e-3c4f-4a5b-8c6d-9e0f1a2b3c4d",
+              "amount": "75.50",
+              "posted_at": "2026-02-27T08:15:00Z",
+              "value_date": "2026-02-27",
+              "object": "transaction",
+              "kind": "transfer",
+              "status": "posted",
+              "priority": 2,
+              "sequence": 9007199254740991,
+              "labels": {
+                "split": "rent"
+              }
+            }
+          ],
+          "next_cursor": "srch_2",
+          "has_more": true
+        }
+      }
+    }
+  },
+  {
+    "name": "searchTransactions 200 page 2",
+    "operation": "searchTransactions",
+    "description": "Pagination state travels in the body: the same criteria plus cursor.",
+    "request": {
+      "method": "POST",
+      "path": "/v1/transaction-searches",
+      "headers": {
+        "Content-Type": {
+          "startsWith": "application/json"
+        }
+      },
+      "auth": {
+        "anyOf": [
+          {
+            "bearerAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Bearer test-bearer-token"
+            }
+          },
+          {
+            "apiKeyHeader": {
+              "in": "header",
+              "name": "X-API-Key",
+              "value": "test-api-key"
+            }
+          }
+        ]
+      },
+      "body": {
+        "json": {
+          "account_id": [
+            "7a1b9d2e-3c4f-4a5b-8c6d-9e0f1a2b3c4d",
+            "0b1c2d3e-4f5a-4b6c-8d7e-9f0a1b2c3d4e"
+          ],
+          "rules": [
+            {
+              "field": "amount",
+              "min": "50.00",
+              "max": "300.00"
+            },
+            {
+              "field": "posted_at",
+              "after": "2026-02-01T00:00:00Z"
+            },
+            {
+              "field": "memo",
+              "contains": "rent"
+            }
+          ],
+          "limit": 2,
+          "cursor": "srch_2"
+        }
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": {
+          "items": [
+            {
+              "id": "6c7d8e9f-0a1b-4c2d-8e3f-4a5b6c7d8e9f",
+              "account_id": "7a1b9d2e-3c4f-4a5b-8c6d-9e0f1a2b3c4d",
+              "amount": "120.00",
+              "posted_at": "2026-02-14T19:30:00Z",
+              "object": "transaction",
+              "kind": "transfer",
+              "status": "reversed",
+              "sequence": 9007199254740989
+            }
+          ],
+          "next_cursor": null,
+          "has_more": false
+        }
+      }
+    }
+  },
+  {
+    "name": "searchTransactions 400",
+    "operation": "searchTransactions",
+    "kind": "error",
+    "request": {
+      "method": "POST",
+      "path": "/v1/transaction-searches",
+      "auth": {
+        "anyOf": [
+          {
+            "bearerAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Bearer test-bearer-token"
+            }
+          },
+          {
+            "apiKeyHeader": {
+              "in": "header",
+              "name": "X-API-Key",
+              "value": "test-api-key"
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 400,
+      "headers": {
+        "Content-Type": "application/json",
+        "X-Request-Id": "req_err_400"
+      },
+      "body": {
+        "json": {
+          "code": "validation_failed",
+          "message": "The request failed validation.",
+          "request_id": "req_err_400",
+          "details": [
+            {
+              "field": "/limit",
+              "issue": "must be between 1 and 200"
+            }
+          ]
+        }
+      }
+    }
+  },
+  {
+    "name": "searchTransactions 500 (default)",
+    "operation": "searchTransactions",
+    "kind": "error",
+    "request": {
+      "method": "POST",
+      "path": "/v1/transaction-searches",
+      "auth": {
+        "anyOf": [
+          {
+            "bearerAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Bearer test-bearer-token"
+            }
+          },
+          {
+            "apiKeyHeader": {
+              "in": "header",
+              "name": "X-API-Key",
+              "value": "test-api-key"
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 500,
+      "headers": {
+        "Content-Type": "application/json",
+        "X-Request-Id": "req_err_500"
+      },
+      "body": {
+        "json": {
+          "code": "internal_error",
+          "message": "Something went wrong on our side.",
+          "request_id": "req_err_500"
+        }
+      }
+    }
+  }
+]

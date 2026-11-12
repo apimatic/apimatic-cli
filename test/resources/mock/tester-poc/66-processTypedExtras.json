@@ -1,0 +1,39 @@
+[
+  {
+    "name": "processTypedExtras 200",
+    "operation": "processTypedExtras",
+    "request": {
+      "method": "POST",
+      "path": "/typed-extras",
+      "headers": {
+        "Content-Type": {
+          "startsWith": "application/json"
+        }
+      },
+      "body": {
+        "json": {
+          "name": "Branch offices"
+        }
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": {
+          "name": "Branch offices",
+          "hq": {
+            "email": "hq@acme.test",
+            "addressLine1": "1 Main St"
+          },
+          "warehouse": {
+            "email": "wh@acme.test",
+            "addressLine1": "9 Dock Rd"
+          }
+        }
+      }
+    }
+  }
+]
