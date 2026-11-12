@@ -492,9 +492,10 @@ describe('PortalConfig', () => {
       expect(errorsOf({ analytics: { keepQueryParams: 'campaign_id' } })).to.deep.equal([
         `'${keep}' must be a list of query parameter names.`
       ]);
-      expect(errorsOf({ analytics: { keepQueryParams: ['', 1] } })).to.deep.equal([
+      expect(errorsOf({ analytics: { keepQueryParams: ['', ' ', 1] } })).to.deep.equal([
         `'${keep}[0]' must be a non-empty string.`,
-        `'${keep}[1]' must be a non-empty string.`
+        `'${keep}[1]' must be a non-empty string.`,
+        `'${keep}[2]' must be a non-empty string.`
       ]);
     });
 
@@ -528,6 +529,20 @@ describe('PortalConfig', () => {
         googleAnalytics: null,
         keepQueryParams: ['campaign_id']
       });
+    });
+
+    it('refuses a null block, and an environment without its auth value', () => {
+      expect(errorsOf({ analytics: null })).to.deep.equal(["'portal.analytics' must be a JSON object."]);
+      expect(
+        errorsOf({ analytics: { googleTagManager: { containerId: 'GTM-ABC123', environment: { preview: 'env-3' } } } })
+      ).to.deep.equal([`'${gtm}.environment.auth' is required.`]);
+    });
+
+    it('keeps an empty list of names as none', () => {
+      expect(config({ analytics: { keepQueryParams: [] } }).identity(true).analytics.keepQueryParams).to.deep.equal([]);
+      expect(JSON.parse(JSON.stringify(config({ analytics: { keepQueryParams: [] } })))).to.not.have.property(
+        'analytics'
+      );
     });
 
     it('uses Google Analytics only with a measurement ID', () => {
@@ -564,6 +579,8 @@ describe('PortalConfig', () => {
 
     it('refuses a block that is not an object, and a blank value', () => {
       expect(errorsOf({ seo: 'abc' })).to.deep.equal(["'portal.seo' must be a JSON object."]);
+      expect(errorsOf({ seo: null })).to.deep.equal(["'portal.seo' must be a JSON object."]);
+      expect(errorsOf({ seo: { foo: 1 } })).to.deep.equal(["'portal.seo.foo' is not a 'portal' setting."]);
       expect(errorsOf({ seo: { googleSiteVerification: ' ' } })).to.deep.equal([
         "'portal.seo.googleSiteVerification' must be a non-empty string."
       ]);

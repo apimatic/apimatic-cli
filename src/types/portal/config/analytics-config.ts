@@ -8,16 +8,20 @@ export interface GoogleTagManagerSetting {
   environment: { auth: string; preview: string } | null;
 }
 
+export interface GoogleAnalyticsSetting {
+  measurementId: string;
+}
+
 /** Public values: they sit in every page's scripts. */
 export interface PortalAnalytics {
   googleTagManager: GoogleTagManagerSetting | null;
-  googleAnalytics: { measurementId: string } | null;
+  googleAnalytics: GoogleAnalyticsSetting | null;
   keepQueryParams: string[];
 }
 
 export interface AnalyticsBlock {
   googleTagManager?: { containerId: string; environment?: { auth: string; preview: string } };
-  googleAnalytics?: { measurementId: string };
+  googleAnalytics?: GoogleAnalyticsSetting;
   keepQueryParams?: string[];
 }
 
@@ -26,7 +30,7 @@ const KNOWN = ['googleTagManager', 'googleAnalytics', 'keepQueryParams'];
 export class AnalyticsConfig {
   private constructor(
     private readonly googleTagManager: GoogleTagManagerSetting | null,
-    private readonly measurementId: string | null,
+    private readonly googleAnalytics: GoogleAnalyticsSetting | null,
     private readonly keepQueryParams: string[]
   ) {}
 
@@ -41,19 +45,19 @@ export class AnalyticsConfig {
           optional(data.googleAnalytics, (vendor) => googleAnalytics(vendor, `${path}.googleAnalytics`)),
           keptQueryParams(data.keepQueryParams, `${path}.keepQueryParams`)
         ])
-      ).map(([gtm, measurementId, keep]) => new AnalyticsConfig(gtm, measurementId, keep))
+      ).map(([gtm, ga, keep]) => new AnalyticsConfig(gtm, ga, keep))
     );
   }
 
   /** `portal generate` warns when this is true: the customer has a GA4 stream setting to turn off. */
   public usesGoogleAnalytics(): boolean {
-    return this.measurementId !== null;
+    return this.googleAnalytics !== null;
   }
 
   public identity(enableAnalytics: boolean): PortalAnalytics {
     return {
       googleTagManager: enableAnalytics ? this.googleTagManager : null,
-      googleAnalytics: enableAnalytics && this.measurementId !== null ? { measurementId: this.measurementId } : null,
+      googleAnalytics: enableAnalytics ? this.googleAnalytics : null,
       keepQueryParams: this.keepQueryParams
     };
   }
@@ -70,7 +74,7 @@ export class AnalyticsConfig {
               ...(gtm.environment === null ? {} : { environment: gtm.environment })
             }
           }),
-      ...(this.measurementId === null ? {} : { googleAnalytics: { measurementId: this.measurementId } }),
+      ...(this.googleAnalytics === null ? {} : { googleAnalytics: this.googleAnalytics }),
       ...(this.keepQueryParams.length === 0 ? {} : { keepQueryParams: this.keepQueryParams })
     };
     return Object.keys(block).length === 0 ? null : block;
@@ -100,14 +104,14 @@ function environment(value: unknown, path: string): Parsed<{ auth: string; previ
   ).map(([auth, preview]) => ({ auth, preview }));
 }
 
-function googleAnalytics(value: unknown, path: string): Parsed<string> {
+function googleAnalytics(value: unknown, path: string): Parsed<GoogleAnalyticsSetting> {
   if (!isJsonObject(value)) {
     return err([`'${path}' must be a JSON object with 'measurementId'.`]);
   }
   return allOf(
     unknownKeys(value, ['measurementId'], path),
     Result.combineWithAllErrors([required(value.measurementId, `${path}.measurementId`)])
-  ).map(([measurementId]) => measurementId);
+  ).map(([measurementId]) => ({ measurementId }));
 }
 
 /** Present and a non-empty string; its format is the vendor's to check, since a wrong value fails there, not here. */

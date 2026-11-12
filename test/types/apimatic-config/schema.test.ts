@@ -152,6 +152,7 @@ describe('apimatic.schema.json', () => {
       ],
       ['a Universal Analytics ID as the measurement ID', { analytics: { googleAnalytics: { measurementId: 'UA-1' } } }],
       ['a kept name with a space, and an OAuth answer name', { analytics: { keepQueryParams: ['a b', 'code'] } }],
+      ['an empty list of kept names', { analytics: { keepQueryParams: [] } }],
       ['a verification value with a space', { seo: { googleSiteVerification: 'abc 123' } }]
     ];
 
@@ -277,6 +278,17 @@ describe('apimatic.schema.json', () => {
       ['kept names that are not a list', { analytics: { keepQueryParams: 'campaign_id' } }],
       ['a kept name that is not a string', { analytics: { keepQueryParams: [1] } }],
       ['seo that is not an object', { seo: 'abc' }],
+      ['analytics that is null', { analytics: null }],
+      [
+        'an environment without its auth',
+        { analytics: { googleTagManager: { containerId: 'GTM-ABC123', environment: { preview: 'env-3' } } } }
+      ],
+      [
+        'a GA4 block with a key beside the ID',
+        { analytics: { googleAnalytics: { measurementId: 'G-ABC123', debug: true } } }
+      ],
+      ['a blank kept name', { analytics: { keepQueryParams: [' '] } }],
+      ['an unknown seo key', { seo: { foo: 1 } }],
       ['a blank verification value', { seo: { googleSiteVerification: ' ' } }]
     ];
 

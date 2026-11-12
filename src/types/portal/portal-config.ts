@@ -146,7 +146,7 @@ export class PortalConfig {
     };
   }
 
-  /** Every namespace included, defaults and all, which is what quickstart writes. */
+  /** Every namespace included, defaults and all, which is what quickstart writes; `analytics` and `seo` only when set. */
   public toJSON(): PortalBlock {
     const analytics = this.analytics.toJSON();
     const seo = this.seo.toJSON();

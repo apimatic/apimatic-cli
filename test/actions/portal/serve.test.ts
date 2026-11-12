@@ -900,6 +900,7 @@ describe('PortalServeAction', () => {
         await save(config);
       }, false);
 
+      expect(shared.prepare.firstCall.args[3]).to.be.false;
       expect(applyConfig.lastCall.args[2]).to.be.false;
     });
 

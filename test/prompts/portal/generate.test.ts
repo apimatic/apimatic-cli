@@ -20,7 +20,7 @@ describe('PortalGeneratePrompts', () => {
         "Google Analytics is set, so the portal sends its own page views. In GA4, turn off the stream's " +
           '"Page changes based on browser history events" (Admin → Data streams → your stream → Enhanced ' +
           'measurement → Page views → advanced settings), or every page change counts twice. ' +
-          'See the analytics page on docs.apimatic.io/v4.'
+          'See the analytics page on https://docs.apimatic.io/v4/.'
       );
     });
   });

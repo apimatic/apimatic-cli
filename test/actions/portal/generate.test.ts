@@ -340,6 +340,20 @@ describe('GenerateAction', () => {
     expect(prompts.googleAnalyticsCountsPageChanges.calledBefore(build)).to.be.true;
   });
 
+  it('does not warn about Google Analytics under --no-analytics, which loads none', async () => {
+    const project = new DirectoryPath(root).join('staging');
+    fs.cpSync(FIXTURE.toString(), project.toString(), { recursive: true });
+    const configFile = path.join(project.toString(), 'src', 'apimatic.json');
+    const edited = JSON.parse(fs.readFileSync(configFile, 'utf8'));
+    edited.portal.analytics = { googleAnalytics: { measurementId: 'G-ABC123' } };
+    fs.writeFileSync(configFile, JSON.stringify(edited));
+
+    const result = await execute(project, false, false, false);
+
+    expect(result.isSuccess()).to.be.true;
+    expect(prompts.googleAnalyticsCountsPageChanges.called).to.be.false;
+  });
+
   it('does not warn about Google Analytics when it is not set', async () => {
     const result = await execute();
 
