@@ -39,6 +39,8 @@ interface BuiltPortal {
   root: string;
   project: DirectoryPath;
   output: DirectoryPath;
+  /** What the build read: the fixture, or its copy when settings were added to it. */
+  source: DirectoryPath;
 }
 
 interface Delivered {
@@ -64,10 +66,20 @@ function deliveredInto(
   );
 }
 
-/** Resolves, prepares, builds and saves a fixture as `portal generate` does. */
-async function buildFixture(name: string, delivered: Delivered = {}): Promise<BuiltPortal> {
-  const fixture = new DirectoryPath(process.cwd()).join('test/resources/portal-inputs').join(name).join('src');
+/** Resolves, prepares, builds and saves a fixture as `portal generate` does, with `settings` added to its `portal` block. */
+async function buildFixture(name: string, delivered: Delivered = {}, settings?: object): Promise<BuiltPortal> {
+  let fixture = new DirectoryPath(process.cwd()).join('test/resources/portal-inputs').join(name).join('src');
   const root = canonical(fs.mkdtempSync(path.join(os.tmpdir(), 'portal-e2e-')));
+
+  if (settings !== undefined) {
+    // A copy, so the fixture the other suites read stays as it is.
+    const copy = new DirectoryPath(root).join('src');
+    fs.cpSync(fixture.toString(), copy.toString(), { recursive: true });
+    const configFile = path.join(copy.toString(), 'apimatic.json');
+    const config = JSON.parse(fs.readFileSync(configFile, 'utf8'));
+    fs.writeFileSync(configFile, JSON.stringify({ ...config, portal: { ...config.portal, ...settings } }));
+    fixture = copy;
+  }
 
   const source = (await new PortalSourceContext(fixture).resolve())._unsafeUnwrap();
 
@@ -85,7 +97,7 @@ async function buildFixture(name: string, delivered: Delivered = {}): Promise<Bu
 
   const output = new DirectoryPath(root).join('portal');
   (await new PortalContext(output).save(build.value.output, false))._unsafeUnwrap();
-  return { root, project, output };
+  return { root, project, output, source: fixture };
 }
 
 function removeBuilt(built: BuiltPortal | undefined): void {
@@ -96,7 +108,7 @@ function removeBuilt(built: BuiltPortal | undefined): void {
  * One fixture built before a describe block's cases and removed after them, read through the
  * accessors, which resolve the build lazily since the hooks run after the block is declared.
  */
-function portalBuilt(name: string, delivered: Delivered = {}) {
+function portalBuilt(name: string, delivered: Delivered = {}, settings?: object) {
   let built: BuiltPortal | undefined;
   const have = (): BuiltPortal => {
     if (built === undefined) throw new Error(`${name} is not built`);
@@ -104,7 +116,7 @@ function portalBuilt(name: string, delivered: Delivered = {}) {
   };
 
   before(async () => {
-    built = await buildFixture(name, delivered);
+    built = await buildFixture(name, delivered, settings);
   });
 
   after(() => removeBuilt(built));
@@ -112,6 +124,7 @@ function portalBuilt(name: string, delivered: Delivered = {}) {
   return {
     output: () => have().output,
     project: () => have().project,
+    source: () => have().source,
     read: (relative: string) => fs.readFileSync(path.join(have().output.toString(), relative), 'utf8'),
     exists: (relative: string) => fs.existsSync(path.join(have().output.toString(), relative))
   };
@@ -179,8 +192,14 @@ const stylesheetOf = (output: DirectoryPath) => {
 (enabled ? describe : describe.skip)('portal build (end to end)', function () {
   this.timeout(10 * 60 * 1000);
 
-  const fixture = new DirectoryPath(process.cwd()).join('test/resources/portal-inputs/default/src');
-  const portal = portalBuilt('default', { codeSampleCatalogs: CODE_SAMPLES });
+  const portal = portalBuilt(
+    'default',
+    { codeSampleCatalogs: CODE_SAMPLES },
+    {
+      analytics: { googleTagManager: { containerId: 'GTM-E2ETEST' }, googleAnalytics: { measurementId: 'G-E2ETEST' } },
+      seo: { googleSiteVerification: 'e2e-verification' }
+    }
+  );
   const { read, exists } = portal;
 
   /** The prerendered server-function cache entries carrying the sidebar tree. */
@@ -248,6 +267,37 @@ const stylesheetOf = (output: DirectoryPath) => {
     expect(read('index.html')).to.contain('<link rel="canonical" href="https://docs.test/"');
   });
 
+  /** Every prerendered page, relative to the output. */
+  const pages = () =>
+    fs
+      .readdirSync(portal.output().toString(), { recursive: true, withFileTypes: true })
+      .filter((entry) => entry.isFile() && entry.name.endsWith('.html'))
+      .map((entry) => path.relative(portal.output().toString(), path.join(entry.parentPath, entry.name)));
+
+  it('tells the browser both vendor IDs in a script, and names the tag host in no prerendered page', () => {
+    const scripts = scriptsOf(portal.output());
+    expect(scripts.some(({ text }) => text.includes('GTM-E2ETEST') && text.includes('G-E2ETEST'))).to.be.true;
+    for (const page of pages()) {
+      expect(read(page), page).to.not.contain('googletagmanager.com');
+    }
+  });
+
+  it('carries the verification meta on every prerendered page', () => {
+    expect(pages()).to.have.length.greaterThan(3);
+    for (const page of pages()) {
+      expect(read(page), page).to.contain('<meta name="google-site-verification" content="e2e-verification"');
+    }
+  });
+
+  it('prerenders the operation page’s playground inside the element session replays skip', () => {
+    const parts = read('api/apimatic-calculator/simple-calculator/Calculate/index.html').split(
+      'data-portal-playground'
+    );
+    expect(parts, 'one element').to.have.length(2);
+    // What Fumadocs' playground renders on the server: its header, with the method, the route and the trigger.
+    expect(parts[1].slice(0, 2000)).to.match(/>GET<[\s\S]*\{operation\}[\s\S]*aria-haspopup="dialog"/);
+  });
+
   it('keeps the server-side specification loader out of the browser bundle', () => {
     const scripts = fs
       .readdirSync(path.join(portal.output().toString(), 'assets'))
@@ -288,13 +338,13 @@ const stylesheetOf = (output: DirectoryPath) => {
   // published: `portal.server.ts` holds the absolute path of every specification, and the
   // prepared project's own location has no business in the output either.
   it('publishes neither the specification paths nor the project directory', () => {
-    expect(filesNaming(portal.project().toString(), fixture.join('spec').toString())).to.deep.equal([]);
+    expect(filesNaming(portal.project().toString(), portal.source().join('spec').toString())).to.deep.equal([]);
   });
 
   // `defineDocs({ dir })` compiles its directory into the client bundle as the collection's
   // `base`, which is why the project reads a copy of the content by a relative name.
   it('publishes no absolute path from the build machine at all', () => {
-    expect(filesNaming(fixture.join('content').toString(), fixture.toString())).to.deep.equal([]);
+    expect(filesNaming(portal.source().join('content').toString(), portal.source().toString())).to.deep.equal([]);
   });
 
   it('writes the sidebar tree to one cache file instead of into every page payload', () => {
