@@ -35,6 +35,12 @@ export interface PortalIdentity {
   links: PortalLink[];
   /** Whether each page offers to open itself in an external AI assistant. */
   pageActions: boolean;
+  /** Public values: they sit in every page's scripts. */
+  analytics: {
+    googleTagManager: { containerId: string; environment: { auth: string; preview: string } | null } | null;
+    googleAnalytics: { measurementId: string; debugMode: boolean } | null;
+    keepQueryParams: string[];
+  };
 }
 
 const BLOCK = 'portal';
@@ -125,7 +131,8 @@ export class PortalConfig {
       favicon: favicon === null ? null : { url: favicon.portalPath(), type: favicon.imageType() },
       colorMode: this.brand.mode(),
       links: this.navigation.headerLinks().map(portalLink),
-      pageActions: this.ai.offersPageActions()
+      pageActions: this.ai.offersPageActions(),
+      analytics: { googleTagManager: null, googleAnalytics: null, keepQueryParams: [] }
     };
   }
 

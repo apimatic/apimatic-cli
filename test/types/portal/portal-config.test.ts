@@ -486,7 +486,8 @@ describe('PortalConfig', () => {
           { label: 'Status', url: 'https://status.example.com', external: true },
           { label: 'Changelog', url: '/changelog', external: false }
         ],
-        pageActions: false
+        pageActions: false,
+        analytics: { googleTagManager: null, googleAnalytics: null, keepQueryParams: [] }
       });
     });
 
@@ -499,7 +500,8 @@ describe('PortalConfig', () => {
         favicon: null,
         colorMode: 'both',
         links: [],
-        pageActions: true
+        pageActions: true,
+        analytics: { googleTagManager: null, googleAnalytics: null, keepQueryParams: [] }
       });
     });
 

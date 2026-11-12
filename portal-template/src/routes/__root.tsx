@@ -1,5 +1,6 @@
-import { createRootRoute, HeadContent, Outlet, Scripts } from '@tanstack/react-router';
+import { createRootRoute, HeadContent, Outlet, Scripts, useRouter } from '@tanstack/react-router';
 import { createServerFn } from '@tanstack/react-start';
+import { useEffect } from 'react';
 import { staticFunctionMiddleware } from '@tanstack/start-static-server-functions';
 import { source } from '@/lib/source.server';
 import appCss from '@/styles/app.css?url';
@@ -7,6 +8,7 @@ import { RootProvider } from 'fumadocs-ui/provider/tanstack';
 import SearchDialog from '@/components/search';
 import { withBasePath } from '@/lib/base-path';
 import { portal } from '@/lib/portal';
+import { insertWhenClean, reportPageViews } from '@/lib/portal-analytics';
 
 // The sidebar tree is the same on every page. Loaded here, once, it is written to a single
 // cache file instead of being repeated in every page's own loader payload.
@@ -47,6 +49,16 @@ export const Route = createRootRoute({
 });
 
 function RootComponent() {
+  const router = useRouter();
+  useEffect(() => {
+    // A start that outwaited an OAuth answer runs on the next page change.
+    const stopInserting = router.subscribe('onRendered', insertWhenClean);
+    const stopPageViews = reportPageViews(router);
+    return () => {
+      stopInserting();
+      stopPageViews();
+    };
+  }, [router]);
   return (
     <html lang="en" suppressHydrationWarning>
       <head>

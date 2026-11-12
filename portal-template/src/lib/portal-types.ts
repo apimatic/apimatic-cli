@@ -51,4 +51,5 @@ export interface Portal {
   links: PortalLink[];
   /** Whether each page offers to open itself in an external AI assistant. */
   pageActions: boolean;
+  analytics: PortalAnalytics;
 }
