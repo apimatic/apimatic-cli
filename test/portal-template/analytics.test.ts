@@ -94,7 +94,10 @@ describe('pageLocation', () => {
 describe('PortalEvents', () => {
   // The compiler holds this table to the interface: a missing event, a missing key or an extra key does not compile.
   const events: { [E in PortalEventName]: Record<keyof PortalEvents[E], true> } = {
-    docs_page_view: { page_title: true }
+    docs_page_view: { page_title: true },
+    docs_markdown_copy: {},
+    docs_plugin_install: {},
+    docs_sdk_download: { language: true }
   };
 
   it('names every event docs_ plus lowercase snake_case, at most 40 characters', () => {

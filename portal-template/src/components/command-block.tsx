@@ -7,6 +7,8 @@ interface CommandBlockProps {
   command: string;
   /** One line that truncates, for a card; the full command is still what the button copies. */
   compact?: boolean;
+  /** Called as the copy button is clicked. */
+  onCopy?: () => void;
 }
 
 // Centred on the one line, where the block's own placement pins the button to the top corner.
@@ -15,13 +17,24 @@ function CentredActions({ children }: Readonly<{ children?: ReactNode }>) {
 }
 
 /** One shell command in a copyable block: an MDX page has no highlighter to hand, so it is plain. */
-export function CommandBlock({ command, compact = false }: Readonly<CommandBlockProps>) {
+export function CommandBlock({ command, compact = false, onCopy }: Readonly<CommandBlockProps>) {
   if (asMarkdown()) {
     return `\`\`\`bash\n${command}\n\`\`\``;
   }
   if (!compact) {
     return (
-      <CodeBlock title={CODE_BLOCK_TITLES.shellscript}>
+      // Fumadocs calls Actions as a function with its copy button as the children, so a wrapper sees the click.
+      <CodeBlock
+        title={CODE_BLOCK_TITLES.shellscript}
+        Actions={
+          onCopy &&
+          (({ className, children }) => (
+            <div className={className} onClickCapture={onCopy}>
+              {children}
+            </div>
+          ))
+        }
+      >
         <Pre>
           <code>
             {/* A highlighted block's lines carry this class, which is what the block pads. */}

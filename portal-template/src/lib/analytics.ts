@@ -28,6 +28,9 @@ const KEPT_NAMES = new Set([
  */
 export interface PortalEvents {
   docs_page_view: { page_title: string };
+  docs_markdown_copy: Record<never, never>;
+  docs_plugin_install: Record<never, never>;
+  docs_sdk_download: { language: string };
 }
 export type PortalEventName = keyof PortalEvents;
 
