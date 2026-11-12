@@ -1,3 +1,4 @@
+import type { FetchResult } from 'fumadocs-openapi/playground';
 import { withBasePath } from './base-path';
 import { oauthCallbackPath } from './oauth-callback';
 import type { PortalAnalytics } from './portal-types';
@@ -34,6 +35,7 @@ export interface PortalEvents {
   docs_code_copy: { language: string };
   docs_search: { search_term: string; result: string; result_count: number };
   docs_not_found: { page_referrer: string };
+  docs_api_request: { endpoint: string; status: string; duration_ms: number };
 }
 export type PortalEventName = keyof PortalEvents;
 
@@ -125,6 +127,7 @@ export class Analytics {
   private started = false;
   private lastPageView: string | null = null;
   private previousPageView: string | null = null;
+  private requestStartedAt = 0;
 
   public constructor(private readonly settings: PortalAnalytics) {
     if (settings.googleTagManager) this.live.push(adapters.googleTagManager(settings.googleTagManager));
@@ -186,5 +189,18 @@ export class Analytics {
       referrer.hash = '';
     }
     this.report('docs_not_found', { page_referrer: this.previousPageView ?? referrer?.href ?? '' });
+  }
+  /** As the playground sends a request: the start of the one duration a request that never arrives can have. */
+  public requestStarted(): void {
+    this.requestStartedAt = Date.now();
+  }
+
+  /** The playground's result for `endpoint`, the method and path as the spec writes them: its status and its time, and nothing of the request itself. */
+  public reportApiRequest(endpoint: string, result: FetchResult): void {
+    const [status, duration_ms] =
+      result.type === 'response'
+        ? [String(result.status), Math.round(result.duration)]
+        : ['client_error', Date.now() - this.requestStartedAt];
+    this.report('docs_api_request', { endpoint, status, duration_ms });
   }
 }

@@ -8,7 +8,7 @@ import { renderExampleLayout } from './example-layout';
 import { codeUsages, renderUsageTabs } from './usage-tabs';
 
 // Its own chunk, as Fumadocs loads it: the playground's forms are not in every page's bundle.
-const PlaygroundClient = lazy(() => import('fumadocs-openapi/ui/playground/client'));
+const Playground = lazy(() => import('./playground'));
 
 export const OpenAPIPage = createOpenAPIPage({
   codeUsages,
@@ -28,7 +28,7 @@ export const OpenAPIPage = createOpenAPIPage({
         data-portal-playground=""
       >
         <Suspense fallback={null}>
-          <PlaygroundClient />
+          <Playground />
         </Suspense>
       </div>
     )

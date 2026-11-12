@@ -101,7 +101,8 @@ describe('PortalEvents', () => {
     docs_sdk_download: { language: true },
     docs_code_copy: { language: true },
     docs_search: { search_term: true, result: true, result_count: true },
-    docs_not_found: { page_referrer: true }
+    docs_not_found: { page_referrer: true },
+    docs_api_request: { endpoint: true, status: true, duration_ms: true }
   };
 
   it('names every event docs_ plus lowercase snake_case, at most 40 characters', () => {
@@ -728,6 +729,56 @@ describe('Analytics', () => {
       analytics.reportNotFound('');
 
       expect(referrers(page.dataLayer())).to.deep.equal(['https://www.google.com/search', '']);
+    });
+  });
+  describe('reportApiRequest', () => {
+    const address = 'https://docs.acme.com/api/calc/Calculate';
+    const endpoint = 'GET /{operation}';
+    // The request's own address, which holds filled-in values: never reported.
+    const url = 'https://api.acme.com/v1/calc/SUM?x=4&api_key=s3cret';
+    const requests = (entries: unknown[]) =>
+      entries.filter((entry) => isPlainObject(entry) && entry.event === 'docs_api_request') as {
+        docs: Record<string, unknown>;
+      }[];
+
+    it('reports a response by its status and its own duration, rounded', () => {
+      const page = browser(address);
+
+      new Analytics(none).reportApiRequest(endpoint, { type: 'response', url, status: 200, duration: 123.4 } as never);
+
+      expect(requests(page.dataLayer())).to.deep.equal([
+        { event: 'docs_api_request', docs: { endpoint, status: '200', duration_ms: 123, page_location: address } }
+      ]);
+    });
+
+    it('reports a request that never reached the API as a client error, timed from its start', () => {
+      const page = browser(address);
+      const analytics = new Analytics(none);
+      analytics.requestStarted();
+
+      analytics.reportApiRequest(endpoint, { type: 'client_error', url, message: 'Failed to fetch' } as never);
+
+      const [entry] = requests(page.dataLayer());
+      expect(entry.docs).to.include({ endpoint, status: 'client_error', page_location: address });
+      expect(entry.docs.duration_ms).to.be.a('number').within(0, 5000);
+    });
+
+    it('carries the endpoint, the status and the duration, and nothing of the request', () => {
+      const page = browser(address);
+      const result = {
+        type: 'response',
+        url,
+        status: 401,
+        duration: 8,
+        headers: { 'x-key': 's3cret' },
+        body: 's3cret'
+      };
+
+      new Analytics(none).reportApiRequest(endpoint, result as never);
+
+      const [entry] = requests(page.dataLayer());
+      expect(Object.keys(entry.docs).sort()).to.deep.equal(['duration_ms', 'endpoint', 'page_location', 'status']);
+      expect(JSON.stringify(entry)).to.not.contain('s3cret');
     });
   });
 });
