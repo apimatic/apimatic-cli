@@ -29,6 +29,9 @@ const iconLinks = portal.favicon
 
 // A portal fixed to one mode keeps to it whatever the visitor's system prefers, and offers no
 // way out: the layout hides the switch, and the `D` hotkey is turned off here.
+// Fumadocs' copy button has no callback of its own, so the document hears every click.
+const reportCodeCopy = (event: MouseEvent) => analytics.reportCodeCopy(event.target);
+
 const theme =
   portal.colorMode === 'both'
     ? undefined
@@ -55,7 +58,12 @@ function RootComponent() {
   const router = useRouter();
   useEffect(() => {
     analytics.reportPageView();
-    return router.subscribe('onRendered', () => analytics.reportPageView());
+    const unsubscribe = router.subscribe('onRendered', () => analytics.reportPageView());
+    document.addEventListener('click', reportCodeCopy);
+    return () => {
+      unsubscribe();
+      document.removeEventListener('click', reportCodeCopy);
+    };
   }, [router]);
   return (
     <html lang="en" suppressHydrationWarning>

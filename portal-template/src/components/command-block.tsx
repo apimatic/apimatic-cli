@@ -29,7 +29,7 @@ export function CommandBlock({ command, compact = false, onCopy }: Readonly<Comm
         Actions={
           onCopy &&
           (({ className, children }) => (
-            <div className={className} onClickCapture={onCopy}>
+            <div className={className} onClickCapture={onCopy} data-copy-reported="">
               {children}
             </div>
           ))

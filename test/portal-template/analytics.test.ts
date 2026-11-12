@@ -3,6 +3,7 @@ import {
   Adapter,
   adapters,
   Analytics,
+  copiedLanguage,
   pageLocation,
   PortalEventName,
   PortalEvents
@@ -97,7 +98,8 @@ describe('PortalEvents', () => {
     docs_page_view: { page_title: true },
     docs_markdown_copy: {},
     docs_plugin_install: {},
-    docs_sdk_download: { language: true }
+    docs_sdk_download: { language: true },
+    docs_code_copy: { language: true }
   };
 
   it('names every event docs_ plus lowercase snake_case, at most 40 characters', () => {
@@ -112,6 +114,72 @@ describe('PortalEvents', () => {
     for (const [name, keys] of Object.entries(events)) {
       expect(Object.keys(keys).length, name).to.be.at.most(24);
     }
+  });
+});
+
+/** As much of an element as the copy reader walks: the selectors it matches, its text, and its place in the tree. */
+class FakeElement {
+  public parentElement: FakeElement | null = null;
+
+  public constructor(
+    private readonly selectors: string[],
+    public readonly textContent: string | null = null,
+    private readonly children: FakeElement[] = []
+  ) {
+    for (const child of children) child.parentElement = this;
+  }
+
+  public closest(selector: string): FakeElement | null {
+    return this.selectors.includes(selector) ? this : this.parentElement?.closest(selector) ?? null;
+  }
+
+  public querySelector(selector: string): FakeElement | null {
+    for (const child of this.children) {
+      const found = child.selectors.includes(selector) ? child : child.querySelector(selector);
+      if (found !== null) return found;
+    }
+    return null;
+  }
+}
+
+const element = (fake: FakeElement) => fake as unknown as Parameters<typeof copiedLanguage>[0];
+
+/** Fumadocs' code block: a figure with the copy button in its header beside the caption, or in its corner when untitled. */
+function codeBlock(title: string | null) {
+  const button = new FakeElement(['figure button']);
+  const caption = title === null ? [] : [new FakeElement(['figcaption'], title)];
+  const figure = new FakeElement(['figure'], null, [new FakeElement([], null, [...caption, button])]);
+  return { figure, button };
+}
+
+/** A tabbed set of untitled blocks under one root, with `selected` shown: the copy button of the block that is. */
+function tabbedBlocks(names: string[], selected: string): FakeElement {
+  const tabs = names.map(
+    (name) =>
+      new FakeElement(
+        name === selected ? ['[role="tab"]', '[role="tab"][aria-selected="true"]'] : ['[role="tab"]'],
+        name
+      )
+  );
+  const blocks = names.map(() => codeBlock(null));
+  const panels = blocks.map(({ figure }) => new FakeElement(['[role="tabpanel"]'], null, [figure]));
+  new FakeElement([], null, [new FakeElement(['[role="tablist"]'], null, tabs), ...panels]);
+  return blocks[names.indexOf(selected)].button;
+}
+
+describe('copiedLanguage', () => {
+  it('reads a titled block’s caption', () => {
+    expect(copiedLanguage(element(codeBlock('TypeScript').button))).to.equal('TypeScript');
+  });
+
+  it('reads the selected tab’s name for a block in a tabbed set', () => {
+    expect(copiedLanguage(element(tabbedBlocks(['cURL', 'TypeScript'], 'TypeScript')))).to.equal('TypeScript');
+    expect(copiedLanguage(element(tabbedBlocks(['cURL', 'TypeScript'], 'cURL')))).to.equal('cURL');
+  });
+
+  it('is null for a block with neither, and for a button outside any block', () => {
+    expect(copiedLanguage(element(codeBlock(null).button))).to.be.null;
+    expect(copiedLanguage(element(new FakeElement(['button'])))).to.be.null;
   });
 });
 
@@ -559,6 +627,37 @@ describe('Analytics', () => {
       expect(
         pageViews(page.dataLayer()).map((view) => (view as { docs: { page_location: string } }).docs.page_location)
       ).to.deep.equal([quickstart, components, quickstart]);
+    });
+  });
+  describe('reportCodeCopy', () => {
+    const address = 'https://docs.acme.com/guides/quickstart';
+    const codeCopies = (entries: unknown[]) =>
+      entries.filter((entry) => isPlainObject(entry) && entry.event === 'docs_code_copy');
+
+    it('reports a code block’s copy with its language', () => {
+      const page = browser(address);
+      const analytics = new Analytics(none);
+
+      analytics.reportCodeCopy(element(codeBlock('TypeScript').button));
+
+      expect(codeCopies(page.dataLayer())).to.deep.equal([
+        { event: 'docs_code_copy', docs: { language: 'TypeScript', page_location: address } }
+      ]);
+    });
+
+    it('reports nothing for a click outside a block, on an untitled block, or in a block that reports its own copy', () => {
+      const page = browser(address);
+      const analytics = new Analytics(none);
+      const own = codeBlock('Terminal');
+      // The install command's wrapper marks its block.
+      new FakeElement(['[data-copy-reported]'], null, [own.figure]);
+
+      analytics.reportCodeCopy(element(new FakeElement(['button'])));
+      analytics.reportCodeCopy(element(codeBlock(null).button));
+      analytics.reportCodeCopy(element(own.button));
+      analytics.reportCodeCopy(null);
+
+      expect(codeCopies(page.dataLayer())).to.be.empty;
     });
   });
 });

@@ -31,6 +31,7 @@ export interface PortalEvents {
   docs_markdown_copy: Record<never, never>;
   docs_plugin_install: Record<never, never>;
   docs_sdk_download: { language: string };
+  docs_code_copy: { language: string };
 }
 export type PortalEventName = keyof PortalEvents;
 
@@ -102,6 +103,20 @@ export function pageLocation(href: string, keep: readonly string[], base?: strin
   return url.href;
 }
 
+/**
+ * The language of the code block a copy button sits in: a titled block's caption, or the selected tab's name
+ * when the block is one of a tabbed set. Null for a block with neither, and for a button outside any block.
+ */
+export function copiedLanguage(button: Element): string | null {
+  const figure = button.closest('figure');
+  if (figure === null) return null;
+  const tabs = figure.closest('[role="tabpanel"]')?.parentElement;
+  const name = tabs
+    ? tabs.querySelector('[role="tab"][aria-selected="true"]')?.textContent
+    : figure.querySelector('figcaption')?.textContent;
+  return name?.trim() || null;
+}
+
 /** The one instance a portal runs: started when the bundle evaluates, reporting from the root effect and the components. */
 export class Analytics {
   private readonly live: Adapter[] = [];
@@ -144,5 +159,13 @@ export class Analytics {
     if (page === null || page === this.lastPageView) return;
     this.lastPageView = page;
     this.report('docs_page_view', { page_title: document.title });
+  }
+  /** For a click anywhere on the page: a code block's copy button reports the copy with the block's language. */
+  public reportCodeCopy(target: EventTarget | null): void {
+    const button = target !== null && 'closest' in target ? (target as Element).closest('figure button') : null;
+    // A block that reports its own copy, such as the install command, is not a code copy as well.
+    if (button === null || button.closest('[data-copy-reported]') !== null) return;
+    const language = copiedLanguage(button);
+    if (language !== null) this.report('docs_code_copy', { language });
   }
 }
