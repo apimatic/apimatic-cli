@@ -8,13 +8,15 @@ import {
   SearchDialogInput,
   SearchDialogList,
   SearchDialogOverlay,
+  type SearchItemType,
   type SharedProps
 } from 'fumadocs-ui/components/dialog/search';
 import { useDocsSearch } from 'fumadocs-core/search/client';
 import { staticClient } from 'fumadocs-core/search/client/orama-static';
 import { useI18n } from 'fumadocs-ui/contexts/i18n';
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 import { withBasePath } from '@/lib/base-path';
+import { analytics } from '@/lib/portal-analytics';
 
 export default function DefaultSearchDialog(props: SharedProps) {
   const { locale } = useI18n();
@@ -32,8 +34,37 @@ export default function DefaultSearchDialog(props: SharedProps) {
     [query.data]
   );
 
+  const typed = useRef(false);
+  const picked = useRef('');
+
+  const onSearchChange = (value: string) => {
+    typed.current = true;
+    setSearch(value);
+  };
+  const onSelect = (item: SearchItemType) => {
+    picked.current = 'url' in item ? item.url : '';
+  };
+  const onOpenChange = (open: boolean) => {
+    props.onOpenChange(open);
+    if (open || !typed.current) return;
+    typed.current = false;
+    const count = results?.length ?? 0;
+    // Fumadocs closes the dialog before it hands over the pick, so the report waits a tick for it.
+    window.setTimeout(() => {
+      analytics.reportSearch(search, picked.current, count);
+      picked.current = '';
+    }, 0);
+  };
+
   return (
-    <SearchDialog search={search} onSearchChange={setSearch} isLoading={query.isLoading} {...props}>
+    <SearchDialog
+      search={search}
+      onSearchChange={onSearchChange}
+      isLoading={query.isLoading}
+      {...props}
+      onOpenChange={onOpenChange}
+      onSelect={onSelect}
+    >
       <SearchDialogOverlay />
       <SearchDialogContent>
         <SearchDialogHeader>

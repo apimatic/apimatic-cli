@@ -99,7 +99,8 @@ describe('PortalEvents', () => {
     docs_markdown_copy: {},
     docs_plugin_install: {},
     docs_sdk_download: { language: true },
-    docs_code_copy: { language: true }
+    docs_code_copy: { language: true },
+    docs_search: { search_term: true, result: true, result_count: true }
   };
 
   it('names every event docs_ plus lowercase snake_case, at most 40 characters', () => {
@@ -658,6 +659,44 @@ describe('Analytics', () => {
       analytics.reportCodeCopy(null);
 
       expect(codeCopies(page.dataLayer())).to.be.empty;
+    });
+  });
+  describe('reportSearch', () => {
+    const address = 'https://docs.acme.com/guides/quickstart';
+    const searches = (entries: unknown[]) =>
+      entries.filter((entry) => isPlainObject(entry) && entry.event === 'docs_search');
+
+    it('reports the term trimmed, the pick and the count shown', () => {
+      const page = browser(address);
+
+      new Analytics(none).reportSearch(' auth ', '/guides/authentication', 3);
+
+      expect(searches(page.dataLayer())).to.deep.equal([
+        {
+          event: 'docs_search',
+          docs: { search_term: 'auth', result: '/guides/authentication', result_count: 3, page_location: address }
+        }
+      ]);
+    });
+
+    it('reports an empty result when the dialog closed without a pick', () => {
+      const page = browser(address);
+
+      new Analytics(none).reportSearch('auth', '', 0);
+
+      expect(searches(page.dataLayer())).to.deep.equal([
+        { event: 'docs_search', docs: { search_term: 'auth', result: '', result_count: 0, page_location: address } }
+      ]);
+    });
+
+    it('reports nothing when nothing was typed', () => {
+      const page = browser(address);
+      const analytics = new Analytics(none);
+
+      analytics.reportSearch('', '', 0);
+      analytics.reportSearch('   ', '/guides/authentication', 1);
+
+      expect(searches(page.dataLayer())).to.be.empty;
     });
   });
 });

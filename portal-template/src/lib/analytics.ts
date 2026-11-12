@@ -32,6 +32,7 @@ export interface PortalEvents {
   docs_plugin_install: Record<never, never>;
   docs_sdk_download: { language: string };
   docs_code_copy: { language: string };
+  docs_search: { search_term: string; result: string; result_count: number };
 }
 export type PortalEventName = keyof PortalEvents;
 
@@ -167,5 +168,11 @@ export class Analytics {
     if (button === null || button.closest('[data-copy-reported]') !== null) return;
     const language = copiedLanguage(button);
     if (language !== null) this.report('docs_code_copy', { language });
+  }
+  /** One search, as the dialog closes: what was typed, the result picked or '' for none, and how many were shown. */
+  public reportSearch(term: string, picked: string, resultCount: number): void {
+    const search_term = term.trim();
+    if (search_term === '') return;
+    this.report('docs_search', { search_term, result: picked, result_count: resultCount });
   }
 }
