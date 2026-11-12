@@ -3,6 +3,7 @@ import { createOpenAPIPage } from 'fumadocs-openapi/ui';
 import { withBasePath } from '@/lib/base-path';
 import { mediaAdapters } from '@/lib/media-adapters';
 import { oauthCallbackPath } from '@/lib/oauth-callback';
+import { REPLAY_MARKERS } from '@/lib/replay-markers';
 import { ApiMarkdown } from './api-markdown';
 import { renderExampleLayout } from './example-layout';
 import { codeUsages, renderUsageTabs } from './usage-tabs';
@@ -20,13 +21,7 @@ export const OpenAPIPage = createOpenAPIPage({
   playground: {
     // Session replay tools a GTM tag loads record the page's text and input; each marker keeps its tool out of the playground.
     render: () => (
-      <div
-        className="ph-no-capture fs-exclude rr-block amp-block"
-        data-hj-suppress=""
-        data-clarity-mask="True"
-        data-private=""
-        data-portal-playground=""
-      >
+      <div {...REPLAY_MARKERS}>
         <Suspense fallback={null}>
           <Playground />
         </Suspense>

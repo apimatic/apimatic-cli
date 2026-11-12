@@ -29,8 +29,8 @@ const KEPT_NAMES = new Set([
  */
 export interface PortalEvents {
   docs_page_view: { page_title: string };
-  docs_markdown_copy: Record<never, never>;
-  docs_plugin_install: Record<never, never>;
+  docs_markdown_copy: Record<string, never>;
+  docs_plugin_install: Record<string, never>;
   docs_sdk_download: { language: string };
   docs_code_copy: { language: string };
   docs_search: { search_term: string; result: string; result_count: number };
@@ -68,10 +68,12 @@ const GOOGLE = 'https://www.googletagmanager.com';
 export const adapters: { [V in Vendor]: (setting: NonNullable<PortalAnalytics[V]>) => Adapter } = {
   googleTagManager: (setting) => {
     const env = setting.environment;
-    const environment = env ? `&gtm_auth=${env.auth}&gtm_preview=${env.preview}&gtm_cookies_win=x` : '';
+    const environment = env
+      ? `&gtm_auth=${encodeURIComponent(env.auth)}&gtm_preview=${encodeURIComponent(env.preview)}&gtm_cookies_win=x`
+      : '';
     return {
       setup: (dataLayer) => dataLayer.push({ 'gtm.start': Date.now(), event: 'gtm.js' }),
-      scripts: () => [`${GOOGLE}/gtm.js?id=${setting.containerId}${environment}`],
+      scripts: () => [`${GOOGLE}/gtm.js?id=${encodeURIComponent(setting.containerId)}${environment}`],
       send: () => {}
     };
   },
@@ -86,7 +88,7 @@ export const adapters: { [V in Vendor]: (setting: NonNullable<PortalAnalytics[V]
         gtag('js', new Date());
         gtag('config', setting.measurementId, { send_page_view: false });
       },
-      scripts: () => [`${GOOGLE}/gtag/js?id=${setting.measurementId}`],
+      scripts: () => [`${GOOGLE}/gtag/js?id=${encodeURIComponent(setting.measurementId)}`],
       // GA4 gets its own names: the `docs_` prefix comes off.
       send: (name, params) => gtag('event', name.replace(/^docs_/, ''), params)
     };
@@ -114,11 +116,10 @@ export function pageLocation(href: string, keep: readonly string[], base?: strin
 export function copiedLanguage(button: Element): string | null {
   const figure = button.closest('figure');
   if (figure === null) return null;
+  const caption = figure.querySelector('figcaption')?.textContent?.trim();
+  if (caption) return caption;
   const tabs = figure.closest('[role="tabpanel"]')?.parentElement;
-  const name = tabs
-    ? tabs.querySelector('[role="tab"][aria-selected="true"]')?.textContent
-    : figure.querySelector('figcaption')?.textContent;
-  return name?.trim() || null;
+  return tabs?.querySelector('[role="tab"][aria-selected="true"]')?.textContent?.trim() || null;
 }
 
 /** The one instance a portal runs: started when the bundle evaluates, reporting from the root effect and the components. */
@@ -127,7 +128,9 @@ export class Analytics {
   private started = false;
   private lastPageView: string | null = null;
   private previousPageView: string | null = null;
-  private requestStartedAt = 0;
+  private lastNotFound: string | null = null;
+  private requestStartedAt: number | null = null;
+  private lastApiResult: FetchResult | null = null;
 
   public constructor(private readonly settings: PortalAnalytics) {
     if (settings.googleTagManager) this.live.push(adapters.googleTagManager(settings.googleTagManager));
@@ -148,8 +151,9 @@ export class Analytics {
     }
   }
 
-  public report<E extends PortalEventName>(name: E, params: PortalEvents[E]): void {
-    const page_location = pageLocation(window.location.href, this.settings.keepQueryParams);
+  /** `href` is the page the event belongs to, the current one unless the caller saw the address change first. */
+  public report<E extends PortalEventName>(name: E, params: PortalEvents[E], href = window.location.href): void {
+    const page_location = pageLocation(href, this.settings.keepQueryParams);
     if (page_location === null) return;
     const docs = { ...params, page_location };
     const dataLayer = (window.dataLayer ??= []);
@@ -170,19 +174,25 @@ export class Analytics {
   /** For a click anywhere on the page: a code block's copy button reports the copy with the block's language. */
   public reportCodeCopy(target: EventTarget | null): void {
     const button = target !== null && 'closest' in target ? (target as Element).closest('figure button') : null;
-    // A block that reports its own copy, such as the install command, is not a code copy as well.
-    if (button === null || button.closest('[data-copy-reported]') !== null) return;
+    if (button === null) return;
+    // Not a copy: a dropdown in a block's header, the playground's dialog, or a block that reports its own copy.
+    if (button.matches('[role="combobox"]') || button.matches('[aria-haspopup]')) return;
+    if (button.closest('[role="dialog"]') !== null || button.closest('[data-copy-reported]') !== null) return;
     const language = copiedLanguage(button);
     if (language !== null) this.report('docs_code_copy', { language });
   }
-  /** One search, as the dialog closes: what was typed, the result picked or '' for none, and how many were shown. */
-  public reportSearch(term: string, picked: string, resultCount: number): void {
+  /** One search, as the dialog closes: what was typed, the pick or '' for none, the count shown, and the page searched from. */
+  public reportSearch(term: string, picked: string, resultCount: number, href: string): void {
     const search_term = term.trim();
     if (search_term === '') return;
-    this.report('docs_search', { search_term, result: picked, result_count: resultCount });
+    this.report('docs_search', { search_term, result: picked, result_count: resultCount }, href);
   }
-  /** The not-found page: `page_referrer` is the portal page left for it, else the document's referrer without its query. */
+  /** The not-found page, once per missing page: `page_referrer` is the portal page left for it, else the document's referrer without its query. */
   public reportNotFound(documentReferrer: string): void {
+    const page = pageLocation(window.location.href, this.settings.keepQueryParams);
+    // A dev build mounts the page twice; the next missing page is a new report.
+    if (page === null || page === this.lastNotFound) return;
+    this.lastNotFound = page;
     const referrer = documentReferrer === '' ? null : new URL(documentReferrer);
     if (referrer !== null) {
       referrer.search = '';
@@ -190,17 +200,21 @@ export class Analytics {
     }
     this.report('docs_not_found', { page_referrer: this.previousPageView ?? referrer?.href ?? '' });
   }
-  /** As the playground sends a request: the start of the one duration a request that never arrives can have. */
+  /** As the playground sends a request: the start of the one duration a request that never arrives can have; a request failing before this has none. */
   public requestStarted(): void {
     this.requestStartedAt = Date.now();
   }
 
   /** The playground's result for `endpoint`, the method and path as the spec writes them: its status and its time, and nothing of the request itself. */
   public reportApiRequest(endpoint: string, result: FetchResult): void {
+    // The display mounts again with the same result on each reopen, and twice in a dev build.
+    if (result === this.lastApiResult) return;
+    this.lastApiResult = result;
     const [status, duration_ms] =
       result.type === 'response'
         ? [String(result.status), Math.round(result.duration)]
-        : ['client_error', Date.now() - this.requestStartedAt];
+        : ['client_error', this.requestStartedAt === null ? 0 : Date.now() - this.requestStartedAt];
+    this.requestStartedAt = null;
     this.report('docs_api_request', { endpoint, status, duration_ms });
   }
 }

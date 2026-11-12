@@ -277,6 +277,8 @@ const stylesheetOf = (output: DirectoryPath) => {
   it('tells the browser both vendor IDs in a script, and names the tag host in no prerendered page', () => {
     const scripts = scriptsOf(portal.output());
     expect(scripts.some(({ text }) => text.includes('GTM-E2ETEST') && text.includes('G-E2ETEST'))).to.be.true;
+    // The loader itself, not only the identity file the IDs sit in.
+    expect(scripts.some(({ text }) => text.includes('gtm.js?id=') && text.includes('/gtag/js?id='))).to.be.true;
     for (const page of pages()) {
       expect(read(page), page).to.not.contain('googletagmanager.com');
     }
@@ -289,7 +291,7 @@ const stylesheetOf = (output: DirectoryPath) => {
     }
   });
 
-  it('prerenders the operation page’s playground inside the element session replays skip', () => {
+  it('prerenders the operation page’s playground header inside the element session replays skip', () => {
     const parts = read('api/apimatic-calculator/simple-calculator/Calculate/index.html').split(
       'data-portal-playground'
     );

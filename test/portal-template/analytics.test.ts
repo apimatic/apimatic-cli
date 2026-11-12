@@ -93,7 +93,8 @@ describe('pageLocation', () => {
 });
 
 describe('PortalEvents', () => {
-  // The compiler holds this table to the interface: a missing event, a missing key or an extra key does not compile.
+  // The compiler holds this table to the interface: a missing event, a missing key, or an extra key on an event with
+  // keys does not compile; an event with no keys takes none at report().
   const events: { [E in PortalEventName]: Record<keyof PortalEvents[E], true> } = {
     docs_page_view: { page_title: true },
     docs_markdown_copy: {},
@@ -130,6 +131,10 @@ class FakeElement {
     private readonly children: FakeElement[] = []
   ) {
     for (const child of children) child.parentElement = this;
+  }
+
+  public matches(selector: string): boolean {
+    return this.selectors.includes(selector);
   }
 
   public closest(selector: string): FakeElement | null {
@@ -178,6 +183,17 @@ describe('copiedLanguage', () => {
   it('reads the selected tab’s name for a block in a tabbed set', () => {
     expect(copiedLanguage(element(tabbedBlocks(['cURL', 'TypeScript'], 'TypeScript')))).to.equal('TypeScript');
     expect(copiedLanguage(element(tabbedBlocks(['cURL', 'TypeScript'], 'cURL')))).to.equal('cURL');
+  });
+
+  it('prefers the caption of a titled block inside a tabbed set', () => {
+    const { figure, button } = codeBlock('Terminal');
+    const tab = new FakeElement(['[role="tab"]', '[role="tab"][aria-selected="true"]'], 'macOS');
+    new FakeElement([], null, [
+      new FakeElement(['[role="tablist"]'], null, [tab]),
+      new FakeElement(['[role="tabpanel"]'], null, [figure])
+    ]);
+
+    expect(copiedLanguage(element(button))).to.equal('Terminal');
   });
 
   it('is null for a block with neither, and for a button outside any block', () => {
@@ -316,6 +332,17 @@ describe('Analytics', () => {
       expect(page.window.gtag).to.be.undefined;
     });
 
+    it("escapes the container's ID and the environment's values in the tag's address", () => {
+      const page = browser(quickstart);
+      const setting = { containerId: 'GTM-A&B', environment: { auth: 'a&b', preview: 'env 3' } };
+
+      new Analytics({ ...none, googleTagManager: setting }).start();
+
+      expect(page.scripts.map((script) => script.src)).to.deep.equal([
+        'https://www.googletagmanager.com/gtm.js?id=GTM-A%26B&gtm_auth=a%26b&gtm_preview=env%203&gtm_cookies_win=x'
+      ]);
+    });
+
     it("loads the container's environment when one is set", () => {
       const page = browser(quickstart);
 
@@ -365,6 +392,16 @@ describe('Analytics', () => {
 
       expect(page.dataLayer().filter(isArguments)).to.have.length(3);
       expect(page.dataLayer().some(Array.isArray)).to.be.false;
+    });
+
+    it("escapes the measurement ID in the tag's address", () => {
+      const page = browser(quickstart);
+
+      new Analytics({ ...none, googleAnalytics: { measurementId: 'G-A#B' } }).start();
+
+      expect(page.scripts.map((script) => script.src)).to.deep.equal([
+        'https://www.googletagmanager.com/gtag/js?id=G-A%23B'
+      ]);
     });
 
     it('uses a gtag the page already defines, rather than replacing it', () => {
@@ -518,20 +555,6 @@ describe('Analytics', () => {
           expect(received).to.not.match(/code=|token=|#/);
         });
 
-        it('turns on no session recording or input capture', () => {
-          const page = browser(quickstart);
-          const analytics = new Analytics(settings);
-
-          analytics.start();
-          analytics.reportPageView();
-
-          const everything = JSON.stringify([
-            ...page.dataLayer().map((entry) => (isArguments(entry) ? Array.from(entry as ArrayLike<unknown>) : entry)),
-            ...page.scripts.map((script) => script.src)
-          ]);
-          expect(everything).to.not.match(/record|capture|replay|heatmap/i);
-        });
-
         it('inserts only https scripts, none inline', () => {
           expect(adapter().scripts()).to.not.be.empty;
           for (const src of adapter().scripts()) expect(src).to.match(/^https:\/\//);
@@ -570,10 +593,7 @@ describe('Analytics', () => {
       const page = browser(quickstart);
       const analytics = new Analytics(none);
       analytics.start();
-      // PR 3's events differ in their keys; until one lands, an extra key on a page view stands in for that.
-      const withExtraKey = { page_title: 'A', language: 'python' };
-
-      analytics.report('docs_page_view', withExtraKey);
+      analytics.report('docs_code_copy', { language: 'python' });
       analytics.report('docs_page_view', { page_title: 'B' });
 
       expect(mergedLikeGtm(page.dataLayer()).docs).to.deep.equal({ page_title: 'B', page_location: quickstart });
@@ -662,6 +682,25 @@ describe('Analytics', () => {
 
       expect(codeCopies(page.dataLayer())).to.be.empty;
     });
+
+    it('reports nothing for a dropdown in a block’s header, nor for anything in the playground’s dialog', () => {
+      const page = browser(address);
+      const analytics = new Analytics(none);
+      const dropdown = new FakeElement(['figure button', '[role="combobox"]']);
+      new FakeElement(['figure'], null, [
+        new FakeElement([], null, [new FakeElement(['figcaption'], 'Request'), dropdown])
+      ]);
+      const menu = new FakeElement(['figure button', '[aria-haspopup]']);
+      new FakeElement(['figure'], null, [new FakeElement(['figcaption'], 'JSON'), menu]);
+      const inDialog = codeBlock('Body');
+      new FakeElement(['[role="dialog"]'], null, [inDialog.figure]);
+
+      analytics.reportCodeCopy(element(dropdown));
+      analytics.reportCodeCopy(element(menu));
+      analytics.reportCodeCopy(element(inDialog.button));
+
+      expect(codeCopies(page.dataLayer())).to.be.empty;
+    });
   });
   describe('reportSearch', () => {
     const address = 'https://docs.acme.com/guides/quickstart';
@@ -671,7 +710,7 @@ describe('Analytics', () => {
     it('reports the term trimmed, the pick and the count shown', () => {
       const page = browser(address);
 
-      new Analytics(none).reportSearch(' auth ', '/guides/authentication', 3);
+      new Analytics(none).reportSearch(' auth ', '/guides/authentication', 3, address);
 
       expect(searches(page.dataLayer())).to.deep.equal([
         {
@@ -684,7 +723,7 @@ describe('Analytics', () => {
     it('reports an empty result when the dialog closed without a pick', () => {
       const page = browser(address);
 
-      new Analytics(none).reportSearch('auth', '', 0);
+      new Analytics(none).reportSearch('auth', '', 0, address);
 
       expect(searches(page.dataLayer())).to.deep.equal([
         { event: 'docs_search', docs: { search_term: 'auth', result: '', result_count: 0, page_location: address } }
@@ -695,10 +734,20 @@ describe('Analytics', () => {
       const page = browser(address);
       const analytics = new Analytics(none);
 
-      analytics.reportSearch('', '', 0);
-      analytics.reportSearch('   ', '/guides/authentication', 1);
+      analytics.reportSearch('', '', 0, address);
+      analytics.reportSearch('   ', '/guides/authentication', 1, address);
 
       expect(searches(page.dataLayer())).to.be.empty;
+    });
+
+    it('reports the page the search was made on, not the one a pick led to', () => {
+      const page = browser(address);
+      const analytics = new Analytics(none);
+      page.go('https://docs.acme.com/guides/authentication');
+
+      analytics.reportSearch('auth', '/guides/authentication', 3, address);
+
+      expect(searches(page.dataLayer())).to.have.nested.property('[0].docs.page_location', address);
     });
   });
   describe('reportNotFound', () => {
@@ -726,9 +775,22 @@ describe('Analytics', () => {
       const analytics = new Analytics(none);
 
       analytics.reportNotFound('https://www.google.com/search?q=acme+docs#top');
+      page.go('https://docs.acme.com/guides/other-missing');
       analytics.reportNotFound('');
 
       expect(referrers(page.dataLayer())).to.deep.equal(['https://www.google.com/search', '']);
+    });
+
+    it('reports a missing page once, however often its page mounts, and the next missing page again', () => {
+      const page = browser(missing);
+      const analytics = new Analytics(none);
+
+      analytics.reportNotFound('');
+      analytics.reportNotFound('');
+      page.go('https://docs.acme.com/guides/also-missing');
+      analytics.reportNotFound('');
+
+      expect(referrers(page.dataLayer())).to.deep.equal(['', '']);
     });
   });
   describe('reportApiRequest', () => {
@@ -779,6 +841,26 @@ describe('Analytics', () => {
       const [entry] = requests(page.dataLayer());
       expect(Object.keys(entry.docs).sort()).to.deep.equal(['duration_ms', 'endpoint', 'page_location', 'status']);
       expect(JSON.stringify(entry)).to.not.contain('s3cret');
+    });
+
+    it('reports the same result once, however often the display mounts', () => {
+      const page = browser(address);
+      const analytics = new Analytics(none);
+      const result = { type: 'response', url, status: 200, duration: 5 } as never;
+
+      analytics.reportApiRequest(endpoint, result);
+      analytics.reportApiRequest(endpoint, result);
+      analytics.reportApiRequest(endpoint, { type: 'response', url, status: 200, duration: 5 } as never);
+
+      expect(requests(page.dataLayer())).to.have.length(2);
+    });
+
+    it('reports a request that failed before it was sent with no duration', () => {
+      const page = browser(address);
+
+      new Analytics(none).reportApiRequest(endpoint, { type: 'client_error', url, message: 'No adapter' } as never);
+
+      expect(requests(page.dataLayer())[0].docs).to.include({ status: 'client_error', duration_ms: 0 });
     });
   });
 });

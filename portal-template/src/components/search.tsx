@@ -14,7 +14,7 @@ import {
 import { useDocsSearch } from 'fumadocs-core/search/client';
 import { staticClient } from 'fumadocs-core/search/client/orama-static';
 import { useI18n } from 'fumadocs-ui/contexts/i18n';
-import { useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { withBasePath } from '@/lib/base-path';
 import { analytics } from '@/lib/portal-analytics';
 
@@ -36,12 +36,19 @@ export default function DefaultSearchDialog(props: SharedProps) {
 
   const typed = useRef(false);
   const picked = useRef('');
+  const openedAt = useRef('');
+
+  // The page the search is made on: a pick changes the address before the dialog reports its close.
+  useEffect(() => {
+    if (props.open) openedAt.current = window.location.href;
+  }, [props.open]);
 
   const onSearchChange = (value: string) => {
     typed.current = true;
     setSearch(value);
   };
   const onSelect = (item: SearchItemType) => {
+    typed.current = true;
     picked.current = 'url' in item ? item.url : '';
   };
   const onOpenChange = (open: boolean) => {
@@ -49,9 +56,10 @@ export default function DefaultSearchDialog(props: SharedProps) {
     if (open || !typed.current) return;
     typed.current = false;
     const count = results?.length ?? 0;
+    const page = openedAt.current;
     // Fumadocs closes the dialog before it hands over the pick, so the report waits a tick for it.
     window.setTimeout(() => {
-      analytics.reportSearch(search, picked.current, count);
+      analytics.reportSearch(search, picked.current, count, page);
       picked.current = '';
     }, 0);
   };

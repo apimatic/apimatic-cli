@@ -63,26 +63,26 @@ The table lists the keys each adds.
 
 | Event | Keys under `docs` | When |
 |---|---|---|
-| `docs_page_view` | `page_title` | The first page renders, and each later page change, once the new page's title is in place. Never twice for the same address, and never on `/oauth/callback`. |
+| `docs_page_view` | `page_title` | The first page renders, and each later page change, once the new page's title is in place. Never twice in a row for the same address, and never on `/oauth/callback`. |
 | `docs_markdown_copy` | none | The page's "Copy Markdown" button, when the copy succeeded. |
 | `docs_plugin_install` | none | The Context Plugin page's install command, as its copy button is clicked. |
 | `docs_sdk_download` | `language` | A "Download SDK" link, on the SDKs page's cards or an SDK's own page. `language` is the SDK's, as `languages` names it in `apimatic.json`. |
-| `docs_code_copy` | `language` | The copy button of a code block on any page, the API reference's examples included. `language` is the block's title, such as `TypeScript` or `Terminal`, or the selected tab's name in a tabbed block. A block with neither reports nothing, and neither does the install command's block, which has its own event. |
-| `docs_search` | `search_term`, `result`, `result_count` | The search dialog closes after the reader typed in it: the term, the address of the result picked or empty when none was, and how many results the list showed. Reopening the dialog and closing it without typing again reports nothing. |
+| `docs_code_copy` | `language` | The copy button of a code block on any page, the API reference's examples included. `language` is the block's title, such as `TypeScript` or `Terminal`, or for an untitled block in a tabbed set the selected tab's name. A block with neither reports nothing, nor does the install command's block, which has its own event, nor the playground's own blocks. |
+| `docs_search` | `search_term`, `result`, `result_count` | The search dialog closes after the reader typed in it: the term, the address of the result picked or empty when none was, and how many results the list showed. `page_location` is the page the search was made on, not the result's. Reopening the dialog and closing it without typing or picking reports nothing. |
 | `docs_not_found` | `page_referrer` | The not-found page renders. `page_referrer` is the portal page the reader left for it after a portal link, or on a first load the browser's referrer without its query, or empty when the browser sends none. The page's own `docs_page_view` is sent too. |
-| `docs_api_request` | `endpoint`, `status`, `duration_ms` | The API playground shows a result. `endpoint` is the method and path as the specification writes them, such as `GET /users/{id}`; `status` the HTTP status, or `client_error` for a request that never reached the API; `duration_ms` how long it took. It never carries the request's address, headers or body: those hold what the reader typed, keys included. |
+| `docs_api_request` | `endpoint`, `status`, `duration_ms` | The API playground shows a result. `endpoint` is the method in capitals and the path as the specification writes it, such as `GET /users/{id}`; `status` the HTTP status, or `client_error` for a request that never reached the API; `duration_ms` how long it took. It never carries the request's address, headers or body: those hold what the reader typed, keys included. |
 
 With `googleAnalytics` set, the portal also sends each event to GA4 directly, under its name
 without the `docs_` prefix: `docs_page_view` arrives as `page_view` and `docs_search` as
-`search`, which are GA4's own events with these same parameters, and the rest as custom
-events.
+`search`, which are GA4's own events; `page_title`, `page_location` and `search_term` are their own
+parameters, and the rest arrive as custom events and parameters.
 
 #### Registering the keys in GA4
 
 GA4 reports a custom parameter only once it is registered (Admin → Custom definitions). Register
-five custom dimensions, `search_term`, `result`, `language`, `endpoint` and `status`, and two
-custom metrics, `result_count` and `duration_ms`. Each appears in reports a day or two after.
-`page_title`, `page_location` and `page_referrer` are GA4's own parameters and need nothing.
+four custom dimensions, `result`, `language`, `endpoint` and `status`, and two custom metrics,
+`result_count` and `duration_ms`. Each appears in reports a day or two after. `page_title`,
+`page_location`, `page_referrer` and `search_term` are GA4's own parameters and need nothing.
 
 ### Google Analytics 4
 
@@ -97,8 +97,8 @@ custom metrics, `result_count` and `duration_ms`. Each appears in reports a day 
    extension, so DebugView shows your session, then move between pages. DebugView must show one
    `page_view` per page change. Two per change means the setting in step 2 is still on; in
    reports, double counting shows as views climbing to about twice what readers saw.
-4. Redact `code` and `state`: Admin → Data streams → your stream → Redact data → add both as
-   query parameters. The portal never reports them, but GA4's own collection can read a page's
+4. Redact `code` and `state`: Admin → Data streams → your stream → Configure tag settings →
+   Show all → Redact data → add both as query parameters. The portal never reports them, but GA4's own collection can read a page's
    full address, and this keeps a sign-in answer out of it either way.
 5. With `googleAnalytics` set, do not also add a GA4 tag for the same stream inside the GTM
    container: every hit would count twice.
@@ -150,17 +150,18 @@ tag in the HTML.
 ### Consent
 
 Consent is yours to collect in this release. A consent banner inside the GTM container works as
-it does on any site, with Google's Consent Mode deciding what each tag may send. With
-`googleAnalytics` set directly, GA4 runs under Consent Mode once your banner sends its update.
-A banner of your own, outside GTM, waits for a later portal setting.
+it does on any site, with Google's Consent Mode deciding what each tag may send, so load GA4
+through the container when readers must consent first. `googleAnalytics` set directly cannot
+wait for a banner: the portal configures GA4 as the page starts, before a banner inside the
+container can set a consent default, so its first hits go out as consented. A banner of your
+own, outside GTM, waits for a later portal setting.
 
 ### Content Security Policy
 
-If the portal's host sets a CSP, allow the domains in
-[Google's CSP guide](https://developers.google.com/tag-platform/security/guides/csp): the
-tag manager and Google tag script on `https://www.googletagmanager.com`, and GA4's collection on
-`https://*.google-analytics.com` and `https://*.analytics.google.com`, plus whatever each tag
-inside the container loads.
+If the portal's host sets a CSP, copy the `script-src`, `img-src` and `connect-src` lists from
+[Google's CSP guide](https://developers.google.com/tag-platform/security/guides/csp), which name
+`www.googletagmanager.com`, `*.googletagmanager.com`, `*.google-analytics.com` and
+`*.analytics.google.com`, and add whatever each tag inside the container loads.
 
 ### Who can change the container
 
@@ -170,11 +171,12 @@ page, and read what readers type. Give it only to people you would give the repo
 ### Session replay
 
 Session replay tools record what readers type. The API playground, where readers paste keys
-and tokens, is wrapped in an element carrying the opt-out markers of PostHog (`ph-no-capture`),
-FullStory (`fs-exclude`), rrweb (`rr-block`), Amplitude (`amp-block`), Hotjar
-(`data-hj-suppress`), Microsoft Clarity (`data-clarity-mask`) and LogRocket (`data-private`),
-so a replay shows the page with the playground blank. For any other tool, block the selector
-`[data-portal-playground]` in its settings.
+and tokens, carries the opt-out markers of PostHog (`ph-no-capture`), FullStory (`fs-exclude`),
+rrweb (`rr-block`), Amplitude (`amp-block`), Hotjar (`data-hj-suppress`), Microsoft Clarity
+(`data-clarity-mask`) and LogRocket (`data-private`): its header on the page, and the dialog it
+opens, which is marked as it appears. A replay shows the page with the playground blank. For
+any other tool, block the selector `[data-portal-playground]` in its settings, which both the
+header and the dialog carry.
 
 ### After a sign-in
 
@@ -205,3 +207,6 @@ In `v4/src/content/apimatic-cli/cli-reference.mdx`, both `apimatic portal genera
 | Flag | Description |
 |---|---|
 | `--no-analytics` | leave out Google Tag Manager, Google Analytics and every analytics or marketing script, for staging. |
+
+"Every analytics or marketing script" refers to `portal.scripts`, which a later release adds; until
+then the flag leaves out the two Google tags.
