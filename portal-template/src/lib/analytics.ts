@@ -48,14 +48,6 @@ export interface PortalEvents {
 }
 export type PortalEventName = keyof PortalEvents;
 
-export interface PortalEvent {
-  readonly name: PortalEventName;
-  readonly params: Readonly<Record<string, unknown>>;
-  readonly time: number;
-  /** Lets a later shape be told from this one. */
-  readonly version: 1;
-}
-
 /** The reset entry, then the event entry with every detail under `docs`. */
 export type DataLayerEntry =
   | { docs: null }
@@ -136,7 +128,6 @@ export function analyticsFor(settings: PortalAnalytics) {
   const live: Adapter[] = [];
   if (settings.googleTagManager) live.push(adapters.googleTagManager(settings.googleTagManager));
   if (settings.googleAnalytics) live.push(adapters.googleAnalytics(settings.googleAnalytics));
-  const events: PortalEvent[] = [];
   let set = false;
   let inserted = false;
   let waiting = false;
@@ -185,7 +176,6 @@ export function analyticsFor(settings: PortalAnalytics) {
     dataLayer.push(reset);
     dataLayer.push(entry);
     for (const adapter of live) adapter.send(name, all);
-    events.push(Object.freeze({ name, params: Object.freeze(all), time: Date.now(), version: 1 }));
   }
 
   function reportPageViews(router: { subscribe(event: 'onRendered', listener: () => void): () => void }): () => void {
@@ -199,7 +189,7 @@ export function analyticsFor(settings: PortalAnalytics) {
     return router.subscribe('onRendered', pageView);
   }
 
-  return { startAnalytics, insertWhenClean, report, reportPageViews, events };
+  return { startAnalytics, insertWhenClean, report, reportPageViews };
 }
 
 function add(src: string): void {

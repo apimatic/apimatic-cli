@@ -531,7 +531,6 @@ describe('analyticsFor', () => {
         expect(page.dataLayer()).to.have.length(3);
         expect(pageViews(page.dataLayer())).to.be.empty;
         expect(page.scripts).to.be.empty;
-        expect(analytics.events).to.be.empty;
       });
     }
   });
@@ -664,29 +663,6 @@ describe('analyticsFor', () => {
       expect(mergedLikeGtm(page.dataLayer()).docs).to.deep.equal({ page_title: 'B', page_location: quickstart });
       const withoutResets = page.dataLayer().filter((entry) => !(isPlainObject(entry) && entry.docs === null));
       expect(mergedLikeGtm(withoutResets).docs).to.have.property('language', 'python');
-    });
-
-    it('keeps each event, frozen, for replay', () => {
-      browser(quickstart);
-      const analytics = analyticsFor(none);
-      analytics.startAnalytics();
-      const before = Date.now();
-
-      analytics.report('docs_page_view', { page_title: 'A' });
-      analytics.report('docs_page_view', { page_title: 'B' });
-
-      expect(analytics.events).to.have.length(2);
-      const [first, second] = analytics.events;
-      expect(first).to.deep.equal({
-        name: 'docs_page_view',
-        params: { page_title: 'A', page_location: quickstart },
-        time: first.time,
-        version: 1
-      });
-      expect(first.time).to.be.at.least(before);
-      expect(second.params).to.include({ page_title: 'B' });
-      expect(Object.isFrozen(first)).to.be.true;
-      expect(Object.isFrozen(first.params)).to.be.true;
     });
   });
 
