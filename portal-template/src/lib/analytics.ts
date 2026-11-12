@@ -2,6 +2,10 @@ import { withBasePath } from './base-path';
 import { oauthCallbackPath } from './oauth-callback';
 import type { PortalAnalytics } from './portal-types';
 
+/** 5 seconds in all: long enough for a slow page chunk to run the playground's effect that removes the answer. */
+const ANSWER_CHECKS = 50;
+const ANSWER_CHECK_MS = 100;
+
 /** Names the OAuth standard puts in an answer. While one is in the address, the loader inserts nothing. */
 const OAUTH_ANSWER = [
   'code',
@@ -134,6 +138,8 @@ export function analyticsFor(settings: PortalAnalytics) {
   if (settings.googleAnalytics) live.push(adapters.googleAnalytics(settings.googleAnalytics));
   const events: PortalEvent[] = [];
   let set = false;
+  let inserted = false;
+  let waiting = false;
   let lastPageView: string | null = null;
 
   function startAnalytics(): void {
@@ -141,10 +147,30 @@ export function analyticsFor(settings: PortalAnalytics) {
     set = true;
     const dataLayer = (window.dataLayer ??= []);
     for (const adapter of live) adapter.setup(dataLayer);
-    if (!holdsOAuthAnswer(window.location.href)) insert();
+    insertWhenClean();
+  }
+
+  function insertWhenClean(): void {
+    if (inserted || waiting) return;
+    if (!holdsOAuthAnswer(window.location.href)) {
+      insert();
+      return;
+    }
+    // The playground's effect that removes the answer can run after ours, and vendor tags read the address themselves.
+    waiting = true;
+    let checks = 0;
+    const timer = setInterval(() => {
+      const answered = holdsOAuthAnswer(window.location.href);
+      if (answered && ++checks < ANSWER_CHECKS) return;
+      // After the last check the next page change calls this again, so a page never cleaned loads nothing.
+      clearInterval(timer);
+      waiting = false;
+      if (!answered) insert();
+    }, ANSWER_CHECK_MS);
   }
 
   function insert(): void {
+    inserted = true;
     for (const adapter of live) for (const src of adapter.scripts()) add(src);
   }
 
@@ -173,7 +199,7 @@ export function analyticsFor(settings: PortalAnalytics) {
     return router.subscribe('onRendered', pageView);
   }
 
-  return { startAnalytics, report, reportPageViews, events };
+  return { startAnalytics, insertWhenClean, report, reportPageViews, events };
 }
 
 function add(src: string): void {

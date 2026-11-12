@@ -1,4 +1,5 @@
 import { expect } from 'chai';
+import sinon from 'sinon';
 import {
   Adapter,
   adapters,
@@ -246,8 +247,15 @@ describe('analyticsFor', () => {
     docs: { page_title: 'Quickstart | Acme API', page_location: quickstart }
   };
   const global = globalThis as { window?: unknown; document?: unknown };
+  let clock: sinon.SinonFakeTimers;
+
+  // A start on an address with an OAuth answer leaves a timer, which must never fire for real once the fakes are gone.
+  beforeEach(() => {
+    clock = sinon.useFakeTimers();
+  });
 
   afterEach(() => {
+    clock.restore();
     delete global.window;
     delete global.document;
   });
@@ -414,30 +422,96 @@ describe('analyticsFor', () => {
     });
   });
 
-  // The wait for the playground to take the answer out of the address is the next step.
   describe('while the address holds an OAuth answer', () => {
-    it('pushes the setup entries and inserts no script', () => {
-      const page = browser('https://docs.test/api/pets/listPets?code=abc&state=123');
+    const listPets = 'https://docs.test/api/pets/listPets';
+    const answered = `${listPets}?code=abc&state=123`;
+
+    it('pushes the setup entries at once and inserts no script while the answer stays', () => {
+      const page = browser(answered);
 
       analyticsFor(withBoth).startAnalytics();
 
       expect(page.dataLayer()).to.have.length(3);
+      clock.tick(100 * 10);
       expect(page.scripts).to.be.empty;
     });
 
-    it('still reports, with a clean page_location', () => {
-      const page = browser('https://docs.test/api/pets/listPets#access_token=xyz&state=123', 'List pets');
+    it('still reports meanwhile, at once, with a clean page_location', () => {
+      const page = browser(`${listPets}#access_token=xyz&state=123`, 'List pets');
       const analytics = analyticsFor(withBoth);
 
       analytics.startAnalytics();
       analytics.reportPageViews(fakeRouter());
 
       expect(pageViews(page.dataLayer())).to.deep.equal([
-        {
-          event: 'docs_page_view',
-          docs: { page_title: 'List pets', page_location: 'https://docs.test/api/pets/listPets' }
-        }
+        { event: 'docs_page_view', docs: { page_title: 'List pets', page_location: listPets } }
       ]);
+    });
+
+    it('inserts at the next check once the playground has taken the answer out of the address', () => {
+      const page = browser(answered);
+      analyticsFor(withBoth).startAnalytics();
+
+      clock.tick(300);
+      page.go(listPets);
+      expect(page.scripts).to.be.empty;
+      clock.tick(100);
+
+      expect(page.scripts.map((script) => script.src)).to.deep.equal([GTM_SCRIPT, GA4_SCRIPT]);
+      expect(clock.countTimers()).to.equal(0);
+    });
+
+    it('inserts at the next check after a page change while it waits', () => {
+      const page = browser(answered);
+      analyticsFor(withBoth).startAnalytics();
+
+      clock.tick(1000);
+      page.go(quickstart);
+      clock.tick(100);
+
+      expect(page.scripts).to.have.length(2);
+    });
+
+    it('stops checking after 5 seconds, and a later call on a clean address inserts at once', () => {
+      const page = browser(answered);
+      const analytics = analyticsFor(withBoth);
+      analytics.startAnalytics();
+
+      clock.tick(100 * 50);
+      expect(page.scripts).to.be.empty;
+      expect(clock.countTimers()).to.equal(0);
+      page.go(listPets);
+      clock.tick(100 * 50);
+      expect(page.scripts).to.be.empty;
+      analytics.insertWhenClean();
+
+      expect(page.scripts).to.have.length(2);
+      expect(clock.countTimers()).to.equal(0);
+    });
+
+    it('starts no second timer for a call while it waits, and inserts once', () => {
+      const page = browser(answered);
+      const analytics = analyticsFor(withBoth);
+      analytics.startAnalytics();
+
+      analytics.insertWhenClean();
+      analytics.insertWhenClean();
+      expect(clock.countTimers()).to.equal(1);
+      page.go(listPets);
+      clock.tick(100);
+
+      expect(page.scripts).to.have.length(2);
+    });
+
+    it('adds nothing on a call after the insert', () => {
+      const page = browser(listPets);
+      const analytics = analyticsFor(withBoth);
+      analytics.startAnalytics();
+
+      analytics.insertWhenClean();
+
+      expect(page.scripts).to.have.length(2);
+      expect(clock.countTimers()).to.equal(0);
     });
   });
 
