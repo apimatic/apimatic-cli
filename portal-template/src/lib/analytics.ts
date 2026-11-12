@@ -33,6 +33,7 @@ export interface PortalEvents {
   docs_sdk_download: { language: string };
   docs_code_copy: { language: string };
   docs_search: { search_term: string; result: string; result_count: number };
+  docs_not_found: { page_referrer: string };
 }
 export type PortalEventName = keyof PortalEvents;
 
@@ -123,6 +124,7 @@ export class Analytics {
   private readonly live: Adapter[] = [];
   private started = false;
   private lastPageView: string | null = null;
+  private previousPageView: string | null = null;
 
   public constructor(private readonly settings: PortalAnalytics) {
     if (settings.googleTagManager) this.live.push(adapters.googleTagManager(settings.googleTagManager));
@@ -158,6 +160,7 @@ export class Analytics {
   public reportPageView(): void {
     const page = pageLocation(window.location.href, this.settings.keepQueryParams);
     if (page === null || page === this.lastPageView) return;
+    this.previousPageView = this.lastPageView;
     this.lastPageView = page;
     this.report('docs_page_view', { page_title: document.title });
   }
@@ -174,5 +177,14 @@ export class Analytics {
     const search_term = term.trim();
     if (search_term === '') return;
     this.report('docs_search', { search_term, result: picked, result_count: resultCount });
+  }
+  /** The not-found page: `page_referrer` is the portal page left for it, else the document's referrer without its query. */
+  public reportNotFound(documentReferrer: string): void {
+    const referrer = documentReferrer === '' ? null : new URL(documentReferrer);
+    if (referrer !== null) {
+      referrer.search = '';
+      referrer.hash = '';
+    }
+    this.report('docs_not_found', { page_referrer: this.previousPageView ?? referrer?.href ?? '' });
   }
 }

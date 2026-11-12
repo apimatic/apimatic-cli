@@ -100,7 +100,8 @@ describe('PortalEvents', () => {
     docs_plugin_install: {},
     docs_sdk_download: { language: true },
     docs_code_copy: { language: true },
-    docs_search: { search_term: true, result: true, result_count: true }
+    docs_search: { search_term: true, result: true, result_count: true },
+    docs_not_found: { page_referrer: true }
   };
 
   it('names every event docs_ plus lowercase snake_case, at most 40 characters', () => {
@@ -697,6 +698,36 @@ describe('Analytics', () => {
       analytics.reportSearch('   ', '/guides/authentication', 1);
 
       expect(searches(page.dataLayer())).to.be.empty;
+    });
+  });
+  describe('reportNotFound', () => {
+    const missing = 'https://docs.acme.com/guides/missing';
+    const referrers = (entries: unknown[]) =>
+      entries
+        .filter((entry) => isPlainObject(entry) && entry.event === 'docs_not_found')
+        .map((entry) => (entry as { docs: { page_referrer: string } }).docs.page_referrer);
+
+    it('names the portal page the reader left for it, whatever the document says', () => {
+      const page = browser('https://docs.acme.com/guides/quickstart');
+      const analytics = new Analytics(none);
+      analytics.reportPageView();
+      page.go(missing);
+      analytics.reportPageView();
+
+      analytics.reportNotFound('https://www.google.com/search?q=acme+docs');
+
+      expect(referrers(page.dataLayer())).to.deep.equal(['https://docs.acme.com/guides/quickstart']);
+      expect(page.dataLayer().at(-1)).to.have.nested.property('docs.page_location', missing);
+    });
+
+    it('names the referrer without its query or # part on a first load, and nothing when the browser sends none', () => {
+      const page = browser(missing);
+      const analytics = new Analytics(none);
+
+      analytics.reportNotFound('https://www.google.com/search?q=acme+docs#top');
+      analytics.reportNotFound('');
+
+      expect(referrers(page.dataLayer())).to.deep.equal(['https://www.google.com/search', '']);
     });
   });
 });
