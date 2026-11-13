@@ -443,12 +443,13 @@ describe('Analytics', () => {
       expect(page.scripts.map((script) => script.src)).to.deep.equal([GTM_SCRIPT, GA4_SCRIPT]);
     });
 
-    it('starts once: a second start adds no entry and no script', () => {
+    it('starts once per page, for a second start and for a second instance alike', () => {
       const page = browser(quickstart);
       const analytics = new Analytics(withBoth);
 
       analytics.start();
       analytics.start();
+      new Analytics(withBoth).start();
 
       expect(page.dataLayer()).to.have.length(3);
       expect(page.scripts).to.have.length(2);

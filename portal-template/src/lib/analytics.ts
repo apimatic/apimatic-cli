@@ -50,6 +50,8 @@ declare global {
   interface Window {
     dataLayer?: unknown[];
     gtag?: Gtag;
+    /** Set by the first start in a page load: a module Vite evaluates again under `portal serve` makes a second instance. */
+    portalAnalyticsStarted?: true;
   }
 }
 
@@ -145,7 +147,6 @@ function insertTags(live: Adapter[], keep: readonly string[]): void {
 /** The one instance a portal runs: started when the bundle evaluates, reporting from the root effect and the components. */
 export class Analytics {
   private readonly live: Adapter[];
-  private started = false;
   private lastPageView: string | null = null;
   private previousPageView: string | null = null;
   private lastNotFound: string | null = null;
@@ -159,12 +160,13 @@ export class Analytics {
   }
 
   /**
-   * Once, when the bundle starts: the data layer, every vendor's setup entries, then the vendor tags unless the
-   * address holds an OAuth answer, in which case the next page view inserts them.
+   * Once per page load, when the bundle starts: the data layer, every vendor's setup entries, then the vendor
+   * tags unless the address holds an OAuth answer, in which case the next page view inserts them. The guard is
+   * the window's, not the instance's: a config save under `portal serve` makes Vite evaluate the module again.
    */
   public start(): void {
-    if (this.started) return;
-    this.started = true;
+    if (window.portalAnalyticsStarted) return;
+    window.portalAnalyticsStarted = true;
     const dataLayer = (window.dataLayer ??= []);
     for (const adapter of this.live) adapter.setup(dataLayer);
     insertTags(this.live, this.settings.keepQueryParams);
