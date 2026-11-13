@@ -117,19 +117,6 @@ export function pageLocation(href: string, keep: readonly string[], base?: strin
 }
 
 /**
- * The language of the code block a copy button sits in: a titled block's caption, or the selected tab's name
- * when the block is one of a tabbed set. Null for a block with neither, and for a button outside any block.
- */
-export function copiedLanguage(button: Element): string | null {
-  const figure = button.closest('figure');
-  if (figure === null) return null;
-  const caption = figure.querySelector('figcaption')?.textContent?.trim();
-  if (caption) return caption;
-  const tabs = figure.closest('[role="tabpanel"]')?.parentElement;
-  return tabs?.querySelector('[role="tab"][aria-selected="true"]')?.textContent?.trim() || null;
-}
-
-/**
  * Appends each vendor tag once, and none while the address holds an OAuth answer, which GTM's tags and gtag.js
  * read for themselves; a tag already in the page is left, so a page view after the callback adds only the rest.
  */
@@ -197,29 +184,14 @@ export class Analytics {
     if (this.lastNotFound !== page) this.lastNotFound = null;
     this.report('docs_page_view', { page_title: document.title });
   }
-  /** For a click anywhere on the page: a code block's copy button reports the copy with the block's language. */
-  public reportCodeCopy(target: EventTarget | null): void {
-    const button = target !== null && 'closest' in target ? (target as Element).closest('figure button') : null;
-    if (button === null) return;
-    // Not a copy: a dropdown in a block's header, the playground's dialog, or a block that reports its own copy.
-    if (button.matches('[role="combobox"]') || button.matches('[aria-haspopup]')) return;
-    if (button.closest('[role="dialog"]') !== null || button.closest('[data-copy-reported]') !== null) return;
-    const language = copiedLanguage(button);
-    if (language !== null) this.report('docs_code_copy', { language });
-  }
-  /** One search, as the dialog closes: what was typed, the pick or '' for none, the count shown, and the page searched from. */
-  public reportSearch(term: string, picked: string, resultCount: number, href: string): void {
-    const search_term = term.trim();
-    if (search_term === '') return;
-    this.report('docs_search', { search_term, result: picked, result_count: resultCount }, href);
-  }
+
   /** The not-found page, once per missing page: `page_referrer` is the portal page left for it, else the document's referrer without its query. */
-  public reportNotFound(documentReferrer: string): void {
+  public reportNotFound(): void {
     const page = pageLocation(window.location.href, this.settings.keepQueryParams);
     // A dev build mounts the page twice; the next missing page is a new report.
     if (page === null || page === this.lastNotFound) return;
     this.lastNotFound = page;
-    const referrer = documentReferrer === '' ? null : new URL(documentReferrer);
+    const referrer = document.referrer === '' ? null : new URL(document.referrer);
     if (referrer !== null) {
       referrer.search = '';
       referrer.hash = '';

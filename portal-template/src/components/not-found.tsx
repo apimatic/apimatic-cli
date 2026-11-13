@@ -8,7 +8,7 @@ import { DefaultNotFound } from 'fumadocs-ui/layouts/home/not-found';
 export function NotFound() {
   const { pathname } = useLocation();
   // Keyed on the path: the same component shows the next missing page too.
-  useEffect(() => analytics.reportNotFound(document.referrer), [pathname]);
+  useEffect(() => analytics.reportNotFound(), [pathname]);
   return (
     <HomeLayout {...baseOptions()}>
       <DefaultNotFound />

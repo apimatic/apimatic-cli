@@ -3,7 +3,6 @@ import {
   Adapter,
   adapters,
   Analytics,
-  copiedLanguage,
   pageLocation,
   PortalEventName,
   PortalEvents
@@ -121,87 +120,6 @@ describe('PortalEvents', () => {
   });
 });
 
-/** As much of an element as the copy reader walks: the selectors it matches, its text, and its place in the tree. */
-class FakeElement {
-  public parentElement: FakeElement | null = null;
-
-  public constructor(
-    private readonly selectors: string[],
-    public readonly textContent: string | null = null,
-    private readonly children: FakeElement[] = []
-  ) {
-    for (const child of children) child.parentElement = this;
-  }
-
-  public matches(selector: string): boolean {
-    return this.selectors.includes(selector);
-  }
-
-  public closest(selector: string): FakeElement | null {
-    return this.selectors.includes(selector) ? this : this.parentElement?.closest(selector) ?? null;
-  }
-
-  public querySelector(selector: string): FakeElement | null {
-    for (const child of this.children) {
-      const found = child.selectors.includes(selector) ? child : child.querySelector(selector);
-      if (found !== null) return found;
-    }
-    return null;
-  }
-}
-
-const element = (fake: FakeElement) => fake as unknown as Parameters<typeof copiedLanguage>[0];
-
-/** Fumadocs' code block: a figure with the copy button in its header beside the caption, or in its corner when untitled. */
-function codeBlock(title: string | null) {
-  const button = new FakeElement(['figure button']);
-  const caption = title === null ? [] : [new FakeElement(['figcaption'], title)];
-  const figure = new FakeElement(['figure'], null, [new FakeElement([], null, [...caption, button])]);
-  return { figure, button };
-}
-
-/** A tabbed set of untitled blocks under one root, with `selected` shown: the copy button of the block that is. */
-function tabbedBlocks(names: string[], selected: string): FakeElement {
-  const tabs = names.map(
-    (name) =>
-      new FakeElement(
-        name === selected ? ['[role="tab"]', '[role="tab"][aria-selected="true"]'] : ['[role="tab"]'],
-        name
-      )
-  );
-  const blocks = names.map(() => codeBlock(null));
-  const panels = blocks.map(({ figure }) => new FakeElement(['[role="tabpanel"]'], null, [figure]));
-  new FakeElement([], null, [new FakeElement(['[role="tablist"]'], null, tabs), ...panels]);
-  return blocks[names.indexOf(selected)].button;
-}
-
-describe('copiedLanguage', () => {
-  it('reads a titled block’s caption', () => {
-    expect(copiedLanguage(element(codeBlock('TypeScript').button))).to.equal('TypeScript');
-  });
-
-  it('reads the selected tab’s name for a block in a tabbed set', () => {
-    expect(copiedLanguage(element(tabbedBlocks(['cURL', 'TypeScript'], 'TypeScript')))).to.equal('TypeScript');
-    expect(copiedLanguage(element(tabbedBlocks(['cURL', 'TypeScript'], 'cURL')))).to.equal('cURL');
-  });
-
-  it('prefers the caption of a titled block inside a tabbed set', () => {
-    const { figure, button } = codeBlock('Terminal');
-    const tab = new FakeElement(['[role="tab"]', '[role="tab"][aria-selected="true"]'], 'macOS');
-    new FakeElement([], null, [
-      new FakeElement(['[role="tablist"]'], null, [tab]),
-      new FakeElement(['[role="tabpanel"]'], null, [figure])
-    ]);
-
-    expect(copiedLanguage(element(button))).to.equal('Terminal');
-  });
-
-  it('is null for a block with neither, and for a button outside any block', () => {
-    expect(copiedLanguage(element(codeBlock(null).button))).to.be.null;
-    expect(copiedLanguage(element(new FakeElement(['button'])))).to.be.null;
-  });
-});
-
 interface FakeScript {
   async: boolean;
   src: string;
@@ -215,11 +133,12 @@ interface FakeWindow {
 }
 
 /** A page in the browser: the `window` and `document` the module reads, and the scripts the loader appends. */
-function browser(href: string, title = 'Quickstart | Acme API') {
+function browser(href: string, title = 'Quickstart | Acme API', referrer = '') {
   const scripts: FakeScript[] = [];
   const window: FakeWindow = { location: { href } };
   const document = {
     title,
+    referrer,
     createElement: (): FakeScript => ({ async: false, src: '', textContent: '' }),
     head: {
       append: (script: FakeScript) => scripts.push(script),
@@ -639,6 +558,20 @@ describe('Analytics', () => {
       const withoutResets = page.dataLayer().filter((entry) => !(isPlainObject(entry) && entry.docs === null));
       expect(mergedLikeGtm(withoutResets).docs).to.have.property('language', 'python');
     });
+
+    it('reports the page the caller names, not the one the address has moved on to', () => {
+      const page = browser(quickstart);
+      const analytics = new Analytics(none);
+      page.go('https://docs.test/guides/authentication');
+
+      analytics.report(
+        'docs_search',
+        { search_term: 'auth', result: '/guides/authentication', result_count: 3 },
+        quickstart
+      );
+
+      expect(page.dataLayer().at(-1)).to.have.nested.property('docs.page_location', quickstart);
+    });
   });
 
   // The root effect calls this once on mount and once per page change the router renders.
@@ -691,104 +624,6 @@ describe('Analytics', () => {
       ).to.deep.equal([quickstart, components, quickstart]);
     });
   });
-  describe('reportCodeCopy', () => {
-    const address = 'https://docs.acme.com/guides/quickstart';
-    const codeCopies = (entries: unknown[]) =>
-      entries.filter((entry) => isPlainObject(entry) && entry.event === 'docs_code_copy');
-
-    it('reports a code block’s copy with its language', () => {
-      const page = browser(address);
-      const analytics = new Analytics(none);
-
-      analytics.reportCodeCopy(element(codeBlock('TypeScript').button));
-
-      expect(codeCopies(page.dataLayer())).to.deep.equal([
-        { event: 'docs_code_copy', docs: { language: 'TypeScript', page_location: address } }
-      ]);
-    });
-
-    it('reports nothing for a click outside a block, on an untitled block, or in a block that reports its own copy', () => {
-      const page = browser(address);
-      const analytics = new Analytics(none);
-      const own = codeBlock('Terminal');
-      // The install command's wrapper marks its block.
-      new FakeElement(['[data-copy-reported]'], null, [own.figure]);
-
-      analytics.reportCodeCopy(element(new FakeElement(['button'])));
-      analytics.reportCodeCopy(element(codeBlock(null).button));
-      analytics.reportCodeCopy(element(own.button));
-      analytics.reportCodeCopy(null);
-
-      expect(codeCopies(page.dataLayer())).to.be.empty;
-    });
-
-    it('reports nothing for a dropdown in a block’s header, nor for anything in the playground’s dialog', () => {
-      const page = browser(address);
-      const analytics = new Analytics(none);
-      const dropdown = new FakeElement(['figure button', '[role="combobox"]']);
-      new FakeElement(['figure'], null, [
-        new FakeElement([], null, [new FakeElement(['figcaption'], 'Request'), dropdown])
-      ]);
-      const menu = new FakeElement(['figure button', '[aria-haspopup]']);
-      new FakeElement(['figure'], null, [new FakeElement(['figcaption'], 'JSON'), menu]);
-      const inDialog = codeBlock('Body');
-      new FakeElement(['[role="dialog"]'], null, [inDialog.figure]);
-
-      analytics.reportCodeCopy(element(dropdown));
-      analytics.reportCodeCopy(element(menu));
-      analytics.reportCodeCopy(element(inDialog.button));
-
-      expect(codeCopies(page.dataLayer())).to.be.empty;
-    });
-  });
-  describe('reportSearch', () => {
-    const address = 'https://docs.acme.com/guides/quickstart';
-    const searches = (entries: unknown[]) =>
-      entries.filter((entry) => isPlainObject(entry) && entry.event === 'docs_search');
-
-    it('reports the term trimmed, the pick and the count shown', () => {
-      const page = browser(address);
-
-      new Analytics(none).reportSearch(' auth ', '/guides/authentication', 3, address);
-
-      expect(searches(page.dataLayer())).to.deep.equal([
-        {
-          event: 'docs_search',
-          docs: { search_term: 'auth', result: '/guides/authentication', result_count: 3, page_location: address }
-        }
-      ]);
-    });
-
-    it('reports an empty result when the dialog closed without a pick', () => {
-      const page = browser(address);
-
-      new Analytics(none).reportSearch('auth', '', 0, address);
-
-      expect(searches(page.dataLayer())).to.deep.equal([
-        { event: 'docs_search', docs: { search_term: 'auth', result: '', result_count: 0, page_location: address } }
-      ]);
-    });
-
-    it('reports nothing when nothing was typed', () => {
-      const page = browser(address);
-      const analytics = new Analytics(none);
-
-      analytics.reportSearch('', '', 0, address);
-      analytics.reportSearch('   ', '/guides/authentication', 1, address);
-
-      expect(searches(page.dataLayer())).to.be.empty;
-    });
-
-    it('reports the page the search was made on, not the one a pick led to', () => {
-      const page = browser(address);
-      const analytics = new Analytics(none);
-      page.go('https://docs.acme.com/guides/authentication');
-
-      analytics.reportSearch('auth', '/guides/authentication', 3, address);
-
-      expect(searches(page.dataLayer())).to.have.nested.property('[0].docs.page_location', address);
-    });
-  });
   describe('reportNotFound', () => {
     const missing = 'https://docs.acme.com/guides/missing';
     const referrers = (entries: unknown[]) =>
@@ -797,49 +632,56 @@ describe('Analytics', () => {
         .map((entry) => (entry as { docs: { page_referrer: string } }).docs.page_referrer);
 
     it('names the portal page the reader left for it, whatever the document says', () => {
-      const page = browser('https://docs.acme.com/guides/quickstart');
+      const page = browser(
+        'https://docs.acme.com/guides/quickstart',
+        'Quickstart',
+        'https://www.google.com/search?q=acme+docs'
+      );
       const analytics = new Analytics(none);
       analytics.reportPageView();
       page.go(missing);
       analytics.reportPageView();
 
-      analytics.reportNotFound('https://www.google.com/search?q=acme+docs');
+      analytics.reportNotFound();
 
       expect(referrers(page.dataLayer())).to.deep.equal(['https://docs.acme.com/guides/quickstart']);
       expect(page.dataLayer().at(-1)).to.have.nested.property('docs.page_location', missing);
     });
 
     it('names the page left when the missing page’s own view is yet to be reported', () => {
-      const page = browser('https://docs.acme.com/guides/quickstart');
+      const page = browser(
+        'https://docs.acme.com/guides/quickstart',
+        'Quickstart',
+        'https://www.google.com/search?q=acme+docs'
+      );
       const analytics = new Analytics(none);
       analytics.reportPageView();
       page.go(missing);
 
-      analytics.reportNotFound('https://www.google.com/search?q=acme+docs');
+      analytics.reportNotFound();
       analytics.reportPageView();
 
       expect(referrers(page.dataLayer())).to.deep.equal(['https://docs.acme.com/guides/quickstart']);
     });
 
     it('names the referrer without its query or # part on a first load, and nothing when the browser sends none', () => {
-      const page = browser(missing);
-      const analytics = new Analytics(none);
+      const fromSearch = browser(missing, 'Not found', 'https://www.google.com/search?q=acme+docs#top');
+      new Analytics(none).reportNotFound();
+      const typedIn = browser(missing, 'Not found');
+      new Analytics(none).reportNotFound();
 
-      analytics.reportNotFound('https://www.google.com/search?q=acme+docs#top');
-      page.go('https://docs.acme.com/guides/other-missing');
-      analytics.reportNotFound('');
-
-      expect(referrers(page.dataLayer())).to.deep.equal(['https://www.google.com/search', '']);
+      expect(referrers(fromSearch.dataLayer())).to.deep.equal(['https://www.google.com/search']);
+      expect(referrers(typedIn.dataLayer())).to.deep.equal(['']);
     });
 
     it('reports a missing page once, however often its page mounts, and the next missing page again', () => {
       const page = browser(missing);
       const analytics = new Analytics(none);
 
-      analytics.reportNotFound('');
-      analytics.reportNotFound('');
+      analytics.reportNotFound();
+      analytics.reportNotFound();
       page.go('https://docs.acme.com/guides/also-missing');
-      analytics.reportNotFound('');
+      analytics.reportNotFound();
 
       expect(referrers(page.dataLayer())).to.deep.equal(['', '']);
     });
@@ -849,14 +691,14 @@ describe('Analytics', () => {
       const analytics = new Analytics(none);
       analytics.reportPageView();
       page.go(missing);
-      analytics.reportNotFound('');
+      analytics.reportNotFound();
       analytics.reportPageView();
-      analytics.reportNotFound('');
+      analytics.reportNotFound();
       page.go('https://docs.acme.com/guides/quickstart');
       analytics.reportPageView();
       page.go(missing);
       analytics.reportPageView();
-      analytics.reportNotFound('');
+      analytics.reportNotFound();
 
       expect(referrers(page.dataLayer())).to.deep.equal([
         'https://docs.acme.com/guides/quickstart',

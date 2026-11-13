@@ -51,8 +51,10 @@ export default function DefaultSearchDialog(props: SharedProps) {
   useEffect(() => {
     if (props.open || !wasOpen.current || query.isLoading) return;
     wasOpen.current = false;
-    if (typed.current || picked.current !== '') {
-      analytics.reportSearch(search, picked.current, results?.length ?? 0, openedAt.current);
+    const search_term = search.trim();
+    if ((typed.current || picked.current !== '') && search_term !== '') {
+      const result_count = results?.length ?? 0;
+      analytics.report('docs_search', { search_term, result: picked.current, result_count }, openedAt.current);
     }
     typed.current = false;
     picked.current = '';
