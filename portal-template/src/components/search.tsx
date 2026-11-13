@@ -37,31 +37,33 @@ export default function DefaultSearchDialog(props: SharedProps) {
   const typed = useRef(false);
   const picked = useRef('');
   const openedAt = useRef('');
+  const wasOpen = useRef(false);
 
   // The page the search is made on: a pick changes the address before the dialog reports its close.
   useEffect(() => {
-    if (props.open) openedAt.current = window.location.href;
+    if (!props.open) return;
+    wasOpen.current = true;
+    openedAt.current = window.location.href;
   }, [props.open]);
+
+  // A close is seen from the prop, which the hotkey changes too. Fumadocs hands over the pick before the close
+  // renders, and the last keystrokes' results may still be loading, so the report waits for the results shown.
+  useEffect(() => {
+    if (props.open || !wasOpen.current || query.isLoading) return;
+    wasOpen.current = false;
+    if (typed.current || picked.current !== '') {
+      analytics.reportSearch(search, picked.current, results?.length ?? 0, openedAt.current);
+    }
+    typed.current = false;
+    picked.current = '';
+  }, [props.open, query.isLoading, search, results]);
 
   const onSearchChange = (value: string) => {
     typed.current = true;
     setSearch(value);
   };
   const onSelect = (item: SearchItemType) => {
-    typed.current = true;
     picked.current = 'url' in item ? item.url : '';
-  };
-  const onOpenChange = (open: boolean) => {
-    props.onOpenChange(open);
-    if (open || !typed.current) return;
-    typed.current = false;
-    const count = results?.length ?? 0;
-    const page = openedAt.current;
-    // Fumadocs closes the dialog before it hands over the pick, so the report waits a tick for it.
-    window.setTimeout(() => {
-      analytics.reportSearch(search, picked.current, count, page);
-      picked.current = '';
-    }, 0);
   };
 
   return (
@@ -70,7 +72,6 @@ export default function DefaultSearchDialog(props: SharedProps) {
       onSearchChange={onSearchChange}
       isLoading={query.isLoading}
       {...props}
-      onOpenChange={onOpenChange}
       onSelect={onSelect}
     >
       <SearchDialogOverlay />
