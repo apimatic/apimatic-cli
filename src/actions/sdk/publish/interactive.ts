@@ -17,7 +17,11 @@ export class SdkPublishInteractiveAction {
   private readonly prompts: SdkPublishInteractivePrompts = new SdkPublishInteractivePrompts();
   private readonly publishingApiService: PublishingApiService = new PublishingApiService();
 
-  public constructor(private readonly configDir: DirectoryPath, private readonly commandMetadata: CommandMetadata) {}
+  public constructor(
+    private readonly configDir: DirectoryPath,
+    private readonly commandMetadata: CommandMetadata,
+    private readonly authKey: string | null = null
+  ) {}
 
   public readonly execute = async (
     defaultProjectDirectory: DirectoryPath,
@@ -35,7 +39,7 @@ export class SdkPublishInteractiveAction {
     const project = ProjectContext.in(workingDirectory);
 
     const publishingProfilesResponse = await this.prompts.getPublishingProfiles(
-      this.publishingApiService.getPublishingProfiles(this.configDir, this.commandMetadata.shell)
+      this.publishingApiService.getPublishingProfiles(this.configDir, this.commandMetadata.shell, this.authKey)
     );
     if (publishingProfilesResponse.isErr()) {
       this.prompts.getPublishingProfilesServiceError(publishingProfilesResponse.error);
@@ -126,7 +130,7 @@ export class SdkPublishInteractiveAction {
     }
 
     const publishingProfileId = ProfileId.createFromPublishingProfileItem(publishingProfileItem);
-    const publishResult = await new SdkPublishAction(this.configDir, this.commandMetadata).execute(
+    const publishResult = await new SdkPublishAction(this.configDir, this.commandMetadata, this.authKey).execute(
       project,
       sdkDirectory,
       language,
