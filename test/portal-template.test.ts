@@ -16,6 +16,7 @@ import { GENERATED_INCLUDES_DIRECTORY_NAME } from '../src/types/portal/page-frag
 import { PortalIdentity } from '../src/types/portal/portal-config';
 import type { BuildPaths } from '../portal-template/portal-config';
 import type { CodeSamplesFile as TemplateCodeSamplesFile } from '../portal-template/src/lib/code-samples.server';
+import { languageAliases } from '../portal-template/src/lib/languages';
 import type { Portal } from '../portal-template/src/lib/portal-types';
 
 /** True only when the two types are identical, every nested field and union member included. */
@@ -232,12 +233,7 @@ describe('portal template packaging', () => {
     /** The language ids the bundle imports a grammar for. */
     const bundledIds = (): string[] => [...source().matchAll(/shiki\/dist\/langs\/([\w-]+)\.mjs/g)].map((m) => m[1]);
 
-    const keys = (): Set<string> => {
-      const text = source();
-      const block = /const aliases[^{]*{([\s\S]*?)\n};/.exec(text);
-      const aliasKeys = [...(block?.[1] ?? '').matchAll(/^\s*'?([\w#-]+)'?\s*:/gm)].map((m) => m[1]);
-      return new Set([...bundledIds(), ...aliasKeys]);
-    };
+    const keys = (): Set<string> => new Set([...bundledIds(), ...Object.keys(languageAliases)]);
 
     it('names every grammar it imports by a file that exists', async () => {
       const shiki = path.dirname(createRequire(import.meta.url).resolve('shiki/package.json'));
@@ -265,8 +261,7 @@ describe('portal template packaging', () => {
     });
 
     it('points every alias at a language it actually bundles', () => {
-      const block = /const aliases[^{]*{([\s\S]*?)\n};/.exec(source());
-      const targets = [...(block?.[1] ?? '').matchAll(/:\s*'([\w-]+)'/g)].map((m) => m[1]);
+      const targets = Object.values(languageAliases);
       const bundled = new Set(bundledIds());
 
       expect(targets).to.not.be.empty;

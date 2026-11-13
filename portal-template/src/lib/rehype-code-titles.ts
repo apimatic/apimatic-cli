@@ -1,6 +1,6 @@
 import { parseCodeBlockAttributes } from 'fumadocs-core/mdx-plugins/codeblock-utils';
 import { CODE_BLOCK_TITLES, languageOf } from './code-titles';
-import { bundledLanguage } from './shiki-bundle';
+import { bundledLanguage } from './languages';
 
 interface HastNode {
   type: string;

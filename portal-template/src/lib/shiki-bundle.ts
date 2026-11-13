@@ -1,5 +1,6 @@
 import { createBundledHighlighter } from 'shiki/core';
 import { createJavaScriptRegexEngine } from 'shiki/engine/javascript';
+import { languageAliases, type BundledLanguage } from './languages';
 
 // Re-exported untouched: Fumadocs imports it from the `shiki` entry point this file stands
 // in for, though the bundle itself builds its highlighter on the JavaScript engine.
@@ -44,49 +45,12 @@ const languages = {
   markdown: () => import('shiki/dist/langs/markdown.mjs'),
   sql: () => import('shiki/dist/langs/sql.mjs'),
   tsx: () => import('shiki/dist/langs/tsx.mjs')
-} satisfies Record<string, LanguageImport>;
+} satisfies Record<BundledLanguage, LanguageImport>;
 
-/**
- * Shiki's own bundle resolves `ts` or `yml` through an alias table beside its grammars; a
- * hand-built map has none, so an alias reaches Fumadocs as an unknown language and is replaced
- * with `text`. Each shares its grammar's import, as Shiki's `bundledLanguagesAlias` does, so
- * the bundler still emits one chunk per language rather than one per spelling. Taken from
- * Shiki's `bundledLanguagesInfo`; `test/portal-template.test.ts` holds them to it.
- */
-const aliases: Record<string, keyof typeof languages> = {
-  'c#': 'csharp',
-  cs: 'csharp',
-  py: 'python',
-  rb: 'ruby',
-  ts: 'typescript',
-  cts: 'typescript',
-  mts: 'typescript',
-  js: 'javascript',
-  cjs: 'javascript',
-  mjs: 'javascript',
-  bash: 'shellscript',
-  sh: 'shellscript',
-  shell: 'shellscript',
-  zsh: 'shellscript',
-  console: 'shellsession',
-  yml: 'yaml',
-  md: 'markdown',
-  gql: 'graphql'
-};
-
-export type BundledLanguage = keyof typeof languages;
-
-/** The grammar a fence's language names, by its own name or an alias; null for one not bundled. */
-export function bundledLanguage(name: string): BundledLanguage | null {
-  if (Object.hasOwn(languages, name)) {
-    return name as BundledLanguage;
-  }
-  return Object.hasOwn(aliases, name) ? aliases[name] : null;
-}
-
+// Each alias shares its grammar's import, as Shiki's `bundledLanguagesAlias` does: one chunk per language, not per spelling.
 const bundledLanguages = {
   ...languages,
-  ...Object.fromEntries(Object.entries(aliases).map(([alias, id]) => [alias, languages[id]]))
+  ...Object.fromEntries(Object.entries(languageAliases).map(([alias, id]) => [alias, languages[id]]))
 } as never;
 
 /** The two Fumadocs asks for by default; the rest of Shiki's themes are never requested. */

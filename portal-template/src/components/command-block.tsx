@@ -2,12 +2,13 @@ import type { ReactNode } from 'react';
 import { asMarkdown } from 'fumadocs-core/server';
 import { CodeBlock, Pre } from 'fumadocs-ui/components/codeblock';
 import { CODE_BLOCK_TITLES } from '@/lib/code-titles';
+import { reportCodeCopy, reportCopies } from './code-copy';
 
 interface CommandBlockProps {
   command: string;
   /** One line that truncates, for a card; the full command is still what the button copies. */
   compact?: boolean;
-  /** Called as the copy button is clicked. */
+  /** Called as the copy button is clicked; a copy of a shell command otherwise. */
   onCopy?: () => void;
 }
 
@@ -17,24 +18,15 @@ function CentredActions({ children }: Readonly<{ children?: ReactNode }>) {
 }
 
 /** One shell command in a copyable block: an MDX page has no highlighter to hand, so it is plain. */
-export function CommandBlock({ command, compact = false, onCopy }: Readonly<CommandBlockProps>) {
+const reportShellCopy = () => reportCodeCopy('shellscript');
+
+export function CommandBlock({ command, compact = false, onCopy = reportShellCopy }: Readonly<CommandBlockProps>) {
   if (asMarkdown()) {
     return `\`\`\`bash\n${command}\n\`\`\``;
   }
   if (!compact) {
     return (
-      // Fumadocs calls Actions as a function with its copy button as the children, so a wrapper sees the click.
-      <CodeBlock
-        title={CODE_BLOCK_TITLES.shellscript}
-        Actions={
-          onCopy &&
-          (({ className, children }) => (
-            <div className={className} onClickCapture={onCopy} data-copy-reported="">
-              {children}
-            </div>
-          ))
-        }
-      >
+      <CodeBlock title={CODE_BLOCK_TITLES.shellscript} Actions={reportCopies(onCopy)}>
         <Pre>
           <code>
             {/* A highlighted block's lines carry this class, which is what the block pads. */}
@@ -48,7 +40,7 @@ export function CommandBlock({ command, compact = false, onCopy }: Readonly<Comm
     <CodeBlock
       className="my-0 rounded-lg bg-fd-secondary shadow-none"
       viewportProps={{ className: 'py-2 text-xs' }}
-      Actions={CentredActions}
+      Actions={reportCopies(onCopy, CentredActions)}
     >
       <Pre className="w-full">
         <code>

@@ -1,10 +1,10 @@
 import { createMarkdownRenderer } from 'fumadocs-core/content/md';
 import { remarkGfm } from 'fumadocs-core/mdx-plugins/remark-gfm';
-import { DynamicCodeBlock } from 'fumadocs-ui/components/dynamic-codeblock';
 import defaultMdxComponents from 'fumadocs-ui/mdx';
 import { Children, type ComponentProps, type ReactElement } from 'react';
 import { withBasePath } from '@/lib/base-path';
 import { languageOf } from '@/lib/code-titles';
+import { ReportedCodeBlock } from './code-copy';
 
 const { Markdown } = createMarkdownRenderer({ remarkPlugins: [remarkGfm] });
 
@@ -28,5 +28,5 @@ function CodeBlock({ children }: ComponentProps<'pre'>) {
   const text = code.props.children;
   if (typeof text !== 'string') return null;
   const language = languageOf(code.props.className?.split(' ') ?? []) ?? 'text';
-  return <DynamicCodeBlock lang={language} code={text.trimEnd()} />;
+  return <ReportedCodeBlock lang={language} code={text.trimEnd()} />;
 }

@@ -7,7 +7,6 @@ import appCss from '@/styles/app.css?url';
 import { RootProvider } from 'fumadocs-ui/provider/tanstack';
 import SearchDialog from '@/components/search';
 import { withBasePath } from '@/lib/base-path';
-import { copiedLanguage } from '@/lib/code-copy';
 import { portal } from '@/lib/portal';
 import { analytics } from '@/lib/portal-analytics';
 
@@ -27,12 +26,6 @@ const iconLinks = portal.favicon
       }
     ]
   : [];
-
-// Fumadocs' copy button has no callback of its own, so the document hears every click.
-const reportCodeCopy = (event: MouseEvent) => {
-  const language = copiedLanguage(event.target);
-  if (language !== null) analytics.report('docs_code_copy', { language });
-};
 
 // A portal fixed to one mode keeps to it whatever the visitor's system prefers, and offers no
 // way out: the layout hides the switch, and the `D` hotkey is turned off here.
@@ -64,12 +57,7 @@ function RootComponent() {
     // A prerendered page mounts with the router idle and raises no `onRendered` for its first page, so it
     // is reported here; `portal serve` mounts pending, before the page's head applies, and `onRendered` follows.
     if (router.state.status === 'idle') analytics.reportPageView();
-    const unsubscribe = router.subscribe('onRendered', () => analytics.reportPageView());
-    document.addEventListener('click', reportCodeCopy);
-    return () => {
-      unsubscribe();
-      document.removeEventListener('click', reportCodeCopy);
-    };
+    return router.subscribe('onRendered', () => analytics.reportPageView());
   }, [router]);
   return (
     <html lang="en" suppressHydrationWarning>

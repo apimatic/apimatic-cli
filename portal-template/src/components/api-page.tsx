@@ -5,6 +5,7 @@ import { mediaAdapters } from '@/lib/media-adapters';
 import { oauthCallbackPath } from '@/lib/oauth-callback';
 import { REPLAY_MARKERS } from '@/lib/replay-markers';
 import { ApiMarkdown } from './api-markdown';
+import { ReportedCodeBlock } from './code-copy';
 import { renderExampleLayout } from './example-layout';
 import { codeUsages, renderUsageTabs } from './usage-tabs';
 
@@ -15,7 +16,7 @@ export const OpenAPIPage = createOpenAPIPage({
   codeUsages,
   generateTypeScriptDefinitions: false,
   content: { renderAPIExampleLayout: renderExampleLayout, renderAPIExampleUsageTabs: renderUsageTabs },
-  components: { Markdown: ApiMarkdown },
+  components: { Markdown: ApiMarkdown, CodeBlock: ReportedCodeBlock },
   mediaAdapters,
   oauthRedirectUrl: withBasePath(oauthCallbackPath),
   playground: {

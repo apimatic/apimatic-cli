@@ -12,6 +12,7 @@ import { prerenderPages } from './prerender-pages.ts';
 import { remarkJsxImages } from './remark-jsx-images.ts';
 import { specReload } from './spec-reload.ts';
 import { remarkImageReferences } from './src/lib/remark-image-references.ts';
+import { rehypeCodeOptions } from './src/lib/transformer-language.ts';
 import { staticFunctionsBase } from './static-functions-base.ts';
 import { staticImages } from './static-images.ts';
 
@@ -37,7 +38,8 @@ export default defineConfig(async ({ command, isPreview }) => {
           mdxOptions: {
             remarkImageOptions: { publicDir: publicDir || undefined, external: false },
             // A function, so it runs ahead of the preset's own plugins, `remarkImage` among them.
-            remarkPlugins: (plugins) => [remarkImageReferences, [remarkJsxImages, { publicDir }], ...plugins]
+            remarkPlugins: (plugins) => [remarkImageReferences, [remarkJsxImages, { publicDir }], ...plugins],
+            rehypeCodeOptions
           }
         }
       }),
