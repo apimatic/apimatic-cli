@@ -26,15 +26,15 @@ const components = { ResultDisplay };
 
 /** The playground with the reporting around it, in the one chunk the API page loads lazily. */
 export default function Playground() {
-  // Fumadocs renders the dialog outside the marked wrapper, so each dialog is marked as it appears,
-  // until fuma-nama/fumadocs#3824 lets the markers be passed to the dialog directly.
+  // Fumadocs renders the dialog outside the marked wrapper, so it is marked as it appears, told from the search
+  // dialog by the request form in it, until fuma-nama/fumadocs#3824 lets the markers be passed to the dialog directly.
   useEffect(() => {
     const observer = new MutationObserver((mutations) => {
       for (const { addedNodes } of mutations) {
         for (const node of addedNodes) {
           if (!(node instanceof Element)) continue;
           const dialog = node.matches('[role="dialog"]') ? node : node.querySelector('[role="dialog"]');
-          if (dialog !== null) markForReplay(dialog);
+          if (dialog !== null && dialog.querySelector('form') !== null) markForReplay(dialog);
         }
       }
     });
