@@ -21,7 +21,7 @@ export const OpenAPIPage = createOpenAPIPage({
   playground: {
     // Session replay tools a GTM tag loads record the page's text and input; each marker keeps its tool out of the playground.
     render: () => (
-      <div {...REPLAY_MARKERS}>
+      <div {...REPLAY_MARKERS} data-portal-playground="">
         <Suspense fallback={null}>
           <Playground />
         </Suspense>

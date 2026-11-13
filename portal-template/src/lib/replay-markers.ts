@@ -3,8 +3,7 @@ export const REPLAY_MARKERS = {
   className: 'ph-no-capture fs-exclude rr-block amp-block',
   'data-hj-suppress': '',
   'data-clarity-mask': 'True',
-  'data-private': '',
-  'data-portal-playground': ''
+  'data-private': ''
 } as const;
 
 function markForReplay(element: Element): void {
