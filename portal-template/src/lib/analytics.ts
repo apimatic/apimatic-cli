@@ -1,4 +1,3 @@
-import type { FetchResult } from 'fumadocs-openapi/playground';
 import { isOAuthCallbackPath } from './oauth-callback';
 import type { PortalAnalytics } from './portal-types';
 import { type Adapter, adapters, insertTags } from './vendor-tags';
@@ -68,8 +67,6 @@ export class Analytics {
   private lastPageView: string | null = null;
   private previousPageView: string | null = null;
   private lastNotFound: string | null = null;
-  private requestStartedAt: number | null = null;
-  private lastApiResult: FetchResult | null = null;
 
   public constructor(private readonly settings: PortalAnalytics) {
     this.live = Object.values(adapters)
@@ -136,27 +133,5 @@ export class Analytics {
     // one reported besides it.
     const left = this.lastPageView === page ? this.previousPageView : this.lastPageView;
     this.report('docs_not_found', { page_referrer: left ?? referrer?.href ?? '' });
-  }
-  /** As the playground sends a request: the start of the one duration a request that never arrives can have; a request failing before this has none. */
-  public requestStarted(): void {
-    this.requestStartedAt = Date.now();
-  }
-
-  /** As the playground leaves the page: a request still in flight reports nothing, so its start times nothing later. */
-  public requestAbandoned(): void {
-    this.requestStartedAt = null;
-  }
-
-  /** The playground's result for `endpoint`, the method and path as the spec writes them: its status and its time, and nothing of the request itself. */
-  public reportApiRequest(endpoint: string, result: FetchResult): void {
-    // The display mounts again with the same result on each reopen, and twice in a dev build.
-    if (result === this.lastApiResult) return;
-    this.lastApiResult = result;
-    const [status, duration_ms] =
-      result.type === 'response'
-        ? [String(result.status), Math.round(result.duration)]
-        : ['client_error', this.requestStartedAt === null ? 0 : Date.now() - this.requestStartedAt];
-    this.requestStartedAt = null;
-    this.report('docs_api_request', { endpoint, status, duration_ms });
   }
 }

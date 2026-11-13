@@ -1,24 +1,27 @@
-import { useEffect } from 'react';
+import { createContext, use, useEffect, useMemo, useRef, type RefObject } from 'react';
 import { useOperation } from 'fumadocs-openapi/operation';
+import type { FetchResult } from 'fumadocs-openapi/playground';
 import PlaygroundClient, { DefaultResultDisplay, type ResultDisplayProps } from 'fumadocs-openapi/ui/playground/client';
+import { apiRequest } from '@/lib/api-request';
 import { analytics } from '@/lib/portal-analytics';
 import { markForReplay } from '@/lib/replay-markers';
 
-// Fumadocs' request has no callback of its own: the start is noted here, and the request goes on unchanged.
-const fetchOptions = {
-  onRequestInit: (requestInit: RequestInit) => {
-    analytics.requestStarted();
-    return requestInit;
-  }
-};
+/** When this playground last sent a request, for a result that has no duration of its own. */
+const SentAt = createContext<RefObject<number | null>>({ current: null });
 
-/** Fumadocs' result display, reporting each result once: the effect runs per result object, not per render. */
+// The display mounts again with the same result on each reopen, and twice in a dev build.
+const reported = new WeakSet<FetchResult>();
+
 function ResultDisplay(props: ResultDisplayProps) {
   const { method, path } = useOperation();
-  useEffect(
-    () => analytics.reportApiRequest(`${method.toUpperCase()} ${path}`, props.data),
-    [method, path, props.data]
-  );
+  const sentAt = use(SentAt);
+  useEffect(() => {
+    if (reported.has(props.data)) return;
+    reported.add(props.data);
+    const endpoint = `${method.toUpperCase()} ${path}`;
+    analytics.report('docs_api_request', apiRequest(endpoint, props.data, sentAt.current, Date.now()));
+    sentAt.current = null;
+  }, [method, path, props.data, sentAt]);
   return <DefaultResultDisplay {...props} />;
 }
 
@@ -26,6 +29,17 @@ const components = { ResultDisplay };
 
 /** The playground with the reporting around it, in the one chunk the API page loads lazily. */
 export default function Playground() {
+  const sentAt = useRef<number | null>(null);
+  // Fumadocs' request has no callback of its own: the time is noted here, and the request goes on unchanged.
+  const fetchOptions = useMemo(
+    () => ({
+      onRequestInit: (requestInit: RequestInit) => {
+        sentAt.current = Date.now();
+        return requestInit;
+      }
+    }),
+    []
+  );
   // Fumadocs renders the dialog outside the marked wrapper, so it is marked as it appears, told from the search
   // dialog by the request form in it, until fuma-nama/fumadocs#3824 lets the markers be passed to the dialog directly.
   useEffect(() => {
@@ -41,7 +55,9 @@ export default function Playground() {
     observer.observe(document.body, { childList: true, subtree: true });
     return () => observer.disconnect();
   }, []);
-  // A request still in flight when the page is left reports nothing, so its start must not time a later one.
-  useEffect(() => () => analytics.requestAbandoned(), []);
-  return <PlaygroundClient fetchOptions={fetchOptions} components={components} />;
+  return (
+    <SentAt value={sentAt}>
+      <PlaygroundClient fetchOptions={fetchOptions} components={components} />
+    </SentAt>
+  );
 }
