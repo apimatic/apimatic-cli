@@ -6,6 +6,7 @@ import { oauthCallbackPath } from '@/lib/oauth-callback';
 import { REPLAY_MARKERS } from '@/lib/replay-markers';
 import { ApiMarkdown } from './api-markdown';
 import { ReportedCodeBlock } from './code-copy';
+import { EndpointBar } from './endpoint-bar';
 import { renderExampleLayout } from './example-layout';
 import { codeUsages, renderUsageTabs } from './usage-tabs';
 
@@ -21,9 +22,9 @@ export const OpenAPIPage = createOpenAPIPage({
   oauthRedirectUrl: withBasePath(oauthCallbackPath),
   playground: {
     // Session replay tools a GTM tag loads record the page's text and input; each marker keeps its tool out of the playground.
-    render: () => (
+    render: ({ method, path }) => (
       <div {...REPLAY_MARKERS} data-portal-playground="">
-        <Suspense fallback={null}>
+        <Suspense fallback={<EndpointBar method={method} route={path} />}>
           <Playground />
         </Suspense>
       </div>
