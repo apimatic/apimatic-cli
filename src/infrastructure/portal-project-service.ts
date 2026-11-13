@@ -131,7 +131,6 @@ export class PortalProjectService {
       await this.writeCodeSamples(projectDirectory, source, artifacts.codeSampleCatalogs),
       await this.writeDownloads(projectDirectory, artifacts)
     );
-    await this.writeAppearance(projectDirectory, source.config);
 
     const pages = await this.pagesService.write(projectDirectory.join(GENERATED_DIRECTORY_NAME), source.generatedPages);
     if (pages.isErr()) {
@@ -298,6 +297,8 @@ export class PortalProjectService {
       new FilePath(projectDirectory, new FileName('portal.config.json')),
       JSON.stringify(configuration, null, 2)
     );
+
+    await this.writeAppearance(projectDirectory, source.config);
   }
 
   /**
