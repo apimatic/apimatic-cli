@@ -305,9 +305,11 @@ Delivers, from the commands inward, after the "check first" answer in section 5:
   or marketing script, for staging."; each passes `enableAnalytics: !flags['no-analytics']` to
   its action; quickstart's preview passes `true`.
 - `PreparePortalProjectAction` takes `enableAnalytics: boolean` as a parameter, never a field,
-  and hands `PortalProjectService.prepare()` the source as read, or with
-  `config.withoutVendors()` when the flag is false; `src/actions/portal/serve.ts` does the same
-  for `applyConfig()` on each rewrite. The service, `PortalConfig.identity()` and
+  and hands `PortalProjectService.prepare()` and the caller's next step
+  `settingsForBuild(source, enableAnalytics)` from `src/types/portal/portal-source.ts`: the source
+  as read, or with `config.withoutVendors()` when the flag is false. `src/actions/portal/serve.ts`
+  does the same for `applyConfig()` on each rewrite, and `generate`'s Google Analytics notice
+  reads the config alone. The service, `PortalConfig.identity()` and
   `AnalyticsConfig.identity()` never see the flag (the review of 2026-11-13 moved it up from
   them). The sketch's `PortalDelivery` class is not built: with no preview mode it would wrap
   this one boolean.
@@ -315,8 +317,8 @@ Delivers, from the commands inward, after the "check first" answer in section 5:
 Tests: both commands accept the flag (`test/commands/flag-parser.ts` is the helper the command
 tests use); `withoutVendors()` leaves both vendors out and keeps `keepQueryParams` and the rest
 of the identity; the generate, prepare and serve actions hand the service a config without
-vendors under `--no-analytics`, the serve action on each rewrite too, while what follows them
-still sees the source as read; the identity file written from such a config has both vendors
+vendors under `--no-analytics`, the serve action on each rewrite too, and the prepare action
+hands the same config to the caller's next step; the identity file written from such a config has both vendors
 `null`.
 
 Commit: `feat(portal): add --no-analytics and leave the vendors out of the identity file`.

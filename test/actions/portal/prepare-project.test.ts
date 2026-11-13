@@ -75,7 +75,7 @@ describe('PreparePortalProjectAction', () => {
       expect(uploaded.filter((entry) => entry.startsWith('static/'))).to.be.empty;
     });
 
-    it('prepares the project with neither vendor tag under --no-analytics, and hands on the source as read', async () => {
+    it('prepares the project, and hands on the source, with neither vendor tag under --no-analytics', async () => {
       const root = fs.mkdtempSync(path.join(os.tmpdir(), 'portal-prepare-'));
       try {
         fs.cpSync(FIXTURE.toString(), root, { recursive: true });
@@ -87,10 +87,7 @@ describe('PreparePortalProjectAction', () => {
         await execute(false, new DirectoryPath(root));
 
         expect(shared.prepare.firstCall.args[1].config.identity().analytics.googleTagManager).to.be.null;
-        expect(onPrepared.firstCall.args[1].config.identity().analytics.googleTagManager).to.deep.equal({
-          containerId: 'GTM-ABC123',
-          environment: null
-        });
+        expect(onPrepared.firstCall.args[1].config.identity().analytics.googleTagManager).to.be.null;
       } finally {
         fs.rmSync(root, { recursive: true, force: true });
       }

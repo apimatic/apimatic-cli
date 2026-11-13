@@ -46,7 +46,7 @@ export class GenerateAction {
     return await prepare.execute(project, enableAnalytics, {
       confirm: () => this.confirmOverwrite(portalContext, portalDirectory, force),
       onPrepared: (portalProject, source) => {
-        if (enableAnalytics && source.config.usesGoogleAnalytics()) {
+        if (source.config.usesGoogleAnalytics()) {
           this.prompts.googleAnalyticsCountsPageChanges();
         }
         return this.build(portalProject, source.config.siteAddress(), portalContext, portalDirectory, zipPortal);

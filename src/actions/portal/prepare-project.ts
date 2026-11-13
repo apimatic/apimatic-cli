@@ -6,7 +6,7 @@ import { PreparePortalProjectPrompts } from '../../prompts/portal/prepare-projec
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { PortalArtifacts } from '../../types/portal/portal-artifacts.js';
-import { PortalSource } from '../../types/portal/portal-source.js';
+import { PortalSource, settingsForBuild } from '../../types/portal/portal-source.js';
 import { ProjectContext } from '../../types/project-context.js';
 import { ActionResult } from '../action-result.js';
 
@@ -111,18 +111,14 @@ export class PreparePortalProjectAction {
       }
 
       return await withDirPath(async (tempDirectory) => {
-        // Under --no-analytics the build names neither vendor tag; what follows still sees the source as read.
-        const portalProject = await this.projectService.prepare(
-          tempDirectory,
-          enableAnalytics ? source.value : { ...source.value, config: source.value.config.withoutVendors() },
-          artifacts.value
-        );
+        const sourceForBuild = settingsForBuild(source.value, enableAnalytics);
+        const portalProject = await this.projectService.prepare(tempDirectory, sourceForBuild, artifacts.value);
         if (portalProject.isErr()) {
           this.prompts.runtimeUnsupported(portalProject.error);
           return ActionResult.failed();
         }
 
-        return await onPrepared(portalProject.value, source.value, artifacts.value);
+        return await onPrepared(portalProject.value, sourceForBuild, artifacts.value);
       });
     });
   };

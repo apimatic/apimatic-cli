@@ -9,7 +9,7 @@ import { ProjectContext } from '../../types/project-context.js';
 import { isSkippedByGlob } from '../../types/portal/content-tree.js';
 import { GeneratedPages } from '../../types/portal/generated-pages.js';
 import { PortalArtifacts } from '../../types/portal/portal-artifacts.js';
-import { PortalSettings, PortalSource, WatchedSource } from '../../types/portal/portal-source.js';
+import { PortalSettings, PortalSource, settingsForBuild, WatchedSource } from '../../types/portal/portal-source.js';
 import { PreviewConfig } from '../../types/portal/preview-config.js';
 import { PreviewContent } from '../../types/portal/preview-content.js';
 import { PreviewSpecs } from '../../types/portal/preview-specs.js';
@@ -161,7 +161,7 @@ export class PortalServeAction {
 
       const applied = await this.projectService.applyConfig(
         portalProjectDirectory,
-        enableAnalytics ? settings : { ...settings, config: config.withoutVendors() }
+        settingsForBuild(settings, enableAnalytics)
       );
       if (applied.isErr()) {
         this.prompts.notApplied('config', applied.error, sourceDirectory);

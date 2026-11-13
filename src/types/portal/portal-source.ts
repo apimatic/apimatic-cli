@@ -47,6 +47,11 @@ export interface PortalSource extends PortalSettings {
   contentNotices: ContentNotices;
 }
 
+/** The settings a portal is built from: under `--no-analytics`, neither vendor tag. */
+export function settingsForBuild<T extends PortalSettings>(settings: T, enableAnalytics: boolean): T {
+  return enableAnalytics ? settings : { ...settings, config: settings.config.withoutVendors() };
+}
+
 /** Why a source directory could not be written; each variant maps to its own message. */
 export type PortalScaffoldProblem =
   | { kind: 'configUnreadable' }
