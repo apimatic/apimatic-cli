@@ -127,6 +127,21 @@ export function copiedLanguage(button: Element): string | null {
   return tabs?.querySelector('[role="tab"][aria-selected="true"]')?.textContent?.trim() || null;
 }
 
+/**
+ * Appends each vendor tag once, and none while the address holds an OAuth answer, which GTM's tags and gtag.js
+ * read for themselves; a tag already in the page is left, so a page view after the callback adds only the rest.
+ */
+function insertTags(live: Adapter[], keep: readonly string[]): void {
+  if (pageLocation(window.location.href, keep) === null) return;
+  for (const src of live.flatMap((adapter) => adapter.scripts())) {
+    if (document.head.querySelector(`script[src="${src}"]`) !== null) continue;
+    const script = document.createElement('script');
+    script.async = true;
+    script.src = src;
+    document.head.append(script);
+  }
+}
+
 /** The one instance a portal runs: started when the bundle evaluates, reporting from the root effect and the components. */
 export class Analytics {
   private readonly live: Adapter[];
@@ -143,18 +158,16 @@ export class Analytics {
       .filter((adapter) => adapter !== null);
   }
 
-  /** Once, when the bundle starts: the data layer, every vendor's setup entries, then the vendor tags. */
+  /**
+   * Once, when the bundle starts: the data layer, every vendor's setup entries, then the vendor tags unless the
+   * address holds an OAuth answer, in which case the next page view inserts them.
+   */
   public start(): void {
     if (this.started) return;
     this.started = true;
     const dataLayer = (window.dataLayer ??= []);
     for (const adapter of this.live) adapter.setup(dataLayer);
-    for (const src of this.live.flatMap((adapter) => adapter.scripts())) {
-      const script = document.createElement('script');
-      script.async = true;
-      script.src = src;
-      document.head.append(script);
-    }
+    insertTags(this.live, this.settings.keepQueryParams);
   }
 
   /** `href` is the page the event belongs to, the current one unless the caller saw the address change first. */
@@ -172,7 +185,10 @@ export class Analytics {
   /** `docs_page_view` for the current page, unless its cleaned address is the one last reported: a `#` jump sends none. */
   public reportPageView(): void {
     const page = pageLocation(window.location.href, this.settings.keepQueryParams);
-    if (page === null || page === this.lastPageView) return;
+    if (page === null) return;
+    // The tags held back on the OAuth callback start here, on the first page after it.
+    insertTags(this.live, this.settings.keepQueryParams);
+    if (page === this.lastPageView) return;
     this.previousPageView = this.lastPageView;
     this.lastPageView = page;
     this.report('docs_page_view', { page_title: document.title });

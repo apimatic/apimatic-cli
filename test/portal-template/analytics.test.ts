@@ -221,7 +221,10 @@ function browser(href: string, title = 'Quickstart | Acme API') {
   const document = {
     title,
     createElement: (): FakeScript => ({ async: false, src: '', textContent: '' }),
-    head: { append: (script: FakeScript) => scripts.push(script) }
+    head: {
+      append: (script: FakeScript) => scripts.push(script),
+      querySelector: (selector: string) => scripts.find((script) => selector === `script[src="${script.src}"]`) ?? null
+    }
   };
   Object.assign(globalThis, { window, document });
   return {
@@ -475,7 +478,7 @@ describe('Analytics', () => {
       'https://docs.test/oauth/callback/?code=abc&state=123',
       'https://docs.test/oauth/callback#access_token=xyz&state=123'
     ]) {
-      it(`pushes the setup entries and no page view at ${href}`, () => {
+      it(`holds the tags and the page view back at ${href}, and inserts the tags on the next page`, () => {
         const page = browser(href);
         const analytics = new Analytics(withBoth);
 
@@ -484,6 +487,26 @@ describe('Analytics', () => {
 
         expect(page.dataLayer()).to.have.length(3);
         expect(pageViews(page.dataLayer())).to.be.empty;
+        expect(page.scripts).to.be.empty;
+
+        page.go(quickstart);
+        analytics.reportPageView();
+        analytics.reportPageView();
+
+        expect(page.scripts.map((script) => script.src)).to.deep.equal([GTM_SCRIPT, GA4_SCRIPT]);
+        expect(pageViews(page.dataLayer())).to.have.length(1);
+      });
+
+      it(`sends nothing for any event reported at ${href}`, () => {
+        const page = browser(href);
+        const analytics = new Analytics(withBoth);
+        analytics.start();
+
+        analytics.report('docs_code_copy', { language: 'cURL' });
+        analytics.report('docs_markdown_copy', {});
+
+        expect(page.dataLayer()).to.have.length(3);
+        expect(gtagCalls(page.dataLayer()).map((command) => command[0])).to.deep.equal(['js', 'config']);
       });
     }
   });

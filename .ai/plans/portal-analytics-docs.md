@@ -181,14 +181,16 @@ header and the dialog carry.
 ### After a sign-in
 
 The playground's OAuth sign-in returns the reader to the endpoint page they left. The answer
-never reaches the page's address: the playground takes it over through session storage, so the
-reported address, the vendors' own page view and anything else that reads the address are
-clean.
+never reaches a page the vendor tags load on: the callback page loads none, and the page the
+reader returns to has a clean address, since the callback hands the answer over through session
+storage, so the reported address, the vendors' own page view and anything else that reads the
+address are clean.
 
-> Reviewer: this paragraph holds once fuma-nama/fumadocs#3809 is shipped and picked up, which
-> is the PR's merge prerequisite. If the wait of step 1.3 comes back instead, the paragraph
-> becomes: the tags start once the playground has removed the answer, up to 5 seconds later, or
-> on the next page change.
+> Reviewer: the callback page has loaded no tag since 2026-11-13. The rest of this paragraph
+> holds once the branch takes fumadocs-openapi 12.6.2 (from 2026-11-19) with the callback change
+> the PR's "Before merging" item names; until then the return page's address holds the answer
+> until the playground removes it, the tags load on the next page change, and that page view is
+> the first reported.
 
 ### Using another tag manager
 
