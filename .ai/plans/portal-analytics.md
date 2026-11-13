@@ -16,7 +16,7 @@ reviewed. Where this file and an issue disagree, the issue wins and this file is
 |---|---|---|
 | apimatic/apimatic-io#2347 | the plan: the eight events, the loader, the Decisions table (locked), the risks | starting, and whenever a "why" comes up |
 | apimatic/apimatic-io#2348 | the build checklist for the three PRs, "Schema, validation and reports" (every rule and every message, verbatim), "Done when" | every step |
-| apimatic/apimatic-io#2349 | PR 1 in detail, top-down, with code sketches for every file | every PR 1 step; PR 2 and PR 3 build on its `analyticsFor()` |
+| apimatic/apimatic-io#2349 | PR 1 in detail, top-down, with code sketches for every file | every PR 1 step; PR 2 builds on its loader, in the code `Analytics` (`lib/analytics.ts`) and `insertTags()` (`lib/vendor-tags.ts`) |
 | Plan doc https://claude.ai/artifact/A6rr4cGkbEL3bRCnPGqWzy | the same plan as a document, with the diagram | only to settle a reading of the issues |
 | Explainer https://claude.ai/artifact/RVbt9jerbNzTFyzGh4eE8t | the plain-language version | never needed for the build |
 
@@ -394,8 +394,9 @@ Commit: `feat(portal): read portal.scripts from apimatic.json`.
 
 #### Step 2.2: the loader inserts listed scripts
 
-Delivers: `analyticsFor(settings, scripts)`; `insert()` adds each listed script after the
-vendor tags, in order, `async = false`, static files through `withBasePath()`, each attribute
+Delivers: `Analytics` takes the listed scripts beside the settings (`new Analytics(portal.analytics,
+portal.scripts)` in `lib/portal-analytics.ts`); `insertTags()` in `lib/vendor-tags.ts` adds each
+listed script after the vendor tags, in order, `async = false`, static files through `withBasePath()`, each attribute
 set on the element; a failed one doesn't stop the rest; vendor tags and listed scripts don't
 wait for each other.
 
@@ -406,7 +407,7 @@ Commit: `feat(portal): load listed scripts through the loader`.
 
 #### Step 2.3: `window.apimatic.analytics.subscribe()`
 
-Delivers: set up by `startAnalytics()` before any script is inserted; replays the events so far,
+Delivers: set up by `Analytics.start()` before any script is inserted; replays the events so far,
 then each new one; returns an unsubscribe; each callback in `try`/`catch` with the error
 rethrown through `setTimeout`; one `window.apimatic` object.
 
@@ -561,7 +562,21 @@ callback guard has a direct test. Still open, and now the one merge prerequisite
 query and `#` part onto the starting page; 12.6.2's `getReturnedFlow()` reads `sessionStorage` under
 `fumadocs-openapi-oauth-returned` and falls back to the address, while 12.6.0 reads the address only, so the
 callback change (store `location.href` under that key, return the bare page, follow in
-`oauth-callback.test.ts` and the comment at `oauth-callback.ts:13`) lands with the bump, from 2026-11-19.
+`oauth-callback.test.ts` and the comment at `oauth-callback.ts:20`) lands with the bump, from 2026-11-19.
+
+**Second review of 2026-11-13** (`lib/analytics.ts`, for encapsulation it does not need and infrastructure
+mixed in), taken the same day. The class keeps what every event shares: `start()`, `report()`, the page-view
+and not-found history, and the playground's request timing. Reading Fumadocs' code-block markup moved to
+`copiedLanguage()` in `lib/code-copy.ts`, which the root's click listener reports through `report()`;
+`search.tsx` alone decides whether a search counts, and reports through `report()`; `reportNotFound()` reads
+`document.referrer` itself, as `reportPageView()` reads the title. The vendor adapters and the tag loader moved
+to `lib/vendor-tags.ts`: an adapter has one `script`; the registry is keyed by the vendors `PortalAnalytics`
+names, so a vendor added there without an adapter does not compile; GA4's `send()` calls the page's `gtag`,
+since an instance a config save makes never runs its setup (in isolation it threw `gtag is not a function`; a
+config save in the browser did not show it). `isOAuthCallbackPath()` in `lib/oauth-callback.ts` is the one
+check of the callback's path, for `pageLocation()` and the loader. Found on the way: the loader holds the tags
+back on `/oauth/callback` only, not on the starting page the callback returns to with the answer attached, so
+until the merge prerequisite above lands the tags load there with the answer in the address.
 
 ## 5. Questions each step will raise
 
