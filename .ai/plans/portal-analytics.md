@@ -304,18 +304,20 @@ Delivers, from the commands inward, after the "check first" answer in section 5:
   boolean flag, description "leave out Google Tag Manager, Google Analytics and every analytics
   or marketing script, for staging."; each passes `enableAnalytics: !flags['no-analytics']` to
   its action; quickstart's preview passes `true`.
-- `PreparePortalProjectAction`, `PortalProjectService.prepare()`, `applyConfig()` and
-  `appearanceFiles()` take `enableAnalytics: boolean` as a parameter, never a field;
-  `PortalConfig.identity(enableAnalytics)` hands it to `AnalyticsConfig.identity()`, which
-  leaves both vendors out when it is false; `src/actions/portal/serve.ts` hands the same value
-  to the rewrite when the block changes. The sketch's `PortalDelivery` class is not built: with
-  no preview mode it would wrap this one boolean.
+- `PreparePortalProjectAction` takes `enableAnalytics: boolean` as a parameter, never a field,
+  and hands `PortalProjectService.prepare()` the source as read, or with
+  `config.withoutVendors()` when the flag is false; `src/actions/portal/serve.ts` does the same
+  for `applyConfig()` on each rewrite. The service, `PortalConfig.identity()` and
+  `AnalyticsConfig.identity()` never see the flag (the review of 2026-11-13 moved it up from
+  them). The sketch's `PortalDelivery` class is not built: with no preview mode it would wrap
+  this one boolean.
 
 Tests: both commands accept the flag (`test/commands/flag-parser.ts` is the helper the command
-tests use); `identity(false)` leaves both vendors out and keeps `keepQueryParams`;
-`test/actions/portal/prepare-project.test.ts` and the stubs follow the new signature; the
-generate, prepare and serve actions hand `--no-analytics` on, the serve action to the rewrite
-too; the identity file written under `--no-analytics` has both vendors `null`.
+tests use); `withoutVendors()` leaves both vendors out and keeps `keepQueryParams` and the rest
+of the identity; the generate, prepare and serve actions hand the service a config without
+vendors under `--no-analytics`, the serve action on each rewrite too, while what follows them
+still sees the source as read; the identity file written from such a config has both vendors
+`null`.
 
 Commit: `feat(portal): add --no-analytics and leave the vendors out of the identity file`.
 
@@ -375,8 +377,8 @@ Delivers: `src/types/portal/config/portal-script.ts` (new), one entry parsed as
 every error collected. `httpsAddress(value, path, example)` moved into `fields.ts` from
 `portal-config.ts`'s `secureAddress()`, with `pluginUrl` on it. `PortalConfig`: `scripts` among
 the known keys, parsed in `fromBlock()`, `staticFiles()` returning the listed static files
-beside the brand files, `identity(enableAnalytics)` keeping the `necessary` and `functional` entries always and the rest only when the flag
-allows, `toJSON()` writing `scripts` only when set with `category` and `attributes` only when
+beside the brand files, `withoutVendors()` keeping the `necessary` and `functional` entries and dropping the rest, so
+`identity()` writes what the build loads, `toJSON()` writing `scripts` only when set with `category` and `attributes` only when
 given. No class for it: the category rule is a function beside the parser. `scripts: PortalScript[]` on `PortalIdentity` and on
 the template's `Portal` (`ScriptCategory`, `PortalScript` in `portal-types.ts`).
 

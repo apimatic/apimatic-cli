@@ -128,7 +128,7 @@ export class PortalConfig {
     return this.analytics.usesGoogleAnalytics();
   }
 
-  public identity(enableAnalytics: boolean): PortalIdentity {
+  public identity(): PortalIdentity {
     const address = this.site.siteAddress();
     const logo = this.brand.logoImages();
     const favicon = this.brand.faviconImage();
@@ -141,9 +141,22 @@ export class PortalConfig {
       colorMode: this.brand.mode(),
       links: this.navigation.headerLinks().map(portalLink),
       pageActions: this.ai.offersPageActions(),
-      analytics: this.analytics.identity(enableAnalytics),
+      analytics: this.analytics.identity(),
       seo: this.seo.identity()
     };
+  }
+
+  /** The same portal with neither vendor tag, for a staging build under `--no-analytics`. */
+  public withoutVendors(): PortalConfig {
+    return new PortalConfig(
+      this.site,
+      this.brand,
+      this.navigation,
+      this.ai,
+      this.analytics.withoutVendors(),
+      this.seo,
+      this.pluginAddress
+    );
   }
 
   /** Every namespace included, defaults and all, which is what quickstart writes; `analytics` and `seo` only when set. */

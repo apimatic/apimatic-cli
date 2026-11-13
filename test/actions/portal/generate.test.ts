@@ -318,13 +318,6 @@ describe('GenerateAction', () => {
     expect(shared.prompts.filesShadowedByStatic.firstCall.args[0].map(String)).to.deep.equal(['robots.txt']);
   });
 
-  it('hands --no-analytics to the project it prepares', async () => {
-    const result = await execute(FIXTURE, false, false, false);
-
-    expect(result.isSuccess()).to.be.true;
-    expect(shared.prepare.firstCall.args[3]).to.be.false;
-  });
-
   it('warns that Google Analytics counts page changes, before the build, when it is set', async () => {
     const project = new DirectoryPath(root).join('analytics');
     fs.cpSync(FIXTURE.toString(), project.toString(), { recursive: true });
@@ -338,9 +331,10 @@ describe('GenerateAction', () => {
     expect(result.isSuccess()).to.be.true;
     expect(prompts.googleAnalyticsCountsPageChanges.calledOnce).to.be.true;
     expect(prompts.googleAnalyticsCountsPageChanges.calledBefore(build)).to.be.true;
+    expect(shared.prepare.firstCall.args[1].config.usesGoogleAnalytics()).to.be.true;
   });
 
-  it('does not warn about Google Analytics under --no-analytics, which loads none', async () => {
+  it('does not warn about Google Analytics under --no-analytics, which prepares the project without it', async () => {
     const project = new DirectoryPath(root).join('staging');
     fs.cpSync(FIXTURE.toString(), project.toString(), { recursive: true });
     const configFile = path.join(project.toString(), 'src', 'apimatic.json');
@@ -352,6 +346,7 @@ describe('GenerateAction', () => {
 
     expect(result.isSuccess()).to.be.true;
     expect(prompts.googleAnalyticsCountsPageChanges.called).to.be.false;
+    expect(shared.prepare.firstCall.args[1].config.usesGoogleAnalytics()).to.be.false;
   });
 
   it('does not warn about Google Analytics when it is not set', async () => {

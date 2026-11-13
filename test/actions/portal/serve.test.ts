@@ -631,10 +631,10 @@ describe('PortalServeAction', () => {
       // `prepare` is stubbed above; this one writes the files an edit can change, as a real one
       // would, so the test can see what an edit changes.
       (PortalProjectService.prototype.prepare as sinon.SinonStub).callsFake(
-        async (directory: DirectoryPath, portal: PortalSource, _artifacts: unknown, enableAnalytics: boolean) => {
+        async (directory: DirectoryPath, portal: PortalSource) => {
           projectDirectory = directory;
           fs.mkdirSync(path.join(directory.toString(), 'src/styles'), { recursive: true });
-          (await new PortalProjectService().applyConfig(directory, portal, enableAnalytics))._unsafeUnwrap();
+          (await new PortalProjectService().applyConfig(directory, portal))._unsafeUnwrap();
           return ok({
             projectDirectory: directory,
             viteBinary: new FilePath(directory, new FileName('vite.js')),
@@ -891,17 +891,19 @@ describe('PortalServeAction', () => {
       });
     });
 
-    it('keeps --no-analytics for the rewrite when the block changes', async () => {
+    it('leaves the vendor tags out of the project and of each rewrite under --no-analytics', async () => {
       const applyConfig = sinon.spy(PortalProjectService.prototype, 'applyConfig');
+      const config = originalConfig();
+      config.portal.analytics = { googleTagManager: { containerId: 'GTM-ABC123' } };
+      writeConfig(config);
 
       await whileServing(async () => {
-        const config = originalConfig();
         config.portal.site.name = 'Renamed API';
         await save(config);
       }, false);
 
-      expect(shared.prepare.firstCall.args[3]).to.be.false;
-      expect(applyConfig.lastCall.args[2]).to.be.false;
+      expect(shared.prepare.firstCall.args[1].config.identity().analytics.googleTagManager).to.be.null;
+      expect(applyConfig.lastCall.args[1].config.identity().analytics.googleTagManager).to.be.null;
     });
 
     it('reports a change it could not write to the preview', async () => {

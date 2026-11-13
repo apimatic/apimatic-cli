@@ -144,7 +144,7 @@ describe('PortalSourceContext', () => {
       const { config } = (await resolve())._unsafeUnwrap();
 
       expect(config.siteTitle()).to.equal('Calc');
-      expect(config.identity(true).description).to.equal('Adds.');
+      expect(config.identity().description).to.equal('Adds.');
     });
 
     it('lets the block describe the portal instead, or not at all', async () => {
@@ -154,9 +154,9 @@ describe('PortalSourceContext', () => {
       );
 
       writeConfig({ site: { description: 'Our docs.' } });
-      expect((await resolve())._unsafeUnwrap().config.identity(true).description).to.equal('Our docs.');
+      expect((await resolve())._unsafeUnwrap().config.identity().description).to.equal('Our docs.');
       writeConfig({ site: { description: '' } });
-      expect((await resolve())._unsafeUnwrap().config.identity(true).description).to.be.null;
+      expect((await resolve())._unsafeUnwrap().config.identity().description).to.be.null;
     });
 
     // No one of several specifications speaks for the whole portal.
@@ -2636,7 +2636,7 @@ describe('PortalSourceContext', () => {
       const empty = (await new PortalSourceContext(source).resolve())._unsafeUnwrap().config;
 
       expect(scaffolded.toJSON()).to.deep.equal(empty.toJSON());
-      expect(scaffolded.identity(true)).to.deep.equal(empty.identity(true));
+      expect(scaffolded.identity()).to.deep.equal(empty.identity());
     });
 
     // Every block the wizard writes has to pass the schema it points editors at.

@@ -54,12 +54,17 @@ export class AnalyticsConfig {
     return this.googleAnalytics !== null;
   }
 
-  public identity(enableAnalytics: boolean): PortalAnalytics {
+  public identity(): PortalAnalytics {
     return {
-      googleTagManager: enableAnalytics ? this.googleTagManager : null,
-      googleAnalytics: enableAnalytics ? this.googleAnalytics : null,
+      googleTagManager: this.googleTagManager,
+      googleAnalytics: this.googleAnalytics,
       keepQueryParams: this.keepQueryParams
     };
+  }
+
+  /** For a staging build: neither vendor tag loads, while a reported address still keeps the same names. */
+  public withoutVendors(): AnalyticsConfig {
+    return new AnalyticsConfig(null, null, this.keepQueryParams);
   }
 
   /** Null with nothing set, so the block quickstart writes has no `analytics`. */

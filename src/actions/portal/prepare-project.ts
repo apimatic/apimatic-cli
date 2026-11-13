@@ -111,11 +111,11 @@ export class PreparePortalProjectAction {
       }
 
       return await withDirPath(async (tempDirectory) => {
+        // Under --no-analytics the build names neither vendor tag; what follows still sees the source as read.
         const portalProject = await this.projectService.prepare(
           tempDirectory,
-          source.value,
-          artifacts.value,
-          enableAnalytics
+          enableAnalytics ? source.value : { ...source.value, config: source.value.config.withoutVendors() },
+          artifacts.value
         );
         if (portalProject.isErr()) {
           this.prompts.runtimeUnsupported(portalProject.error);

@@ -22,6 +22,7 @@ import { FileDownloadService } from '../../src/infrastructure/services/file-down
 import { ServiceError } from '../../src/infrastructure/service-error';
 import { UrlPath } from '../../src/types/file/urlPath';
 import { ProjectContext } from '../../src/types/project-context';
+import { PortalConfig } from '../../src/types/portal/portal-config';
 import { completeArtifacts } from './portal/prepare-project-stubs';
 
 const COMMAND_METADATA: CommandMetadata = { commandName: 'portal quickstart', shell: 'test' };
@@ -107,6 +108,7 @@ describe('QuickstartAction', () => {
       .stub(PortalArtifactsService.prototype, 'generate')
       .resolves(ok(completeArtifacts([Language.TYPESCRIPT, Language.PYTHON])));
     const prepare = sinon.stub(PortalProjectService.prototype, 'prepare').resolves(err('stopped here'));
+    const withoutVendors = sinon.spy(PortalConfig.prototype, 'withoutVendors');
 
     await execute();
 
@@ -127,7 +129,7 @@ describe('QuickstartAction', () => {
     // prepares a project.
     expect(artifacts.called, 'the wizard asked for the artifacts').to.be.true;
     expect(prepare.called, 'the wizard reached the preview').to.be.true;
-    expect(prepare.firstCall.args[3], 'the preview counts like a hosted portal').to.be.true;
+    expect(withoutVendors.called, 'the preview counts like a hosted portal').to.be.false;
   });
 
   it('asks for nothing more and stops when no language is chosen', async () => {

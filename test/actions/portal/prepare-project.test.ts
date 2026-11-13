@@ -1,4 +1,6 @@
+import fs from 'fs';
 import os from 'os';
+import path from 'path';
 import AdmZip from 'adm-zip';
 import sinon from 'sinon';
 import { expect } from 'chai';
@@ -46,9 +48,9 @@ describe('PreparePortalProjectAction', () => {
     let shared: PreparePortalProjectStubs;
     let onPrepared: sinon.SinonStub;
 
-    const execute = (enableAnalytics = true) =>
+    const execute = (enableAnalytics = true, project = FIXTURE) =>
       new PreparePortalProjectAction(new DirectoryPath(os.tmpdir()), COMMAND_METADATA).execute(
-        ProjectContext.in(FIXTURE),
+        ProjectContext.in(project),
         enableAnalytics,
         { onPrepared }
       );
@@ -73,10 +75,25 @@ describe('PreparePortalProjectAction', () => {
       expect(uploaded.filter((entry) => entry.startsWith('static/'))).to.be.empty;
     });
 
-    it('hands --no-analytics to the project it prepares', async () => {
-      await execute(false);
+    it('prepares the project with neither vendor tag under --no-analytics, and hands on the source as read', async () => {
+      const root = fs.mkdtempSync(path.join(os.tmpdir(), 'portal-prepare-'));
+      try {
+        fs.cpSync(FIXTURE.toString(), root, { recursive: true });
+        const configFile = path.join(root, 'src', 'apimatic.json');
+        const edited = JSON.parse(fs.readFileSync(configFile, 'utf8'));
+        edited.portal.analytics = { googleTagManager: { containerId: 'GTM-ABC123' } };
+        fs.writeFileSync(configFile, JSON.stringify(edited));
 
-      expect(shared.prepare.firstCall.args[3]).to.be.false;
+        await execute(false, new DirectoryPath(root));
+
+        expect(shared.prepare.firstCall.args[1].config.identity().analytics.googleTagManager).to.be.null;
+        expect(onPrepared.firstCall.args[1].config.identity().analytics.googleTagManager).to.deep.equal({
+          containerId: 'GTM-ABC123',
+          environment: null
+        });
+      } finally {
+        fs.rmSync(root, { recursive: true, force: true });
+      }
     });
 
     it('reports a source it could not zip, without asking for the artifacts', async () => {

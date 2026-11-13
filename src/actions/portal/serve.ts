@@ -159,7 +159,10 @@ export class PortalServeAction {
         this.prompts.staticDirectoryNotServed(sourceDirectory);
       }
 
-      const applied = await this.projectService.applyConfig(portalProjectDirectory, settings, enableAnalytics);
+      const applied = await this.projectService.applyConfig(
+        portalProjectDirectory,
+        enableAnalytics ? settings : { ...settings, config: config.withoutVendors() }
+      );
       if (applied.isErr()) {
         this.prompts.notApplied('config', applied.error, sourceDirectory);
         return;
