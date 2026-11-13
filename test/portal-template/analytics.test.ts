@@ -274,10 +274,29 @@ describe('Analytics', () => {
       analytics.reportPageView();
 
       const entries = page.dataLayer();
-      expect(entries).to.have.length(5);
+      expect(entries).to.have.length(6);
       expect(entries[2]).to.deep.equal({ docs: null });
       expect(entries[3]).to.deep.equal(quickstartView);
-      expect(gtagCalls([entries[4]])[0]).to.deep.equal(['event', 'page_view', quickstartView.docs]);
+      expect(gtagCalls(entries.slice(4))).to.deep.equal([
+        ['set', { page_location: quickstart }],
+        ['event', 'page_view', quickstartView.docs]
+      ]);
+    });
+
+    it("gives GA4's own events the reported address of each page, never the one in the address bar", () => {
+      const page = browser('https://docs.test/api/pets/listPets?code=x&state=y#access_token=z', 'List pets');
+      const analytics = new Analytics(withGa4);
+
+      analytics.start();
+      analytics.reportPageView();
+      page.go(`${quickstart}?utm_source=mail&tab=python#install`);
+      analytics.reportPageView();
+      analytics.report('docs_markdown_copy', {});
+
+      expect(gtagCalls(page.dataLayer()).filter((command) => command[0] === 'set')).to.deep.equal([
+        ['set', { page_location: 'https://docs.test/api/pets/listPets' }],
+        ['set', { page_location: `${quickstart}?utm_source=mail` }]
+      ]);
     });
 
     it('pushes Arguments objects, which gtag.js reads, never arrays of the same values', () => {
@@ -287,7 +306,7 @@ describe('Analytics', () => {
       analytics.start();
       analytics.reportPageView();
 
-      expect(page.dataLayer().filter(isArguments)).to.have.length(3);
+      expect(page.dataLayer().filter(isArguments)).to.have.length(4);
       expect(page.dataLayer().some(Array.isArray)).to.be.false;
     });
 
@@ -314,7 +333,7 @@ describe('Analytics', () => {
       analytics.reportPageView();
 
       expect(page.window.gtag).to.equal(existing);
-      expect(calls.map((command) => command[0])).to.deep.equal(['js', 'config', 'event']);
+      expect(calls.map((command) => command[0])).to.deep.equal(['js', 'config', 'set', 'event']);
       expect(page.dataLayer().filter(isArguments)).to.be.empty;
     });
 
@@ -339,12 +358,13 @@ describe('Analytics', () => {
       analytics.reportPageView();
 
       const entries = page.dataLayer();
-      expect(entries).to.have.length(6);
+      expect(entries).to.have.length(7);
       expect(entries[0]).to.have.property('event', 'gtm.js');
       expect(gtagCalls(entries.slice(1, 3)).map((command) => command[0])).to.deep.equal(['js', 'config']);
       expect(entries[3]).to.deep.equal({ docs: null });
       expect(entries[4]).to.deep.equal(quickstartView);
-      expect(gtagCalls([entries[5]])[0]).to.deep.equal(['event', 'page_view', quickstartView.docs]);
+      expect(gtagCalls(entries.slice(5)).map((command) => command[0])).to.deep.equal(['set', 'event']);
+      expect(gtagCalls([entries[6]])[0]).to.deep.equal(['event', 'page_view', quickstartView.docs]);
       expect(page.scripts.map((script) => script.src)).to.deep.equal([GTM_SCRIPT, GA4_SCRIPT]);
     });
 

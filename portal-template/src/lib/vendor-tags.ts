@@ -50,7 +50,11 @@ export const adapters: { [V in Vendor]: (settings: PortalAnalytics) => Adapter |
       script: `${GOOGLE}/gtag/js?id=${encodeURIComponent(setting.measurementId)}`,
       // The page's gtag, which an instance a config save under `portal serve` makes never sets up; GA4 gets its own
       // names, without the `docs_` prefix.
-      send: (name, params) => window.gtag?.('event', name.replace(/^docs_/, ''), params)
+      send: (name, params) => {
+        // GA4's own events, such as a scroll, read this instead of the address, which may hold more.
+        if (name === 'docs_page_view') window.gtag?.('set', { page_location: params.page_location });
+        window.gtag?.('event', name.replace(/^docs_/, ''), params);
+      }
     };
   }
 };
