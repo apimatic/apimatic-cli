@@ -406,7 +406,6 @@ describe('PortalConfig', () => {
         googleAnalytics: null,
         keepQueryParams: []
       });
-      expect(JSON.parse(JSON.stringify(config({})))).to.not.have.property('analytics');
     });
 
     it('keeps both vendors with their IDs trimmed, the environment and every kept name, an OAuth answer’s included', () => {
@@ -539,9 +538,6 @@ describe('PortalConfig', () => {
 
     it('keeps an empty list of names as none', () => {
       expect(config({ analytics: { keepQueryParams: [] } }).identity().analytics.keepQueryParams).to.deep.equal([]);
-      expect(JSON.parse(JSON.stringify(config({ analytics: { keepQueryParams: [] } })))).to.not.have.property(
-        'analytics'
-      );
     });
 
     it('uses Google Analytics only with a measurement ID', () => {
@@ -550,21 +546,6 @@ describe('PortalConfig', () => {
         .false;
       expect(config({ analytics: { googleAnalytics: { measurementId: 'G-ABC123' } } }).usesGoogleAnalytics()).to.be
         .true;
-    });
-
-    it('serialises what it was given, and nothing when given nothing', () => {
-      const analytics = {
-        googleTagManager: { containerId: 'GTM-ABC123', environment: { auth: 'a', preview: 'env-1' } },
-        googleAnalytics: { measurementId: 'G-ABC123' },
-        keepQueryParams: ['campaign_id']
-      };
-      const written = (block: unknown) => JSON.parse(JSON.stringify(config(block)));
-
-      expect(written({ analytics }).analytics).to.deep.equal(analytics);
-      expect(written({ analytics: { googleTagManager: { containerId: 'GTM-1' } } }).analytics).to.deep.equal({
-        googleTagManager: { containerId: 'GTM-1' }
-      });
-      expect(written({ analytics: {} })).to.not.have.property('analytics');
     });
   });
 
@@ -583,13 +564,6 @@ describe('PortalConfig', () => {
       expect(errorsOf({ seo: { googleSiteVerification: ' ' } })).to.deep.equal([
         "'portal.seo.googleSiteVerification' must be a non-empty string."
       ]);
-    });
-
-    it('is serialised only when set', () => {
-      const written = (block: unknown) => JSON.parse(JSON.stringify(config(block)));
-
-      expect(written({ seo: { googleSiteVerification: 'abc' } }).seo).to.deep.equal({ googleSiteVerification: 'abc' });
-      expect(written({ seo: {} })).to.not.have.property('seo');
     });
   });
 

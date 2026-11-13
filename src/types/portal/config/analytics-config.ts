@@ -2,10 +2,15 @@ import { err, ok, Result } from 'neverthrow';
 import { isJsonObject } from '../../../utils/json-utils.js';
 import { allOf, namespace, nonEmptyString, optional, Parsed, required, unknownKeys } from './fields.js';
 
+/** From a GTM environment's own snippet, so a staging build can still be checked in GTM. */
+export interface GoogleTagManagerEnvironment {
+  auth: string;
+  preview: string;
+}
+
 export interface GoogleTagManagerSetting {
   containerId: string;
-  /** From the environment's own snippet, so a staging build can still be checked in GTM. */
-  environment: { auth: string; preview: string } | null;
+  environment: GoogleTagManagerEnvironment | null;
 }
 
 export interface GoogleAnalyticsSetting {
@@ -17,12 +22,6 @@ export interface PortalAnalytics {
   googleTagManager: GoogleTagManagerSetting | null;
   googleAnalytics: GoogleAnalyticsSetting | null;
   keepQueryParams: string[];
-}
-
-export interface AnalyticsBlock {
-  googleTagManager?: { containerId: string; environment?: { auth: string; preview: string } };
-  googleAnalytics?: GoogleAnalyticsSetting;
-  keepQueryParams?: string[];
 }
 
 const KNOWN = ['googleTagManager', 'googleAnalytics', 'keepQueryParams'];
@@ -66,24 +65,6 @@ export class AnalyticsConfig {
   public withoutVendors(): AnalyticsConfig {
     return new AnalyticsConfig(null, null, this.keepQueryParams);
   }
-
-  /** Null with nothing set, so the block quickstart writes has no `analytics`. */
-  public toJSON(): AnalyticsBlock | null {
-    const gtm = this.googleTagManager;
-    const block: AnalyticsBlock = {
-      ...(gtm === null
-        ? {}
-        : {
-            googleTagManager: {
-              containerId: gtm.containerId,
-              ...(gtm.environment === null ? {} : { environment: gtm.environment })
-            }
-          }),
-      ...(this.googleAnalytics === null ? {} : { googleAnalytics: this.googleAnalytics }),
-      ...(this.keepQueryParams.length === 0 ? {} : { keepQueryParams: this.keepQueryParams })
-    };
-    return Object.keys(block).length === 0 ? null : block;
-  }
 }
 
 // Each ID is required and nothing more: its format is the vendor's to check, since a wrong value fails there, not here.
@@ -100,7 +81,7 @@ function googleTagManager(value: unknown, path: string): Parsed<GoogleTagManager
   ).map(([containerId, environment]) => ({ containerId, environment }));
 }
 
-function environment(value: unknown, path: string): Parsed<{ auth: string; preview: string }> {
+function environment(value: unknown, path: string): Parsed<GoogleTagManagerEnvironment> {
   if (!isJsonObject(value)) {
     return err([`'${path}' must be a JSON object with 'auth' and 'preview'.`]);
   }

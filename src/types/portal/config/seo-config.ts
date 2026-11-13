@@ -6,10 +6,6 @@ export interface PortalSeo {
   googleSiteVerification: string | null;
 }
 
-export interface SeoBlock {
-  googleSiteVerification: string;
-}
-
 const KNOWN = ['googleSiteVerification'];
 
 export class SeoConfig {
@@ -30,10 +26,5 @@ export class SeoConfig {
 
   public identity(): PortalSeo {
     return { googleSiteVerification: this.googleSiteVerification };
-  }
-
-  /** Null with nothing set, so the block quickstart writes has no `seo`. */
-  public toJSON(): SeoBlock | null {
-    return this.googleSiteVerification === null ? null : { googleSiteVerification: this.googleSiteVerification };
   }
 }

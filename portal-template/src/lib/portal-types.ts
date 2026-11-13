@@ -22,9 +22,14 @@ export interface PortalFavicon {
   type: string | null;
 }
 
+export interface GoogleTagManagerEnvironment {
+  auth: string;
+  preview: string;
+}
+
 export interface GoogleTagManagerSetting {
   containerId: string;
-  environment: { auth: string; preview: string } | null;
+  environment: GoogleTagManagerEnvironment | null;
 }
 
 export interface GoogleAnalyticsSetting {

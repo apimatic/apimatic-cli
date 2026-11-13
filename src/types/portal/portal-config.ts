@@ -2,12 +2,12 @@ import { err, ok, Result } from 'neverthrow';
 import { isJsonObject } from '../../utils/json-utils.js';
 import { UrlPath } from '../file/urlPath.js';
 import { AiConfig } from './config/ai-config.js';
-import { AnalyticsBlock, AnalyticsConfig, PortalAnalytics } from './config/analytics-config.js';
+import { AnalyticsConfig, PortalAnalytics } from './config/analytics-config.js';
 import { BrandConfig, ColorMode } from './config/brand-config.js';
 import { allOf, optional, Parsed, unknownKeys } from './config/fields.js';
 import { Link } from './config/link.js';
 import { NavigationConfig } from './config/navigation-config.js';
-import { PortalSeo, SeoBlock, SeoConfig } from './config/seo-config.js';
+import { PortalSeo, SeoConfig } from './config/seo-config.js';
 import { SiteAddress } from './config/site-address.js';
 import { SiteConfig, SuggestedSite } from './config/site-config.js';
 import { StaticAsset } from './config/static-asset.js';
@@ -159,17 +159,13 @@ export class PortalConfig {
     );
   }
 
-  /** Every namespace included, defaults and all, which is what quickstart writes; `analytics` and `seo` only when set. */
+  /** Every namespace included, defaults and all, which is what quickstart writes; `analytics` and `seo` start unset. */
   public toJSON(): PortalBlock {
-    const analytics = this.analytics.toJSON();
-    const seo = this.seo.toJSON();
     return {
       site: this.site.toJSON(),
       brand: this.brand.toJSON(),
       navigation: this.navigation.toJSON(),
       ai: this.ai.toJSON(),
-      ...(analytics === null ? {} : { analytics }),
-      ...(seo === null ? {} : { seo }),
       ...(this.pluginAddress === null ? {} : { pluginUrl: this.pluginAddress.toString() })
     };
   }
@@ -198,7 +194,5 @@ export interface PortalBlock {
   brand: ReturnType<BrandConfig['toJSON']>;
   navigation: ReturnType<NavigationConfig['toJSON']>;
   ai: ReturnType<AiConfig['toJSON']>;
-  analytics?: AnalyticsBlock;
-  seo?: SeoBlock;
   pluginUrl?: string;
 }
