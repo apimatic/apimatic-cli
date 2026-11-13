@@ -64,9 +64,13 @@ export interface Adapter {
 type Vendor = 'googleTagManager' | 'googleAnalytics';
 const GOOGLE = 'https://www.googletagmanager.com';
 
-/** Keyed by every vendor in the union: a vendor without an adapter does not compile. */
-export const adapters: { [V in Vendor]: (setting: NonNullable<PortalAnalytics[V]>) => Adapter } = {
-  googleTagManager: (setting) => {
+/**
+ * Keyed by every vendor in the union, each building its adapter from the settings, or null with its vendor
+ * unset: a vendor without an adapter does not compile, and an instance loads whatever the registry builds.
+ */
+export const adapters: { [V in Vendor]: (settings: PortalAnalytics) => Adapter | null } = {
+  googleTagManager: ({ googleTagManager: setting }) => {
+    if (setting === null) return null;
     const env = setting.environment;
     const environment = env
       ? `&gtm_auth=${encodeURIComponent(env.auth)}&gtm_preview=${encodeURIComponent(env.preview)}&gtm_cookies_win=x`
@@ -77,7 +81,8 @@ export const adapters: { [V in Vendor]: (setting: NonNullable<PortalAnalytics[V]
       send: () => {}
     };
   },
-  googleAnalytics: (setting) => {
+  googleAnalytics: ({ googleAnalytics: setting }) => {
+    if (setting === null) return null;
     let gtag: Gtag;
     return {
       setup: (dataLayer) => {
@@ -124,7 +129,7 @@ export function copiedLanguage(button: Element): string | null {
 
 /** The one instance a portal runs: started when the bundle evaluates, reporting from the root effect and the components. */
 export class Analytics {
-  private readonly live: Adapter[] = [];
+  private readonly live: Adapter[];
   private started = false;
   private lastPageView: string | null = null;
   private previousPageView: string | null = null;
@@ -133,8 +138,9 @@ export class Analytics {
   private lastApiResult: FetchResult | null = null;
 
   public constructor(private readonly settings: PortalAnalytics) {
-    if (settings.googleTagManager) this.live.push(adapters.googleTagManager(settings.googleTagManager));
-    if (settings.googleAnalytics) this.live.push(adapters.googleAnalytics(settings.googleAnalytics));
+    this.live = Object.values(adapters)
+      .map((build) => build(settings))
+      .filter((adapter) => adapter !== null);
   }
 
   /** Once, when the bundle starts: the data layer, every vendor's setup entries, then the vendor tags. */

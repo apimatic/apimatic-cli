@@ -492,20 +492,17 @@ describe('Analytics', () => {
     const suite: {
       vendor: keyof typeof adapters;
       settings: PortalAnalytics;
-      adapter: () => Adapter;
       pageViewCall: (entries: unknown[]) => void;
     }[] = [
       {
         vendor: 'googleTagManager',
         settings: withGtm(),
-        adapter: () => adapters.googleTagManager({ containerId: 'GTM-ABC123', environment: null }),
         // The data layer entry is the call; GTM sends nothing of its own.
         pageViewCall: (entries) => expect(entries.filter(isArguments)).to.be.empty
       },
       {
         vendor: 'googleAnalytics',
         settings: withGa4,
-        adapter: () => adapters.googleAnalytics({ measurementId: 'G-ABC123' }),
         pageViewCall: (entries) => expect(gtagCalls(entries).at(-1)?.slice(0, 2)).to.deep.equal(['event', 'page_view'])
       }
     ];
@@ -514,8 +511,14 @@ describe('Analytics', () => {
       expect(suite.map((row) => row.vendor)).to.have.members(Object.keys(adapters));
     });
 
-    for (const { vendor, settings, adapter, pageViewCall } of suite) {
+    for (const { vendor, settings, pageViewCall } of suite) {
       describe(vendor, () => {
+        const adapter = (): Adapter => adapters[vendor](settings) ?? expect.fail(`${vendor} builds no adapter`);
+
+        it('builds no adapter from settings without its vendor', () => {
+          expect(adapters[vendor](none)).to.be.null;
+        });
+
         it("turns the vendor's own page view off in its setup", () => {
           browser(quickstart);
           const pushed: unknown[] = [];
