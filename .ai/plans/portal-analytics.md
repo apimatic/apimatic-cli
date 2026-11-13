@@ -516,6 +516,16 @@ the path; vendor values are escaped in the tag addresses; the GA4 warning stays 
 replay, search and GA4 lines are corrected. `portal serve` runs under React's StrictMode, which is
 why the once-per-result and once-per-page rules exist. The dialog marking is a workaround for fuma-nama/fumadocs#3824 (filed 2026-11-12), which asks for a prop that reaches the dialog; a follow-up to remove the observer once it ships, not a merge prerequisite. Rebased onto the base tip `d1e22066` on 2026-11-12, cleanly, with the fixes stashed and restored: the base holds fumadocs-openapi 12.6.0, having stepped back from 12.6.1 for the seven-day release-age rule. fuma-nama/fumadocs#3809 shipped in 12.6.2 on 2026-11-12 (12.6.1 answers #3810 only), which clears the rule on 2026-11-19, so the prerequisite stands until the base takes 12.6.2.
 
+**End-to-end run of 2026-11-13** (headless Chrome driven over the DevTools protocol against `portal serve` and a
+`portal generate` build, with a real GA4 property): seven of the eight events reached GA4 once each with their
+keys; `docs_plugin_install` needs a project with a `plugin` block. The playground's header and its dialog both
+carry the replay markers in the browser. One bug found and fixed in `__root.tsx`, uncommitted: in `portal serve`
+the root effect runs while the router is still pending, before the page's head applies, so the first
+`docs_page_view` carried the site name as its title and the address dedupe then dropped the `onRendered` report
+that had the right one; a prerendered page mounts idle with the right title and raises no `onRendered` for its
+first page. The effect now reports directly only when the router is idle at mount. GA4's own history-change
+page view was seen on every page change with the stream setting still on, as the warning says.
+
 ## 5. Questions each step will raise
 
 Answered already, so the agent does not ask them:
