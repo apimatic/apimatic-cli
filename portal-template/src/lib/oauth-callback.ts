@@ -1,9 +1,16 @@
+import { withBasePath } from './base-path';
+
 /**
  * The one redirect URI a portal owner registers with their OAuth provider, instead of the
  * address of every endpoint page that can start an authorization. The CLI keeps the user's
  * pages off it, in `src/types/portal/content-tree.ts`.
  */
 export const oauthCallbackPath = '/oauth/callback';
+
+/** Whether a path is the callback's under `base`, Vite's own unless one is given; a static host may add a slash. */
+export function isOAuthCallbackPath(pathname: string, base?: string): boolean {
+  return pathname.replace(/\/$/, '') === withBasePath(oauthCallbackPath, base);
+}
 
 /** Where the playground notes the path of the page that started the flow before it leaves: this tab's session storage. */
 const STARTING_PAGE_KEY = 'fumadocs-openapi-oauth';

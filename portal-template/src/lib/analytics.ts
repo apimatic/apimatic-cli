@@ -1,7 +1,7 @@
 import type { FetchResult } from 'fumadocs-openapi/playground';
-import { withBasePath } from './base-path';
-import { oauthCallbackPath } from './oauth-callback';
+import { isOAuthCallbackPath } from './oauth-callback';
 import type { PortalAnalytics } from './portal-types';
+import { type Adapter, adapters, insertTags } from './vendor-tags';
 
 /** Query parameters a reported address keeps: campaign, ad-click and cross-domain tags, which attribution reads from the address. */
 const KEPT_PREFIXES = ['utm_', 'hsa_'];
@@ -40,73 +40,20 @@ export interface PortalEvents {
 export type PortalEventName = keyof PortalEvents;
 
 /** The reset entry, then the event entry with every detail under `docs`. */
-export type DataLayerEntry =
-  | { docs: null }
-  | { event: PortalEventName; docs: Readonly<Record<string, string | number>> };
-
-type Gtag = (...command: unknown[]) => void;
+type DataLayerEntry = { docs: null } | { event: PortalEventName; docs: Readonly<Record<string, string | number>> };
 
 declare global {
   interface Window {
     dataLayer?: unknown[];
-    gtag?: Gtag;
     /** Set by the first start in a page load: a module Vite evaluates again under `portal serve` makes a second instance. */
     portalAnalyticsStarted?: true;
   }
 }
 
-/** Our code for one vendor. The shared adapter suite runs against each. */
-export interface Adapter {
-  setup(dataLayer: unknown[]): void;
-  scripts(): string[];
-  /** GTM needs nothing here: it reads the data layer. */
-  send(name: PortalEventName, params: Record<string, unknown>): void;
-}
-
-type Vendor = 'googleTagManager' | 'googleAnalytics';
-const GOOGLE = 'https://www.googletagmanager.com';
-
-/**
- * Keyed by every vendor in the union, each building its adapter from the settings, or null with its vendor
- * unset: a vendor without an adapter does not compile, and an instance loads whatever the registry builds.
- */
-export const adapters: { [V in Vendor]: (settings: PortalAnalytics) => Adapter | null } = {
-  googleTagManager: ({ googleTagManager: setting }) => {
-    if (setting === null) return null;
-    const env = setting.environment;
-    const environment = env
-      ? `&gtm_auth=${encodeURIComponent(env.auth)}&gtm_preview=${encodeURIComponent(env.preview)}&gtm_cookies_win=x`
-      : '';
-    return {
-      setup: (dataLayer) => dataLayer.push({ 'gtm.start': Date.now(), event: 'gtm.js' }),
-      scripts: () => [`${GOOGLE}/gtm.js?id=${encodeURIComponent(setting.containerId)}${environment}`],
-      send: () => {}
-    };
-  },
-  googleAnalytics: ({ googleAnalytics: setting }) => {
-    if (setting === null) return null;
-    let gtag: Gtag;
-    return {
-      setup: (dataLayer) => {
-        // gtag.js reads only Arguments objects from the data layer, never an array of the same values.
-        gtag = window.gtag ??= function () {
-          dataLayer.push(arguments);
-        };
-        gtag('js', new Date());
-        gtag('config', setting.measurementId, { send_page_view: false });
-      },
-      scripts: () => [`${GOOGLE}/gtag/js?id=${encodeURIComponent(setting.measurementId)}`],
-      // GA4 gets its own names: the `docs_` prefix comes off.
-      send: (name, params) => gtag('event', name.replace(/^docs_/, ''), params)
-    };
-  }
-};
-
 /** The address as reported: no `#` part, no query but the kept tags, and null on the OAuth callback. */
 export function pageLocation(href: string, keep: readonly string[], base?: string): string | null {
   const url = new URL(href);
-  // A static host may answer `/oauth/callback` at `/oauth/callback/` and keep the query.
-  if (url.pathname.replace(/\/$/, '') === withBasePath(oauthCallbackPath, base)) return null;
+  if (isOAuthCallbackPath(url.pathname, base)) return null;
   url.search = new URLSearchParams(
     [...url.searchParams].filter(
       ([name]) => KEPT_PREFIXES.some((prefix) => name.startsWith(prefix)) || KEPT_NAMES.has(name) || keep.includes(name)
@@ -114,21 +61,6 @@ export function pageLocation(href: string, keep: readonly string[], base?: strin
   ).toString();
   url.hash = '';
   return url.href;
-}
-
-/**
- * Appends each vendor tag once, and none while the address holds an OAuth answer, which GTM's tags and gtag.js
- * read for themselves; a tag already in the page is left, so a page view after the callback adds only the rest.
- */
-function insertTags(live: Adapter[], keep: readonly string[]): void {
-  if (pageLocation(window.location.href, keep) === null) return;
-  for (const src of live.flatMap((adapter) => adapter.scripts())) {
-    if (document.head.querySelector(`script[src="${src}"]`) !== null) continue;
-    const script = document.createElement('script');
-    script.async = true;
-    script.src = src;
-    document.head.append(script);
-  }
 }
 
 /** The one instance a portal runs: started when the bundle evaluates, reporting from the root effect and the components. */
@@ -148,15 +80,15 @@ export class Analytics {
 
   /**
    * Once per page load, when the bundle starts: the data layer, every vendor's setup entries, then the vendor
-   * tags unless the address holds an OAuth answer, in which case the next page view inserts them. The guard is
-   * the window's, not the instance's: a config save under `portal serve` makes Vite evaluate the module again.
+   * tags unless this is the OAuth callback, in which case the next page view inserts them. The guard is the
+   * window's, not the instance's: a config save under `portal serve` makes Vite evaluate the module again.
    */
   public start(): void {
     if (window.portalAnalyticsStarted) return;
     window.portalAnalyticsStarted = true;
     const dataLayer = (window.dataLayer ??= []);
     for (const adapter of this.live) adapter.setup(dataLayer);
-    insertTags(this.live, this.settings.keepQueryParams);
+    insertTags(this.live);
   }
 
   /** `href` is the page the event belongs to, the current one unless the caller saw the address change first. */
@@ -176,7 +108,7 @@ export class Analytics {
     const page = pageLocation(window.location.href, this.settings.keepQueryParams);
     if (page === null) return;
     // The tags held back on the OAuth callback start here, on the first page after it.
-    insertTags(this.live, this.settings.keepQueryParams);
+    insertTags(this.live);
     if (page === this.lastPageView) return;
     this.previousPageView = this.lastPageView;
     this.lastPageView = page;

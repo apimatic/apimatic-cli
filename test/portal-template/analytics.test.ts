@@ -1,13 +1,7 @@
 import { expect } from 'chai';
-import {
-  Adapter,
-  adapters,
-  Analytics,
-  pageLocation,
-  PortalEventName,
-  PortalEvents
-} from '../../portal-template/src/lib/analytics';
+import { Analytics, pageLocation, PortalEventName, PortalEvents } from '../../portal-template/src/lib/analytics';
 import type { PortalAnalytics } from '../../portal-template/src/lib/portal-types';
+import { Adapter, adapters } from '../../portal-template/src/lib/vendor-tags';
 
 // The list is written out here, not imported: the test is the contract, and a name the module drops fails it.
 const KEPT_NAMES = [
@@ -127,7 +121,7 @@ interface FakeScript {
 }
 
 interface FakeWindow {
-  location: { href: string };
+  location: URL;
   dataLayer?: unknown[];
   gtag?: (...command: unknown[]) => void;
 }
@@ -135,7 +129,7 @@ interface FakeWindow {
 /** A page in the browser: the `window` and `document` the module reads, and the scripts the loader appends. */
 function browser(href: string, title = 'Quickstart | Acme API', referrer = '') {
   const scripts: FakeScript[] = [];
-  const window: FakeWindow = { location: { href } };
+  const window: FakeWindow = { location: new URL(href) };
   const document = {
     title,
     referrer,
@@ -471,7 +465,7 @@ describe('Analytics', () => {
           const named = /record|capture|replay/i;
           const entries = pushed.map((entry) => (isArguments(entry) ? Array.from(entry as ArrayLike<unknown>) : entry));
           expect(JSON.stringify(entries)).to.not.match(named);
-          for (const src of adapter().scripts()) expect(src).to.not.match(named);
+          expect(adapter().script).to.not.match(named);
         });
 
         it("turns the vendor's own page view off in its setup", () => {
@@ -514,8 +508,7 @@ describe('Analytics', () => {
         });
 
         it('inserts only https scripts, none inline', () => {
-          expect(adapter().scripts()).to.not.be.empty;
-          for (const src of adapter().scripts()) expect(src).to.match(/^https:\/\//);
+          expect(adapter().script).to.match(/^https:\/\//);
           const page = browser(quickstart);
 
           new Analytics(settings).start();
