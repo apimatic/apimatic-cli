@@ -9,7 +9,7 @@ import { ProjectContext } from '../../types/project-context.js';
 import { isSkippedByGlob } from '../../types/portal/content-tree.js';
 import { GeneratedPages } from '../../types/portal/generated-pages.js';
 import { PortalArtifacts } from '../../types/portal/portal-artifacts.js';
-import { PortalSettings, PortalSource, settingsForBuild, WatchedSource } from '../../types/portal/portal-source.js';
+import { PortalBuildOptions, PortalSettings, PortalSource, WatchedSource } from '../../types/portal/portal-source.js';
 import { PreviewConfig } from '../../types/portal/preview-config.js';
 import { PreviewContent } from '../../types/portal/preview-content.js';
 import { PreviewSpecs } from '../../types/portal/preview-specs.js';
@@ -45,11 +45,11 @@ export class PortalServeAction {
     project: ProjectContext,
     port: number,
     openInBrowser: boolean,
-    enableAnalytics: boolean,
+    build: PortalBuildOptions,
     onServing?: () => void
   ): Promise<ActionResult> => {
     const prepare = new PreparePortalProjectAction(this.configDir, this.commandMetadata, this.authKey);
-    return await prepare.execute(project, enableAnalytics, {
+    return await prepare.execute(project, build, {
       onPrepared: async (portalProject, source, artifacts) => {
         const servePort = await this.networkService.getServerPort([port, 3000, 3001, 3002]);
         if (servePort !== port) {
@@ -80,7 +80,7 @@ export class PortalServeAction {
           source,
           artifacts,
           portalProject.projectDirectory,
-          enableAnalytics,
+          build,
           (settings) => {
             const sectionsChanged = !settings.generatedPages.makesSameSectionsAs(generatedPages);
             generatedPages = settings.generatedPages;
@@ -131,7 +131,7 @@ export class PortalServeAction {
     source: PortalSource,
     artifacts: PortalArtifacts,
     portalProjectDirectory: DirectoryPath,
-    enableAnalytics: boolean,
+    build: PortalBuildOptions,
     onApplied: (settings: PortalSettings) => void
   ): FileWatch | undefined {
     const sourceDirectory = project.sourceDirectory();
@@ -139,7 +139,7 @@ export class PortalServeAction {
     const preview = new PreviewConfig(source.config, source.staticDirectory !== null);
 
     const applyEdit = async () => {
-      const reloaded = await sourceContext.resolveSettings(source.suggestedSite);
+      const reloaded = await sourceContext.resolveSettings(source.suggestedSite, build);
       if (reloaded.isErr()) {
         preview.refuse();
         this.prompts.configRejected(reloaded.error, sourceDirectory);
@@ -159,10 +159,7 @@ export class PortalServeAction {
         this.prompts.staticDirectoryNotServed(sourceDirectory);
       }
 
-      const applied = await this.projectService.applyConfig(
-        portalProjectDirectory,
-        settingsForBuild(settings, enableAnalytics)
-      );
+      const applied = await this.projectService.applyConfig(portalProjectDirectory, settings);
       if (applied.isErr()) {
         this.prompts.notApplied('config', applied.error, sourceDirectory);
         return;

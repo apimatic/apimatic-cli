@@ -53,7 +53,7 @@ Nothing is written to disk; run 'apimatic portal generate' to produce the static
 
     intro('Portal Serve');
     const action = new PortalServeAction(this.getConfigDir(), commandMetadata, authKey);
-    const result = await action.execute(ProjectContext.at(input), port, open, !noAnalytics);
+    const result = await action.execute(ProjectContext.at(input), port, open, { analytics: !noAnalytics });
     outro(result);
   }
 

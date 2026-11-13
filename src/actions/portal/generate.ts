@@ -5,6 +5,7 @@ import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { PortalContext } from '../../types/portal-context.js';
 import { SiteAddress } from '../../types/portal/config/site-address.js';
+import { PortalBuildOptions } from '../../types/portal/portal-source.js';
 import { ProjectContext } from '../../types/project-context.js';
 import { ActionResult } from '../action-result.js';
 import { PreparePortalProjectAction } from './prepare-project.js';
@@ -27,7 +28,7 @@ export class GenerateAction {
     portalDirectory: DirectoryPath,
     force: boolean,
     zipPortal: boolean,
-    enableAnalytics: boolean
+    build: PortalBuildOptions
   ): Promise<ActionResult> => {
     if (project.isSourceDirectory(portalDirectory)) {
       this.prompts.directoryCannotBeSame(portalDirectory);
@@ -43,7 +44,7 @@ export class GenerateAction {
 
     const portalContext = new PortalContext(portalDirectory);
     const prepare = new PreparePortalProjectAction(this.configDir, this.commandMetadata, this.authKey);
-    return await prepare.execute(project, enableAnalytics, {
+    return await prepare.execute(project, build, {
       confirm: () => this.confirmOverwrite(portalContext, portalDirectory, force),
       onPrepared: (portalProject, source) => {
         if (source.config.usesGoogleAnalytics()) {

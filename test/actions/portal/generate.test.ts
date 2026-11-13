@@ -15,7 +15,7 @@ import { ServiceError } from '../../../src/infrastructure/service-error';
 import { DirectoryPath } from '../../../src/types/file/directoryPath';
 import { CommandMetadata } from '../../../src/types/common/command-metadata';
 import { ProjectContext } from '../../../src/types/project-context';
-import { completeArtifacts, stubPreparePortalProject } from './prepare-project-stubs';
+import { completeArtifacts, fixtureWithAnalytics, stubPreparePortalProject } from './prepare-project-stubs';
 
 const COMMAND_METADATA: CommandMetadata = { commandName: 'portal generate', shell: 'test' };
 const FIXTURE = new DirectoryPath(process.cwd()).join('test/resources/portal-inputs/default');
@@ -38,13 +38,13 @@ describe('GenerateAction', () => {
   let authorize: sinon.SinonStub;
   let build: sinon.SinonStub;
 
-  const execute = (projectDirectory = FIXTURE, force = false, zip = false, enableAnalytics = true) =>
+  const execute = (projectDirectory = FIXTURE, force = false, zip = false, analytics = true) =>
     new GenerateAction(new DirectoryPath(root), COMMAND_METADATA, 'auth-key').execute(
       ProjectContext.in(projectDirectory),
       portalDirectory,
       force,
       zip,
-      enableAnalytics
+      { analytics }
     );
 
   const inPortal = (relative: string) => fs.existsSync(path.join(portalDirectory.toString(), relative));
@@ -120,7 +120,9 @@ describe('GenerateAction', () => {
   it('fails when the source and destination are the same directory', async () => {
     const action = new GenerateAction(new DirectoryPath(root), COMMAND_METADATA);
 
-    const result = await action.execute(ProjectContext.in(FIXTURE), FIXTURE.join('src'), false, false, true);
+    const result = await action.execute(ProjectContext.in(FIXTURE), FIXTURE.join('src'), false, false, {
+      analytics: true
+    });
 
     expect(result.isFailed()).to.be.true;
     expect(prompts.directoryCannotBeSame.calledOnce).to.be.true;
@@ -319,12 +321,9 @@ describe('GenerateAction', () => {
   });
 
   it('warns that Google Analytics counts page changes, before the build, when it is set', async () => {
-    const project = new DirectoryPath(root).join('analytics');
-    fs.cpSync(FIXTURE.toString(), project.toString(), { recursive: true });
-    const configFile = path.join(project.toString(), 'src', 'apimatic.json');
-    const edited = JSON.parse(fs.readFileSync(configFile, 'utf8'));
-    edited.portal.analytics = { googleAnalytics: { measurementId: 'G-ABC123' } };
-    fs.writeFileSync(configFile, JSON.stringify(edited));
+    const project = fixtureWithAnalytics(FIXTURE, new DirectoryPath(root).join('analytics'), {
+      googleAnalytics: { measurementId: 'G-ABC123' }
+    });
 
     const result = await execute(project);
 
@@ -335,12 +334,9 @@ describe('GenerateAction', () => {
   });
 
   it('does not warn about Google Analytics under --no-analytics, which prepares the project without it', async () => {
-    const project = new DirectoryPath(root).join('staging');
-    fs.cpSync(FIXTURE.toString(), project.toString(), { recursive: true });
-    const configFile = path.join(project.toString(), 'src', 'apimatic.json');
-    const edited = JSON.parse(fs.readFileSync(configFile, 'utf8'));
-    edited.portal.analytics = { googleAnalytics: { measurementId: 'G-ABC123' } };
-    fs.writeFileSync(configFile, JSON.stringify(edited));
+    const project = fixtureWithAnalytics(FIXTURE, new DirectoryPath(root).join('staging'), {
+      googleAnalytics: { measurementId: 'G-ABC123' }
+    });
 
     const result = await execute(project, false, false, false);
 

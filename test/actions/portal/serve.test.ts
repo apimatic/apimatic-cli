@@ -45,12 +45,12 @@ describe('PortalServeAction', () => {
   /** Stands in for the preview process dying, with what it printed on the way out. */
   let exit: (output: string) => void;
 
-  const execute = (projectDirectory = FIXTURE, openInBrowser = false, enableAnalytics = true) =>
+  const execute = (projectDirectory = FIXTURE, openInBrowser = false, analytics = true) =>
     new PortalServeAction(new DirectoryPath(root), COMMAND_METADATA, 'auth-key').execute(
       ProjectContext.in(projectDirectory),
       PORT,
       openInBrowser,
-      enableAnalytics
+      { analytics }
     );
 
   /** Stands in for the watch on `directory`, answered by `watching`; any other tree's watch is left alone. */
@@ -609,8 +609,8 @@ describe('PortalServeAction', () => {
       fs.writeFileSync(path.join(source.toString(), 'apimatic.json'), JSON.stringify(config));
 
     /** Runs the preview until `body` is done with it, then stops it as CTRL+C would. */
-    const whileServing = async (body: () => Promise<void>, enableAnalytics = true) => {
-      const running = execute(new DirectoryPath(root), false, enableAnalytics);
+    const whileServing = async (body: () => Promise<void>, analytics = true) => {
+      const running = execute(new DirectoryPath(root), false, analytics);
       const { onChange } = await watched;
       save = async (config: object) => {
         writeConfig(config);

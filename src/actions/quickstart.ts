@@ -240,13 +240,11 @@ export class QuickstartAction {
     const structure = await this.fileService.getDirectory(project.sourceDirectory());
     this.prompts.printDirectoryStructure(projectDirectory, structure);
 
-    const openInBrowser = true;
-    const enableAnalytics = true;
     const result = await new PortalServeAction(this.configDir, this.commandMetadata, null).execute(
       project,
       DEFAULT_PORTAL_PORT,
-      openInBrowser,
-      enableAnalytics,
+      true,
+      { analytics: true },
       () => this.prompts.nextSteps(configFile)
     );
 

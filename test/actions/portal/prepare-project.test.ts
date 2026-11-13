@@ -14,7 +14,12 @@ import { FilePath } from '../../../src/types/file/filePath';
 import { CommandMetadata } from '../../../src/types/common/command-metadata';
 import { ProjectContext } from '../../../src/types/project-context';
 import { TempContext } from '../../../src/types/temp-context';
-import { completeArtifacts, PreparePortalProjectStubs, stubPreparePortalProject } from './prepare-project-stubs';
+import {
+  completeArtifacts,
+  fixtureWithAnalytics,
+  PreparePortalProjectStubs,
+  stubPreparePortalProject
+} from './prepare-project-stubs';
 
 const COMMAND_METADATA: CommandMetadata = { commandName: 'portal generate', shell: 'test' };
 
@@ -33,7 +38,7 @@ describe('PreparePortalProjectAction', () => {
 
     const result = await new PreparePortalProjectAction(new DirectoryPath(os.tmpdir()), COMMAND_METADATA).execute(
       ProjectContext.in(share),
-      true,
+      { analytics: true },
       { onPrepared }
     );
 
@@ -48,10 +53,10 @@ describe('PreparePortalProjectAction', () => {
     let shared: PreparePortalProjectStubs;
     let onPrepared: sinon.SinonStub;
 
-    const execute = (enableAnalytics = true, project = FIXTURE) =>
+    const execute = (analytics = true, project = FIXTURE) =>
       new PreparePortalProjectAction(new DirectoryPath(os.tmpdir()), COMMAND_METADATA).execute(
         ProjectContext.in(project),
-        enableAnalytics,
+        { analytics },
         { onPrepared }
       );
 
@@ -78,13 +83,11 @@ describe('PreparePortalProjectAction', () => {
     it('prepares the project, and hands on the source, with neither vendor tag under --no-analytics', async () => {
       const root = fs.mkdtempSync(path.join(os.tmpdir(), 'portal-prepare-'));
       try {
-        fs.cpSync(FIXTURE.toString(), root, { recursive: true });
-        const configFile = path.join(root, 'src', 'apimatic.json');
-        const edited = JSON.parse(fs.readFileSync(configFile, 'utf8'));
-        edited.portal.analytics = { googleTagManager: { containerId: 'GTM-ABC123' } };
-        fs.writeFileSync(configFile, JSON.stringify(edited));
+        const project = fixtureWithAnalytics(FIXTURE, new DirectoryPath(root), {
+          googleTagManager: { containerId: 'GTM-ABC123' }
+        });
 
-        await execute(false, new DirectoryPath(root));
+        await execute(false, project);
 
         expect(shared.prepare.firstCall.args[1].config.identity().analytics.googleTagManager).to.be.null;
         expect(onPrepared.firstCall.args[1].config.identity().analytics.googleTagManager).to.be.null;

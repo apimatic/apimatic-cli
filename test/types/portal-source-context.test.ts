@@ -376,6 +376,30 @@ describe('PortalSourceContext', () => {
       ]);
     });
 
+    it('leaves out the vendor tags under --no-analytics, as resolve does, and keeps the query names to keep', async () => {
+      writeConfig({
+        site: { name: 'Calc' },
+        analytics: { googleTagManager: { containerId: 'GTM-ABC123' }, keepQueryParams: ['campaign_id'] }
+      });
+      const off = { analytics: false };
+
+      const resolved = (await new PortalSourceContext(new DirectoryPath(root)).resolve(off))._unsafeUnwrap();
+      const reloaded = (await context().resolveSettings(null, off))._unsafeUnwrap();
+      const kept = (await context().resolveSettings(null))._unsafeUnwrap();
+
+      for (const { config } of [resolved, reloaded]) {
+        expect(config.identity().analytics).to.deep.equal({
+          googleTagManager: null,
+          googleAnalytics: null,
+          keepQueryParams: ['campaign_id']
+        });
+      }
+      expect(kept.config.identity().analytics.googleTagManager).to.deep.equal({
+        containerId: 'GTM-ABC123',
+        environment: null
+      });
+    });
+
     it('reports a file removed while the preview runs', async () => {
       expect((await context().resolveSettings(null))._unsafeUnwrapErr()).to.deep.equal({ kind: 'missingConfig' });
     });

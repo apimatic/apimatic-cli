@@ -30,6 +30,7 @@ import {
   MissingFile,
   MissingImage,
   MissingStaticFile,
+  PortalBuildOptions,
   PortalScaffoldProblem,
   PortalSettings,
   PortalSource,
@@ -135,7 +136,9 @@ export class PortalSourceContext {
   }
 
   /** Reads and validates the whole source directory, or reports the first problem found. */
-  public async resolve(): Promise<Result<PortalSource, PortalSourceProblem>> {
+  public async resolve(
+    build: PortalBuildOptions = { analytics: true }
+  ): Promise<Result<PortalSource, PortalSourceProblem>> {
     const document = await this.readConfigDocument();
     if (document.isErr()) {
       return err(document.error);
@@ -149,7 +152,7 @@ export class PortalSourceContext {
     }
     const { specs, suggestedSite, unmergedSpecs, leftOutSpecs } = discovered.value;
 
-    const settings = await this.settingsFrom(document.value, suggestedSite);
+    const settings = await this.settingsFrom(document.value, suggestedSite, build);
     if (settings.isErr()) {
       return err(settings.error);
     }
@@ -279,17 +282,21 @@ export class PortalSourceContext {
    * is accepted exactly when a build would accept it. `suggested` is what `resolve` found in the
    * specifications, which are not read again; changing them needs a restart anyway.
    */
-  public async resolveSettings(suggested: SuggestedSite | null): Promise<Result<PortalSettings, PortalSourceProblem>> {
+  public async resolveSettings(
+    suggested: SuggestedSite | null,
+    build: PortalBuildOptions = { analytics: true }
+  ): Promise<Result<PortalSettings, PortalSourceProblem>> {
     const document = await this.readConfigDocument();
     if (document.isErr()) {
       return err(document.error);
     }
-    return this.settingsFrom(document.value, suggested);
+    return this.settingsFrom(document.value, suggested, build);
   }
 
   private async settingsFrom(
     document: ApimaticConfigDocument,
-    suggested: SuggestedSite | null
+    suggested: SuggestedSite | null,
+    build: PortalBuildOptions
   ): Promise<Result<PortalSettings, PortalSourceProblem>> {
     const settings = PortalSourceContext.parseSettings(document, suggested);
     if (settings.isErr()) {
@@ -301,7 +308,7 @@ export class PortalSourceContext {
     if (missingFiles.length > 0) {
       return err({ kind: 'missingStaticFiles', files: missingFiles });
     }
-    return ok(settings.value);
+    return ok(build.analytics ? settings.value : { ...settings.value, config: settings.value.config.withoutVendors() });
   }
 
   private async readConfigDocument(): Promise<Result<ApimaticConfigDocument, PortalSourceProblem>> {

@@ -48,7 +48,9 @@ The portal is built on your machine and written as static files for any static h
 
     intro('Generate Portal');
     const action = new GenerateAction(this.getConfigDir(), commandMetadata, authKey);
-    const result = await action.execute(project, project.portalDirectory(destination), force, zipPortal, !noAnalytics);
+    const result = await action.execute(project, project.portalDirectory(destination), force, zipPortal, {
+      analytics: !noAnalytics
+    });
     outro(result);
   }
 
