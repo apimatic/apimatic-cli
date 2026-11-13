@@ -291,13 +291,15 @@ const stylesheetOf = (output: DirectoryPath) => {
     }
   });
 
-  it('prerenders the operation page’s playground header inside the element session replays skip', () => {
-    const parts = read('api/apimatic-calculator/simple-calculator/Calculate/index.html').split(
-      'data-portal-playground'
-    );
-    expect(parts, 'one element').to.have.length(2);
+  it('prerenders the playground header and the cURL sample beside it inside the elements session replays skip', () => {
+    const marked = read('api/apimatic-calculator/simple-calculator/Calculate/index.html')
+      .split('data-portal-playground')
+      .slice(1);
+    expect(marked, 'the header and the sample').to.have.length(2);
     // What Fumadocs' playground renders on the server: its header, with the method, the route and the trigger.
-    expect(parts[1].slice(0, 2000)).to.match(/>GET<[\s\S]*\{operation\}[\s\S]*aria-haspopup="dialog"/);
+    expect(marked[0].slice(0, 2000)).to.match(/>GET<[\s\S]*\{operation\}[\s\S]*aria-haspopup="dialog"/);
+    // The sample follows what the reader types into the playground, the credentials among it.
+    expect(marked[1]).to.match(/>curl<[\s\S]*> -X<[\s\S]*> GET</);
   });
 
   it('keeps the server-side specification loader out of the browser bundle', () => {
