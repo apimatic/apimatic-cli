@@ -46,12 +46,8 @@ export class GenerateAction {
     const prepare = new PreparePortalProjectAction(this.configDir, this.commandMetadata, this.authKey);
     return await prepare.execute(project, build, {
       confirm: () => this.confirmOverwrite(portalContext, portalDirectory, force),
-      onPrepared: (portalProject, source) => {
-        if (source.config.usesGoogleAnalytics()) {
-          this.prompts.googleAnalyticsCountsPageChanges();
-        }
-        return this.build(portalProject, source.config.siteAddress(), portalContext, portalDirectory, zipPortal);
-      }
+      onPrepared: (portalProject, source) =>
+        this.build(portalProject, source.config.siteAddress(), portalContext, portalDirectory, zipPortal)
     });
   };
 

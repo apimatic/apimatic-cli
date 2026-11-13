@@ -179,7 +179,7 @@
         },
         "analytics": {
           "type": "object",
-          "description": "Analytics the portal loads. Every page view goes to window.dataLayer as docs_page_view, and to GA4 when a measurement ID is set. The portal counts page changes itself: with googleAnalytics set, turn off the GA4 stream's 'Page changes based on browser history events', or every page change counts twice.",
+          "description": "Analytics the portal loads. Every page view goes to window.dataLayer as docs_page_view, and to GA4 when a measurement ID is set.",
           "additionalProperties": false,
           "properties": {
             "googleTagManager": {

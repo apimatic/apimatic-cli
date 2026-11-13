@@ -80,20 +80,44 @@ describe('PreparePortalProjectAction', () => {
       expect(uploaded.filter((entry) => entry.startsWith('static/'))).to.be.empty;
     });
 
-    it('prepares the project, and hands on the source, with neither vendor tag under --no-analytics', async () => {
-      const root = fs.mkdtempSync(path.join(os.tmpdir(), 'portal-prepare-'));
-      try {
-        const project = fixtureWithAnalytics(FIXTURE, new DirectoryPath(root), {
-          googleTagManager: { containerId: 'GTM-ABC123' }
+    describe('with both vendors set', () => {
+      let root: string;
+      const project = () =>
+        fixtureWithAnalytics(FIXTURE, new DirectoryPath(root), {
+          googleTagManager: { containerId: 'GTM-ABC123' },
+          googleAnalytics: { measurementId: 'G-ABC123' }
         });
 
-        await execute(false, project);
+      beforeEach(() => {
+        root = fs.mkdtempSync(path.join(os.tmpdir(), 'portal-prepare-'));
+      });
+
+      afterEach(() => {
+        fs.rmSync(root, { recursive: true, force: true });
+      });
+
+      it('warns that Google Analytics counts page changes, before the artifacts are asked for', async () => {
+        await execute(true, project());
+
+        expect(shared.prompts.googleAnalyticsCountsPageChanges.calledOnce).to.be.true;
+        expect(shared.prompts.googleAnalyticsCountsPageChanges.calledBefore(shared.artifacts)).to.be.true;
+        expect(onPrepared.firstCall.args[1].config.usesGoogleAnalytics()).to.be.true;
+      });
+
+      it('prepares the project, and hands on the source, with neither vendor tag and no warning under --no-analytics', async () => {
+        await execute(false, project());
 
         expect(shared.prepare.firstCall.args[1].config.identity().analytics.googleTagManager).to.be.null;
         expect(onPrepared.firstCall.args[1].config.identity().analytics.googleTagManager).to.be.null;
-      } finally {
-        fs.rmSync(root, { recursive: true, force: true });
-      }
+        expect(onPrepared.firstCall.args[1].config.usesGoogleAnalytics()).to.be.false;
+        expect(shared.prompts.googleAnalyticsCountsPageChanges.called).to.be.false;
+      });
+    });
+
+    it('does not warn about Google Analytics when it is not set', async () => {
+      await execute();
+
+      expect(shared.prompts.googleAnalyticsCountsPageChanges.called).to.be.false;
     });
 
     it('reports a source it could not zip, without asking for the artifacts', async () => {

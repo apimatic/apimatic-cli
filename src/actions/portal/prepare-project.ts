@@ -73,6 +73,9 @@ export class PreparePortalProjectAction {
     this.prompts.contentNotices(source.value.contentNotices, sourceDirectory);
     this.prompts.unmergedSpecs(source.value.unmergedSpecs, sourceDirectory);
     this.prompts.leftOutSpecs(source.value.leftOutSpecs, sourceDirectory);
+    if (source.value.config.usesGoogleAnalytics()) {
+      this.prompts.googleAnalyticsCountsPageChanges();
+    }
 
     if (!(await confirm())) {
       return ActionResult.cancelled();

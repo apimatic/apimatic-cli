@@ -15,7 +15,7 @@ import { ServiceError } from '../../../src/infrastructure/service-error';
 import { DirectoryPath } from '../../../src/types/file/directoryPath';
 import { CommandMetadata } from '../../../src/types/common/command-metadata';
 import { ProjectContext } from '../../../src/types/project-context';
-import { completeArtifacts, fixtureWithAnalytics, stubPreparePortalProject } from './prepare-project-stubs';
+import { completeArtifacts, stubPreparePortalProject } from './prepare-project-stubs';
 
 const COMMAND_METADATA: CommandMetadata = { commandName: 'portal generate', shell: 'test' };
 const FIXTURE = new DirectoryPath(process.cwd()).join('test/resources/portal-inputs/default');
@@ -318,38 +318,6 @@ describe('GenerateAction', () => {
 
     expect(result.isSuccess()).to.be.true;
     expect(shared.prompts.filesShadowedByStatic.firstCall.args[0].map(String)).to.deep.equal(['robots.txt']);
-  });
-
-  it('warns that Google Analytics counts page changes, before the build, when it is set', async () => {
-    const project = fixtureWithAnalytics(FIXTURE, new DirectoryPath(root).join('analytics'), {
-      googleAnalytics: { measurementId: 'G-ABC123' }
-    });
-
-    const result = await execute(project);
-
-    expect(result.isSuccess()).to.be.true;
-    expect(prompts.googleAnalyticsCountsPageChanges.calledOnce).to.be.true;
-    expect(prompts.googleAnalyticsCountsPageChanges.calledBefore(build)).to.be.true;
-    expect(shared.prepare.firstCall.args[1].config.usesGoogleAnalytics()).to.be.true;
-  });
-
-  it('does not warn about Google Analytics under --no-analytics, which prepares the project without it', async () => {
-    const project = fixtureWithAnalytics(FIXTURE, new DirectoryPath(root).join('staging'), {
-      googleAnalytics: { measurementId: 'G-ABC123' }
-    });
-
-    const result = await execute(project, false, false, false);
-
-    expect(result.isSuccess()).to.be.true;
-    expect(prompts.googleAnalyticsCountsPageChanges.called).to.be.false;
-    expect(shared.prepare.firstCall.args[1].config.usesGoogleAnalytics()).to.be.false;
-  });
-
-  it('does not warn about Google Analytics when it is not set', async () => {
-    const result = await execute();
-
-    expect(result.isSuccess()).to.be.true;
-    expect(prompts.googleAnalyticsCountsPageChanges.called).to.be.false;
   });
 
   it('reports the specs the SDKs do not cover and the operations two specs declare, none in the fixture', async () => {

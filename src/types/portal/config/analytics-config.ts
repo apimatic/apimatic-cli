@@ -49,7 +49,7 @@ export class AnalyticsConfig {
     );
   }
 
-  /** `portal generate` warns when this is true: the customer has a GA4 stream setting to turn off. */
+  /** `portal generate` and `portal serve` warn when this is true: the customer has a GA4 stream setting to turn off. */
   public usesGoogleAnalytics(): boolean {
     return this.googleAnalytics !== null;
   }
