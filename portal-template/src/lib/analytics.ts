@@ -50,10 +50,9 @@ declare global {
   }
 }
 
-/** The address as reported: no `#` part, no query but the kept tags, and null on the OAuth callback. */
-export function pageLocation(href: string, keep: readonly string[], base?: string): string | null {
+/** The address as reported: no `#` part, and no query but the kept tags. */
+export function pageLocation(href: string, keep: readonly string[]): string {
   const url = new URL(href);
-  if (isOAuthCallbackPath(url.pathname, base)) return null;
   url.search = new URLSearchParams(
     [...url.searchParams].filter(
       ([name]) => KEPT_PREFIXES.some((prefix) => name.startsWith(prefix)) || KEPT_NAMES.has(name) || keep.includes(name)
@@ -93,22 +92,21 @@ export class Analytics {
 
   /** `href` is the page the event belongs to, the current one unless the caller saw the address change first. */
   public report<E extends PortalEventName>(name: E, params: PortalEvents[E], href = window.location.href): void {
-    const page_location = pageLocation(href, this.settings.keepQueryParams);
-    if (page_location === null) return;
-    const docs = { ...params, page_location };
+    if (isOAuthCallbackPath(new URL(href).pathname)) return;
+    const docs = { ...params, page_location: pageLocation(href, this.settings.keepQueryParams) };
     const dataLayer = (window.dataLayer ??= []);
     // GTM keeps every key from earlier pushes and merges objects, so clear ours first: a shared GA4 tag never sends the last event's details.
     dataLayer.push({ docs: null } satisfies DataLayerEntry);
     dataLayer.push({ event: name, docs } satisfies DataLayerEntry);
-    for (const adapter of this.live) adapter.send(name, docs);
+    for (const adapter of this.live) adapter.send?.(name, docs);
   }
 
   /** `docs_page_view` for the current page, unless its cleaned address is the one last reported: a `#` jump sends none. */
   public reportPageView(): void {
-    const page = pageLocation(window.location.href, this.settings.keepQueryParams);
-    if (page === null) return;
+    if (isOAuthCallbackPath(window.location.pathname)) return;
     // The tags held back on the OAuth callback start here, on the first page after it.
     insertTags(this.live);
+    const page = pageLocation(window.location.href, this.settings.keepQueryParams);
     if (page === this.lastPageView) return;
     this.previousPageView = this.lastPageView;
     this.lastPageView = page;
@@ -121,7 +119,7 @@ export class Analytics {
   public reportNotFound(): void {
     const page = pageLocation(window.location.href, this.settings.keepQueryParams);
     // A dev build mounts the page twice; the next missing page is a new report.
-    if (page === null || page === this.lastNotFound) return;
+    if (page === this.lastNotFound) return;
     this.lastNotFound = page;
     const referrer = document.referrer === '' ? null : new URL(document.referrer);
     if (referrer !== null) {

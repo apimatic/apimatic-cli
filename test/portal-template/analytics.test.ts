@@ -54,29 +54,10 @@ describe('pageLocation', () => {
     expect(pageLocation(`${page}?gclidx=1`, [])).to.equal(page);
   });
 
-  it('is null on the OAuth callback', () => {
-    expect(pageLocation('https://docs.test/oauth/callback?code=abc&state=123', [])).to.be.null;
-    expect(pageLocation('https://docs.test/oauth/callback#access_token=xyz&state=123', [])).to.be.null;
-  });
-
-  it('is null on the OAuth callback under a base path', () => {
-    expect(pageLocation('https://docs.test/docs/oauth/callback?code=abc&state=123', [], '/docs/')).to.be.null;
-  });
-
-  // A static host may answer `/oauth/callback` at `/oauth/callback/` and keep the query.
-  it('is null on the OAuth callback with a trailing slash', () => {
-    expect(pageLocation('https://docs.test/oauth/callback/?code=abc&state=123', [])).to.be.null;
-    expect(pageLocation('https://docs.test/docs/oauth/callback/#access_token=xyz', [], '/docs/')).to.be.null;
-  });
-
-  it('is not the callback at the root when the portal is under a base path', () => {
-    expect(pageLocation('https://docs.test/oauth/callback', [], '/docs/')).to.equal('https://docs.test/oauth/callback');
-  });
-
   it('leaves the address otherwise unchanged', () => {
     expect(pageLocation(page, [])).to.equal(page);
     expect(pageLocation('https://docs.test/', [])).to.equal('https://docs.test/');
-    expect(pageLocation('https://docs.test/docs/api/pets/Get%20Pets', [], '/docs/')).to.equal(
+    expect(pageLocation('https://docs.test/docs/api/pets/Get%20Pets', [])).to.equal(
       'https://docs.test/docs/api/pets/Get%20Pets'
     );
     expect(pageLocation('http://localhost:3000/guides/quickstart', [])).to.equal(

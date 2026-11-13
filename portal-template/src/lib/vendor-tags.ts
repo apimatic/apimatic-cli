@@ -1,4 +1,3 @@
-import type { PortalEventName } from './analytics';
 import { isOAuthCallbackPath } from './oauth-callback';
 import type { PortalAnalytics } from './portal-types';
 
@@ -14,8 +13,8 @@ declare global {
 export interface Adapter {
   setup(dataLayer: unknown[]): void;
   script: string;
-  /** GTM needs nothing here: it reads the data layer. */
-  send(name: PortalEventName, params: Record<string, unknown>): void;
+  /** For a vendor that does not read the data layer itself, as GTM does. */
+  send?(name: string, params: Record<string, unknown>): void;
 }
 
 type Vendor = Exclude<keyof PortalAnalytics, 'keepQueryParams'>;
@@ -34,8 +33,7 @@ export const adapters: { [V in Vendor]: (settings: PortalAnalytics) => Adapter |
       : '';
     return {
       setup: (dataLayer) => dataLayer.push({ 'gtm.start': Date.now(), event: 'gtm.js' }),
-      script: `${GOOGLE}/gtm.js?id=${encodeURIComponent(setting.containerId)}${environment}`,
-      send: () => {}
+      script: `${GOOGLE}/gtm.js?id=${encodeURIComponent(setting.containerId)}${environment}`
     };
   },
   googleAnalytics: ({ googleAnalytics: setting }) => {
