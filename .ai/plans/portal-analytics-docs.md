@@ -173,10 +173,11 @@ page, and read what readers type. Give it only to people you would give the repo
 Session replay tools record what readers type. The API playground, where readers paste keys
 and tokens, carries the opt-out markers of PostHog (`ph-no-capture`), FullStory (`fs-exclude`),
 rrweb (`rr-block`), Amplitude (`amp-block`), Hotjar (`data-hj-suppress`), Microsoft Clarity
-(`data-clarity-mask`) and LogRocket (`data-private`): its header on the page, and the dialog it
-opens, which is marked as it appears. A replay shows the page with the playground blank. For
-any other tool, block the selector `[data-portal-playground]` in its settings, which both the
-header and the dialog carry.
+(`data-clarity-mask`) and LogRocket (`data-private`): its header on the page, the dialog it
+opens, which is marked as it appears, and the cURL sample beside it, which follows what the
+reader types into the playground. A replay shows the page with the playground and that sample
+blank. For any other tool, block the selector `[data-portal-playground]` in its settings, which
+all three carry.
 
 ### After a sign-in
 
