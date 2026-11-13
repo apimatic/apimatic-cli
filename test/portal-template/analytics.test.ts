@@ -336,6 +336,17 @@ describe('Analytics', () => {
       expect(calls.map((command) => command[0])).to.deep.equal(['js', 'config', 'event']);
       expect(page.dataLayer().filter(isArguments)).to.be.empty;
     });
+
+    it("sends through the page's gtag from a second instance, as a config save under portal serve makes", () => {
+      const page = browser(quickstart);
+      new Analytics(withGa4).start();
+      const second = new Analytics(withGa4);
+      second.start();
+
+      second.report('docs_markdown_copy', {});
+
+      expect(gtagCalls(page.dataLayer()).map((command) => command[0])).to.deep.equal(['js', 'config', 'event']);
+    });
   });
 
   describe('with both vendors', () => {

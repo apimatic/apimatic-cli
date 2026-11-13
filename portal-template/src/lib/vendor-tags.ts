@@ -40,19 +40,19 @@ export const adapters: { [V in Vendor]: (settings: PortalAnalytics) => Adapter |
   },
   googleAnalytics: ({ googleAnalytics: setting }) => {
     if (setting === null) return null;
-    let gtag: Gtag;
     return {
       setup: (dataLayer) => {
         // gtag.js reads only Arguments objects from the data layer, never an array of the same values.
-        gtag = window.gtag ??= function () {
+        const gtag = (window.gtag ??= function () {
           dataLayer.push(arguments);
-        };
+        });
         gtag('js', new Date());
         gtag('config', setting.measurementId, { send_page_view: false });
       },
       script: `${GOOGLE}/gtag/js?id=${encodeURIComponent(setting.measurementId)}`,
-      // GA4 gets its own names: the `docs_` prefix comes off.
-      send: (name, params) => gtag('event', name.replace(/^docs_/, ''), params)
+      // The page's gtag, which an instance a config save under `portal serve` makes never sets up; GA4 gets its own
+      // names, without the `docs_` prefix.
+      send: (name, params) => window.gtag?.('event', name.replace(/^docs_/, ''), params)
     };
   }
 };
