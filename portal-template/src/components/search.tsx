@@ -17,6 +17,7 @@ import { useI18n } from 'fumadocs-ui/contexts/i18n';
 import { useEffect, useMemo, useRef } from 'react';
 import { withBasePath } from '@/lib/base-path';
 import { analytics } from '@/lib/portal-analytics';
+import { searchOutcome } from '@/lib/search-report';
 
 export default function DefaultSearchDialog(props: SharedProps) {
   const { locale } = useI18n();
@@ -46,18 +47,22 @@ export default function DefaultSearchDialog(props: SharedProps) {
     openedAt.current = window.location.href;
   }, [props.open]);
 
-  // A close is seen from the prop, which the hotkey changes too. Fumadocs hands over the pick before the close
-  // renders, and the last keystrokes' results may still be loading, so the report waits for the results shown.
+  // A close is seen from the prop, which the hotkey changes too.
   useEffect(() => {
-    if (props.open || !wasOpen.current || query.isLoading) return;
+    if (!wasOpen.current) return;
+    const outcome = searchOutcome({
+      open: props.open,
+      loading: query.isLoading,
+      typed: typed.current,
+      picked: picked.current,
+      term: search,
+      resultCount: results?.length ?? 0
+    });
+    if (!outcome.ended) return;
     wasOpen.current = false;
-    const search_term = search.trim();
-    if ((typed.current || picked.current !== '') && search_term !== '') {
-      const result_count = results?.length ?? 0;
-      analytics.report('docs_search', { search_term, result: picked.current, result_count }, openedAt.current);
-    }
     typed.current = false;
     picked.current = '';
+    if (outcome.report !== null) analytics.report('docs_search', outcome.report, openedAt.current);
   }, [props.open, query.isLoading, search, results]);
 
   const onSearchChange = (value: string) => {
