@@ -204,7 +204,10 @@ export class Analytics {
       referrer.search = '';
       referrer.hash = '';
     }
-    this.report('docs_not_found', { page_referrer: this.previousPageView ?? referrer?.href ?? '' });
+    // The missing page's own view may be reported before this or after it: the page left is the last
+    // one reported besides it.
+    const left = this.lastPageView === page ? this.previousPageView : this.lastPageView;
+    this.report('docs_not_found', { page_referrer: left ?? referrer?.href ?? '' });
   }
   /** As the playground sends a request: the start of the one duration a request that never arrives can have; a request failing before this has none. */
   public requestStarted(): void {

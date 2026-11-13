@@ -773,6 +773,18 @@ describe('Analytics', () => {
       expect(page.dataLayer().at(-1)).to.have.nested.property('docs.page_location', missing);
     });
 
+    it('names the page left when the missing page’s own view is yet to be reported', () => {
+      const page = browser('https://docs.acme.com/guides/quickstart');
+      const analytics = new Analytics(none);
+      analytics.reportPageView();
+      page.go(missing);
+
+      analytics.reportNotFound('https://www.google.com/search?q=acme+docs');
+      analytics.reportPageView();
+
+      expect(referrers(page.dataLayer())).to.deep.equal(['https://docs.acme.com/guides/quickstart']);
+    });
+
     it('names the referrer without its query or # part on a first load, and nothing when the browser sends none', () => {
       const page = browser(missing);
       const analytics = new Analytics(none);
