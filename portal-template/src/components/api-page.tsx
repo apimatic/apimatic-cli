@@ -21,7 +21,6 @@ export const OpenAPIPage = createOpenAPIPage({
   mediaAdapters,
   oauthRedirectUrl: withBasePath(oauthCallbackPath),
   playground: {
-    // Session replay tools a GTM tag loads record the page's text and input; each marker keeps its tool out of the playground.
     render: ({ method, path }) => (
       <div {...REPLAY_MARKERS} data-portal-playground="">
         <Suspense fallback={<EndpointBar method={method} route={path} />}>

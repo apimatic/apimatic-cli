@@ -9,7 +9,6 @@ declare global {
   }
 }
 
-/** Our code for one vendor. The shared adapter suite runs against each. */
 export interface Adapter {
   setup(dataLayer: unknown[]): void;
   script: string;
@@ -20,10 +19,7 @@ export interface Adapter {
 type Vendor = Exclude<keyof PortalAnalytics, 'keepQueryParams'>;
 const GOOGLE = 'https://www.googletagmanager.com';
 
-/**
- * Keyed by every vendor `PortalAnalytics` names, each building its adapter from the settings, or null with its vendor
- * unset: a vendor without an adapter does not compile, and an instance loads whatever the registry builds.
- */
+/** Keyed by every vendor `PortalAnalytics` names, so a vendor without an adapter does not compile. */
 export const adapters: { [V in Vendor]: (settings: PortalAnalytics) => Adapter | null } = {
   googleTagManager: ({ googleTagManager: setting }) => {
     if (setting === null) return null;
@@ -48,21 +44,17 @@ export const adapters: { [V in Vendor]: (settings: PortalAnalytics) => Adapter |
         gtag('config', setting.measurementId, { send_page_view: false });
       },
       script: `${GOOGLE}/gtag/js?id=${encodeURIComponent(setting.measurementId)}`,
-      // The page's gtag, which an instance a config save under `portal serve` makes never sets up; GA4 gets its own
-      // names, without the `docs_` prefix.
       send: (name, params) => {
         // GA4's own events, such as a scroll, read this instead of the address, which may hold more.
         if (name === 'docs_page_view') window.gtag?.('set', { page_location: params.page_location });
+        // The page's gtag, since a second instance under `portal serve` never runs its setup.
         window.gtag?.('event', name.replace(/^docs_/, ''), params);
       }
     };
   }
 };
 
-/**
- * Appends each vendor tag once, and none on the OAuth callback, whose address GTM's tags and gtag.js read for
- * themselves; a tag already in the page is left, so a page view after the callback adds only the rest.
- */
+/** None on the OAuth callback, whose address the tags read for themselves; each once, so a later page adds the rest. */
 export function insertTags(live: Adapter[]): void {
   if (isOAuthCallbackPath(window.location.pathname)) return;
   for (const { script: src } of live) {

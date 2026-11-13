@@ -65,8 +65,7 @@ function SampleCode({ sample }: Readonly<{ sample: CodeSample }>) {
   return <CodeBlock lang={sample.lang} code={source} />;
 }
 
-// Follows the playground's edits to the selected example, on the selected server, the typed credentials among
-// them: marked as the playground is, so a session replay shows this sample blank too.
+// Follows the playground's edits, typed credentials included, so it carries the playground's replay markers.
 function CurlCode() {
   const { CodeBlock } = useComponents();
   const code = useCodeUsage(CURL_USAGE_ID);

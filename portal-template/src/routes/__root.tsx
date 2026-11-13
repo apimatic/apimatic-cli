@@ -54,8 +54,7 @@ export const Route = createRootRoute({
 function RootComponent() {
   const router = useRouter();
   useEffect(() => {
-    // A prerendered page mounts with the router idle and raises no `onRendered` for its first page, so it
-    // is reported here; `portal serve` mounts pending, before the page's head applies, and `onRendered` follows.
+    // A prerendered page mounts idle with no `onRendered` to come; `portal serve` mounts pending, and one follows.
     if (router.state.status === 'idle') analytics.reportPageView();
     return router.subscribe('onRendered', () => analytics.reportPageView());
   }, [router]);

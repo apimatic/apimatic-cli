@@ -13,10 +13,7 @@ function markForReplay(element: Element): void {
   }
 }
 
-/**
- * Marks the playground's dialog, which Fumadocs renders outside the marked wrapper, as it appears: observers are told
- * in the order they were made, so this one, made before any vendor tag, marks it before a replay tool's records it.
- */
+/** Observers are told in the order they were made, so this one, made before any tag's, marks the dialog first. */
 export function markPlaygroundDialogs(): void {
   new MutationObserver((mutations) => {
     for (const { addedNodes } of mutations) {

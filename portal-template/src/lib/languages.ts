@@ -32,12 +32,7 @@ export const BUNDLED_LANGUAGES = [
 
 export type BundledLanguage = (typeof BUNDLED_LANGUAGES)[number];
 
-/**
- * Shiki's own bundle resolves `ts` or `yml` through an alias table beside its grammars; a
- * hand-built map has none, so an alias reaches Fumadocs as an unknown language and is replaced
- * with `text`. Taken from Shiki's `bundledLanguagesInfo`; `test/portal-template.test.ts` holds
- * them to it.
- */
+/** Shiki's aliases, which a hand-built bundle lacks; `test/portal-template.test.ts` holds them to Shiki's own. */
 export const languageAliases: Readonly<Record<string, BundledLanguage>> = {
   'c#': 'csharp',
   cs: 'csharp',
