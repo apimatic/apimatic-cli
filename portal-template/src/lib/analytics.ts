@@ -214,6 +214,11 @@ export class Analytics {
     this.requestStartedAt = Date.now();
   }
 
+  /** As the playground leaves the page: a request still in flight reports nothing, so its start times nothing later. */
+  public requestAbandoned(): void {
+    this.requestStartedAt = null;
+  }
+
   /** The playground's result for `endpoint`, the method and path as the spec writes them: its status and its time, and nothing of the request itself. */
   public reportApiRequest(endpoint: string, result: FetchResult): void {
     // The display mounts again with the same result on each reopen, and twice in a dev build.

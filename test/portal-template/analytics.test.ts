@@ -877,5 +877,16 @@ describe('Analytics', () => {
 
       expect(requests(page.dataLayer())[0].docs).to.include({ status: 'client_error', duration_ms: 0 });
     });
+
+    it('times a client error from no start once the playground left the page with a request in flight', () => {
+      const page = browser(address);
+      const analytics = new Analytics(none);
+      analytics.requestStarted();
+      analytics.requestAbandoned();
+
+      analytics.reportApiRequest(endpoint, { type: 'client_error', url, message: 'No adapter' } as never);
+
+      expect(requests(page.dataLayer())[0].docs).to.include({ status: 'client_error', duration_ms: 0 });
+    });
   });
 });

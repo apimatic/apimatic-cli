@@ -41,5 +41,7 @@ export default function Playground() {
     observer.observe(document.body, { childList: true, subtree: true });
     return () => observer.disconnect();
   }, []);
+  // A request still in flight when the page is left reports nothing, so its start must not time a later one.
+  useEffect(() => () => analytics.requestAbandoned(), []);
   return <PlaygroundClient fetchOptions={fetchOptions} components={components} />;
 }
