@@ -545,6 +545,22 @@ in flight when the playground leaves the page no longer times a later client err
 this build renders nowhere; the OAuth-callback tag load, which fuma-nama/fumadocs#3809 covers; the
 `sessionStorage` read, which came with #472.
 
+**The reviewer's findings of 2026-11-13** (seven, on PR #473), taken the same day: the vendor tags load
+neither on `/oauth/callback` nor at any address holding an OAuth answer; `start()` pushes the setup entries
+and inserts the tags only at a clean address, `reportPageView()` inserts them otherwise on the first page
+after, each tag once, and the start guard is the window's, since a config save under `portal serve` made Vite
+evaluate the module again and start a second time (seen in the browser: two `gtm.js` scripts and two
+`gtm.start` entries in one document). The cURL sample beside the playground follows the typed credentials, so
+it carries the replay markers too. The search dialog's close is seen from its open prop, which the hotkey
+changes as well. `lastNotFound` clears on the next page, so a repeat visit to a missing page reports again. The
+adapter suite checks that no setup entry or script so much as names recording or capture, and `report()`'s own
+callback guard has a direct test. Still open, and now the one merge prerequisite: taking fumadocs-openapi
+12.6.2 does not keep the answer out of the address on its own, since our own callback copies the provider's
+query and `#` part onto the starting page; 12.6.2's `getReturnedFlow()` reads `sessionStorage` under
+`fumadocs-openapi-oauth-returned` and falls back to the address, while 12.6.0 reads the address only, so the
+callback change (store `location.href` under that key, return the bare page, follow in
+`oauth-callback.test.ts` and the comment at `oauth-callback.ts:13`) lands with the bump, from 2026-11-19.
+
 ## 5. Questions each step will raise
 
 Answered already, so the agent does not ask them:
