@@ -543,6 +543,18 @@ describe('Analytics', () => {
           expect(adapters[vendor](none)).to.be.null;
         });
 
+        it('turns no session recording or input capture on, nor so much as names them', () => {
+          browser(quickstart);
+          const pushed: unknown[] = [];
+          adapter().setup(pushed);
+
+          // A later adapter that has to name them, to turn them off, says here how it does.
+          const named = /record|capture|replay/i;
+          const entries = pushed.map((entry) => (isArguments(entry) ? Array.from(entry as ArrayLike<unknown>) : entry));
+          expect(JSON.stringify(entries)).to.not.match(named);
+          for (const src of adapter().scripts()) expect(src).to.not.match(named);
+        });
+
         it("turns the vendor's own page view off in its setup", () => {
           browser(quickstart);
           const pushed: unknown[] = [];
