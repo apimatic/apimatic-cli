@@ -1,6 +1,6 @@
 import { err, ok, Result } from 'neverthrow';
 import { isJsonObject } from '../../../utils/json-utils.js';
-import { allOf, namespace, nonEmptyString, optional, Parsed, unknownKeys } from './fields.js';
+import { allOf, namespace, nonEmptyString, optional, Parsed, required, unknownKeys } from './fields.js';
 
 export interface GoogleTagManagerSetting {
   containerId: string;
@@ -86,6 +86,7 @@ export class AnalyticsConfig {
   }
 }
 
+// Each ID is required and nothing more: its format is the vendor's to check, since a wrong value fails there, not here.
 function googleTagManager(value: unknown, path: string): Parsed<GoogleTagManagerSetting> {
   if (!isJsonObject(value)) {
     return err([`'${path}' must be a JSON object with 'containerId'.`]);
@@ -93,7 +94,7 @@ function googleTagManager(value: unknown, path: string): Parsed<GoogleTagManager
   return allOf(
     unknownKeys(value, ['containerId', 'environment'], path),
     Result.combineWithAllErrors([
-      required(value.containerId, `${path}.containerId`),
+      required(value.containerId, `${path}.containerId`, nonEmptyString),
       optional(value.environment, (given) => environment(given, `${path}.environment`))
     ])
   ).map(([containerId, environment]) => ({ containerId, environment }));
@@ -105,7 +106,10 @@ function environment(value: unknown, path: string): Parsed<{ auth: string; previ
   }
   return allOf(
     unknownKeys(value, ['auth', 'preview'], path),
-    Result.combineWithAllErrors([required(value.auth, `${path}.auth`), required(value.preview, `${path}.preview`)])
+    Result.combineWithAllErrors([
+      required(value.auth, `${path}.auth`, nonEmptyString),
+      required(value.preview, `${path}.preview`, nonEmptyString)
+    ])
   ).map(([auth, preview]) => ({ auth, preview }));
 }
 
@@ -115,13 +119,8 @@ function googleAnalytics(value: unknown, path: string): Parsed<GoogleAnalyticsSe
   }
   return allOf(
     unknownKeys(value, ['measurementId'], path),
-    Result.combineWithAllErrors([required(value.measurementId, `${path}.measurementId`)])
+    Result.combineWithAllErrors([required(value.measurementId, `${path}.measurementId`, nonEmptyString)])
   ).map(([measurementId]) => ({ measurementId }));
-}
-
-/** Present and a non-empty string; its format is the vendor's to check, since a wrong value fails there, not here. */
-function required(given: unknown, path: string): Parsed<string> {
-  return given === undefined ? err([`'${path}' is required.`]) : nonEmptyString(given, path);
 }
 
 /** Names a reported address keeps, beyond the campaign names it always keeps. */
