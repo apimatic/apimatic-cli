@@ -210,6 +210,28 @@ jobs:
           PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}\.playwright-browsers
         run: pnpm test:functional
 
+      # Functional against the suite's petstore build: server selection, server
+      # variables and request parameters on the playground
+      # (tests/functional/petstore/). The tests intercept their own calls, so
+      # this needs no API Tester and no secrets beyond generation.
+      - name: generate the petstore portal
+        id: generate-petstore
+        if: ${{ !cancelled() }}
+        working-directory: tests
+        env:
+          PORTAL: petstore
+        run: pnpm portal:generate
+
+      - name: functional — petstore
+        if: ${{ !cancelled() && steps.generate-petstore.outcome == 'success' }}
+        working-directory: tests
+        shell: bash
+        env:
+          PORTAL: petstore
+          PORTAL_PREBUILT: '1'
+          PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}\.playwright-browsers
+        run: pnpm test:functional
+
       - name: upload playwright report
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
