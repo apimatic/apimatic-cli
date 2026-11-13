@@ -193,6 +193,8 @@ export class Analytics {
     if (page === this.lastPageView) return;
     this.previousPageView = this.lastPageView;
     this.lastPageView = page;
+    // Another page now: the missing page's next render is a new visit, while its own mounts stay one.
+    if (this.lastNotFound !== page) this.lastNotFound = null;
     this.report('docs_page_view', { page_title: document.title });
   }
   /** For a click anywhere on the page: a code block's copy button reports the copy with the block's language. */

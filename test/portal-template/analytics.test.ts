@@ -831,6 +831,27 @@ describe('Analytics', () => {
 
       expect(referrers(page.dataLayer())).to.deep.equal(['', '']);
     });
+
+    it('reports a missing page again when the reader comes back to it from another page', () => {
+      const page = browser('https://docs.acme.com/guides/quickstart');
+      const analytics = new Analytics(none);
+      analytics.reportPageView();
+      page.go(missing);
+      analytics.reportNotFound('');
+      analytics.reportPageView();
+      analytics.reportNotFound('');
+      page.go('https://docs.acme.com/guides/quickstart');
+      analytics.reportPageView();
+      page.go(missing);
+      analytics.reportPageView();
+      analytics.reportNotFound('');
+
+      expect(referrers(page.dataLayer())).to.deep.equal([
+        'https://docs.acme.com/guides/quickstart',
+        'https://docs.acme.com/guides/quickstart'
+      ]);
+      expect(pageViews(page.dataLayer())).to.have.length(4);
+    });
   });
   describe('reportApiRequest', () => {
     const address = 'https://docs.acme.com/api/calc/Calculate';
