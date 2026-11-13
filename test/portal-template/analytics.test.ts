@@ -102,7 +102,7 @@ interface FakeScript {
 }
 
 interface FakeWindow {
-  location: URL;
+  location: URL & { reload: () => void };
   dataLayer?: unknown[];
   gtag?: (...command: unknown[]) => void;
 }
@@ -110,7 +110,8 @@ interface FakeWindow {
 /** A page in the browser: the `window` and `document` the module reads, and the scripts the loader appends. */
 function browser(href: string, title = 'Quickstart | Acme API', referrer = '') {
   const scripts: FakeScript[] = [];
-  const window: FakeWindow = { location: new URL(href) };
+  let reloads = 0;
+  const window: FakeWindow = { location: Object.assign(new URL(href), { reload: () => (reloads += 1) }) };
   const document = {
     title,
     referrer,
@@ -125,6 +126,7 @@ function browser(href: string, title = 'Quickstart | Acme API', referrer = '') {
     window,
     scripts,
     dataLayer: () => window.dataLayer ?? [],
+    reloads: () => reloads,
     go: (next: string, nextTitle = title) => {
       window.location.href = next;
       document.title = nextTitle;
@@ -378,6 +380,18 @@ describe('Analytics', () => {
 
       expect(page.dataLayer()).to.have.length(3);
       expect(page.scripts).to.have.length(2);
+      expect(page.reloads()).to.equal(0);
+    });
+
+    it('reloads the page for a start with other vendors, as a config save under portal serve makes', () => {
+      const page = browser(quickstart);
+      new Analytics(withGtm()).start();
+
+      new Analytics(withBoth).start();
+
+      expect(page.reloads()).to.equal(1);
+      expect(page.dataLayer()).to.have.length(1);
+      expect(page.scripts.map((script) => script.src)).to.deep.equal([GTM_SCRIPT]);
     });
   });
 

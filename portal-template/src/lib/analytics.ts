@@ -45,8 +45,8 @@ type DataLayerEntry = { docs: null } | { event: PortalEventName; docs: Readonly<
 declare global {
   interface Window {
     dataLayer?: unknown[];
-    /** Set by the first start in a page load: a module Vite evaluates again under `portal serve` makes a second instance. */
-    portalAnalyticsStarted?: true;
+    /** The settings the page load started with: a config save under `portal serve` evaluates the module again. */
+    portalAnalyticsStarted?: string;
   }
 }
 
@@ -83,8 +83,14 @@ export class Analytics {
    * window's, not the instance's: a config save under `portal serve` makes Vite evaluate the module again.
    */
   public start(): void {
-    if (window.portalAnalyticsStarted) return;
-    window.portalAnalyticsStarted = true;
+    const settings = JSON.stringify(this.settings);
+    if (window.portalAnalyticsStarted === settings) return;
+    // Other vendors after a config save: only a fresh page holds exactly their tags and setup.
+    if (window.portalAnalyticsStarted !== undefined) {
+      window.location.reload();
+      return;
+    }
+    window.portalAnalyticsStarted = settings;
     const dataLayer = (window.dataLayer ??= []);
     for (const adapter of this.live) adapter.setup(dataLayer);
     insertTags(this.live);
