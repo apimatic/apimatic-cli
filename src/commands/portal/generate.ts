@@ -28,11 +28,7 @@ The portal is built on your machine and written as static files for any static h
       default: false,
       description: 'write the generated portal as a .zip archive.'
     }),
-    'no-analytics': Flags.boolean({
-      default: false,
-      description:
-        'leave out Google Tag Manager, Google Analytics and every analytics or marketing script, for staging.'
-    }),
+    ...FlagsProvider.noAnalytics,
     ...FlagsProvider.input,
     ...FlagsProvider.destination('portal', 'portal'),
     ...FlagsProvider.force,

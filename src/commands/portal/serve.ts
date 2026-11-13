@@ -36,11 +36,7 @@ Nothing is written to disk; run 'apimatic portal generate' to produce the static
       description: 'open the portal in the default browser.',
       default: false
     }),
-    'no-analytics': Flags.boolean({
-      default: false,
-      description:
-        'leave out Google Tag Manager, Google Analytics and every analytics or marketing script, for staging.'
-    }),
+    ...FlagsProvider.noAnalytics,
     ...FlagsProvider.input,
     ...FlagsProvider.authKey
   };

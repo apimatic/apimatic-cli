@@ -306,8 +306,7 @@ FLAGS
   -i, --input=<value>        [default: ./] path to the parent directory containing the 'src' directory, which includes
                              API specifications and configuration files.
   -k, --auth-key=<value>     override current authentication state with an authentication key.
-      --no-analytics         leave out Google Tag Manager, Google Analytics and every analytics or marketing script, for
-                             staging.
+      --no-analytics         leave out the Google Tag Manager and Google Analytics tags set in 'portal.analytics'.
       --zip                  write the generated portal as a .zip archive.
 
 DESCRIPTION
@@ -348,8 +347,7 @@ FLAGS
   -k, --auth-key=<value>  override current authentication state with an authentication key.
   -o, --open              open the portal in the default browser.
   -p, --port=23513        [default: 23513] port to serve the portal on.
-      --no-analytics      leave out Google Tag Manager, Google Analytics and every analytics or marketing script, for
-                          staging.
+      --no-analytics      leave out the Google Tag Manager and Google Analytics tags set in 'portal.analytics'.
 
 DESCRIPTION
   Preview your API Documentation Portal with live reload.
