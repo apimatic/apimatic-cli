@@ -4,7 +4,6 @@ import type { FetchResult } from 'fumadocs-openapi/playground';
 import PlaygroundClient, { DefaultResultDisplay, type ResultDisplayProps } from 'fumadocs-openapi/ui/playground/client';
 import { apiRequest } from '@/lib/api-request';
 import { analytics } from '@/lib/portal-analytics';
-import { markForReplay } from '@/lib/replay-markers';
 
 /** When this playground last sent a request, for a result that has no duration of its own. */
 const SentAt = createContext<RefObject<number | null>>({ current: null });
@@ -40,21 +39,6 @@ export default function Playground() {
     }),
     []
   );
-  // Fumadocs renders the dialog outside the marked wrapper, so it is marked as it appears, told from the search
-  // dialog by the request form in it, until fuma-nama/fumadocs#3824 lets the markers be passed to the dialog directly.
-  useEffect(() => {
-    const observer = new MutationObserver((mutations) => {
-      for (const { addedNodes } of mutations) {
-        for (const node of addedNodes) {
-          if (!(node instanceof Element)) continue;
-          const dialog = node.matches('[role="dialog"]') ? node : node.querySelector('[role="dialog"]');
-          if (dialog !== null && dialog.querySelector('form') !== null) markForReplay(dialog);
-        }
-      }
-    });
-    observer.observe(document.body, { childList: true, subtree: true });
-    return () => observer.disconnect();
-  }, []);
   return (
     <SentAt value={sentAt}>
       <PlaygroundClient fetchOptions={fetchOptions} components={components} />
