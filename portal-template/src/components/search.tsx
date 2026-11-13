@@ -8,13 +8,16 @@ import {
   SearchDialogInput,
   SearchDialogList,
   SearchDialogOverlay,
+  type SearchItemType,
   type SharedProps
 } from 'fumadocs-ui/components/dialog/search';
 import { useDocsSearch } from 'fumadocs-core/search/client';
 import { staticClient } from 'fumadocs-core/search/client/orama-static';
 import { useI18n } from 'fumadocs-ui/contexts/i18n';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { withBasePath } from '@/lib/base-path';
+import { analytics } from '@/lib/portal-analytics';
+import { searchOutcome } from '@/lib/search-report';
 
 export default function DefaultSearchDialog(props: SharedProps) {
   const { locale } = useI18n();
@@ -32,8 +35,52 @@ export default function DefaultSearchDialog(props: SharedProps) {
     [query.data]
   );
 
+  const typed = useRef(false);
+  const picked = useRef('');
+  const openedAt = useRef('');
+  const wasOpen = useRef(false);
+
+  // The page the search is made on: a pick changes the address before the dialog reports its close.
+  useEffect(() => {
+    if (!props.open) return;
+    wasOpen.current = true;
+    openedAt.current = window.location.href;
+  }, [props.open]);
+
+  // A close is seen from the prop, which the hotkey changes too.
+  useEffect(() => {
+    if (!wasOpen.current) return;
+    const outcome = searchOutcome({
+      open: props.open,
+      loading: query.isLoading,
+      typed: typed.current,
+      picked: picked.current,
+      term: search,
+      resultCount: results?.length ?? 0
+    });
+    if (!outcome.ended) return;
+    wasOpen.current = false;
+    typed.current = false;
+    picked.current = '';
+    if (outcome.report !== null) analytics.report('docs_search', outcome.report, openedAt.current);
+  }, [props.open, query.isLoading, search, results]);
+
+  const onSearchChange = (value: string) => {
+    typed.current = true;
+    setSearch(value);
+  };
+  const onSelect = (item: SearchItemType) => {
+    picked.current = 'url' in item ? item.url : '';
+  };
+
   return (
-    <SearchDialog search={search} onSearchChange={setSearch} isLoading={query.isLoading} {...props}>
+    <SearchDialog
+      search={search}
+      onSearchChange={onSearchChange}
+      isLoading={query.isLoading}
+      {...props}
+      onSelect={onSelect}
+    >
       <SearchDialogOverlay />
       <SearchDialogContent>
         <SearchDialogHeader>

@@ -1,9 +1,10 @@
-import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useContext, useMemo, useState, type MouseEvent, type ReactNode } from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@fumadocs/api-docs/components/select';
 import { useOpenAPI } from 'fumadocs-openapi';
 import { useExampleRequests, useOperation } from 'fumadocs-openapi/operation';
 import { CodeSample } from '@/lib/code-samples';
 import { Parameter, requestExamples, type RequestExample } from '@/lib/request-examples';
+import { reportCodeCopy } from './code-copy';
 
 interface ExampleSelection {
   operation: unknown;
@@ -19,6 +20,11 @@ interface LayoutSlots {
 }
 
 const SelectionContext = createContext<ExampleSelection | undefined>(undefined);
+
+// "Example Response" copies through a button of Fumadocs' own in the card's header, which takes no callback.
+const reportResponseCopy = (event: MouseEvent) => {
+  if (event.target instanceof Element && event.target.closest('button[aria-live]') !== null) reportCodeCopy('json');
+};
 
 export function useExampleSelection(): ExampleSelection {
   const selection = useContext(SelectionContext);
@@ -63,7 +69,9 @@ function ExampleLayout({ selector, usageTabs, responseTabs }: Readonly<LayoutSlo
       <div className="prose-no-margin">
         {selector === null ? null : <ExampleSelector />}
         {usageTabs}
-        {responseTabs}
+        <div className="contents" onClickCapture={reportResponseCopy}>
+          {responseTabs}
+        </div>
       </div>
     </SelectionContext.Provider>
   );

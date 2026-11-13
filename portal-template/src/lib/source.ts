@@ -1,9 +1,9 @@
 import { defineDocs } from 'fumadocs-mdx/macro';
 import { applyMdxPreset } from 'fumadocs-mdx/config';
-import { rehypeCodeDefaultOptions } from 'fumadocs-core/mdx-plugins';
 import rehypeRaw from 'rehype-raw';
 import { rehypeCodeTitles, rehypeKeepCodeMeta } from './rehype-code-titles';
 import { navigationSchema } from './navigation-schema';
+import { rehypeCodeOptions } from './transformer-language';
 
 // What `rehype-raw` must hand on untouched, being MDX's own nodes rather than HTML.
 const MDX_NODE_TYPES = ['mdxFlowExpression', 'mdxJsxFlowElement', 'mdxJsxTextElement', 'mdxTextExpression', 'mdxjsEsm'];
@@ -35,7 +35,7 @@ export const generated = defineDocs({
       // A remote image is never fetched for its size, which would make the build depend on its host.
       remarkImageOptions: { external: false },
       // The SDK pages' design heads a block with its title alone, without Fumadocs' language icon.
-      rehypeCodeOptions: { ...rehypeCodeDefaultOptions, icon: false },
+      rehypeCodeOptions: { ...rehypeCodeOptions, icon: false },
       // The SDK docs' HTML fails the build unrendered; not sanitized, as it comes from the owner's own spec.
       // The titles go in after it, and ahead of `rehypeCode`, the first of the defaults, which reads them.
       rehypePlugins: (defaults) => [

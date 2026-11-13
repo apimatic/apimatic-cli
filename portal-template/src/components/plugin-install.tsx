@@ -3,10 +3,13 @@ import { asMarkdown } from 'fumadocs-core/server';
 import { CommandBlock } from './command-block';
 import { fullAddress } from '@/lib/base-path';
 import { installCommand } from '@/lib/install-command';
+import { analytics } from '@/lib/portal-analytics';
 import { portal } from '@/lib/portal';
 
 // The address never changes while the page is open, so there is nothing to subscribe to.
 const noSubscribe = () => () => {};
+
+const reportInstall = () => analytics.report('docs_plugin_install', {});
 
 /** The prerender cannot know where the portal is hosted, so the browser swaps in its own address. */
 export function PluginInstall({ path }: Readonly<{ path: string }>) {
@@ -19,5 +22,5 @@ export function PluginInstall({ path }: Readonly<{ path: string }>) {
     () => fullAddress('/'),
     () => portal.siteUrl
   );
-  return <CommandBlock command={installCommand(path, site)} />;
+  return <CommandBlock command={installCommand(path, site)} onCopy={reportInstall} />;
 }

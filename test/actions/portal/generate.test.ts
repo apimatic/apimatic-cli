@@ -38,12 +38,13 @@ describe('GenerateAction', () => {
   let authorize: sinon.SinonStub;
   let build: sinon.SinonStub;
 
-  const execute = (projectDirectory = FIXTURE, force = false, zip = false) =>
+  const execute = (projectDirectory = FIXTURE, force = false, zip = false, analytics = true) =>
     new GenerateAction(new DirectoryPath(root), COMMAND_METADATA, 'auth-key').execute(
       ProjectContext.in(projectDirectory),
       portalDirectory,
       force,
-      zip
+      zip,
+      { analytics }
     );
 
   const inPortal = (relative: string) => fs.existsSync(path.join(portalDirectory.toString(), relative));
@@ -119,7 +120,9 @@ describe('GenerateAction', () => {
   it('fails when the source and destination are the same directory', async () => {
     const action = new GenerateAction(new DirectoryPath(root), COMMAND_METADATA);
 
-    const result = await action.execute(ProjectContext.in(FIXTURE), FIXTURE.join('src'), false, false);
+    const result = await action.execute(ProjectContext.in(FIXTURE), FIXTURE.join('src'), false, false, {
+      analytics: true
+    });
 
     expect(result.isFailed()).to.be.true;
     expect(prompts.directoryCannotBeSame.calledOnce).to.be.true;

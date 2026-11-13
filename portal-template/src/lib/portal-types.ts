@@ -22,6 +22,32 @@ export interface PortalFavicon {
   type: string | null;
 }
 
+export interface GoogleTagManagerEnvironment {
+  auth: string;
+  preview: string;
+}
+
+export interface GoogleTagManagerSetting {
+  containerId: string;
+  environment: GoogleTagManagerEnvironment | null;
+}
+
+export interface GoogleAnalyticsSetting {
+  measurementId: string;
+}
+
+/** Public values: they sit in every page's scripts. */
+export interface PortalAnalytics {
+  googleTagManager: GoogleTagManagerSetting | null;
+  googleAnalytics: GoogleAnalyticsSetting | null;
+  keepQueryParams: string[];
+}
+
+export interface PortalSeo {
+  /** The content value of Google's site verification meta tag, for Search Console. */
+  googleSiteVerification: string | null;
+}
+
 export interface Portal {
   name: string;
   description: string | null;
@@ -33,4 +59,6 @@ export interface Portal {
   links: PortalLink[];
   /** Whether each page offers to open itself in an external AI assistant. */
   pageActions: boolean;
+  analytics: PortalAnalytics;
+  seo: PortalSeo;
 }

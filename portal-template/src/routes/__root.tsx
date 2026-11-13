@@ -1,5 +1,6 @@
-import { createRootRoute, HeadContent, Outlet, Scripts } from '@tanstack/react-router';
+import { createRootRoute, HeadContent, Outlet, Scripts, useRouter } from '@tanstack/react-router';
 import { createServerFn } from '@tanstack/react-start';
+import { useEffect } from 'react';
 import { staticFunctionMiddleware } from '@tanstack/start-static-server-functions';
 import { source } from '@/lib/source.server';
 import appCss from '@/styles/app.css?url';
@@ -7,6 +8,7 @@ import { RootProvider } from 'fumadocs-ui/provider/tanstack';
 import SearchDialog from '@/components/search';
 import { withBasePath } from '@/lib/base-path';
 import { portal } from '@/lib/portal';
+import { analytics } from '@/lib/portal-analytics';
 
 // The sidebar tree is the same on every page. Loaded here, once, it is written to a single
 // cache file instead of being repeated in every page's own loader payload.
@@ -39,7 +41,10 @@ export const Route = createRootRoute({
       { charSet: 'utf-8' },
       { name: 'viewport', content: 'width=device-width, initial-scale=1' },
       { title: portal.name },
-      ...(portal.description ? [{ name: 'description', content: portal.description }] : [])
+      ...(portal.description ? [{ name: 'description', content: portal.description }] : []),
+      ...(portal.seo.googleSiteVerification
+        ? [{ name: 'google-site-verification', content: portal.seo.googleSiteVerification }]
+        : [])
     ],
     links: [{ rel: 'stylesheet', href: appCss }, ...iconLinks]
   }),
@@ -47,6 +52,12 @@ export const Route = createRootRoute({
 });
 
 function RootComponent() {
+  const router = useRouter();
+  useEffect(() => {
+    // A prerendered page mounts idle with no `onRendered` to come; `portal serve` mounts pending, and one follows.
+    if (router.state.status === 'idle') analytics.reportPageView();
+    return router.subscribe('onRendered', () => analytics.reportPageView());
+  }, [router]);
   return (
     <html lang="en" suppressHydrationWarning>
       <head>

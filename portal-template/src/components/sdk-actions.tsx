@@ -3,8 +3,10 @@ import { asMarkdown } from 'fumadocs-core/server';
 import { buttonVariants } from 'fumadocs-ui/components/ui/button';
 import { Code, Download, Package } from 'lucide-react';
 import { withBasePath } from '@/lib/base-path';
+import { analytics } from '@/lib/portal-analytics';
 
 export interface SdkActionsProps {
+  language: string;
   download: string;
   /** Empty when no source repository is recorded. */
   source: string;
@@ -19,7 +21,7 @@ export const LINK =
 export const QUIET_LINK = `${LINK} text-fd-muted-foreground hover:text-fd-foreground`;
 
 /** Download, View source and View package: each shown only when there is something behind it. */
-export function SdkActions({ download, source, packageUrl, registry }: Readonly<SdkActionsProps>) {
+export function SdkActions({ language, download, source, packageUrl, registry }: Readonly<SdkActionsProps>) {
   // The page's Markdown twin, which the page actions and llms-full.txt hand to an AI assistant.
   if (asMarkdown()) {
     const links = [
@@ -35,6 +37,7 @@ export function SdkActions({ download, source, packageUrl, registry }: Readonly<
     <div className="not-prose flex flex-wrap items-center gap-x-5 gap-y-2">
       <DownloadLink
         href={download}
+        language={language}
         className={leads ? buttonVariants({ color: 'primary', className: 'gap-1.5' }) : QUIET_LINK}
       >
         <Download className="size-4" />
@@ -62,10 +65,19 @@ interface LinkProps {
   children: ReactNode;
 }
 
+interface DownloadLinkProps extends LinkProps {
+  language: string;
+}
+
 /** A plain link, not a route: the zip is a file the site serves beside its pages. */
-export function DownloadLink({ href, className, children }: Readonly<LinkProps>) {
+export function DownloadLink({ href, className, language, children }: Readonly<DownloadLinkProps>) {
   return (
-    <a href={withBasePath(href)} download className={className}>
+    <a
+      href={withBasePath(href)}
+      download
+      className={className}
+      onClick={() => analytics.report('docs_sdk_download', { language })}
+    >
       {children}
     </a>
   );

@@ -1,7 +1,12 @@
 import { expect } from 'chai';
 import type { SecuritySchemeObject } from 'fumadocs-openapi';
 import { requestOAuthToken } from 'fumadocs-openapi/playground';
-import { oauthCallback, oauthCallbackPath, takeStartingPage } from '../../portal-template/src/lib/oauth-callback';
+import {
+  isOAuthCallbackPath,
+  oauthCallback,
+  oauthCallbackPath,
+  takeStartingPage
+} from '../../portal-template/src/lib/oauth-callback';
 import { OAUTH_CALLBACK_ADDRESS } from '../../src/types/portal/content-tree';
 
 // The CLI refuses a page of the user's at the address the template serves the callback at.
@@ -16,6 +21,25 @@ describe('oauthCallbackPath', () => {
  * callback takes the note from the same place. The playground's flow is run here, in a stand-in
  * tab, so a move of the note, as 12.5.7 made from a cookie, fails this test and not a portal.
  */
+describe('isOAuthCallbackPath', () => {
+  it('is the callback at the root, and under a base path', () => {
+    expect(isOAuthCallbackPath('/oauth/callback')).to.be.true;
+    expect(isOAuthCallbackPath('/docs/oauth/callback', '/docs/')).to.be.true;
+  });
+
+  // A static host may answer `/oauth/callback` at `/oauth/callback/`.
+  it('is the callback with a trailing slash', () => {
+    expect(isOAuthCallbackPath('/oauth/callback/')).to.be.true;
+    expect(isOAuthCallbackPath('/docs/oauth/callback/', '/docs/')).to.be.true;
+  });
+
+  it('is not the callback at the root when the portal is under a base path, nor any other page', () => {
+    expect(isOAuthCallbackPath('/oauth/callback', '/docs/')).to.be.false;
+    expect(isOAuthCallbackPath('/guides/quickstart')).to.be.false;
+    expect(isOAuthCallbackPath('/oauth/callback/more')).to.be.false;
+  });
+});
+
 describe('takeStartingPage', () => {
   const origin = 'https://docs.test';
   const pathname = '/api/pets/pets/listPets';

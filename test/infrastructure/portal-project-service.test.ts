@@ -540,6 +540,28 @@ describe('PortalProjectService', () => {
     const themeFile = () => path.join(project.toString(), 'src/styles/theme.css');
     const identityFile = () => path.join(project.toString(), 'portal.identity.json');
 
+    it('writes the vendors the config holds, and none from a config without them', async () => {
+      const config = configFor({
+        site: { name: 'My API' },
+        analytics: { googleTagManager: { containerId: 'GTM-ABC123' }, googleAnalytics: { measurementId: 'G-ABC123' } }
+      });
+      (await service.prepare(project, sourceFor({ config: config.withoutVendors() }), NO_ARTIFACTS))._unsafeUnwrap();
+
+      expect(readIdentity().analytics).to.deep.equal({
+        googleTagManager: null,
+        googleAnalytics: null,
+        keepQueryParams: []
+      });
+
+      expect((await service.applyConfig(project, settingsFor(config)))._unsafeUnwrap()).to.be.true;
+
+      expect(readIdentity().analytics).to.deep.equal({
+        googleTagManager: { containerId: 'GTM-ABC123', environment: null },
+        googleAnalytics: { measurementId: 'G-ABC123' },
+        keepQueryParams: []
+      });
+    });
+
     it('writes nothing, and says so, when the block makes the same site', async () => {
       const config = configFor({ site: { name: 'My API' }, brand: { colors: { primary: '#1d4ed8' } } });
       (await service.prepare(project, sourceFor({ config }), NO_ARTIFACTS))._unsafeUnwrap();

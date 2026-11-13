@@ -2,10 +2,12 @@ import { err, ok, Result } from 'neverthrow';
 import { isJsonObject } from '../../utils/json-utils.js';
 import { UrlPath } from '../file/urlPath.js';
 import { AiConfig } from './config/ai-config.js';
+import { AnalyticsConfig, PortalAnalytics } from './config/analytics-config.js';
 import { BrandConfig, ColorMode } from './config/brand-config.js';
 import { allOf, optional, Parsed, unknownKeys } from './config/fields.js';
 import { Link } from './config/link.js';
 import { NavigationConfig } from './config/navigation-config.js';
+import { PortalSeo, SeoConfig } from './config/seo-config.js';
 import { SiteAddress } from './config/site-address.js';
 import { SiteConfig, SuggestedSite } from './config/site-config.js';
 import { StaticAsset } from './config/static-asset.js';
@@ -35,11 +37,13 @@ export interface PortalIdentity {
   links: PortalLink[];
   /** Whether each page offers to open itself in an external AI assistant. */
   pageActions: boolean;
+  analytics: PortalAnalytics;
+  seo: PortalSeo;
 }
 
 const BLOCK = 'portal';
 
-const NAMESPACES = ['site', 'brand', 'navigation', 'ai'];
+const NAMESPACES = ['site', 'brand', 'navigation', 'ai', 'analytics', 'seo'];
 
 /** The one setting outside the namespaces, named as the portal artifacts endpoint reads it. */
 const PLUGIN_URL = 'pluginUrl';
@@ -50,6 +54,8 @@ export class PortalConfig {
     private readonly brand: BrandConfig,
     private readonly navigation: NavigationConfig,
     private readonly ai: AiConfig,
+    private readonly analytics: AnalyticsConfig,
+    private readonly seo: SeoConfig,
     private readonly pluginAddress: UrlPath | null
   ) {}
 
@@ -60,6 +66,8 @@ export class PortalConfig {
       BrandConfig.defaults,
       NavigationConfig.defaults,
       AiConfig.defaults,
+      AnalyticsConfig.defaults,
+      SeoConfig.defaults,
       null
     );
   }
@@ -86,6 +94,8 @@ export class PortalConfig {
         BrandConfig.parse(block.brand, `${BLOCK}.brand`),
         NavigationConfig.parse(block.navigation, `${BLOCK}.navigation`),
         AiConfig.parse(block.ai, `${BLOCK}.ai`),
+        AnalyticsConfig.parse(block.analytics, `${BLOCK}.analytics`),
+        SeoConfig.parse(block.seo, `${BLOCK}.seo`),
         optional(block.pluginUrl, (value) => secureAddress(value, `${BLOCK}.${PLUGIN_URL}`))
       ])
     ).map((settings) => new PortalConfig(...settings));
@@ -113,6 +123,11 @@ export class PortalConfig {
     return this.brand.files();
   }
 
+  /** `portal generate` and `portal serve` warn when this is true: the customer has a GA4 stream setting to turn off. */
+  public usesGoogleAnalytics(): boolean {
+    return this.analytics.usesGoogleAnalytics();
+  }
+
   public identity(): PortalIdentity {
     const address = this.site.siteAddress();
     const logo = this.brand.logoImages();
@@ -125,11 +140,26 @@ export class PortalConfig {
       favicon: favicon === null ? null : { url: favicon.portalPath(), type: favicon.imageType() },
       colorMode: this.brand.mode(),
       links: this.navigation.headerLinks().map(portalLink),
-      pageActions: this.ai.offersPageActions()
+      pageActions: this.ai.offersPageActions(),
+      analytics: this.analytics.identity(),
+      seo: this.seo.identity()
     };
   }
 
-  /** Every namespace included, defaults and all, which is what quickstart writes. */
+  /** The same portal with neither vendor tag, for a staging build under `--no-analytics`. */
+  public withoutVendors(): PortalConfig {
+    return new PortalConfig(
+      this.site,
+      this.brand,
+      this.navigation,
+      this.ai,
+      this.analytics.withoutVendors(),
+      this.seo,
+      this.pluginAddress
+    );
+  }
+
+  /** Every namespace included, defaults and all, which is what quickstart writes; `analytics` and `seo` start unset. */
   public toJSON(): PortalBlock {
     return {
       site: this.site.toJSON(),

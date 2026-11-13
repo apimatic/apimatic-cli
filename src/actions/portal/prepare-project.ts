@@ -6,7 +6,7 @@ import { PreparePortalProjectPrompts } from '../../prompts/portal/prepare-projec
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { PortalArtifacts } from '../../types/portal/portal-artifacts.js';
-import { PortalSource } from '../../types/portal/portal-source.js';
+import { PortalBuildOptions, PortalSource } from '../../types/portal/portal-source.js';
 import { ProjectContext } from '../../types/project-context.js';
 import { ActionResult } from '../action-result.js';
 
@@ -36,6 +36,7 @@ export class PreparePortalProjectAction {
   /** Takes the caller's next step rather than returning, because its temporary directories must outlive this call. */
   public readonly execute = async (
     project: ProjectContext,
+    build: PortalBuildOptions,
     { confirm = async () => true, onPrepared }: PreparationSteps
   ): Promise<ActionResult> => {
     const sourceDirectory = project.sourceDirectory();
@@ -63,7 +64,7 @@ export class PreparePortalProjectAction {
     }
 
     // Ahead of the server run, which can take minutes: a mistake or a question should not wait on it.
-    const source = await project.portalSource().resolve();
+    const source = await project.portalSource().resolve(build);
     if (source.isErr()) {
       this.prompts.sourceProblem(source.error, sourceDirectory);
       return ActionResult.failed();
@@ -72,6 +73,9 @@ export class PreparePortalProjectAction {
     this.prompts.contentNotices(source.value.contentNotices, sourceDirectory);
     this.prompts.unmergedSpecs(source.value.unmergedSpecs, sourceDirectory);
     this.prompts.leftOutSpecs(source.value.leftOutSpecs, sourceDirectory);
+    if (source.value.config.usesGoogleAnalytics()) {
+      this.prompts.googleAnalyticsCountsPageChanges();
+    }
 
     if (!(await confirm())) {
       return ActionResult.cancelled();
