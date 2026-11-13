@@ -528,6 +528,23 @@ that had the right one; a prerendered page mounts idle with the right title and 
 first page. The effect now reports directly only when the router is idle at mount. GA4's own history-change
 page view was seen on every page change with the stream setting still on, as the warning says.
 
+**Review of 2026-11-13** (`/code-review` over the whole PR, each finding checked against the code, Fumadocs'
+source and the served portal): eight findings stood and are fixed, uncommitted. The search dialog's typed and
+picked bookkeeping leaked across opens, since Fumadocs closes the dialog before it hands over the pick, and the
+count could belong to an earlier term while the last keystrokes' results were loading; the report is now made
+from an effect once the close has rendered and the results are shown, which also drops the one-tick timeout.
+The playground's observer marked every dialog, the search dialog included on an operation page, so it now
+marks only a dialog holding the request form. `enableAnalytics` was forwarded unread through four
+`PortalProjectService` methods and into `identity()`, against the "No middlemen" rule; the service and
+`identity()` are back to their old signatures, and the two actions hand the service `config.withoutVendors()`
+under `--no-analytics`. The `Analytics` constructor hand-wired the two vendors beside a registry meant to guard
+them, so the registry's builders now take the settings and the constructor loads whatever they build. Smaller:
+the not-found referrer no longer depends on `onRendered` running before the not-found effect; a request still
+in flight when the playground leaves the page no longer times a later client error; `required()` moved to
+`fields.ts` and serves `lightDark` too. Set aside: a `language-` class the review assumed on code blocks, which
+this build renders nowhere; the OAuth-callback tag load, which fuma-nama/fumadocs#3809 covers; the
+`sessionStorage` read, which came with #472.
+
 ## 5. Questions each step will raise
 
 Answered already, so the agent does not ask them:
