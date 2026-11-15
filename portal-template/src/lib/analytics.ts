@@ -83,6 +83,11 @@ export class Analytics {
     insertTags(this.live);
   }
 
+  /** The tags held back while the address held an OAuth answer, once something has taken it out. */
+  public loadTags(): void {
+    insertTags(this.live);
+  }
+
   /** `href` is the page the event belongs to, when the caller saw the address move on first. */
   public report<E extends PortalEventName>(name: E, params: PortalEvents[E], href = window.location.href): void {
     if (isOAuthCallbackPath(new URL(href).pathname)) return;
@@ -96,8 +101,7 @@ export class Analytics {
 
   public reportPageView(): void {
     if (isOAuthCallbackPath(window.location.pathname)) return;
-    // The tags held back on the OAuth callback start here, on the first page after it.
-    insertTags(this.live);
+    this.loadTags();
     const page = pageLocation(window.location.href, this.settings.keepQueryParams);
     if (page === this.lastPageView) return;
     this.previousPageView = this.lastPageView;

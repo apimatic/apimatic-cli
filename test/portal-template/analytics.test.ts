@@ -412,6 +412,29 @@ describe('Analytics', () => {
     });
   });
 
+  describe('on the page a playground sign-in returned to', () => {
+    const answered = 'https://docs.test/api/pets/listPets?code=abc&state=123';
+
+    it('holds the tags back while the answer is in the address, and loads them once the playground took it out', () => {
+      const page = browser(answered, 'List pets');
+      const analytics = new Analytics(withBoth);
+
+      analytics.start();
+      analytics.reportPageView();
+      analytics.loadTags();
+
+      expect(page.scripts).to.be.empty;
+      expect(pageViews(page.dataLayer())).to.have.length(1);
+
+      page.go('https://docs.test/api/pets/listPets');
+      analytics.loadTags();
+      analytics.reportPageView();
+
+      expect(page.scripts.map((script) => script.src)).to.deep.equal([GTM_SCRIPT, GA4_SCRIPT]);
+      expect(pageViews(page.dataLayer())).to.have.length(1);
+    });
+  });
+
   describe('on the OAuth callback', () => {
     for (const href of [
       'https://docs.test/oauth/callback?code=abc&state=123',

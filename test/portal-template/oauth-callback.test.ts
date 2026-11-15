@@ -2,6 +2,7 @@ import { expect } from 'chai';
 import type { SecuritySchemeObject } from 'fumadocs-openapi';
 import { requestOAuthToken } from 'fumadocs-openapi/playground';
 import {
+  holdsOAuthAnswer,
   isOAuthCallbackPath,
   oauthCallback,
   oauthCallbackPath,
@@ -37,6 +38,26 @@ describe('isOAuthCallbackPath', () => {
     expect(isOAuthCallbackPath('/oauth/callback', '/docs/')).to.be.false;
     expect(isOAuthCallbackPath('/guides/quickstart')).to.be.false;
     expect(isOAuthCallbackPath('/oauth/callback/more')).to.be.false;
+  });
+});
+
+describe('holdsOAuthAnswer', () => {
+  const at = (href: string) => holdsOAuthAnswer(new URL(href));
+
+  it('holds on the callback, with or without an answer', () => {
+    expect(at('https://docs.test/oauth/callback')).to.be.true;
+    expect(at('https://docs.test/oauth/callback?code=abc&state=123')).to.be.true;
+  });
+
+  it('holds on a page a sign-in returned to, with a code, a token or an error', () => {
+    expect(at('https://docs.test/api/pets/listPets?code=abc&state=123')).to.be.true;
+    expect(at('https://docs.test/api/pets/listPets#access_token=xyz&token_type=Bearer&state=123')).to.be.true;
+    expect(at('https://docs.test/api/pets/listPets?error=access_denied&state=123')).to.be.true;
+  });
+
+  it('does not hold on any other address, a query or a # part of its own included', () => {
+    expect(at('https://docs.test/api/pets/listPets')).to.be.false;
+    expect(at('https://docs.test/guides/quickstart?utm_source=mail&code=SAVE10#install')).to.be.false;
   });
 });
 
