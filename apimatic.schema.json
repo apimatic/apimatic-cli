@@ -197,7 +197,7 @@
                 },
                 "environment": {
                   "type": "object",
-                  "description": "A GTM environment, so a staging build loads the container's staging version: the gtm_auth and gtm_preview values from the environment's snippet.",
+                  "description": "A GTM environment, for a staging build only, which loads the container's staging version: the gtm_auth and gtm_preview values from the environment's snippet. Both are public in the built portal, so a production portal sets none.",
                   "additionalProperties": false,
                   "required": ["auth", "preview"],
                   "properties": {
