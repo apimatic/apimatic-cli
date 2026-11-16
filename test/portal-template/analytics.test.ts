@@ -85,6 +85,21 @@ describe('PortalEvents', () => {
     docs_api_request: { endpoint: true, status: true, duration_ms: true }
   };
 
+  // Customers build GTM triggers and GA4 reports on these. They are plain text here, apart from the interface, so
+  // a rename or a new key is a change made in this list on purpose, never the side effect of a refactor.
+  it('ships exactly these events, each with exactly these keys', () => {
+    expect(Object.entries(events).map(([name, keys]) => [name, Object.keys(keys)])).to.deep.equal([
+      ['docs_page_view', ['page_title']],
+      ['docs_markdown_copy', []],
+      ['docs_plugin_install', []],
+      ['docs_sdk_download', ['language']],
+      ['docs_code_copy', ['language']],
+      ['docs_search', ['search_term', 'result', 'result_count']],
+      ['docs_not_found', ['page_referrer']],
+      ['docs_api_request', ['endpoint', 'status', 'duration_ms']]
+    ]);
+  });
+
   it('names every event docs_ plus lowercase snake_case, at most 40 characters', () => {
     for (const name of Object.keys(events)) {
       expect(name).to.match(/^docs_[a-z0-9_]+$/);
