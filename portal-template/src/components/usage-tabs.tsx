@@ -6,7 +6,7 @@ import { createCodeUsageGeneratorRegistry } from 'fumadocs-openapi/requests/gene
 import { curl } from 'fumadocs-openapi/requests/generators/curl';
 import { CodeSample } from '@/lib/code-samples';
 import { REPLAY_MARKERS } from '@/lib/replay-markers';
-import { useExampleSelection } from './example-layout';
+import { SHRINKS_WITH_COLUMN, useExampleSelection } from './example-layout';
 
 interface UsageTab {
   id: string;
@@ -20,6 +20,9 @@ const CURL_USAGE_ID = 'portal-curl';
 // Without a registry of its own, Fumadocs registers and bundles every request generator it has.
 export const codeUsages = createCodeUsageGeneratorRegistry();
 codeUsages.add(CURL_USAGE_ID, curl);
+
+// A sample that shrinks with its tab, and scrolls inside it.
+const SHRINKING_BLOCK = { className: SHRINKS_WITH_COLUMN, viewportProps: { className: 'min-h-0' } };
 
 // The registry Fumadocs passes in adds the operation's `x-codeSamples`, which cannot follow the example selector.
 export function renderUsageTabs(): ReactNode {
@@ -37,8 +40,8 @@ function UsageTabs() {
   ];
 
   return (
-    <CodeBlockTabs groupId="fumadocs_openapi_requests" defaultValue={tabs[0].id}>
-      <CodeBlockTabsList>
+    <CodeBlockTabs groupId="fumadocs_openapi_requests" defaultValue={tabs[0].id} className={SHRINKS_WITH_COLUMN}>
+      <CodeBlockTabsList className="shrink-0">
         {tabs.map((tab) => (
           <CodeBlockTabsTrigger key={tab.id} value={tab.id}>
             {tab.label}
@@ -46,7 +49,7 @@ function UsageTabs() {
         ))}
       </CodeBlockTabsList>
       {tabs.map((tab) => (
-        <CodeBlockTab key={tab.id} value={tab.id}>
+        <CodeBlockTab key={tab.id} value={tab.id} className={SHRINKS_WITH_COLUMN}>
           {tab.body}
         </CodeBlockTab>
       ))}
@@ -62,7 +65,7 @@ function SampleCode({ sample }: Readonly<{ sample: CodeSample }>) {
   if (source === undefined) {
     return <p className="px-4 py-3 text-sm text-fd-muted-foreground">No {sample.label} sample for this example.</p>;
   }
-  return <CodeBlock lang={sample.lang} code={source} />;
+  return <CodeBlock lang={sample.lang} code={source} codeblock={SHRINKING_BLOCK} />;
 }
 
 // Follows the playground's edits, typed credentials included, so it carries the playground's replay markers.
@@ -70,8 +73,8 @@ function CurlCode() {
   const { CodeBlock } = useComponents();
   const code = useCodeUsage(CURL_USAGE_ID);
   return code === undefined ? null : (
-    <div {...REPLAY_MARKERS}>
-      <CodeBlock lang={curl.lang} code={code} />
+    <div {...REPLAY_MARKERS} className={`${REPLAY_MARKERS.className} ${SHRINKS_WITH_COLUMN}`}>
+      <CodeBlock lang={curl.lang} code={code} codeblock={SHRINKING_BLOCK} />
     </div>
   );
 }
