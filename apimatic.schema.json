@@ -38,6 +38,11 @@
       "description": "A path relative to 'src' inside the 'static' directory, for example 'static/images/logo.png'.",
       "pattern": "^\\s*(?:\\.[\\\\/])?static(?:[\\\\/](?!\\.{1,2}(?:[\\\\/]|\\s*$))[^\\\\/]*[^\\\\/\\s][^\\\\/]*)+\\s*$"
     },
+    "httpsAddress": {
+      "type": "string",
+      "description": "An address starting with 'https://', with no spaces.",
+      "pattern": "^[hH][tT][tT][pP][sS]://[^\\s/?#]+(?:[/?#]\\S*)?$"
+    },
     "color": {
       "type": "string",
       "description": "#rgb or #rrggbb, for example '#1d4ed8'.",
@@ -250,10 +255,41 @@
             }
           }
         },
+        "scripts": {
+          "type": "array",
+          "description": "Other vendors' scripts and widgets, loaded on every page in the listed order once the address holds no OAuth answer. They get the portal's events from window.apimatic.analytics.subscribe(). Any listed script can read what readers type into the API playground, so list only vendors you trust.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["src"],
+            "properties": {
+              "src": {
+                "description": "An address starting with 'https://', with no spaces, or a file in the 'static' directory, for example 'static/analytics.js'.",
+                "anyOf": [
+                  {
+                    "$ref": "#/definitions/httpsAddress"
+                  },
+                  {
+                    "$ref": "#/definitions/staticPath"
+                  }
+                ]
+              },
+              "category": {
+                "type": "string",
+                "description": "What the script is for. --no-analytics leaves out the 'analytics' and 'marketing' scripts, and a script that names no category counts as 'analytics'.",
+                "enum": ["necessary", "functional", "analytics", "marketing"],
+                "default": "analytics"
+              }
+            }
+          }
+        },
         "pluginUrl": {
-          "type": "string",
-          "description": "Where the context plugin is hosted, starting with 'https://' and with no spaces. The Context Plugin page installs it from here, and the portal carries no copy of its own.",
-          "pattern": "^[hH][tT][tT][pP][sS]://[^\\s/?#]+(?:[/?#]\\S*)?$"
+          "allOf": [
+            {
+              "$ref": "#/definitions/httpsAddress"
+            }
+          ],
+          "description": "Where the context plugin is hosted, starting with 'https://' and with no spaces. The Context Plugin page installs it from here, and the portal carries no copy of its own."
         }
       }
     },

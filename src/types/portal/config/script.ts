@@ -6,7 +6,7 @@ import { StaticAsset } from './static-asset.js';
 
 const KNOWN = ['src', 'category'];
 
-const CATEGORIES = ['necessary', 'functional', 'analytics', 'marketing'] as const;
+export const SCRIPT_CATEGORIES = ['necessary', 'functional', 'analytics', 'marketing'] as const;
 
 const ADDRESS_EXAMPLE = 'https://cdn.example.com/widget.js';
 
@@ -21,7 +21,7 @@ export interface PortalScript {
 export class Script {
   private constructor(
     private readonly source: UrlPath | StaticAsset,
-    private readonly category: (typeof CATEGORIES)[number]
+    private readonly category: (typeof SCRIPT_CATEGORIES)[number]
   ) {}
 
   public static parseList(value: unknown, path: string): Parsed<Script[]> {
@@ -59,7 +59,7 @@ export class Script {
       Result.combineWithAllErrors([
         required(value.src, `${path}.src`, Script.parseSource),
         // Left out, it counts as analytics: a staging build must not load a script nobody vouched for.
-        oneOf(value.category, `${path}.category`, CATEGORIES, 'analytics')
+        oneOf(value.category, `${path}.category`, SCRIPT_CATEGORIES, 'analytics')
       ])
     ).map(([source, category]) => new Script(source, category));
   }

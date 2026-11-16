@@ -8,6 +8,7 @@ import {
   SCHEMA_VERSION
 } from '../../../src/types/apimatic-config/document';
 import { COLOR_MODES } from '../../../src/types/portal/config/brand-config';
+import { SCRIPT_CATEGORIES } from '../../../src/types/portal/config/script';
 import { PortalConfig } from '../../../src/types/portal/portal-config';
 import { PortalLanguages } from '../../../src/types/portal/portal-languages';
 import { AVAILABLE_LANGUAGES, Language } from '../../../src/types/sdk/generate';
@@ -63,6 +64,7 @@ describe('apimatic.schema.json', () => {
 
     const cases: [string, unknown, readonly string[]][] = [
       ['brand.colorMode', brand.colorMode.enum, COLOR_MODES],
+      ["a script's category", portal.scripts.items.properties.category.enum, SCRIPT_CATEGORIES],
       ['languages', schema.definitions.languages.propertyNames.enum, AVAILABLE_LANGUAGES]
     ];
 
@@ -105,7 +107,11 @@ describe('apimatic.schema.json', () => {
             googleAnalytics: { measurementId: 'G-ABC123' },
             keepQueryParams: ['campaign_id']
           },
-          seo: { googleSiteVerification: 'abc' }
+          seo: { googleSiteVerification: 'abc' },
+          scripts: [
+            { src: 'https://cdn.example.com/widget.js', category: 'necessary' },
+            { src: '.\\static\\js\\widget.js' }
+          ]
         }
       ],
       ['an address with a port', { site: { url: 'https://docs.example.com:8443' } }],
@@ -153,7 +159,19 @@ describe('apimatic.schema.json', () => {
       ['a Universal Analytics ID as the measurement ID', { analytics: { googleAnalytics: { measurementId: 'UA-1' } } }],
       ['a kept name with a space, and an OAuth answer name', { analytics: { keepQueryParams: ['a b', 'code'] } }],
       ['an empty list of kept names', { analytics: { keepQueryParams: [] } }],
-      ['a verification value with a space', { seo: { googleSiteVerification: 'abc 123' } }]
+      ['a verification value with a space', { seo: { googleSiteVerification: 'abc 123' } }],
+      ['a script at an address', { scripts: [{ src: 'https://cdn.example.com/widget.js' }] }],
+      ['a script address in capitals, with a query', { scripts: [{ src: 'HTTPS://CDN.Example.com/widget.js?v=2' }] }],
+      ['a script file in the static directory', { scripts: [{ src: 'static/js/widget.js' }] }],
+      [
+        'a script file written with backslashes and spaces around it',
+        { scripts: [{ src: ' .\\static\\js\\widget.js ' }] }
+      ],
+      ...SCRIPT_CATEGORIES.map((category): [string, object] => [
+        `a script whose category is ${category}`,
+        { scripts: [{ src: 'static/js/widget.js', category }] }
+      ]),
+      ['an empty list of scripts', { scripts: [] }]
     ];
 
     const invalid: [string, object][] = [
@@ -289,7 +307,21 @@ describe('apimatic.schema.json', () => {
       ],
       ['a blank kept name', { analytics: { keepQueryParams: [' '] } }],
       ['an unknown seo key', { seo: { foo: 1 } }],
-      ['a blank verification value', { seo: { googleSiteVerification: ' ' } }]
+      ['a blank verification value', { seo: { googleSiteVerification: ' ' } }],
+      ['scripts that are not a list', { scripts: { src: 'https://cdn.example.com/widget.js' } }],
+      ['a script that is a bare address', { scripts: ['https://cdn.example.com/widget.js'] }],
+      ['a script without src', { scripts: [{ category: 'necessary' }] }],
+      ['a script at an http address', { scripts: [{ src: 'http://cdn.example.com/widget.js' }] }],
+      ['a script address with a space', { scripts: [{ src: 'https://cdn.example.com/my widget.js' }] }],
+      ['a script address without a host', { scripts: [{ src: 'https://' }] }],
+      ['a protocol-relative script address', { scripts: [{ src: '//cdn.example.com/widget.js' }] }],
+      ['a script file outside the static directory', { scripts: [{ src: 'js/widget.js' }] }],
+      ['a script file that leaves the static directory', { scripts: [{ src: 'static/../widget.js' }] }],
+      ['a blank script src', { scripts: [{ src: ' ' }] }],
+      ['an unknown script category', { scripts: [{ src: 'static/js/widget.js', category: 'essential' }] }],
+      // Neither is a setting in this release.
+      ['a script with attributes', { scripts: [{ src: 'static/js/widget.js', attributes: { 'data-site': 'acme' } }] }],
+      ['a script with integrity', { scripts: [{ src: 'https://cdn.example.com/widget.js', integrity: 'sha384-abc' }] }]
     ];
 
     for (const [label, block] of valid) {
@@ -329,6 +361,21 @@ describe('apimatic.schema.json', () => {
           .reduce<unknown>((node, key) => (node as Record<string, unknown> | undefined)?.[key], applied);
         expect(actual, setting).to.deep.equal(value);
       }
+    });
+
+    // The parser drops analytics and marketing scripts alike, so this cannot tell those two apart;
+    // it does fail for a default the flag would keep.
+    it('offers the category the parser gives a script that names none, as far as --no-analytics shows', () => {
+      const offered: string = schema.definitions.portal.properties.scripts.items.properties.category.default;
+      const kept = (category?: string) =>
+        PortalConfig.fromBlock({ scripts: [{ src: 'static/js/widget.js', category }] }, suggested)
+          ._unsafeUnwrap()
+          .withoutAnalytics()
+          .identity().scripts.length;
+
+      expect(offered).to.equal('analytics');
+      expect(kept()).to.equal(kept(offered));
+      expect(kept()).to.not.equal(kept('necessary'));
     });
 
     // The other way round is covered by the scaffold, which writes every setting that has a
