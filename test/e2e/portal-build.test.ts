@@ -81,7 +81,7 @@ async function buildFixture(name: string, delivered: Delivered = {}, settings?: 
     fixture = copy;
   }
 
-  const source = (await new PortalSourceContext(fixture).resolve())._unsafeUnwrap();
+  const source = (await new PortalSourceContext(fixture).resolve({ analytics: true }))._unsafeUnwrap();
 
   const project = new DirectoryPath(root).join('build');
   fs.mkdirSync(project.toString(), { recursive: true });

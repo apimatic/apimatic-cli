@@ -136,9 +136,7 @@ export class PortalSourceContext {
   }
 
   /** Reads and validates the whole source directory, or reports the first problem found. */
-  public async resolve(
-    build: PortalBuildOptions = { analytics: true }
-  ): Promise<Result<PortalSource, PortalSourceProblem>> {
+  public async resolve(build: PortalBuildOptions): Promise<Result<PortalSource, PortalSourceProblem>> {
     const document = await this.readConfigDocument();
     if (document.isErr()) {
       return err(document.error);
@@ -284,7 +282,7 @@ export class PortalSourceContext {
    */
   public async resolveSettings(
     suggested: SuggestedSite | null,
-    build: PortalBuildOptions = { analytics: true }
+    build: PortalBuildOptions
   ): Promise<Result<PortalSettings, PortalSourceProblem>> {
     const document = await this.readConfigDocument();
     if (document.isErr()) {
