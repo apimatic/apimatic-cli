@@ -21,6 +21,9 @@ interface LayoutSlots {
 
 const SelectionContext = createContext<ExampleSelection | undefined>(undefined);
 
+/** Fumadocs keeps the example column no taller than the window: each box down to the code passes that height on. */
+export const SHRINKS_WITH_COLUMN = 'flex min-h-0 flex-col';
+
 // "Example Response" copies through a button of Fumadocs' own in the card's header, which takes no callback.
 const reportResponseCopy = (event: MouseEvent) => {
   if (event.target instanceof Element && event.target.closest('button[aria-live]') !== null) reportCodeCopy('json');
@@ -66,7 +69,7 @@ function ExampleLayout({ selector, usageTabs, responseTabs }: Readonly<LayoutSlo
   );
   return (
     <SelectionContext.Provider value={selection}>
-      <div className="prose-no-margin">
+      <div className={`${SHRINKS_WITH_COLUMN} prose-no-margin`}>
         {selector === null ? null : <ExampleSelector />}
         {usageTabs}
         <div className="contents" onClickCapture={reportResponseCopy}>
@@ -92,7 +95,7 @@ function ExampleSelector() {
   }));
   return (
     <Select items={items} value={selected.id} onValueChange={(id) => id !== null && select(id)}>
-      <SelectTrigger className="not-prose mb-2">
+      <SelectTrigger className="not-prose">
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
