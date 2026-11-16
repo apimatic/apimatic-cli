@@ -18,8 +18,7 @@ const KEPT_NAMES = [
   'li_fat_id',
   'mc_cid',
   '_hsenc',
-  '_hsmi',
-  'ref'
+  '_hsmi'
 ];
 
 describe('pageLocation', () => {
@@ -52,6 +51,12 @@ describe('pageLocation', () => {
 
   it('drops a name that only starts with a kept one', () => {
     expect(pageLocation(`${page}?gclidx=1`, [])).to.equal(page);
+  });
+
+  // No platform reads it from the address, and a customer can add a name but cannot take one out.
+  it('drops ref, which sites use for codes of their own, unless the customer keeps it', () => {
+    expect(pageLocation(`${page}?ref=invite-4821`, [])).to.equal(page);
+    expect(pageLocation(`${page}?ref=newsletter`, ['ref'])).to.equal(`${page}?ref=newsletter`);
   });
 
   it('leaves the address otherwise unchanged', () => {

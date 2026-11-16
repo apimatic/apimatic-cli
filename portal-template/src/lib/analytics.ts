@@ -2,7 +2,7 @@ import { isOAuthCallbackPath } from './oauth-callback';
 import type { PortalAnalytics } from './portal-types';
 import { type Adapter, adapters, insertTags } from './vendor-tags';
 
-/** The query parameters attribution reads from an address: campaign, ad-click and cross-domain tags. */
+/** The query parameters an ad or mail platform reads from an address itself; a customer adds names, and removes none. */
 const KEPT_PREFIXES = ['utm_', 'hsa_'];
 const KEPT_NAMES = new Set([
   '_gl',
@@ -18,8 +18,7 @@ const KEPT_NAMES = new Set([
   'li_fat_id',
   'mc_cid',
   '_hsenc',
-  '_hsmi',
-  'ref'
+  '_hsmi'
 ]);
 
 /** Customers' GTM triggers match these names, so renaming or removing one breaks them without an error. */
