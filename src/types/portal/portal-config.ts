@@ -128,7 +128,8 @@ export class PortalConfig {
   }
 
   public staticFiles(): StaticAsset[] {
-    return this.brand.files();
+    const listed = this.scripts.map((script) => script.staticFile()).filter((file) => file !== null);
+    return [...this.brand.files(), ...listed];
   }
 
   /** `portal generate` and `portal serve` warn when this is true: the customer has a GA4 stream setting to turn off. */

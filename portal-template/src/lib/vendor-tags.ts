@@ -1,3 +1,4 @@
+import { withBasePath } from './base-path';
 import { holdsOAuthAnswer } from './oauth-callback';
 import type { PortalAnalytics, PortalScript } from './portal-types';
 
@@ -60,7 +61,8 @@ export function insertTags(live: Adapter[], scripts: PortalScript[]): void {
   // A listed script is not async, so the browser runs them in the order listed, whichever arrives first.
   const wanted = [
     ...live.map(({ script: src }) => ({ src, async: true })),
-    ...scripts.map(({ src }) => ({ src, async: false }))
+    // A file of the portal's own is named from its root, which a host may serve under a path.
+    ...scripts.map(({ src }) => ({ src: src.startsWith('/') ? withBasePath(src) : src, async: false }))
   ];
   for (const { src, async } of wanted) {
     // Compared as written, since a selector built from a customer's address breaks on a backslash.

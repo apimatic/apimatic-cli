@@ -615,17 +615,58 @@ describe('PortalConfig', () => {
     });
 
     // The browser runs what it fetches, and a portal served over https blocks a script that is not.
-    it('refuses anything but an https address', () => {
+    it('refuses an address that is not https, or that holds a space', () => {
       for (const src of [
         'http://cdn.example.com/widget.js',
-        '//cdn.example.com/widget.js',
+        'HTTP://cdn.example.com/widget.js',
         'https://',
         'https:cdn.example.com/widget.js',
         'https://cdn.example.com/my widget.js',
-        '',
-        7
+        ' https://cdn.example.com/widget.js'
       ]) {
         expect(errorsOf({ scripts: [{ src }] }), JSON.stringify(src)).to.deep.equal([refused('portal.scripts[0].src')]);
+      }
+    });
+
+    it('takes a file in the static directory, however its path is written, and tells the browser its place in the portal', () => {
+      for (const src of ['static/js/widget.js', './static/js/widget.js', '.\\static\\js\\widget.js']) {
+        expect(config({ scripts: [{ src }] }).identity().scripts, src).to.deep.equal([{ src: '/js/widget.js' }]);
+      }
+    });
+
+    it("names its files after the brand's, each by its entry, for the check that they are on disk", () => {
+      const portal = config({
+        brand: { favicon: 'static/favicon.ico' },
+        scripts: [{ src: WIDGET }, { src: 'static/js/widget.js' }, { src: 'static/js/setup.js' }]
+      });
+
+      expect(portal.staticFiles().map((file) => [file.settingPath(), file.portalPath()])).to.deep.equal([
+        ['portal.brand.favicon', '/favicon.ico'],
+        ['portal.scripts[1].src', '/js/widget.js'],
+        ['portal.scripts[2].src', '/js/setup.js']
+      ]);
+    });
+
+    // One report names both, since a path that is no file here is often an address without its https://.
+    it('refuses what is neither an https address nor a file in the static directory', () => {
+      for (const src of [
+        'js/widget.js',
+        'static',
+        'static/',
+        'static/../widget.js',
+        'static//widget.js',
+        '/static/js/widget.js',
+        '//cdn.example.com/widget.js',
+        'cdn.example.com/widget.js',
+        '',
+        ' ',
+        7,
+        null
+      ]) {
+        expect(errorsOf({ scripts: [{ src }] }), JSON.stringify(src)).to.deep.equal([
+          "'portal.scripts[0].src' must be an address starting with 'https://', or a path relative to 'src' inside " +
+            "the 'static' directory, for example 'static/analytics.js'."
+        ]);
       }
     });
 

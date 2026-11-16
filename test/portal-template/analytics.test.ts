@@ -445,6 +445,15 @@ describe('Analytics', () => {
       expect(page.scripts.map((script) => script.src)).to.deep.equal([SETUP, WIDGET]);
     });
 
+    // At the root here; a portal hosted under a path puts that path before the file's.
+    it("inserts a file of the portal's own by its path from the root, and an address as it is", () => {
+      const page = browser(quickstart);
+
+      new Analytics(none, [{ src: '/js/widget.js' }, { src: WIDGET }]).start();
+
+      expect(page.scripts.map((script) => script.src)).to.deep.equal(['/js/widget.js', WIDGET]);
+    });
+
     it('inserts each once: across page views, for a second instance, and for an address listed twice', () => {
       const page = browser(quickstart);
       const twice = [...listed, { src: SETUP }];

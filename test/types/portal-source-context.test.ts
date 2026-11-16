@@ -324,6 +324,24 @@ describe('PortalSourceContext', () => {
       ]);
     });
 
+    it('reports a listed script file that is not on disk, or is spelt in another case, by the entry that names it', async () => {
+      writeConfig({
+        scripts: [
+          { src: 'https://cdn.example.com/widget.js' },
+          { src: 'static/js/setup.js' },
+          { src: 'static/js/Widget.js' },
+          { src: 'static/js/chat.js' }
+        ]
+      });
+      write('static/js/widget.js', 'x');
+      write('static/js/chat.js', 'x');
+
+      expect(missingFiles(await resolve())).to.deep.equal([
+        ['portal.scripts[1].src', 'static/js/setup.js', null],
+        ['portal.scripts[2].src', 'static/js/Widget.js', 'static/js/widget.js']
+      ]);
+    });
+
     it('accepts files that are there', async () => {
       writeConfig({ brand: { logo: 'static/images/logo.png', favicon: 'static/favicon.ico' } });
       write('static/images/logo.png', 'x');
