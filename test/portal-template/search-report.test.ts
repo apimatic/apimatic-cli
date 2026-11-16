@@ -25,10 +25,22 @@ describe('searchOutcome', () => {
 
   // Fumadocs hands over the pick before the close renders, so a pick made with the hotkey's term counts too.
   it('reports the result picked, typed or not', () => {
-    expect(searchOutcome({ ...closed, typed: false, picked: '/api/pets/listPets' })).to.deep.equal({
+    const picked = 'https://docs.acme.com/api/pets/listPets';
+
+    expect(searchOutcome({ ...closed, typed: false, picked })).to.deep.equal({
       ended: true,
-      report: { search_term: 'pets', result: '/api/pets/listPets', result_count: 3 }
+      report: { search_term: 'pets', result: picked, result_count: 3 }
     });
+  });
+
+  // Every event's page_location has this shape, so a report can join a search to the page it led to.
+  it('reports the result as a whole address, without the # part of a heading hit', () => {
+    const picked = 'https://docs.acme.com/docs/guides/intro#install';
+
+    expect(searchOutcome({ ...closed, picked })).to.have.nested.property(
+      'report.result',
+      'https://docs.acme.com/docs/guides/intro'
+    );
   });
 
   it('ends without a report when the reader neither typed nor picked, or left no term', () => {
@@ -40,6 +52,13 @@ describe('searchOutcome', () => {
     expect(searchOutcome({ ...closed, term: '  list pets ' })).to.have.nested.property(
       'report.search_term',
       'list pets'
+    );
+  });
+
+  it('reports at most the 100 characters of a term that GA4 keeps', () => {
+    expect(searchOutcome({ ...closed, term: 'k'.repeat(300) })).to.have.nested.property(
+      'report.search_term',
+      'k'.repeat(100)
     );
   });
 });

@@ -70,7 +70,7 @@ export default function DefaultSearchDialog(props: SharedProps) {
     setSearch(value);
   };
   const onSelect = (item: SearchItemType) => {
-    picked.current = 'url' in item ? item.url : '';
+    picked.current = 'url' in item ? new URL(item.url, window.location.href).href : '';
   };
 
   return (
