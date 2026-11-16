@@ -315,6 +315,18 @@ const stylesheetOf = (output: DirectoryPath) => {
     );
   });
 
+  it('lets both example cards shrink with their column, which Fumadocs keeps no taller than the window', () => {
+    const shrinks = '[^>]*[" ]flex min-h-0 flex-col[" ][^>]*>';
+    // Each box passes the height on: our layout, then the request card's tabs, open tab, marked element and block.
+    const boxes = new RegExp(
+      `@4xl:max-h-[^>]*><div${shrinks}[\\s\\S]*?<div${shrinks}<div(?=[^>]*role="tablist")[^>]*[" ]shrink-0[" ]` +
+        `[\\s\\S]*?<div${shrinks}<div${shrinks}(?:<!--.*?-->)*<figure${shrinks}` +
+        // The code scrolls in what the block has left.
+        `(?:(?!</figure>)[\\s\\S])*?<div[^>]*[" ]overflow-auto[" ][^>]*[" ]min-h-0[" ]`
+    );
+    expect(read('api/apimatic-calculator/simple-calculator/Calculate/index.html')).to.match(boxes);
+  });
+
   it('keeps the server-side specification loader out of the browser bundle', () => {
     const scripts = fs
       .readdirSync(path.join(portal.output().toString(), 'assets'))
