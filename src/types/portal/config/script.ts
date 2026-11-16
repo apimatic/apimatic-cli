@@ -1,10 +1,12 @@
 import { err, ok, Result } from 'neverthrow';
 import { isJsonObject } from '../../../utils/json-utils.js';
 import { UrlPath } from '../../file/urlPath.js';
-import { allOf, httpsAddress, Parsed, required, unknownKeys } from './fields.js';
+import { allOf, httpsAddress, oneOf, Parsed, required, unknownKeys } from './fields.js';
 import { StaticAsset } from './static-asset.js';
 
-const KNOWN = ['src'];
+const KNOWN = ['src', 'category'];
+
+const CATEGORIES = ['necessary', 'functional', 'analytics', 'marketing'] as const;
 
 const ADDRESS_EXAMPLE = 'https://cdn.example.com/widget.js';
 
@@ -17,7 +19,10 @@ export interface PortalScript {
 
 /** A script of the customer's own, which the portal loads on every page. */
 export class Script {
-  private constructor(private readonly source: UrlPath | StaticAsset) {}
+  private constructor(
+    private readonly source: UrlPath | StaticAsset,
+    private readonly category: (typeof CATEGORIES)[number]
+  ) {}
 
   public static parseList(value: unknown, path: string): Parsed<Script[]> {
     if (value === undefined) {
@@ -36,6 +41,11 @@ export class Script {
     return this.source instanceof StaticAsset ? this.source : null;
   }
 
+  /** Whether a portal built with `--no-analytics` still loads it. */
+  public loadsWithoutAnalytics(): boolean {
+    return this.category === 'necessary' || this.category === 'functional';
+  }
+
   public identity(): PortalScript {
     return { src: this.source instanceof StaticAsset ? this.source.portalPath() : this.source.toString() };
   }
@@ -46,8 +56,12 @@ export class Script {
     }
     return allOf(
       unknownKeys(value, KNOWN, path),
-      Result.combineWithAllErrors([required(value.src, `${path}.src`, Script.parseSource)])
-    ).map(([source]) => new Script(source));
+      Result.combineWithAllErrors([
+        required(value.src, `${path}.src`, Script.parseSource),
+        // Left out, it counts as analytics: a staging build must not load a script nobody vouched for.
+        oneOf(value.category, `${path}.category`, CATEGORIES, 'analytics')
+      ])
+    ).map(([source, category]) => new Script(source, category));
   }
 
   // An address by its scheme, so an http one is told to be https rather than taken for a file.

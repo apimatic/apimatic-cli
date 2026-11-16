@@ -36,7 +36,8 @@ export class FlagsProvider {
   public static readonly noAnalytics = {
     'no-analytics': Flags.boolean({
       default: false,
-      description: "leave out the Google Tag Manager and Google Analytics tags set in 'portal.analytics'."
+      description:
+        "leave out the tags set in 'portal.analytics', and the 'analytics' and 'marketing' scripts in 'portal.scripts'."
     })
   };
 

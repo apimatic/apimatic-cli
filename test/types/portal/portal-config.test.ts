@@ -523,7 +523,7 @@ describe('PortalConfig', () => {
       };
       const portal = config({ analytics });
 
-      expect(portal.withoutVendors().identity()).to.deep.equal({
+      expect(portal.withoutAnalytics().identity()).to.deep.equal({
         ...portal.identity(),
         analytics: { googleTagManager: null, googleAnalytics: null, keepQueryParams: ['campaign_id'] }
       });
@@ -668,6 +668,49 @@ describe('PortalConfig', () => {
             "the 'static' directory, for example 'static/analytics.js'."
         ]);
       }
+    });
+
+    it('takes one of four categories, and refuses any other', () => {
+      for (const category of ['necessary', 'functional', 'analytics', 'marketing']) {
+        expect(parse({ scripts: [{ src: WIDGET, category }] }).isOk(), category).to.be.true;
+      }
+      for (const category of ['Necessary', 'essential', '', 7, null]) {
+        expect(errorsOf({ scripts: [{ src: WIDGET, category }] }), JSON.stringify(category)).to.deep.equal([
+          "'portal.scripts[0].category' must be one of 'necessary', 'functional', 'analytics' or 'marketing'."
+        ]);
+      }
+    });
+
+    // The one with no category goes too: nobody vouched that it counts no readers.
+    it('keeps only necessary and functional scripts without analytics, in their order, and tells the browser no category', () => {
+      const at = (name: string) => `https://cdn.example.com/${name}.js`;
+      const portal = config({
+        scripts: [
+          { src: at('pixel'), category: 'marketing' },
+          { src: at('chat'), category: 'functional' },
+          { src: at('uncategorised') },
+          { src: 'static/js/banner.js', category: 'necessary' },
+          { src: 'static/js/counter.js', category: 'analytics' }
+        ]
+      });
+
+      expect(portal.identity().scripts).to.deep.equal([
+        { src: at('pixel') },
+        { src: at('chat') },
+        { src: at('uncategorised') },
+        { src: '/js/banner.js' },
+        { src: '/js/counter.js' }
+      ]);
+      expect(portal.withoutAnalytics().identity().scripts).to.deep.equal([
+        { src: at('chat') },
+        { src: '/js/banner.js' }
+      ]);
+      expect(
+        portal
+          .withoutAnalytics()
+          .staticFiles()
+          .map((file) => file.settingPath())
+      ).to.deep.equal(['portal.scripts[3].src']);
     });
 
     it('reports every entry at once, each by its place in the list', () => {

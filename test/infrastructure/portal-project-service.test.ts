@@ -545,7 +545,7 @@ describe('PortalProjectService', () => {
         site: { name: 'My API' },
         analytics: { googleTagManager: { containerId: 'GTM-ABC123' }, googleAnalytics: { measurementId: 'G-ABC123' } }
       });
-      (await service.prepare(project, sourceFor({ config: config.withoutVendors() }), NO_ARTIFACTS))._unsafeUnwrap();
+      (await service.prepare(project, sourceFor({ config: config.withoutAnalytics() }), NO_ARTIFACTS))._unsafeUnwrap();
 
       expect(readIdentity().analytics).to.deep.equal({
         googleTagManager: null,
@@ -573,6 +573,19 @@ describe('PortalProjectService', () => {
       expect((await service.applyConfig(project, settingsFor(listing([widget]))))._unsafeUnwrap()).to.be.true;
 
       expect(readIdentity().scripts).to.deep.equal([widget]);
+    });
+
+    it('writes only the scripts a config without analytics keeps, and every script from the whole config', async () => {
+      const banner = { src: 'https://cdn.example.com/banner.js' };
+      const counter = { src: 'https://cdn.example.com/counter.js' };
+      const config = configFor({ site: { name: 'My API' }, scripts: [{ ...banner, category: 'necessary' }, counter] });
+      (await service.prepare(project, sourceFor({ config: config.withoutAnalytics() }), NO_ARTIFACTS))._unsafeUnwrap();
+
+      expect(readIdentity().scripts).to.deep.equal([banner]);
+
+      expect((await service.applyConfig(project, settingsFor(config)))._unsafeUnwrap()).to.be.true;
+
+      expect(readIdentity().scripts).to.deep.equal([banner, counter]);
     });
 
     it('writes nothing, and says so, when the block makes the same site', async () => {

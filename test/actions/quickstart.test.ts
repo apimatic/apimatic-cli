@@ -108,7 +108,7 @@ describe('QuickstartAction', () => {
       .stub(PortalArtifactsService.prototype, 'generate')
       .resolves(ok(completeArtifacts([Language.TYPESCRIPT, Language.PYTHON])));
     const prepare = sinon.stub(PortalProjectService.prototype, 'prepare').resolves(err('stopped here'));
-    const withoutVendors = sinon.spy(PortalConfig.prototype, 'withoutVendors');
+    const withoutAnalytics = sinon.spy(PortalConfig.prototype, 'withoutAnalytics');
 
     await execute();
 
@@ -129,7 +129,7 @@ describe('QuickstartAction', () => {
     // prepares a project.
     expect(artifacts.called, 'the wizard asked for the artifacts').to.be.true;
     expect(prepare.called, 'the wizard reached the preview').to.be.true;
-    expect(withoutVendors.called, 'the preview counts like a hosted portal').to.be.false;
+    expect(withoutAnalytics.called, 'the preview counts like a hosted portal').to.be.false;
   });
 
   it('asks for nothing more and stops when no language is chosen', async () => {

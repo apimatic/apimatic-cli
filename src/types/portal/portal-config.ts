@@ -156,8 +156,8 @@ export class PortalConfig {
     };
   }
 
-  /** The same portal with neither vendor tag, for a staging build under `--no-analytics`. */
-  public withoutVendors(): PortalConfig {
+  /** For a staging build under `--no-analytics`: neither vendor tag, and no `analytics` or `marketing` script. */
+  public withoutAnalytics(): PortalConfig {
     return new PortalConfig(
       this.site,
       this.brand,
@@ -165,7 +165,7 @@ export class PortalConfig {
       this.ai,
       this.analytics.withoutVendors(),
       this.seo,
-      this.scripts,
+      this.scripts.filter((script) => script.loadsWithoutAnalytics()),
       this.pluginAddress
     );
   }

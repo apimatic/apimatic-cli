@@ -418,6 +418,40 @@ describe('PortalSourceContext', () => {
       });
     });
 
+    it('leaves out the analytics and marketing scripts under --no-analytics, for resolve and for a reload alike', async () => {
+      const at = (name: string) => `https://cdn.example.com/${name}.js`;
+      writeConfig({
+        site: { name: 'Calc' },
+        scripts: [
+          { src: at('banner'), category: 'necessary' },
+          { src: at('counter') },
+          { src: at('chat'), category: 'functional' },
+          { src: at('pixel'), category: 'marketing' }
+        ]
+      });
+      const off = { analytics: false };
+
+      const resolved = (await new PortalSourceContext(new DirectoryPath(root)).resolve(off))._unsafeUnwrap();
+      const reloaded = (await context().resolveSettings(null, off))._unsafeUnwrap();
+      const counted = (await context().resolveSettings(null, { analytics: true }))._unsafeUnwrap();
+
+      for (const { config } of [resolved, reloaded]) {
+        expect(config.identity().scripts).to.deep.equal([{ src: at('banner') }, { src: at('chat') }]);
+      }
+      expect(counted.config.identity().scripts).to.have.length(4);
+    });
+
+    // A staging build accepts exactly what a production build accepts.
+    it('reports a missing file of a script that --no-analytics would leave out', async () => {
+      writeConfig({ site: { name: 'Calc' }, scripts: [{ src: 'static/js/counter.js', category: 'analytics' }] });
+
+      for (const analytics of [false, true]) {
+        expect(missingFiles(await context().resolveSettings(null, { analytics })), `${analytics}`).to.deep.equal([
+          ['portal.scripts[0].src', 'static/js/counter.js', null]
+        ]);
+      }
+    });
+
     it('reports a file removed while the preview runs', async () => {
       expect((await context().resolveSettings(null, { analytics: true }))._unsafeUnwrapErr()).to.deep.equal({
         kind: 'missingConfig'

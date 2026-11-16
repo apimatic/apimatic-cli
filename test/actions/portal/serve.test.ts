@@ -906,6 +906,28 @@ describe('PortalServeAction', () => {
       expect(applyConfig.lastCall.args[1].config.identity().analytics.googleTagManager).to.be.null;
     });
 
+    it('leaves the analytics and marketing scripts out of the project and of each rewrite under --no-analytics', async () => {
+      const applyConfig = sinon.spy(PortalProjectService.prototype, 'applyConfig');
+      const at = (name: string) => `https://cdn.example.com/${name}.js`;
+      const config = originalConfig();
+      config.portal.scripts = [{ src: at('banner'), category: 'necessary' }, { src: at('counter') }];
+      writeConfig(config);
+
+      await whileServing(async () => {
+        config.portal.scripts.push(
+          { src: at('pixel'), category: 'marketing' },
+          { src: at('chat'), category: 'functional' }
+        );
+        await save(config);
+      }, false);
+
+      expect(shared.prepare.firstCall.args[1].config.identity().scripts).to.deep.equal([{ src: at('banner') }]);
+      expect(applyConfig.lastCall.args[1].config.identity().scripts).to.deep.equal([
+        { src: at('banner') },
+        { src: at('chat') }
+      ]);
+    });
+
     it('reports a change it could not write to the preview', async () => {
       await whileServing(async () => {
         sinon.stub(PortalProjectService.prototype, 'applyConfig').resolves(err('EACCES: permission denied'));
