@@ -48,6 +48,10 @@ export interface PortalSeo {
   googleSiteVerification: string | null;
 }
 
+export interface PortalScript {
+  src: string;
+}
+
 export interface Portal {
   name: string;
   description: string | null;
@@ -61,4 +65,6 @@ export interface Portal {
   pageActions: boolean;
   analytics: PortalAnalytics;
   seo: PortalSeo;
+  /** In the order the block lists them, which is the order the browser runs them in. */
+  scripts: PortalScript[];
 }

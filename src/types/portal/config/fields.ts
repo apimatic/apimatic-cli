@@ -104,3 +104,13 @@ export function nonEmptyString(value: unknown, path: string): Parsed<string> {
     ? ok(value.trim())
     : err([`'${path}' must be a non-empty string.`]);
 }
+
+const HTTPS_ADDRESS = /^https:\/\/\S+$/i;
+
+// https, since what it names is fetched and run; parsed, so it holds no space or quote wherever it is written out.
+export function httpsAddress(value: unknown, path: string, example: string): Parsed<UrlPath> {
+  const url = typeof value === 'string' && HTTPS_ADDRESS.test(value) ? UrlPath.create(value) : undefined;
+  return url === undefined
+    ? err([`'${path}' must be an address starting with 'https://', with no spaces, for example '${example}'.`])
+    : ok(new UrlPath(new URL(`${url}`).href));
+}

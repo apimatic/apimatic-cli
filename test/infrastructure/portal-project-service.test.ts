@@ -562,6 +562,19 @@ describe('PortalProjectService', () => {
       });
     });
 
+    it('writes the listed scripts in order, and the new list when a save changes it', async () => {
+      const setup = { src: 'https://cdn.example.com/setup.js' };
+      const widget = { src: 'https://cdn.example.com/widget.js' };
+      const listing = (scripts: object[]) => configFor({ site: { name: 'My API' }, scripts });
+      (await service.prepare(project, sourceFor({ config: listing([setup, widget]) }), NO_ARTIFACTS))._unsafeUnwrap();
+
+      expect(readIdentity().scripts).to.deep.equal([setup, widget]);
+
+      expect((await service.applyConfig(project, settingsFor(listing([widget]))))._unsafeUnwrap()).to.be.true;
+
+      expect(readIdentity().scripts).to.deep.equal([widget]);
+    });
+
     it('writes nothing, and says so, when the block makes the same site', async () => {
       const config = configFor({ site: { name: 'My API' }, brand: { colors: { primary: '#1d4ed8' } } });
       (await service.prepare(project, sourceFor({ config }), NO_ARTIFACTS))._unsafeUnwrap();

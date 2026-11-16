@@ -1,6 +1,6 @@
 import { expect } from 'chai';
 import { Analytics, pageLocation, PortalEventName, PortalEvents } from '../../portal-template/src/lib/analytics';
-import type { PortalAnalytics } from '../../portal-template/src/lib/portal-types';
+import type { PortalAnalytics, PortalScript } from '../../portal-template/src/lib/portal-types';
 import { Adapter, adapters } from '../../portal-template/src/lib/vendor-tags';
 
 // The list is written out here, not imported: the test is the contract, and a name the module drops fails it.
@@ -119,6 +119,7 @@ interface FakeScript {
   async: boolean;
   src: string;
   textContent: string;
+  getAttribute(name: 'src'): string;
 }
 
 interface FakeWindow {
@@ -135,10 +136,13 @@ function browser(href: string, title = 'Quickstart | Acme API', referrer = '') {
   const document = {
     title,
     referrer,
-    createElement: (): FakeScript => ({ async: false, src: '', textContent: '' }),
+    createElement: (): FakeScript => {
+      const script: FakeScript = { async: false, src: '', textContent: '', getAttribute: () => script.src };
+      return script;
+    },
     head: {
       append: (script: FakeScript) => scripts.push(script),
-      querySelector: (selector: string) => scripts.find((script) => selector === `script[src="${script.src}"]`) ?? null
+      querySelectorAll: () => scripts
     }
   };
   Object.assign(globalThis, { window, document });
@@ -203,7 +207,7 @@ describe('Analytics', () => {
   describe('with neither vendor set', () => {
     it('pushes a reset entry and one clean page view entry, and nothing else', () => {
       const page = browser(`${quickstart}?utm_source=newsletter&tab=python#install`);
-      const analytics = new Analytics(none);
+      const analytics = new Analytics(none, []);
 
       analytics.start();
       analytics.reportPageView();
@@ -223,7 +227,7 @@ describe('Analytics', () => {
       const page = browser(quickstart);
       const existing = { 'host-tag': true };
       page.window.dataLayer = [existing];
-      const analytics = new Analytics(none);
+      const analytics = new Analytics(none, []);
 
       analytics.start();
       analytics.reportPageView();
@@ -235,7 +239,7 @@ describe('Analytics', () => {
   describe('with Google Tag Manager', () => {
     it('pushes the gtm.start entry first, inserts gtm.js, then pushes the page view', () => {
       const page = browser(quickstart);
-      const analytics = new Analytics(withGtm());
+      const analytics = new Analytics(withGtm(), []);
 
       analytics.start();
       analytics.reportPageView();
@@ -255,7 +259,7 @@ describe('Analytics', () => {
       const page = browser(quickstart);
       const setting = { containerId: 'GTM-A&B', environment: { auth: 'a&b', preview: 'env 3' } };
 
-      new Analytics({ ...none, googleTagManager: setting }).start();
+      new Analytics({ ...none, googleTagManager: setting }, []).start();
 
       expect(page.scripts.map((script) => script.src)).to.deep.equal([
         'https://www.googletagmanager.com/gtm.js?id=GTM-A%26B&gtm_auth=a%26b&gtm_preview=env%203&gtm_cookies_win=x'
@@ -265,7 +269,7 @@ describe('Analytics', () => {
     it("loads the container's environment when one is set", () => {
       const page = browser(quickstart);
 
-      new Analytics(withGtm({ auth: 'abc123', preview: 'env-3' })).start();
+      new Analytics(withGtm({ auth: 'abc123', preview: 'env-3' }), []).start();
 
       expect(page.scripts.map((script) => script.src)).to.deep.equal([
         `${GTM_SCRIPT}&gtm_auth=abc123&gtm_preview=env-3&gtm_cookies_win=x`
@@ -277,7 +281,7 @@ describe('Analytics', () => {
     it('pushes js and config with its own page view off, and inserts gtag.js', () => {
       const page = browser(quickstart);
 
-      new Analytics(withGa4).start();
+      new Analytics(withGa4, []).start();
 
       const [js, config, ...rest] = gtagCalls(page.dataLayer());
       expect(js[0]).to.equal('js');
@@ -290,7 +294,7 @@ describe('Analytics', () => {
 
     it('sends each page view as page_view, without the prefix, after the reset and event entries', () => {
       const page = browser(quickstart);
-      const analytics = new Analytics(withGa4);
+      const analytics = new Analytics(withGa4, []);
 
       analytics.start();
       analytics.reportPageView();
@@ -307,7 +311,7 @@ describe('Analytics', () => {
 
     it("gives GA4's own events the reported address of each page, never the one in the address bar", () => {
       const page = browser('https://docs.test/api/pets/listPets?code=x&state=y#access_token=z', 'List pets');
-      const analytics = new Analytics(withGa4);
+      const analytics = new Analytics(withGa4, []);
 
       analytics.start();
       analytics.reportPageView();
@@ -323,7 +327,7 @@ describe('Analytics', () => {
 
     it('pushes Arguments objects, which gtag.js reads, never arrays of the same values', () => {
       const page = browser(quickstart);
-      const analytics = new Analytics(withGa4);
+      const analytics = new Analytics(withGa4, []);
 
       analytics.start();
       analytics.reportPageView();
@@ -335,7 +339,7 @@ describe('Analytics', () => {
     it("escapes the measurement ID in the tag's address", () => {
       const page = browser(quickstart);
 
-      new Analytics({ ...none, googleAnalytics: { measurementId: 'G-A#B' } }).start();
+      new Analytics({ ...none, googleAnalytics: { measurementId: 'G-A#B' } }, []).start();
 
       expect(page.scripts.map((script) => script.src)).to.deep.equal([
         'https://www.googletagmanager.com/gtag/js?id=G-A%23B'
@@ -349,7 +353,7 @@ describe('Analytics', () => {
         calls.push(command);
       };
       page.window.gtag = existing;
-      const analytics = new Analytics(withGa4);
+      const analytics = new Analytics(withGa4, []);
 
       analytics.start();
       analytics.reportPageView();
@@ -361,8 +365,8 @@ describe('Analytics', () => {
 
     it("sends through the page's gtag from a second instance, as a config save under portal serve makes", () => {
       const page = browser(quickstart);
-      new Analytics(withGa4).start();
-      const second = new Analytics(withGa4);
+      new Analytics(withGa4, []).start();
+      const second = new Analytics(withGa4, []);
       second.start();
 
       second.report('docs_markdown_copy', {});
@@ -374,7 +378,7 @@ describe('Analytics', () => {
   describe('with both vendors', () => {
     it('pushes every setup entry once, gtm.start first, before the first event', () => {
       const page = browser(quickstart);
-      const analytics = new Analytics(withBoth);
+      const analytics = new Analytics(withBoth, []);
 
       analytics.start();
       analytics.reportPageView();
@@ -392,11 +396,11 @@ describe('Analytics', () => {
 
     it('starts once per page, for a second start and for a second instance alike', () => {
       const page = browser(quickstart);
-      const analytics = new Analytics(withBoth);
+      const analytics = new Analytics(withBoth, []);
 
       analytics.start();
       analytics.start();
-      new Analytics(withBoth).start();
+      new Analytics(withBoth, []).start();
 
       expect(page.dataLayer()).to.have.length(3);
       expect(page.scripts).to.have.length(2);
@@ -405,9 +409,9 @@ describe('Analytics', () => {
 
     it('reloads the page for a start with other vendors, as a config save under portal serve makes', () => {
       const page = browser(quickstart);
-      new Analytics(withGtm()).start();
+      new Analytics(withGtm(), []).start();
 
-      new Analytics(withBoth).start();
+      new Analytics(withBoth, []).start();
 
       expect(page.reloads()).to.equal(1);
       expect(page.dataLayer()).to.have.length(1);
@@ -415,10 +419,85 @@ describe('Analytics', () => {
     });
   });
 
+  describe('with scripts listed in portal.scripts', () => {
+    const SETUP = 'https://cdn.example.com/setup.js';
+    const WIDGET = 'https://cdn.example.com/widget.js';
+    const listed: PortalScript[] = [{ src: SETUP }, { src: WIDGET }];
+
+    it('inserts each after the vendor tags, in the order listed, and not async, so they run in that order', () => {
+      const page = browser(quickstart);
+
+      new Analytics(withBoth, listed).start();
+
+      expect(page.scripts.map(({ src, async }) => [src, async])).to.deep.equal([
+        [GTM_SCRIPT, true],
+        [GA4_SCRIPT, true],
+        [SETUP, false],
+        [WIDGET, false]
+      ]);
+    });
+
+    it('inserts them on a portal with neither vendor set', () => {
+      const page = browser(quickstart);
+
+      new Analytics(none, listed).start();
+
+      expect(page.scripts.map((script) => script.src)).to.deep.equal([SETUP, WIDGET]);
+    });
+
+    it('inserts each once: across page views, for a second instance, and for an address listed twice', () => {
+      const page = browser(quickstart);
+      const twice = [...listed, { src: SETUP }];
+      const analytics = new Analytics(withGtm(), twice);
+
+      analytics.start();
+      analytics.reportPageView();
+      page.go('https://docs.test/guides/errors', 'Errors | Acme API');
+      analytics.reportPageView();
+      new Analytics(withGtm(), twice).start();
+
+      expect(page.scripts.map((script) => script.src)).to.deep.equal([GTM_SCRIPT, SETUP, WIDGET]);
+      expect(page.reloads()).to.equal(0);
+    });
+
+    // A listed script reads the address as a vendor tag does, so it waits out a sign-in's answer with them.
+    it('holds them back with the tags while the address holds an OAuth answer, and inserts all once it is gone', () => {
+      const page = browser('https://docs.test/api/pets/listPets?code=abc&state=123', 'List pets');
+      const analytics = new Analytics(withGtm(), listed);
+
+      analytics.start();
+      analytics.reportPageView();
+      analytics.loadTags();
+
+      expect(page.scripts).to.be.empty;
+
+      page.go('https://docs.test/api/pets/listPets');
+      analytics.loadTags();
+
+      expect(page.scripts.map((script) => script.src)).to.deep.equal([GTM_SCRIPT, SETUP, WIDGET]);
+    });
+
+    for (const [change, next] of [
+      ['one more script', [...listed, { src: 'https://cdn.example.com/chat.js' }]],
+      ['one script fewer', [{ src: SETUP }]],
+      ['the same scripts in another order', [{ src: WIDGET }, { src: SETUP }]]
+    ] as const) {
+      it(`reloads the page for a start with ${change}, as a config save under portal serve makes`, () => {
+        const page = browser(quickstart);
+        new Analytics(none, listed).start();
+
+        new Analytics(none, [...next]).start();
+
+        expect(page.reloads()).to.equal(1);
+        expect(page.scripts.map((script) => script.src)).to.deep.equal([SETUP, WIDGET]);
+      });
+    }
+  });
+
   describe('after a playground sign-in', () => {
     it('reports with the OAuth answer stripped from page_location', () => {
       const page = browser('https://docs.test/api/pets/listPets#access_token=xyz&state=123', 'List pets');
-      const analytics = new Analytics(withBoth);
+      const analytics = new Analytics(withBoth, []);
 
       analytics.start();
       analytics.reportPageView();
@@ -437,7 +516,7 @@ describe('Analytics', () => {
 
     it('holds the tags back while the answer is in the address, and loads them once the playground took it out', () => {
       const page = browser(answered, 'List pets');
-      const analytics = new Analytics(withBoth);
+      const analytics = new Analytics(withBoth, []);
 
       analytics.start();
       analytics.reportPageView();
@@ -463,7 +542,7 @@ describe('Analytics', () => {
     ]) {
       it(`holds the tags and the page view back at ${href}, and inserts the tags on the next page`, () => {
         const page = browser(href);
-        const analytics = new Analytics(withBoth);
+        const analytics = new Analytics(withBoth, []);
 
         analytics.start();
         analytics.reportPageView();
@@ -482,7 +561,7 @@ describe('Analytics', () => {
 
       it(`sends nothing for any event reported at ${href}`, () => {
         const page = browser(href);
-        const analytics = new Analytics(withBoth);
+        const analytics = new Analytics(withBoth, []);
         analytics.start();
 
         analytics.report('docs_code_copy', { language: 'cURL' });
@@ -553,7 +632,7 @@ describe('Analytics', () => {
 
         it('maps docs_page_view to its page view call', () => {
           const page = browser(quickstart);
-          const analytics = new Analytics(settings);
+          const analytics = new Analytics(settings, []);
 
           analytics.start();
           analytics.reportPageView();
@@ -564,7 +643,7 @@ describe('Analytics', () => {
 
         it('receives nothing holding code=, token= or a # part from a report made with an OAuth answer in the address', () => {
           const page = browser('https://docs.test/api/pets/listPets?code=x&state=y#access_token=z', 'List pets');
-          const analytics = new Analytics(settings);
+          const analytics = new Analytics(settings, []);
 
           analytics.start();
           analytics.report('docs_page_view', { page_title: 'List pets' });
@@ -580,7 +659,7 @@ describe('Analytics', () => {
           expect(adapter().script).to.match(/^https:\/\//);
           const page = browser(quickstart);
 
-          new Analytics(settings).start();
+          new Analytics(settings, []).start();
 
           expect(page.scripts).to.not.be.empty;
           for (const script of page.scripts) {
@@ -595,7 +674,7 @@ describe('Analytics', () => {
   describe('report', () => {
     it('pushes a reset entry right before every event entry, which holds event and docs only', () => {
       const page = browser(quickstart);
-      const analytics = new Analytics(none);
+      const analytics = new Analytics(none, []);
       analytics.start();
 
       analytics.report('docs_page_view', { page_title: 'A' });
@@ -611,7 +690,7 @@ describe('Analytics', () => {
 
     it("clears the previous event's details for a tag that reads the merged data layer", () => {
       const page = browser(quickstart);
-      const analytics = new Analytics(none);
+      const analytics = new Analytics(none, []);
       analytics.start();
       analytics.report('docs_code_copy', { language: 'python' });
       analytics.report('docs_page_view', { page_title: 'B' });
@@ -623,7 +702,7 @@ describe('Analytics', () => {
 
     it('reports the page the caller names, not the one the address has moved on to', () => {
       const page = browser(quickstart);
-      const analytics = new Analytics(none);
+      const analytics = new Analytics(none, []);
       page.go('https://docs.test/guides/authentication');
 
       analytics.report(
@@ -642,7 +721,7 @@ describe('Analytics', () => {
 
     it('sends the current page, each with its own title', () => {
       const page = browser(quickstart);
-      const analytics = new Analytics(none);
+      const analytics = new Analytics(none, []);
       analytics.start();
 
       analytics.reportPageView();
@@ -657,7 +736,7 @@ describe('Analytics', () => {
 
     it('sends none when only the # part or the query changed, or nothing changed', () => {
       const page = browser(quickstart);
-      const analytics = new Analytics(none);
+      const analytics = new Analytics(none, []);
       analytics.start();
 
       analytics.reportPageView();
@@ -672,7 +751,7 @@ describe('Analytics', () => {
 
     it('sends three for A, then B, then A', () => {
       const page = browser(quickstart);
-      const analytics = new Analytics(none);
+      const analytics = new Analytics(none, []);
       analytics.start();
 
       analytics.reportPageView();
@@ -699,7 +778,7 @@ describe('Analytics', () => {
         'Quickstart',
         'https://www.google.com/search?q=acme+docs'
       );
-      const analytics = new Analytics(none);
+      const analytics = new Analytics(none, []);
       analytics.reportPageView();
       page.go(missing);
       analytics.reportPageView();
@@ -716,7 +795,7 @@ describe('Analytics', () => {
         'Quickstart',
         'https://www.google.com/search?q=acme+docs'
       );
-      const analytics = new Analytics(none);
+      const analytics = new Analytics(none, []);
       analytics.reportPageView();
       page.go(missing);
 
@@ -728,9 +807,9 @@ describe('Analytics', () => {
 
     it('names the referrer without its query or # part on a first load, and nothing when the browser sends none', () => {
       const fromSearch = browser(missing, 'Not found', 'https://www.google.com/search?q=acme+docs#top');
-      new Analytics(none).reportNotFound();
+      new Analytics(none, []).reportNotFound();
       const typedIn = browser(missing, 'Not found');
-      new Analytics(none).reportNotFound();
+      new Analytics(none, []).reportNotFound();
 
       expect(referrers(fromSearch.dataLayer())).to.deep.equal(['https://www.google.com/search']);
       expect(referrers(typedIn.dataLayer())).to.deep.equal(['']);
@@ -738,7 +817,7 @@ describe('Analytics', () => {
 
     it('reports a missing page once, however often its page mounts, and the next missing page again', () => {
       const page = browser(missing);
-      const analytics = new Analytics(none);
+      const analytics = new Analytics(none, []);
 
       analytics.reportNotFound();
       analytics.reportNotFound();
@@ -750,7 +829,7 @@ describe('Analytics', () => {
 
     it('reports a missing page again when the reader comes back to it from another page', () => {
       const page = browser('https://docs.acme.com/guides/quickstart');
-      const analytics = new Analytics(none);
+      const analytics = new Analytics(none, []);
       analytics.reportPageView();
       page.go(missing);
       analytics.reportNotFound();

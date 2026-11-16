@@ -1,12 +1,13 @@
-import { err, ok, Result } from 'neverthrow';
+import { err, Result } from 'neverthrow';
 import { isJsonObject } from '../../utils/json-utils.js';
 import { UrlPath } from '../file/urlPath.js';
 import { AiConfig } from './config/ai-config.js';
 import { AnalyticsConfig, PortalAnalytics } from './config/analytics-config.js';
 import { BrandConfig, ColorMode } from './config/brand-config.js';
-import { allOf, optional, Parsed, unknownKeys } from './config/fields.js';
+import { allOf, httpsAddress, optional, unknownKeys } from './config/fields.js';
 import { Link } from './config/link.js';
 import { NavigationConfig } from './config/navigation-config.js';
+import { PortalScript, Script } from './config/script.js';
 import { PortalSeo, SeoConfig } from './config/seo-config.js';
 import { SiteAddress } from './config/site-address.js';
 import { SiteConfig, SuggestedSite } from './config/site-config.js';
@@ -39,11 +40,15 @@ export interface PortalIdentity {
   pageActions: boolean;
   analytics: PortalAnalytics;
   seo: PortalSeo;
+  /** In the order the block lists them, which is the order the browser runs them in. */
+  scripts: PortalScript[];
 }
 
 const BLOCK = 'portal';
 
 const NAMESPACES = ['site', 'brand', 'navigation', 'ai', 'analytics', 'seo'];
+
+const SCRIPTS = 'scripts';
 
 /** The one setting outside the namespaces, named as the portal artifacts endpoint reads it. */
 const PLUGIN_URL = 'pluginUrl';
@@ -56,6 +61,7 @@ export class PortalConfig {
     private readonly ai: AiConfig,
     private readonly analytics: AnalyticsConfig,
     private readonly seo: SeoConfig,
+    private readonly scripts: Script[],
     private readonly pluginAddress: UrlPath | null
   ) {}
 
@@ -68,6 +74,7 @@ export class PortalConfig {
       AiConfig.defaults,
       AnalyticsConfig.defaults,
       SeoConfig.defaults,
+      [],
       null
     );
   }
@@ -88,7 +95,7 @@ export class PortalConfig {
     // Each parser hands back the value it accepted, so the constructor is fed only what
     // validation proved.
     return allOf(
-      unknownKeys(block, [...NAMESPACES, PLUGIN_URL], BLOCK),
+      unknownKeys(block, [...NAMESPACES, SCRIPTS, PLUGIN_URL], BLOCK),
       Result.combineWithAllErrors([
         SiteConfig.parse(block.site, `${BLOCK}.site`, suggested),
         BrandConfig.parse(block.brand, `${BLOCK}.brand`),
@@ -96,7 +103,8 @@ export class PortalConfig {
         AiConfig.parse(block.ai, `${BLOCK}.ai`),
         AnalyticsConfig.parse(block.analytics, `${BLOCK}.analytics`),
         SeoConfig.parse(block.seo, `${BLOCK}.seo`),
-        optional(block.pluginUrl, (value) => secureAddress(value, `${BLOCK}.${PLUGIN_URL}`))
+        Script.parseList(block.scripts, `${BLOCK}.${SCRIPTS}`),
+        optional(block.pluginUrl, (value) => httpsAddress(value, `${BLOCK}.${PLUGIN_URL}`, PLUGIN_URL_EXAMPLE))
       ])
     ).map((settings) => new PortalConfig(...settings));
   }
@@ -142,7 +150,8 @@ export class PortalConfig {
       links: this.navigation.headerLinks().map(portalLink),
       pageActions: this.ai.offersPageActions(),
       analytics: this.analytics.identity(),
-      seo: this.seo.identity()
+      seo: this.seo.identity(),
+      scripts: this.scripts.map((script) => script.identity())
     };
   }
 
@@ -155,11 +164,12 @@ export class PortalConfig {
       this.ai,
       this.analytics.withoutVendors(),
       this.seo,
+      this.scripts,
       this.pluginAddress
     );
   }
 
-  /** Every namespace included, defaults and all, which is what quickstart writes; `analytics` and `seo` start unset. */
+  /** Every namespace included, defaults and all, which is what quickstart writes; `analytics`, `seo` and `scripts` start unset. */
   public toJSON(): PortalBlock {
     return {
       site: this.site.toJSON(),
@@ -175,19 +185,7 @@ function portalLink(link: Link): PortalLink {
   return { label: link.text(), url: link.href(), external: link.isExternal() };
 }
 
-const HTTPS_ADDRESS = /^https:\/\/\S+$/i;
-
 const PLUGIN_URL_EXAMPLE = 'https://example.com/acme-plugin.zip';
-
-// Parsed, so the quoted install command it goes into can hold no space or quote; https, as npx runs what it fetches.
-function secureAddress(value: unknown, path: string): Parsed<UrlPath> {
-  const url = typeof value === 'string' && HTTPS_ADDRESS.test(value) ? UrlPath.create(value) : undefined;
-  return url === undefined
-    ? err([
-        `'${path}' must be an address starting with 'https://', with no spaces, for example '${PLUGIN_URL_EXAMPLE}'.`
-      ])
-    : ok(new UrlPath(new URL(`${url}`).href));
-}
 
 export interface PortalBlock {
   site: ReturnType<SiteConfig['toJSON']>;

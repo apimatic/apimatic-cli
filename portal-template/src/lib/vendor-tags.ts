@@ -1,5 +1,5 @@
 import { holdsOAuthAnswer } from './oauth-callback';
-import type { PortalAnalytics } from './portal-types';
+import type { PortalAnalytics, PortalScript } from './portal-types';
 
 type Gtag = (...command: unknown[]) => void;
 
@@ -55,12 +55,19 @@ export const adapters: { [V in Vendor]: (settings: PortalAnalytics) => Adapter |
 };
 
 /** None while the address holds an OAuth answer, which the tags read for themselves; each once, so a later call adds the rest. */
-export function insertTags(live: Adapter[]): void {
+export function insertTags(live: Adapter[], scripts: PortalScript[]): void {
   if (holdsOAuthAnswer(window.location)) return;
-  for (const { script: src } of live) {
-    if (document.head.querySelector(`script[src="${src}"]`) !== null) continue;
+  // A listed script is not async, so the browser runs them in the order listed, whichever arrives first.
+  const wanted = [
+    ...live.map(({ script: src }) => ({ src, async: true })),
+    ...scripts.map(({ src }) => ({ src, async: false }))
+  ];
+  for (const { src, async } of wanted) {
+    // Compared as written, since a selector built from a customer's address breaks on a backslash.
+    const inserted = Array.from(document.head.querySelectorAll('script'), (script) => script.getAttribute('src'));
+    if (inserted.includes(src)) continue;
     const script = document.createElement('script');
-    script.async = true;
+    script.async = async;
     script.src = src;
     document.head.append(script);
   }

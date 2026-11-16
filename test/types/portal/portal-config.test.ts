@@ -567,6 +567,87 @@ describe('PortalConfig', () => {
     });
   });
 
+  describe('scripts', () => {
+    const SETUP = 'https://cdn.example.com/setup.js';
+    const WIDGET = 'https://cdn.example.com/widget.js';
+    const refused = (path: string) =>
+      `'${path}' must be an address starting with 'https://', with no spaces, for example ` +
+      "'https://cdn.example.com/widget.js'.";
+
+    it('lists none unless the block does', () => {
+      expect(config({}).identity().scripts).to.be.empty;
+    });
+
+    it('tells the browser each address, in the order listed', () => {
+      const scripts = [{ src: SETUP }, { src: WIDGET }];
+
+      expect(config({ scripts }).identity().scripts).to.deep.equal(scripts);
+    });
+
+    it('must be a list', () => {
+      for (const scripts of [WIDGET, { src: WIDGET }, null, 7]) {
+        expect(errorsOf({ scripts }), JSON.stringify(scripts)).to.deep.equal([
+          "'portal.scripts' must be a list of scripts."
+        ]);
+      }
+    });
+
+    it('takes each entry as an object, never a bare address', () => {
+      for (const entry of [WIDGET, [WIDGET], null, 7]) {
+        expect(errorsOf({ scripts: [entry] }), JSON.stringify(entry)).to.deep.equal([
+          "'portal.scripts[0]' must be a JSON object with 'src'."
+        ]);
+      }
+    });
+
+    it('asks for src', () => {
+      expect(errorsOf({ scripts: [{}] })).to.deep.equal(["'portal.scripts[0].src' is required."]);
+    });
+
+    // Neither is a setting in this release: a file in static/ adds a tag that needs attributes of its own.
+    it('names a key it does not know, integrity and attributes among them', () => {
+      expect(
+        errorsOf({ scripts: [{ src: WIDGET, integrity: 'sha384-abc', attributes: { 'data-site': 'acme' } }] })
+      ).to.deep.equal([
+        "'portal.scripts[0].integrity' is not a 'portal' setting.",
+        "'portal.scripts[0].attributes' is not a 'portal' setting."
+      ]);
+    });
+
+    // The browser runs what it fetches, and a portal served over https blocks a script that is not.
+    it('refuses anything but an https address', () => {
+      for (const src of [
+        'http://cdn.example.com/widget.js',
+        '//cdn.example.com/widget.js',
+        'https://',
+        'https:cdn.example.com/widget.js',
+        'https://cdn.example.com/my widget.js',
+        '',
+        7
+      ]) {
+        expect(errorsOf({ scripts: [{ src }] }), JSON.stringify(src)).to.deep.equal([refused('portal.scripts[0].src')]);
+      }
+    });
+
+    it('reports every entry at once, each by its place in the list', () => {
+      expect(
+        errorsOf({ scripts: [{ src: WIDGET }, { src: 'http://cdn.example.com/a.js', defer: true }, WIDGET] })
+      ).to.deep.equal([
+        "'portal.scripts[1].defer' is not a 'portal' setting.",
+        refused('portal.scripts[1].src'),
+        "'portal.scripts[2]' must be a JSON object with 'src'."
+      ]);
+    });
+
+    it('keeps the address as it parses: the host in lowercase, and a query whole', () => {
+      const scripts = [{ src: 'https://CDN.Example.com/widget.js?site=a%2Fb&v=2' }];
+
+      expect(config({ scripts }).identity().scripts).to.deep.equal([
+        { src: 'https://cdn.example.com/widget.js?site=a%2Fb&v=2' }
+      ]);
+    });
+  });
+
   describe('pluginUrl', () => {
     const REFUSED =
       "'portal.pluginUrl' must be an address starting with 'https://', with no spaces, for example " +
@@ -660,7 +741,8 @@ describe('PortalConfig', () => {
         ],
         pageActions: false,
         analytics: { googleTagManager: null, googleAnalytics: null, keepQueryParams: [] },
-        seo: { googleSiteVerification: null }
+        seo: { googleSiteVerification: null },
+        scripts: []
       });
     });
 
@@ -675,7 +757,8 @@ describe('PortalConfig', () => {
         links: [],
         pageActions: true,
         analytics: { googleTagManager: null, googleAnalytics: null, keepQueryParams: [] },
-        seo: { googleSiteVerification: null }
+        seo: { googleSiteVerification: null },
+        scripts: []
       });
     });
 

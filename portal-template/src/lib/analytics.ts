@@ -1,5 +1,5 @@
 import { isOAuthCallbackPath } from './oauth-callback';
-import type { PortalAnalytics } from './portal-types';
+import type { PortalAnalytics, PortalScript } from './portal-types';
 import { type Adapter, adapters, insertTags } from './vendor-tags';
 
 /** The query parameters an ad or mail platform reads from an address itself; a customer adds names and removes none. */
@@ -63,29 +63,29 @@ export class Analytics {
   private previousPageView: string | null = null;
   private lastNotFound: string | null = null;
 
-  public constructor(private readonly settings: PortalAnalytics) {
+  public constructor(private readonly settings: PortalAnalytics, private readonly scripts: PortalScript[]) {
     this.live = Object.values(adapters)
       .map((build) => build(settings))
       .filter((adapter) => adapter !== null);
   }
 
   public start(): void {
-    const settings = JSON.stringify(this.settings);
-    if (window.portalAnalyticsStarted === settings) return;
-    // Other vendors after a config save: only a fresh page holds exactly their tags.
+    const started = JSON.stringify([this.settings, this.scripts]);
+    if (window.portalAnalyticsStarted === started) return;
+    // Other vendors or scripts after a config save: only a fresh page holds exactly their tags.
     if (window.portalAnalyticsStarted !== undefined) {
       window.location.reload();
       return;
     }
-    window.portalAnalyticsStarted = settings;
+    window.portalAnalyticsStarted = started;
     const dataLayer = (window.dataLayer ??= []);
     for (const adapter of this.live) adapter.setup(dataLayer);
-    insertTags(this.live);
+    insertTags(this.live, this.scripts);
   }
 
   /** The tags held back while the address held an OAuth answer, once something has taken it out. */
   public loadTags(): void {
-    insertTags(this.live);
+    insertTags(this.live, this.scripts);
   }
 
   /** `href` is the page the event belongs to, when the caller saw the address move on first. */
