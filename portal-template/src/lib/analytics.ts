@@ -1,3 +1,4 @@
+import { EventFeed } from './event-feed';
 import { isOAuthCallbackPath } from './oauth-callback';
 import type { PortalAnalytics, PortalScript } from './portal-types';
 import { type Adapter, adapters, insertTags } from './vendor-tags';
@@ -42,6 +43,8 @@ declare global {
     dataLayer?: unknown[];
     /** Held by the window: a config save under `portal serve` evaluates this module again. */
     portalAnalyticsStarted?: string;
+    /** For customers' scripts: `analytics` is the page's event feed, whose `subscribe()` they call. */
+    apimatic?: { analytics?: EventFeed };
   }
 }
 
@@ -80,6 +83,8 @@ export class Analytics {
     window.portalAnalyticsStarted = started;
     const dataLayer = (window.dataLayer ??= []);
     for (const adapter of this.live) adapter.setup(dataLayer);
+    // The page's, not this instance's: a subscriber has to outlive a second instance under `portal serve`.
+    (window.apimatic ??= {}).analytics ??= new EventFeed();
     insertTags(this.live, this.scripts);
   }
 
@@ -97,6 +102,7 @@ export class Analytics {
     dataLayer.push({ docs: null } satisfies DataLayerEntry);
     dataLayer.push({ event: name, docs } satisfies DataLayerEntry);
     for (const adapter of this.live) adapter.send?.(name, docs);
+    window.apimatic?.analytics?.publish(name, docs);
   }
 
   public reportPageView(): void {

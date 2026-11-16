@@ -1,5 +1,6 @@
 import { expect } from 'chai';
 import { Analytics, pageLocation, PortalEventName, PortalEvents } from '../../portal-template/src/lib/analytics';
+import type { PortalEvent } from '../../portal-template/src/lib/event-feed';
 import type { PortalAnalytics, PortalScript } from '../../portal-template/src/lib/portal-types';
 import { Adapter, adapters } from '../../portal-template/src/lib/vendor-tags';
 
@@ -126,6 +127,8 @@ interface FakeWindow {
   location: URL & { reload: () => void };
   dataLayer?: unknown[];
   gtag?: (...command: unknown[]) => void;
+  /** As a script in the page sees it. */
+  apimatic?: { analytics: { subscribe(callback: (event: PortalEvent) => void): () => void } };
 }
 
 /** A page in the browser: the `window` and `document` the module reads, and the scripts the loader appends. */
@@ -148,6 +151,7 @@ function browser(href: string, title = 'Quickstart | Acme API', referrer = '') {
   Object.assign(globalThis, { window, document });
   return {
     window,
+    head: document.head,
     scripts,
     dataLayer: () => window.dataLayer ?? [],
     reloads: () => reloads,
@@ -501,6 +505,97 @@ describe('Analytics', () => {
         expect(page.scripts.map((script) => script.src)).to.deep.equal([SETUP, WIDGET]);
       });
     }
+  });
+
+  describe('for a script that subscribes through window.apimatic.analytics', () => {
+    /** Events from before a subscription arrive on a microtask, once `subscribe()` has returned. */
+    const settled = () => Promise.resolve();
+    const subscribe = (page: ReturnType<typeof browser>) => {
+      const events: PortalEvent[] = [];
+      page.window.apimatic?.analytics.subscribe((event) => events.push(event));
+      return events;
+    };
+
+    it('is in place before the first tag or script is inserted, and on a portal with no vendor and no script too', () => {
+      const page = browser(quickstart);
+      const append = page.head.append;
+      const atEachInsert: string[] = [];
+      page.head.append = (script) => {
+        atEachInsert.push(typeof page.window.apimatic?.analytics.subscribe);
+        return append(script);
+      };
+
+      new Analytics(withGtm(), [{ src: 'https://cdn.example.com/widget.js' }]).start();
+
+      expect(atEachInsert).to.deep.equal(['function', 'function']);
+
+      const bare = browser(quickstart);
+      new Analytics(none, []).start();
+
+      expect(bare.window.apimatic?.analytics.subscribe).to.be.a('function');
+    });
+
+    it('hands over every event so far and then each new one, each with its own keys and the cleaned address', async () => {
+      const page = browser(`${quickstart}?utm_source=newsletter&tab=python#install`);
+      const analytics = new Analytics(withGa4, []);
+      analytics.start();
+      analytics.reportPageView();
+
+      const events = subscribe(page);
+      await settled();
+      analytics.report('docs_code_copy', { language: 'python' });
+
+      expect(events.map(({ name, params }) => [name, params])).to.deep.equal([
+        [
+          'docs_page_view',
+          { page_title: 'Quickstart | Acme API', page_location: `${quickstart}?utm_source=newsletter` }
+        ],
+        ['docs_code_copy', { language: 'python', page_location: `${quickstart}?utm_source=newsletter` }]
+      ]);
+    });
+
+    // GTM writes to the entries it is handed, so a subscriber gets a frozen copy and the data layer keeps its own.
+    it('freezes what a subscriber gets, and leaves the entry in the data layer as it was', async () => {
+      const page = browser(quickstart);
+      const analytics = new Analytics(none, []);
+      analytics.start();
+      analytics.report('docs_code_copy', { language: 'python' });
+
+      const events = subscribe(page);
+      await settled();
+
+      const pushed = page.dataLayer().filter(isPlainObject)[1];
+      expect(Object.isFrozen(events[0]) && Object.isFrozen(events[0].params)).to.be.true;
+      expect(pushed.docs).to.deep.equal(events[0].params);
+      expect(pushed.docs).to.not.equal(events[0].params);
+      expect(Object.isFrozen(pushed.docs)).to.be.false;
+    });
+
+    it('hands over nothing for a report made on the OAuth callback', async () => {
+      const page = browser('https://docs.test/oauth/callback?code=abc&state=123');
+      const analytics = new Analytics(none, []);
+      analytics.start();
+      const events = subscribe(page);
+
+      analytics.reportPageView();
+      analytics.report('docs_markdown_copy', {});
+      await settled();
+
+      expect(events).to.be.empty;
+    });
+
+    it('keeps a subscriber through a second instance, as a config save under portal serve makes', async () => {
+      const page = browser(quickstart);
+      new Analytics(withGtm(), []).start();
+      const events = subscribe(page);
+
+      const second = new Analytics(withGtm(), []);
+      second.start();
+      second.report('docs_markdown_copy', {});
+      await settled();
+
+      expect(events.map((event) => event.name)).to.deep.equal(['docs_markdown_copy']);
+    });
   });
 
   describe('after a playground sign-in', () => {
