@@ -3,7 +3,7 @@ import { languageId } from '../../portal-template/src/lib/languages';
 import { Language } from '../../src/types/sdk/generate';
 
 describe('languageId', () => {
-  // A download sends the language's key in `languages`, a copy this: one GA4 dimension holds both.
+  // A download and a copy both send this, so one GA4 dimension holds one set of values.
   it('is the key of every language the CLI generates an SDK in', () => {
     for (const language of Object.values(Language)) {
       expect(languageId(language)).to.equal(language);
@@ -22,8 +22,17 @@ describe('languageId', () => {
     ]);
   });
 
-  it('keeps a language the bundle does not know as it was written', () => {
+  it('reads a name or an alias written in capitals as the same language', () => {
+    expect(['TypeScript', 'TS', 'C#', 'JSON'].map(languageId)).to.deep.equal([
+      'typescript',
+      'typescript',
+      'csharp',
+      'json'
+    ]);
+  });
+
+  it('sends a language the bundle does not know in lowercase, so one language is one value', () => {
     expect(languageId('plaintext')).to.equal('plaintext');
-    expect(languageId('rust')).to.equal('rust');
+    expect(['rust', 'Rust', 'Kotlin'].map(languageId)).to.deep.equal(['rust', 'rust', 'kotlin']);
   });
 });

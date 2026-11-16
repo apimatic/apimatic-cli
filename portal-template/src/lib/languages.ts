@@ -62,7 +62,8 @@ export function bundledLanguage(name: string): BundledLanguage | null {
   return Object.hasOwn(languageAliases, name) ? languageAliases[name] : null;
 }
 
-/** A block's language as the portal reports it: the bundle's ID for a name or alias it knows, else the name as given. */
+/** A language as the portal reports it: the bundle's ID for a name or alias, else the name itself, read in lowercase. */
 export function languageId(name: string): string {
-  return bundledLanguage(name) ?? name;
+  const lowered = name.toLowerCase();
+  return bundledLanguage(lowered) ?? lowered;
 }

@@ -3,6 +3,7 @@ import { asMarkdown } from 'fumadocs-core/server';
 import { buttonVariants } from 'fumadocs-ui/components/ui/button';
 import { Code, Download, Package } from 'lucide-react';
 import { withBasePath } from '@/lib/base-path';
+import { languageId } from '@/lib/languages';
 import { analytics } from '@/lib/portal-analytics';
 
 export interface SdkActionsProps {
@@ -76,7 +77,7 @@ export function DownloadLink({ href, className, language, children }: Readonly<D
       href={withBasePath(href)}
       download
       className={className}
-      onClick={() => analytics.report('docs_sdk_download', { language })}
+      onClick={() => analytics.report('docs_sdk_download', { language: languageId(language) })}
     >
       {children}
     </a>
