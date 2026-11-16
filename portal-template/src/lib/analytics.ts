@@ -2,7 +2,7 @@ import { isOAuthCallbackPath } from './oauth-callback';
 import type { PortalAnalytics } from './portal-types';
 import { type Adapter, adapters, insertTags } from './vendor-tags';
 
-/** The query parameters an ad or mail platform reads from an address itself; a customer adds names, and removes none. */
+/** The query parameters an ad or mail platform reads from an address itself; a customer adds names and removes none. */
 const KEPT_PREFIXES = ['utm_', 'hsa_'];
 const KEPT_NAMES = new Set([
   '_gl',
@@ -30,6 +30,7 @@ export interface PortalEvents {
   docs_code_copy: { language: string };
   docs_search: { search_term: string; result: string; result_count: number };
   docs_not_found: { page_referrer: string };
+  /** `status` is always text: the HTTP status in digits, or `client_error` for a request that never reached the API. */
   docs_api_request: { endpoint: string; status: string; duration_ms: number };
 }
 export type PortalEventName = keyof PortalEvents;

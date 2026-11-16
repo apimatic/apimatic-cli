@@ -25,6 +25,14 @@ describe('apiRequest', () => {
     });
   });
 
+  // One GA4 dimension holds both forms, so a report filters on `status = 500` and on `status = client_error` alike.
+  it('reports the status as text either way: the HTTP status in digits, or client_error', () => {
+    for (const status of [200, 204, 404, 500]) {
+      expect(apiRequest(endpoint, response(status, 1), null, 0).status).to.equal(String(status));
+    }
+    expect(apiRequest(endpoint, clientError, null, 0).status).to.equal('client_error');
+  });
+
   it('times a request that never reached the API from when it was sent', () => {
     expect(apiRequest(endpoint, clientError, 1000, 1250)).to.deep.equal({
       endpoint,
