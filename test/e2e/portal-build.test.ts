@@ -301,6 +301,20 @@ const stylesheetOf = (output: DirectoryPath) => {
     expect(parts[0].slice(parts[0].lastIndexOf('<div'))).to.contain('data-private=""');
   });
 
+  it('prerenders the cURL sample, which follows what the reader types, inside an element session replays skip too', () => {
+    // The marked element's one child, past React's own comment, is the sample's block, with the command in it.
+    expect(read('api/apimatic-calculator/simple-calculator/Calculate/index.html')).to.match(
+      /data-private="">(?:<!--.*?-->)*<figure(?:(?!<\/figure>)[\s\S])*>curl<[\s\S]*?> -X<[\s\S]*?> GET</
+    );
+  });
+
+  it('renders the copy button of "Example Response" as the button[aria-live] its copies are reported by', () => {
+    // Fumadocs' own button, in the card's header: after the title, before the header closes.
+    expect(read('api/apimatic-calculator/simple-calculator/Calculate/index.html')).to.match(
+      />Example Response<\/span>(?:(?!<\/div>)[\s\S])*<button[^>]*\baria-live=/
+    );
+  });
+
   it('keeps the server-side specification loader out of the browser bundle', () => {
     const scripts = fs
       .readdirSync(path.join(portal.output().toString(), 'assets'))
