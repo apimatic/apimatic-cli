@@ -12,6 +12,19 @@ describe('PreparePortalProjectPrompts', () => {
     sinon.restore();
   });
 
+  it('says what to turn off in GA4, where, and why', () => {
+    const warn = sinon.stub(log, 'warn');
+
+    new PreparePortalProjectPrompts().googleAnalyticsCountsPageChanges();
+
+    expect(stripVTControlCharacters(String(warn.firstCall.args[0]))).to.equal(
+      "Google Analytics is set, so the portal sends its own page views. In GA4, turn off the stream's " +
+        '"Page changes based on browser history events" (Admin → Data streams → your stream → Enhanced ' +
+        'measurement → Page views → advanced settings), or every page change counts twice. ' +
+        'See the analytics page on https://docs.apimatic.io/v4/.'
+    );
+  });
+
   // A run delivers everything or nothing, so a gap is the server's to fix.
   it('names what the artifacts left out, and says to try again', () => {
     const error = sinon.stub(log, 'error');

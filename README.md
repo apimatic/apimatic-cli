@@ -298,7 +298,7 @@ Generate a static API Documentation Portal.
 
 ```
 USAGE
-  $ apimatic portal generate [--zip] [-i <value>] [-d <value>] [-f] [-k <value>]
+  $ apimatic portal generate [--zip] [--no-analytics] [-i <value>] [-d <value>] [-f] [-k <value>]
 
 FLAGS
   -d, --destination=<value>  [default: <input>/portal] path where the portal will be generated.
@@ -306,6 +306,7 @@ FLAGS
   -i, --input=<value>        [default: ./] path to the parent directory containing the 'src' directory, which includes
                              API specifications and configuration files.
   -k, --auth-key=<value>     override current authentication state with an authentication key.
+      --no-analytics         leave out the Google Tag Manager and Google Analytics tags set in 'portal.analytics'.
       --zip                  write the generated portal as a .zip archive.
 
 DESCRIPTION
@@ -338,7 +339,7 @@ Preview your API Documentation Portal with live reload.
 
 ```
 USAGE
-  $ apimatic portal serve [-p 23513] [-o] [-i <value>] [-k <value>]
+  $ apimatic portal serve [-p 23513] [-o] [--no-analytics] [-i <value>] [-k <value>]
 
 FLAGS
   -i, --input=<value>     [default: ./] path to the parent directory containing the 'src' directory, which includes API
@@ -346,6 +347,7 @@ FLAGS
   -k, --auth-key=<value>  override current authentication state with an authentication key.
   -o, --open              open the portal in the default browser.
   -p, --port=23513        [default: 23513] port to serve the portal on.
+      --no-analytics      leave out the Google Tag Manager and Google Analytics tags set in 'portal.analytics'.
 
 DESCRIPTION
   Preview your API Documentation Portal with live reload.

@@ -5,6 +5,7 @@ import { useCodeUsage } from 'fumadocs-openapi/operation';
 import { createCodeUsageGeneratorRegistry } from 'fumadocs-openapi/requests/generators';
 import { curl } from 'fumadocs-openapi/requests/generators/curl';
 import { CodeSample } from '@/lib/code-samples';
+import { REPLAY_MARKERS } from '@/lib/replay-markers';
 import { useExampleSelection } from './example-layout';
 
 interface UsageTab {
@@ -64,9 +65,13 @@ function SampleCode({ sample }: Readonly<{ sample: CodeSample }>) {
   return <CodeBlock lang={sample.lang} code={source} />;
 }
 
-// Follows the playground's edits to the selected example, on the selected server.
+// Follows the playground's edits, typed credentials included, so it carries the playground's replay markers.
 function CurlCode() {
   const { CodeBlock } = useComponents();
   const code = useCodeUsage(CURL_USAGE_ID);
-  return code === undefined ? null : <CodeBlock lang={curl.lang} code={code} />;
+  return code === undefined ? null : (
+    <div {...REPLAY_MARKERS}>
+      <CodeBlock lang={curl.lang} code={code} />
+    </div>
+  );
 }

@@ -1,7 +1,13 @@
 import { expect } from 'chai';
 import type { SecuritySchemeObject } from 'fumadocs-openapi';
 import { requestOAuthToken } from 'fumadocs-openapi/playground';
-import { oauthCallback, oauthCallbackPath, takeStartingPage } from '../../portal-template/src/lib/oauth-callback';
+import {
+  holdsOAuthAnswer,
+  isOAuthCallbackPath,
+  oauthCallback,
+  oauthCallbackPath,
+  takeStartingPage
+} from '../../portal-template/src/lib/oauth-callback';
 import { OAUTH_CALLBACK_ADDRESS } from '../../src/types/portal/content-tree';
 
 // The CLI refuses a page of the user's at the address the template serves the callback at.
@@ -16,6 +22,45 @@ describe('oauthCallbackPath', () => {
  * callback takes the note from the same place. The playground's flow is run here, in a stand-in
  * tab, so a move of the note, as 12.5.7 made from a cookie, fails this test and not a portal.
  */
+describe('isOAuthCallbackPath', () => {
+  it('is the callback at the root, and under a base path', () => {
+    expect(isOAuthCallbackPath('/oauth/callback')).to.be.true;
+    expect(isOAuthCallbackPath('/docs/oauth/callback', '/docs/')).to.be.true;
+  });
+
+  // A static host may answer `/oauth/callback` at `/oauth/callback/`.
+  it('is the callback with a trailing slash', () => {
+    expect(isOAuthCallbackPath('/oauth/callback/')).to.be.true;
+    expect(isOAuthCallbackPath('/docs/oauth/callback/', '/docs/')).to.be.true;
+  });
+
+  it('is not the callback at the root when the portal is under a base path, nor any other page', () => {
+    expect(isOAuthCallbackPath('/oauth/callback', '/docs/')).to.be.false;
+    expect(isOAuthCallbackPath('/guides/quickstart')).to.be.false;
+    expect(isOAuthCallbackPath('/oauth/callback/more')).to.be.false;
+  });
+});
+
+describe('holdsOAuthAnswer', () => {
+  const at = (href: string) => holdsOAuthAnswer(new URL(href));
+
+  it('holds on the callback, with or without an answer', () => {
+    expect(at('https://docs.test/oauth/callback')).to.be.true;
+    expect(at('https://docs.test/oauth/callback?code=abc&state=123')).to.be.true;
+  });
+
+  it('holds on a page a sign-in returned to, with a code, a token or an error', () => {
+    expect(at('https://docs.test/api/pets/listPets?code=abc&state=123')).to.be.true;
+    expect(at('https://docs.test/api/pets/listPets#access_token=xyz&token_type=Bearer&state=123')).to.be.true;
+    expect(at('https://docs.test/api/pets/listPets?error=access_denied&state=123')).to.be.true;
+  });
+
+  it('does not hold on any other address, a query or a # part of its own included', () => {
+    expect(at('https://docs.test/api/pets/listPets')).to.be.false;
+    expect(at('https://docs.test/guides/quickstart?utm_source=mail&code=SAVE10#install')).to.be.false;
+  });
+});
+
 describe('takeStartingPage', () => {
   const origin = 'https://docs.test';
   const pathname = '/api/pets/pets/listPets';

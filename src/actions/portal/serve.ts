@@ -9,7 +9,7 @@ import { ProjectContext } from '../../types/project-context.js';
 import { isSkippedByGlob } from '../../types/portal/content-tree.js';
 import { GeneratedPages } from '../../types/portal/generated-pages.js';
 import { PortalArtifacts } from '../../types/portal/portal-artifacts.js';
-import { PortalSettings, PortalSource, WatchedSource } from '../../types/portal/portal-source.js';
+import { PortalBuildOptions, PortalSettings, PortalSource, WatchedSource } from '../../types/portal/portal-source.js';
 import { PreviewConfig } from '../../types/portal/preview-config.js';
 import { PreviewContent } from '../../types/portal/preview-content.js';
 import { PreviewSpecs } from '../../types/portal/preview-specs.js';
@@ -45,9 +45,11 @@ export class PortalServeAction {
     project: ProjectContext,
     port: number,
     openInBrowser: boolean,
+    build: PortalBuildOptions,
     onServing?: () => void
   ): Promise<ActionResult> => {
-    return await new PreparePortalProjectAction(this.configDir, this.commandMetadata, this.authKey).execute(project, {
+    const prepare = new PreparePortalProjectAction(this.configDir, this.commandMetadata, this.authKey);
+    return await prepare.execute(project, build, {
       onPrepared: async (portalProject, source, artifacts) => {
         const servePort = await this.networkService.getServerPort([port, 3000, 3001, 3002]);
         if (servePort !== port) {
@@ -73,13 +75,20 @@ export class PortalServeAction {
         // adds and removes, and which the root nav.json makes tabs of or places in Home.
         let generatedPages = source.generatedPages;
         const contentWatch = this.watchContent(project, source, () => generatedPages, portalProject.projectDirectory);
-        const configWatch = this.watchConfig(project, source, artifacts, portalProject.projectDirectory, (settings) => {
-          const sectionsChanged = !settings.generatedPages.makesSameSectionsAs(generatedPages);
-          generatedPages = settings.generatedPages;
-          if (sectionsChanged) {
-            contentWatch?.recheck();
+        const configWatch = this.watchConfig(
+          project,
+          source,
+          artifacts,
+          portalProject.projectDirectory,
+          build,
+          (settings) => {
+            const sectionsChanged = !settings.generatedPages.makesSameSectionsAs(generatedPages);
+            generatedPages = settings.generatedPages;
+            if (sectionsChanged) {
+              contentWatch?.recheck();
+            }
           }
-        });
+        );
         const specWatch = this.watchSpecs(project, source);
         const closeWatches = async () => {
           await specWatch?.close();
@@ -122,6 +131,7 @@ export class PortalServeAction {
     source: PortalSource,
     artifacts: PortalArtifacts,
     portalProjectDirectory: DirectoryPath,
+    build: PortalBuildOptions,
     onApplied: (settings: PortalSettings) => void
   ): FileWatch | undefined {
     const sourceDirectory = project.sourceDirectory();
@@ -129,7 +139,7 @@ export class PortalServeAction {
     const preview = new PreviewConfig(source.config, source.staticDirectory !== null);
 
     const applyEdit = async () => {
-      const reloaded = await sourceContext.resolveSettings(source.suggestedSite);
+      const reloaded = await sourceContext.resolveSettings(source.suggestedSite, build);
       if (reloaded.isErr()) {
         preview.refuse();
         this.prompts.configRejected(reloaded.error, sourceDirectory);

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { buttonVariants } from 'fumadocs-ui/components/ui/button';
 import { Check, Copy, X } from 'lucide-react';
 import { copyMarkdown } from '@/lib/copy-markdown';
+import { analytics } from '@/lib/portal-analytics';
 
 type CopyState = 'idle' | 'copying' | 'copied' | 'failed';
 
@@ -24,7 +25,10 @@ export function MarkdownCopyButton({ markdownUrl }: Readonly<{ markdownUrl: stri
   const copy = () => {
     setState('copying');
     copyMarkdown(markdownUrl).then(
-      () => setState('copied'),
+      () => {
+        setState('copied');
+        analytics.report('docs_markdown_copy', {});
+      },
       (error: unknown) => {
         console.error(error);
         setState('failed');
