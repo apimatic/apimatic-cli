@@ -62,8 +62,38 @@ export function bundledLanguage(name: string): BundledLanguage | null {
   return Object.hasOwn(languageAliases, name) ? languageAliases[name] : null;
 }
 
-/** A language as the portal reports it: the bundle's ID for a name or alias, else the name itself, read in lowercase. */
+/** Short names of languages outside the bundle, by Shiki's ID: for reports only, so one language is one value. */
+export const reportedAliases: Readonly<Record<string, string>> = {
+  kt: 'kotlin',
+  kts: 'kotlin',
+  rs: 'rust',
+  'c++': 'cpp',
+  objc: 'objective-c',
+  'f#': 'fsharp',
+  fs: 'fsharp',
+  hs: 'haskell',
+  clj: 'clojure',
+  erl: 'erlang',
+  jl: 'julia',
+  ps: 'powershell',
+  ps1: 'powershell',
+  pwsh: 'powershell',
+  batch: 'bat',
+  cmd: 'bat',
+  dockerfile: 'docker',
+  makefile: 'make',
+  tf: 'terraform',
+  tfvars: 'terraform',
+  protobuf: 'proto',
+  properties: 'ini',
+  // Shiki's other names for a block in no language, which a page's own blocks report as `plaintext`.
+  text: 'plaintext',
+  txt: 'plaintext',
+  plain: 'plaintext'
+};
+
+/** A language as the portal reports it: its ID for any name it goes by, bundled or not, else the name in lowercase. */
 export function languageId(name: string): string {
   const lowered = name.toLowerCase();
-  return bundledLanguage(lowered) ?? lowered;
+  return bundledLanguage(lowered) ?? (Object.hasOwn(reportedAliases, lowered) ? reportedAliases[lowered] : lowered);
 }
