@@ -197,7 +197,8 @@ const stylesheetOf = (output: DirectoryPath) => {
     { codeSampleCatalogs: CODE_SAMPLES },
     {
       analytics: { googleTagManager: { containerId: 'GTM-E2ETEST' }, googleAnalytics: { measurementId: 'G-E2ETEST' } },
-      seo: { googleSiteVerification: 'e2e-verification' }
+      seo: { googleSiteVerification: 'e2e-verification' },
+      scripts: [{ src: 'https://cdn.e2e.test/widget.js', category: 'necessary' }, { src: 'static/js/widget.js' }]
     }
   );
   const { read, exists } = portal;
@@ -281,6 +282,23 @@ const stylesheetOf = (output: DirectoryPath) => {
     expect(scripts.some(({ text }) => text.includes('gtm.js?id=') && text.includes('/gtag/js?id='))).to.be.true;
     for (const page of pages()) {
       expect(read(page), page).to.not.contain('googletagmanager.com');
+    }
+  });
+
+  it('tells the browser each listed script in a script, ships the file one of them names, and names neither in a prerendered page', () => {
+    const scripts = scriptsOf(portal.output());
+    expect(
+      scripts.some(({ text }) => text.includes('https://cdn.e2e.test/widget.js') && text.includes('/js/widget.js'))
+    ).to.be.true;
+    // The feed a listed script subscribes to, by the one message of its own that survives the build.
+    expect(scripts.some(({ text }) => text.includes('window.apimatic.analytics.subscribe() takes a function.'))).to.be
+      .true;
+    expect(read('js/widget.js')).to.equal(
+      fs.readFileSync(path.join(portal.source().toString(), 'static/js/widget.js'), 'utf8')
+    );
+    for (const page of pages()) {
+      expect(read(page), page).to.not.contain('cdn.e2e.test');
+      expect(read(page), page).to.not.contain('/js/widget.js');
     }
   });
 
