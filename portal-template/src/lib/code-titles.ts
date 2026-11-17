@@ -1,5 +1,4 @@
-// A type alone, so a page naming a title does not load the highlighter the bundle builds.
-import type { BundledLanguage } from './shiki-bundle';
+import type { BundledLanguage } from './languages';
 
 /** What a code block's header calls its language; a shell is named for where the command runs. */
 export const CODE_BLOCK_TITLES: Readonly<Record<BundledLanguage, string>> = {

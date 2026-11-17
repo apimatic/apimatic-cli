@@ -52,16 +52,26 @@ export function lightDark<T>(
   if (!isJsonObject(value)) {
     return err([`'${path}' must be a string, or an object with 'light' and 'dark'.`]);
   }
-  const mode = (name: 'light' | 'dark'): Parsed<T> =>
-    value[name] === undefined ? err([`'${path}.${name}' is required.`]) : parse(value[name], `${path}.${name}`);
   return allOf(
     unknownKeys(value, ['light', 'dark'], path),
-    Result.combineWithAllErrors([mode('light'), mode('dark')])
+    Result.combineWithAllErrors([
+      required(value.light, `${path}.light`, parse),
+      required(value.dark, `${path}.dark`, parse)
+    ])
   ).map(([light, dark]) => ({ light, dark, single: false }));
 }
 
 export function optional<T>(value: unknown, parse: (present: unknown) => Parsed<T>): Parsed<T | null> {
   return value === undefined ? ok(null) : parse(value);
+}
+
+/** Present, then parsed: a field left out is named as missing rather than as the wrong type. */
+export function required<T>(
+  value: unknown,
+  path: string,
+  parse: (present: unknown, path: string) => Parsed<T>
+): Parsed<T> {
+  return value === undefined ? err([`'${path}' is required.`]) : parse(value, path);
 }
 
 export function optionalBoolean(value: unknown, path: string, fallback: boolean): Parsed<boolean> {

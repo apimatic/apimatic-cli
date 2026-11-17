@@ -41,6 +41,16 @@ export class PreparePortalProjectPrompts {
     reportAuthorizationFailure(failure);
   }
 
+  /** The portal reports its own page views, so a GA4 stream that also counts history changes counts each page twice. */
+  public googleAnalyticsCountsPageChanges() {
+    const message =
+      `Google Analytics is set, so the portal sends its own page views. In GA4, turn off the stream's ` +
+      `"Page changes based on browser history events" (Admin → Data streams → your stream → Enhanced ` +
+      `measurement → Page views → advanced settings), or every page change counts twice. ` +
+      `See the analytics page on ${f.link('https://docs.apimatic.io/v4/')}.`;
+    log.warn(message);
+  }
+
   public sourceNotZipped(problem: FileProblem, sourceDirectory: DirectoryPath) {
     log.error(notZippedForUpload(sourceDirectory, problem.reason));
   }

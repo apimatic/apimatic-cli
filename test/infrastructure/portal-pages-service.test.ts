@@ -90,7 +90,7 @@ describe('PortalPagesService', () => {
         'install="npm install @acme/calc" packageUrl="https://www.npmjs.com/package/@acme/calc" registry="npm" />'
     );
     expect(read('sdks/typescript.mdx')).to.contain(
-      '<SdkActions download="/__downloads/sdk/typescript.zip" source="https://github.com/acme/calc-ts" ' +
+      '<SdkActions language="typescript" download="/__downloads/sdk/typescript.zip" source="https://github.com/acme/calc-ts" ' +
         'packageUrl="https://www.npmjs.com/package/@acme/calc" registry="npm" />'
     );
   });

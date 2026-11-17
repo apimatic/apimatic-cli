@@ -1,4 +1,6 @@
+import fs from 'fs';
 import os from 'os';
+import path from 'path';
 import AdmZip from 'adm-zip';
 import sinon from 'sinon';
 import { expect } from 'chai';
@@ -12,7 +14,12 @@ import { FilePath } from '../../../src/types/file/filePath';
 import { CommandMetadata } from '../../../src/types/common/command-metadata';
 import { ProjectContext } from '../../../src/types/project-context';
 import { TempContext } from '../../../src/types/temp-context';
-import { completeArtifacts, PreparePortalProjectStubs, stubPreparePortalProject } from './prepare-project-stubs';
+import {
+  completeArtifacts,
+  fixtureWithAnalytics,
+  PreparePortalProjectStubs,
+  stubPreparePortalProject
+} from './prepare-project-stubs';
 
 const COMMAND_METADATA: CommandMetadata = { commandName: 'portal generate', shell: 'test' };
 
@@ -31,6 +38,7 @@ describe('PreparePortalProjectAction', () => {
 
     const result = await new PreparePortalProjectAction(new DirectoryPath(os.tmpdir()), COMMAND_METADATA).execute(
       ProjectContext.in(share),
+      { analytics: true },
       { onPrepared }
     );
 
@@ -45,9 +53,10 @@ describe('PreparePortalProjectAction', () => {
     let shared: PreparePortalProjectStubs;
     let onPrepared: sinon.SinonStub;
 
-    const execute = () =>
+    const execute = (analytics = true, project = FIXTURE) =>
       new PreparePortalProjectAction(new DirectoryPath(os.tmpdir()), COMMAND_METADATA).execute(
-        ProjectContext.in(FIXTURE),
+        ProjectContext.in(project),
+        { analytics },
         { onPrepared }
       );
 
@@ -69,6 +78,46 @@ describe('PreparePortalProjectAction', () => {
 
       expect(uploaded).to.include.members(['apimatic.json', 'content/index.md']);
       expect(uploaded.filter((entry) => entry.startsWith('static/'))).to.be.empty;
+    });
+
+    describe('with both vendors set', () => {
+      let root: string;
+      const project = () =>
+        fixtureWithAnalytics(FIXTURE, new DirectoryPath(root), {
+          googleTagManager: { containerId: 'GTM-ABC123' },
+          googleAnalytics: { measurementId: 'G-ABC123' }
+        });
+
+      beforeEach(() => {
+        root = fs.mkdtempSync(path.join(os.tmpdir(), 'portal-prepare-'));
+      });
+
+      afterEach(() => {
+        fs.rmSync(root, { recursive: true, force: true });
+      });
+
+      it('warns that Google Analytics counts page changes, before the artifacts are asked for', async () => {
+        await execute(true, project());
+
+        expect(shared.prompts.googleAnalyticsCountsPageChanges.calledOnce).to.be.true;
+        expect(shared.prompts.googleAnalyticsCountsPageChanges.calledBefore(shared.artifacts)).to.be.true;
+        expect(onPrepared.firstCall.args[1].config.usesGoogleAnalytics()).to.be.true;
+      });
+
+      it('prepares the project, and hands on the source, with neither vendor tag and no warning under --no-analytics', async () => {
+        await execute(false, project());
+
+        expect(shared.prepare.firstCall.args[1].config.identity().analytics.googleTagManager).to.be.null;
+        expect(onPrepared.firstCall.args[1].config.identity().analytics.googleTagManager).to.be.null;
+        expect(onPrepared.firstCall.args[1].config.usesGoogleAnalytics()).to.be.false;
+        expect(shared.prompts.googleAnalyticsCountsPageChanges.called).to.be.false;
+      });
+    });
+
+    it('does not warn about Google Analytics when it is not set', async () => {
+      await execute();
+
+      expect(shared.prompts.googleAnalyticsCountsPageChanges.called).to.be.false;
     });
 
     it('reports a source it could not zip, without asking for the artifacts', async () => {

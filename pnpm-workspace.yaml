@@ -17,5 +17,18 @@ overrides:
   '@oclif/core': "4.11.0"
   oclif: "4.17.34"
   browserslist: "4.24.4"
-  '@scalar/json-magic>undici': 7.29.1
+  # fumadocs-openapi 12.6 asks for chokidar 6 (Node 22.22 and up) and undici 8 (22.19 and up), above
+  # the CLI's 22.14 floor, which fails CI's `--engine-strict` install. The CLI loads neither: chokidar
+  # serves `generateFiles()` in watch mode, undici the server proxy. Held at chokidar 5, which 12.5.0
+  # shipped with, and at the patched undici 7.30.1 that @scalar/json-magic 0.16 pins as well. The
+  # overrides reach CI alone: `npm install -g` ignores them, prints an EBADENGINE warning for each of
+  # the two on Node 22.14, and installs all the same.
+  'fumadocs-openapi>chokidar': ^5.0.0
+  'fumadocs-openapi>undici': 7.30.1
+  # 12.6.5 asks for @scalar/json-magic 0.19 as well, whose floor is Node 22.19 for the undici 8 it pins.
+  # Held at 0.16, which 12.6.0 shipped with. Unlike the two above, the CLI loads this one: fumadocs-openapi
+  # reads a specification through its magic proxy, which 0.19 rewrote. So the tests here run 0.16's proxy
+  # and an `npm install -g` runs 0.19's, with two more EBADENGINE warnings on Node 22.14, for it and for
+  # that undici; the portal tests install the packed CLI as npm does.
+  'fumadocs-openapi>@scalar/json-magic': ^0.16.1
   '@types/node': $@types/node

@@ -1,9 +1,10 @@
-import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useContext, useMemo, useState, type MouseEvent, type ReactNode } from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@fumadocs/api-docs/components/select';
 import { useOpenAPI } from 'fumadocs-openapi';
 import { useExampleRequests, useOperation } from 'fumadocs-openapi/operation';
 import { CodeSample } from '@/lib/code-samples';
 import { Parameter, requestExamples, type RequestExample } from '@/lib/request-examples';
+import { reportCodeCopy } from './code-copy';
 
 interface ExampleSelection {
   operation: unknown;
@@ -19,6 +20,14 @@ interface LayoutSlots {
 }
 
 const SelectionContext = createContext<ExampleSelection | undefined>(undefined);
+
+/** Fumadocs keeps the example column no taller than the window: each box down to the code passes that height on. */
+export const SHRINKS_WITH_COLUMN = 'flex min-h-0 flex-col';
+
+// "Example Response" copies through a button of Fumadocs' own in the card's header, which takes no callback.
+const reportResponseCopy = (event: MouseEvent) => {
+  if (event.target instanceof Element && event.target.closest('button[aria-live]') !== null) reportCodeCopy('json');
+};
 
 export function useExampleSelection(): ExampleSelection {
   const selection = useContext(SelectionContext);
@@ -60,10 +69,12 @@ function ExampleLayout({ selector, usageTabs, responseTabs }: Readonly<LayoutSlo
   );
   return (
     <SelectionContext.Provider value={selection}>
-      <div className="prose-no-margin">
+      <div className={`${SHRINKS_WITH_COLUMN} prose-no-margin`}>
         {selector === null ? null : <ExampleSelector />}
         {usageTabs}
-        {responseTabs}
+        <div className="contents" onClickCapture={reportResponseCopy}>
+          {responseTabs}
+        </div>
       </div>
     </SelectionContext.Provider>
   );
@@ -84,7 +95,7 @@ function ExampleSelector() {
   }));
   return (
     <Select items={items} value={selected.id} onValueChange={(id) => id !== null && select(id)}>
-      <SelectTrigger className="not-prose mb-2">
+      <SelectTrigger className="not-prose">
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
