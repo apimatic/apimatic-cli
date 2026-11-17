@@ -105,6 +105,7 @@ describe('apimatic.schema.json', () => {
           analytics: {
             googleTagManager: { containerId: 'GTM-ABC123', environment: { auth: 'abc', preview: 'env-3' } },
             googleAnalytics: { measurementId: 'G-ABC123' },
+            googleConsentMode: { default: 'denied' },
             keepQueryParams: ['campaign_id']
           },
           seo: { googleSiteVerification: 'abc' },
@@ -148,6 +149,7 @@ describe('apimatic.schema.json', () => {
         }
       ],
       ['a kept query parameter name', { analytics: { keepQueryParams: ['campaign_id'] } }],
+      ['a consent mode that starts as denied', { analytics: { googleConsentMode: { default: 'denied' } } }],
       ['an empty analytics block', { analytics: {} }],
       ['a verification value', { seo: { googleSiteVerification: 'abc_123-XYZ' } }],
       // The vendors' formats are theirs to check, so each ID and value is any non-blank string.
@@ -307,6 +309,13 @@ describe('apimatic.schema.json', () => {
         { analytics: { googleAnalytics: { measurementId: 'G-ABC123', debug: true } } }
       ],
       ['a blank kept name', { analytics: { keepQueryParams: [' '] } }],
+      ['a consent mode that is a bare word', { analytics: { googleConsentMode: 'denied' } }],
+      ['a consent mode without its default', { analytics: { googleConsentMode: {} } }],
+      ['a consent mode that starts as granted', { analytics: { googleConsentMode: { default: 'granted' } } }],
+      [
+        'a consent mode with an unknown key',
+        { analytics: { googleConsentMode: { default: 'denied', region: ['DE'] } } }
+      ],
       ['an event feed set in the file', { analytics: { eventFeed: 'off' } }],
       ['an unknown seo key', { seo: { foo: 1 } }],
       ['a blank verification value', { seo: { googleSiteVerification: ' ' } }],
