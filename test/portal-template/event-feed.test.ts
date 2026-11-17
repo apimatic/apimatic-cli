@@ -134,6 +134,37 @@ describe('EventFeed', () => {
     expect(clock.countTimers()).to.equal(0);
   });
 
+  it('hands a subscriber added from inside a callback every event once, in order, and none before its subscribe() returned', async () => {
+    const feed = new EventFeed();
+    const inner: string[] = [];
+    let innerWhenSubscribeReturned: number | undefined;
+    feed.subscribe(() => {
+      if (innerWhenSubscribeReturned !== undefined) return;
+      feed.subscribe((event) => inner.push(event.name));
+      innerWhenSubscribeReturned = inner.length;
+    });
+
+    feed.publish('docs_page_view', {});
+    feed.publish('docs_search', {});
+    await settled();
+
+    expect(innerWhenSubscribeReturned).to.equal(0);
+    expect(inner).to.deep.equal(['docs_page_view', 'docs_search']);
+  });
+
+  it('skips a subscriber that an earlier one removed while the same event was being handed over', async () => {
+    const feed = new EventFeed();
+    const second: string[] = [];
+    let stopSecond: () => void = () => undefined;
+    feed.subscribe(() => stopSecond());
+    stopSecond = feed.subscribe((event) => second.push(event.name));
+
+    feed.publish('docs_page_view', {});
+    await settled();
+
+    expect(second).to.be.empty;
+  });
+
   it('refuses at once what is not a function, by the name a script calls it by', () => {
     const feed = new EventFeed();
 

@@ -38,7 +38,8 @@ export class EventFeed {
   public publish(name: string, params: Record<string, string | number>): void {
     // A copy, frozen, so no subscriber changes what the next one gets, or what the data layer was handed.
     this.events.push(Object.freeze({ name, params: Object.freeze({ ...params }), time: Date.now(), version: 1 }));
-    for (const subscription of [...this.subscriptions]) EventFeed.deliver(this, subscription);
+    // The set itself: one a callback adds is reached in this same pass, and one it removes is skipped.
+    for (const subscription of this.subscriptions) EventFeed.deliver(this, subscription);
   }
 
   private static deliver(feed: EventFeed, subscription: Subscription): void {
