@@ -96,8 +96,15 @@ export class Analytics {
     window[PAGE] = { started, feed, inserted };
     const dataLayer = (window.dataLayer ??= []);
     for (const adapter of this.live) adapter.setup(dataLayer);
-    // Ours whatever a page put there first, and `subscribe` alone, bound so a script may call it on its own.
-    window.apimatic = { ...window.apimatic, analytics: Object.freeze({ subscribe: feed.subscribe.bind(feed) }) };
+    try {
+      // Ours whatever a page put there first, and `subscribe` alone, bound so a script may call it on its own.
+      window.apimatic = { ...window.apimatic, analytics: Object.freeze({ subscribe: feed.subscribe.bind(feed) }) };
+    } catch (error) {
+      // A host may have locked the name. Thrown later, so it shows in the console and the bundle goes on loading.
+      setTimeout(() => {
+        throw error;
+      });
+    }
     insertTags(this.live, this.scripts, inserted);
   }
 

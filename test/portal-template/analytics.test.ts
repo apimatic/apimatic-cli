@@ -1,4 +1,5 @@
 import { expect } from 'chai';
+import sinon from 'sinon';
 import { Analytics, pageLocation, PortalEventName, PortalEvents } from '../../portal-template/src/lib/analytics';
 import type { PortalEvent } from '../../portal-template/src/lib/event-feed';
 import type { PortalAnalytics, PortalScript } from '../../portal-template/src/lib/portal-types';
@@ -602,6 +603,30 @@ describe('Analytics', () => {
       expect(page.window.apimatic?.consent).to.equal('the page set this');
       expect(events.map((event) => event.name)).to.deep.equal(['docs_page_view']);
       expect(pageViews(page.dataLayer())).to.have.length(1);
+    });
+
+    // The start runs while the bundle loads, so an error thrown there leaves every page without its scripts.
+    it('starts and reports where a page made window.apimatic read-only, and shows the error later', () => {
+      const clock = sinon.useFakeTimers({ toFake: ['setTimeout'] });
+      try {
+        const page = browser(quickstart);
+        const locked = { consent: 'the host locked this' };
+        Object.defineProperty(page.window, 'apimatic', { value: locked, writable: false });
+        const analytics = new Analytics(withGtm(), [{ src: 'https://cdn.example.com/widget.js' }]);
+
+        analytics.start();
+        analytics.reportPageView();
+
+        expect(page.window.apimatic).to.equal(locked);
+        expect(page.scripts.map((script) => script.src)).to.deep.equal([
+          GTM_SCRIPT,
+          'https://cdn.example.com/widget.js'
+        ]);
+        expect(pageViews(page.dataLayer())).to.have.length(1);
+        expect(() => clock.next()).to.throw(TypeError, 'apimatic');
+      } finally {
+        clock.restore();
+      }
     });
 
     it('hands over every event so far and then each new one, each with its own keys and the cleaned address', async () => {
