@@ -117,7 +117,8 @@ export class Analytics {
     dataLayer.push({ docs: null } satisfies DataLayerEntry);
     dataLayer.push({ event: name, docs } satisfies DataLayerEntry);
     for (const adapter of this.live) adapter.send?.(name, docs);
-    window[PAGE]?.feed.publish(name, docs);
+    // A build made with `--no-analytics` keeps `subscribe()` for its scripts and hands them nothing.
+    if (this.settings.eventFeed === 'on') window[PAGE]?.feed.publish(name, docs);
   }
 
   public reportPageView(): void {

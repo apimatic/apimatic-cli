@@ -404,7 +404,8 @@ describe('PortalConfig', () => {
       expect(config({}).identity().analytics).to.deep.equal({
         googleTagManager: null,
         googleAnalytics: null,
-        keepQueryParams: []
+        keepQueryParams: [],
+        eventFeed: 'on'
       });
     });
 
@@ -418,8 +419,17 @@ describe('PortalConfig', () => {
       expect(config({ analytics }).identity().analytics).to.deep.equal({
         googleTagManager: { containerId: 'GTM-ABC123', environment: { auth: 'a1_b-2', preview: 'env-3' } },
         googleAnalytics: { measurementId: 'G-ABC123' },
-        keepQueryParams: ['campaign_id', 'code']
+        keepQueryParams: ['campaign_id', 'code'],
+        eventFeed: 'on'
       });
+    });
+
+    // What a build made with --no-analytics turns off is the flag's to say, never a line in the file.
+    it('hands events to scripts in every config as written, and takes no setting that says otherwise', () => {
+      expect(config({}).identity().analytics.eventFeed).to.equal('on');
+      expect(errorsOf({ analytics: { eventFeed: 'off' } })).to.deep.equal([
+        "'portal.analytics.eventFeed' is not a 'portal' setting."
+      ]);
     });
 
     it('refuses a block, a vendor or an environment that is not an object, as a bare ID is the likely slip', () => {
@@ -515,7 +525,7 @@ describe('PortalConfig', () => {
       ]);
     });
 
-    it('tells the browser to load neither vendor without them, and still which names to keep', () => {
+    it('tells a build without analytics to load no vendor and hand over no event', () => {
       const analytics = {
         googleTagManager: { containerId: 'GTM-ABC123' },
         googleAnalytics: { measurementId: 'G-ABC123' },
@@ -525,7 +535,12 @@ describe('PortalConfig', () => {
 
       expect(portal.withoutAnalytics().identity()).to.deep.equal({
         ...portal.identity(),
-        analytics: { googleTagManager: null, googleAnalytics: null, keepQueryParams: ['campaign_id'] }
+        analytics: {
+          googleTagManager: null,
+          googleAnalytics: null,
+          keepQueryParams: ['campaign_id'],
+          eventFeed: 'off'
+        }
       });
     });
 
@@ -824,7 +839,12 @@ describe('PortalConfig', () => {
           { label: 'Changelog', url: '/changelog', external: false }
         ],
         pageActions: false,
-        analytics: { googleTagManager: null, googleAnalytics: null, keepQueryParams: [] },
+        analytics: {
+          googleTagManager: null,
+          googleAnalytics: null,
+          keepQueryParams: [],
+          eventFeed: 'on'
+        },
         seo: { googleSiteVerification: null },
         scripts: []
       });
@@ -840,7 +860,12 @@ describe('PortalConfig', () => {
         colorMode: 'both',
         links: [],
         pageActions: true,
-        analytics: { googleTagManager: null, googleAnalytics: null, keepQueryParams: [] },
+        analytics: {
+          googleTagManager: null,
+          googleAnalytics: null,
+          keepQueryParams: [],
+          eventFeed: 'on'
+        },
         seo: { googleSiteVerification: null },
         scripts: []
       });

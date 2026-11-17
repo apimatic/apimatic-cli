@@ -17,7 +17,7 @@ export interface Adapter {
   send?(name: string, params: Record<string, unknown>): void;
 }
 
-type Vendor = Exclude<keyof PortalAnalytics, 'keepQueryParams'>;
+type Vendor = Exclude<keyof PortalAnalytics, 'keepQueryParams' | 'eventFeed'>;
 const GOOGLE = 'https://www.googletagmanager.com';
 
 /** Keyed by every vendor `PortalAnalytics` names, so a vendor without an adapter does not compile. */

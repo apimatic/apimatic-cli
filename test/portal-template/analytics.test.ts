@@ -175,7 +175,12 @@ function mergedLikeGtm(entries: unknown[]): Record<string, unknown> {
   return entries.filter(isPlainObject).reduce(merge, {});
 }
 
-const none: PortalAnalytics = { googleTagManager: null, googleAnalytics: null, keepQueryParams: [] };
+const none: PortalAnalytics = {
+  googleTagManager: null,
+  googleAnalytics: null,
+  keepQueryParams: [],
+  eventFeed: 'on'
+};
 const withGtm = (environment: { auth: string; preview: string } | null = null): PortalAnalytics => ({
   ...none,
   googleTagManager: { containerId: 'GTM-ABC123', environment }
@@ -676,6 +681,28 @@ describe('Analytics', () => {
       await settled();
 
       expect(events).to.be.empty;
+    });
+
+    // A staging build keeps its `necessary` and `functional` scripts, which call subscribe() as on any build.
+    it('hands a subscriber nothing in a --no-analytics build, with subscribe in place and the data layer as ever', async () => {
+      const page = browser(quickstart);
+      const analytics = new Analytics({ ...none, eventFeed: 'off' }, []);
+      analytics.start();
+      const events: PortalEvent[] = [];
+
+      const stop = page.window.apimatic?.analytics.subscribe((event) => events.push(event));
+      analytics.reportPageView();
+      analytics.report('docs_search', { search_term: 'refund', result: '', result_count: 0 });
+      await settled();
+
+      expect(events).to.be.empty;
+      expect(stop).to.be.a('function');
+      expect(
+        page
+          .dataLayer()
+          .filter(isPlainObject)
+          .map((entry) => entry.event)
+      ).to.deep.equal([undefined, 'docs_page_view', undefined, 'docs_search']);
     });
 
     it('keeps a subscriber through a second instance, as a config save under portal serve makes', async () => {

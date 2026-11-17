@@ -307,6 +307,7 @@ describe('apimatic.schema.json', () => {
         { analytics: { googleAnalytics: { measurementId: 'G-ABC123', debug: true } } }
       ],
       ['a blank kept name', { analytics: { keepQueryParams: [' '] } }],
+      ['an event feed set in the file', { analytics: { eventFeed: 'off' } }],
       ['an unknown seo key', { seo: { foo: 1 } }],
       ['a blank verification value', { seo: { googleSiteVerification: ' ' } }],
       ['scripts that are not a list', { scripts: { src: 'https://cdn.example.com/widget.js' } }],

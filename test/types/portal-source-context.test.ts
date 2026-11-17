@@ -394,10 +394,13 @@ describe('PortalSourceContext', () => {
       ]);
     });
 
-    it('leaves out the vendor tags under --no-analytics, as resolve does, and keeps the query names to keep', async () => {
+    it('leaves out the vendor tags and the event feed under --no-analytics, and keeps the query names', async () => {
       writeConfig({
         site: { name: 'Calc' },
-        analytics: { googleTagManager: { containerId: 'GTM-ABC123' }, keepQueryParams: ['campaign_id'] }
+        analytics: {
+          googleTagManager: { containerId: 'GTM-ABC123' },
+          keepQueryParams: ['campaign_id']
+        }
       });
       const off = { analytics: false };
 
@@ -409,12 +412,15 @@ describe('PortalSourceContext', () => {
         expect(config.identity().analytics).to.deep.equal({
           googleTagManager: null,
           googleAnalytics: null,
-          keepQueryParams: ['campaign_id']
+          keepQueryParams: ['campaign_id'],
+          eventFeed: 'off'
         });
       }
-      expect(kept.config.identity().analytics.googleTagManager).to.deep.equal({
-        containerId: 'GTM-ABC123',
-        environment: null
+      expect(kept.config.identity().analytics).to.deep.equal({
+        googleTagManager: { containerId: 'GTM-ABC123', environment: null },
+        googleAnalytics: null,
+        keepQueryParams: ['campaign_id'],
+        eventFeed: 'on'
       });
     });
 

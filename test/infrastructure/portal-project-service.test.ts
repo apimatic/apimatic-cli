@@ -540,17 +540,21 @@ describe('PortalProjectService', () => {
     const themeFile = () => path.join(project.toString(), 'src/styles/theme.css');
     const identityFile = () => path.join(project.toString(), 'portal.identity.json');
 
-    it('writes the vendors the config holds, and none from a config without them', async () => {
+    it('writes the vendors and the event feed a config holds, and none from a config without analytics', async () => {
       const config = configFor({
         site: { name: 'My API' },
-        analytics: { googleTagManager: { containerId: 'GTM-ABC123' }, googleAnalytics: { measurementId: 'G-ABC123' } }
+        analytics: {
+          googleTagManager: { containerId: 'GTM-ABC123' },
+          googleAnalytics: { measurementId: 'G-ABC123' }
+        }
       });
       (await service.prepare(project, sourceFor({ config: config.withoutAnalytics() }), NO_ARTIFACTS))._unsafeUnwrap();
 
       expect(readIdentity().analytics).to.deep.equal({
         googleTagManager: null,
         googleAnalytics: null,
-        keepQueryParams: []
+        keepQueryParams: [],
+        eventFeed: 'off'
       });
 
       expect((await service.applyConfig(project, settingsFor(config)))._unsafeUnwrap()).to.be.true;
@@ -558,7 +562,8 @@ describe('PortalProjectService', () => {
       expect(readIdentity().analytics).to.deep.equal({
         googleTagManager: { containerId: 'GTM-ABC123', environment: null },
         googleAnalytics: { measurementId: 'G-ABC123' },
-        keepQueryParams: []
+        keepQueryParams: [],
+        eventFeed: 'on'
       });
     });
 

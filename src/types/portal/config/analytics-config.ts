@@ -22,6 +22,8 @@ export interface PortalAnalytics {
   googleTagManager: GoogleTagManagerSetting | null;
   googleAnalytics: GoogleAnalyticsSetting | null;
   keepQueryParams: string[];
+  /** Off in a build made with `--no-analytics`, whose scripts are handed no event. */
+  eventFeed: 'on' | 'off';
 }
 
 const KNOWN = ['googleTagManager', 'googleAnalytics', 'keepQueryParams'];
@@ -30,10 +32,11 @@ export class AnalyticsConfig {
   private constructor(
     private readonly googleTagManager: GoogleTagManagerSetting | null,
     private readonly googleAnalytics: GoogleAnalyticsSetting | null,
-    private readonly keepQueryParams: string[]
+    private readonly keepQueryParams: string[],
+    private readonly eventFeed: 'on' | 'off'
   ) {}
 
-  public static readonly defaults = new AnalyticsConfig(null, null, []);
+  public static readonly defaults = new AnalyticsConfig(null, null, [], 'on');
 
   public static parse(value: unknown, path: string): Parsed<AnalyticsConfig> {
     return namespace(value, path).andThen((data) =>
@@ -44,7 +47,7 @@ export class AnalyticsConfig {
           optional(data.googleAnalytics, (vendor) => googleAnalytics(vendor, `${path}.googleAnalytics`)),
           keptQueryParams(data.keepQueryParams, `${path}.keepQueryParams`)
         ])
-      ).map(([gtm, ga, keep]) => new AnalyticsConfig(gtm, ga, keep))
+      ).map(([gtm, ga, keep]) => new AnalyticsConfig(gtm, ga, keep, 'on'))
     );
   }
 
@@ -57,13 +60,14 @@ export class AnalyticsConfig {
     return {
       googleTagManager: this.googleTagManager,
       googleAnalytics: this.googleAnalytics,
-      keepQueryParams: this.keepQueryParams
+      keepQueryParams: this.keepQueryParams,
+      eventFeed: this.eventFeed
     };
   }
 
-  /** For a staging build: neither vendor tag loads, while a reported address still keeps the same names. */
-  public withoutVendors(): AnalyticsConfig {
-    return new AnalyticsConfig(null, null, this.keepQueryParams);
+  /** For a staging build: no tag and no event for a script; an address keeps the same names. */
+  public withoutAnalytics(): AnalyticsConfig {
+    return new AnalyticsConfig(null, null, this.keepQueryParams, 'off');
   }
 }
 

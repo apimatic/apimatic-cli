@@ -306,8 +306,9 @@ FLAGS
   -i, --input=<value>        [default: ./] path to the parent directory containing the 'src' directory, which includes
                              API specifications and configuration files.
   -k, --auth-key=<value>     override current authentication state with an authentication key.
-      --no-analytics         leave out the tags set in 'portal.analytics', and each script in 'portal.scripts' whose
-                             category is 'analytics', 'marketing' or not set.
+      --no-analytics         leave out the tags set in 'portal.analytics' and each script in 'portal.scripts' whose
+                             category is 'analytics', 'marketing' or not set, and hand no event to the scripts that
+                             stay.
       --zip                  write the generated portal as a .zip archive.
 
 DESCRIPTION
@@ -348,8 +349,8 @@ FLAGS
   -k, --auth-key=<value>  override current authentication state with an authentication key.
   -o, --open              open the portal in the default browser.
   -p, --port=23513        [default: 23513] port to serve the portal on.
-      --no-analytics      leave out the tags set in 'portal.analytics', and each script in 'portal.scripts' whose
-                          category is 'analytics', 'marketing' or not set.
+      --no-analytics      leave out the tags set in 'portal.analytics' and each script in 'portal.scripts' whose
+                          category is 'analytics', 'marketing' or not set, and hand no event to the scripts that stay.
 
 DESCRIPTION
   Preview your API Documentation Portal with live reload.

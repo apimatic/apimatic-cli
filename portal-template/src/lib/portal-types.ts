@@ -41,6 +41,8 @@ export interface PortalAnalytics {
   googleTagManager: GoogleTagManagerSetting | null;
   googleAnalytics: GoogleAnalyticsSetting | null;
   keepQueryParams: string[];
+  /** Off in a build made with `--no-analytics`, whose scripts are handed no event. */
+  eventFeed: 'on' | 'off';
 }
 
 export interface PortalSeo {
