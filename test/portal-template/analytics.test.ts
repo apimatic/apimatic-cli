@@ -473,19 +473,27 @@ describe('Analytics', () => {
       expect(page.reloads()).to.equal(0);
     });
 
-    // A listed script reads the address as a vendor tag does, so it waits out a sign-in's answer with them.
-    it('holds them back with the tags while the address holds an OAuth answer, and inserts all once it is gone', () => {
-      const page = browser('https://docs.test/api/pets/listPets?code=abc&state=123', 'List pets');
+    // A listed script reads the address as a vendor tag does, so it stays off the OAuth callback with them.
+    it('holds them back with the tags on the OAuth callback, and inserts all on the next page', () => {
+      const page = browser('https://docs.test/oauth/callback?code=abc&state=123');
       const analytics = new Analytics(withGtm(), listed);
 
       analytics.start();
       analytics.reportPageView();
-      analytics.loadTags();
 
       expect(page.scripts).to.be.empty;
 
-      page.go('https://docs.test/api/pets/listPets');
-      analytics.loadTags();
+      page.go(quickstart);
+      analytics.reportPageView();
+
+      expect(page.scripts.map((script) => script.src)).to.deep.equal([GTM_SCRIPT, SETUP, WIDGET]);
+    });
+
+    // A sign-in's answer reaches the playground through the tab's session, so the page it returns to holds none back.
+    it('inserts them at once on a page whose own link carries a state parameter', () => {
+      const page = browser(`${quickstart}?state=CA`);
+
+      new Analytics(withGtm(), listed).start();
 
       expect(page.scripts.map((script) => script.src)).to.deep.equal([GTM_SCRIPT, SETUP, WIDGET]);
     });
@@ -641,8 +649,8 @@ describe('Analytics', () => {
     });
   });
 
-  describe('after a playground sign-in', () => {
-    it('reports with the OAuth answer stripped from page_location', () => {
+  describe('at an address that holds an OAuth answer', () => {
+    it('reports with the answer stripped from page_location', () => {
       const page = browser('https://docs.test/api/pets/listPets#access_token=xyz&state=123', 'List pets');
       const analytics = new Analytics(withBoth, []);
 
@@ -658,26 +666,17 @@ describe('Analytics', () => {
     });
   });
 
-  describe('on the page a playground sign-in returned to', () => {
-    const answered = 'https://docs.test/api/pets/listPets?code=abc&state=123';
-
-    it('holds the tags back while the answer is in the address, and loads them once the playground took it out', () => {
-      const page = browser(answered, 'List pets');
+  // A sign-in's answer reaches the playground through the tab's session, so no page but the callback waits for one.
+  describe('on a page whose own link carries a state parameter', () => {
+    it('loads the tags at once, and reports the page without the parameter', () => {
+      const page = browser(`${quickstart}?state=CA`);
       const analytics = new Analytics(withBoth, []);
 
       analytics.start();
       analytics.reportPageView();
-      analytics.loadTags();
-
-      expect(page.scripts).to.be.empty;
-      expect(pageViews(page.dataLayer())).to.have.length(1);
-
-      page.go('https://docs.test/api/pets/listPets');
-      analytics.loadTags();
-      analytics.reportPageView();
 
       expect(page.scripts.map((script) => script.src)).to.deep.equal([GTM_SCRIPT, GA4_SCRIPT]);
-      expect(pageViews(page.dataLayer())).to.have.length(1);
+      expect(pageViews(page.dataLayer())).to.deep.equal([quickstartView]);
     });
   });
 

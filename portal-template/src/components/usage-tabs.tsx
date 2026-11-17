@@ -68,7 +68,7 @@ function SampleCode({ sample }: Readonly<{ sample: CodeSample }>) {
   return <CodeBlock lang={sample.lang} code={source} codeblock={SHRINKING_BLOCK} />;
 }
 
-// Follows the playground's edits, typed credentials included, so it carries the playground's replay markers.
+// Follows the playground's edits, so it carries its replay markers; Fumadocs writes a credential as `********`.
 function CurlCode() {
   const { CodeBlock } = useComponents();
   const code = useCodeUsage(CURL_USAGE_ID);

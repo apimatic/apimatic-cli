@@ -91,11 +91,6 @@ export class Analytics {
     insertTags(this.live, this.scripts);
   }
 
-  /** The tags held back while the address held an OAuth answer, once something has taken it out. */
-  public loadTags(): void {
-    insertTags(this.live, this.scripts);
-  }
-
   /** `href` is the page the event belongs to, when the caller saw the address move on first. */
   public report<E extends PortalEventName>(name: E, params: PortalEvents[E], href = window.location.href): void {
     if (isOAuthCallbackPath(new URL(href).pathname)) return;
@@ -110,7 +105,8 @@ export class Analytics {
 
   public reportPageView(): void {
     if (isOAuthCallbackPath(window.location.pathname)) return;
-    this.loadTags();
+    // The tags and scripts a start on the OAuth callback left out, now that the reader has moved on from it.
+    insertTags(this.live, this.scripts);
     const page = pageLocation(window.location.href, this.settings.keepQueryParams);
     if (page === this.lastPageView) return;
     this.previousPageView = this.lastPageView;
