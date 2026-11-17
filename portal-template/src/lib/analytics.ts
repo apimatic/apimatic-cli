@@ -1,7 +1,7 @@
 import { EventFeed } from './event-feed';
 import { isOAuthCallbackPath } from './oauth-callback';
 import type { PortalAnalytics, PortalScript } from './portal-types';
-import { type Adapter, adapters, insertTags } from './vendor-tags';
+import { type Adapter, adapters, insertTags, queueConsentDefaults } from './vendor-tags';
 
 /** The query parameters an ad or mail platform reads from an address itself; a customer adds names and removes none. */
 const KEPT_PREFIXES = ['utm_', 'hsa_'];
@@ -95,6 +95,7 @@ export class Analytics {
     const inserted = new Set<string>();
     window[PAGE] = { started, feed, inserted };
     const dataLayer = (window.dataLayer ??= []);
+    if (this.settings.googleConsentMode !== null) queueConsentDefaults(dataLayer);
     for (const adapter of this.live) adapter.setup(dataLayer);
     try {
       // Ours whatever a page put there first, and `subscribe` alone, bound so a script may call it on its own.

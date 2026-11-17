@@ -178,6 +178,7 @@ function mergedLikeGtm(entries: unknown[]): Record<string, unknown> {
 const none: PortalAnalytics = {
   googleTagManager: null,
   googleAnalytics: null,
+  googleConsentMode: null,
   keepQueryParams: [],
   eventFeed: 'on'
 };
@@ -419,6 +420,101 @@ describe('Analytics', () => {
       expect(page.reloads()).to.equal(1);
       expect(page.dataLayer()).to.have.length(1);
       expect(page.scripts.map((script) => script.src)).to.deep.equal([GTM_SCRIPT]);
+    });
+  });
+
+  describe('with Google Consent Mode set', () => {
+    const denied: PortalAnalytics['googleConsentMode'] = { default: 'denied' };
+    const defaults = [
+      'consent',
+      'default',
+      {
+        ad_storage: 'denied',
+        ad_user_data: 'denied',
+        ad_personalization: 'denied',
+        analytics_storage: 'denied',
+        wait_for_update: 500
+      }
+    ];
+    const consentCommands = (entries: unknown[]) => gtagCalls(entries).filter((command) => command[0] === 'consent');
+
+    // Google takes a reader's answer from what is queued before its first event, so this has to lead the data layer.
+    it('queues the defaults first, ahead of both setups, as an Arguments object with four types denied and a wait', () => {
+      const page = browser(quickstart);
+
+      new Analytics({ ...withBoth, googleConsentMode: denied }, []).start();
+
+      const entries = page.dataLayer();
+      expect(isArguments(entries[0])).to.be.true;
+      expect(gtagCalls([entries[0]])[0]).to.deep.equal(defaults);
+      expect(entries[1]).to.have.property('event', 'gtm.js');
+      expect(gtagCalls(entries.slice(2)).map((command) => command[0])).to.deep.equal(['js', 'config']);
+      expect(page.scripts.map((script) => script.src)).to.deep.equal([GTM_SCRIPT, GA4_SCRIPT]);
+    });
+
+    it('queues them once per page, for a second start and for a second instance alike', () => {
+      const page = browser(quickstart);
+      const settings = { ...withGa4, googleConsentMode: denied };
+      const analytics = new Analytics(settings, []);
+
+      analytics.start();
+      analytics.start();
+      new Analytics(settings, []).start();
+
+      expect(consentCommands(page.dataLayer())).to.have.length(1);
+    });
+
+    // A container reads the same Arguments entries, and a consent tool calls the page's gtag to hand over an answer.
+    it('queues them on a portal with Google Tag Manager alone, through a gtag it gives the page', () => {
+      const page = browser(quickstart);
+
+      new Analytics({ ...withGtm(), googleConsentMode: denied }, []).start();
+
+      const entries = page.dataLayer();
+      expect(gtagCalls([entries[0]])[0]).to.deep.equal(defaults);
+      expect(entries[1]).to.have.property('event', 'gtm.js');
+      expect(page.window.gtag).to.be.a('function');
+    });
+
+    it('queues them through a gtag the page already defines', () => {
+      const page = browser(quickstart);
+      const calls: unknown[][] = [];
+      page.window.gtag = (...command: unknown[]) => {
+        calls.push(command);
+      };
+
+      new Analytics({ ...withGa4, googleConsentMode: denied }, []).start();
+
+      expect(calls[0]).to.deep.equal(defaults);
+      expect(calls.map((command) => command[0])).to.deep.equal(['consent', 'js', 'config']);
+    });
+
+    // For a Google snippet the customer lists in portal.scripts themselves.
+    it('queues them with neither vendor set', () => {
+      const page = browser(quickstart);
+
+      new Analytics({ ...none, googleConsentMode: denied }, []).start();
+
+      expect(gtagCalls(page.dataLayer())).to.deep.equal([defaults]);
+    });
+
+    it('queues them at a start on the OAuth callback, where no tag loads', () => {
+      const page = browser('https://docs.test/oauth/callback?code=abc&state=123');
+
+      new Analytics({ ...withGa4, googleConsentMode: denied }, []).start();
+
+      expect(gtagCalls(page.dataLayer()).map((command) => command[0])).to.deep.equal(['consent', 'js', 'config']);
+      expect(page.scripts).to.be.empty;
+    });
+
+    it('reloads the page for a start with the setting added, as a config save under portal serve makes', () => {
+      const page = browser(quickstart);
+      new Analytics(withGa4, []).start();
+
+      new Analytics({ ...withGa4, googleConsentMode: denied }, []).start();
+
+      expect(page.reloads()).to.equal(1);
+      expect(consentCommands(page.dataLayer())).to.be.empty;
     });
   });
 

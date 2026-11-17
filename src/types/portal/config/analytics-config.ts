@@ -17,26 +17,33 @@ export interface GoogleAnalyticsSetting {
   measurementId: string;
 }
 
+export interface GoogleConsentModeSetting {
+  /** What Google's tags take a reader's answer to be until a consent tool gives one. */
+  default: 'denied';
+}
+
 /** Public values: they sit in every page's scripts. */
 export interface PortalAnalytics {
   googleTagManager: GoogleTagManagerSetting | null;
   googleAnalytics: GoogleAnalyticsSetting | null;
+  googleConsentMode: GoogleConsentModeSetting | null;
   keepQueryParams: string[];
   /** Off in a build made with `--no-analytics`, whose scripts are handed no event. */
   eventFeed: 'on' | 'off';
 }
 
-const KNOWN = ['googleTagManager', 'googleAnalytics', 'keepQueryParams'];
+const KNOWN = ['googleTagManager', 'googleAnalytics', 'googleConsentMode', 'keepQueryParams'];
 
 export class AnalyticsConfig {
   private constructor(
     private readonly googleTagManager: GoogleTagManagerSetting | null,
     private readonly googleAnalytics: GoogleAnalyticsSetting | null,
+    private readonly googleConsentMode: GoogleConsentModeSetting | null,
     private readonly keepQueryParams: string[],
     private readonly eventFeed: 'on' | 'off'
   ) {}
 
-  public static readonly defaults = new AnalyticsConfig(null, null, [], 'on');
+  public static readonly defaults = new AnalyticsConfig(null, null, null, [], 'on');
 
   public static parse(value: unknown, path: string): Parsed<AnalyticsConfig> {
     return namespace(value, path).andThen((data) =>
@@ -45,9 +52,10 @@ export class AnalyticsConfig {
         Result.combineWithAllErrors([
           optional(data.googleTagManager, (vendor) => googleTagManager(vendor, `${path}.googleTagManager`)),
           optional(data.googleAnalytics, (vendor) => googleAnalytics(vendor, `${path}.googleAnalytics`)),
+          optional(data.googleConsentMode, (mode) => googleConsentMode(mode, `${path}.googleConsentMode`)),
           keptQueryParams(data.keepQueryParams, `${path}.keepQueryParams`)
         ])
-      ).map(([gtm, ga, keep]) => new AnalyticsConfig(gtm, ga, keep, 'on'))
+      ).map(([gtm, ga, consent, keep]) => new AnalyticsConfig(gtm, ga, consent, keep, 'on'))
     );
   }
 
@@ -60,14 +68,15 @@ export class AnalyticsConfig {
     return {
       googleTagManager: this.googleTagManager,
       googleAnalytics: this.googleAnalytics,
+      googleConsentMode: this.googleConsentMode,
       keepQueryParams: this.keepQueryParams,
       eventFeed: this.eventFeed
     };
   }
 
-  /** For a staging build: no tag and no event for a script; an address keeps the same names. */
+  /** For a staging build: no tag, nothing queued for one, no event for a script; an address keeps the same names. */
   public withoutAnalytics(): AnalyticsConfig {
-    return new AnalyticsConfig(null, null, this.keepQueryParams, 'off');
+    return new AnalyticsConfig(null, null, null, this.keepQueryParams, 'off');
   }
 }
 
@@ -106,6 +115,21 @@ function googleAnalytics(value: unknown, path: string): Parsed<GoogleAnalyticsSe
     unknownKeys(value, ['measurementId'], path),
     Result.combineWithAllErrors([required(value.measurementId, `${path}.measurementId`, nonEmptyString)])
   ).map(([measurementId]) => ({ measurementId }));
+}
+
+// An object with one key, so a key added later (a wait, regions) changes no config written today.
+function googleConsentMode(value: unknown, path: string): Parsed<GoogleConsentModeSetting> {
+  if (!isJsonObject(value)) {
+    return err([`'${path}' must be a JSON object with 'default'.`]);
+  }
+  return allOf(
+    unknownKeys(value, ['default'], path),
+    Result.combineWithAllErrors([required(value.default, `${path}.default`, denied)])
+  ).map(([given]) => ({ default: given }));
+}
+
+function denied(value: unknown, path: string): Parsed<'denied'> {
+  return value === 'denied' ? ok('denied') : err([`'${path}' must be 'denied'.`]);
 }
 
 /** Names a reported address keeps, beyond the campaign names it always keeps. */

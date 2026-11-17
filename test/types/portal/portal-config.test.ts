@@ -404,6 +404,7 @@ describe('PortalConfig', () => {
       expect(config({}).identity().analytics).to.deep.equal({
         googleTagManager: null,
         googleAnalytics: null,
+        googleConsentMode: null,
         keepQueryParams: [],
         eventFeed: 'on'
       });
@@ -419,9 +420,41 @@ describe('PortalConfig', () => {
       expect(config({ analytics }).identity().analytics).to.deep.equal({
         googleTagManager: { containerId: 'GTM-ABC123', environment: { auth: 'a1_b-2', preview: 'env-3' } },
         googleAnalytics: { measurementId: 'G-ABC123' },
+        googleConsentMode: null,
         keepQueryParams: ['campaign_id', 'code'],
         eventFeed: 'on'
       });
+    });
+
+    it('tells the browser to start the Google tags as denied, beside either vendor, both or neither', () => {
+      const googleConsentMode = { default: 'denied' };
+      const vendors = [
+        {},
+        { googleTagManager: { containerId: 'GTM-ABC123' } },
+        { googleAnalytics: { measurementId: 'G-ABC123' } },
+        { googleTagManager: { containerId: 'GTM-ABC123' }, googleAnalytics: { measurementId: 'G-ABC123' } }
+      ];
+
+      for (const set of vendors) {
+        expect(
+          config({ analytics: { ...set, googleConsentMode } }).identity().analytics.googleConsentMode,
+          JSON.stringify(set)
+        ).to.deep.equal(googleConsentMode);
+      }
+    });
+
+    it('refuses a consent mode that is not an object with default set to denied, each mistake by name', () => {
+      const mode = 'portal.analytics.googleConsentMode';
+      const errorsFor = (googleConsentMode: unknown) => errorsOf({ analytics: { googleConsentMode } });
+
+      expect(errorsFor('denied')).to.deep.equal([`'${mode}' must be a JSON object with 'default'.`]);
+      expect(errorsFor(true)).to.deep.equal([`'${mode}' must be a JSON object with 'default'.`]);
+      expect(errorsFor({})).to.deep.equal([`'${mode}.default' is required.`]);
+      expect(errorsFor({ default: 'granted' })).to.deep.equal([`'${mode}.default' must be 'denied'.`]);
+      expect(errorsFor({ default: 'Denied', region: ['DE'] })).to.deep.equal([
+        `'${mode}.region' is not a 'portal' setting.`,
+        `'${mode}.default' must be 'denied'.`
+      ]);
     });
 
     // What a build made with --no-analytics turns off is the flag's to say, never a line in the file.
@@ -525,10 +558,11 @@ describe('PortalConfig', () => {
       ]);
     });
 
-    it('tells a build without analytics to load no vendor and hand over no event', () => {
+    it('tells a build without analytics to load no vendor, queue no consent default and hand over no event', () => {
       const analytics = {
         googleTagManager: { containerId: 'GTM-ABC123' },
         googleAnalytics: { measurementId: 'G-ABC123' },
+        googleConsentMode: { default: 'denied' },
         keepQueryParams: ['campaign_id']
       };
       const portal = config({ analytics });
@@ -538,6 +572,7 @@ describe('PortalConfig', () => {
         analytics: {
           googleTagManager: null,
           googleAnalytics: null,
+          googleConsentMode: null,
           keepQueryParams: ['campaign_id'],
           eventFeed: 'off'
         }
@@ -842,6 +877,7 @@ describe('PortalConfig', () => {
         analytics: {
           googleTagManager: null,
           googleAnalytics: null,
+          googleConsentMode: null,
           keepQueryParams: [],
           eventFeed: 'on'
         },
@@ -863,6 +899,7 @@ describe('PortalConfig', () => {
         analytics: {
           googleTagManager: null,
           googleAnalytics: null,
+          googleConsentMode: null,
           keepQueryParams: [],
           eventFeed: 'on'
         },

@@ -17,8 +17,27 @@ export interface Adapter {
   send?(name: string, params: Record<string, unknown>): void;
 }
 
-type Vendor = Exclude<keyof PortalAnalytics, 'keepQueryParams' | 'eventFeed'>;
+type Vendor = Exclude<keyof PortalAnalytics, 'googleConsentMode' | 'keepQueryParams' | 'eventFeed'>;
 const GOOGLE = 'https://www.googletagmanager.com';
+
+/** The page's own gtag, or one made here: Google reads only Arguments objects from the data layer, never arrays. */
+function pageGtag(dataLayer: unknown[]): Gtag {
+  return (window.gtag ??= function () {
+    dataLayer.push(arguments);
+  });
+}
+
+/** Ahead of every vendor's setup: Google reads a reader's answer from what is queued before its first event. */
+export function queueConsentDefaults(dataLayer: unknown[]): void {
+  pageGtag(dataLayer)('consent', 'default', {
+    ad_storage: 'denied',
+    ad_user_data: 'denied',
+    ad_personalization: 'denied',
+    analytics_storage: 'denied',
+    // Time for a consent tool to hand over a returning reader's answer, before the first hit goes out as denied.
+    wait_for_update: 500
+  });
+}
 
 /** Keyed by every vendor `PortalAnalytics` names, so a vendor without an adapter does not compile. */
 export const adapters: { [V in Vendor]: (settings: PortalAnalytics) => Adapter | null } = {
@@ -37,10 +56,7 @@ export const adapters: { [V in Vendor]: (settings: PortalAnalytics) => Adapter |
     if (setting === null) return null;
     return {
       setup: (dataLayer) => {
-        // gtag.js reads only Arguments objects from the data layer, never an array of the same values.
-        const gtag = (window.gtag ??= function () {
-          dataLayer.push(arguments);
-        });
+        const gtag = pageGtag(dataLayer);
         gtag('js', new Date());
         gtag('config', setting.measurementId, { send_page_view: false });
       },

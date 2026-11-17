@@ -394,11 +394,12 @@ describe('PortalSourceContext', () => {
       ]);
     });
 
-    it('leaves out the vendor tags and the event feed under --no-analytics, and keeps the query names', async () => {
+    it('leaves out the vendor tags, the consent default and the event feed under --no-analytics, and keeps the query names', async () => {
       writeConfig({
         site: { name: 'Calc' },
         analytics: {
           googleTagManager: { containerId: 'GTM-ABC123' },
+          googleConsentMode: { default: 'denied' },
           keepQueryParams: ['campaign_id']
         }
       });
@@ -412,6 +413,7 @@ describe('PortalSourceContext', () => {
         expect(config.identity().analytics).to.deep.equal({
           googleTagManager: null,
           googleAnalytics: null,
+          googleConsentMode: null,
           keepQueryParams: ['campaign_id'],
           eventFeed: 'off'
         });
@@ -419,6 +421,7 @@ describe('PortalSourceContext', () => {
       expect(kept.config.identity().analytics).to.deep.equal({
         googleTagManager: { containerId: 'GTM-ABC123', environment: null },
         googleAnalytics: null,
+        googleConsentMode: { default: 'denied' },
         keepQueryParams: ['campaign_id'],
         eventFeed: 'on'
       });

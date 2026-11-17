@@ -36,10 +36,16 @@ export interface GoogleAnalyticsSetting {
   measurementId: string;
 }
 
+export interface GoogleConsentModeSetting {
+  /** What Google's tags take a reader's answer to be until a consent tool gives one. */
+  default: 'denied';
+}
+
 /** Public values: they sit in every page's scripts. */
 export interface PortalAnalytics {
   googleTagManager: GoogleTagManagerSetting | null;
   googleAnalytics: GoogleAnalyticsSetting | null;
+  googleConsentMode: GoogleConsentModeSetting | null;
   keepQueryParams: string[];
   /** Off in a build made with `--no-analytics`, whose scripts are handed no event. */
   eventFeed: 'on' | 'off';
