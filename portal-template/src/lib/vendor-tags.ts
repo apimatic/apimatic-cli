@@ -54,7 +54,12 @@ export const adapters: { [V in Vendor]: (settings: PortalAnalytics) => Adapter |
   }
 };
 
-/** None on the OAuth callback, whose address holds an answer; each once, so a later call adds the rest. */
+/**
+ * None on the OAuth callback, whose address holds the provider's answer; each once, so a later call adds the rest.
+ * The page a sign-in returns to loads them at once, although the answer waits in the tab's session storage until
+ * a playground reads it: tags read the address, not the storage, so that window is accepted. On a page that mounts
+ * no playground the answer stays until one mounts in the tab or the tab closes, as with Fumadocs' own handler.
+ */
 export function insertTags(live: Adapter[]): void {
   if (isOAuthCallbackPath(window.location.pathname)) return;
   for (const { script: src } of live) {
