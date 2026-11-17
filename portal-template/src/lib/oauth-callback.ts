@@ -12,22 +12,15 @@ export function isOAuthCallbackPath(pathname: string, base?: string): boolean {
   return pathname.replace(/\/$/, '') === withBasePath(oauthCallbackPath, base);
 }
 
-/** The callback's address always holds a provider's answer; a page a sign-in returned to does until the playground reads it. */
-export function holdsOAuthAnswer({ pathname, search, hash }: Pick<Location, 'pathname' | 'search' | 'hash'>): boolean {
-  // Fumadocs sends a `state` with every authorization, and the answer carries it back in the query or the `#` part.
-  return (
-    isOAuthCallbackPath(pathname) ||
-    new URLSearchParams(search).has('state') ||
-    new URLSearchParams(hash.slice(1)).has('state')
-  );
-}
-
 /** Where the playground notes the path of the page that started the flow before it leaves: this tab's session storage. */
 const STARTING_PAGE_KEY = 'fumadocs-openapi-oauth';
 
+/** Where the playground looks for the callback's address, the provider's answer in it, once its page loads again. */
+const ANSWER_KEY = 'fumadocs-openapi-oauth-returned';
+
 /** What the callback does with the browser that lands on it. */
 export type OAuthCallback =
-  /** Sends it back to the page that started the flow, with the provider's answer still attached. */
+  /** Sends it back to the page that started the flow, at its own address: the answer goes through the session. */
   | { kind: 'return'; url: string }
   /** Stays, to show the error the provider ended the authorization with, and a link back to that page. */
   | { kind: 'providerError'; error: string; description: string | null; page: string }
@@ -56,7 +49,7 @@ export function oauthCallback(
   } catch {
     return { kind: 'unknownPage' };
   }
-  // Anything else is an open redirect, carrying the authorization code to another site.
+  // Anything else is an open redirect.
   if (page.origin !== location.origin) return { kind: 'unknownPage' };
 
   const query = new URLSearchParams(location.search);
@@ -67,8 +60,6 @@ export function oauthCallback(
   }
 
   // Whole, not as a path: a path of `//evil.test/x` would be read as another site's address.
-  page.search = location.search;
-  page.hash = location.hash;
   return { kind: 'return', url: page.href };
 }
 
@@ -81,4 +72,9 @@ export function takeStartingPage(): string | null {
   const page = sessionStorage.getItem(STARTING_PAGE_KEY);
   sessionStorage.removeItem(STARTING_PAGE_KEY);
   return page;
+}
+
+/** Leaves the callback's address for the playground, as Fumadocs' handler does: no page's address holds the answer. */
+export function leaveAnswer(callbackAddress: string): void {
+  sessionStorage.setItem(ANSWER_KEY, callbackAddress);
 }
