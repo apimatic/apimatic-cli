@@ -46,6 +46,8 @@ interface PageAnalytics {
   /** The settings and scripts the page started with. */
   started: string;
   feed: EventFeed;
+  /** The address of every tag and script inserted so far. */
+  inserted: Set<string>;
 }
 
 declare global {
@@ -90,12 +92,13 @@ export class Analytics {
       return;
     }
     const feed = new EventFeed();
-    window[PAGE] = { started, feed };
+    const inserted = new Set<string>();
+    window[PAGE] = { started, feed, inserted };
     const dataLayer = (window.dataLayer ??= []);
     for (const adapter of this.live) adapter.setup(dataLayer);
     // Ours whatever a page put there first, and `subscribe` alone, bound so a script may call it on its own.
     window.apimatic = { ...window.apimatic, analytics: Object.freeze({ subscribe: feed.subscribe.bind(feed) }) };
-    insertTags(this.live, this.scripts);
+    insertTags(this.live, this.scripts, inserted);
   }
 
   /** `href` is the page the event belongs to, when the caller saw the address move on first. */
@@ -112,8 +115,9 @@ export class Analytics {
 
   public reportPageView(): void {
     if (isOAuthCallbackPath(window.location.pathname)) return;
+    const inserted = window[PAGE]?.inserted;
     // The tags and scripts a start on the OAuth callback left out, now that the reader has moved on from it.
-    insertTags(this.live, this.scripts);
+    if (inserted !== undefined) insertTags(this.live, this.scripts, inserted);
     const page = pageLocation(window.location.href, this.settings.keepQueryParams);
     if (page === this.lastPageView) return;
     this.previousPageView = this.lastPageView;

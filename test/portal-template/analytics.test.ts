@@ -120,7 +120,6 @@ interface FakeScript {
   async: boolean;
   src: string;
   textContent: string;
-  getAttribute(name: 'src'): string;
 }
 
 interface FakeWindow {
@@ -139,14 +138,8 @@ function browser(href: string, title = 'Quickstart | Acme API', referrer = '') {
   const document = {
     title,
     referrer,
-    createElement: (): FakeScript => {
-      const script: FakeScript = { async: false, src: '', textContent: '', getAttribute: () => script.src };
-      return script;
-    },
-    head: {
-      append: (script: FakeScript) => scripts.push(script),
-      querySelectorAll: () => scripts
-    }
+    createElement: (): FakeScript => ({ async: false, src: '', textContent: '' }),
+    head: { append: (script: FakeScript) => scripts.push(script) }
   };
   Object.assign(globalThis, { window, document });
   return {
@@ -471,6 +464,21 @@ describe('Analytics', () => {
 
       expect(page.scripts.map((script) => script.src)).to.deep.equal([GTM_SCRIPT, SETUP, WIDGET]);
       expect(page.reloads()).to.equal(0);
+    });
+
+    // A vendor's loader may remove its own element once it has run, so the head is no record of what was inserted.
+    it('inserts none again once its element has left the page, on a new page or for a second instance', () => {
+      const page = browser(quickstart);
+      const analytics = new Analytics(withGtm(), listed);
+      analytics.start();
+      page.scripts.length = 0;
+
+      analytics.reportPageView();
+      page.go('https://docs.test/guides/errors', 'Errors | Acme API');
+      analytics.reportPageView();
+      new Analytics(withGtm(), listed).start();
+
+      expect(page.scripts).to.be.empty;
     });
 
     // A listed script reads the address as a vendor tag does, so it stays off the OAuth callback with them.

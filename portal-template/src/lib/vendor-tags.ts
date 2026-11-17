@@ -62,7 +62,7 @@ export const adapters: { [V in Vendor]: (settings: PortalAnalytics) => Adapter |
  * read it there, as it could anything else on the page. On a page that mounts no playground the answer stays until
  * one mounts in the tab or the tab closes, as with Fumadocs' own handler.
  */
-export function insertTags(live: Adapter[], scripts: PortalScript[]): void {
+export function insertTags(live: Adapter[], scripts: PortalScript[], inserted: Set<string>): void {
   if (isOAuthCallbackPath(window.location.pathname)) return;
   // A listed script is not async, so the browser runs them in the order listed, whichever arrives first.
   const wanted = [
@@ -70,11 +70,8 @@ export function insertTags(live: Adapter[], scripts: PortalScript[]): void {
     // A file of the portal's own is named from its root, which a host may serve under a path.
     ...scripts.map(({ src }) => ({ src: src.startsWith('/') ? withBasePath(src) : src, async: false }))
   ];
-  // Compared as written, since a selector built from a customer's address breaks on a backslash.
-  const inserted = new Set(
-    Array.from(document.head.querySelectorAll('script'), (script) => script.getAttribute('src'))
-  );
   for (const { src, async } of wanted) {
+    // Remembered, not looked up in the head: a vendor's loader may take its own element out once it has run.
     if (inserted.has(src)) continue;
     inserted.add(src);
     const script = document.createElement('script');
