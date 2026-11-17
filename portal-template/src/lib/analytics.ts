@@ -38,13 +38,20 @@ export type PortalEventName = keyof PortalEvents;
 
 type DataLayerEntry = { docs: null } | { event: PortalEventName; docs: Readonly<Record<string, string | number>> };
 
+/** A symbol, so the window holds it under no name a script comes across and builds on. */
+const PAGE = Symbol.for('apimatic.portal.analytics');
+
+/** Held by the window for every instance on the page: a config save under `portal serve` makes a second one. */
+interface PageAnalytics {
+  /** The settings and scripts the page started with. */
+  started: string;
+  feed: EventFeed;
+}
+
 declare global {
   interface Window {
     dataLayer?: unknown[];
-    /** Held by the window: a config save under `portal serve` evaluates this module again. */
-    portalAnalyticsStarted?: string;
-    /** Held by the window, as the mark above is: a subscriber has to outlive a second instance under `portal serve`. */
-    portalEventFeed?: EventFeed;
+    [PAGE]?: PageAnalytics;
     /** What customers' scripts are given: `subscribe()` and nothing else. */
     apimatic?: { analytics?: Pick<EventFeed, 'subscribe'> };
   }
@@ -76,16 +83,16 @@ export class Analytics {
 
   public start(): void {
     const started = JSON.stringify([this.settings, this.scripts]);
-    if (window.portalAnalyticsStarted === started) return;
+    if (window[PAGE]?.started === started) return;
     // Other vendors or scripts after a config save: only a fresh page holds exactly their tags.
-    if (window.portalAnalyticsStarted !== undefined) {
+    if (window[PAGE] !== undefined) {
       window.location.reload();
       return;
     }
-    window.portalAnalyticsStarted = started;
+    const feed = new EventFeed();
+    window[PAGE] = { started, feed };
     const dataLayer = (window.dataLayer ??= []);
     for (const adapter of this.live) adapter.setup(dataLayer);
-    const feed = (window.portalEventFeed = new EventFeed());
     // Ours whatever a page put there first, and `subscribe` alone, bound so a script may call it on its own.
     window.apimatic = { ...window.apimatic, analytics: Object.freeze({ subscribe: feed.subscribe.bind(feed) }) };
     insertTags(this.live, this.scripts);
@@ -100,7 +107,7 @@ export class Analytics {
     dataLayer.push({ docs: null } satisfies DataLayerEntry);
     dataLayer.push({ event: name, docs } satisfies DataLayerEntry);
     for (const adapter of this.live) adapter.send?.(name, docs);
-    window.portalEventFeed?.publish(name, docs);
+    window[PAGE]?.feed.publish(name, docs);
   }
 
   public reportPageView(): void {

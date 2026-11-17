@@ -554,6 +554,16 @@ describe('Analytics', () => {
       expect(Object.isFrozen(given)).to.be.true;
     });
 
+    // A global by a name is one a script finds and builds on; the feed could also publish, or be replaced, through it.
+    it('adds no name to the window but apimatic and the data layer', () => {
+      const page = browser(quickstart);
+      const before = Object.keys(page.window);
+
+      new Analytics(none, []).start();
+
+      expect(Object.keys(page.window)).to.deep.equal([...before, 'dataLayer', 'apimatic']);
+    });
+
     it('hands over events to a subscribe a script took off the object and called on its own', async () => {
       const page = browser(quickstart);
       const analytics = new Analytics(none, []);
