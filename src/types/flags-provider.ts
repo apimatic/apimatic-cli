@@ -37,7 +37,7 @@ export class FlagsProvider {
     'no-analytics': Flags.boolean({
       default: false,
       description:
-        "leave out the tags set in 'portal.analytics', and the 'analytics' and 'marketing' scripts in 'portal.scripts'."
+        "leave out the tags set in 'portal.analytics', and each script in 'portal.scripts' whose category is 'analytics', 'marketing' or not set."
     })
   };
 
