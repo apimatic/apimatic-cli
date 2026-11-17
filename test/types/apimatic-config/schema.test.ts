@@ -366,8 +366,7 @@ describe('apimatic.schema.json', () => {
       }
     });
 
-    // The parser drops analytics and marketing scripts alike, so this cannot tell those two apart;
-    // it does fail for a default the flag would keep.
+    // Analytics and marketing scripts are dropped alike, so this proves a default the flag drops, not which of the two.
     it('offers the category the parser gives a script that names none, as far as --no-analytics shows', () => {
       const offered: string = schema.definitions.portal.properties.scripts.items.properties.category.default;
       const kept = (category?: string) =>

@@ -9,11 +9,11 @@ export interface PortalEvent {
 }
 
 type Subscriber = (event: PortalEvent) => void;
+type Unsubscribe = () => void;
 
 interface Subscription {
   callback: Subscriber;
-  /** How many of the events it has been handed. */
-  delivered: number;
+  deliveredCount: number;
 }
 
 /** A page's events, for the scripts on it: a subscriber gets every one reported so far, then each new one. */
@@ -21,12 +21,11 @@ export class EventFeed {
   private readonly events: PortalEvent[] = [];
   private readonly subscriptions = new Set<Subscription>();
 
-  /** Answers with the function that stops delivery. */
-  public subscribe(callback: Subscriber): () => void {
+  public subscribe(callback: Subscriber): Unsubscribe {
     if (typeof callback !== 'function') {
       throw new TypeError('window.apimatic.analytics.subscribe() takes a function.');
     }
-    const subscription: Subscription = { callback, delivered: 0 };
+    const subscription: Subscription = { callback, deliveredCount: 0 };
     this.subscriptions.add(subscription);
     // Once this has returned, so a callback can call the function it returns, even for an earlier event.
     queueMicrotask(() => EventFeed.deliver(this, subscription));
@@ -45,9 +44,9 @@ export class EventFeed {
   private static deliver(feed: EventFeed, subscription: Subscription): void {
     // Called on its own, so a callback written without strict mode finds the window as `this`, never this record.
     const { callback } = subscription;
-    while (feed.subscriptions.has(subscription) && subscription.delivered < feed.events.length) {
-      const event = feed.events[subscription.delivered];
-      subscription.delivered += 1;
+    while (feed.subscriptions.has(subscription) && subscription.deliveredCount < feed.events.length) {
+      const event = feed.events[subscription.deliveredCount];
+      subscription.deliveredCount += 1;
       try {
         callback(event);
       } catch (error) {
