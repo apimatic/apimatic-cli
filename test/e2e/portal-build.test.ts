@@ -196,7 +196,11 @@ const stylesheetOf = (output: DirectoryPath) => {
     'default',
     { codeSampleCatalogs: CODE_SAMPLES },
     {
-      analytics: { googleTagManager: { containerId: 'GTM-E2ETEST' }, googleAnalytics: { measurementId: 'G-E2ETEST' } },
+      analytics: {
+        googleTagManager: { containerId: 'GTM-E2ETEST' },
+        googleAnalytics: { measurementId: 'G-E2ETEST' },
+        googleConsentMode: { default: 'denied' }
+      },
       seo: { googleSiteVerification: 'e2e-verification' },
       scripts: [{ src: 'https://cdn.e2e.test/widget.js', category: 'necessary' }, { src: 'static/js/widget.js' }]
     }
@@ -282,6 +286,16 @@ const stylesheetOf = (output: DirectoryPath) => {
     expect(scripts.some(({ text }) => text.includes('gtm.js?id=') && text.includes('/gtag/js?id='))).to.be.true;
     for (const page of pages()) {
       expect(read(page), page).to.not.contain('googletagmanager.com');
+    }
+  });
+
+  it('tells the browser to start the Google tags as denied, in a script that holds the defaults it queues', () => {
+    const scripts = scriptsOf(portal.output());
+    expect(scripts.some(({ text }) => text.includes('googleConsentMode'))).to.be.true;
+    // The defaults themselves, by the one key of theirs that nothing else in the bundle names.
+    expect(scripts.some(({ text }) => text.includes('wait_for_update'))).to.be.true;
+    for (const page of pages()) {
+      expect(read(page), page).to.not.contain('wait_for_update');
     }
   });
 
