@@ -43,8 +43,10 @@ declare global {
     dataLayer?: unknown[];
     /** Held by the window: a config save under `portal serve` evaluates this module again. */
     portalAnalyticsStarted?: string;
-    /** For customers' scripts: `analytics` is the page's event feed, whose `subscribe()` they call. */
-    apimatic?: { analytics?: EventFeed };
+    /** Held by the window, as the mark above is: a subscriber has to outlive a second instance under `portal serve`. */
+    portalEventFeed?: EventFeed;
+    /** What customers' scripts are given: `subscribe()` and nothing else. */
+    apimatic?: { analytics?: Pick<EventFeed, 'subscribe'> };
   }
 }
 
@@ -83,8 +85,9 @@ export class Analytics {
     window.portalAnalyticsStarted = started;
     const dataLayer = (window.dataLayer ??= []);
     for (const adapter of this.live) adapter.setup(dataLayer);
-    // The page's, not this instance's: a subscriber has to outlive a second instance under `portal serve`.
-    (window.apimatic ??= {}).analytics ??= new EventFeed();
+    const feed = (window.portalEventFeed = new EventFeed());
+    // Ours whatever a page put there first, and `subscribe` alone, bound so a script may call it on its own.
+    window.apimatic = { ...window.apimatic, analytics: Object.freeze({ subscribe: feed.subscribe.bind(feed) }) };
     insertTags(this.live, this.scripts);
   }
 
@@ -102,7 +105,7 @@ export class Analytics {
     dataLayer.push({ docs: null } satisfies DataLayerEntry);
     dataLayer.push({ event: name, docs } satisfies DataLayerEntry);
     for (const adapter of this.live) adapter.send?.(name, docs);
-    window.apimatic?.analytics?.publish(name, docs);
+    window.portalEventFeed?.publish(name, docs);
   }
 
   public reportPageView(): void {

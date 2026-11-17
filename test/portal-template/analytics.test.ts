@@ -127,8 +127,8 @@ interface FakeWindow {
   location: URL & { reload: () => void };
   dataLayer?: unknown[];
   gtag?: (...command: unknown[]) => void;
-  /** As a script in the page sees it. */
-  apimatic?: { analytics: { subscribe(callback: (event: PortalEvent) => void): () => void } };
+  /** As a script in the page sees it; `consent` stands for a key of someone else's. */
+  apimatic?: { analytics: { subscribe(callback: (event: PortalEvent) => void): () => void }; consent?: string };
 }
 
 /** A page in the browser: the `window` and `document` the module reads, and the scripts the loader appends. */
@@ -533,6 +533,49 @@ describe('Analytics', () => {
       new Analytics(none, []).start();
 
       expect(bare.window.apimatic?.analytics.subscribe).to.be.a('function');
+    });
+
+    // What is there is what customers build on, so it is `subscribe` and nothing a script could publish or rewrite with.
+    it('gives scripts subscribe alone, on an object they cannot change', () => {
+      const page = browser(quickstart);
+
+      new Analytics(none, []).start();
+
+      const given = page.window.apimatic?.analytics;
+      expect(Object.keys(given ?? {})).to.deep.equal(['subscribe']);
+      expect(Object.isFrozen(given)).to.be.true;
+    });
+
+    it('hands over events to a subscribe a script took off the object and called on its own', async () => {
+      const page = browser(quickstart);
+      const analytics = new Analytics(none, []);
+      analytics.start();
+      const events: PortalEvent[] = [];
+
+      const { subscribe } = page.window.apimatic?.analytics ?? { subscribe: () => () => undefined };
+      subscribe((event) => events.push(event));
+      analytics.report('docs_markdown_copy', {});
+      await settled();
+
+      expect(events.map((event) => event.name)).to.deep.equal(['docs_markdown_copy']);
+    });
+
+    // A page's own script may have put a stand-in there first; reporting must not come to depend on it.
+    it('puts its own in place of one a page set first, keeps what else the page put beside it, and goes on reporting', async () => {
+      const page = browser(quickstart);
+      const standIn = { subscribe: () => () => undefined };
+      page.window.apimatic = { analytics: standIn, consent: 'the page set this' };
+      const analytics = new Analytics(none, []);
+
+      analytics.start();
+      const events = subscribe(page);
+      analytics.reportPageView();
+      await settled();
+
+      expect(page.window.apimatic?.analytics).to.not.equal(standIn);
+      expect(page.window.apimatic?.consent).to.equal('the page set this');
+      expect(events.map((event) => event.name)).to.deep.equal(['docs_page_view']);
+      expect(pageViews(page.dataLayer())).to.have.length(1);
     });
 
     it('hands over every event so far and then each new one, each with its own keys and the cleaned address', async () => {
