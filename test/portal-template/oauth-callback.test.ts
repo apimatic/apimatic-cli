@@ -1,9 +1,11 @@
+import { runInNewContext } from 'node:vm';
 import { expect } from 'chai';
 import type { SecuritySchemeObject } from 'fumadocs-openapi';
 import { requestOAuthToken } from 'fumadocs-openapi/playground';
+import { createOpenAPI } from 'fumadocs-openapi/server';
 import {
-  holdsOAuthAnswer,
   isOAuthCallbackPath,
+  leaveAnswer,
   oauthCallback,
   oauthCallbackPath,
   takeStartingPage
@@ -38,26 +40,6 @@ describe('isOAuthCallbackPath', () => {
     expect(isOAuthCallbackPath('/oauth/callback', '/docs/')).to.be.false;
     expect(isOAuthCallbackPath('/guides/quickstart')).to.be.false;
     expect(isOAuthCallbackPath('/oauth/callback/more')).to.be.false;
-  });
-});
-
-describe('holdsOAuthAnswer', () => {
-  const at = (href: string) => holdsOAuthAnswer(new URL(href));
-
-  it('holds on the callback, with or without an answer', () => {
-    expect(at('https://docs.test/oauth/callback')).to.be.true;
-    expect(at('https://docs.test/oauth/callback?code=abc&state=123')).to.be.true;
-  });
-
-  it('holds on a page a sign-in returned to, with a code, a token or an error', () => {
-    expect(at('https://docs.test/api/pets/listPets?code=abc&state=123')).to.be.true;
-    expect(at('https://docs.test/api/pets/listPets#access_token=xyz&token_type=Bearer&state=123')).to.be.true;
-    expect(at('https://docs.test/api/pets/listPets?error=access_denied&state=123')).to.be.true;
-  });
-
-  it('does not hold on any other address, a query or a # part of its own included', () => {
-    expect(at('https://docs.test/api/pets/listPets')).to.be.false;
-    expect(at('https://docs.test/guides/quickstart?utm_source=mail&code=SAVE10#install')).to.be.false;
   });
 });
 
@@ -107,7 +89,7 @@ describe('takeStartingPage', () => {
     }
   });
 
-  it("sends the provider's answer back to the page the playground noted before it left", async () => {
+  it('sends the browser back to the page the playground noted before it left', async () => {
     await requestOAuthToken(scheme, 'authorizationCode', flow);
     expect(leftFor?.origin, 'left for the provider').to.equal('https://provider.test');
     expect(leftFor?.searchParams.get('redirect_uri')).to.equal(`${origin}${oauthCallbackPath}`);
@@ -115,7 +97,7 @@ describe('takeStartingPage', () => {
 
     const callback = oauthCallback(takeStartingPage(), { origin, search: `?code=abc&state=${state}`, hash: '' });
 
-    expect(callback).to.deep.equal({ kind: 'return', url: `${origin}${pathname}?code=abc&state=${state}` });
+    expect(callback).to.deep.equal({ kind: 'return', url: `${origin}${pathname}` });
   });
 
   it('takes the note once', async () => {
@@ -126,41 +108,76 @@ describe('takeStartingPage', () => {
   });
 });
 
+// Fumadocs' handler is a server route. Inlined, its page carries the script a static site would serve.
+describe('leaveAnswer', () => {
+  const tab = globalThis as { sessionStorage?: unknown };
+  const callbackAddress = 'https://docs.test/oauth/callback?code=abc&state=123';
+  /** A tab's session in which the playground has noted its page, as the test above holds it does. */
+  const session = () => {
+    const storage = new Map([['fumadocs-openapi-oauth', '/api/pets/pets/listPets']]);
+    return {
+      // What a callback left for the playground, the note aside: Fumadocs' handler keeps it, ours takes it.
+      left: () => [...storage].filter(([key]) => key !== 'fumadocs-openapi-oauth'),
+      getItem: (key: string) => storage.get(key) ?? null,
+      setItem: (key: string, value: string) => void storage.set(key, value),
+      removeItem: (key: string) => void storage.delete(key)
+    };
+  };
+
+  afterEach(() => {
+    delete tab.sessionStorage;
+  });
+
+  it("leaves what Fumadocs' own handler leaves for the playground, and goes to the same page", async () => {
+    const handler = createOpenAPI().createOAuthHandler({ inline: true });
+    const script =
+      /<script>([\s\S]*)<\/script>/.exec(await handler(new globalThis.Request(callbackAddress)).text())?.[1] ?? '';
+    const theirs = session();
+    let theirPage = '';
+    runInNewContext(script, {
+      sessionStorage: theirs,
+      location: { href: callbackAddress, origin: 'https://docs.test', replace: (url: string) => void (theirPage = url) }
+    });
+
+    const ours = session();
+    tab.sessionStorage = ours;
+    const callback = oauthCallback(takeStartingPage(), new URL(callbackAddress));
+    leaveAnswer(callbackAddress);
+
+    expect(theirs.left(), "what Fumadocs' handler left").to.deep.equal([
+      ['fumadocs-openapi-oauth-returned', callbackAddress]
+    ]);
+    expect(ours.left()).to.deep.equal(theirs.left());
+    expect(callback).to.deep.equal({ kind: 'return', url: theirPage });
+  });
+});
+
 describe('oauthCallback', () => {
   const origin = 'https://docs.test';
   const answered = (search: string, hash = '') => ({ origin, search, hash });
 
-  it("sends the authorization code back to the page that started the flow, in the provider's query", () => {
-    const callback = oauthCallback('/api/pets/pets/listPets', answered('?code=abc&state=123'));
-
-    expect(callback).to.deep.equal({
-      kind: 'return',
-      url: 'https://docs.test/api/pets/pets/listPets?code=abc&state=123'
-    });
-  });
-
-  // The implicit flow answers in the fragment, which a browser never sends to a server either.
-  it("sends the implicit flow's token back in the provider's fragment", () => {
-    const callback = oauthCallback('/api/pets/pets/listPets', answered('', '#access_token=xyz&state=123'));
-
-    expect(callback).to.deep.equal({
-      kind: 'return',
-      url: 'https://docs.test/api/pets/pets/listPets#access_token=xyz&state=123'
-    });
+  // The authorization code flow answers in the query, the implicit one in the fragment.
+  it('sends the browser back to the page at its own address, whichever way the provider answered', () => {
+    for (const answer of [answered('?code=abc&state=123'), answered('', '#access_token=xyz&state=123')]) {
+      expect(oauthCallback('/api/pets/pets/listPets', answer)).to.deep.equal({
+        kind: 'return',
+        url: 'https://docs.test/api/pets/pets/listPets'
+      });
+    }
   });
 
   // The playground notes `location.pathname`, which the browser has already percent-encoded.
   it('keeps an encoded page path as the playground wrote it', () => {
     const callback = oauthCallback('/api/pets/Get%20Pets', answered('?code=abc'));
 
-    expect(callback).to.deep.equal({ kind: 'return', url: 'https://docs.test/api/pets/Get%20Pets?code=abc' });
+    expect(callback).to.deep.equal({ kind: 'return', url: 'https://docs.test/api/pets/Get%20Pets' });
   });
 
-  // As a bare path, `//evil.test/x?code=abc` would send the code to evil.test.
-  it('keeps the code on this site for a page whose path reads as another site', () => {
+  // As a bare path, `//evil.test/x` would send the browser to evil.test.
+  it('stays on this site for a page whose path reads as another site', () => {
     const callback = oauthCallback('https://docs.test//evil.test/x', answered('?code=abc', '#access_token=xyz'));
 
-    expect(callback).to.deep.equal({ kind: 'return', url: 'https://docs.test//evil.test/x?code=abc#access_token=xyz' });
+    expect(callback).to.deep.equal({ kind: 'return', url: 'https://docs.test//evil.test/x' });
   });
 
   // The playground's own return handling finds no code or token in it, and says nothing.
@@ -201,7 +218,7 @@ describe('oauthCallback', () => {
   });
 
   // The last is the path of a page at `//a b/x`, which does not read as an address at all.
-  it('refuses to send the code to another site, or to a page that does not read as one', () => {
+  it('refuses to send the browser to another site, or to a page that does not read as one', () => {
     for (const page of ['https://evil.test/steal', '//evil.test/steal', '//a%20b/x']) {
       expect(oauthCallback(page, answered('?code=abc')), page).to.deep.equal({ kind: 'unknownPage' });
     }

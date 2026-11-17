@@ -415,8 +415,8 @@ describe('Analytics', () => {
     });
   });
 
-  describe('after a playground sign-in', () => {
-    it('reports with the OAuth answer stripped from page_location', () => {
+  describe('at an address that holds an OAuth answer', () => {
+    it('reports with the answer stripped from page_location', () => {
       const page = browser('https://docs.test/api/pets/listPets#access_token=xyz&state=123', 'List pets');
       const analytics = new Analytics(withBoth);
 
@@ -432,26 +432,17 @@ describe('Analytics', () => {
     });
   });
 
-  describe('on the page a playground sign-in returned to', () => {
-    const answered = 'https://docs.test/api/pets/listPets?code=abc&state=123';
-
-    it('holds the tags back while the answer is in the address, and loads them once the playground took it out', () => {
-      const page = browser(answered, 'List pets');
+  // A sign-in's answer reaches the playground through the tab's session, so no page but the callback waits for one.
+  describe('on a page whose own link carries a state parameter', () => {
+    it('loads the tags at once, and reports the page without the parameter', () => {
+      const page = browser(`${quickstart}?state=CA`);
       const analytics = new Analytics(withBoth);
 
       analytics.start();
       analytics.reportPageView();
-      analytics.loadTags();
-
-      expect(page.scripts).to.be.empty;
-      expect(pageViews(page.dataLayer())).to.have.length(1);
-
-      page.go('https://docs.test/api/pets/listPets');
-      analytics.loadTags();
-      analytics.reportPageView();
 
       expect(page.scripts.map((script) => script.src)).to.deep.equal([GTM_SCRIPT, GA4_SCRIPT]);
-      expect(pageViews(page.dataLayer())).to.have.length(1);
+      expect(pageViews(page.dataLayer())).to.deep.equal([quickstartView]);
     });
   });
 

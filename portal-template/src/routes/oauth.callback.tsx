@@ -3,7 +3,13 @@ import { HomeLayout } from 'fumadocs-ui/layouts/home';
 import { useEffect, useState } from 'react';
 import { AuthorizationFailure } from '@/components/authorization-failure';
 import { baseOptions } from '@/lib/layout.shared';
-import { oauthCallback, takeStartingPage, type OAuthCallback, type OAuthCallbackFailure } from '@/lib/oauth-callback';
+import {
+  leaveAnswer,
+  oauthCallback,
+  takeStartingPage,
+  type OAuthCallback,
+  type OAuthCallbackFailure
+} from '@/lib/oauth-callback';
 import { portal } from '@/lib/portal';
 
 // Published portals are static, so this page does in the browser what Fumadocs'
@@ -32,7 +38,10 @@ let completion: OAuthCallback | undefined;
 function completeAuthorization(): OAuthCallback {
   if (completion === undefined) {
     completion = oauthCallback(takeStartingPage(), window.location);
-    if (completion.kind === 'return') window.location.replace(completion.url);
+    if (completion.kind === 'return') {
+      leaveAnswer(window.location.href);
+      window.location.replace(completion.url);
+    }
   }
   return completion;
 }

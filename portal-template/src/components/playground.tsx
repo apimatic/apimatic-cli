@@ -39,8 +39,6 @@ export default function Playground() {
     }),
     []
   );
-  // Fumadocs takes a returned sign-in's answer out of the address in the effects of the playground below this one.
-  useEffect(() => analytics.loadTags(), []);
   return (
     <SentAt value={sentAt}>
       <PlaygroundClient fetchOptions={fetchOptions} components={components} />

@@ -1,4 +1,4 @@
-import { holdsOAuthAnswer } from './oauth-callback';
+import { isOAuthCallbackPath } from './oauth-callback';
 import type { PortalAnalytics } from './portal-types';
 
 type Gtag = (...command: unknown[]) => void;
@@ -54,9 +54,9 @@ export const adapters: { [V in Vendor]: (settings: PortalAnalytics) => Adapter |
   }
 };
 
-/** None while the address holds an OAuth answer, which the tags read for themselves; each once, so a later call adds the rest. */
+/** None on the OAuth callback, whose address holds an answer; each once, so a later call adds the rest. */
 export function insertTags(live: Adapter[]): void {
-  if (holdsOAuthAnswer(window.location)) return;
+  if (isOAuthCallbackPath(window.location.pathname)) return;
   for (const { script: src } of live) {
     if (document.head.querySelector(`script[src="${src}"]`) !== null) continue;
     const script = document.createElement('script');
