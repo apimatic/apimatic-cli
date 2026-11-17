@@ -64,10 +64,13 @@ export function insertTags(live: Adapter[], scripts: PortalScript[]): void {
     // A file of the portal's own is named from its root, which a host may serve under a path.
     ...scripts.map(({ src }) => ({ src: src.startsWith('/') ? withBasePath(src) : src, async: false }))
   ];
+  // Compared as written, since a selector built from a customer's address breaks on a backslash.
+  const inserted = new Set(
+    Array.from(document.head.querySelectorAll('script'), (script) => script.getAttribute('src'))
+  );
   for (const { src, async } of wanted) {
-    // Compared as written, since a selector built from a customer's address breaks on a backslash.
-    const inserted = Array.from(document.head.querySelectorAll('script'), (script) => script.getAttribute('src'));
-    if (inserted.includes(src)) continue;
+    if (inserted.has(src)) continue;
+    inserted.add(src);
     const script = document.createElement('script');
     script.async = async;
     script.src = src;
