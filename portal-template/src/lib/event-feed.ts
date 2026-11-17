@@ -29,7 +29,7 @@ export class EventFeed {
     const subscription: Subscription = { callback, delivered: 0 };
     this.subscriptions.add(subscription);
     // Once this has returned, so a callback can call the function it returns, even for an earlier event.
-    queueMicrotask(() => this.deliver(subscription));
+    queueMicrotask(() => EventFeed.deliver(this, subscription));
     return () => {
       this.subscriptions.delete(subscription);
     };
@@ -38,12 +38,12 @@ export class EventFeed {
   public publish(name: string, params: Record<string, string | number>): void {
     // A copy, frozen, so no subscriber changes what the next one gets, or what the data layer was handed.
     this.events.push(Object.freeze({ name, params: Object.freeze({ ...params }), time: Date.now(), version: 1 }));
-    for (const subscription of [...this.subscriptions]) this.deliver(subscription);
+    for (const subscription of [...this.subscriptions]) EventFeed.deliver(this, subscription);
   }
 
-  private deliver(subscription: Subscription): void {
-    while (this.subscriptions.has(subscription) && subscription.delivered < this.events.length) {
-      const event = this.events[subscription.delivered];
+  private static deliver(feed: EventFeed, subscription: Subscription): void {
+    while (feed.subscriptions.has(subscription) && subscription.delivered < feed.events.length) {
+      const event = feed.events[subscription.delivered];
       subscription.delivered += 1;
       try {
         subscription.callback(event);
