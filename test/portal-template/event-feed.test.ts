@@ -165,6 +165,21 @@ describe('EventFeed', () => {
     expect(second).to.be.empty;
   });
 
+  // Its record of a subscriber holds the count delivery runs on, which a callback could otherwise reset through `this`.
+  it('calls a callback on its own, so its `this` is nothing of the feed', () => {
+    const feed = new EventFeed();
+    const seen: unknown[] = [];
+    feed.subscribe(function (this: unknown) {
+      seen.push(this);
+    });
+
+    feed.publish('docs_page_view', {});
+
+    // What any function called on its own gets: `undefined` in strict code, the global object in older code.
+    expect(seen).to.have.length(1);
+    expect([undefined, globalThis]).to.include(seen[0]);
+  });
+
   it('refuses at once what is not a function, by the name a script calls it by', () => {
     const feed = new EventFeed();
 

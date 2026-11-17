@@ -43,11 +43,13 @@ export class EventFeed {
   }
 
   private static deliver(feed: EventFeed, subscription: Subscription): void {
+    // Called on its own, so a callback written without strict mode finds the window as `this`, never this record.
+    const { callback } = subscription;
     while (feed.subscriptions.has(subscription) && subscription.delivered < feed.events.length) {
       const event = feed.events[subscription.delivered];
       subscription.delivered += 1;
       try {
-        subscription.callback(event);
+        callback(event);
       } catch (error) {
         // Thrown later, so it shows in the console and stops neither the next event nor the next subscriber.
         setTimeout(() => {
