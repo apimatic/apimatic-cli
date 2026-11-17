@@ -36,9 +36,9 @@ export class Script {
     );
   }
 
-  /** The file it names in the static directory, or null for an address. */
-  public staticFile(): StaticAsset | null {
-    return this.source instanceof StaticAsset ? this.source : null;
+  /** The file it names in the static directory; none for an address. */
+  public staticFiles(): StaticAsset[] {
+    return this.source instanceof StaticAsset ? [this.source] : [];
   }
 
   /** Whether a portal built with `--no-analytics` still loads it. */
