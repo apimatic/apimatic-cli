@@ -748,7 +748,8 @@ describe('Analytics', () => {
     it('puts its own in place of one a page set first, keeps what else the page put beside it, and goes on reporting', async () => {
       const page = browser(quickstart);
       const standIn = { subscribe: () => () => undefined };
-      page.window.apimatic = { analytics: standIn, consent: 'the page set this' };
+      const hosts = { analytics: standIn, consent: 'the page set this' };
+      page.window.apimatic = hosts;
       const analytics = new Analytics(none, []);
 
       analytics.start();
@@ -756,18 +757,68 @@ describe('Analytics', () => {
       analytics.reportPageView();
       await settled();
 
+      expect(page.window.apimatic).to.equal(hosts);
       expect(page.window.apimatic?.analytics).to.not.equal(standIn);
       expect(page.window.apimatic?.consent).to.equal('the page set this');
       expect(events.map((event) => event.name)).to.deep.equal(['docs_page_view']);
       expect(pageViews(page.dataLayer())).to.have.length(1);
     });
 
-    // The start runs while the bundle loads, so an error thrown there leaves every page without its scripts.
-    it('starts and reports where a page made window.apimatic read-only, and shows the error later', () => {
+    // A copy of it would have its values and none of its class's methods, and the host's own reference would miss it.
+    it("adds analytics to a host's own object, which keeps its methods and stays the one the window holds", () => {
+      class ConsentBridge {
+        public readonly region = 'eu';
+        public update(): string {
+          return `updated for ${this.region}`;
+        }
+      }
+      const page = browser(quickstart);
+      const hosts = new ConsentBridge();
+      Object.assign(page.window, { apimatic: hosts });
+
+      new Analytics(none, []).start();
+
+      expect(page.window.apimatic).to.equal(hosts);
+      expect(hosts.update()).to.equal('updated for eu');
+      expect(page.window.apimatic?.analytics.subscribe).to.be.a('function');
+    });
+
+    it('puts a copy in place of an object that takes no property, with what else that object held', () => {
+      const page = browser(quickstart);
+      const frozen = Object.freeze({ analytics: { subscribe: () => () => undefined }, consent: 'the page set this' });
+      page.window.apimatic = frozen;
+
+      new Analytics(none, []).start();
+
+      expect(page.window.apimatic).to.not.equal(frozen);
+      expect(page.window.apimatic?.analytics).to.not.equal(frozen.analytics);
+      expect(page.window.apimatic?.consent).to.equal('the page set this');
+    });
+
+    // The name is fixed, the object behind it is not: analytics goes on that object, and nothing is in error.
+    it('gives subscribe on the object itself where a page made window.apimatic read-only', () => {
       const clock = sinon.useFakeTimers({ toFake: ['setTimeout'] });
       try {
         const page = browser(quickstart);
         const locked = { consent: 'the host locked this' };
+        Object.defineProperty(page.window, 'apimatic', { value: locked, writable: false });
+
+        new Analytics(none, []).start();
+
+        expect(page.window.apimatic).to.equal(locked);
+        expect(page.window.apimatic?.analytics.subscribe).to.be.a('function');
+        expect(clock.countTimers()).to.equal(0);
+      } finally {
+        clock.restore();
+      }
+    });
+
+    // The start runs while the bundle loads, so an error thrown there leaves every page without its scripts.
+    it('starts and reports where a page froze window.apimatic and made it read-only, and shows the error later', () => {
+      const clock = sinon.useFakeTimers({ toFake: ['setTimeout'] });
+      try {
+        const page = browser(quickstart);
+        const locked = Object.freeze({ consent: 'the host locked this' });
         Object.defineProperty(page.window, 'apimatic', { value: locked, writable: false });
         const analytics = new Analytics(withGtm(), [{ src: 'https://cdn.example.com/widget.js' }]);
 

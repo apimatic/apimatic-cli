@@ -75,6 +75,12 @@ export function pageLocation(href: string, keep: readonly string[]): string {
   return url.href;
 }
 
+/** Whether `host` took `analytics` as its own property: a frozen object does not, nor one that fixed the name. */
+function putOn(host: unknown, analytics: Pick<EventFeed, 'subscribe'>): boolean {
+  const property = { value: analytics, writable: true, enumerable: true, configurable: true };
+  return Object(host) === host && Reflect.defineProperty(host as object, 'analytics', property);
+}
+
 export class Analytics {
   private readonly live: Adapter[];
   /** The window's, once `start()` has made it or joined it: no other method reads the global. */
@@ -105,9 +111,11 @@ export class Analytics {
     const dataLayer = (window.dataLayer ??= []);
     if (this.settings.googleConsentMode !== null) queueConsentDefaults(dataLayer);
     for (const adapter of this.live) adapter.setup(dataLayer);
+    // Ours whatever the window held there first, and `subscribe` alone, bound so a script may call it on its own.
+    const analytics = Object.freeze({ subscribe: feed.subscribe.bind(feed) });
     try {
-      // Ours whatever the window held there first, and `subscribe` alone, bound so a script may call it on its own.
-      window.apimatic = { ...window.apimatic, analytics: Object.freeze({ subscribe: feed.subscribe.bind(feed) }) };
+      // On the host's own object if it takes one: a copy lacks its class's methods and is not the object it holds.
+      if (!putOn(window.apimatic, analytics)) window.apimatic = { ...window.apimatic, analytics };
     } catch (error) {
       // A host may have locked the name. Thrown later, so it shows in the console and the bundle goes on loading.
       setTimeout(() => {
