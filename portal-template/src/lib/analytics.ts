@@ -1,7 +1,7 @@
 import { EventFeed } from './event-feed';
 import { isOAuthCallbackPath } from './oauth-callback';
 import type { PortalAnalytics, PortalScript } from './portal-types';
-import { type Adapter, adapters, insertTags, queueConsentDefaults } from './vendor-tags';
+import { type Adapter, adapters, insertTags, queueConsentDefaults, scriptsInHead } from './vendor-tags';
 
 /** The query parameters an ad or mail platform reads from an address itself; a customer adds names and removes none. */
 const KEPT_PREFIXES = ['utm_', 'hsa_'];
@@ -50,7 +50,7 @@ interface WindowAnalytics {
   /** The settings and scripts the window started with. */
   started: string;
   feed: EventFeed;
-  /** The address of every tag and script inserted so far. */
+  /** The address of every script the head held at the start, and of each tag and script inserted since. */
   inserted: Set<string>;
 }
 
@@ -99,7 +99,7 @@ export class Analytics {
       return;
     }
     const feed = new EventFeed();
-    const inserted = new Set<string>();
+    const inserted = new Set(scriptsInHead());
     this.windowAnalytics = { started, feed, inserted };
     window[WINDOW_ANALYTICS] = this.windowAnalytics;
     const dataLayer = (window.dataLayer ??= []);

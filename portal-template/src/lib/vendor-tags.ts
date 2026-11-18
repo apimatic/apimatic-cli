@@ -81,6 +81,11 @@ export const adapters: { [V in Vendor]: (settings: PortalAnalytics) => Adapter |
   }
 };
 
+/** The address of every script the head already holds, as written: a host may inject one of the portal's itself. */
+export function scriptsInHead(): string[] {
+  return Array.from(document.head.querySelectorAll('script[src]'), (script) => script.getAttribute('src') ?? '');
+}
+
 /**
  * None on the OAuth callback, whose address holds the provider's answer; each once, so a later call adds the rest.
  * The page a sign-in returns to loads them at once, although the answer waits in the tab's session storage until

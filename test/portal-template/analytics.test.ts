@@ -139,19 +139,25 @@ interface FakeWindow {
 /** A page in the browser: the `window` and `document` the module reads, and the scripts the loader appends. */
 function browser(href: string, title = 'Quickstart | Acme API', referrer = '') {
   const scripts: FakeScript[] = [];
+  /** The address of each script the host put in the head itself, before the portal's bundle ran. */
+  const fromHost: string[] = [];
   let reloads = 0;
   const window: FakeWindow = { location: Object.assign(new URL(href), { reload: () => (reloads += 1) }) };
   const document = {
     title,
     referrer,
     createElement: (): FakeScript => ({ async: false, src: '', textContent: '' }),
-    head: { append: (script: FakeScript) => scripts.push(script) }
+    head: {
+      append: (script: FakeScript) => scripts.push(script),
+      querySelectorAll: () => fromHost.map((src) => ({ getAttribute: () => src }))
+    }
   };
   Object.assign(globalThis, { window, document });
   return {
     window,
     head: document.head,
     scripts,
+    fromHost,
     dataLayer: () => window.dataLayer ?? [],
     reloads: () => reloads,
     go: (next: string, nextTitle = title) => {
@@ -589,6 +595,18 @@ describe('Analytics', () => {
       new Analytics(none, [{ src: '/js/widget.js' }, { src: WIDGET }]).start();
 
       expect(page.scripts.map((script) => script.src)).to.deep.equal(['/js/widget.js', WIDGET]);
+    });
+
+    // A host, a snippet injector at its CDN or a proxy may add one of the same scripts to every page itself.
+    it('inserts no second copy of a tag or a listed script the host already put in the head', () => {
+      const page = browser(quickstart);
+      page.fromHost.push(GTM_SCRIPT, WIDGET);
+      const analytics = new Analytics(withGtm(), listed);
+
+      analytics.start();
+      analytics.reportPageView();
+
+      expect(page.scripts.map((script) => script.src)).to.deep.equal([SETUP]);
     });
 
     it('inserts each once: across page views, for a second instance, and for an address listed twice', () => {
