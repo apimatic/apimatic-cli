@@ -327,10 +327,10 @@ describe('PortalSourceContext', () => {
     it('reports a listed script file that is not on disk, or is spelt in another case, by the entry that names it', async () => {
       writeConfig({
         scripts: [
-          { src: 'https://cdn.example.com/widget.js' },
-          { src: 'static/js/setup.js' },
-          { src: 'static/js/Widget.js' },
-          { src: 'static/js/chat.js' }
+          { src: 'https://cdn.example.com/widget.js', category: 'analytics' },
+          { src: 'static/js/setup.js', category: 'necessary' },
+          { src: 'static/js/Widget.js', category: 'functional' },
+          { src: 'static/js/chat.js', category: 'functional' }
         ]
       });
       write('static/js/widget.js', 'x');
@@ -433,7 +433,7 @@ describe('PortalSourceContext', () => {
         site: { name: 'Calc' },
         scripts: [
           { src: at('banner'), category: 'necessary' },
-          { src: at('counter') },
+          { src: at('counter'), category: 'analytics' },
           { src: at('chat'), category: 'functional' },
           { src: at('pixel'), category: 'marketing' }
         ]

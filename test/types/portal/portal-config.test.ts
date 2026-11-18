@@ -629,9 +629,12 @@ describe('PortalConfig', () => {
     });
 
     it('tells the browser each address, in the order listed', () => {
-      const scripts = [{ src: SETUP }, { src: WIDGET }];
+      const scripts = [
+        { src: SETUP, category: 'necessary' },
+        { src: WIDGET, category: 'analytics' }
+      ];
 
-      expect(config({ scripts }).identity().scripts).to.deep.equal(scripts);
+      expect(config({ scripts }).identity().scripts).to.deep.equal([{ src: SETUP }, { src: WIDGET }]);
     });
 
     it('must be a list', () => {
@@ -645,19 +648,28 @@ describe('PortalConfig', () => {
     it('takes each entry as an object, never a bare address', () => {
       for (const entry of [WIDGET, [WIDGET], null, 7]) {
         expect(errorsOf({ scripts: [entry] }), JSON.stringify(entry)).to.deep.equal([
-          "'portal.scripts[0]' must be a JSON object with 'src'."
+          "'portal.scripts[0]' must be a JSON object with 'src' and 'category'."
         ]);
       }
     });
 
-    it('asks for src', () => {
-      expect(errorsOf({ scripts: [{}] })).to.deep.equal(["'portal.scripts[0].src' is required."]);
+    // No category is assumed: --no-analytics drops a script by it, and a guess would drop one nobody meant to.
+    it('asks for src and for category, and assumes neither', () => {
+      expect(errorsOf({ scripts: [{}] })).to.deep.equal([
+        "'portal.scripts[0].src' is required.",
+        "'portal.scripts[0].category' is required."
+      ]);
+      expect(errorsOf({ scripts: [{ src: WIDGET }] })).to.deep.equal(["'portal.scripts[0].category' is required."]);
     });
 
     // Neither is a setting in this release: a file in static/ adds a tag that needs attributes of its own.
     it('names a key it does not know, integrity and attributes among them', () => {
       expect(
-        errorsOf({ scripts: [{ src: WIDGET, integrity: 'sha384-abc', attributes: { 'data-site': 'acme' } }] })
+        errorsOf({
+          scripts: [
+            { src: WIDGET, category: 'analytics', integrity: 'sha384-abc', attributes: { 'data-site': 'acme' } }
+          ]
+        })
       ).to.deep.equal([
         "'portal.scripts[0].integrity' is not a 'portal' setting.",
         "'portal.scripts[0].attributes' is not a 'portal' setting."
@@ -674,20 +686,28 @@ describe('PortalConfig', () => {
         'https://cdn.example.com/my widget.js',
         ' https://cdn.example.com/widget.js'
       ]) {
-        expect(errorsOf({ scripts: [{ src }] }), JSON.stringify(src)).to.deep.equal([refused('portal.scripts[0].src')]);
+        expect(errorsOf({ scripts: [{ src, category: 'analytics' }] }), JSON.stringify(src)).to.deep.equal([
+          refused('portal.scripts[0].src')
+        ]);
       }
     });
 
     it('takes a file in the static directory, however its path is written, and tells the browser its place in the portal', () => {
       for (const src of ['static/js/widget.js', './static/js/widget.js', '.\\static\\js\\widget.js']) {
-        expect(config({ scripts: [{ src }] }).identity().scripts, src).to.deep.equal([{ src: '/js/widget.js' }]);
+        expect(config({ scripts: [{ src, category: 'analytics' }] }).identity().scripts, src).to.deep.equal([
+          { src: '/js/widget.js' }
+        ]);
       }
     });
 
     it("names its files after the brand's, each by its entry, for the check that they are on disk", () => {
       const portal = config({
         brand: { favicon: 'static/favicon.ico' },
-        scripts: [{ src: WIDGET }, { src: 'static/js/widget.js' }, { src: 'static/js/setup.js' }]
+        scripts: [
+          { src: WIDGET, category: 'analytics' },
+          { src: 'static/js/widget.js', category: 'functional' },
+          { src: 'static/js/setup.js', category: 'necessary' }
+        ]
       });
 
       expect(portal.staticFiles().map((file) => [file.settingPath(), file.portalPath()])).to.deep.equal([
@@ -713,7 +733,7 @@ describe('PortalConfig', () => {
         7,
         null
       ]) {
-        expect(errorsOf({ scripts: [{ src }] }), JSON.stringify(src)).to.deep.equal([
+        expect(errorsOf({ scripts: [{ src, category: 'analytics' }] }), JSON.stringify(src)).to.deep.equal([
           "'portal.scripts[0].src' must be an address starting with 'https://', or a path relative to 'src' inside " +
             "the 'static' directory, for example 'static/analytics.js'."
         ]);
@@ -731,14 +751,12 @@ describe('PortalConfig', () => {
       }
     });
 
-    // The one with no category goes too: nobody vouched that it counts no readers.
     it('keeps only necessary and functional scripts without analytics, in their order, and tells the browser no category', () => {
       const at = (name: string) => `https://cdn.example.com/${name}.js`;
       const portal = config({
         scripts: [
           { src: at('pixel'), category: 'marketing' },
           { src: at('chat'), category: 'functional' },
-          { src: at('uncategorised') },
           { src: 'static/js/banner.js', category: 'necessary' },
           { src: 'static/js/counter.js', category: 'analytics' }
         ]
@@ -747,7 +765,6 @@ describe('PortalConfig', () => {
       expect(portal.identity().scripts).to.deep.equal([
         { src: at('pixel') },
         { src: at('chat') },
-        { src: at('uncategorised') },
         { src: '/js/banner.js' },
         { src: '/js/counter.js' }
       ]);
@@ -760,21 +777,27 @@ describe('PortalConfig', () => {
           .withoutAnalytics()
           .staticFiles()
           .map((file) => file.settingPath())
-      ).to.deep.equal(['portal.scripts[3].src']);
+      ).to.deep.equal(['portal.scripts[2].src']);
     });
 
     it('reports every entry at once, each by its place in the list', () => {
       expect(
-        errorsOf({ scripts: [{ src: WIDGET }, { src: 'http://cdn.example.com/a.js', defer: true }, WIDGET] })
+        errorsOf({
+          scripts: [
+            { src: WIDGET, category: 'analytics' },
+            { src: 'http://cdn.example.com/a.js', category: 'analytics', defer: true },
+            WIDGET
+          ]
+        })
       ).to.deep.equal([
         "'portal.scripts[1].defer' is not a 'portal' setting.",
         refused('portal.scripts[1].src'),
-        "'portal.scripts[2]' must be a JSON object with 'src'."
+        "'portal.scripts[2]' must be a JSON object with 'src' and 'category'."
       ]);
     });
 
     it('keeps the address as it parses: the host in lowercase, and a query whole', () => {
-      const scripts = [{ src: 'https://CDN.Example.com/widget.js?site=a%2Fb&v=2' }];
+      const scripts = [{ src: 'https://CDN.Example.com/widget.js?site=a%2Fb&v=2', category: 'analytics' }];
 
       expect(config({ scripts }).identity().scripts).to.deep.equal([
         { src: 'https://cdn.example.com/widget.js?site=a%2Fb&v=2' }

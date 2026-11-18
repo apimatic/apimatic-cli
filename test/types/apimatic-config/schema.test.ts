@@ -111,7 +111,7 @@ describe('apimatic.schema.json', () => {
           seo: { googleSiteVerification: 'abc' },
           scripts: [
             { src: 'https://cdn.example.com/widget.js', category: 'necessary' },
-            { src: '.\\static\\js\\widget.js' }
+            { src: '.\\static\\js\\widget.js', category: 'analytics' }
           ]
         }
       ],
@@ -162,12 +162,15 @@ describe('apimatic.schema.json', () => {
       ['a kept name with a space, and an OAuth answer name', { analytics: { keepQueryParams: ['a b', 'code'] } }],
       ['an empty list of kept names', { analytics: { keepQueryParams: [] } }],
       ['a verification value with a space', { seo: { googleSiteVerification: 'abc 123' } }],
-      ['a script at an address', { scripts: [{ src: 'https://cdn.example.com/widget.js' }] }],
-      ['a script address in capitals, with a query', { scripts: [{ src: 'HTTPS://CDN.Example.com/widget.js?v=2' }] }],
-      ['a script file in the static directory', { scripts: [{ src: 'static/js/widget.js' }] }],
+      ['a script at an address', { scripts: [{ src: 'https://cdn.example.com/widget.js', category: 'analytics' }] }],
+      [
+        'a script address in capitals, with a query',
+        { scripts: [{ src: 'HTTPS://CDN.Example.com/widget.js?v=2', category: 'analytics' }] }
+      ],
+      ['a script file in the static directory', { scripts: [{ src: 'static/js/widget.js', category: 'analytics' }] }],
       [
         'a script file written with backslashes and spaces around it',
-        { scripts: [{ src: ' .\\static\\js\\widget.js ' }] }
+        { scripts: [{ src: ' .\\static\\js\\widget.js ', category: 'analytics' }] }
       ],
       ...SCRIPT_CATEGORIES.map((category): [string, object] => [
         `a script whose category is ${category}`,
@@ -322,19 +325,41 @@ describe('apimatic.schema.json', () => {
       ['scripts that are not a list', { scripts: { src: 'https://cdn.example.com/widget.js' } }],
       ['a script that is a bare address', { scripts: ['https://cdn.example.com/widget.js'] }],
       ['a script without src', { scripts: [{ category: 'necessary' }] }],
-      ['a script at an http address', { scripts: [{ src: 'http://cdn.example.com/widget.js' }] }],
-      ['a script address with a space', { scripts: [{ src: 'https://cdn.example.com/my widget.js' }] }],
-      ['a script address without a host', { scripts: [{ src: 'https://' }] }],
-      ['a script address without a host before its path', { scripts: [{ src: 'https:///cdn.example.com/widget.js' }] }],
-      ['a script address that is only a query', { scripts: [{ src: 'https://?widget.js' }] }],
-      ['a protocol-relative script address', { scripts: [{ src: '//cdn.example.com/widget.js' }] }],
-      ['a script file outside the static directory', { scripts: [{ src: 'js/widget.js' }] }],
-      ['a script file that leaves the static directory', { scripts: [{ src: 'static/../widget.js' }] }],
-      ['a blank script src', { scripts: [{ src: ' ' }] }],
+      ['a script without a category', { scripts: [{ src: 'static/js/widget.js' }] }],
+      [
+        'a script at an http address',
+        { scripts: [{ src: 'http://cdn.example.com/widget.js', category: 'analytics' }] }
+      ],
+      [
+        'a script address with a space',
+        { scripts: [{ src: 'https://cdn.example.com/my widget.js', category: 'analytics' }] }
+      ],
+      ['a script address without a host', { scripts: [{ src: 'https://', category: 'analytics' }] }],
+      [
+        'a script address without a host before its path',
+        { scripts: [{ src: 'https:///cdn.example.com/widget.js', category: 'analytics' }] }
+      ],
+      ['a script address that is only a query', { scripts: [{ src: 'https://?widget.js', category: 'analytics' }] }],
+      [
+        'a protocol-relative script address',
+        { scripts: [{ src: '//cdn.example.com/widget.js', category: 'analytics' }] }
+      ],
+      ['a script file outside the static directory', { scripts: [{ src: 'js/widget.js', category: 'analytics' }] }],
+      [
+        'a script file that leaves the static directory',
+        { scripts: [{ src: 'static/../widget.js', category: 'analytics' }] }
+      ],
+      ['a blank script src', { scripts: [{ src: ' ', category: 'analytics' }] }],
       ['an unknown script category', { scripts: [{ src: 'static/js/widget.js', category: 'essential' }] }],
       // Neither is a setting in this release.
-      ['a script with attributes', { scripts: [{ src: 'static/js/widget.js', attributes: { 'data-site': 'acme' } }] }],
-      ['a script with integrity', { scripts: [{ src: 'https://cdn.example.com/widget.js', integrity: 'sha384-abc' }] }]
+      [
+        'a script with attributes',
+        { scripts: [{ src: 'static/js/widget.js', category: 'analytics', attributes: { 'data-site': 'acme' } }] }
+      ],
+      [
+        'a script with integrity',
+        { scripts: [{ src: 'https://cdn.example.com/widget.js', category: 'analytics', integrity: 'sha384-abc' }] }
+      ]
     ];
 
     for (const [label, block] of valid) {
@@ -374,20 +399,6 @@ describe('apimatic.schema.json', () => {
           .reduce<unknown>((node, key) => (node as Record<string, unknown> | undefined)?.[key], applied);
         expect(actual, setting).to.deep.equal(value);
       }
-    });
-
-    // Analytics and marketing scripts are dropped alike, so this proves a default the flag drops, not which of the two.
-    it('offers the category the parser gives a script that names none, as far as --no-analytics shows', () => {
-      const offered: string = schema.definitions.portal.properties.scripts.items.properties.category.default;
-      const kept = (category?: string) =>
-        PortalConfig.fromBlock({ scripts: [{ src: 'static/js/widget.js', category }] }, suggested)
-          ._unsafeUnwrap()
-          .withoutAnalytics()
-          .identity().scripts.length;
-
-      expect(offered).to.equal('analytics');
-      expect(kept()).to.equal(kept(offered));
-      expect(kept()).to.not.equal(kept('necessary'));
     });
 
     // The other way round is covered by the scaffold, which writes every setting that has a

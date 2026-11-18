@@ -912,7 +912,10 @@ describe('PortalServeAction', () => {
       const applyConfig = sinon.spy(PortalProjectService.prototype, 'applyConfig');
       const at = (name: string) => `https://cdn.example.com/${name}.js`;
       const config = originalConfig();
-      config.portal.scripts = [{ src: at('banner'), category: 'necessary' }, { src: at('counter') }];
+      config.portal.scripts = [
+        { src: at('banner'), category: 'necessary' },
+        { src: at('counter'), category: 'analytics' }
+      ];
       writeConfig(config);
 
       await whileServing(async () => {

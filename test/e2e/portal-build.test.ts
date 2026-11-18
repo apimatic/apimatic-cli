@@ -202,7 +202,10 @@ const stylesheetOf = (output: DirectoryPath) => {
         googleConsentMode: { default: 'denied' }
       },
       seo: { googleSiteVerification: 'e2e-verification' },
-      scripts: [{ src: 'https://cdn.e2e.test/widget.js', category: 'necessary' }, { src: 'static/js/widget.js' }]
+      scripts: [
+        { src: 'https://cdn.e2e.test/widget.js', category: 'necessary' },
+        { src: 'static/js/widget.js', category: 'functional' }
+      ]
     }
   );
   const { read, exists } = portal;

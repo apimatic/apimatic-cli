@@ -17,7 +17,7 @@ describe('PreviewConfig', () => {
     });
 
     it('is said for a listed script file as for a logo, and not for a script at an address', () => {
-      const listing = (src: string) => config({ site: { name: 'Pets' }, scripts: [{ src }] });
+      const listing = (src: string) => config({ site: { name: 'Pets' }, scripts: [{ src, category: 'functional' }] });
       const preview = new PreviewConfig(named('Pets'), false);
 
       expect(preview.staticDirectoryNotServed(listing('https://cdn.example.com/widget.js'))).to.equal(false);

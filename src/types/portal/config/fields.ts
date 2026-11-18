@@ -81,10 +81,7 @@ export function optionalBoolean(value: unknown, path: string, fallback: boolean)
   return typeof value === 'boolean' ? ok(value) : err([`'${path}' must be true or false.`]);
 }
 
-export function oneOf<T extends string>(value: unknown, path: string, allowed: readonly T[], fallback: T): Parsed<T> {
-  if (value === undefined) {
-    return ok(fallback);
-  }
+export function oneOf<T extends string>(value: unknown, path: string, allowed: readonly T[]): Parsed<T> {
   if (typeof value === 'string' && (allowed as readonly string[]).includes(value)) {
     return ok(value as T);
   }

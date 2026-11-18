@@ -573,7 +573,11 @@ describe('PortalProjectService', () => {
     it('writes the listed scripts in order, and the new list when a save changes it', async () => {
       const setup = { src: 'https://cdn.example.com/setup.js' };
       const widget = { src: 'https://cdn.example.com/widget.js' };
-      const listing = (scripts: object[]) => configFor({ site: { name: 'My API' }, scripts });
+      const listing = (scripts: object[]) =>
+        configFor({
+          site: { name: 'My API' },
+          scripts: scripts.map((script) => ({ ...script, category: 'functional' }))
+        });
       (await service.prepare(project, sourceFor({ config: listing([setup, widget]) }), NO_ARTIFACTS))._unsafeUnwrap();
 
       expect(readIdentity().scripts).to.deep.equal([setup, widget]);
@@ -586,7 +590,13 @@ describe('PortalProjectService', () => {
     it('writes only the scripts a config without analytics keeps, and every script from the whole config', async () => {
       const banner = { src: 'https://cdn.example.com/banner.js' };
       const counter = { src: 'https://cdn.example.com/counter.js' };
-      const config = configFor({ site: { name: 'My API' }, scripts: [{ ...banner, category: 'necessary' }, counter] });
+      const config = configFor({
+        site: { name: 'My API' },
+        scripts: [
+          { ...banner, category: 'necessary' },
+          { ...counter, category: 'analytics' }
+        ]
+      });
       (await service.prepare(project, sourceFor({ config: config.withoutAnalytics() }), NO_ARTIFACTS))._unsafeUnwrap();
 
       expect(readIdentity().scripts).to.deep.equal([banner]);

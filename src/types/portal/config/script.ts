@@ -52,14 +52,14 @@ export class Script {
 
   private static parse(value: unknown, path: string): Parsed<Script> {
     if (!isJsonObject(value)) {
-      return err([`'${path}' must be a JSON object with 'src'.`]);
+      return err([`'${path}' must be a JSON object with 'src' and 'category'.`]);
     }
     return allOf(
       unknownKeys(value, KNOWN, path),
       Result.combineWithAllErrors([
         required(value.src, `${path}.src`, Script.parseSource),
-        // Left out, it counts as analytics: a staging build must not load a script nobody vouched for.
-        oneOf(value.category, `${path}.category`, SCRIPT_CATEGORIES, 'analytics')
+        // Never assumed: `--no-analytics` drops a script by its category, and a guess would drop one nobody meant to.
+        required(value.category, `${path}.category`, (category, at) => oneOf(category, at, SCRIPT_CATEGORIES))
       ])
     ).map(([source, category]) => new Script(source, category));
   }

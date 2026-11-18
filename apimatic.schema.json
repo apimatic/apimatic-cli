@@ -274,7 +274,7 @@
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["src"],
+            "required": ["src", "category"],
             "properties": {
               "src": {
                 "description": "An address starting with 'https://', with no spaces, or a file in the 'static' directory, for example 'static/analytics.js'.",
@@ -289,9 +289,8 @@
               },
               "category": {
                 "type": "string",
-                "description": "What the script is for. --no-analytics leaves out the 'analytics' and 'marketing' scripts, and a script that names no category counts as 'analytics'.",
-                "enum": ["necessary", "functional", "analytics", "marketing"],
-                "default": "analytics"
+                "description": "What the script is for. --no-analytics leaves out the 'analytics' and 'marketing' scripts.",
+                "enum": ["necessary", "functional", "analytics", "marketing"]
               }
             }
           }
