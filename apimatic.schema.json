@@ -233,7 +233,7 @@
             },
             "googleConsentMode": {
               "type": "object",
-              "description": "Starts the Google tags set here in Google's Consent Mode: they load at once, set no cookies and mark every hit as denied until your consent tool calls gtag('consent', 'update'). Set it when a consent banner decides what is tracked. It holds back no script listed in 'scripts'.",
+              "description": "Starts Google's own tags in Google's Consent Mode: they load at once, set no cookies and mark every hit as denied until your consent tool calls gtag('consent', 'update'). Other vendors' tags inside a Google Tag Manager container need consent checks of their own there. Set it when a consent banner decides what is tracked. It holds back no script listed in 'scripts'.",
               "additionalProperties": false,
               "required": ["default"],
               "properties": {
