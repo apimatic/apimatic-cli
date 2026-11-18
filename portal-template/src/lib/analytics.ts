@@ -40,11 +40,14 @@ export type PortalEventName = keyof PortalEvents;
 type DataLayerEntry = { docs: null } | { event: PortalEventName; docs: Readonly<Record<string, string | number>> };
 
 /** A symbol, so the window holds it under no name a script comes across and builds on. */
-const PAGE = Symbol.for('apimatic.portal.analytics');
+const WINDOW_ANALYTICS = Symbol.for('apimatic.portal.analytics');
 
-/** Held by the window for every instance on the page: a config save under `portal serve` makes a second one. */
-interface PageAnalytics {
-  /** The settings and scripts the page started with. */
+/**
+ * One per `Window` object (https://developer.mozilla.org/en-US/docs/Web/API/Window), which a reload replaces.
+ * Every instance in it shares this one: a config save under `portal serve` makes a second.
+ */
+interface WindowAnalytics {
+  /** The settings and scripts the window started with. */
   started: string;
   feed: EventFeed;
   /** The address of every tag and script inserted so far. */
@@ -54,7 +57,7 @@ interface PageAnalytics {
 declare global {
   interface Window {
     dataLayer?: unknown[];
-    [PAGE]?: PageAnalytics;
+    [WINDOW_ANALYTICS]?: WindowAnalytics;
     /** What customers' scripts are given: `subscribe()` and nothing else. */
     apimatic?: { analytics?: Pick<EventFeed, 'subscribe'> };
   }
@@ -86,20 +89,20 @@ export class Analytics {
 
   public start(): void {
     const started = JSON.stringify([this.settings, this.scripts]);
-    if (window[PAGE]?.started === started) return;
-    // Other vendors or scripts after a config save: only a fresh page holds exactly their tags.
-    if (window[PAGE] !== undefined) {
+    if (window[WINDOW_ANALYTICS]?.started === started) return;
+    // Other vendors or scripts after a config save: only a fresh window holds exactly their tags.
+    if (window[WINDOW_ANALYTICS] !== undefined) {
       window.location.reload();
       return;
     }
     const feed = new EventFeed();
     const inserted = new Set<string>();
-    window[PAGE] = { started, feed, inserted };
+    window[WINDOW_ANALYTICS] = { started, feed, inserted };
     const dataLayer = (window.dataLayer ??= []);
     if (this.settings.googleConsentMode !== null) queueConsentDefaults(dataLayer);
     for (const adapter of this.live) adapter.setup(dataLayer);
     try {
-      // Ours whatever a page put there first, and `subscribe` alone, bound so a script may call it on its own.
+      // Ours whatever the window held there first, and `subscribe` alone, bound so a script may call it on its own.
       window.apimatic = { ...window.apimatic, analytics: Object.freeze({ subscribe: feed.subscribe.bind(feed) }) };
     } catch (error) {
       // A host may have locked the name. Thrown later, so it shows in the console and the bundle goes on loading.
@@ -120,12 +123,12 @@ export class Analytics {
     dataLayer.push({ event: name, docs } satisfies DataLayerEntry);
     for (const adapter of this.live) adapter.send?.(name, docs);
     // A build made with `--no-analytics` keeps `subscribe()` for its scripts and hands them nothing.
-    if (this.settings.eventFeed === 'on') window[PAGE]?.feed.publish(name, docs);
+    if (this.settings.eventFeed === 'on') window[WINDOW_ANALYTICS]?.feed.publish(name, docs);
   }
 
   public reportPageView(): void {
     if (isOAuthCallbackPath(window.location.pathname)) return;
-    const inserted = window[PAGE]?.inserted;
+    const inserted = window[WINDOW_ANALYTICS]?.inserted;
     // The tags and scripts a start on the OAuth callback left out, now that the reader has moved on from it.
     if (inserted !== undefined) insertTags(this.live, this.scripts, inserted);
     const page = pageLocation(window.location.href, this.settings.keepQueryParams);

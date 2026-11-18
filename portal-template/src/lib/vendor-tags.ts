@@ -20,7 +20,7 @@ export interface Adapter {
 type Vendor = Exclude<keyof PortalAnalytics, 'googleConsentMode' | 'keepQueryParams' | 'eventFeed'>;
 const GOOGLE = 'https://www.googletagmanager.com';
 
-/** The page's own gtag, or one made here: Google reads only Arguments objects from the data layer, never arrays. */
+/** The window's own gtag, or one made here: Google reads only Arguments objects from the data layer, never arrays. */
 function pageGtag(dataLayer: unknown[]): Gtag {
   return (window.gtag ??= function () {
     dataLayer.push(arguments);
@@ -64,7 +64,7 @@ export const adapters: { [V in Vendor]: (settings: PortalAnalytics) => Adapter |
       send: (name, params) => {
         // GA4's own events, such as a scroll, read this instead of the address, which may hold more.
         if (name === 'docs_page_view') window.gtag?.('set', { page_location: params.page_location });
-        // The page's gtag, since a second instance under `portal serve` never runs its setup.
+        // The window's gtag, since a second instance under `portal serve` never runs its setup.
         window.gtag?.('event', name.replace(/^docs_/, ''), params);
       }
     };

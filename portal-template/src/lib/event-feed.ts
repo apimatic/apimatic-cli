@@ -16,7 +16,7 @@ interface Subscription {
   deliveredCount: number;
 }
 
-/** A page's events, for the scripts on it: a subscriber gets every one reported so far, then each new one. */
+/** A window's events, for the scripts in it: a subscriber gets every one reported so far, then each new one. */
 export class EventFeed {
   private readonly events: PortalEvent[] = [];
   private readonly subscriptions = new Set<Subscription>();

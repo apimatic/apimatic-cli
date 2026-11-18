@@ -372,7 +372,7 @@ describe('Analytics', () => {
       expect(page.dataLayer().filter(isArguments)).to.be.empty;
     });
 
-    it("sends through the page's gtag from a second instance, as a config save under portal serve makes", () => {
+    it("sends through the window's gtag from a second instance, as a config save under portal serve makes", () => {
       const page = browser(quickstart);
       new Analytics(withGa4, []).start();
       const second = new Analytics(withGa4, []);
@@ -403,7 +403,7 @@ describe('Analytics', () => {
       expect(page.scripts.map((script) => script.src)).to.deep.equal([GTM_SCRIPT, GA4_SCRIPT]);
     });
 
-    it('starts once per page, for a second start and for a second instance alike', () => {
+    it('starts once per window, for a second start and for a second instance alike', () => {
       const page = browser(quickstart);
       const analytics = new Analytics(withBoth, []);
 
@@ -457,7 +457,7 @@ describe('Analytics', () => {
       expect(page.scripts.map((script) => script.src)).to.deep.equal([GTM_SCRIPT, GA4_SCRIPT]);
     });
 
-    it('queues them once per page, for a second start and for a second instance alike', () => {
+    it('queues them once per window, for a second start and for a second instance alike', () => {
       const page = browser(quickstart);
       const settings = { ...withGa4, googleConsentMode: denied };
       const analytics = new Analytics(settings, []);
@@ -469,7 +469,7 @@ describe('Analytics', () => {
       expect(consentCommands(page.dataLayer())).to.have.length(1);
     });
 
-    // A container reads the same Arguments entries, and a consent tool calls the page's gtag to hand over an answer.
+    // A container reads the same Arguments entries, and a consent tool calls the window's gtag to hand over an answer.
     it('queues them on a portal with Google Tag Manager alone, through a gtag it gives the page', () => {
       const page = browser(quickstart);
 
