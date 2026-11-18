@@ -47,7 +47,7 @@ export interface PortalAnalytics {
   googleAnalytics: GoogleAnalyticsSetting | null;
   googleConsentMode: GoogleConsentModeSetting | null;
   keepQueryParams: string[];
-  /** Off in a build made with `--no-analytics`, whose scripts are handed no event. */
+  /** Off in a build made with `--no-analytics`, which reports no event: none to the data layer, none to a script. */
   eventFeed: 'on' | 'off';
 }
 

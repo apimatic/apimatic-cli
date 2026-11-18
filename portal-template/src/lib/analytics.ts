@@ -127,6 +127,8 @@ export class Analytics {
 
   /** `href` is the page the event belongs to, when the caller saw the address move on first. */
   public report<E extends PortalEventName>(name: E, params: PortalEvents[E], href = window.location.href): void {
+    // A `--no-analytics` build reports nothing, even to the data layer: a container a kept script loads reads it.
+    if (this.settings.eventFeed === 'off') return;
     if (isOAuthCallbackPath(new URL(href).pathname)) return;
     const docs = { ...params, page_location: pageLocation(href, this.settings.keepQueryParams) };
     const dataLayer = (window.dataLayer ??= []);
@@ -134,8 +136,7 @@ export class Analytics {
     dataLayer.push({ docs: null } satisfies DataLayerEntry);
     dataLayer.push({ event: name, docs } satisfies DataLayerEntry);
     for (const adapter of this.live) adapter.send?.(name, docs);
-    // A build made with `--no-analytics` keeps `subscribe()` for its scripts and hands them nothing.
-    if (this.settings.eventFeed === 'on') this.windowAnalytics?.feed.publish(name, docs);
+    this.windowAnalytics?.feed.publish(name, docs);
   }
 
   public reportPageView(): void {

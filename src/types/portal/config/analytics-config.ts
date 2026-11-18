@@ -28,7 +28,7 @@ export interface PortalAnalytics {
   googleAnalytics: GoogleAnalyticsSetting | null;
   googleConsentMode: GoogleConsentModeSetting | null;
   keepQueryParams: string[];
-  /** Off in a build made with `--no-analytics`, whose scripts are handed no event. */
+  /** Off in a build made with `--no-analytics`, which reports no event: none to the data layer, none to a script. */
   eventFeed: 'on' | 'off';
 }
 
@@ -75,8 +75,9 @@ export class AnalyticsConfig {
   }
 
   /**
-   * For a staging build: no tag and no event for a script; an address keeps the same names. The consent default
-   * stays, since a script the build keeps may load a Google tag of its own, which has to start as denied there too.
+   * For a staging build: no tag, and no event in the data layer or for a script; an address keeps the same names.
+   * The consent default stays, since a script the build keeps may load a Google tag of its own, which has to start
+   * as denied there too.
    */
   public withoutAnalytics(): AnalyticsConfig {
     return new AnalyticsConfig(null, null, this.googleConsentMode, this.keepQueryParams, 'off');

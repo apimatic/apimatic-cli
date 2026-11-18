@@ -542,6 +542,19 @@ describe('Analytics', () => {
       expect(gtagCalls(page.dataLayer())).to.deep.equal([defaults]);
     });
 
+    // A --no-analytics build keeps the default for a Google tag a kept script loads, and reports no event beside it.
+    it('queues them in a --no-analytics build, where the data layer then holds them alone', () => {
+      const page = browser(quickstart);
+      const analytics = new Analytics({ ...none, googleConsentMode: denied, eventFeed: 'off' }, []);
+
+      analytics.start();
+      analytics.reportPageView();
+      analytics.report('docs_markdown_copy', {});
+
+      expect(page.dataLayer()).to.have.length(1);
+      expect(gtagCalls(page.dataLayer())).to.deep.equal([defaults]);
+    });
+
     it('queues them at a start on the OAuth callback, where no tag loads', () => {
       const page = browser('https://docs.test/oauth/callback?code=abc&state=123');
 
@@ -886,8 +899,8 @@ describe('Analytics', () => {
       expect(events).to.be.empty;
     });
 
-    // A staging build keeps its `necessary` and `functional` scripts, which call subscribe() as on any build.
-    it('hands a subscriber nothing in a --no-analytics build, with subscribe in place and the data layer as ever', async () => {
+    // A staging build keeps its `necessary` and `functional` scripts, which may load a container that reads the data layer.
+    it('reports nothing in a --no-analytics build, to a subscriber or to the data layer, with subscribe in place', async () => {
       const page = browser(quickstart);
       const analytics = new Analytics({ ...none, eventFeed: 'off' }, []);
       analytics.start();
@@ -900,12 +913,7 @@ describe('Analytics', () => {
 
       expect(events).to.be.empty;
       expect(stop).to.be.a('function');
-      expect(
-        page
-          .dataLayer()
-          .filter(isPlainObject)
-          .map((entry) => entry.event)
-      ).to.deep.equal([undefined, 'docs_page_view', undefined, 'docs_search']);
+      expect(page.dataLayer()).to.be.empty;
     });
 
     it('keeps a subscriber through a second instance, as a config save under portal serve makes', async () => {
