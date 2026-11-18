@@ -30,11 +30,13 @@ function windowGtag(): Gtag | undefined {
 
 /** The window's own, or one made here: Google reads only Arguments objects from the data layer, never arrays. */
 function gtagFor(dataLayer: unknown[]): Gtag {
-  return (window.gtag =
+  const gtag =
     windowGtag() ??
     function () {
       dataLayer.push(arguments);
-    });
+    };
+  window.gtag = gtag;
+  return gtag;
 }
 
 /** Ahead of every vendor's setup: Google reads a reader's answer from what is queued before its first event. */
