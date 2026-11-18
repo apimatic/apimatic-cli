@@ -74,9 +74,12 @@ export class AnalyticsConfig {
     };
   }
 
-  /** For a staging build: no tag, nothing queued for one, no event for a script; an address keeps the same names. */
+  /**
+   * For a staging build: no tag and no event for a script; an address keeps the same names. The consent default
+   * stays, since a script the build keeps may load a Google tag of its own, which has to start as denied there too.
+   */
   public withoutAnalytics(): AnalyticsConfig {
-    return new AnalyticsConfig(null, null, null, this.keepQueryParams, 'off');
+    return new AnalyticsConfig(null, null, this.googleConsentMode, this.keepQueryParams, 'off');
   }
 }
 

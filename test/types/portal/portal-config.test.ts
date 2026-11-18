@@ -558,7 +558,8 @@ describe('PortalConfig', () => {
       ]);
     });
 
-    it('tells a build without analytics to load no vendor, queue no consent default and hand over no event', () => {
+    // A script such a build keeps may load a Google tag of its own, which has to start as denied there too.
+    it('tells a build without analytics to load no vendor and hand over no event, and keeps the consent default', () => {
       const analytics = {
         googleTagManager: { containerId: 'GTM-ABC123' },
         googleAnalytics: { measurementId: 'G-ABC123' },
@@ -572,7 +573,7 @@ describe('PortalConfig', () => {
         analytics: {
           googleTagManager: null,
           googleAnalytics: null,
-          googleConsentMode: null,
+          googleConsentMode: { default: 'denied' },
           keepQueryParams: ['campaign_id'],
           eventFeed: 'off'
         }
