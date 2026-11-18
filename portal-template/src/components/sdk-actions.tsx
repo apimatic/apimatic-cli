@@ -77,7 +77,7 @@ export function DownloadLink({ href, className, language, children }: Readonly<D
       href={withBasePath(href)}
       download
       className={className}
-      onClick={() => analytics.report('docs_sdk_download', { language: languageId(language) })}
+      onClick={() => analytics.report('docs_sdk_download', { sdk_language: languageId(language) })}
     >
       {children}
     </a>

@@ -7,7 +7,7 @@ import { analytics } from '@/lib/portal-analytics';
 type Actions = NonNullable<BlockProps['Actions']>;
 
 export const reportCodeCopy = (language: string) =>
-  analytics.report('docs_code_copy', { language: languageId(language) });
+  analytics.report('docs_code_copy', { code_language: languageId(language) });
 
 // Fumadocs' own, which any Actions a block is given replaces.
 const DefaultActions: Actions = ({ className, children }) => (

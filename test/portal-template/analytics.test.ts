@@ -80,8 +80,8 @@ describe('PortalEvents', () => {
     docs_page_view: { page_title: true },
     docs_markdown_copy: {},
     docs_plugin_install: {},
-    docs_sdk_download: { language: true },
-    docs_code_copy: { language: true },
+    docs_sdk_download: { sdk_language: true },
+    docs_code_copy: { code_language: true },
     docs_search: { search_term: true, result: true, result_count: true },
     docs_not_found: { page_referrer: true },
     docs_api_request: { endpoint: true, status: true, duration_ms: true }
@@ -94,12 +94,17 @@ describe('PortalEvents', () => {
       ['docs_page_view', ['page_title']],
       ['docs_markdown_copy', []],
       ['docs_plugin_install', []],
-      ['docs_sdk_download', ['language']],
-      ['docs_code_copy', ['language']],
+      ['docs_sdk_download', ['sdk_language']],
+      ['docs_code_copy', ['code_language']],
       ['docs_search', ['search_term', 'result', 'result_count']],
       ['docs_not_found', ['page_referrer']],
       ['docs_api_request', ['endpoint', 'status', 'duration_ms']]
     ]);
+  });
+
+  // gtag takes `language` on an event for the reader's own, so GA4's Language report would list `python`.
+  it('names no key `language`', () => {
+    expect(Object.values(events).flatMap((keys) => Object.keys(keys))).to.not.include('language');
   });
 
   it('names every event docs_ plus lowercase snake_case, at most 40 characters', () => {
@@ -738,14 +743,14 @@ describe('Analytics', () => {
 
       const events = subscribe(page);
       await settled();
-      analytics.report('docs_code_copy', { language: 'python' });
+      analytics.report('docs_code_copy', { code_language: 'python' });
 
       expect(events.map(({ name, params }) => [name, params])).to.deep.equal([
         [
           'docs_page_view',
           { page_title: 'Quickstart | Acme API', page_location: `${quickstart}?utm_source=newsletter` }
         ],
-        ['docs_code_copy', { language: 'python', page_location: `${quickstart}?utm_source=newsletter` }]
+        ['docs_code_copy', { code_language: 'python', page_location: `${quickstart}?utm_source=newsletter` }]
       ]);
     });
 
@@ -754,7 +759,7 @@ describe('Analytics', () => {
       const page = browser(quickstart);
       const analytics = new Analytics(none, []);
       analytics.start();
-      analytics.report('docs_code_copy', { language: 'python' });
+      analytics.report('docs_code_copy', { code_language: 'python' });
 
       const events = subscribe(page);
       await settled();
@@ -876,7 +881,7 @@ describe('Analytics', () => {
         const analytics = new Analytics(withBoth, []);
         analytics.start();
 
-        analytics.report('docs_code_copy', { language: 'cURL' });
+        analytics.report('docs_code_copy', { code_language: 'cURL' });
         analytics.report('docs_markdown_copy', {});
 
         expect(page.dataLayer()).to.have.length(3);
@@ -1004,12 +1009,12 @@ describe('Analytics', () => {
       const page = browser(quickstart);
       const analytics = new Analytics(none, []);
       analytics.start();
-      analytics.report('docs_code_copy', { language: 'python' });
+      analytics.report('docs_code_copy', { code_language: 'python' });
       analytics.report('docs_page_view', { page_title: 'B' });
 
       expect(mergedLikeGtm(page.dataLayer()).docs).to.deep.equal({ page_title: 'B', page_location: quickstart });
       const withoutResets = page.dataLayer().filter((entry) => !(isPlainObject(entry) && entry.docs === null));
-      expect(mergedLikeGtm(withoutResets).docs).to.have.property('language', 'python');
+      expect(mergedLikeGtm(withoutResets).docs).to.have.property('code_language', 'python');
     });
 
     it('reports the page the caller names, not the one the address has moved on to', () => {

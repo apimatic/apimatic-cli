@@ -30,7 +30,7 @@ describe('EventFeed', () => {
     await settled();
     expect(names(events)).to.deep.equal(['docs_page_view', 'docs_search']);
 
-    feed.publish('docs_code_copy', { language: 'python' });
+    feed.publish('docs_code_copy', { code_language: 'python' });
     expect(names(events)).to.deep.equal(['docs_page_view', 'docs_search', 'docs_code_copy']);
   });
 
@@ -60,7 +60,7 @@ describe('EventFeed', () => {
   // Customers' scripts read these. They are plain text here, so a new or renamed key is a change made on purpose.
   it('gives an event exactly these keys, and version 1', async () => {
     const feed = new EventFeed();
-    feed.publish('docs_code_copy', { language: 'python', page_location: 'https://docs.test/' });
+    feed.publish('docs_code_copy', { code_language: 'python', page_location: 'https://docs.test/' });
 
     const events = collect(feed);
     await settled();
@@ -68,7 +68,7 @@ describe('EventFeed', () => {
     expect(Object.keys(events[0])).to.deep.equal(['name', 'params', 'time', 'version']);
     expect(events[0]).to.deep.equal({
       name: 'docs_code_copy',
-      params: { language: 'python', page_location: 'https://docs.test/' },
+      params: { code_language: 'python', page_location: 'https://docs.test/' },
       time: NOW,
       version: 1
     });
@@ -76,7 +76,7 @@ describe('EventFeed', () => {
 
   it('freezes the event and its details, and leaves the details it was given as they were', async () => {
     const feed = new EventFeed();
-    const given = { language: 'python' };
+    const given = { code_language: 'python' };
     feed.publish('docs_code_copy', given);
 
     const events = collect(feed);
