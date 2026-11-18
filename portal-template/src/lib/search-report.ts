@@ -23,6 +23,6 @@ export function searchOutcome(state: SearchDialogState): SearchOutcome {
   const search_term = state.term.trim().slice(0, TERM_LIMIT);
   const counted = (state.typed || state.picked !== '') && search_term !== '';
   // In the shape of `page_location`, so a report joins the two: a heading hit loses its `#` part.
-  const result = state.picked === '' ? '' : pageLocation(state.picked, []);
-  return { ended: true, report: counted ? { search_term, result, result_count: state.resultCount } : null };
+  const picked_result = state.picked === '' ? '' : pageLocation(state.picked, []);
+  return { ended: true, report: counted ? { search_term, picked_result, result_count: state.resultCount } : null };
 }

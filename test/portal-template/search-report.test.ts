@@ -19,7 +19,7 @@ describe('searchOutcome', () => {
   it('reports a typed term with the count shown once the results are in', () => {
     expect(searchOutcome(closed)).to.deep.equal({
       ended: true,
-      report: { search_term: 'pets', result: '', result_count: 3 }
+      report: { search_term: 'pets', picked_result: '', result_count: 3 }
     });
   });
 
@@ -29,7 +29,7 @@ describe('searchOutcome', () => {
 
     expect(searchOutcome({ ...closed, typed: false, picked })).to.deep.equal({
       ended: true,
-      report: { search_term: 'pets', result: picked, result_count: 3 }
+      report: { search_term: 'pets', picked_result: picked, result_count: 3 }
     });
   });
 
@@ -38,7 +38,7 @@ describe('searchOutcome', () => {
     const picked = 'https://docs.acme.com/docs/guides/intro#install';
 
     expect(searchOutcome({ ...closed, picked })).to.have.nested.property(
-      'report.result',
+      'report.picked_result',
       'https://docs.acme.com/docs/guides/intro'
     );
   });

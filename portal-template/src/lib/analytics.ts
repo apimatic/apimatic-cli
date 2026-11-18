@@ -30,7 +30,7 @@ export interface PortalEvents {
   // Neither is named `language`: gtag takes that name on an event for the reader's own language.
   docs_sdk_download: { sdk_language: string };
   docs_code_copy: { code_language: string };
-  docs_search: { search_term: string; result: string; result_count: number };
+  docs_search: { search_term: string; picked_result: string; result_count: number };
   docs_not_found: { page_referrer: string };
   /** `status` is always text: the HTTP status in digits, or `client_error` for a request that never reached the API. */
   docs_api_request: { endpoint: string; status: string; duration_ms: number };

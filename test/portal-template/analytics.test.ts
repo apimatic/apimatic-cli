@@ -82,7 +82,7 @@ describe('PortalEvents', () => {
     docs_plugin_install: {},
     docs_sdk_download: { sdk_language: true },
     docs_code_copy: { code_language: true },
-    docs_search: { search_term: true, result: true, result_count: true },
+    docs_search: { search_term: true, picked_result: true, result_count: true },
     docs_not_found: { page_referrer: true },
     docs_api_request: { endpoint: true, status: true, duration_ms: true }
   };
@@ -96,7 +96,7 @@ describe('PortalEvents', () => {
       ['docs_plugin_install', []],
       ['docs_sdk_download', ['sdk_language']],
       ['docs_code_copy', ['code_language']],
-      ['docs_search', ['search_term', 'result', 'result_count']],
+      ['docs_search', ['search_term', 'picked_result', 'result_count']],
       ['docs_not_found', ['page_referrer']],
       ['docs_api_request', ['endpoint', 'status', 'duration_ms']]
     ]);
@@ -793,7 +793,7 @@ describe('Analytics', () => {
 
       const stop = page.window.apimatic?.analytics.subscribe((event) => events.push(event));
       analytics.reportPageView();
-      analytics.report('docs_search', { search_term: 'refund', result: '', result_count: 0 });
+      analytics.report('docs_search', { search_term: 'refund', picked_result: '', result_count: 0 });
       await settled();
 
       expect(events).to.be.empty;
@@ -1024,7 +1024,7 @@ describe('Analytics', () => {
 
       analytics.report(
         'docs_search',
-        { search_term: 'auth', result: '/guides/authentication', result_count: 3 },
+        { search_term: 'auth', picked_result: '/guides/authentication', result_count: 3 },
         quickstart
       );
 
