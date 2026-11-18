@@ -372,6 +372,28 @@ describe('Analytics', () => {
       expect(page.dataLayer().filter(isArguments)).to.be.empty;
     });
 
+    // The browser answers `window.gtag` with an element whose id is `gtag`, which a heading by that name gets.
+    it('makes a gtag of its own where the window answers that name with an element, as for a heading', () => {
+      const page = browser(quickstart);
+      Object.assign(page.window, { gtag: { id: 'gtag' } });
+      const analytics = new Analytics(withGa4, []);
+
+      analytics.start();
+      analytics.reportPageView();
+
+      expect(page.window.gtag).to.be.a('function');
+      expect(gtagCalls(page.dataLayer()).map((command) => command[0])).to.deep.equal(['js', 'config', 'set', 'event']);
+    });
+
+    // An instance that ran no setup, as one whose start asked for a reload, finds the element still there.
+    it('sends nothing, and throws nothing, through an element by that name', () => {
+      const page = browser(quickstart);
+      Object.assign(page.window, { gtag: { id: 'gtag' } });
+
+      expect(() => new Analytics(withGa4, []).report('docs_markdown_copy', {})).to.not.throw();
+      expect(page.dataLayer().filter(isArguments)).to.be.empty;
+    });
+
     it("sends through the window's gtag from a second instance, as a config save under portal serve makes", () => {
       const page = browser(quickstart);
       new Analytics(withGa4, []).start();
@@ -492,6 +514,17 @@ describe('Analytics', () => {
 
       expect(calls[0]).to.deep.equal(defaults);
       expect(calls.map((command) => command[0])).to.deep.equal(['consent', 'js', 'config']);
+    });
+
+    // With the setting alone, a page whose heading is called gtag used to stop the bundle on every fresh load.
+    it('queues them through a gtag of its own where the window answers that name with an element', () => {
+      const page = browser(quickstart);
+      Object.assign(page.window, { gtag: { id: 'gtag' } });
+
+      new Analytics({ ...none, googleConsentMode: denied }, []).start();
+
+      expect(gtagCalls(page.dataLayer())).to.deep.equal([defaults]);
+      expect(page.window.gtag).to.be.a('function');
     });
 
     // For a Google snippet the customer lists in portal.scripts themselves.

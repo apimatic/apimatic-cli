@@ -20,16 +20,26 @@ export interface Adapter {
 type Vendor = Exclude<keyof PortalAnalytics, 'googleConsentMode' | 'keepQueryParams' | 'eventFeed'>;
 const GOOGLE = 'https://www.googletagmanager.com';
 
-/** The window's own gtag, or one made here: Google reads only Arguments objects from the data layer, never arrays. */
-function pageGtag(dataLayer: unknown[]): Gtag {
-  return (window.gtag ??= function () {
-    dataLayer.push(arguments);
-  });
+/**
+ * The window's gtag, when it is one. For an element whose id is `gtag`, such as a guide's heading, the browser
+ * answers `window.gtag` with that element, and calling it stopped the whole bundle.
+ */
+function windowGtag(): Gtag | undefined {
+  return typeof window.gtag === 'function' ? window.gtag : undefined;
+}
+
+/** The window's own, or one made here: Google reads only Arguments objects from the data layer, never arrays. */
+function gtagFor(dataLayer: unknown[]): Gtag {
+  return (window.gtag =
+    windowGtag() ??
+    function () {
+      dataLayer.push(arguments);
+    });
 }
 
 /** Ahead of every vendor's setup: Google reads a reader's answer from what is queued before its first event. */
 export function queueConsentDefaults(dataLayer: unknown[]): void {
-  pageGtag(dataLayer)('consent', 'default', {
+  gtagFor(dataLayer)('consent', 'default', {
     ad_storage: 'denied',
     ad_user_data: 'denied',
     ad_personalization: 'denied',
@@ -56,16 +66,16 @@ export const adapters: { [V in Vendor]: (settings: PortalAnalytics) => Adapter |
     if (setting === null) return null;
     return {
       setup: (dataLayer) => {
-        const gtag = pageGtag(dataLayer);
+        const gtag = gtagFor(dataLayer);
         gtag('js', new Date());
         gtag('config', setting.measurementId, { send_page_view: false });
       },
       script: `${GOOGLE}/gtag/js?id=${encodeURIComponent(setting.measurementId)}`,
       send: (name, params) => {
         // GA4's own events, such as a scroll, read this instead of the address, which may hold more.
-        if (name === 'docs_page_view') window.gtag?.('set', { page_location: params.page_location });
+        if (name === 'docs_page_view') windowGtag()?.('set', { page_location: params.page_location });
         // The window's gtag, since a second instance under `portal serve` never runs its setup.
-        window.gtag?.('event', name.replace(/^docs_/, ''), params);
+        windowGtag()?.('event', name.replace(/^docs_/, ''), params);
       }
     };
   }
