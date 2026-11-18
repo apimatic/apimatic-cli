@@ -77,6 +77,8 @@ export function pageLocation(href: string, keep: readonly string[]): string {
 
 export class Analytics {
   private readonly live: Adapter[];
+  /** The window's, once `start()` has made it or joined it: no other method reads the global. */
+  private windowAnalytics: WindowAnalytics | undefined;
   private lastPageView: string | null = null;
   private previousPageView: string | null = null;
   private lastNotFound: string | null = null;
@@ -89,15 +91,17 @@ export class Analytics {
 
   public start(): void {
     const started = JSON.stringify([this.settings, this.scripts]);
-    if (window[WINDOW_ANALYTICS]?.started === started) return;
-    // Other vendors or scripts after a config save: only a fresh window holds exactly their tags.
-    if (window[WINDOW_ANALYTICS] !== undefined) {
-      window.location.reload();
+    const existing = window[WINDOW_ANALYTICS];
+    if (existing !== undefined) {
+      // Other vendors or scripts after a config save: only a fresh window holds exactly their tags.
+      if (existing.started === started) this.windowAnalytics = existing;
+      else window.location.reload();
       return;
     }
     const feed = new EventFeed();
     const inserted = new Set<string>();
-    window[WINDOW_ANALYTICS] = { started, feed, inserted };
+    this.windowAnalytics = { started, feed, inserted };
+    window[WINDOW_ANALYTICS] = this.windowAnalytics;
     const dataLayer = (window.dataLayer ??= []);
     if (this.settings.googleConsentMode !== null) queueConsentDefaults(dataLayer);
     for (const adapter of this.live) adapter.setup(dataLayer);
@@ -123,12 +127,12 @@ export class Analytics {
     dataLayer.push({ event: name, docs } satisfies DataLayerEntry);
     for (const adapter of this.live) adapter.send?.(name, docs);
     // A build made with `--no-analytics` keeps `subscribe()` for its scripts and hands them nothing.
-    if (this.settings.eventFeed === 'on') window[WINDOW_ANALYTICS]?.feed.publish(name, docs);
+    if (this.settings.eventFeed === 'on') this.windowAnalytics?.feed.publish(name, docs);
   }
 
   public reportPageView(): void {
     if (isOAuthCallbackPath(window.location.pathname)) return;
-    const inserted = window[WINDOW_ANALYTICS]?.inserted;
+    const inserted = this.windowAnalytics?.inserted;
     // The tags and scripts a start on the OAuth callback left out, now that the reader has moved on from it.
     if (inserted !== undefined) insertTags(this.live, this.scripts, inserted);
     const page = pageLocation(window.location.href, this.settings.keepQueryParams);

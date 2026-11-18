@@ -818,6 +818,22 @@ describe('Analytics', () => {
 
       expect(events.map((event) => event.name)).to.deep.equal(['docs_markdown_copy']);
     });
+
+    // Until the reload lands the bundle goes on calling the new instance, which never joined this window.
+    it('adds no tag and hands over no event from an instance whose start asked for a reload', async () => {
+      const page = browser(quickstart);
+      new Analytics(withGtm(), []).start();
+      const events = subscribe(page);
+
+      const next = new Analytics(withGtm(), [{ src: 'https://cdn.example.com/widget.js' }]);
+      next.start();
+      next.reportPageView();
+      await settled();
+
+      expect(page.reloads()).to.equal(1);
+      expect(page.scripts.map((script) => script.src)).to.deep.equal([GTM_SCRIPT]);
+      expect(events).to.be.empty;
+    });
   });
 
   describe('at an address that holds an OAuth answer', () => {
