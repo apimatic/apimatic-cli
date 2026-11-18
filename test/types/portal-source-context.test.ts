@@ -394,7 +394,7 @@ describe('PortalSourceContext', () => {
       ]);
     });
 
-    it('leaves out the vendor tags and the event feed under --no-analytics, and keeps the consent default and the query names', async () => {
+    it('leaves out the vendor tags and the events under --no-analytics, and keeps the consent default and the query names', async () => {
       writeConfig({
         site: { name: 'Calc' },
         analytics: {
@@ -415,7 +415,7 @@ describe('PortalSourceContext', () => {
           googleAnalytics: null,
           googleConsentMode: { default: 'denied' },
           keepQueryParams: ['campaign_id'],
-          eventFeed: 'off'
+          events: 'off'
         });
       }
       expect(kept.config.identity().analytics).to.deep.equal({
@@ -423,7 +423,7 @@ describe('PortalSourceContext', () => {
         googleAnalytics: null,
         googleConsentMode: { default: 'denied' },
         keepQueryParams: ['campaign_id'],
-        eventFeed: 'on'
+        events: 'on'
       });
     });
 

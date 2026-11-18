@@ -191,7 +191,7 @@ const none: PortalAnalytics = {
   googleAnalytics: null,
   googleConsentMode: null,
   keepQueryParams: [],
-  eventFeed: 'on'
+  events: 'on'
 };
 const withGtm = (environment: { auth: string; preview: string } | null = null): PortalAnalytics => ({
   ...none,
@@ -545,7 +545,7 @@ describe('Analytics', () => {
     // A --no-analytics build keeps the default for a Google tag a kept script loads, and reports no event beside it.
     it('queues them in a --no-analytics build, where the data layer then holds them alone', () => {
       const page = browser(quickstart);
-      const analytics = new Analytics({ ...none, googleConsentMode: denied, eventFeed: 'off' }, []);
+      const analytics = new Analytics({ ...none, googleConsentMode: denied, events: 'off' }, []);
 
       analytics.start();
       analytics.reportPageView();
@@ -902,7 +902,7 @@ describe('Analytics', () => {
     // A staging build keeps its `necessary` and `functional` scripts, which may load a container that reads the data layer.
     it('reports nothing in a --no-analytics build, to a subscriber or to the data layer, with subscribe in place', async () => {
       const page = browser(quickstart);
-      const analytics = new Analytics({ ...none, eventFeed: 'off' }, []);
+      const analytics = new Analytics({ ...none, events: 'off' }, []);
       analytics.start();
       const events: PortalEvent[] = [];
 

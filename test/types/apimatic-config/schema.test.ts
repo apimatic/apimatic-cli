@@ -324,7 +324,7 @@ describe('apimatic.schema.json', () => {
         'a consent mode with an unknown key',
         { analytics: { googleConsentMode: { default: 'denied', region: ['DE'] } } }
       ],
-      ['an event feed set in the file', { analytics: { eventFeed: 'off' } }],
+      ['the events switched off in the file', { analytics: { events: 'off' } }],
       ['an unknown seo key', { seo: { foo: 1 } }],
       ['a blank verification value', { seo: { googleSiteVerification: ' ' } }],
       ['scripts that are not a list', { scripts: { src: 'https://cdn.example.com/widget.js' } }],

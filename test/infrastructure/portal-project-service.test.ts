@@ -540,7 +540,7 @@ describe('PortalProjectService', () => {
     const themeFile = () => path.join(project.toString(), 'src/styles/theme.css');
     const identityFile = () => path.join(project.toString(), 'portal.identity.json');
 
-    it('writes the vendors, the consent mode and the event feed a config holds, and no vendor or feed from one without analytics', async () => {
+    it('writes the vendors, the consent mode and the events a config holds, and no vendor or event from one without analytics', async () => {
       const config = configFor({
         site: { name: 'My API' },
         analytics: {
@@ -556,7 +556,7 @@ describe('PortalProjectService', () => {
         googleAnalytics: null,
         googleConsentMode: { default: 'denied' },
         keepQueryParams: [],
-        eventFeed: 'off'
+        events: 'off'
       });
 
       expect((await service.applyConfig(project, settingsFor(config)))._unsafeUnwrap()).to.be.true;
@@ -566,7 +566,7 @@ describe('PortalProjectService', () => {
         googleAnalytics: { measurementId: 'G-ABC123' },
         googleConsentMode: { default: 'denied' },
         keepQueryParams: [],
-        eventFeed: 'on'
+        events: 'on'
       });
     });
 

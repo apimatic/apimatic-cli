@@ -891,7 +891,7 @@ describe('PortalServeAction', () => {
       });
     });
 
-    it('leaves the vendor tags and the event feed out of the project and of each rewrite under --no-analytics', async () => {
+    it('leaves the vendor tags and the events out of the project and of each rewrite under --no-analytics', async () => {
       const applyConfig = sinon.spy(PortalProjectService.prototype, 'applyConfig');
       const config = originalConfig();
       config.portal.analytics = { googleTagManager: { containerId: 'GTM-ABC123' } };
@@ -904,7 +904,7 @@ describe('PortalServeAction', () => {
 
       for (const { config: applied } of [shared.prepare.firstCall.args[1], applyConfig.lastCall.args[1]]) {
         expect(applied.identity().analytics.googleTagManager).to.be.null;
-        expect(applied.identity().analytics.eventFeed).to.equal('off');
+        expect(applied.identity().analytics.events).to.equal('off');
       }
     });
 

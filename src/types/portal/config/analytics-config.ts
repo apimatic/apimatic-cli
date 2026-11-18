@@ -29,7 +29,7 @@ export interface PortalAnalytics {
   googleConsentMode: GoogleConsentModeSetting | null;
   keepQueryParams: string[];
   /** Off in a build made with `--no-analytics`, which reports no event: none to the data layer, none to a script. */
-  eventFeed: 'on' | 'off';
+  events: 'on' | 'off';
 }
 
 const KNOWN = ['googleTagManager', 'googleAnalytics', 'googleConsentMode', 'keepQueryParams'];
@@ -40,7 +40,7 @@ export class AnalyticsConfig {
     private readonly googleAnalytics: GoogleAnalyticsSetting | null,
     private readonly googleConsentMode: GoogleConsentModeSetting | null,
     private readonly keepQueryParams: string[],
-    private readonly eventFeed: 'on' | 'off'
+    private readonly events: 'on' | 'off'
   ) {}
 
   public static readonly defaults = new AnalyticsConfig(null, null, null, [], 'on');
@@ -70,7 +70,7 @@ export class AnalyticsConfig {
       googleAnalytics: this.googleAnalytics,
       googleConsentMode: this.googleConsentMode,
       keepQueryParams: this.keepQueryParams,
-      eventFeed: this.eventFeed
+      events: this.events
     };
   }
 

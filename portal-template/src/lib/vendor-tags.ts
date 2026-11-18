@@ -17,7 +17,7 @@ export interface Adapter {
   send?(name: string, params: Record<string, unknown>): void;
 }
 
-type Vendor = Exclude<keyof PortalAnalytics, 'googleConsentMode' | 'keepQueryParams' | 'eventFeed'>;
+type Vendor = Exclude<keyof PortalAnalytics, 'googleConsentMode' | 'keepQueryParams' | 'events'>;
 const GOOGLE = 'https://www.googletagmanager.com';
 
 /**

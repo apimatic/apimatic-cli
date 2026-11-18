@@ -406,7 +406,7 @@ describe('PortalConfig', () => {
         googleAnalytics: null,
         googleConsentMode: null,
         keepQueryParams: [],
-        eventFeed: 'on'
+        events: 'on'
       });
     });
 
@@ -422,7 +422,7 @@ describe('PortalConfig', () => {
         googleAnalytics: { measurementId: 'G-ABC123' },
         googleConsentMode: null,
         keepQueryParams: ['campaign_id', 'code'],
-        eventFeed: 'on'
+        events: 'on'
       });
     });
 
@@ -459,9 +459,9 @@ describe('PortalConfig', () => {
 
     // What a build made with --no-analytics turns off is the flag's to say, never a line in the file.
     it('hands events to scripts in every config as written, and takes no setting that says otherwise', () => {
-      expect(config({}).identity().analytics.eventFeed).to.equal('on');
-      expect(errorsOf({ analytics: { eventFeed: 'off' } })).to.deep.equal([
-        "'portal.analytics.eventFeed' is not a 'portal' setting."
+      expect(config({}).identity().analytics.events).to.equal('on');
+      expect(errorsOf({ analytics: { events: 'off' } })).to.deep.equal([
+        "'portal.analytics.events' is not a 'portal' setting."
       ]);
     });
 
@@ -575,7 +575,7 @@ describe('PortalConfig', () => {
           googleAnalytics: null,
           googleConsentMode: { default: 'denied' },
           keepQueryParams: ['campaign_id'],
-          eventFeed: 'off'
+          events: 'off'
         }
       });
     });
@@ -909,7 +909,7 @@ describe('PortalConfig', () => {
           googleAnalytics: null,
           googleConsentMode: null,
           keepQueryParams: [],
-          eventFeed: 'on'
+          events: 'on'
         },
         seo: { googleSiteVerification: null },
         scripts: []
@@ -931,7 +931,7 @@ describe('PortalConfig', () => {
           googleAnalytics: null,
           googleConsentMode: null,
           keepQueryParams: [],
-          eventFeed: 'on'
+          events: 'on'
         },
         seo: { googleSiteVerification: null },
         scripts: []
