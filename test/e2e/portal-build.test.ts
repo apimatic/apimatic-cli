@@ -180,6 +180,10 @@ const scriptsOf = (output: DirectoryPath) =>
     .filter((name) => name.endsWith('.js'))
     .map((name) => ({ name, text: fs.readFileSync(path.join(output.toString(), 'assets', name), 'utf8') }));
 
+/** By the setting's value: its name, and the defaults it queues, are in every build, with the setting or without. */
+const startsGoogleTagsDenied = (output: DirectoryPath) =>
+  scriptsOf(output).some(({ text }) => /googleConsentMode:\{default:["'`]denied["'`]\}/.test(text));
+
 const stylesheetOf = (output: DirectoryPath) => {
   const assets = path.join(output.toString(), 'assets');
   return fs
@@ -293,10 +297,9 @@ const stylesheetOf = (output: DirectoryPath) => {
   });
 
   it('tells the browser to start the Google tags as denied, in a script that holds the defaults it queues', () => {
-    const scripts = scriptsOf(portal.output());
-    expect(scripts.some(({ text }) => text.includes('googleConsentMode'))).to.be.true;
+    expect(startsGoogleTagsDenied(portal.output())).to.be.true;
     // The defaults themselves, by the one key of theirs that nothing else in the bundle names.
-    expect(scripts.some(({ text }) => text.includes('wait_for_update'))).to.be.true;
+    expect(scriptsOf(portal.output()).some(({ text }) => text.includes('wait_for_update'))).to.be.true;
     for (const page of pages()) {
       expect(read(page), page).to.not.contain('wait_for_update');
     }
@@ -667,6 +670,12 @@ const stylesheetOf = (output: DirectoryPath) => {
 
   const portal = portalBuilt('branded', { plugin: true });
   const { read, exists } = portal;
+
+  // The other half of the default build's check: a build that sets no consent mode must not pass it.
+  it('does not tell the browser to start the Google tags as denied when the config sets no consent mode', () => {
+    expect(startsGoogleTagsDenied(portal.output())).to.be.false;
+    expect(scriptsOf(portal.output()).some(({ text }) => text.includes('googleConsentMode:null'))).to.be.true;
+  });
 
   // The minifier may merge the two modes' rules when they match, as they do for a primary
   // written once, so the selectors and their place are checked rather than one spelling.
