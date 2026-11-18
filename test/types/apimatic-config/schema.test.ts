@@ -169,6 +169,10 @@ describe('apimatic.schema.json', () => {
       ],
       ['a script file in the static directory', { scripts: [{ src: 'static/js/widget.js', category: 'analytics' }] }],
       [
+        'a script address with a backslash in its path',
+        { scripts: [{ src: 'https://cdn.example.com/js\\widget.js', category: 'analytics' }] }
+      ],
+      [
         'a script file written with backslashes and spaces around it',
         { scripts: [{ src: ' .\\static\\js\\widget.js ', category: 'analytics' }] }
       ],
@@ -277,6 +281,7 @@ describe('apimatic.schema.json', () => {
       ['a plugin address on the portal itself', { pluginUrl: '/__downloads/plugin.zip' }],
       ['a plugin address without a host', { pluginUrl: 'https://' }],
       ['a plugin address without a host before its path', { pluginUrl: 'https:///plugins.acme.test/calc.zip' }],
+      ['a plugin address with a backslash for its host', { pluginUrl: 'https://\\plugins.acme.test/calc.zip' }],
       ['a plugin address that is not a string', { pluginUrl: 7 }],
       ['a plugin address with a space', { pluginUrl: 'https://plugins.acme.test/my plugin.zip' }],
       ['a plugin address with trailing whitespace', { pluginUrl: 'https://plugins.acme.test/calc.zip ' }],
@@ -335,6 +340,14 @@ describe('apimatic.schema.json', () => {
         { scripts: [{ src: 'https://cdn.example.com/my widget.js', category: 'analytics' }] }
       ],
       ['a script address without a host', { scripts: [{ src: 'https://', category: 'analytics' }] }],
+      [
+        'a script address with a backslash where its host should be',
+        { scripts: [{ src: 'https://\\cdn.example.com/widget.js', category: 'analytics' }] }
+      ],
+      [
+        'a script address with a backslash in its host',
+        { scripts: [{ src: 'https://cdn.example.com\\widget.js', category: 'analytics' }] }
+      ],
       [
         'a script address without a host before its path',
         { scripts: [{ src: 'https:///cdn.example.com/widget.js', category: 'analytics' }] }

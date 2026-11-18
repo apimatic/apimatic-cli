@@ -40,8 +40,8 @@
     },
     "httpsAddress": {
       "type": "string",
-      "description": "An address starting with 'https://', with no spaces.",
-      "pattern": "^[hH][tT][tT][pP][sS]://[^\\s/?#]+(?:[/?#]\\S*)?$"
+      "description": "An address starting with 'https://' and a host, with no spaces.",
+      "pattern": "^[hH][tT][tT][pP][sS]://[^\\s/\\\\?#]+(?:[/?#]\\S*)?$"
     },
     "color": {
       "type": "string",
@@ -277,7 +277,7 @@
             "required": ["src", "category"],
             "properties": {
               "src": {
-                "description": "An address starting with 'https://', with no spaces, or a file in the 'static' directory, for example 'static/analytics.js'.",
+                "description": "An address starting with 'https://' and a host, with no spaces, or a file in the 'static' directory, for example 'static/analytics.js'.",
                 "anyOf": [
                   {
                     "$ref": "#/definitions/httpsAddress"

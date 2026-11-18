@@ -622,7 +622,7 @@ describe('PortalConfig', () => {
     const SETUP = 'https://cdn.example.com/setup.js';
     const WIDGET = 'https://cdn.example.com/widget.js';
     const refused = (path: string) =>
-      `'${path}' must be an address starting with 'https://', with no spaces, for example ` +
+      `'${path}' must be an address starting with 'https://' and a host, with no spaces, for example ` +
       "'https://cdn.example.com/widget.js'.";
 
     it('lists none unless the block does', () => {
@@ -678,11 +678,16 @@ describe('PortalConfig', () => {
     });
 
     // The browser runs what it fetches, and a portal served over https blocks a script that is not.
-    it('refuses an address that is not https, or that holds a space', () => {
+    // A backslash reads as a slash to an address parser, which would take what follows it for the host.
+    it('refuses an address that is not https, that names no host, or that holds a space', () => {
       for (const src of [
         'http://cdn.example.com/widget.js',
         'HTTP://cdn.example.com/widget.js',
         'https://',
+        'https:///cdn.example.com/widget.js',
+        'https://\\cdn.example.com/widget.js',
+        'https://\\/cdn.example.com/widget.js',
+        'https://cdn.example.com\\widget.js',
         'https:cdn.example.com/widget.js',
         'https://cdn.example.com/my widget.js',
         ' https://cdn.example.com/widget.js'
@@ -808,7 +813,7 @@ describe('PortalConfig', () => {
 
   describe('pluginUrl', () => {
     const REFUSED =
-      "'portal.pluginUrl' must be an address starting with 'https://', with no spaces, for example " +
+      "'portal.pluginUrl' must be an address starting with 'https://' and a host, with no spaces, for example " +
       "'https://example.com/acme-plugin.zip'.";
 
     it('is absent unless the block gives one, so the plugin is bundled', () => {
@@ -827,6 +832,7 @@ describe('PortalConfig', () => {
         'http://plugins.acme.test/calc.zip',
         '/__downloads/plugin.zip',
         'https://',
+        'https://\\plugins.acme.test/calc.zip',
         'https:x.test',
         '',
         7
