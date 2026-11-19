@@ -25,8 +25,7 @@ export class PublishingApiService {
     authKey: string | null = null
   ): Promise<Result<PublishingProfileItem[], ServiceError>> {
     const authInfo: AuthInfo | null = await getAuthInfo(configDir.toString());
-    // `auth logout` blanks config.json rather than deleting it, so a logged-out user
-    // still has a non-null AuthInfo with an empty key — check the key, not the object.
+    // `auth logout` blanks config.json rather than deleting it, so check the key, not the AuthInfo.
     const token = authKey || authInfo?.authKey;
     if (!token) {
       return err(ServiceError.unauthorizedWithHint(null));
@@ -51,25 +50,25 @@ export class PublishingApiService {
     packageVersion: SemVersion,
     publishType: PublishType[],
     configDir: DirectoryPath,
-    shell: string
+    shell: string,
+    authKey: string | null = null
   ): Promise<Result<PublishingInfo, ServiceError>> {
     const authInfo: AuthInfo | null = await getAuthInfo(configDir.toString());
-    // `auth logout` blanks config.json rather than deleting it, so a logged-out user
-    // still has a non-null AuthInfo with an empty key — check the key, not the object.
-    if (!authInfo?.authKey) {
+    // `auth logout` blanks config.json rather than deleting it, so check the key, not the AuthInfo.
+    const token = authKey || authInfo?.authKey;
+    if (!token) {
       return err(ServiceError.unauthorizedWithHint(null));
     }
     const sdkFileStream = await this.fileService.getStream(sdkFilePath);
 
     try {
-      const token = authInfo.authKey;
       const formData = new FormData();
       formData.append('file', sdkFileStream);
       formData.append('packageVersion', packageVersion.toString());
 
-      // If both package and source code publishing are not selected, publishType array will contain only one of them, so we need to specify which one to the API. 
+      // If both package and source code publishing are not selected, publishType array will contain only one of them, so we need to specify which one to the API.
       // If both are selected, we will omit this field as API defaults to both types being selected.
-      if (publishType.length !== 2) { 
+      if (publishType.length !== 2) {
         formData.append('publishType', publishType[0]);
       }
 
@@ -109,17 +108,17 @@ export class PublishingApiService {
   public async getSdkPublishingLog(
     publishingLogId: string,
     configDir: DirectoryPath,
-    shell: string
+    shell: string,
+    authKey: string | null = null
   ): Promise<Result<PublishLogItem, ServiceError>> {
     const authInfo: AuthInfo | null = await getAuthInfo(configDir.toString());
-    // `auth logout` blanks config.json rather than deleting it, so a logged-out user
-    // still has a non-null AuthInfo with an empty key — check the key, not the object.
-    if (!authInfo?.authKey) {
+    // `auth logout` blanks config.json rather than deleting it, so check the key, not the AuthInfo.
+    const token = authKey || authInfo?.authKey;
+    if (!token) {
       return err(ServiceError.unauthorizedWithHint(null));
     }
 
     try {
-      const token = authInfo.authKey;
       const response = await this.axiosInstance(shell, token).get(`/publish-logs/${publishingLogId}`);
 
       if (response.status === 200) {

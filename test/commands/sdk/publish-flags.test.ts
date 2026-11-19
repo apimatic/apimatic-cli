@@ -52,11 +52,25 @@ describe('sdk publish flags', () => {
     expect(omitted.flags['git-init']).to.be.false;
   });
 
-  it('runs guided with no flags or --git-init alone, and with flags otherwise', () => {
-    expect(SdkPublish.isGuided([])).to.be.true;
-    expect(SdkPublish.isGuided(['--git-init'])).to.be.true;
-    expect(SdkPublish.isGuided(['--git-init', '--dry-run'])).to.be.false;
-    expect(SdkPublish.isGuided(['--language', 'python'])).to.be.false;
+  it('runs guided with no flags or only --git-init and --auth-key, and with flags otherwise', async () => {
+    const guided = async (argv: string[]) => SdkPublish.isGuided((await parse(argv)).raw);
+
+    expect(await guided([])).to.be.true;
+    expect(await guided(['--git-init'])).to.be.true;
+    expect(await guided(['--auth-key', 'key'])).to.be.true;
+    expect(await guided(['--auth-key=key'])).to.be.true;
+    expect(await guided(['-k', 'key'])).to.be.true;
+    expect(await guided(['--git-init', '-k', 'key'])).to.be.true;
+    expect(await guided(['--git-init', '--dry-run'])).to.be.false;
+    expect(await guided(['-k', 'key', '--language', 'python'])).to.be.false;
+  });
+
+  it('accepts an auth key, long or short', async () => {
+    const long = (await parse(['--auth-key', 'key'])) as never as { flags: Record<string, unknown> };
+    const short = (await parse(['-k', 'key'])) as never as { flags: Record<string, unknown> };
+
+    expect(long.flags['auth-key']).to.equal('key');
+    expect(short.flags['auth-key']).to.equal('key');
   });
 
   it('still parses the flags a publish is actually made of', async () => {

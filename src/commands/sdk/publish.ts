@@ -1,4 +1,4 @@
-import { Command, Flags } from '@oclif/core';
+import { Command, Flags, Interfaces } from '@oclif/core';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { FlagsProvider } from '../../types/flags-provider.js';
 import { Language, Stability } from '../../types/sdk/generate.js';
@@ -15,7 +15,7 @@ import { SdkPublishNonInteractiveAction } from '../../actions/sdk/publish/non-in
 export default class SdkPublish extends Command {
   static readonly summary = 'Generate and publish an SDK to a package registry and/or source repository';
 
-  static readonly description = `Generate and publish an SDK using a publishing profile configured in the APIMatic App. Requires an input directory containing the API specification. Run it with no flags, or with only --git-init, for guided mode, or pass flags for CI/CD. When you pass flags, --profile-id, --language, --version, and --publish-type are required.
+  static readonly description = `Generate and publish an SDK using a publishing profile configured in the APIMatic App. Requires an input directory containing the API specification. Run it with no flags, or with only --git-init or --auth-key, for guided mode, or pass flags for CI/CD. When you pass flags, --profile-id, --language, --version, and --publish-type are required.
 Your changes to the SDK are merged before it is published, as sdk generate does with git 2.38 or later: with flags, always; in guided mode, add --git-init. Nothing is published while conflicts are left to resolve.`;
 
   static readonly cmdTxt = format.cmd('apimatic', 'sdk', 'publish');
@@ -56,7 +56,8 @@ Your changes to the SDK are merged before it is published, as sdk generate does 
       default: false,
       description:
         "In guided mode, make the SDK directory a git repository when it isn't one of its own, so your changes to the SDK are kept. With flags, sdk publish always does this."
-    })
+    }),
+    ...FlagsProvider.authKey
   };
 
   static examples = [
@@ -80,9 +81,9 @@ Your changes to the SDK are merged before it is published, as sdk generate does 
     )}`
   ];
 
-  /** Guided mode is asked for by no flags, or `--git-init` alone. */
-  static isGuided(argv: readonly string[]): boolean {
-    return argv.every((arg) => arg === '--git-init');
+  /** Guided mode is asked for by no flags, or only `--git-init` and `--auth-key`. */
+  static isGuided(raw: Interfaces.ParserOutput['raw']): boolean {
+    return raw.every((token) => token.type === 'flag' && (token.flag === 'git-init' || token.flag === 'auth-key'));
   }
 
   async run() {
@@ -97,12 +98,14 @@ Your changes to the SDK are merged before it is published, as sdk generate does 
         'publish-type': publishType,
         'dry-run': dryRun,
         stability,
-        'git-init': gitInit
-      }
+        'git-init': gitInit,
+        'auth-key': authKey
+      },
+      raw
     } = await this.parse(SdkPublish);
 
     const publishTypes = [...new Set(publishType)] as PublishType[];
-    const interactive = SdkPublish.isGuided(this.argv);
+    const interactive = SdkPublish.isGuided(raw);
     const commandMetadata: CommandMetadata = {
       commandName: SdkPublish.id,
       shell: this.config.shell
@@ -134,12 +137,12 @@ Your changes to the SDK are merged before it is published, as sdk generate does 
     const sdkDirectory = destination === undefined ? undefined : DirectoryPath.fromUserInput(destination);
     intro('Publish SDK');
     const result = interactive
-      ? await new SdkPublishInteractiveAction(configDir, commandMetadata).execute(
+      ? await new SdkPublishInteractiveAction(configDir, commandMetadata, authKey).execute(
           DirectoryPath.createInput(input),
           gitInit,
           onPublishSdkError
         )
-      : await new SdkPublishNonInteractiveAction(configDir, commandMetadata).execute(
+      : await new SdkPublishNonInteractiveAction(configDir, commandMetadata, authKey).execute(
           project,
           sdkDirectory,
           language as Language,

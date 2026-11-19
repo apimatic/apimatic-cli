@@ -19,6 +19,7 @@ import { FileProblem } from '../../../src/types/file/file-problem.js';
 import { GitContext } from '../../../src/types/git-context.js';
 import { ProjectContext } from '../../../src/types/project-context.js';
 import { PublishingProfileItem, PublishType } from '../../../src/types/publish-api/publishing-profile-item.js';
+import { PublishLogItem } from '../../../src/types/publish-api/publish-log.js';
 import { ProfileId } from '../../../src/types/publish/profile-id.js';
 import { PublishingProfile } from '../../../src/types/publish/publishing-profile.js';
 import { SemVersion } from '../../../src/types/publish/version.js';
@@ -34,6 +35,7 @@ const COMMAND_METADATA: CommandMetadata = { commandName: 'sdk publish', shell: '
 describe('SdkPublishAction', () => {
   let root: string;
   let generates: (files: Files) => Promise<void>;
+  let generateSdk: sinon.SinonStub;
   let onPublishSdkError: sinon.SinonStub;
   let restoreConfig: () => void;
 
@@ -63,7 +65,7 @@ describe('SdkPublishAction', () => {
 
   beforeEach(async () => {
     root = fs.mkdtempSync(path.join(os.tmpdir(), 'sdk-publish-'));
-    ({ generates } = stubSdkGeneration(root));
+    ({ generates, generateSdk } = stubSdkGeneration(root));
     await generates({ 'README.md': '# sdk' });
     onPublishSdkError = sinon.stub();
     restoreConfig = emptyGlobalGitConfig(root);
@@ -113,6 +115,43 @@ describe('SdkPublishAction', () => {
     expect(uploaded).to.have.members(['.gitignore', 'README.md']);
     expect(fs.existsSync(path.join(sdk().toString(), '.apimatic', 'generation.json'))).to.be.true;
     expect(fs.existsSync(path.join(sdk().toString(), 'node_modules', 'dep.js'))).to.be.true;
+  });
+
+  it('uses the auth key it was given to generate, upload and follow the publish', async () => {
+    quietGeneration();
+    sinon.stub(SdkPublishPrompts.prototype, 'publishSdk').callsFake((fn) => fn);
+    sinon.stub(SdkPublishPrompts.prototype, 'publishingRunningNotice');
+    sinon.stub(SdkPublishPrompts.prototype, 'publishingLogsMessage');
+    sinon.stub(SdkPublishPrompts.prototype, 'pollPublishingStatus').callsFake(async (poll) => {
+      await poll();
+      return 'succeeded';
+    });
+    const publishSdkPackage = uploads([]);
+    const getSdkPublishingLog = sinon
+      .stub(PublishingApiService.prototype, 'getSdkPublishingLog')
+      .resolves(ok({} as PublishLogItem));
+
+    const result = await new SdkPublishAction(new DirectoryPath(root), COMMAND_METADATA, 'flag-key').execute(
+      ProjectContext.in(new DirectoryPath(root)),
+      sdk(),
+      Language.PYTHON,
+      Stability.STABLE,
+      [PublishType.PackagePublishing],
+      true,
+      false,
+      true,
+      ProfileId.tryCreate('profile')._unsafeUnwrap(),
+      SemVersion.tryCreate('1.0.0')._unsafeUnwrap(),
+      withoutPackageSettings,
+      false,
+      'summary',
+      onPublishSdkError
+    );
+
+    expect(result.isSuccess()).to.be.true;
+    expect(generateSdk.firstCall.args[5]).to.equal('flag-key');
+    expect(publishSdkPackage.firstCall.args[7]).to.equal('flag-key');
+    expect(getSdkPublishingLog.firstCall.args[3]).to.equal('flag-key');
   });
 
   it('generates into the SDK directory on a dry run and opens it, uploading nothing', async () => {
