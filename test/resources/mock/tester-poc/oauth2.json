@@ -1,0 +1,24 @@
+[
+  {
+    "name": "oauth2 authorization server",
+    "kind": "oauth2",
+    "description": "The auth spec's three oauth2 schemes share one tokenUrl, so they merge into one server: client credentials, authorization code with the path of its authorizationUrl, and password, with the union of their scopes. The SDK builds both URLs from its Auth server base, which the contract tests point at the mock.",
+    "oauth2": {
+      "tokenPath": "/oauth2/token",
+      "flows": {
+        "clientCredentials": {},
+        "authorizationCode": {
+          "authorizePath": "/oauth2/authorize"
+        },
+        "password": {}
+      },
+      "clientId": "test-client-id",
+      "clientSecret": "test-client-secret",
+      "scopes": [
+        "read:profile",
+        "service:read",
+        "user:read"
+      ]
+    }
+  }
+]

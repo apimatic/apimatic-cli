@@ -1,0 +1,120 @@
+[
+  {
+    "name": "getAccountBalance 200 (spec example)",
+    "operation": "getAccountBalance",
+    "description": "The spec's example: a bare JSON string, not an object. OR security: api_key in the query, or basic.",
+    "request": {
+      "method": "GET",
+      "path": "/v1/accounts/7a1b9d2e-3c4f-4a5b-8c6d-9e0f1a2b3c4d/balance",
+      "auth": {
+        "anyOf": [
+          {
+            "apiKeyQuery": {
+              "in": "query",
+              "name": "api_key",
+              "value": "test-api-key"
+            }
+          },
+          {
+            "basicAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Basic dGVzdC11c2VyOnRlc3QtcGFzc3dvcmQ="
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": "1250.75"
+      }
+    }
+  },
+  {
+    "name": "getAccountBalance 404",
+    "operation": "getAccountBalance",
+    "kind": "error",
+    "request": {
+      "method": "GET",
+      "path": "/v1/accounts/{account_id}/balance",
+      "auth": {
+        "anyOf": [
+          {
+            "apiKeyQuery": {
+              "in": "query",
+              "name": "api_key",
+              "value": "test-api-key"
+            }
+          },
+          {
+            "basicAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Basic dGVzdC11c2VyOnRlc3QtcGFzc3dvcmQ="
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 404,
+      "headers": {
+        "Content-Type": "application/json",
+        "X-Request-Id": "req_err_404"
+      },
+      "body": {
+        "json": {
+          "code": "not_found",
+          "message": "No resource exists at this identifier.",
+          "request_id": "req_err_404"
+        }
+      }
+    }
+  },
+  {
+    "name": "getAccountBalance 500 (default)",
+    "operation": "getAccountBalance",
+    "kind": "error",
+    "request": {
+      "method": "GET",
+      "path": "/v1/accounts/{account_id}/balance",
+      "auth": {
+        "anyOf": [
+          {
+            "apiKeyQuery": {
+              "in": "query",
+              "name": "api_key",
+              "value": "test-api-key"
+            }
+          },
+          {
+            "basicAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Basic dGVzdC11c2VyOnRlc3QtcGFzc3dvcmQ="
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 500,
+      "headers": {
+        "Content-Type": "application/json",
+        "X-Request-Id": "req_err_500"
+      },
+      "body": {
+        "json": {
+          "code": "internal_error",
+          "message": "Something went wrong on our side.",
+          "request_id": "req_err_500"
+        }
+      }
+    }
+  }
+]

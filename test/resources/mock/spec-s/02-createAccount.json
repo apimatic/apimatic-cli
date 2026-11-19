@@ -1,0 +1,230 @@
+[
+  {
+    "name": "createAccount 201 travel card",
+    "operation": "createAccount",
+    "description": "AND security: the bearer token and the API key on the same request. Location is absolute, built from the request's origin.",
+    "request": {
+      "method": "POST",
+      "path": "/v1/accounts",
+      "headers": {
+        "Content-Type": {
+          "startsWith": "application/json"
+        },
+        "Idempotency-Key": "9b2f6c1e-7d3a-4e8b-a5c4-1f0e9d8c7b6a"
+      },
+      "auth": {
+        "anyOf": [
+          {
+            "bearerAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Bearer test-bearer-token"
+            },
+            "apiKeyHeader": {
+              "in": "header",
+              "name": "X-API-Key",
+              "value": "test-api-key"
+            }
+          }
+        ]
+      },
+      "body": {
+        "json": {
+          "name": "Travel card",
+          "class": "liability",
+          "currency": "USD",
+          "owner_id": "c0ffee00-1234-4567-89ab-cdef01234567",
+          "profile": "premium",
+          "external_reference": "crm-4471"
+        }
+      }
+    },
+    "response": {
+      "status": 201,
+      "headers": {
+        "Content-Type": "application/json",
+        "X-Request-Id": "req_create_account",
+        "Location": "{{origin}}/v1/accounts/5d6e7f80-91a2-4b3c-8d4e-5f6a7b8c9d0e"
+      },
+      "body": {
+        "json": {
+          "id": "5d6e7f80-91a2-4b3c-8d4e-5f6a7b8c9d0e",
+          "name": "Travel card",
+          "class": "liability",
+          "status": "active",
+          "currency": "USD",
+          "profile": "premium",
+          "owner": {
+            "id": "c0ffee00-1234-4567-89ab-cdef01234567",
+            "display_name": "Avery Ledgerwood",
+            "email": "avery@example.com"
+          },
+          "created_at": "2026-03-01T09:00:00Z"
+        }
+      }
+    }
+  },
+  {
+    "name": "createAccount 400",
+    "operation": "createAccount",
+    "kind": "error",
+    "request": {
+      "method": "POST",
+      "path": "/v1/accounts",
+      "auth": {
+        "anyOf": [
+          {
+            "bearerAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Bearer test-bearer-token"
+            },
+            "apiKeyHeader": {
+              "in": "header",
+              "name": "X-API-Key",
+              "value": "test-api-key"
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 400,
+      "headers": {
+        "Content-Type": "application/json",
+        "X-Request-Id": "req_err_400"
+      },
+      "body": {
+        "json": {
+          "code": "validation_failed",
+          "message": "The request failed validation.",
+          "request_id": "req_err_400",
+          "details": [
+            {
+              "field": "/name",
+              "issue": "must not be empty"
+            }
+          ]
+        }
+      }
+    }
+  },
+  {
+    "name": "createAccount 409",
+    "operation": "createAccount",
+    "kind": "error",
+    "description": "Operation-specific error body (AccountConflictError), not the shared Error.",
+    "request": {
+      "method": "POST",
+      "path": "/v1/accounts",
+      "auth": {
+        "anyOf": [
+          {
+            "bearerAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Bearer test-bearer-token"
+            },
+            "apiKeyHeader": {
+              "in": "header",
+              "name": "X-API-Key",
+              "value": "test-api-key"
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 409,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": {
+          "code": "account_exists",
+          "message": "An account with external reference crm-4471 already exists.",
+          "existing_account_id": "5d6e7f80-91a2-4b3c-8d4e-5f6a7b8c9d0e"
+        }
+      }
+    }
+  },
+  {
+    "name": "createAccount 429",
+    "operation": "createAccount",
+    "kind": "error",
+    "request": {
+      "method": "POST",
+      "path": "/v1/accounts",
+      "auth": {
+        "anyOf": [
+          {
+            "bearerAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Bearer test-bearer-token"
+            },
+            "apiKeyHeader": {
+              "in": "header",
+              "name": "X-API-Key",
+              "value": "test-api-key"
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 429,
+      "headers": {
+        "Content-Type": "application/json",
+        "Retry-After": "1",
+        "X-Request-Id": "req_err_429"
+      },
+      "body": {
+        "json": {
+          "code": "rate_limited",
+          "message": "Too many requests; retry after 1 second.",
+          "request_id": "req_err_429"
+        }
+      }
+    }
+  },
+  {
+    "name": "createAccount 500 (default)",
+    "operation": "createAccount",
+    "kind": "error",
+    "request": {
+      "method": "POST",
+      "path": "/v1/accounts",
+      "auth": {
+        "anyOf": [
+          {
+            "bearerAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Bearer test-bearer-token"
+            },
+            "apiKeyHeader": {
+              "in": "header",
+              "name": "X-API-Key",
+              "value": "test-api-key"
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 500,
+      "headers": {
+        "Content-Type": "application/json",
+        "X-Request-Id": "req_err_500"
+      },
+      "body": {
+        "json": {
+          "code": "internal_error",
+          "message": "Something went wrong on our side.",
+          "request_id": "req_err_500"
+        }
+      }
+    }
+  }
+]

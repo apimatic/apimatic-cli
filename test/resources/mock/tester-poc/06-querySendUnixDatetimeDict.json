@@ -1,0 +1,32 @@
+[
+  {
+    "name": "querySendUnixDatetimeDict 200",
+    "operation": "querySendUnixDatetimeDict",
+    "description": "The spec declares no parameters here; the stub follows what the SDK sends.",
+    "request": {
+      "method": "GET",
+      "path": "/query/datetime/unix/dict",
+      "query": {
+        "dates[key1]": {
+          "dateTime": "784111777"
+        },
+        "dates[key2]": {
+          "dateTime": "784111777"
+        }
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": {
+          "passed": true,
+          "message": "request received",
+          "input": {}
+        }
+      }
+    }
+  }
+]

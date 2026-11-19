@@ -1,0 +1,174 @@
+[
+  {
+    "name": "getTransaction 200 card purchase (every field)",
+    "operation": "getTransaction",
+    "description": "Exercises allOf, the shape-only oneOf (card details), the recursive category, the three additionalProperties forms, the integer enum, const, int64 beyond 2^53, byte, uri, date, a hyphenated property and the digit-leading 3DSecureInfo schema. posted_at carries a +01:00 offset.",
+    "request": {
+      "method": "GET",
+      "path": "/v1/transactions/3c4d5e6f-7a8b-4c9d-8e0f-1a2b3c4d5e6f",
+      "auth": {
+        "anyOf": [
+          {
+            "bearerAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Bearer test-bearer-token"
+            }
+          },
+          {
+            "apiKeyHeader": {
+              "in": "header",
+              "name": "X-API-Key",
+              "value": "test-api-key"
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": {
+          "id": "3c4d5e6f-7a8b-4c9d-8e0f-1a2b3c4d5e6f",
+          "account_id": "7a1b9d2e-3c4f-4a5b-8c6d-9e0f1a2b3c4d",
+          "amount": "-19.99",
+          "posted_at": "2026-02-20T12:34:56+01:00",
+          "value_date": "2026-02-20",
+          "object": "transaction",
+          "kind": "withdrawal",
+          "status": "posted",
+          "priority": 3,
+          "sequence": 9007199254740997,
+          "reference_id": "8f7e6d5c-4b3a-4c2d-9e1f-0a9b8c7d6e5f",
+          "receipt_url": "https://receipts.ledger.example.com/r/3c4d5e6f",
+          "memo_hash": "DpD1FLg9unCEJJdR0eVBp+CnzVl0XyuE0yInZYRwLvc=",
+          "details": {
+            "last4": "4242",
+            "card-brand": "visa",
+            "three_d_secure": {
+              "version": "2.2.0",
+              "eci": "05",
+              "cavv": "AAABBEg0VhI0VniQEjRWAAAAAAA="
+            }
+          },
+          "category": {
+            "id": "ca7e0005-0000-4000-8000-000000000005",
+            "name": "Meals",
+            "children": [
+              {
+                "id": "ca7e0006-0000-4000-8000-000000000006",
+                "name": "Client meals",
+                "children": []
+              }
+            ]
+          },
+          "metadata": {
+            "source": "pos",
+            "tip": 2.5,
+            "tags": [
+              "client",
+              "lunch"
+            ],
+            "nested": {
+              "ok": true
+            },
+            "none": null
+          },
+          "labels": {
+            "team": "sales",
+            "cost_center": "CC-12"
+          },
+          "audit": {
+            "created_by": "svc-ledger",
+            "source_ip": "203.0.113.7"
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "getTransaction 404",
+    "operation": "getTransaction",
+    "kind": "error",
+    "request": {
+      "method": "GET",
+      "path": "/v1/transactions/{transaction_id}",
+      "auth": {
+        "anyOf": [
+          {
+            "bearerAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Bearer test-bearer-token"
+            }
+          },
+          {
+            "apiKeyHeader": {
+              "in": "header",
+              "name": "X-API-Key",
+              "value": "test-api-key"
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 404,
+      "headers": {
+        "Content-Type": "application/json",
+        "X-Request-Id": "req_err_404"
+      },
+      "body": {
+        "json": {
+          "code": "not_found",
+          "message": "No resource exists at this identifier.",
+          "request_id": "req_err_404"
+        }
+      }
+    }
+  },
+  {
+    "name": "getTransaction 500 (default)",
+    "operation": "getTransaction",
+    "kind": "error",
+    "request": {
+      "method": "GET",
+      "path": "/v1/transactions/{transaction_id}",
+      "auth": {
+        "anyOf": [
+          {
+            "bearerAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Bearer test-bearer-token"
+            }
+          },
+          {
+            "apiKeyHeader": {
+              "in": "header",
+              "name": "X-API-Key",
+              "value": "test-api-key"
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 500,
+      "headers": {
+        "Content-Type": "application/json",
+        "X-Request-Id": "req_err_500"
+      },
+      "body": {
+        "json": {
+          "code": "internal_error",
+          "message": "Something went wrong on our side.",
+          "request_id": "req_err_500"
+        }
+      }
+    }
+  }
+]

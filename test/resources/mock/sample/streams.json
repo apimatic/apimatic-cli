@@ -1,0 +1,231 @@
+[
+  {
+    "name": "streamAccountEvents 200 live",
+    "operation": "streamAccountEvents",
+    "request": {
+      "method": "GET",
+      "path": "/v1/accounts/7a1b9d2e-3c4f-4a5b-8c6d-9e0f1a2b3c4d/events",
+      "query": {
+        "since_sequence": null
+      },
+      "headers": {
+        "Accept": "text/event-stream"
+      },
+      "auth": {
+        "anyOf": [
+          {
+            "bearerAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Bearer test-bearer-token"
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache"
+      },
+      "chunkDelayMs": 5,
+      "body": {
+        "sse": [
+          {
+            "id": "1",
+            "data": {
+              "type": "balance.updated",
+              "sequence": 9007199254740993
+            }
+          },
+          {
+            "id": "2",
+            "event": "transaction.posted",
+            "retry": 1500,
+            "data": {
+              "type": "transaction.posted",
+              "amount": "250.00"
+            }
+          },
+          {
+            "data": "[DONE]"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "exportTransactions 200",
+    "operation": "exportTransactions",
+    "request": {
+      "method": "GET",
+      "path": "/v1/accounts/7a1b9d2e-3c4f-4a5b-8c6d-9e0f1a2b3c4d/transactions/export",
+      "headers": {
+        "Accept": "application/x-ndjson"
+      },
+      "auth": {
+        "anyOf": [
+          {
+            "bearerAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Bearer test-bearer-token"
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/x-ndjson"
+      },
+      "body": {
+        "ndjson": [
+          {
+            "id": "t1",
+            "amount": "250.00"
+          },
+          {
+            "id": "t2",
+            "amount": "75.50"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "uploadDocument 201",
+    "operation": "uploadDocument",
+    "request": {
+      "method": "POST",
+      "path": "/v1/documents",
+      "headers": {
+        "Content-Type": {
+          "startsWith": "multipart/form-data"
+        }
+      },
+      "auth": {
+        "anyOf": [
+          {
+            "bearerAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Bearer test-bearer-token"
+            }
+          }
+        ]
+      },
+      "body": {
+        "multipart": {
+          "parts": {
+            "file": {
+              "filename": "statement-2026-02.pdf",
+              "contentType": "application/pdf",
+              "bytes": "JVBERi0xLjcK"
+            },
+            "metadata": {
+              "contentType": {
+                "startsWith": "application/json"
+              },
+              "json": {
+                "title": "February statement",
+                "tags": [
+                  "statement",
+                  "2026-02"
+                ]
+              }
+            },
+            "description": {
+              "text": "Monthly statement for February 2026"
+            }
+          }
+        }
+      }
+    },
+    "response": {
+      "status": 201,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": {
+          "id": "d0c5e1a2-6b7c-4d8e-9f01-a2b3c4d5e6f7",
+          "title": "February statement",
+          "size_bytes": 9,
+          "content_type": "application/pdf"
+        }
+      }
+    }
+  },
+  {
+    "name": "downloadDocumentContent 200",
+    "operation": "downloadDocumentContent",
+    "request": {
+      "method": "GET",
+      "path": "/v1/documents/d0c5e1a2-6b7c-4d8e-9f01-a2b3c4d5e6f7/content",
+      "headers": {
+        "Accept": "application/octet-stream"
+      },
+      "auth": {
+        "anyOf": [
+          {
+            "bearerAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Bearer test-bearer-token"
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": "attachment; filename=\"statement-2026-02.pdf\""
+      },
+      "body": {
+        "bytes": "JVBERi0xLjcK"
+      }
+    }
+  },
+  {
+    "name": "replaceDocumentContent 200",
+    "operation": "replaceDocumentContent",
+    "request": {
+      "method": "PUT",
+      "path": "/v1/documents/d0c5e1a2-6b7c-4d8e-9f01-a2b3c4d5e6f7/content",
+      "headers": {
+        "Content-Type": "application/octet-stream"
+      },
+      "auth": {
+        "anyOf": [
+          {
+            "bearerAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Bearer test-bearer-token"
+            }
+          }
+        ]
+      },
+      "body": {
+        "bytes": "JVBERi0xLjcK"
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": {
+          "id": "d0c5e1a2-6b7c-4d8e-9f01-a2b3c4d5e6f7",
+          "size_bytes": 9
+        }
+      }
+    }
+  }
+]

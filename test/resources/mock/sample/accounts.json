@@ -1,0 +1,290 @@
+[
+  {
+    "name": "listAccounts 200 first page",
+    "operation": "listAccounts",
+    "description": "The spec's firstPage example: no query parameters at all.",
+    "request": {
+      "method": "GET",
+      "path": "/v1/accounts",
+      "query": {
+        "limit": null,
+        "offset": {
+          "absent": true
+        }
+      },
+      "headers": {
+        "Accept": {
+          "startsWith": "application/json"
+        }
+      },
+      "auth": {
+        "anyOf": [
+          {
+            "bearerAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Bearer test-bearer-token"
+            }
+          },
+          {
+            "apiKeyHeader": {
+              "in": "header",
+              "name": "X-API-Key",
+              "value": "test-api-key"
+            },
+            "basicAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Basic dGVzdC11c2VyOnRlc3QtcGFzc3dvcmQ="
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json",
+        "X-Request-Id": "req_list_accounts_p1"
+      },
+      "body": {
+        "json": {
+          "data": [
+            {
+              "id": "7a1b9d2e-3c4f-4a5b-8c6d-9e0f1a2b3c4d",
+              "name": "Operating cash",
+              "class": "asset",
+              "status": "active"
+            }
+          ],
+          "has_more": true,
+          "total_count": 42
+        }
+      }
+    }
+  },
+  {
+    "name": "listAccounts 200 page 2",
+    "operation": "listAccounts",
+    "request": {
+      "method": "GET",
+      "path": "/v1/accounts",
+      "query": {
+        "offset": "1",
+        "tags": [
+          "rent",
+          "shared"
+        ],
+        "cursor": {
+          "startsWith": "cur_"
+        },
+        "limit": null
+      },
+      "headers": {
+        "Accept": {
+          "startsWith": "application/json"
+        }
+      },
+      "auth": {
+        "anyOf": [
+          {
+            "bearerAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Bearer test-bearer-token"
+            }
+          },
+          {
+            "apiKeyHeader": {
+              "in": "header",
+              "name": "X-API-Key",
+              "value": "test-api-key"
+            },
+            "basicAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Basic dGVzdC11c2VyOnRlc3QtcGFzc3dvcmQ="
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": {
+          "data": [],
+          "has_more": false,
+          "total_count": 42
+        }
+      }
+    }
+  },
+  {
+    "name": "listAccounts 200 filtered",
+    "operation": "listAccounts",
+    "description": "A deepObject key and a value with a space: both arrive percent-encoded and are decoded before matching.",
+    "request": {
+      "method": "GET",
+      "path": "/v1/accounts",
+      "query": {
+        "filter[status]": "active",
+        "q": "cash flow",
+        "limit": null,
+        "offset": null
+      },
+      "headers": {
+        "Accept": {
+          "startsWith": "application/json"
+        }
+      },
+      "auth": {
+        "anyOf": [
+          {
+            "bearerAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Bearer test-bearer-token"
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": {
+          "data": [
+            {
+              "id": "7a1b9d2e-3c4f-4a5b-8c6d-9e0f1a2b3c4d",
+              "name": "Operating cash",
+              "class": "asset",
+              "status": "active"
+            }
+          ],
+          "has_more": false,
+          "total_count": 1
+        }
+      }
+    }
+  },
+  {
+    "name": "createAccount 201",
+    "operation": "createAccount",
+    "request": {
+      "method": "POST",
+      "path": "/v1/accounts",
+      "headers": {
+        "Idempotency-Key": "9b2f6c1e-7d3a-4e8b-a5c4-1f0e9d8c7b6a",
+        "Content-Type": {
+          "startsWith": "application/json"
+        },
+        "Prefer": {
+          "absent": true
+        }
+      },
+      "cookies": {
+        "ledger_session": "sess_7f3a"
+      },
+      "auth": {
+        "anyOf": [
+          {
+            "oauth2ClientCredentials": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Bearer cc-access-token"
+            }
+          }
+        ]
+      },
+      "body": {
+        "json": {
+          "name": "Operating cash",
+          "class": "asset",
+          "owner_id": "c0ffee00-1234-4567-89ab-cdef01234567",
+          "credit_limit": "1250.75"
+        }
+      }
+    },
+    "response": {
+      "status": 201,
+      "headers": {
+        "Content-Type": "application/json",
+        "Location": "{{origin}}/v1/accounts/7a1b9d2e-3c4f-4a5b-8c6d-9e0f1a2b3c4d"
+      },
+      "body": {
+        "json": {
+          "id": "7a1b9d2e-3c4f-4a5b-8c6d-9e0f1a2b3c4d",
+          "name": "Operating cash",
+          "class": "asset",
+          "status": "active",
+          "sequence": 9007199254740993
+        }
+      }
+    }
+  },
+  {
+    "name": "deleteAccount 204",
+    "operation": "deleteAccount",
+    "request": {
+      "method": "DELETE",
+      "path": "/v1/accounts/7a1b9d2e-3c4f-4a5b-8c6d-9e0f1a2b3c4d",
+      "auth": {
+        "anyOf": [
+          {
+            "bearerAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Bearer test-bearer-token"
+            }
+          }
+        ]
+      },
+      "body": null
+    },
+    "response": {
+      "status": 204
+    }
+  },
+  {
+    "name": "getAccount 404",
+    "operation": "getAccount",
+    "kind": "error",
+    "description": "Served when the request adds Prefer: code=404.",
+    "request": {
+      "method": "GET",
+      "path": "/v1/accounts/{account_id}",
+      "auth": {
+        "anyOf": [
+          {
+            "bearerAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Bearer test-bearer-token"
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 404,
+      "headers": {
+        "Content-Type": "application/json",
+        "X-Request-Id": "req_err_404"
+      },
+      "body": {
+        "json": {
+          "code": "not_found",
+          "message": "No resource exists at this identifier.",
+          "request_id": "req_err_404"
+        }
+      }
+    }
+  }
+]

@@ -1,0 +1,35 @@
+[
+  {
+    "name": "createBatchJob 200",
+    "operation": "createBatchJob",
+    "request": {
+      "method": "POST",
+      "path": "/batch-job",
+      "headers": {
+        "Content-Type": {
+          "startsWith": "application/json"
+        }
+      },
+      "body": {
+        "json": {
+          "batch_size": 100,
+          "job_type": "batch",
+          "retry": true
+        }
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": {
+          "batch_size": 100,
+          "job_type": "batch",
+          "retry": true
+        }
+      }
+    }
+  }
+]

@@ -1,0 +1,33 @@
+[
+  {
+    "name": "anyOfAccountantManagerReturnsAccountant 200",
+    "operation": "anyOfAccountantManagerReturnsAccountant",
+    "request": {
+      "method": "POST",
+      "path": "/anyOf-accountant-manager-returns-accountant",
+      "headers": {
+        "Content-Type": {
+          "startsWith": "application/json"
+        }
+      },
+      "body": {
+        "json": {
+          "name": "Alice",
+          "level": 3
+        }
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": {
+          "name": "Alice",
+          "level": 3
+        }
+      }
+    }
+  }
+]

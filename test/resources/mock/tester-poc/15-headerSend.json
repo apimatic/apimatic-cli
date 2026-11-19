@@ -1,0 +1,83 @@
+[
+  {
+    "name": "headerSend 200",
+    "operation": "headerSend",
+    "description": "The optional custom-header and the form body are left unset.",
+    "request": {
+      "method": "POST",
+      "path": "/header",
+      "headers": {
+        "custom-header": null,
+        "custom-headers": null,
+        "days": null
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": {
+          "passed": true,
+          "message": "request received",
+          "input": {}
+        }
+      }
+    }
+  },
+  {
+    "name": "headerSend 200 custom-headers",
+    "operation": "headerSend",
+    "description": "The SDK sends a custom-headers list the spec does not declare.",
+    "request": {
+      "method": "POST",
+      "path": "/header",
+      "headers": {
+        "custom-headers": "abc, def",
+        "custom-header": null,
+        "days": null
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": {
+          "passed": true,
+          "message": "request received",
+          "input": {}
+        }
+      }
+    }
+  },
+  {
+    "name": "headerSend 200 days",
+    "operation": "headerSend",
+    "description": "The SDK sends a days list the spec does not declare.",
+    "request": {
+      "method": "POST",
+      "path": "/header",
+      "headers": {
+        "days": "Monday, Tuesday, Friday",
+        "custom-header": null,
+        "custom-headers": null
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": {
+          "passed": true,
+          "message": "request received",
+          "input": {}
+        }
+      }
+    }
+  }
+]

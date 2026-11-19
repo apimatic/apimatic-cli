@@ -1,0 +1,24 @@
+[
+  {
+    "name": "querySendUnixDatetime 200",
+    "operation": "querySendUnixDatetime",
+    "description": "The optional datetime is left unset, so no query is sent.",
+    "request": {
+      "method": "GET",
+      "path": "/query/datetime/unix"
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": {
+          "passed": true,
+          "message": "request received",
+          "input": {}
+        }
+      }
+    }
+  }
+]

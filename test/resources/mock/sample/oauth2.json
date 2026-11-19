@@ -1,0 +1,27 @@
+[
+  {
+    "name": "oauth2 authorization server",
+    "kind": "oauth2",
+    "description": "All four flows at their default tokens: client credentials and the password grant at the token path, the authorization-code and implicit flows sharing one authorize path.",
+    "oauth2": {
+      "tokenPath": "/oauth2/token",
+      "flows": {
+        "clientCredentials": {},
+        "authorizationCode": {
+          "authorizePath": "/oauth2/authorize"
+        },
+        "password": {},
+        "implicit": {
+          "authorizePath": "/oauth2/authorize"
+        }
+      },
+      "clientId": "test-client-id",
+      "clientSecret": "test-client-secret",
+      "scopes": [
+        "ledger:read",
+        "ledger:write",
+        "audit:read"
+      ]
+    }
+  }
+]

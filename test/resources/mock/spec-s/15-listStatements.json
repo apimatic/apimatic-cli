@@ -1,0 +1,199 @@
+[
+  {
+    "name": "listStatements 200 page 1",
+    "operation": "listStatements",
+    "description": "Page-number pagination; items sit under statements and the metadata gives total_pages.",
+    "request": {
+      "method": "GET",
+      "path": "/v1/statements",
+      "query": {
+        "page": "1",
+        "page_size": "2",
+        "account_id": "7a1b9d2e-3c4f-4a5b-8c6d-9e0f1a2b3c4d"
+      },
+      "auth": {
+        "anyOf": [
+          {
+            "bearerAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Bearer test-bearer-token"
+            }
+          },
+          {
+            "apiKeyHeader": {
+              "in": "header",
+              "name": "X-API-Key",
+              "value": "test-api-key"
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": {
+          "statements": [
+            {
+              "id": "2b7c9e10-4d3a-4f6b-9c8d-7e6f5a4b3c21",
+              "account_id": "7a1b9d2e-3c4f-4a5b-8c6d-9e0f1a2b3c4d",
+              "period_start": "2026-02-01",
+              "period_end": "2026-02-28",
+              "closing_balance": "1250.75",
+              "document_id": "d0c5e1a2-6b7c-4d8e-9f01-a2b3c4d5e6f7"
+            },
+            {
+              "id": "3c8d0f21-5e4b-4a7c-8d9e-8f7a6b5c4d32",
+              "account_id": "7a1b9d2e-3c4f-4a5b-8c6d-9e0f1a2b3c4d",
+              "period_start": "2026-01-01",
+              "period_end": "2026-01-31",
+              "closing_balance": "1000.75"
+            }
+          ],
+          "page": 1,
+          "total_pages": 2,
+          "total_count": 3
+        }
+      }
+    }
+  },
+  {
+    "name": "listStatements 200 page 2",
+    "operation": "listStatements",
+    "request": {
+      "method": "GET",
+      "path": "/v1/statements",
+      "query": {
+        "page": "2",
+        "page_size": "2",
+        "account_id": "7a1b9d2e-3c4f-4a5b-8c6d-9e0f1a2b3c4d"
+      },
+      "auth": {
+        "anyOf": [
+          {
+            "bearerAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Bearer test-bearer-token"
+            }
+          },
+          {
+            "apiKeyHeader": {
+              "in": "header",
+              "name": "X-API-Key",
+              "value": "test-api-key"
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": {
+          "statements": [
+            {
+              "id": "4d9e1a32-6f5c-4b8d-9eaf-9a8b7c6d5e43",
+              "account_id": "7a1b9d2e-3c4f-4a5b-8c6d-9e0f1a2b3c4d",
+              "period_start": "2025-12-01",
+              "period_end": "2025-12-31",
+              "closing_balance": "-19.99"
+            }
+          ],
+          "page": 2,
+          "total_pages": 2,
+          "total_count": 3
+        }
+      }
+    }
+  },
+  {
+    "name": "listStatements 401",
+    "operation": "listStatements",
+    "kind": "error",
+    "request": {
+      "method": "GET",
+      "path": "/v1/statements",
+      "auth": {
+        "anyOf": [
+          {
+            "bearerAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Bearer test-bearer-token"
+            }
+          },
+          {
+            "apiKeyHeader": {
+              "in": "header",
+              "name": "X-API-Key",
+              "value": "test-api-key"
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 401,
+      "headers": {
+        "Content-Type": "application/json",
+        "X-Request-Id": "req_err_401"
+      },
+      "body": {
+        "json": {
+          "code": "unauthorized",
+          "message": "The credentials are missing, expired or invalid.",
+          "request_id": "req_err_401"
+        }
+      }
+    }
+  },
+  {
+    "name": "listStatements 500 (default)",
+    "operation": "listStatements",
+    "kind": "error",
+    "request": {
+      "method": "GET",
+      "path": "/v1/statements",
+      "auth": {
+        "anyOf": [
+          {
+            "bearerAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Bearer test-bearer-token"
+            }
+          },
+          {
+            "apiKeyHeader": {
+              "in": "header",
+              "name": "X-API-Key",
+              "value": "test-api-key"
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 500,
+      "headers": {
+        "Content-Type": "application/json",
+        "X-Request-Id": "req_err_500"
+      },
+      "body": {
+        "json": {
+          "code": "internal_error",
+          "message": "Something went wrong on our side.",
+          "request_id": "req_err_500"
+        }
+      }
+    }
+  }
+]

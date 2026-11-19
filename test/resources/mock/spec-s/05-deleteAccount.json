@@ -1,0 +1,126 @@
+[
+  {
+    "name": "deleteAccount 204 travel card",
+    "operation": "deleteAccount",
+    "description": "204 with no body and no Content-Type.",
+    "request": {
+      "method": "DELETE",
+      "path": "/v1/accounts/5d6e7f80-91a2-4b3c-8d4e-5f6a7b8c9d0e",
+      "auth": {
+        "anyOf": [
+          {
+            "oauth2AuthCode": {
+              "in": "header",
+              "name": "Authorization",
+              "startsWith": "Bearer ac-access-token-"
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 204
+    }
+  },
+  {
+    "name": "deleteAccount 404",
+    "operation": "deleteAccount",
+    "kind": "error",
+    "request": {
+      "method": "DELETE",
+      "path": "/v1/accounts/{account_id}",
+      "auth": {
+        "anyOf": [
+          {
+            "oauth2AuthCode": {
+              "in": "header",
+              "name": "Authorization",
+              "startsWith": "Bearer ac-access-token-"
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 404,
+      "headers": {
+        "Content-Type": "application/json",
+        "X-Request-Id": "req_err_404"
+      },
+      "body": {
+        "json": {
+          "code": "not_found",
+          "message": "No resource exists at this identifier.",
+          "request_id": "req_err_404"
+        }
+      }
+    }
+  },
+  {
+    "name": "deleteAccount 409",
+    "operation": "deleteAccount",
+    "kind": "error",
+    "request": {
+      "method": "DELETE",
+      "path": "/v1/accounts/{account_id}",
+      "auth": {
+        "anyOf": [
+          {
+            "oauth2AuthCode": {
+              "in": "header",
+              "name": "Authorization",
+              "startsWith": "Bearer ac-access-token-"
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 409,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": {
+          "code": "balance_not_zero",
+          "message": "The account still has a balance of 1250.75 USD.",
+          "request_id": "req_err_409"
+        }
+      }
+    }
+  },
+  {
+    "name": "deleteAccount 500 (default)",
+    "operation": "deleteAccount",
+    "kind": "error",
+    "request": {
+      "method": "DELETE",
+      "path": "/v1/accounts/{account_id}",
+      "auth": {
+        "anyOf": [
+          {
+            "oauth2AuthCode": {
+              "in": "header",
+              "name": "Authorization",
+              "startsWith": "Bearer ac-access-token-"
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 500,
+      "headers": {
+        "Content-Type": "application/json",
+        "X-Request-Id": "req_err_500"
+      },
+      "body": {
+        "json": {
+          "code": "internal_error",
+          "message": "Something went wrong on our side.",
+          "request_id": "req_err_500"
+        }
+      }
+    }
+  }
+]

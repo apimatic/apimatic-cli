@@ -1,0 +1,30 @@
+[
+  {
+    "name": "querySendStringArray 200",
+    "operation": "querySendStringArray",
+    "description": "The spec declares no parameters here; the stub follows what the SDK sends.",
+    "request": {
+      "method": "GET",
+      "path": "/query/stringarray",
+      "query": {
+        "strings": [
+          "abc",
+          "def"
+        ]
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": {
+          "passed": true,
+          "message": "request received",
+          "input": {}
+        }
+      }
+    }
+  }
+]

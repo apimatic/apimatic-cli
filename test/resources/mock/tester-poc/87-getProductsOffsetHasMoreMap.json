@@ -1,0 +1,46 @@
+[
+  {
+    "name": "getProductsOffsetHasMoreMap 200 page1",
+    "operation": "getProductsOffsetHasMoreMap",
+    "request": {
+      "method": "GET",
+      "path": "/products/offset-hasmore-map",
+      "query": {
+        "offset": "0",
+        "limit": "20"
+      },
+      "auth": {
+        "anyOf": [
+          {
+            "BearerAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Bearer test-bearer-token"
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": {
+          "data": [
+            {
+              "id": 1,
+              "name": "Aeron Chair",
+              "price": 1395.0,
+              "category": "furniture"
+            }
+          ],
+          "meta": {
+            "hasMore": true
+          }
+        }
+      }
+    }
+  }
+]

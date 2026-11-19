@@ -1,0 +1,261 @@
+[
+  {
+    "name": "listAccounts 200 page 1 (spec example firstPage)",
+    "operation": "listAccounts",
+    "description": "The spec's named example firstPage, verbatim. Requested with no query parameters.",
+    "request": {
+      "method": "GET",
+      "path": "/v1/accounts",
+      "auth": {
+        "anyOf": [
+          {
+            "bearerAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Bearer test-bearer-token"
+            }
+          },
+          {
+            "apiKeyHeader": {
+              "in": "header",
+              "name": "X-API-Key",
+              "value": "test-api-key"
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json",
+        "X-Request-Id": "req_list_accounts_p1"
+      },
+      "body": {
+        "json": {
+          "data": [
+            {
+              "id": "7a1b9d2e-3c4f-4a5b-8c6d-9e0f1a2b3c4d",
+              "name": "Operating cash",
+              "class": "asset",
+              "status": "active",
+              "currency": "USD",
+              "profile": "standard",
+              "owner": {
+                "id": "c0ffee00-1234-4567-89ab-cdef01234567",
+                "display_name": "Avery Ledgerwood",
+                "email": "avery@example.com"
+              },
+              "created_at": "2026-01-15T09:30:00Z"
+            }
+          ],
+          "total_count": 42,
+          "has_more": true
+        }
+      }
+    }
+  },
+  {
+    "name": "listAccounts 200 page 2",
+    "operation": "listAccounts",
+    "description": "The page an offset paginator asks for after page 1 returned one item. Ends the chain.",
+    "request": {
+      "method": "GET",
+      "path": "/v1/accounts",
+      "query": {
+        "offset": "1"
+      },
+      "auth": {
+        "anyOf": [
+          {
+            "bearerAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Bearer test-bearer-token"
+            }
+          },
+          {
+            "apiKeyHeader": {
+              "in": "header",
+              "name": "X-API-Key",
+              "value": "test-api-key"
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json",
+        "X-Request-Id": "req_list_accounts_p2"
+      },
+      "body": {
+        "json": {
+          "data": [
+            {
+              "id": "0b1c2d3e-4f5a-4b6c-8d7e-9f0a1b2c3d4e",
+              "name": "Payroll reserve",
+              "nickname": null,
+              "class": "liability",
+              "status": "frozen",
+              "currency": "USD",
+              "credit_limit": null,
+              "profile": "premium",
+              "owner": {
+                "id": "c0ffee00-1234-4567-89ab-cdef01234567",
+                "display_name": "Avery Ledgerwood"
+              },
+              "created_at": "2026-01-20T11:00:00Z"
+            }
+          ],
+          "total_count": 42,
+          "has_more": false
+        }
+      }
+    }
+  },
+  {
+    "name": "listAccounts 200 filtered",
+    "operation": "listAccounts",
+    "description": "status is form/explode=false, so both values travel as one comma-separated value; class is a reserved word.",
+    "request": {
+      "method": "GET",
+      "path": "/v1/accounts",
+      "query": {
+        "limit": "10",
+        "status": "active,frozen",
+        "class": "asset"
+      },
+      "auth": {
+        "anyOf": [
+          {
+            "bearerAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Bearer test-bearer-token"
+            }
+          },
+          {
+            "apiKeyHeader": {
+              "in": "header",
+              "name": "X-API-Key",
+              "value": "test-api-key"
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json",
+        "X-Request-Id": "req_list_accounts_filtered"
+      },
+      "body": {
+        "json": {
+          "data": [
+            {
+              "id": "7a1b9d2e-3c4f-4a5b-8c6d-9e0f1a2b3c4d",
+              "name": "Operating cash",
+              "class": "asset",
+              "status": "active",
+              "currency": "USD",
+              "profile": "standard",
+              "owner": {
+                "id": "c0ffee00-1234-4567-89ab-cdef01234567",
+                "display_name": "Avery Ledgerwood",
+                "email": "avery@example.com"
+              },
+              "created_at": "2026-01-15T09:30:00Z"
+            }
+          ],
+          "total_count": 1,
+          "has_more": false
+        }
+      }
+    }
+  },
+  {
+    "name": "listAccounts 401",
+    "operation": "listAccounts",
+    "kind": "error",
+    "request": {
+      "method": "GET",
+      "path": "/v1/accounts",
+      "auth": {
+        "anyOf": [
+          {
+            "bearerAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Bearer test-bearer-token"
+            }
+          },
+          {
+            "apiKeyHeader": {
+              "in": "header",
+              "name": "X-API-Key",
+              "value": "test-api-key"
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 401,
+      "headers": {
+        "Content-Type": "application/json",
+        "X-Request-Id": "req_err_401"
+      },
+      "body": {
+        "json": {
+          "code": "unauthorized",
+          "message": "The credentials are missing, expired or invalid.",
+          "request_id": "req_err_401"
+        }
+      }
+    }
+  },
+  {
+    "name": "listAccounts 500 (default)",
+    "operation": "listAccounts",
+    "kind": "error",
+    "request": {
+      "method": "GET",
+      "path": "/v1/accounts",
+      "auth": {
+        "anyOf": [
+          {
+            "bearerAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Bearer test-bearer-token"
+            }
+          },
+          {
+            "apiKeyHeader": {
+              "in": "header",
+              "name": "X-API-Key",
+              "value": "test-api-key"
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 500,
+      "headers": {
+        "Content-Type": "application/json",
+        "X-Request-Id": "req_err_500"
+      },
+      "body": {
+        "json": {
+          "code": "internal_error",
+          "message": "Something went wrong on our side.",
+          "request_id": "req_err_500"
+        }
+      }
+    }
+  }
+]

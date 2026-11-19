@@ -1,0 +1,157 @@
+[
+  {
+    "name": "listCategories 200 custom only",
+    "operation": "listCategories",
+    "description": "default is a reserved word; false is sent explicitly. The tree nests three levels deep.",
+    "request": {
+      "method": "GET",
+      "path": "/v1/categories",
+      "query": {
+        "default": "false"
+      },
+      "auth": {
+        "anyOf": [
+          {
+            "bearerAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Bearer test-bearer-token"
+            }
+          },
+          {
+            "apiKeyHeader": {
+              "in": "header",
+              "name": "X-API-Key",
+              "value": "test-api-key"
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": [
+          {
+            "id": "ca7e0001-0000-4000-8000-000000000001",
+            "name": "Housing",
+            "children": [
+              {
+                "id": "ca7e0002-0000-4000-8000-000000000002",
+                "name": "Rent",
+                "children": []
+              },
+              {
+                "id": "ca7e0003-0000-4000-8000-000000000003",
+                "name": "Utilities",
+                "children": [
+                  {
+                    "id": "ca7e0004-0000-4000-8000-000000000004",
+                    "name": "Electricity",
+                    "children": []
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "ca7e0005-0000-4000-8000-000000000005",
+            "name": "Meals",
+            "children": [
+              {
+                "id": "ca7e0006-0000-4000-8000-000000000006",
+                "name": "Client meals",
+                "children": []
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "listCategories 401",
+    "operation": "listCategories",
+    "kind": "error",
+    "request": {
+      "method": "GET",
+      "path": "/v1/categories",
+      "auth": {
+        "anyOf": [
+          {
+            "bearerAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Bearer test-bearer-token"
+            }
+          },
+          {
+            "apiKeyHeader": {
+              "in": "header",
+              "name": "X-API-Key",
+              "value": "test-api-key"
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 401,
+      "headers": {
+        "Content-Type": "application/json",
+        "X-Request-Id": "req_err_401"
+      },
+      "body": {
+        "json": {
+          "code": "unauthorized",
+          "message": "The credentials are missing, expired or invalid.",
+          "request_id": "req_err_401"
+        }
+      }
+    }
+  },
+  {
+    "name": "listCategories 500 (default)",
+    "operation": "listCategories",
+    "kind": "error",
+    "request": {
+      "method": "GET",
+      "path": "/v1/categories",
+      "auth": {
+        "anyOf": [
+          {
+            "bearerAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Bearer test-bearer-token"
+            }
+          },
+          {
+            "apiKeyHeader": {
+              "in": "header",
+              "name": "X-API-Key",
+              "value": "test-api-key"
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 500,
+      "headers": {
+        "Content-Type": "application/json",
+        "X-Request-Id": "req_err_500"
+      },
+      "body": {
+        "json": {
+          "code": "internal_error",
+          "message": "Something went wrong on our side.",
+          "request_id": "req_err_500"
+        }
+      }
+    }
+  }
+]

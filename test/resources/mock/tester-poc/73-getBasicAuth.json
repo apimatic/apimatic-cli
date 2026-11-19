@@ -1,0 +1,25 @@
+[
+  {
+    "name": "getBasicAuth 200",
+    "operation": "getBasicAuth",
+    "description": "The spec gives this operation no operationId; it is named after the SDK method. The 200 is declared with no content.",
+    "request": {
+      "method": "GET",
+      "path": "/basic-auth",
+      "auth": {
+        "anyOf": [
+          {
+            "BasicAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Basic dGVzdC11c2VyOnRlc3QtcGFzc3dvcmQ="
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 200
+    }
+  }
+]

@@ -1,0 +1,167 @@
+[
+  {
+    "name": "downloadDocumentContent 200 raw bytes",
+    "operation": "downloadDocumentContent",
+    "description": "One 200 with two media types; Accept picks this one. bytes is base64 in the stub file.",
+    "request": {
+      "method": "GET",
+      "path": "/v1/documents/d0c5e1a2-6b7c-4d8e-9f01-a2b3c4d5e6f7/content",
+      "headers": {
+        "Accept": "application/octet-stream"
+      },
+      "auth": {
+        "anyOf": [
+          {
+            "bearerAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Bearer test-bearer-token"
+            }
+          },
+          {
+            "apiKeyHeader": {
+              "in": "header",
+              "name": "X-API-Key",
+              "value": "test-api-key"
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/octet-stream",
+        "Content-Disposition": "attachment; filename=\"statement-2026-02.pdf\""
+      },
+      "body": {
+        "bytes": "JVBERi0xLjcKJSBTcGVjIFMgc2FtcGxlIHN0YXRlbWVudCwgRmVicnVhcnkgMjAyNgolJUVPRgo="
+      }
+    }
+  },
+  {
+    "name": "downloadDocumentContent 200 JSON envelope",
+    "operation": "downloadDocumentContent",
+    "description": "Same bytes, base64 inside JSON, when the client asks for application/json.",
+    "request": {
+      "method": "GET",
+      "path": "/v1/documents/d0c5e1a2-6b7c-4d8e-9f01-a2b3c4d5e6f7/content",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "auth": {
+        "anyOf": [
+          {
+            "bearerAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Bearer test-bearer-token"
+            }
+          },
+          {
+            "apiKeyHeader": {
+              "in": "header",
+              "name": "X-API-Key",
+              "value": "test-api-key"
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json",
+        "Content-Disposition": "attachment; filename=\"statement-2026-02.pdf\""
+      },
+      "body": {
+        "json": {
+          "content_type": "application/pdf",
+          "content": "JVBERi0xLjcKJSBTcGVjIFMgc2FtcGxlIHN0YXRlbWVudCwgRmVicnVhcnkgMjAyNgolJUVPRgo="
+        }
+      }
+    }
+  },
+  {
+    "name": "downloadDocumentContent 404",
+    "operation": "downloadDocumentContent",
+    "kind": "error",
+    "request": {
+      "method": "GET",
+      "path": "/v1/documents/{document_id}/content",
+      "auth": {
+        "anyOf": [
+          {
+            "bearerAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Bearer test-bearer-token"
+            }
+          },
+          {
+            "apiKeyHeader": {
+              "in": "header",
+              "name": "X-API-Key",
+              "value": "test-api-key"
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 404,
+      "headers": {
+        "Content-Type": "application/json",
+        "X-Request-Id": "req_err_404"
+      },
+      "body": {
+        "json": {
+          "code": "not_found",
+          "message": "No resource exists at this identifier.",
+          "request_id": "req_err_404"
+        }
+      }
+    }
+  },
+  {
+    "name": "downloadDocumentContent 500 (default)",
+    "operation": "downloadDocumentContent",
+    "kind": "error",
+    "request": {
+      "method": "GET",
+      "path": "/v1/documents/{document_id}/content",
+      "auth": {
+        "anyOf": [
+          {
+            "bearerAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Bearer test-bearer-token"
+            }
+          },
+          {
+            "apiKeyHeader": {
+              "in": "header",
+              "name": "X-API-Key",
+              "value": "test-api-key"
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 500,
+      "headers": {
+        "Content-Type": "application/json",
+        "X-Request-Id": "req_err_500"
+      },
+      "body": {
+        "json": {
+          "code": "internal_error",
+          "message": "Something went wrong on our side.",
+          "request_id": "req_err_500"
+        }
+      }
+    }
+  }
+]

@@ -1,0 +1,24 @@
+[
+  {
+    "name": "sendStringArray 200",
+    "operation": "sendStringArray",
+    "description": "Declared identically by openapi-tester.yaml and openapi.yaml; the path parameter is not declared.",
+    "request": {
+      "method": "GET",
+      "path": "/template/strings/abc,def"
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": {
+          "passed": true,
+          "message": "strings received",
+          "input": "abc,def"
+        }
+      }
+    }
+  }
+]

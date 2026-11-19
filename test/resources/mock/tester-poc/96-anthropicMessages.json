@@ -1,0 +1,76 @@
+[
+  {
+    "name": "anthropicMessages 200 synthesized",
+    "operation": "anthropicMessages",
+    "description": "Synthesized from the schema; the spec has no example. message_start carries stop_reason and stop_sequence as null, as the spec requires.",
+    "request": {
+      "method": "POST",
+      "path": "/v1/messages",
+      "headers": {
+        "Content-Type": {
+          "startsWith": "application/json"
+        },
+        "anthropic-version": "2023-06-01"
+      },
+      "auth": {
+        "anyOf": [
+          {
+            "apiKeyHeader": {
+              "in": "header",
+              "name": "X-API-Key",
+              "value": "test-api-key"
+            }
+          }
+        ]
+      },
+      "body": {
+        "json": {
+          "model": "abc",
+          "content": "abc",
+          "max_tokens": 1,
+          "stream": true
+        }
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "text/event-stream"
+      },
+      "body": {
+        "sse": [
+          {
+            "event": "message_start",
+            "data": {
+              "type": "message_start",
+              "id": "msg_1",
+              "role": "assistant",
+              "content": "",
+              "model": "abc",
+              "stop_reason": null,
+              "stop_sequence": null,
+              "input_tokens": 1,
+              "output_tokens": 1
+            }
+          },
+          {
+            "event": "content_block_delta",
+            "data": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta_type": "text_delta",
+              "text": "Hello",
+              "partial_json": null
+            }
+          },
+          {
+            "event": "message_stop",
+            "data": {
+              "type": "message_stop"
+            }
+          }
+        ]
+      }
+    }
+  }
+]

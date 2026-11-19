@@ -47,6 +47,7 @@ USAGE
 * [`apimatic auth status`](#apimatic-auth-status)
 * [`apimatic autocomplete [SHELL]`](#apimatic-autocomplete-shell)
 * [`apimatic help [COMMAND]`](#apimatic-help-command)
+* [`apimatic mock serve`](#apimatic-mock-serve)
 * [`apimatic plugin generate`](#apimatic-plugin-generate)
 * [`apimatic plugin publish`](#apimatic-plugin-publish)
 * [`apimatic portal generate`](#apimatic-portal-generate)
@@ -233,6 +234,46 @@ DESCRIPTION
 ```
 
 _See code: [@oclif/plugin-help](https://github.com/oclif/plugin-help/blob/6.2.46/src/commands/help.ts)_
+
+## `apimatic mock serve`
+
+Serve a mock of your API from stub files, for SDK tests to run against.
+
+```
+USAGE
+  $ apimatic mock serve [-p 4010] [--host <value>] [-s <value>] [--token-ttl <value>] [--verbose]
+
+FLAGS
+  -p, --port=4010          [default: 4010] port to serve the mock on; 0 picks a free port on localhost.
+  -s, --stubs=<value>      [default: ./stubs] path to the directory containing the stub files.
+      --host=<value>       [default: localhost] localhost or an IP address to listen on, which needs a port other than
+                           0; 0.0.0.0 in a container.
+      --token-ttl=<value>  seconds the OAuth2 tokens live for, sent as expires_in; an oauth2 stub's own expiresIn by
+                           default.
+      --verbose            log every request to stderr.
+
+DESCRIPTION
+  Serve a mock of your API from stub files, for SDK tests to run against.
+
+  Answers exactly the requests its stub files describe. A request no stub describes is answered 418 with the difference
+  from the closest stub, so a failing test explains itself. An 'oauth2' stub adds an authorization server on the same
+  origin.
+
+  A line holding 'MOCKSERVER_URL=<origin>' is printed once the mock listens; a test harness reads the origin from it.
+  The requests the mock received are listed at '<origin>/__admin/requests', where DELETE clears them.
+
+  A busy port is an error, never replaced by another one. Use only the fixed test credentials of the stubs with the
+  mock: it echoes what a request presented.
+
+EXAMPLES
+  apimatic mock serve
+
+  apimatic mock serve --stubs=./stubs --port=0
+
+  apimatic mock serve --host=0.0.0.0 --port=4010 --token-ttl=5 --verbose
+```
+
+_See code: [src/commands/mock/serve.ts](https://github.com/apimatic/apimatic-cli/blob/dev/src/commands/mock/serve.ts)_
 
 ## `apimatic plugin generate`
 

@@ -16,6 +16,7 @@ const COMMANDS: CommandMapping[] = [
   { id: 'auth login', fileParts: ['commands', 'auth', 'login.js'] },
   { id: 'auth logout', fileParts: ['commands', 'auth', 'logout.js'] },
   { id: 'auth status', fileParts: ['commands', 'auth', 'status.js'] },
+  { id: 'mock serve', fileParts: ['commands', 'mock', 'serve.js'] },
   { id: 'plugin generate', fileParts: ['commands', 'plugin', 'generate.js'] },
   { id: 'plugin publish', fileParts: ['commands', 'plugin', 'publish.js'] },
   { id: 'portal generate', fileParts: ['commands', 'portal', 'generate.js'] },

@@ -1,0 +1,37 @@
+[
+  {
+    "name": "getModel 200",
+    "operation": "getModel",
+    "request": {
+      "method": "POST",
+      "path": "/response/model"
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": {
+          "personType": "Empl",
+          "name": "Shahid Khaliq",
+          "age": 5147483645,
+          "address": "H # 531, S # 20",
+          "uid": "123321",
+          "birthday": "1994-02-13",
+          "birthtime": "1994-02-13T14:01:54.9571247Z",
+          "salary": 20000,
+          "department": "Software Development",
+          "joiningDay": "Saturday",
+          "workingDays": [
+            "Monday",
+            "Tuesday",
+            "Friday"
+          ],
+          "hiredAt": "Sun, 06 Nov 1994 08:49:37 GMT",
+          "dependents": []
+        }
+      }
+    }
+  }
+]

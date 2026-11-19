@@ -1,0 +1,27 @@
+[
+  {
+    "name": "processOneOfPrimitiveReturnsInt 200",
+    "operation": "processOneOfPrimitiveReturnsInt",
+    "request": {
+      "method": "POST",
+      "path": "/oneof-primitive-returns-int",
+      "headers": {
+        "Content-Type": {
+          "startsWith": "application/json"
+        }
+      },
+      "body": {
+        "json": 42
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": 42
+      }
+    }
+  }
+]

@@ -1,0 +1,27 @@
+[
+  {
+    "name": "headerSendRfc1123Datetime 200",
+    "operation": "headerSendRfc1123Datetime",
+    "description": "The optional datetime header is left unset.",
+    "request": {
+      "method": "POST",
+      "path": "/header/datetime/rfc1123",
+      "headers": {
+        "datetime": null
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": {
+          "passed": true,
+          "message": "request received",
+          "input": {}
+        }
+      }
+    }
+  }
+]

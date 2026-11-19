@@ -1,0 +1,33 @@
+[
+  {
+    "name": "getTransactionsPages 200",
+    "operation": "getTransactionsPages",
+    "description": "Every paging parameter is optional and left unset; the example is a single last page.",
+    "request": {
+      "method": "GET",
+      "path": "/pagination/transactions/pages"
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": {
+          "data": [
+            {
+              "id": "txn_1",
+              "amount": 12.5,
+              "timestamp": "Sun, 06 Nov 1994 08:49:37 GMT"
+            },
+            {
+              "id": "txn_2",
+              "amount": 42.0,
+              "timestamp": "Sun, 06 Nov 1994 09:15:00 GMT"
+            }
+          ]
+        }
+      }
+    }
+  }
+]

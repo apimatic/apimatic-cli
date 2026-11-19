@@ -1,0 +1,33 @@
+[
+  {
+    "name": "anyOfAccountantManagerReturnsManager 200",
+    "operation": "anyOfAccountantManagerReturnsManager",
+    "request": {
+      "method": "POST",
+      "path": "/anyOf-accountant-manager-returns-manager",
+      "headers": {
+        "Content-Type": {
+          "startsWith": "application/json"
+        }
+      },
+      "body": {
+        "json": {
+          "name": "Bob",
+          "department": "Finance"
+        }
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": {
+          "name": "Bob",
+          "department": "Finance"
+        }
+      }
+    }
+  }
+]

@@ -1,0 +1,178 @@
+[
+  {
+    "name": "getAccount 200 operating cash",
+    "operation": "getAccount",
+    "description": "Every optional Account field is set, including the deprecated legacy_code.",
+    "request": {
+      "method": "GET",
+      "path": "/v1/accounts/7a1b9d2e-3c4f-4a5b-8c6d-9e0f1a2b3c4d",
+      "auth": {
+        "anyOf": [
+          {
+            "bearerAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Bearer test-bearer-token"
+            }
+          },
+          {
+            "apiKeyHeader": {
+              "in": "header",
+              "name": "X-API-Key",
+              "value": "test-api-key"
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": {
+          "id": "7a1b9d2e-3c4f-4a5b-8c6d-9e0f1a2b3c4d",
+          "name": "Operating cash",
+          "nickname": "Ops",
+          "description": "Main operating account for day-to-day spending.",
+          "class": "asset",
+          "status": "active",
+          "currency": "USD",
+          "credit_limit": "500.00",
+          "profile": "standard",
+          "owner": {
+            "id": "c0ffee00-1234-4567-89ab-cdef01234567",
+            "display_name": "Avery Ledgerwood",
+            "email": "avery@example.com"
+          },
+          "legacy_code": "OPS-001",
+          "created_at": "2026-01-15T09:30:00Z"
+        }
+      }
+    }
+  },
+  {
+    "name": "getAccount 404",
+    "operation": "getAccount",
+    "kind": "error",
+    "request": {
+      "method": "GET",
+      "path": "/v1/accounts/{account_id}",
+      "auth": {
+        "anyOf": [
+          {
+            "bearerAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Bearer test-bearer-token"
+            }
+          },
+          {
+            "apiKeyHeader": {
+              "in": "header",
+              "name": "X-API-Key",
+              "value": "test-api-key"
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 404,
+      "headers": {
+        "Content-Type": "application/json",
+        "X-Request-Id": "req_err_404"
+      },
+      "body": {
+        "json": {
+          "code": "not_found",
+          "message": "No resource exists at this identifier.",
+          "request_id": "req_err_404"
+        }
+      }
+    }
+  },
+  {
+    "name": "getAccount 422 (4XX range)",
+    "operation": "getAccount",
+    "kind": "error",
+    "description": "Any client error other than 404 falls into the spec's 4XX range response.",
+    "request": {
+      "method": "GET",
+      "path": "/v1/accounts/{account_id}",
+      "auth": {
+        "anyOf": [
+          {
+            "bearerAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Bearer test-bearer-token"
+            }
+          },
+          {
+            "apiKeyHeader": {
+              "in": "header",
+              "name": "X-API-Key",
+              "value": "test-api-key"
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 422,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": {
+          "code": "invalid_identifier",
+          "message": "account_id must be a UUID.",
+          "request_id": "req_err_422"
+        }
+      }
+    }
+  },
+  {
+    "name": "getAccount 500 (default)",
+    "operation": "getAccount",
+    "kind": "error",
+    "request": {
+      "method": "GET",
+      "path": "/v1/accounts/{account_id}",
+      "auth": {
+        "anyOf": [
+          {
+            "bearerAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Bearer test-bearer-token"
+            }
+          },
+          {
+            "apiKeyHeader": {
+              "in": "header",
+              "name": "X-API-Key",
+              "value": "test-api-key"
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 500,
+      "headers": {
+        "Content-Type": "application/json",
+        "X-Request-Id": "req_err_500"
+      },
+      "body": {
+        "json": {
+          "code": "internal_error",
+          "message": "Something went wrong on our side.",
+          "request_id": "req_err_500"
+        }
+      }
+    }
+  }
+]

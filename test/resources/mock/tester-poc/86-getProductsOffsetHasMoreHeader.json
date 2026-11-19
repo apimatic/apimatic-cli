@@ -1,0 +1,45 @@
+[
+  {
+    "name": "getProductsOffsetHasMoreHeader 200 page1",
+    "operation": "getProductsOffsetHasMoreHeader",
+    "description": "X-Has-More has no example; false is synthesized, so a walk ends on this page.",
+    "request": {
+      "method": "GET",
+      "path": "/products/offset-hasmore-header",
+      "query": {
+        "offset": "0",
+        "limit": "20"
+      },
+      "auth": {
+        "anyOf": [
+          {
+            "BearerAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Bearer test-bearer-token"
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json",
+        "X-Has-More": "false"
+      },
+      "body": {
+        "json": {
+          "data": [
+            {
+              "id": 1,
+              "name": "Aeron Chair",
+              "price": 1395.0,
+              "category": "furniture"
+            }
+          ]
+        }
+      }
+    }
+  }
+]

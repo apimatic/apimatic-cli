@@ -1,0 +1,24 @@
+[
+  {
+    "name": "sendOneOfPrimitive 200",
+    "operation": "sendOneOfPrimitive",
+    "description": "Declared identically by openapi-tester.yaml and openapi.yaml; the path parameter is not declared.",
+    "request": {
+      "method": "GET",
+      "path": "/template/oneof/42"
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": {
+          "passed": true,
+          "message": "oneOf primitive received",
+          "input": "42"
+        }
+      }
+    }
+  }
+]

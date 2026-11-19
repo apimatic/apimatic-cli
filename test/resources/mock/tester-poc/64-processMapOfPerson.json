@@ -1,0 +1,77 @@
+[
+  {
+    "name": "processMapOfPerson 200",
+    "operation": "processMapOfPerson",
+    "request": {
+      "method": "POST",
+      "path": "/map-person",
+      "headers": {
+        "Content-Type": {
+          "startsWith": "application/json"
+        }
+      },
+      "body": {
+        "json": {
+          "key1": {
+            "personType": "Empl",
+            "address": "123 Main St",
+            "age": 30,
+            "birthday": "1995-01-01",
+            "birthtime": {
+              "$dateTime": "1995-01-01T12:00:00.000Z"
+            },
+            "name": "John Doe",
+            "uid": "abc123"
+          }
+        }
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": {
+          "key1": {
+            "personType": "Empl",
+            "address": "123 Main St",
+            "age": 30,
+            "birthday": "1995-01-01",
+            "birthtime": "1995-01-01T12:00:00Z",
+            "name": "John Doe",
+            "uid": "abc123",
+            "salary": 20000,
+            "department": "QA",
+            "joiningDay": "Monday",
+            "workingDays": [
+              "Monday",
+              "Tuesday"
+            ],
+            "hiredAt": "Sun, 06 Nov 1994 08:49:37 GMT",
+            "dependents": []
+          },
+          "key2": {
+            "personType": "Boss",
+            "address": "456 Elm St",
+            "age": 40,
+            "birthday": "1985-01-01",
+            "birthtime": "1985-01-01T12:00:00Z",
+            "name": "Jane Smith",
+            "uid": "def456",
+            "salary": 90000,
+            "department": "Management",
+            "joiningDay": "Tuesday",
+            "workingDays": [
+              "Monday",
+              "Friday"
+            ],
+            "hiredAt": "Sun, 06 Nov 1994 08:49:37 GMT",
+            "dependents": [],
+            "promotedAt": 1731628800
+          }
+        }
+      }
+    }
+  }
+]

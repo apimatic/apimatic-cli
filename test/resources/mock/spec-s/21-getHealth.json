@@ -1,0 +1,44 @@
+[
+  {
+    "name": "getHealth 200",
+    "operation": "getHealth",
+    "description": "Served from the status host's root, not under /v1 (operation-level servers override). No credentials.",
+    "request": {
+      "method": "GET",
+      "path": "/health"
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": {
+          "status": "ok",
+          "version": "2026.10.1"
+        }
+      }
+    }
+  },
+  {
+    "name": "getHealth 503",
+    "operation": "getHealth",
+    "kind": "error",
+    "request": {
+      "method": "GET",
+      "path": "/health"
+    },
+    "response": {
+      "status": 503,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": {
+          "status": "degraded",
+          "version": "2026.10.1"
+        }
+      }
+    }
+  }
+]

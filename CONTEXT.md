@@ -73,3 +73,33 @@ _Avoid_: Lock file, manifest, metadata file
 **Custom code**:
 Whatever differs between the SDK directory on disk and its pristine snapshot: the developer's edits, additions, deletions and moves, kept by merging the next generation over them.
 _Avoid_: Customizations (in code), user changes, overrides
+
+### Mock server
+
+**Stub**:
+One request the mock answers and what it answers with: a `success` stub for an exact request, an `error` stub for a declared error asked for with `Prefer: code=`, or an `oauth2` stub describing an authorization server.
+_Avoid_: Mapping, mock, fixture
+
+**Stub file**:
+A JSON array of stubs, by convention one file per operation, checked against `mock-stubs.schema.json` and the loader's rules.
+_Avoid_: Mapping file, mock file
+
+**Stubs directory**:
+The directory whose top-level `*.json` files `mock serve` loads, in file-name order: `--stubs`, else `./stubs` in the working directory.
+_Avoid_: Stubs folder, data directory, mock directory
+
+**Miss**:
+A request that no stub describes, answered 418 and never with a guess.
+_Avoid_: Unmatched request, mismatch (the report, not the request)
+
+**Mismatch report**:
+The 418 `application/problem+json` body of a miss, naming the closest stub and every difference from it, with a one-line summary in the `X-Mock-Mismatch` header.
+_Avoid_: Error response, diff, problem
+
+**Request log**:
+The newest 10,000 requests that reached the stubs, with what came of each, read at `/__admin/requests` and cleared with DELETE.
+_Avoid_: Journal, admin API (the log is all of it)
+
+**Origin**:
+The scheme, host and port the mock listens on, printed after `MOCKSERVER_URL=` for a test harness to read.
+_Avoid_: Base URL, address, endpoint

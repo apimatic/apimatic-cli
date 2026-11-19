@@ -1,0 +1,260 @@
+[
+  {
+    "name": "renderStatementStream 200 en-GB",
+    "operation": "renderStatementStream",
+    "description": "Render with explicit options; the stream ends with the [DONE] sentinel.",
+    "request": {
+      "method": "POST",
+      "path": "/v1/statements/2b7c9e10-4d3a-4f6b-9c8d-7e6f5a4b3c21/render",
+      "headers": {
+        "Content-Type": {
+          "startsWith": "application/json"
+        }
+      },
+      "auth": {
+        "anyOf": [
+          {
+            "bearerAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Bearer test-bearer-token"
+            }
+          },
+          {
+            "apiKeyHeader": {
+              "in": "header",
+              "name": "X-API-Key",
+              "value": "test-api-key"
+            }
+          }
+        ]
+      },
+      "body": {
+        "json": {
+          "locale": "en-GB",
+          "include_memos": false
+        }
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "text/event-stream"
+      },
+      "body": {
+        "sse": [
+          {
+            "data": {
+              "sequence": 0,
+              "content": "Operating cash - statement 01/02/2026 to 28/02/2026\n"
+            }
+          },
+          {
+            "data": {
+              "sequence": 1,
+              "content": "Opening balance 1000.75 USD\n"
+            }
+          },
+          {
+            "data": {
+              "sequence": 2,
+              "content": "Closing balance 1250.75 USD\n",
+              "finished": true
+            }
+          },
+          {
+            "data": "[DONE]"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "renderStatementStream 200 defaults (no body)",
+    "operation": "renderStatementStream",
+    "description": "Render with no body at all (the body is optional): the server's defaults, memos included. No Content-Type stands for no body.",
+    "request": {
+      "method": "POST",
+      "path": "/v1/statements/2b7c9e10-4d3a-4f6b-9c8d-7e6f5a4b3c21/render",
+      "headers": {
+        "Content-Type": {
+          "absent": true
+        }
+      },
+      "auth": {
+        "anyOf": [
+          {
+            "bearerAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Bearer test-bearer-token"
+            }
+          },
+          {
+            "apiKeyHeader": {
+              "in": "header",
+              "name": "X-API-Key",
+              "value": "test-api-key"
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "text/event-stream"
+      },
+      "body": {
+        "sse": [
+          {
+            "data": {
+              "sequence": 0,
+              "content": "Operating cash - statement 02/01/2026 to 02/28/2026\n"
+            }
+          },
+          {
+            "data": {
+              "sequence": 1,
+              "content": "02/14 Transfer -250.00 USD  Rent split\n"
+            }
+          },
+          {
+            "data": {
+              "sequence": 2,
+              "content": "Closing balance 1250.75 USD\n",
+              "finished": true
+            }
+          },
+          {
+            "data": "[DONE]"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "renderStatementStream 404",
+    "operation": "renderStatementStream",
+    "kind": "error",
+    "request": {
+      "method": "POST",
+      "path": "/v1/statements/{statement_id}/render",
+      "auth": {
+        "anyOf": [
+          {
+            "bearerAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Bearer test-bearer-token"
+            }
+          },
+          {
+            "apiKeyHeader": {
+              "in": "header",
+              "name": "X-API-Key",
+              "value": "test-api-key"
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 404,
+      "headers": {
+        "Content-Type": "application/json",
+        "X-Request-Id": "req_err_404"
+      },
+      "body": {
+        "json": {
+          "code": "not_found",
+          "message": "No resource exists at this identifier.",
+          "request_id": "req_err_404"
+        }
+      }
+    }
+  },
+  {
+    "name": "renderStatementStream 503",
+    "operation": "renderStatementStream",
+    "kind": "error",
+    "description": "Retryable: Retry-After says when.",
+    "request": {
+      "method": "POST",
+      "path": "/v1/statements/{statement_id}/render",
+      "auth": {
+        "anyOf": [
+          {
+            "bearerAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Bearer test-bearer-token"
+            }
+          },
+          {
+            "apiKeyHeader": {
+              "in": "header",
+              "name": "X-API-Key",
+              "value": "test-api-key"
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 503,
+      "headers": {
+        "Content-Type": "application/json",
+        "Retry-After": "2"
+      },
+      "body": {
+        "json": {
+          "code": "renderer_overloaded",
+          "message": "The renderer is overloaded; retry after 2 seconds.",
+          "request_id": "req_err_503"
+        }
+      }
+    }
+  },
+  {
+    "name": "renderStatementStream 500 (default)",
+    "operation": "renderStatementStream",
+    "kind": "error",
+    "request": {
+      "method": "POST",
+      "path": "/v1/statements/{statement_id}/render",
+      "auth": {
+        "anyOf": [
+          {
+            "bearerAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Bearer test-bearer-token"
+            }
+          },
+          {
+            "apiKeyHeader": {
+              "in": "header",
+              "name": "X-API-Key",
+              "value": "test-api-key"
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 500,
+      "headers": {
+        "Content-Type": "application/json",
+        "X-Request-Id": "req_err_500"
+      },
+      "body": {
+        "json": {
+          "code": "internal_error",
+          "message": "Something went wrong on our side.",
+          "request_id": "req_err_500"
+        }
+      }
+    }
+  }
+]

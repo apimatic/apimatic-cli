@@ -1,0 +1,121 @@
+[
+  {
+    "name": "listTransactions 200 firstPage",
+    "operation": "listTransactions",
+    "example": "firstPage",
+    "description": "The first of two named response examples of one request. A request that asks for no example gets this one, being first in file order.",
+    "request": {
+      "method": "GET",
+      "path": "/v1/accounts/7a1b9d2e-3c4f-4a5b-8c6d-9e0f1a2b3c4d/transactions",
+      "headers": {
+        "Accept": {
+          "startsWith": "application/json"
+        }
+      },
+      "auth": {
+        "anyOf": [
+          {
+            "bearerAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Bearer test-bearer-token"
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": {
+          "data": [
+            {
+              "id": "t1",
+              "amount": "250.00"
+            },
+            {
+              "id": "t2",
+              "amount": "75.50"
+            }
+          ],
+          "has_more": true
+        }
+      }
+    }
+  },
+  {
+    "name": "listTransactions 200 noItems",
+    "operation": "listTransactions",
+    "example": "noItems",
+    "description": "The second named example of the same request; only 'Prefer: example=noItems' reaches it.",
+    "request": {
+      "method": "GET",
+      "path": "/v1/accounts/7a1b9d2e-3c4f-4a5b-8c6d-9e0f1a2b3c4d/transactions",
+      "headers": {
+        "Accept": {
+          "startsWith": "application/json"
+        }
+      },
+      "auth": {
+        "anyOf": [
+          {
+            "bearerAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Bearer test-bearer-token"
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": {
+          "data": [],
+          "has_more": false
+        }
+      }
+    }
+  },
+  {
+    "name": "listTransactions 404 unknownAccount",
+    "operation": "listTransactions",
+    "kind": "error",
+    "example": "unknownAccount",
+    "description": "A named error example: 'Prefer: code=404' reaches it with or without 'example=unknownAccount'.",
+    "request": {
+      "method": "GET",
+      "path": "/v1/accounts/{account_id}/transactions",
+      "auth": {
+        "anyOf": [
+          {
+            "bearerAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Bearer test-bearer-token"
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 404,
+      "headers": {
+        "Content-Type": "application/problem+json"
+      },
+      "body": {
+        "json": {
+          "code": "not_found",
+          "message": "No account with that id."
+        }
+      }
+    }
+  }
+]

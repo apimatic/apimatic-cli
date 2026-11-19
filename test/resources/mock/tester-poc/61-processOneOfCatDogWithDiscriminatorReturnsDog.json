@@ -1,0 +1,35 @@
+[
+  {
+    "name": "processOneOfCatDogWithDiscriminatorReturnsDog 200",
+    "operation": "processOneOfCatDogWithDiscriminatorReturnsDog",
+    "request": {
+      "method": "POST",
+      "path": "/oneof-cat-dog-returns-dog",
+      "headers": {
+        "Content-Type": {
+          "startsWith": "application/json"
+        }
+      },
+      "body": {
+        "json": {
+          "name": "Rex",
+          "color": "Brown",
+          "type": "Dog"
+        }
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": {
+          "type": "Dog",
+          "name": "Rex",
+          "color": "Brown"
+        }
+      }
+    }
+  }
+]

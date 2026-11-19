@@ -1,0 +1,29 @@
+[
+  {
+    "name": "processDateTime 200",
+    "operation": "processDateTime",
+    "request": {
+      "method": "POST",
+      "path": "/datetime",
+      "headers": {
+        "Content-Type": {
+          "startsWith": "application/json"
+        }
+      },
+      "body": {
+        "json": {
+          "$dateTime": "2025-12-09T14:30:00+00:00"
+        }
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": "2025-12-09T14:30:00Z"
+      }
+    }
+  }
+]

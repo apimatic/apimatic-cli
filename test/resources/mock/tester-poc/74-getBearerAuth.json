@@ -1,0 +1,25 @@
+[
+  {
+    "name": "getBearerAuth 200",
+    "operation": "getBearerAuth",
+    "description": "The spec gives this operation no operationId; it is named after the SDK method. The 200 is declared with no content.",
+    "request": {
+      "method": "GET",
+      "path": "/bearer-auth",
+      "auth": {
+        "anyOf": [
+          {
+            "BearerAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Bearer test-bearer-token"
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 200
+    }
+  }
+]

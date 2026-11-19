@@ -1,0 +1,24 @@
+[
+  {
+    "name": "querySendRfc1123Datetime 200",
+    "operation": "querySendRfc1123Datetime",
+    "description": "The optional datetime is left unset, so no query is sent.",
+    "request": {
+      "method": "GET",
+      "path": "/query/datetime/rfc1123"
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": {
+          "passed": true,
+          "message": "request received",
+          "input": {}
+        }
+      }
+    }
+  }
+]

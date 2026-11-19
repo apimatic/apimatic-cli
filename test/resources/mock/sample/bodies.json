@@ -1,0 +1,162 @@
+[
+  {
+    "name": "settleAccount 200",
+    "operation": "settleAccount",
+    "description": "A form body: every field named, a repeated field as an array, a bracketed key written literally, a date-time matched as an instant, and a field that must not be sent.",
+    "request": {
+      "method": "POST",
+      "path": "/v1/accounts/7a1b9d2e-3c4f-4a5b-8c6d-9e0f1a2b3c4d/settle",
+      "headers": {
+        "Content-Type": {
+          "startsWith": "application/x-www-form-urlencoded"
+        }
+      },
+      "auth": {
+        "anyOf": [
+          {
+            "bearerAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Bearer test-bearer-token"
+            }
+          }
+        ]
+      },
+      "body": {
+        "form": {
+          "note": "Month end",
+          "tags": [
+            "rent",
+            "shared"
+          ],
+          "filter[since]": "2026-02-01",
+          "settled_at": {
+            "dateTime": "2026-02-28T17:00:00Z"
+          },
+          "dry_run": null
+        }
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": {
+          "id": "7a1b9d2e-3c4f-4a5b-8c6d-9e0f1a2b3c4d",
+          "status": "settled",
+          "settled_at": "2026-02-28T17:00:00Z"
+        }
+      }
+    }
+  },
+  {
+    "name": "uploadStatements 201 two files",
+    "operation": "uploadStatements",
+    "description": "A multipart body whose 'files' field carries two files, as a list parameter sends them; the array pairs with the parts in wire order.",
+    "request": {
+      "method": "POST",
+      "path": "/v1/accounts/7a1b9d2e-3c4f-4a5b-8c6d-9e0f1a2b3c4d/statements",
+      "auth": {
+        "anyOf": [
+          {
+            "bearerAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Bearer test-bearer-token"
+            }
+          }
+        ]
+      },
+      "body": {
+        "multipart": {
+          "parts": {
+            "files": [
+              {
+                "filename": "statement-2026-01.pdf",
+                "contentType": "application/pdf",
+                "bytes": "JVBERi0xLjcK"
+              },
+              {
+                "filename": "statement-2026-02.pdf",
+                "contentType": "application/pdf",
+                "bytes": "JVBERi0xLjcK"
+              }
+            ],
+            "note": {
+              "text": "January and February"
+            }
+          }
+        }
+      }
+    },
+    "response": {
+      "status": 201,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": {
+          "uploaded": 2
+        }
+      }
+    }
+  },
+  {
+    "name": "createTransaction 201",
+    "operation": "createTransaction",
+    "description": "Rules inside a JSON body: a key the SDK generates is matched by its prefix, a date-time as an instant in any spelling (or Unix seconds), and free text is not checked at all. The request-time header is an instant too.",
+    "request": {
+      "method": "POST",
+      "path": "/v1/accounts/7a1b9d2e-3c4f-4a5b-8c6d-9e0f1a2b3c4d/transactions",
+      "headers": {
+        "Content-Type": {
+          "startsWith": "application/json"
+        },
+        "X-Request-Time": {
+          "dateTime": "2026-03-01T09:00:00Z"
+        }
+      },
+      "auth": {
+        "anyOf": [
+          {
+            "bearerAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Bearer test-bearer-token"
+            }
+          }
+        ]
+      },
+      "body": {
+        "json": {
+          "amount": "250.00",
+          "idempotency_key": {
+            "$startsWith": "idem_"
+          },
+          "posted_at": {
+            "$dateTime": "2026-03-01T09:00:00Z"
+          },
+          "memo": {
+            "$any": true
+          }
+        }
+      }
+    },
+    "response": {
+      "status": 201,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": {
+          "id": "t3",
+          "amount": "250.00",
+          "posted_at": "2026-03-01T09:00:00Z",
+          "status": "posted"
+        }
+      }
+    }
+  }
+]

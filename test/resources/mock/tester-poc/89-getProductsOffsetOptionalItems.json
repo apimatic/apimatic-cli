@@ -1,0 +1,82 @@
+[
+  {
+    "name": "getProductsOffsetOptionalItems 200 page1",
+    "operation": "getProductsOffsetOptionalItems",
+    "example": "page1",
+    "description": "Named example page1 of two; a request without Prefer: example= gets this one, the first in file order.",
+    "request": {
+      "method": "GET",
+      "path": "/products/offset-optional-items",
+      "query": {
+        "offset": "0",
+        "limit": "20"
+      },
+      "auth": {
+        "anyOf": [
+          {
+            "BearerAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Bearer test-bearer-token"
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": {
+          "data": [
+            {
+              "id": 1,
+              "name": "Aeron Chair",
+              "price": 1395.0,
+              "category": "furniture"
+            }
+          ],
+          "totalItems": 1240
+        }
+      }
+    }
+  },
+  {
+    "name": "getProductsOffsetOptionalItems 200 noItems",
+    "operation": "getProductsOffsetOptionalItems",
+    "example": "noItems",
+    "description": "Named example noItems, selected with Prefer: example=noItems: a page without the items field, which ends a walk.",
+    "request": {
+      "method": "GET",
+      "path": "/products/offset-optional-items",
+      "query": {
+        "offset": "0",
+        "limit": "20"
+      },
+      "auth": {
+        "anyOf": [
+          {
+            "BearerAuth": {
+              "in": "header",
+              "name": "Authorization",
+              "value": "Bearer test-bearer-token"
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": {
+          "totalItems": 1240
+        }
+      }
+    }
+  }
+]

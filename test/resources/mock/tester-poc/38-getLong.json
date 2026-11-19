@@ -1,0 +1,19 @@
+[
+  {
+    "name": "getLong 200",
+    "operation": "getLong",
+    "request": {
+      "method": "POST",
+      "path": "/response/long"
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": 5147483647
+      }
+    }
+  }
+]

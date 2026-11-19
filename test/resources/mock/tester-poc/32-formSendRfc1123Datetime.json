@@ -1,0 +1,36 @@
+[
+  {
+    "name": "formSendRfc1123Datetime 200",
+    "operation": "formSendRfc1123Datetime",
+    "description": "The form schema is a free-form object; the stub follows what the SDK sends.",
+    "request": {
+      "method": "POST",
+      "path": "/form/datetime/rfc1123",
+      "headers": {
+        "Content-Type": {
+          "startsWith": "application/x-www-form-urlencoded"
+        }
+      },
+      "body": {
+        "form": {
+          "datetime": {
+            "dateTime": "Sun, 06 Nov 1994 08:49:37 GMT"
+          }
+        }
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "json": {
+          "passed": true,
+          "message": "request received",
+          "input": {}
+        }
+      }
+    }
+  }
+]
