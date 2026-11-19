@@ -122,7 +122,14 @@ export class Analytics {
         throw error;
       });
     }
-    insertTags(this.live, this.scripts, inserted);
+    // The listed scripts wait for `loadScripts()`: React drops a change one makes to the page before it hydrates.
+    insertTags(this.live, [], inserted);
+  }
+
+  /** From `ListedScripts`, once the page has hydrated. */
+  public loadScripts(): void {
+    const inserted = this.windowAnalytics?.inserted;
+    if (inserted !== undefined) insertTags([], this.scripts, inserted);
   }
 
   /** `href` is the page the event belongs to, when the caller saw the address move on first. */
@@ -142,8 +149,8 @@ export class Analytics {
   public reportPageView(): void {
     if (isOAuthCallbackPath(window.location.pathname)) return;
     const inserted = this.windowAnalytics?.inserted;
-    // The tags and scripts a start on the OAuth callback left out, now that the reader has moved on from it.
-    if (inserted !== undefined) insertTags(this.live, this.scripts, inserted);
+    // The tags a start on the OAuth callback left out, now that the reader has moved on from it.
+    if (inserted !== undefined) insertTags(this.live, [], inserted);
     const page = pageLocation(window.location.href, this.settings.keepQueryParams);
     if (page === this.lastPageView) return;
     this.previousPageView = this.lastPageView;
