@@ -8,6 +8,7 @@ import {
   SCHEMA_VERSION
 } from '../../../src/types/apimatic-config/document';
 import { COLOR_MODES } from '../../../src/types/portal/config/brand-config';
+import { SCRIPT_CATEGORIES } from '../../../src/types/portal/config/script';
 import { PortalConfig } from '../../../src/types/portal/portal-config';
 import { PortalLanguages } from '../../../src/types/portal/portal-languages';
 import { AVAILABLE_LANGUAGES, Language } from '../../../src/types/sdk/generate';
@@ -63,6 +64,7 @@ describe('apimatic.schema.json', () => {
 
     const cases: [string, unknown, readonly string[]][] = [
       ['brand.colorMode', brand.colorMode.enum, COLOR_MODES],
+      ["a script's category", portal.scripts.items.properties.category.enum, SCRIPT_CATEGORIES],
       ['languages', schema.definitions.languages.propertyNames.enum, AVAILABLE_LANGUAGES]
     ];
 
@@ -103,9 +105,14 @@ describe('apimatic.schema.json', () => {
           analytics: {
             googleTagManager: { containerId: 'GTM-ABC123', environment: { auth: 'abc', preview: 'env-3' } },
             googleAnalytics: { measurementId: 'G-ABC123' },
+            googleConsentMode: { default: 'denied' },
             keepQueryParams: ['campaign_id']
           },
-          seo: { googleSiteVerification: 'abc' }
+          seo: { googleSiteVerification: 'abc' },
+          scripts: [
+            { src: 'https://cdn.example.com/widget.js', category: 'necessary' },
+            { src: '.\\static\\js\\widget.js', category: 'analytics' }
+          ]
         }
       ],
       ['an address with a port', { site: { url: 'https://docs.example.com:8443' } }],
@@ -142,6 +149,7 @@ describe('apimatic.schema.json', () => {
         }
       ],
       ['a kept query parameter name', { analytics: { keepQueryParams: ['campaign_id'] } }],
+      ['a consent mode that starts as denied', { analytics: { googleConsentMode: { default: 'denied' } } }],
       ['an empty analytics block', { analytics: {} }],
       ['a verification value', { seo: { googleSiteVerification: 'abc_123-XYZ' } }],
       // The vendors' formats are theirs to check, so each ID and value is any non-blank string.
@@ -153,7 +161,26 @@ describe('apimatic.schema.json', () => {
       ['a Universal Analytics ID as the measurement ID', { analytics: { googleAnalytics: { measurementId: 'UA-1' } } }],
       ['a kept name with a space, and an OAuth answer name', { analytics: { keepQueryParams: ['a b', 'code'] } }],
       ['an empty list of kept names', { analytics: { keepQueryParams: [] } }],
-      ['a verification value with a space', { seo: { googleSiteVerification: 'abc 123' } }]
+      ['a verification value with a space', { seo: { googleSiteVerification: 'abc 123' } }],
+      ['a script at an address', { scripts: [{ src: 'https://cdn.example.com/widget.js', category: 'analytics' }] }],
+      [
+        'a script address in capitals, with a query',
+        { scripts: [{ src: 'HTTPS://CDN.Example.com/widget.js?v=2', category: 'analytics' }] }
+      ],
+      ['a script file in the static directory', { scripts: [{ src: 'static/js/widget.js', category: 'analytics' }] }],
+      [
+        'a script address with a backslash in its path',
+        { scripts: [{ src: 'https://cdn.example.com/js\\widget.js', category: 'analytics' }] }
+      ],
+      [
+        'a script file written with backslashes and spaces around it',
+        { scripts: [{ src: ' .\\static\\js\\widget.js ', category: 'analytics' }] }
+      ],
+      ...SCRIPT_CATEGORIES.map((category): [string, object] => [
+        `a script whose category is ${category}`,
+        { scripts: [{ src: 'static/js/widget.js', category }] }
+      ]),
+      ['an empty list of scripts', { scripts: [] }]
     ];
 
     const invalid: [string, object][] = [
@@ -253,6 +280,8 @@ describe('apimatic.schema.json', () => {
       ['a plugin address over http', { pluginUrl: 'http://plugins.acme.test/calc.zip' }],
       ['a plugin address on the portal itself', { pluginUrl: '/__downloads/plugin.zip' }],
       ['a plugin address without a host', { pluginUrl: 'https://' }],
+      ['a plugin address without a host before its path', { pluginUrl: 'https:///plugins.acme.test/calc.zip' }],
+      ['a plugin address with a backslash for its host', { pluginUrl: 'https://\\plugins.acme.test/calc.zip' }],
       ['a plugin address that is not a string', { pluginUrl: 7 }],
       ['a plugin address with a space', { pluginUrl: 'https://plugins.acme.test/my plugin.zip' }],
       ['a plugin address with trailing whitespace', { pluginUrl: 'https://plugins.acme.test/calc.zip ' }],
@@ -288,8 +317,62 @@ describe('apimatic.schema.json', () => {
         { analytics: { googleAnalytics: { measurementId: 'G-ABC123', debug: true } } }
       ],
       ['a blank kept name', { analytics: { keepQueryParams: [' '] } }],
+      ['a consent mode that is a bare word', { analytics: { googleConsentMode: 'denied' } }],
+      ['a consent mode without its default', { analytics: { googleConsentMode: {} } }],
+      ['a consent mode that starts as granted', { analytics: { googleConsentMode: { default: 'granted' } } }],
+      [
+        'a consent mode with an unknown key',
+        { analytics: { googleConsentMode: { default: 'denied', region: ['DE'] } } }
+      ],
+      ['the events switched off in the file', { analytics: { events: 'off' } }],
       ['an unknown seo key', { seo: { foo: 1 } }],
-      ['a blank verification value', { seo: { googleSiteVerification: ' ' } }]
+      ['a blank verification value', { seo: { googleSiteVerification: ' ' } }],
+      ['scripts that are not a list', { scripts: { src: 'https://cdn.example.com/widget.js' } }],
+      ['a script that is a bare address', { scripts: ['https://cdn.example.com/widget.js'] }],
+      ['a script without src', { scripts: [{ category: 'necessary' }] }],
+      ['a script without a category', { scripts: [{ src: 'static/js/widget.js' }] }],
+      [
+        'a script at an http address',
+        { scripts: [{ src: 'http://cdn.example.com/widget.js', category: 'analytics' }] }
+      ],
+      [
+        'a script address with a space',
+        { scripts: [{ src: 'https://cdn.example.com/my widget.js', category: 'analytics' }] }
+      ],
+      ['a script address without a host', { scripts: [{ src: 'https://', category: 'analytics' }] }],
+      [
+        'a script address with a backslash where its host should be',
+        { scripts: [{ src: 'https://\\cdn.example.com/widget.js', category: 'analytics' }] }
+      ],
+      [
+        'a script address with a backslash in its host',
+        { scripts: [{ src: 'https://cdn.example.com\\widget.js', category: 'analytics' }] }
+      ],
+      [
+        'a script address without a host before its path',
+        { scripts: [{ src: 'https:///cdn.example.com/widget.js', category: 'analytics' }] }
+      ],
+      ['a script address that is only a query', { scripts: [{ src: 'https://?widget.js', category: 'analytics' }] }],
+      [
+        'a protocol-relative script address',
+        { scripts: [{ src: '//cdn.example.com/widget.js', category: 'analytics' }] }
+      ],
+      ['a script file outside the static directory', { scripts: [{ src: 'js/widget.js', category: 'analytics' }] }],
+      [
+        'a script file that leaves the static directory',
+        { scripts: [{ src: 'static/../widget.js', category: 'analytics' }] }
+      ],
+      ['a blank script src', { scripts: [{ src: ' ', category: 'analytics' }] }],
+      ['an unknown script category', { scripts: [{ src: 'static/js/widget.js', category: 'essential' }] }],
+      // Neither is a setting in this release.
+      [
+        'a script with attributes',
+        { scripts: [{ src: 'static/js/widget.js', category: 'analytics', attributes: { 'data-site': 'acme' } }] }
+      ],
+      [
+        'a script with integrity',
+        { scripts: [{ src: 'https://cdn.example.com/widget.js', category: 'analytics', integrity: 'sha384-abc' }] }
+      ]
     ];
 
     for (const [label, block] of valid) {

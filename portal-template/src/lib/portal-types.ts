@@ -36,16 +36,28 @@ export interface GoogleAnalyticsSetting {
   measurementId: string;
 }
 
+export interface GoogleConsentModeSetting {
+  /** What Google's tags take a reader's answer to be until a consent tool gives one. */
+  default: 'denied';
+}
+
 /** Public values: they sit in every page's scripts. */
 export interface PortalAnalytics {
   googleTagManager: GoogleTagManagerSetting | null;
   googleAnalytics: GoogleAnalyticsSetting | null;
+  googleConsentMode: GoogleConsentModeSetting | null;
   keepQueryParams: string[];
+  /** Off in a build made with `--no-analytics`, which reports no event: none to the data layer, none to a script. */
+  events: 'on' | 'off';
 }
 
 export interface PortalSeo {
   /** The content value of Google's site verification meta tag, for Search Console. */
   googleSiteVerification: string | null;
+}
+
+export interface PortalScript {
+  src: string;
 }
 
 export interface Portal {
@@ -61,4 +73,6 @@ export interface Portal {
   pageActions: boolean;
   analytics: PortalAnalytics;
   seo: PortalSeo;
+  /** In the order the block lists them, which is the order the browser runs them in. */
+  scripts: PortalScript[];
 }

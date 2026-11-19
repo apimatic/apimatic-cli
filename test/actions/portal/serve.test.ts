@@ -891,7 +891,7 @@ describe('PortalServeAction', () => {
       });
     });
 
-    it('leaves the vendor tags out of the project and of each rewrite under --no-analytics', async () => {
+    it('leaves the vendor tags and the events out of the project and of each rewrite under --no-analytics', async () => {
       const applyConfig = sinon.spy(PortalProjectService.prototype, 'applyConfig');
       const config = originalConfig();
       config.portal.analytics = { googleTagManager: { containerId: 'GTM-ABC123' } };
@@ -902,8 +902,35 @@ describe('PortalServeAction', () => {
         await save(config);
       }, false);
 
-      expect(shared.prepare.firstCall.args[1].config.identity().analytics.googleTagManager).to.be.null;
-      expect(applyConfig.lastCall.args[1].config.identity().analytics.googleTagManager).to.be.null;
+      for (const { config: applied } of [shared.prepare.firstCall.args[1], applyConfig.lastCall.args[1]]) {
+        expect(applied.identity().analytics.googleTagManager).to.be.null;
+        expect(applied.identity().analytics.events).to.equal('off');
+      }
+    });
+
+    it('leaves the analytics and marketing scripts out of the project and of each rewrite under --no-analytics', async () => {
+      const applyConfig = sinon.spy(PortalProjectService.prototype, 'applyConfig');
+      const at = (name: string) => `https://cdn.example.com/${name}.js`;
+      const config = originalConfig();
+      config.portal.scripts = [
+        { src: at('banner'), category: 'necessary' },
+        { src: at('counter'), category: 'analytics' }
+      ];
+      writeConfig(config);
+
+      await whileServing(async () => {
+        config.portal.scripts.push(
+          { src: at('pixel'), category: 'marketing' },
+          { src: at('chat'), category: 'functional' }
+        );
+        await save(config);
+      }, false);
+
+      expect(shared.prepare.firstCall.args[1].config.identity().scripts).to.deep.equal([{ src: at('banner') }]);
+      expect(applyConfig.lastCall.args[1].config.identity().scripts).to.deep.equal([
+        { src: at('banner') },
+        { src: at('chat') }
+      ]);
     });
 
     it('reports a change it could not write to the preview', async () => {

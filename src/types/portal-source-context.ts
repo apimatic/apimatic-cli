@@ -306,7 +306,9 @@ export class PortalSourceContext {
     if (missingFiles.length > 0) {
       return err({ kind: 'missingStaticFiles', files: missingFiles });
     }
-    return ok(build.analytics ? settings.value : { ...settings.value, config: settings.value.config.withoutVendors() });
+    return ok(
+      build.analytics ? settings.value : { ...settings.value, config: settings.value.config.withoutAnalytics() }
+    );
   }
 
   private async readConfigDocument(): Promise<Result<ApimaticConfigDocument, PortalSourceProblem>> {

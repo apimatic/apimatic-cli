@@ -38,6 +38,11 @@
       "description": "A path relative to 'src' inside the 'static' directory, for example 'static/images/logo.png'.",
       "pattern": "^\\s*(?:\\.[\\\\/])?static(?:[\\\\/](?!\\.{1,2}(?:[\\\\/]|\\s*$))[^\\\\/]*[^\\\\/\\s][^\\\\/]*)+\\s*$"
     },
+    "httpsAddress": {
+      "type": "string",
+      "description": "An address starting with 'https://' and a host, with no spaces.",
+      "pattern": "^[hH][tT][tT][pP][sS]://[^\\s/\\\\?#]+(?:[/?#]\\S*)?$"
+    },
     "color": {
       "type": "string",
       "description": "#rgb or #rrggbb, for example '#1d4ed8'.",
@@ -226,6 +231,19 @@
                 }
               }
             },
+            "googleConsentMode": {
+              "type": "object",
+              "description": "Starts Google's own tags in Google's Consent Mode: they load at once, set no cookies and mark every hit as denied until your consent tool calls gtag('consent', 'update'). Other vendors' tags inside a Google Tag Manager container need consent checks of their own there. Set it when a consent banner decides what is tracked. It does not affect which scripts in 'portal.scripts' are loaded, or when.",
+              "additionalProperties": false,
+              "required": ["default"],
+              "properties": {
+                "default": {
+                  "type": "string",
+                  "enum": ["denied"],
+                  "description": "What the tags take a reader's answer to be until your consent tool gives one."
+                }
+              }
+            },
             "keepQueryParams": {
               "type": "array",
               "description": "Your own link tags to keep in reported page addresses. Campaign (utm_), ad-click and cross-domain tags are kept already; every other query parameter is dropped.",
@@ -250,10 +268,40 @@
             }
           }
         },
+        "scripts": {
+          "type": "array",
+          "description": "Other vendors' scripts and widgets, loaded on every page in the listed order, except the OAuth callback page. They get the portal's events from window.apimatic.analytics.subscribe(). Any listed script can read what readers type into the API playground, and the token an OAuth 2.0 sign-in leaves in the browser's session storage, so list only vendors you trust.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["src", "category"],
+            "properties": {
+              "src": {
+                "description": "An address starting with 'https://' and a host, with no spaces, or a file in the 'static' directory, for example 'static/analytics.js'.",
+                "anyOf": [
+                  {
+                    "$ref": "#/definitions/httpsAddress"
+                  },
+                  {
+                    "$ref": "#/definitions/staticPath"
+                  }
+                ]
+              },
+              "category": {
+                "type": "string",
+                "description": "What the script is for, in the four groups consent tools ask readers about. 'necessary': the portal needs it to work, or the law requires it, such as your consent tool. 'functional': a feature a reader sees or uses, which may remember their choices, such as a chat widget, a feedback form or a status banner. 'analytics': it measures how readers use the portal, such as an analytics tool, a session recorder or an A/B testing tool. 'marketing': it serves or measures advertising, or follows readers across sites, such as an ad pixel. A script that does more than one takes the last of these that applies, so a feedback widget that also records sessions is 'analytics'. --no-analytics leaves out the 'analytics' and 'marketing' scripts.",
+                "enum": ["necessary", "functional", "analytics", "marketing"]
+              }
+            }
+          }
+        },
         "pluginUrl": {
-          "type": "string",
-          "description": "Where the context plugin is hosted, starting with 'https://' and with no spaces. The Context Plugin page installs it from here, and the portal carries no copy of its own.",
-          "pattern": "^[hH][tT][tT][pP][sS]://[^\\s/?#]+(?:[/?#]\\S*)?$"
+          "allOf": [
+            {
+              "$ref": "#/definitions/httpsAddress"
+            }
+          ],
+          "description": "Where the context plugin is hosted, starting with 'https://' and with no spaces. The Context Plugin page installs it from here, and the portal carries no copy of its own."
         }
       }
     },

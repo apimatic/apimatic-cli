@@ -91,9 +91,12 @@ export class BrandConfig {
           optional(data.logo, (logo) => Logo.parse(logo, `${path}.logo`)),
           optional(data.favicon, (favicon) => StaticAsset.parse(favicon, `${path}.favicon`)),
           BrandColors.parse(data.colors, `${path}.colors`),
-          oneOf(data.colorMode, `${path}.colorMode`, COLOR_MODES, BrandConfig.defaults.colorMode)
+          optional(data.colorMode, (colorMode) => oneOf(colorMode, `${path}.colorMode`, COLOR_MODES))
         ])
-      ).map(([logo, favicon, colors, colorMode]) => new BrandConfig(logo, favicon, colors, colorMode))
+      ).map(
+        ([logo, favicon, colors, colorMode]) =>
+          new BrandConfig(logo, favicon, colors, colorMode ?? BrandConfig.defaults.colorMode)
+      )
     );
   }
 
