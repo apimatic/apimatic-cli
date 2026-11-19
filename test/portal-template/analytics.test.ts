@@ -580,10 +580,27 @@ describe('Analytics', () => {
     const WIDGET = 'https://cdn.example.com/widget.js';
     const listed: PortalScript[] = [{ src: SETUP }, { src: WIDGET }];
 
+    // React drops a change a script makes to the page before it has hydrated, which loadScripts() waits for.
+    it('inserts none on a start or a page view, and all once loadScripts() is called', () => {
+      const page = browser(quickstart);
+      const analytics = new Analytics(withGtm(), listed);
+
+      analytics.start();
+      analytics.reportPageView();
+
+      expect(page.scripts.map((script) => script.src)).to.deep.equal([GTM_SCRIPT]);
+
+      analytics.loadScripts();
+
+      expect(page.scripts.map((script) => script.src)).to.deep.equal([GTM_SCRIPT, SETUP, WIDGET]);
+    });
+
     it('inserts each after the vendor tags, in the order listed, and not async, so they run in that order', () => {
       const page = browser(quickstart);
+      const analytics = new Analytics(withBoth, listed);
 
-      new Analytics(withBoth, listed).start();
+      analytics.start();
+      analytics.loadScripts();
 
       expect(page.scripts.map(({ src, async }) => [src, async])).to.deep.equal([
         [GTM_SCRIPT, true],
@@ -595,8 +612,10 @@ describe('Analytics', () => {
 
     it('inserts them on a portal with neither vendor set', () => {
       const page = browser(quickstart);
+      const analytics = new Analytics(none, listed);
 
-      new Analytics(none, listed).start();
+      analytics.start();
+      analytics.loadScripts();
 
       expect(page.scripts.map((script) => script.src)).to.deep.equal([SETUP, WIDGET]);
     });
@@ -605,7 +624,10 @@ describe('Analytics', () => {
     it("inserts a file of the portal's own by its path from the root, and an address as it is", () => {
       const page = browser(quickstart);
 
-      new Analytics(none, [{ src: '/js/widget.js' }, { src: WIDGET }]).start();
+      const analytics = new Analytics(none, [{ src: '/js/widget.js' }, { src: WIDGET }]);
+
+      analytics.start();
+      analytics.loadScripts();
 
       expect(page.scripts.map((script) => script.src)).to.deep.equal(['/js/widget.js', WIDGET]);
     });
@@ -618,6 +640,7 @@ describe('Analytics', () => {
 
       analytics.start();
       analytics.reportPageView();
+      analytics.loadScripts();
 
       expect(page.scripts.map((script) => script.src)).to.deep.equal([SETUP]);
     });
@@ -626,12 +649,16 @@ describe('Analytics', () => {
       const page = browser(quickstart);
       const twice = [...listed, { src: SETUP }];
       const analytics = new Analytics(withGtm(), twice);
+      const second = new Analytics(withGtm(), twice);
 
       analytics.start();
+      analytics.loadScripts();
       analytics.reportPageView();
       page.go('https://docs.test/guides/errors', 'Errors | Acme API');
       analytics.reportPageView();
-      new Analytics(withGtm(), twice).start();
+      analytics.loadScripts();
+      second.start();
+      second.loadScripts();
 
       expect(page.scripts.map((script) => script.src)).to.deep.equal([GTM_SCRIPT, SETUP, WIDGET]);
       expect(page.reloads()).to.equal(0);
@@ -641,13 +668,17 @@ describe('Analytics', () => {
     it('inserts none again once its element has left the page, on a new page or for a second instance', () => {
       const page = browser(quickstart);
       const analytics = new Analytics(withGtm(), listed);
+      const second = new Analytics(withGtm(), listed);
       analytics.start();
+      analytics.loadScripts();
       page.scripts.length = 0;
 
       analytics.reportPageView();
       page.go('https://docs.test/guides/errors', 'Errors | Acme API');
       analytics.reportPageView();
-      new Analytics(withGtm(), listed).start();
+      analytics.loadScripts();
+      second.start();
+      second.loadScripts();
 
       expect(page.scripts).to.be.empty;
     });
@@ -659,11 +690,13 @@ describe('Analytics', () => {
 
       analytics.start();
       analytics.reportPageView();
+      analytics.loadScripts();
 
       expect(page.scripts).to.be.empty;
 
       page.go(quickstart);
       analytics.reportPageView();
+      analytics.loadScripts();
 
       expect(page.scripts.map((script) => script.src)).to.deep.equal([GTM_SCRIPT, SETUP, WIDGET]);
     });
@@ -671,8 +704,10 @@ describe('Analytics', () => {
     // A sign-in's answer reaches the playground through the tab's session, so the page it returns to holds none back.
     it('inserts them at once on a page whose own link carries a state parameter', () => {
       const page = browser(`${quickstart}?state=CA`);
+      const analytics = new Analytics(withGtm(), listed);
 
-      new Analytics(withGtm(), listed).start();
+      analytics.start();
+      analytics.loadScripts();
 
       expect(page.scripts.map((script) => script.src)).to.deep.equal([GTM_SCRIPT, SETUP, WIDGET]);
     });
@@ -684,9 +719,13 @@ describe('Analytics', () => {
     ] as const) {
       it(`reloads the page for a start with ${change}, as a config save under portal serve makes`, () => {
         const page = browser(quickstart);
-        new Analytics(none, listed).start();
+        const first = new Analytics(none, listed);
+        first.start();
+        first.loadScripts();
+        const saved = new Analytics(none, [...next]);
 
-        new Analytics(none, [...next]).start();
+        saved.start();
+        saved.loadScripts();
 
         expect(page.reloads()).to.equal(1);
         expect(page.scripts.map((script) => script.src)).to.deep.equal([SETUP, WIDGET]);
@@ -712,7 +751,9 @@ describe('Analytics', () => {
         return append(script);
       };
 
-      new Analytics(withGtm(), [{ src: 'https://cdn.example.com/widget.js' }]).start();
+      const analytics = new Analytics(withGtm(), [{ src: 'https://cdn.example.com/widget.js' }]);
+      analytics.start();
+      analytics.loadScripts();
 
       expect(atEachInsert).to.deep.equal(['function', 'function']);
 
@@ -837,6 +878,7 @@ describe('Analytics', () => {
 
         analytics.start();
         analytics.reportPageView();
+        analytics.loadScripts();
 
         expect(page.window.apimatic).to.equal(locked);
         expect(page.scripts.map((script) => script.src)).to.deep.equal([
