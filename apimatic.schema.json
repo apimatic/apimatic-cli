@@ -289,7 +289,7 @@
               },
               "category": {
                 "type": "string",
-                "description": "What the script is for. --no-analytics leaves out the 'analytics' and 'marketing' scripts.",
+                "description": "What the script is for, in the four groups consent tools ask readers about. 'necessary': the portal needs it to work, or the law requires it, such as your consent tool. 'functional': a feature a reader sees or uses, which may remember their choices, such as a chat widget, a feedback form or a status banner. 'analytics': it measures how readers use the portal, such as an analytics tool, a session recorder or an A/B testing tool. 'marketing': it serves or measures advertising, or follows readers across sites, such as an ad pixel. A script that does more than one takes the last of these that applies, so a feedback widget that also records sessions is 'analytics'. --no-analytics leaves out the 'analytics' and 'marketing' scripts.",
                 "enum": ["necessary", "functional", "analytics", "marketing"]
               }
             }
