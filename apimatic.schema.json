@@ -270,7 +270,7 @@
         },
         "scripts": {
           "type": "array",
-          "description": "Other vendors' scripts and widgets, loaded on every page in the listed order, except the OAuth callback page. They get the portal's events from window.apimatic.analytics.subscribe(). Any listed script can read what readers type into the API playground, so list only vendors you trust.",
+          "description": "Other vendors' scripts and widgets, loaded on every page in the listed order, except the OAuth callback page. They get the portal's events from window.apimatic.analytics.subscribe(). Any listed script can read what readers type into the API playground, and the token an OAuth 2.0 sign-in leaves in the browser's session storage, so list only vendors you trust.",
           "items": {
             "type": "object",
             "additionalProperties": false,
