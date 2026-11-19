@@ -1,7 +1,7 @@
 import { EventFeed } from './event-feed';
 import { isOAuthCallbackPath } from './oauth-callback';
 import type { PortalAnalytics, PortalScript } from './portal-types';
-import { type Adapter, adapters, insertTags, queueConsentDefaults, scriptsInHead } from './vendor-tags';
+import { type Adapter, adapters, insertTags, queueConsentDefaults } from './vendor-tags';
 
 /** The query parameters an ad or mail platform reads from an address itself; a customer adds names and removes none. */
 const KEPT_PREFIXES = ['utm_', 'hsa_'];
@@ -75,12 +75,6 @@ export function pageLocation(href: string, keep: readonly string[]): string {
   return url.href;
 }
 
-/** Whether `host` took `analytics` as its own property: a frozen object does not, nor one that fixed the name. */
-function putOn(host: unknown, analytics: Pick<EventFeed, 'subscribe'>): boolean {
-  const property = { value: analytics, writable: true, enumerable: true, configurable: true };
-  return Object(host) === host && Reflect.defineProperty(host as object, 'analytics', property);
-}
-
 export class Analytics {
   private readonly live: Adapter[];
   /** The window's, once `start()` has made it or joined it: no other method reads the global. */
@@ -105,7 +99,9 @@ export class Analytics {
       return;
     }
     const feed = new EventFeed();
-    const inserted = new Set(scriptsInHead());
+    // Each script the head holds already, by its src as written: a host may inject one of the portal's itself.
+    const head = document.head.querySelectorAll('script[src]');
+    const inserted = new Set(Array.from(head, (script) => script.getAttribute('src') ?? ''));
     this.windowAnalytics = { started, feed, inserted };
     window[WINDOW_ANALYTICS] = this.windowAnalytics;
     const dataLayer = (window.dataLayer ??= []);
@@ -115,7 +111,11 @@ export class Analytics {
     const analytics = Object.freeze({ subscribe: feed.subscribe.bind(feed) });
     try {
       // On the host's own object if it takes one: a copy lacks its class's methods and is not the object it holds.
-      if (!putOn(window.apimatic, analytics)) window.apimatic = { ...window.apimatic, analytics };
+      // A frozen object takes none, nor one that fixed the name.
+      const host: unknown = window.apimatic;
+      const property = { value: analytics, writable: true, enumerable: true, configurable: true };
+      const taken = Object(host) === host && Reflect.defineProperty(host as object, 'analytics', property);
+      if (!taken) window.apimatic = { ...window.apimatic, analytics };
     } catch (error) {
       // A host may have locked the name. Thrown later, so it shows in the console and the bundle goes on loading.
       setTimeout(() => {

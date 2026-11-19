@@ -20,21 +20,15 @@ export interface Adapter {
 type Vendor = Exclude<keyof PortalAnalytics, 'googleConsentMode' | 'keepQueryParams' | 'events'>;
 const GOOGLE = 'https://www.googletagmanager.com';
 
-/**
- * The window's gtag, when it is one. For an element whose id is `gtag`, such as a guide's heading, the browser
- * answers `window.gtag` with that element, and calling it stopped the whole bundle.
- */
-function windowGtag(): Gtag | undefined {
-  return typeof window.gtag === 'function' ? window.gtag : undefined;
-}
-
 /** The window's own, or one made here: Google reads only Arguments objects from the data layer, never arrays. */
 function gtagFor(dataLayer: unknown[]): Gtag {
+  // Only a function: a browser answers `window.gtag` with an element whose id is `gtag`, such as a guide's heading.
   const gtag =
-    windowGtag() ??
-    function () {
-      dataLayer.push(arguments);
-    };
+    typeof window.gtag === 'function'
+      ? window.gtag
+      : function () {
+          dataLayer.push(arguments);
+        };
   window.gtag = gtag;
   return gtag;
 }
@@ -74,19 +68,15 @@ export const adapters: { [V in Vendor]: (settings: PortalAnalytics) => Adapter |
       },
       script: `${GOOGLE}/gtag/js?id=${encodeURIComponent(setting.measurementId)}`,
       send: (name, params) => {
+        // The window's gtag, since a second instance under `portal serve` never runs its setup; never an element.
+        if (typeof window.gtag !== 'function') return;
         // GA4's own events, such as a scroll, read this instead of the address, which may hold more.
-        if (name === 'docs_page_view') windowGtag()?.('set', { page_location: params.page_location });
-        // The window's gtag, since a second instance under `portal serve` never runs its setup.
-        windowGtag()?.('event', name.replace(/^docs_/, ''), params);
+        if (name === 'docs_page_view') window.gtag('set', { page_location: params.page_location });
+        window.gtag('event', name.replace(/^docs_/, ''), params);
       }
     };
   }
 };
-
-/** The address of every script the head already holds, as written: a host may inject one of the portal's itself. */
-export function scriptsInHead(): string[] {
-  return Array.from(document.head.querySelectorAll('script[src]'), (script) => script.getAttribute('src') ?? '');
-}
 
 /**
  * None on the OAuth callback, whose address holds the provider's answer; each once, so a later call adds the rest.
