@@ -81,10 +81,7 @@ export function optionalBoolean(value: unknown, path: string, fallback: boolean)
   return typeof value === 'boolean' ? ok(value) : err([`'${path}' must be true or false.`]);
 }
 
-export function oneOf<T extends string>(value: unknown, path: string, allowed: readonly T[], fallback: T): Parsed<T> {
-  if (value === undefined) {
-    return ok(fallback);
-  }
+export function oneOf<T extends string>(value: unknown, path: string, allowed: readonly T[]): Parsed<T> {
   if (typeof value === 'string' && (allowed as readonly string[]).includes(value)) {
     return ok(value as T);
   }
@@ -103,4 +100,18 @@ export function nonEmptyString(value: unknown, path: string): Parsed<string> {
   return typeof value === 'string' && value.trim().length > 0
     ? ok(value.trim())
     : err([`'${path}' must be a non-empty string.`]);
+}
+
+// The same addresses as `httpsAddress` in the schema, so an editor and a build give one verdict on a missing host.
+// No backslash in the host: an address parser reads one as a slash, and takes what follows it for the host.
+const HTTPS_ADDRESS = /^https:\/\/[^\s/\\?#]+(?:[/?#]\S*)?$/i;
+
+// https, since what it names is fetched and run; parsed, so it holds no space or quote wherever it is written out.
+export function httpsAddress(value: unknown, path: string, example: string): Parsed<UrlPath> {
+  const url = typeof value === 'string' && HTTPS_ADDRESS.test(value) ? URL.parse(value) : null;
+  return url === null
+    ? err([
+        `'${path}' must be an address starting with 'https://' and a host, with no spaces, for example '${example}'.`
+      ])
+    : ok(new UrlPath(url.href));
 }

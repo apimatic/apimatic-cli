@@ -49,7 +49,7 @@ export interface PortalSource extends PortalSettings {
 
 /** What a run's flags change in the portal it builds from the source. */
 export interface PortalBuildOptions {
-  /** False under `--no-analytics`: the portal loads neither vendor tag. */
+  /** False under `--no-analytics`: the portal loads neither vendor tag, and no `analytics` or `marketing` script. */
   analytics: boolean;
 }
 

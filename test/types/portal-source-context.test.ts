@@ -324,6 +324,24 @@ describe('PortalSourceContext', () => {
       ]);
     });
 
+    it('reports a listed script file that is not on disk, or is spelt in another case, by the entry that names it', async () => {
+      writeConfig({
+        scripts: [
+          { src: 'https://cdn.example.com/widget.js', category: 'analytics' },
+          { src: 'static/js/setup.js', category: 'necessary' },
+          { src: 'static/js/Widget.js', category: 'functional' },
+          { src: 'static/js/chat.js', category: 'functional' }
+        ]
+      });
+      write('static/js/widget.js', 'x');
+      write('static/js/chat.js', 'x');
+
+      expect(missingFiles(await resolve())).to.deep.equal([
+        ['portal.scripts[1].src', 'static/js/setup.js', null],
+        ['portal.scripts[2].src', 'static/js/Widget.js', 'static/js/widget.js']
+      ]);
+    });
+
     it('accepts files that are there', async () => {
       writeConfig({ brand: { logo: 'static/images/logo.png', favicon: 'static/favicon.ico' } });
       write('static/images/logo.png', 'x');
@@ -376,10 +394,14 @@ describe('PortalSourceContext', () => {
       ]);
     });
 
-    it('leaves out the vendor tags under --no-analytics, as resolve does, and keeps the query names to keep', async () => {
+    it('leaves out the vendor tags and the events under --no-analytics, and keeps the consent default and the query names', async () => {
       writeConfig({
         site: { name: 'Calc' },
-        analytics: { googleTagManager: { containerId: 'GTM-ABC123' }, keepQueryParams: ['campaign_id'] }
+        analytics: {
+          googleTagManager: { containerId: 'GTM-ABC123' },
+          googleConsentMode: { default: 'denied' },
+          keepQueryParams: ['campaign_id']
+        }
       });
       const off = { analytics: false };
 
@@ -391,13 +413,52 @@ describe('PortalSourceContext', () => {
         expect(config.identity().analytics).to.deep.equal({
           googleTagManager: null,
           googleAnalytics: null,
-          keepQueryParams: ['campaign_id']
+          googleConsentMode: { default: 'denied' },
+          keepQueryParams: ['campaign_id'],
+          events: 'off'
         });
       }
-      expect(kept.config.identity().analytics.googleTagManager).to.deep.equal({
-        containerId: 'GTM-ABC123',
-        environment: null
+      expect(kept.config.identity().analytics).to.deep.equal({
+        googleTagManager: { containerId: 'GTM-ABC123', environment: null },
+        googleAnalytics: null,
+        googleConsentMode: { default: 'denied' },
+        keepQueryParams: ['campaign_id'],
+        events: 'on'
       });
+    });
+
+    it('leaves out the analytics and marketing scripts under --no-analytics, for resolve and for a reload alike', async () => {
+      const at = (name: string) => `https://cdn.example.com/${name}.js`;
+      writeConfig({
+        site: { name: 'Calc' },
+        scripts: [
+          { src: at('banner'), category: 'necessary' },
+          { src: at('counter'), category: 'analytics' },
+          { src: at('chat'), category: 'functional' },
+          { src: at('pixel'), category: 'marketing' }
+        ]
+      });
+      const off = { analytics: false };
+
+      const resolved = (await new PortalSourceContext(new DirectoryPath(root)).resolve(off))._unsafeUnwrap();
+      const reloaded = (await context().resolveSettings(null, off))._unsafeUnwrap();
+      const counted = (await context().resolveSettings(null, { analytics: true }))._unsafeUnwrap();
+
+      for (const { config } of [resolved, reloaded]) {
+        expect(config.identity().scripts).to.deep.equal([{ src: at('banner') }, { src: at('chat') }]);
+      }
+      expect(counted.config.identity().scripts).to.have.length(4);
+    });
+
+    // A staging build accepts exactly what a production build accepts.
+    it('reports a missing file of a script that --no-analytics would leave out', async () => {
+      writeConfig({ site: { name: 'Calc' }, scripts: [{ src: 'static/js/counter.js', category: 'analytics' }] });
+
+      for (const analytics of [false, true]) {
+        expect(missingFiles(await context().resolveSettings(null, { analytics })), `${analytics}`).to.deep.equal([
+          ['portal.scripts[0].src', 'static/js/counter.js', null]
+        ]);
+      }
     });
 
     it('reports a file removed while the preview runs', async () => {

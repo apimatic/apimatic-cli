@@ -180,6 +180,10 @@ const scriptsOf = (output: DirectoryPath) =>
     .filter((name) => name.endsWith('.js'))
     .map((name) => ({ name, text: fs.readFileSync(path.join(output.toString(), 'assets', name), 'utf8') }));
 
+/** By the setting's value: its name, and the defaults it queues, are in every build, with the setting or without. */
+const startsGoogleTagsDenied = (output: DirectoryPath) =>
+  scriptsOf(output).some(({ text }) => /googleConsentMode:\{default:["'`]denied["'`]\}/.test(text));
+
 const stylesheetOf = (output: DirectoryPath) => {
   const assets = path.join(output.toString(), 'assets');
   return fs
@@ -196,8 +200,16 @@ const stylesheetOf = (output: DirectoryPath) => {
     'default',
     { codeSampleCatalogs: CODE_SAMPLES },
     {
-      analytics: { googleTagManager: { containerId: 'GTM-E2ETEST' }, googleAnalytics: { measurementId: 'G-E2ETEST' } },
-      seo: { googleSiteVerification: 'e2e-verification' }
+      analytics: {
+        googleTagManager: { containerId: 'GTM-E2ETEST' },
+        googleAnalytics: { measurementId: 'G-E2ETEST' },
+        googleConsentMode: { default: 'denied' }
+      },
+      seo: { googleSiteVerification: 'e2e-verification' },
+      scripts: [
+        { src: 'https://cdn.e2e.test/widget.js', category: 'necessary' },
+        { src: 'static/js/widget.js', category: 'functional' }
+      ]
     }
   );
   const { read, exists } = portal;
@@ -281,6 +293,32 @@ const stylesheetOf = (output: DirectoryPath) => {
     expect(scripts.some(({ text }) => text.includes('gtm.js?id=') && text.includes('/gtag/js?id='))).to.be.true;
     for (const page of pages()) {
       expect(read(page), page).to.not.contain('googletagmanager.com');
+    }
+  });
+
+  it('tells the browser to start the Google tags as denied, in a script that holds the defaults it queues', () => {
+    expect(startsGoogleTagsDenied(portal.output())).to.be.true;
+    // The defaults themselves, by the one key of theirs that nothing else in the bundle names.
+    expect(scriptsOf(portal.output()).some(({ text }) => text.includes('wait_for_update'))).to.be.true;
+    for (const page of pages()) {
+      expect(read(page), page).to.not.contain('wait_for_update');
+    }
+  });
+
+  it('tells the browser each listed script in a script, ships the file one of them names, and names neither in a prerendered page', () => {
+    const scripts = scriptsOf(portal.output());
+    expect(
+      scripts.some(({ text }) => text.includes('https://cdn.e2e.test/widget.js') && text.includes('/js/widget.js'))
+    ).to.be.true;
+    // The feed a listed script subscribes to, by the one message of its own that survives the build.
+    expect(scripts.some(({ text }) => text.includes('window.apimatic.analytics.subscribe() takes a function.'))).to.be
+      .true;
+    expect(read('js/widget.js')).to.equal(
+      fs.readFileSync(path.join(portal.source().toString(), 'static/js/widget.js'), 'utf8')
+    );
+    for (const page of pages()) {
+      expect(read(page), page).to.not.contain('cdn.e2e.test');
+      expect(read(page), page).to.not.contain('/js/widget.js');
     }
   });
 
@@ -632,6 +670,12 @@ const stylesheetOf = (output: DirectoryPath) => {
 
   const portal = portalBuilt('branded', { plugin: true });
   const { read, exists } = portal;
+
+  // The other half of the default build's check: a build that sets no consent mode must not pass it.
+  it('does not tell the browser to start the Google tags as denied when the config sets no consent mode', () => {
+    expect(startsGoogleTagsDenied(portal.output())).to.be.false;
+    expect(scriptsOf(portal.output()).some(({ text }) => text.includes('googleConsentMode:null'))).to.be.true;
+  });
 
   // The minifier may merge the two modes' rules when they match, as they do for a primary
   // written once, so the selectors and their place are checked rather than one spelling.

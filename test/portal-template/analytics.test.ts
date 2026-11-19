@@ -1,6 +1,8 @@
 import { expect } from 'chai';
+import sinon from 'sinon';
 import { Analytics, pageLocation, PortalEventName, PortalEvents } from '../../portal-template/src/lib/analytics';
-import type { PortalAnalytics } from '../../portal-template/src/lib/portal-types';
+import type { PortalEvent } from '../../portal-template/src/lib/event-feed';
+import type { PortalAnalytics, PortalScript } from '../../portal-template/src/lib/portal-types';
 import { Adapter, adapters } from '../../portal-template/src/lib/vendor-tags';
 
 // The list is written out here, not imported: the test is the contract, and a name the module drops fails it.
@@ -78,9 +80,9 @@ describe('PortalEvents', () => {
     docs_page_view: { page_title: true },
     docs_markdown_copy: {},
     docs_plugin_install: {},
-    docs_sdk_download: { language: true },
-    docs_code_copy: { language: true },
-    docs_search: { search_term: true, result: true, result_count: true },
+    docs_sdk_download: { sdk_language: true },
+    docs_code_copy: { code_language: true },
+    docs_search: { search_term: true, picked_result: true, result_count: true },
     docs_not_found: { page_referrer: true },
     docs_api_request: { endpoint: true, status: true, duration_ms: true }
   };
@@ -92,12 +94,17 @@ describe('PortalEvents', () => {
       ['docs_page_view', ['page_title']],
       ['docs_markdown_copy', []],
       ['docs_plugin_install', []],
-      ['docs_sdk_download', ['language']],
-      ['docs_code_copy', ['language']],
-      ['docs_search', ['search_term', 'result', 'result_count']],
+      ['docs_sdk_download', ['sdk_language']],
+      ['docs_code_copy', ['code_language']],
+      ['docs_search', ['search_term', 'picked_result', 'result_count']],
       ['docs_not_found', ['page_referrer']],
       ['docs_api_request', ['endpoint', 'status', 'duration_ms']]
     ]);
+  });
+
+  // gtag takes `language` on an event for the reader's own, so GA4's Language report would list `python`.
+  it('names no key `language`', () => {
+    expect(Object.values(events).flatMap((keys) => Object.keys(keys))).to.not.include('language');
   });
 
   it('names every event docs_ plus lowercase snake_case, at most 40 characters', () => {
@@ -125,11 +132,15 @@ interface FakeWindow {
   location: URL & { reload: () => void };
   dataLayer?: unknown[];
   gtag?: (...command: unknown[]) => void;
+  /** As a script in the page sees it; `consent` stands for a key of someone else's. */
+  apimatic?: { analytics: { subscribe(callback: (event: PortalEvent) => void): () => void }; consent?: string };
 }
 
 /** A page in the browser: the `window` and `document` the module reads, and the scripts the loader appends. */
 function browser(href: string, title = 'Quickstart | Acme API', referrer = '') {
   const scripts: FakeScript[] = [];
+  /** The address of each script the host put in the head itself, before the portal's bundle ran. */
+  const fromHost: string[] = [];
   let reloads = 0;
   const window: FakeWindow = { location: Object.assign(new URL(href), { reload: () => (reloads += 1) }) };
   const document = {
@@ -138,13 +149,15 @@ function browser(href: string, title = 'Quickstart | Acme API', referrer = '') {
     createElement: (): FakeScript => ({ async: false, src: '', textContent: '' }),
     head: {
       append: (script: FakeScript) => scripts.push(script),
-      querySelector: (selector: string) => scripts.find((script) => selector === `script[src="${script.src}"]`) ?? null
+      querySelectorAll: () => fromHost.map((src) => ({ getAttribute: () => src }))
     }
   };
   Object.assign(globalThis, { window, document });
   return {
     window,
+    head: document.head,
     scripts,
+    fromHost,
     dataLayer: () => window.dataLayer ?? [],
     reloads: () => reloads,
     go: (next: string, nextTitle = title) => {
@@ -173,7 +186,13 @@ function mergedLikeGtm(entries: unknown[]): Record<string, unknown> {
   return entries.filter(isPlainObject).reduce(merge, {});
 }
 
-const none: PortalAnalytics = { googleTagManager: null, googleAnalytics: null, keepQueryParams: [] };
+const none: PortalAnalytics = {
+  googleTagManager: null,
+  googleAnalytics: null,
+  googleConsentMode: null,
+  keepQueryParams: [],
+  events: 'on'
+};
 const withGtm = (environment: { auth: string; preview: string } | null = null): PortalAnalytics => ({
   ...none,
   googleTagManager: { containerId: 'GTM-ABC123', environment }
@@ -203,7 +222,7 @@ describe('Analytics', () => {
   describe('with neither vendor set', () => {
     it('pushes a reset entry and one clean page view entry, and nothing else', () => {
       const page = browser(`${quickstart}?utm_source=newsletter&tab=python#install`);
-      const analytics = new Analytics(none);
+      const analytics = new Analytics(none, []);
 
       analytics.start();
       analytics.reportPageView();
@@ -223,7 +242,7 @@ describe('Analytics', () => {
       const page = browser(quickstart);
       const existing = { 'host-tag': true };
       page.window.dataLayer = [existing];
-      const analytics = new Analytics(none);
+      const analytics = new Analytics(none, []);
 
       analytics.start();
       analytics.reportPageView();
@@ -235,7 +254,7 @@ describe('Analytics', () => {
   describe('with Google Tag Manager', () => {
     it('pushes the gtm.start entry first, inserts gtm.js, then pushes the page view', () => {
       const page = browser(quickstart);
-      const analytics = new Analytics(withGtm());
+      const analytics = new Analytics(withGtm(), []);
 
       analytics.start();
       analytics.reportPageView();
@@ -255,7 +274,7 @@ describe('Analytics', () => {
       const page = browser(quickstart);
       const setting = { containerId: 'GTM-A&B', environment: { auth: 'a&b', preview: 'env 3' } };
 
-      new Analytics({ ...none, googleTagManager: setting }).start();
+      new Analytics({ ...none, googleTagManager: setting }, []).start();
 
       expect(page.scripts.map((script) => script.src)).to.deep.equal([
         'https://www.googletagmanager.com/gtm.js?id=GTM-A%26B&gtm_auth=a%26b&gtm_preview=env%203&gtm_cookies_win=x'
@@ -265,7 +284,7 @@ describe('Analytics', () => {
     it("loads the container's environment when one is set", () => {
       const page = browser(quickstart);
 
-      new Analytics(withGtm({ auth: 'abc123', preview: 'env-3' })).start();
+      new Analytics(withGtm({ auth: 'abc123', preview: 'env-3' }), []).start();
 
       expect(page.scripts.map((script) => script.src)).to.deep.equal([
         `${GTM_SCRIPT}&gtm_auth=abc123&gtm_preview=env-3&gtm_cookies_win=x`
@@ -277,7 +296,7 @@ describe('Analytics', () => {
     it('pushes js and config with its own page view off, and inserts gtag.js', () => {
       const page = browser(quickstart);
 
-      new Analytics(withGa4).start();
+      new Analytics(withGa4, []).start();
 
       const [js, config, ...rest] = gtagCalls(page.dataLayer());
       expect(js[0]).to.equal('js');
@@ -290,7 +309,7 @@ describe('Analytics', () => {
 
     it('sends each page view as page_view, without the prefix, after the reset and event entries', () => {
       const page = browser(quickstart);
-      const analytics = new Analytics(withGa4);
+      const analytics = new Analytics(withGa4, []);
 
       analytics.start();
       analytics.reportPageView();
@@ -307,7 +326,7 @@ describe('Analytics', () => {
 
     it("gives GA4's own events the reported address of each page, never the one in the address bar", () => {
       const page = browser('https://docs.test/api/pets/listPets?code=x&state=y#access_token=z', 'List pets');
-      const analytics = new Analytics(withGa4);
+      const analytics = new Analytics(withGa4, []);
 
       analytics.start();
       analytics.reportPageView();
@@ -323,7 +342,7 @@ describe('Analytics', () => {
 
     it('pushes Arguments objects, which gtag.js reads, never arrays of the same values', () => {
       const page = browser(quickstart);
-      const analytics = new Analytics(withGa4);
+      const analytics = new Analytics(withGa4, []);
 
       analytics.start();
       analytics.reportPageView();
@@ -335,7 +354,7 @@ describe('Analytics', () => {
     it("escapes the measurement ID in the tag's address", () => {
       const page = browser(quickstart);
 
-      new Analytics({ ...none, googleAnalytics: { measurementId: 'G-A#B' } }).start();
+      new Analytics({ ...none, googleAnalytics: { measurementId: 'G-A#B' } }, []).start();
 
       expect(page.scripts.map((script) => script.src)).to.deep.equal([
         'https://www.googletagmanager.com/gtag/js?id=G-A%23B'
@@ -349,7 +368,7 @@ describe('Analytics', () => {
         calls.push(command);
       };
       page.window.gtag = existing;
-      const analytics = new Analytics(withGa4);
+      const analytics = new Analytics(withGa4, []);
 
       analytics.start();
       analytics.reportPageView();
@@ -359,10 +378,32 @@ describe('Analytics', () => {
       expect(page.dataLayer().filter(isArguments)).to.be.empty;
     });
 
-    it("sends through the page's gtag from a second instance, as a config save under portal serve makes", () => {
+    // The browser answers `window.gtag` with an element whose id is `gtag`, which a heading by that name gets.
+    it('makes a gtag of its own where the window answers that name with an element, as for a heading', () => {
       const page = browser(quickstart);
-      new Analytics(withGa4).start();
-      const second = new Analytics(withGa4);
+      Object.assign(page.window, { gtag: { id: 'gtag' } });
+      const analytics = new Analytics(withGa4, []);
+
+      analytics.start();
+      analytics.reportPageView();
+
+      expect(page.window.gtag).to.be.a('function');
+      expect(gtagCalls(page.dataLayer()).map((command) => command[0])).to.deep.equal(['js', 'config', 'set', 'event']);
+    });
+
+    // An instance that ran no setup, as one whose start asked for a reload, finds the element still there.
+    it('sends nothing, and throws nothing, through an element by that name', () => {
+      const page = browser(quickstart);
+      Object.assign(page.window, { gtag: { id: 'gtag' } });
+
+      expect(() => new Analytics(withGa4, []).report('docs_markdown_copy', {})).to.not.throw();
+      expect(page.dataLayer().filter(isArguments)).to.be.empty;
+    });
+
+    it("sends through the window's gtag from a second instance, as a config save under portal serve makes", () => {
+      const page = browser(quickstart);
+      new Analytics(withGa4, []).start();
+      const second = new Analytics(withGa4, []);
       second.start();
 
       second.report('docs_markdown_copy', {});
@@ -374,7 +415,7 @@ describe('Analytics', () => {
   describe('with both vendors', () => {
     it('pushes every setup entry once, gtm.start first, before the first event', () => {
       const page = browser(quickstart);
-      const analytics = new Analytics(withBoth);
+      const analytics = new Analytics(withBoth, []);
 
       analytics.start();
       analytics.reportPageView();
@@ -390,13 +431,13 @@ describe('Analytics', () => {
       expect(page.scripts.map((script) => script.src)).to.deep.equal([GTM_SCRIPT, GA4_SCRIPT]);
     });
 
-    it('starts once per page, for a second start and for a second instance alike', () => {
+    it('starts once per window, for a second start and for a second instance alike', () => {
       const page = browser(quickstart);
-      const analytics = new Analytics(withBoth);
+      const analytics = new Analytics(withBoth, []);
 
       analytics.start();
       analytics.start();
-      new Analytics(withBoth).start();
+      new Analytics(withBoth, []).start();
 
       expect(page.dataLayer()).to.have.length(3);
       expect(page.scripts).to.have.length(2);
@@ -405,9 +446,9 @@ describe('Analytics', () => {
 
     it('reloads the page for a start with other vendors, as a config save under portal serve makes', () => {
       const page = browser(quickstart);
-      new Analytics(withGtm()).start();
+      new Analytics(withGtm(), []).start();
 
-      new Analytics(withBoth).start();
+      new Analytics(withBoth, []).start();
 
       expect(page.reloads()).to.equal(1);
       expect(page.dataLayer()).to.have.length(1);
@@ -415,10 +456,500 @@ describe('Analytics', () => {
     });
   });
 
+  describe('with Google Consent Mode set', () => {
+    const denied: PortalAnalytics['googleConsentMode'] = { default: 'denied' };
+    const defaults = [
+      'consent',
+      'default',
+      {
+        ad_storage: 'denied',
+        ad_user_data: 'denied',
+        ad_personalization: 'denied',
+        analytics_storage: 'denied',
+        wait_for_update: 500
+      }
+    ];
+    const consentCommands = (entries: unknown[]) => gtagCalls(entries).filter((command) => command[0] === 'consent');
+
+    // Google takes a reader's answer from what is queued before its first event, so this has to lead the data layer.
+    it('queues the defaults first, ahead of both setups, as an Arguments object with four types denied and a wait', () => {
+      const page = browser(quickstart);
+
+      new Analytics({ ...withBoth, googleConsentMode: denied }, []).start();
+
+      const entries = page.dataLayer();
+      expect(isArguments(entries[0])).to.be.true;
+      expect(gtagCalls([entries[0]])[0]).to.deep.equal(defaults);
+      expect(entries[1]).to.have.property('event', 'gtm.js');
+      expect(gtagCalls(entries.slice(2)).map((command) => command[0])).to.deep.equal(['js', 'config']);
+      expect(page.scripts.map((script) => script.src)).to.deep.equal([GTM_SCRIPT, GA4_SCRIPT]);
+    });
+
+    it('queues them once per window, for a second start and for a second instance alike', () => {
+      const page = browser(quickstart);
+      const settings = { ...withGa4, googleConsentMode: denied };
+      const analytics = new Analytics(settings, []);
+
+      analytics.start();
+      analytics.start();
+      new Analytics(settings, []).start();
+
+      expect(consentCommands(page.dataLayer())).to.have.length(1);
+    });
+
+    // A container reads the same Arguments entries, and a consent tool calls the window's gtag to hand over an answer.
+    it('queues them on a portal with Google Tag Manager alone, through a gtag it gives the page', () => {
+      const page = browser(quickstart);
+
+      new Analytics({ ...withGtm(), googleConsentMode: denied }, []).start();
+
+      const entries = page.dataLayer();
+      expect(gtagCalls([entries[0]])[0]).to.deep.equal(defaults);
+      expect(entries[1]).to.have.property('event', 'gtm.js');
+      expect(page.window.gtag).to.be.a('function');
+    });
+
+    it('queues them through a gtag the page already defines', () => {
+      const page = browser(quickstart);
+      const calls: unknown[][] = [];
+      page.window.gtag = (...command: unknown[]) => {
+        calls.push(command);
+      };
+
+      new Analytics({ ...withGa4, googleConsentMode: denied }, []).start();
+
+      expect(calls[0]).to.deep.equal(defaults);
+      expect(calls.map((command) => command[0])).to.deep.equal(['consent', 'js', 'config']);
+    });
+
+    // With the setting alone, a page whose heading is called gtag used to stop the bundle on every fresh load.
+    it('queues them through a gtag of its own where the window answers that name with an element', () => {
+      const page = browser(quickstart);
+      Object.assign(page.window, { gtag: { id: 'gtag' } });
+
+      new Analytics({ ...none, googleConsentMode: denied }, []).start();
+
+      expect(gtagCalls(page.dataLayer())).to.deep.equal([defaults]);
+      expect(page.window.gtag).to.be.a('function');
+    });
+
+    // For a Google snippet the customer lists in portal.scripts themselves.
+    it('queues them with neither vendor set', () => {
+      const page = browser(quickstart);
+
+      new Analytics({ ...none, googleConsentMode: denied }, []).start();
+
+      expect(gtagCalls(page.dataLayer())).to.deep.equal([defaults]);
+    });
+
+    // A --no-analytics build keeps the default for a Google tag a kept script loads, and reports no event beside it.
+    it('queues them in a --no-analytics build, where the data layer then holds them alone', () => {
+      const page = browser(quickstart);
+      const analytics = new Analytics({ ...none, googleConsentMode: denied, events: 'off' }, []);
+
+      analytics.start();
+      analytics.reportPageView();
+      analytics.report('docs_markdown_copy', {});
+
+      expect(page.dataLayer()).to.have.length(1);
+      expect(gtagCalls(page.dataLayer())).to.deep.equal([defaults]);
+    });
+
+    it('queues them at a start on the OAuth callback, where no tag loads', () => {
+      const page = browser('https://docs.test/oauth/callback?code=abc&state=123');
+
+      new Analytics({ ...withGa4, googleConsentMode: denied }, []).start();
+
+      expect(gtagCalls(page.dataLayer()).map((command) => command[0])).to.deep.equal(['consent', 'js', 'config']);
+      expect(page.scripts).to.be.empty;
+    });
+
+    it('reloads the page for a start with the setting added, as a config save under portal serve makes', () => {
+      const page = browser(quickstart);
+      new Analytics(withGa4, []).start();
+
+      new Analytics({ ...withGa4, googleConsentMode: denied }, []).start();
+
+      expect(page.reloads()).to.equal(1);
+      expect(consentCommands(page.dataLayer())).to.be.empty;
+    });
+  });
+
+  describe('with scripts listed in portal.scripts', () => {
+    const SETUP = 'https://cdn.example.com/setup.js';
+    const WIDGET = 'https://cdn.example.com/widget.js';
+    const listed: PortalScript[] = [{ src: SETUP }, { src: WIDGET }];
+
+    it('inserts each after the vendor tags, in the order listed, and not async, so they run in that order', () => {
+      const page = browser(quickstart);
+
+      new Analytics(withBoth, listed).start();
+
+      expect(page.scripts.map(({ src, async }) => [src, async])).to.deep.equal([
+        [GTM_SCRIPT, true],
+        [GA4_SCRIPT, true],
+        [SETUP, false],
+        [WIDGET, false]
+      ]);
+    });
+
+    it('inserts them on a portal with neither vendor set', () => {
+      const page = browser(quickstart);
+
+      new Analytics(none, listed).start();
+
+      expect(page.scripts.map((script) => script.src)).to.deep.equal([SETUP, WIDGET]);
+    });
+
+    // At the root here; a portal hosted under a path puts that path before the file's.
+    it("inserts a file of the portal's own by its path from the root, and an address as it is", () => {
+      const page = browser(quickstart);
+
+      new Analytics(none, [{ src: '/js/widget.js' }, { src: WIDGET }]).start();
+
+      expect(page.scripts.map((script) => script.src)).to.deep.equal(['/js/widget.js', WIDGET]);
+    });
+
+    // A host, a snippet injector at its CDN or a proxy may add one of the same scripts to every page itself.
+    it('inserts no second copy of a tag or a listed script the host already put in the head', () => {
+      const page = browser(quickstart);
+      page.fromHost.push(GTM_SCRIPT, WIDGET);
+      const analytics = new Analytics(withGtm(), listed);
+
+      analytics.start();
+      analytics.reportPageView();
+
+      expect(page.scripts.map((script) => script.src)).to.deep.equal([SETUP]);
+    });
+
+    it('inserts each once: across page views, for a second instance, and for an address listed twice', () => {
+      const page = browser(quickstart);
+      const twice = [...listed, { src: SETUP }];
+      const analytics = new Analytics(withGtm(), twice);
+
+      analytics.start();
+      analytics.reportPageView();
+      page.go('https://docs.test/guides/errors', 'Errors | Acme API');
+      analytics.reportPageView();
+      new Analytics(withGtm(), twice).start();
+
+      expect(page.scripts.map((script) => script.src)).to.deep.equal([GTM_SCRIPT, SETUP, WIDGET]);
+      expect(page.reloads()).to.equal(0);
+    });
+
+    // A vendor's loader may remove its own element once it has run, so the head is no record of what was inserted.
+    it('inserts none again once its element has left the page, on a new page or for a second instance', () => {
+      const page = browser(quickstart);
+      const analytics = new Analytics(withGtm(), listed);
+      analytics.start();
+      page.scripts.length = 0;
+
+      analytics.reportPageView();
+      page.go('https://docs.test/guides/errors', 'Errors | Acme API');
+      analytics.reportPageView();
+      new Analytics(withGtm(), listed).start();
+
+      expect(page.scripts).to.be.empty;
+    });
+
+    // A listed script reads the address as a vendor tag does, so it stays off the OAuth callback with them.
+    it('holds them back with the tags on the OAuth callback, and inserts all on the next page', () => {
+      const page = browser('https://docs.test/oauth/callback?code=abc&state=123');
+      const analytics = new Analytics(withGtm(), listed);
+
+      analytics.start();
+      analytics.reportPageView();
+
+      expect(page.scripts).to.be.empty;
+
+      page.go(quickstart);
+      analytics.reportPageView();
+
+      expect(page.scripts.map((script) => script.src)).to.deep.equal([GTM_SCRIPT, SETUP, WIDGET]);
+    });
+
+    // A sign-in's answer reaches the playground through the tab's session, so the page it returns to holds none back.
+    it('inserts them at once on a page whose own link carries a state parameter', () => {
+      const page = browser(`${quickstart}?state=CA`);
+
+      new Analytics(withGtm(), listed).start();
+
+      expect(page.scripts.map((script) => script.src)).to.deep.equal([GTM_SCRIPT, SETUP, WIDGET]);
+    });
+
+    for (const [change, next] of [
+      ['one more script', [...listed, { src: 'https://cdn.example.com/chat.js' }]],
+      ['one script fewer', [{ src: SETUP }]],
+      ['the same scripts in another order', [{ src: WIDGET }, { src: SETUP }]]
+    ] as const) {
+      it(`reloads the page for a start with ${change}, as a config save under portal serve makes`, () => {
+        const page = browser(quickstart);
+        new Analytics(none, listed).start();
+
+        new Analytics(none, [...next]).start();
+
+        expect(page.reloads()).to.equal(1);
+        expect(page.scripts.map((script) => script.src)).to.deep.equal([SETUP, WIDGET]);
+      });
+    }
+  });
+
+  describe('for a script that subscribes through window.apimatic.analytics', () => {
+    /** Events from before a subscription arrive on a microtask, once `subscribe()` has returned. */
+    const settled = () => Promise.resolve();
+    const subscribe = (page: ReturnType<typeof browser>) => {
+      const events: PortalEvent[] = [];
+      page.window.apimatic?.analytics.subscribe((event) => events.push(event));
+      return events;
+    };
+
+    it('is in place before the first tag or script is inserted, and on a portal with no vendor and no script too', () => {
+      const page = browser(quickstart);
+      const append = page.head.append;
+      const atEachInsert: string[] = [];
+      page.head.append = (script) => {
+        atEachInsert.push(typeof page.window.apimatic?.analytics.subscribe);
+        return append(script);
+      };
+
+      new Analytics(withGtm(), [{ src: 'https://cdn.example.com/widget.js' }]).start();
+
+      expect(atEachInsert).to.deep.equal(['function', 'function']);
+
+      const bare = browser(quickstart);
+      new Analytics(none, []).start();
+
+      expect(bare.window.apimatic?.analytics.subscribe).to.be.a('function');
+    });
+
+    // What is there is what customers build on, so it is `subscribe` and nothing a script could publish or rewrite with.
+    it('gives scripts subscribe alone, on an object they cannot change', () => {
+      const page = browser(quickstart);
+
+      new Analytics(none, []).start();
+
+      const given = page.window.apimatic?.analytics;
+      expect(Object.keys(given ?? {})).to.deep.equal(['subscribe']);
+      expect(Object.isFrozen(given)).to.be.true;
+    });
+
+    // A global by a name is one a script finds and builds on; the feed could also publish, or be replaced, through it.
+    it('adds no name to the window but apimatic and the data layer', () => {
+      const page = browser(quickstart);
+      const before = Object.keys(page.window);
+
+      new Analytics(none, []).start();
+
+      expect(Object.keys(page.window)).to.deep.equal([...before, 'dataLayer', 'apimatic']);
+    });
+
+    it('hands over events to a subscribe a script took off the object and called on its own', async () => {
+      const page = browser(quickstart);
+      const analytics = new Analytics(none, []);
+      analytics.start();
+      const events: PortalEvent[] = [];
+
+      const { subscribe } = page.window.apimatic?.analytics ?? { subscribe: () => () => undefined };
+      subscribe((event) => events.push(event));
+      analytics.report('docs_markdown_copy', {});
+      await settled();
+
+      expect(events.map((event) => event.name)).to.deep.equal(['docs_markdown_copy']);
+    });
+
+    // A page's own script may have put a stand-in there first; reporting must not come to depend on it.
+    it('puts its own in place of one a page set first, keeps what else the page put beside it, and goes on reporting', async () => {
+      const page = browser(quickstart);
+      const standIn = { subscribe: () => () => undefined };
+      const hosts = { analytics: standIn, consent: 'the page set this' };
+      page.window.apimatic = hosts;
+      const analytics = new Analytics(none, []);
+
+      analytics.start();
+      const events = subscribe(page);
+      analytics.reportPageView();
+      await settled();
+
+      expect(page.window.apimatic).to.equal(hosts);
+      expect(page.window.apimatic?.analytics).to.not.equal(standIn);
+      expect(page.window.apimatic?.consent).to.equal('the page set this');
+      expect(events.map((event) => event.name)).to.deep.equal(['docs_page_view']);
+      expect(pageViews(page.dataLayer())).to.have.length(1);
+    });
+
+    // A copy of it would have its values and none of its class's methods, and the host's own reference would miss it.
+    it("adds analytics to a host's own object, which keeps its methods and stays the one the window holds", () => {
+      class ConsentBridge {
+        public readonly region = 'eu';
+        public update(): string {
+          return `updated for ${this.region}`;
+        }
+      }
+      const page = browser(quickstart);
+      const hosts = new ConsentBridge();
+      Object.assign(page.window, { apimatic: hosts });
+
+      new Analytics(none, []).start();
+
+      expect(page.window.apimatic).to.equal(hosts);
+      expect(hosts.update()).to.equal('updated for eu');
+      expect(page.window.apimatic?.analytics.subscribe).to.be.a('function');
+    });
+
+    it('puts a copy in place of an object that takes no property, with what else that object held', () => {
+      const page = browser(quickstart);
+      const frozen = Object.freeze({ analytics: { subscribe: () => () => undefined }, consent: 'the page set this' });
+      page.window.apimatic = frozen;
+
+      new Analytics(none, []).start();
+
+      expect(page.window.apimatic).to.not.equal(frozen);
+      expect(page.window.apimatic?.analytics).to.not.equal(frozen.analytics);
+      expect(page.window.apimatic?.consent).to.equal('the page set this');
+    });
+
+    // The name is fixed, the object behind it is not: analytics goes on that object, and nothing is in error.
+    it('gives subscribe on the object itself where a page made window.apimatic read-only', () => {
+      const clock = sinon.useFakeTimers({ toFake: ['setTimeout'] });
+      try {
+        const page = browser(quickstart);
+        const locked = { consent: 'the host locked this' };
+        Object.defineProperty(page.window, 'apimatic', { value: locked, writable: false });
+
+        new Analytics(none, []).start();
+
+        expect(page.window.apimatic).to.equal(locked);
+        expect(page.window.apimatic?.analytics.subscribe).to.be.a('function');
+        expect(clock.countTimers()).to.equal(0);
+      } finally {
+        clock.restore();
+      }
+    });
+
+    // The start runs while the bundle loads, so an error thrown there leaves every page without its scripts.
+    it('starts and reports where a page froze window.apimatic and made it read-only, and shows the error later', () => {
+      const clock = sinon.useFakeTimers({ toFake: ['setTimeout'] });
+      try {
+        const page = browser(quickstart);
+        const locked = Object.freeze({ consent: 'the host locked this' });
+        Object.defineProperty(page.window, 'apimatic', { value: locked, writable: false });
+        const analytics = new Analytics(withGtm(), [{ src: 'https://cdn.example.com/widget.js' }]);
+
+        analytics.start();
+        analytics.reportPageView();
+
+        expect(page.window.apimatic).to.equal(locked);
+        expect(page.scripts.map((script) => script.src)).to.deep.equal([
+          GTM_SCRIPT,
+          'https://cdn.example.com/widget.js'
+        ]);
+        expect(pageViews(page.dataLayer())).to.have.length(1);
+        expect(() => clock.next()).to.throw(TypeError, 'apimatic');
+      } finally {
+        clock.restore();
+      }
+    });
+
+    it('hands over every event so far and then each new one, each with its own keys and the cleaned address', async () => {
+      const page = browser(`${quickstart}?utm_source=newsletter&tab=python#install`);
+      const analytics = new Analytics(withGa4, []);
+      analytics.start();
+      analytics.reportPageView();
+
+      const events = subscribe(page);
+      await settled();
+      analytics.report('docs_code_copy', { code_language: 'python' });
+
+      expect(events.map(({ name, params }) => [name, params])).to.deep.equal([
+        [
+          'docs_page_view',
+          { page_title: 'Quickstart | Acme API', page_location: `${quickstart}?utm_source=newsletter` }
+        ],
+        ['docs_code_copy', { code_language: 'python', page_location: `${quickstart}?utm_source=newsletter` }]
+      ]);
+    });
+
+    // GTM writes to the entries it is handed, so a subscriber gets a frozen copy and the data layer keeps its own.
+    it('freezes what a subscriber gets, and leaves the entry in the data layer as it was', async () => {
+      const page = browser(quickstart);
+      const analytics = new Analytics(none, []);
+      analytics.start();
+      analytics.report('docs_code_copy', { code_language: 'python' });
+
+      const events = subscribe(page);
+      await settled();
+
+      const pushed = page.dataLayer().filter(isPlainObject)[1];
+      expect(Object.isFrozen(events[0]) && Object.isFrozen(events[0].params)).to.be.true;
+      expect(pushed.docs).to.deep.equal(events[0].params);
+      expect(pushed.docs).to.not.equal(events[0].params);
+      expect(Object.isFrozen(pushed.docs)).to.be.false;
+    });
+
+    it('hands over nothing for a report made on the OAuth callback', async () => {
+      const page = browser('https://docs.test/oauth/callback?code=abc&state=123');
+      const analytics = new Analytics(none, []);
+      analytics.start();
+      const events = subscribe(page);
+
+      analytics.reportPageView();
+      analytics.report('docs_markdown_copy', {});
+      await settled();
+
+      expect(events).to.be.empty;
+    });
+
+    // A staging build keeps its `necessary` and `functional` scripts, which may load a container that reads the data layer.
+    it('reports nothing in a --no-analytics build, to a subscriber or to the data layer, with subscribe in place', async () => {
+      const page = browser(quickstart);
+      const analytics = new Analytics({ ...none, events: 'off' }, []);
+      analytics.start();
+      const events: PortalEvent[] = [];
+
+      const stop = page.window.apimatic?.analytics.subscribe((event) => events.push(event));
+      analytics.reportPageView();
+      analytics.report('docs_search', { search_term: 'refund', picked_result: '', result_count: 0 });
+      await settled();
+
+      expect(events).to.be.empty;
+      expect(stop).to.be.a('function');
+      expect(page.dataLayer()).to.be.empty;
+    });
+
+    it('keeps a subscriber through a second instance, as a config save under portal serve makes', async () => {
+      const page = browser(quickstart);
+      new Analytics(withGtm(), []).start();
+      const events = subscribe(page);
+
+      const second = new Analytics(withGtm(), []);
+      second.start();
+      second.report('docs_markdown_copy', {});
+      await settled();
+
+      expect(events.map((event) => event.name)).to.deep.equal(['docs_markdown_copy']);
+    });
+
+    // Until the reload lands the bundle goes on calling the new instance, which never joined this window.
+    it('adds no tag and hands over no event from an instance whose start asked for a reload', async () => {
+      const page = browser(quickstart);
+      new Analytics(withGtm(), []).start();
+      const events = subscribe(page);
+
+      const next = new Analytics(withGtm(), [{ src: 'https://cdn.example.com/widget.js' }]);
+      next.start();
+      next.reportPageView();
+      await settled();
+
+      expect(page.reloads()).to.equal(1);
+      expect(page.scripts.map((script) => script.src)).to.deep.equal([GTM_SCRIPT]);
+      expect(events).to.be.empty;
+    });
+  });
+
   describe('at an address that holds an OAuth answer', () => {
     it('reports with the answer stripped from page_location', () => {
       const page = browser('https://docs.test/api/pets/listPets#access_token=xyz&state=123', 'List pets');
-      const analytics = new Analytics(withBoth);
+      const analytics = new Analytics(withBoth, []);
 
       analytics.start();
       analytics.reportPageView();
@@ -436,7 +967,7 @@ describe('Analytics', () => {
   describe('on a page whose own link carries a state parameter', () => {
     it('loads the tags at once, and reports the page without the parameter', () => {
       const page = browser(`${quickstart}?state=CA`);
-      const analytics = new Analytics(withBoth);
+      const analytics = new Analytics(withBoth, []);
 
       analytics.start();
       analytics.reportPageView();
@@ -454,7 +985,7 @@ describe('Analytics', () => {
     ]) {
       it(`holds the tags and the page view back at ${href}, and inserts the tags on the next page`, () => {
         const page = browser(href);
-        const analytics = new Analytics(withBoth);
+        const analytics = new Analytics(withBoth, []);
 
         analytics.start();
         analytics.reportPageView();
@@ -473,10 +1004,10 @@ describe('Analytics', () => {
 
       it(`sends nothing for any event reported at ${href}`, () => {
         const page = browser(href);
-        const analytics = new Analytics(withBoth);
+        const analytics = new Analytics(withBoth, []);
         analytics.start();
 
-        analytics.report('docs_code_copy', { language: 'cURL' });
+        analytics.report('docs_code_copy', { code_language: 'cURL' });
         analytics.report('docs_markdown_copy', {});
 
         expect(page.dataLayer()).to.have.length(3);
@@ -544,7 +1075,7 @@ describe('Analytics', () => {
 
         it('maps docs_page_view to its page view call', () => {
           const page = browser(quickstart);
-          const analytics = new Analytics(settings);
+          const analytics = new Analytics(settings, []);
 
           analytics.start();
           analytics.reportPageView();
@@ -555,7 +1086,7 @@ describe('Analytics', () => {
 
         it('receives nothing holding code=, token= or a # part from a report made with an OAuth answer in the address', () => {
           const page = browser('https://docs.test/api/pets/listPets?code=x&state=y#access_token=z', 'List pets');
-          const analytics = new Analytics(settings);
+          const analytics = new Analytics(settings, []);
 
           analytics.start();
           analytics.report('docs_page_view', { page_title: 'List pets' });
@@ -571,7 +1102,7 @@ describe('Analytics', () => {
           expect(adapter().script).to.match(/^https:\/\//);
           const page = browser(quickstart);
 
-          new Analytics(settings).start();
+          new Analytics(settings, []).start();
 
           expect(page.scripts).to.not.be.empty;
           for (const script of page.scripts) {
@@ -586,7 +1117,7 @@ describe('Analytics', () => {
   describe('report', () => {
     it('pushes a reset entry right before every event entry, which holds event and docs only', () => {
       const page = browser(quickstart);
-      const analytics = new Analytics(none);
+      const analytics = new Analytics(none, []);
       analytics.start();
 
       analytics.report('docs_page_view', { page_title: 'A' });
@@ -602,24 +1133,24 @@ describe('Analytics', () => {
 
     it("clears the previous event's details for a tag that reads the merged data layer", () => {
       const page = browser(quickstart);
-      const analytics = new Analytics(none);
+      const analytics = new Analytics(none, []);
       analytics.start();
-      analytics.report('docs_code_copy', { language: 'python' });
+      analytics.report('docs_code_copy', { code_language: 'python' });
       analytics.report('docs_page_view', { page_title: 'B' });
 
       expect(mergedLikeGtm(page.dataLayer()).docs).to.deep.equal({ page_title: 'B', page_location: quickstart });
       const withoutResets = page.dataLayer().filter((entry) => !(isPlainObject(entry) && entry.docs === null));
-      expect(mergedLikeGtm(withoutResets).docs).to.have.property('language', 'python');
+      expect(mergedLikeGtm(withoutResets).docs).to.have.property('code_language', 'python');
     });
 
     it('reports the page the caller names, not the one the address has moved on to', () => {
       const page = browser(quickstart);
-      const analytics = new Analytics(none);
+      const analytics = new Analytics(none, []);
       page.go('https://docs.test/guides/authentication');
 
       analytics.report(
         'docs_search',
-        { search_term: 'auth', result: '/guides/authentication', result_count: 3 },
+        { search_term: 'auth', picked_result: '/guides/authentication', result_count: 3 },
         quickstart
       );
 
@@ -633,7 +1164,7 @@ describe('Analytics', () => {
 
     it('sends the current page, each with its own title', () => {
       const page = browser(quickstart);
-      const analytics = new Analytics(none);
+      const analytics = new Analytics(none, []);
       analytics.start();
 
       analytics.reportPageView();
@@ -648,7 +1179,7 @@ describe('Analytics', () => {
 
     it('sends none when only the # part or the query changed, or nothing changed', () => {
       const page = browser(quickstart);
-      const analytics = new Analytics(none);
+      const analytics = new Analytics(none, []);
       analytics.start();
 
       analytics.reportPageView();
@@ -663,7 +1194,7 @@ describe('Analytics', () => {
 
     it('sends three for A, then B, then A', () => {
       const page = browser(quickstart);
-      const analytics = new Analytics(none);
+      const analytics = new Analytics(none, []);
       analytics.start();
 
       analytics.reportPageView();
@@ -690,7 +1221,7 @@ describe('Analytics', () => {
         'Quickstart',
         'https://www.google.com/search?q=acme+docs'
       );
-      const analytics = new Analytics(none);
+      const analytics = new Analytics(none, []);
       analytics.reportPageView();
       page.go(missing);
       analytics.reportPageView();
@@ -707,7 +1238,7 @@ describe('Analytics', () => {
         'Quickstart',
         'https://www.google.com/search?q=acme+docs'
       );
-      const analytics = new Analytics(none);
+      const analytics = new Analytics(none, []);
       analytics.reportPageView();
       page.go(missing);
 
@@ -719,9 +1250,9 @@ describe('Analytics', () => {
 
     it('names the referrer without its query or # part on a first load, and nothing when the browser sends none', () => {
       const fromSearch = browser(missing, 'Not found', 'https://www.google.com/search?q=acme+docs#top');
-      new Analytics(none).reportNotFound();
+      new Analytics(none, []).reportNotFound();
       const typedIn = browser(missing, 'Not found');
-      new Analytics(none).reportNotFound();
+      new Analytics(none, []).reportNotFound();
 
       expect(referrers(fromSearch.dataLayer())).to.deep.equal(['https://www.google.com/search']);
       expect(referrers(typedIn.dataLayer())).to.deep.equal(['']);
@@ -729,7 +1260,7 @@ describe('Analytics', () => {
 
     it('reports a missing page once, however often its page mounts, and the next missing page again', () => {
       const page = browser(missing);
-      const analytics = new Analytics(none);
+      const analytics = new Analytics(none, []);
 
       analytics.reportNotFound();
       analytics.reportNotFound();
@@ -741,7 +1272,7 @@ describe('Analytics', () => {
 
     it('reports a missing page again when the reader comes back to it from another page', () => {
       const page = browser('https://docs.acme.com/guides/quickstart');
-      const analytics = new Analytics(none);
+      const analytics = new Analytics(none, []);
       analytics.reportPageView();
       page.go(missing);
       analytics.reportNotFound();
