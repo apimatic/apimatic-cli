@@ -182,4 +182,49 @@ describe('parsePage', () => {
       expect(await images('<img src="./a.png">\n\nInline <img src="./b.png"> here.\n')).to.deep.equal([]);
     });
   });
+
+  // The build leaves out every piece of HTML in a `.md` page, and the reader loses what it says.
+  describe('the HTML of a .md page', () => {
+    const html = async (markdown: string, name?: string) => (await page(markdown, name)).leftOutHtml;
+
+    it('names each piece of HTML by the line it starts on, as written', async () => {
+      const markdown =
+        '---\ntitle: Tags\n---\n\nLine one<br>line two.\n\n<details>\n<summary>More</summary>\n\nHidden.\n\n' +
+        '</details>\n\n<Callout type="warn">\nKeep it secret.\n</Callout>\n';
+
+      expect(await html(markdown)).to.deep.equal([
+        { line: 5, text: '<br>' },
+        { line: 7, text: '<details>' },
+        { line: 14, text: '<Callout type="warn">' }
+      ]);
+    });
+
+    it('names a piece that leaves text out after a closing tag or a comment', async () => {
+      const markdown =
+        '</div>\nThis line is left out too.\n\n<!-- TODO --> And this one.\n\n<!---> <i>After an empty comment</i>\n';
+
+      expect(await html(markdown)).to.deep.equal([
+        { line: 1, text: '</div>' },
+        { line: 4, text: '<!-- TODO --> And this one.' },
+        { line: 6, text: '<!---> <i>After an empty comment</i>' }
+      ]);
+    });
+
+    it('leaves out a piece of nothing but comments and closing tags', async () => {
+      const markdown =
+        '<!-- <b>Draft</b> -->\n\nText <!-- note --> here.\n\n</details>\n\nPress <kbd>Ctrl</kbd>.\n\n<!--->\n';
+
+      expect(await html(markdown)).to.deep.equal([{ line: 7, text: '<kbd>' }]);
+    });
+
+    it('reads code, inline code and an autolink as the text they are', async () => {
+      const markdown = '```html\n<div>\n```\n\nWrite `<br>` for a break, or see <https://example.com>.\n';
+
+      expect(await html(markdown)).to.deep.equal([]);
+    });
+
+    it('names none in an .mdx page, which renders its HTML', async () => {
+      expect(await html('Line one<br />line two.\n\n<details>\n\nText.\n\n</details>\n', 'page.mdx')).to.deep.equal([]);
+    });
+  });
 });

@@ -1,4 +1,5 @@
 import { FilePath } from '../file/filePath.js';
+import { LeftOutHtml } from './left-out-html.js';
 import { TabEntry } from './portal-navigation.js';
 import { SharedTabName } from './portal-tabs.js';
 
@@ -11,6 +12,8 @@ export interface NoTabsListed {
 
 /** What a build accepts in `content/`, but the user should hear of. */
 export interface ContentNotices {
+  /** Warned of rather than refused: the rest of the page builds, and one stray `<br>` should not stop a build. */
+  leftOutHtml: LeftOutHtml[];
   /**
    * Pages below `content/api/<slug>/` for a specification `<slug>`. The section's generated
    * metadata lists only the reference pages, so these never appear in the sidebar.

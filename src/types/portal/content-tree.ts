@@ -6,6 +6,7 @@ import { FileName } from '../file/fileName.js';
 import { FilePath } from '../file/filePath.js';
 import { ContentNotices } from './content-notices.js';
 import { GENERATED_SECTIONS, GeneratedPages } from './generated-pages.js';
+import { LeftOutHtml } from './left-out-html.js';
 import { ParsedPage } from './page.js';
 import {
   API_REFERENCE_NAME,
@@ -190,6 +191,9 @@ export class ContentTree {
     const rootNavigation = navigation.root.navigation;
     const unplaced = ContentTree.unplaced(rootNavigation?.settings, generatedPages);
     return ok({
+      leftOutHtml: read.pages.flatMap(({ file, parsed }) =>
+        parsed === undefined || parsed.leftOutHtml.length === 0 ? [] : [new LeftOutHtml(file, parsed.leftOutHtml)]
+      ),
       hiddenPages: ContentTree.hiddenPages(pages, specs),
       ignoredNavigationFiles: navigation.ignoredFiles,
       sharedTabNames: sharedTabNames(tabs),

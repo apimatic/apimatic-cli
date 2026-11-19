@@ -5,6 +5,7 @@ import { FileName } from '../../../src/types/file/fileName';
 import { FilePath } from '../../../src/types/file/filePath';
 import { ContentFile, ContentTree, ReadPage } from '../../../src/types/portal/content-tree';
 import { GeneratedPages } from '../../../src/types/portal/generated-pages';
+import { LeftOutHtml } from '../../../src/types/portal/left-out-html';
 import { parsePage } from '../../../src/types/portal/page';
 import { PortalLanguages } from '../../../src/types/portal/portal-languages';
 
@@ -97,6 +98,21 @@ describe('ContentTree', () => {
 
     expect(problems.map(({ kind }) => kind)).to.deep.equal(['missingImages', 'invalidNavigation']);
     expect(problems[0]).to.deep.equal({ kind: 'missingImages', images: [image] });
+  });
+
+  it('names each .md page with HTML, and its HTML', async () => {
+    const tagged = await parsed(
+      [inContent('index.md'), '---\ntitle: Home\n---\n\nLine one<br>line two.\n'],
+      [inContent('guides', 'intro.mdx'), '---\ntitle: Intro\n---\n\nLine one<br />line two.\n']
+    );
+    const navigationFiles = handed(
+      [inContent('nav.json'), JSON.stringify({ tabs: ['guides'], pages: ['index'] })],
+      [inContent('guides', 'nav.json'), JSON.stringify({ title: 'Guides' })]
+    );
+
+    const notices = tree.check({ pages: tagged, navigationFiles, missingImages: [] }, [], GENERATED)._unsafeUnwrap();
+
+    expect(notices.leftOutHtml).to.deep.equal([new LeftOutHtml(inContent('index.md'), [{ line: 5, text: '<br>' }])]);
   });
 
   it('names the tabs from what it is handed', () => {
