@@ -111,6 +111,37 @@ describe('ValidateAction', () => {
     expect(result.getError()).to.equal('invalid');
   });
 
+  it('points a spec that fails linting at configuring the rules, naming what kind of spec it was', async () => {
+    validateViaFile.resolves(ok({ validation: PASSED, linting: FAILED } as never));
+    const spec = new FilePath(workingDirectory, new FileName('openapi.yaml'));
+    fs.writeFileSync(spec.toString(), 'openapi: 3.0.3');
+
+    const result = await validate(spec);
+
+    expect(result.getError()).to.equal('invalid');
+    expect(prompts.lintingFailed.calledOnceWithExactly('file')).to.be.true;
+  });
+
+  it('leaves the rules unmentioned when only validation fails, since its rules cannot be turned off', async () => {
+    validateViaFile.resolves(ok({ validation: FAILED, linting: PASSED } as never));
+    const spec = new FilePath(workingDirectory, new FileName('openapi.yaml'));
+    fs.writeFileSync(spec.toString(), 'openapi: 3.0.3');
+
+    await validate(spec);
+
+    expect(prompts.lintingFailed.called).to.be.false;
+  });
+
+  it('leaves the rules unmentioned when asked not to show the summary, as quickstart does', async () => {
+    validateViaFile.resolves(ok({ validation: PASSED, linting: FAILED } as never));
+    const spec = new FilePath(workingDirectory, new FileName('openapi.yaml'));
+    fs.writeFileSync(spec.toString(), 'openapi: 3.0.3');
+
+    await new ValidateAction(workingDirectory, COMMAND_METADATA).execute(spec, false);
+
+    expect(prompts.lintingFailed.called).to.be.false;
+  });
+
   it('calls a spec the service refuses outright invalid, and one it never answered for unchecked', async () => {
     const spec = new FilePath(workingDirectory, new FileName('openapi.yaml'));
     fs.writeFileSync(spec.toString(), 'openapi: 3.0.3');
