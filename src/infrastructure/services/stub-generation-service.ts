@@ -1,13 +1,14 @@
 import axios, { AxiosInstance } from 'axios';
 import FormData from 'form-data';
+import { Buffer } from 'node:buffer';
 import { ReadStream } from 'node:fs';
+import { Readable } from 'node:stream';
 import { Status } from '@apimatic/sdk';
 import { err, ok, Result } from 'neverthrow';
 import { getAuthInfo } from '../../client-utils/auth-manager.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { FilePath } from '../../types/file/filePath.js';
-import { discardStreamBody } from '../../utils/utils.js';
 import { envInfo } from '../env-info.js';
 import { FileService } from '../file-service.js';
 import {
@@ -136,13 +137,10 @@ export class StubGenerationService {
     generationId: string
   ): Promise<Result<NodeJS.ReadableStream, ServiceError>> {
     try {
-      const response = await api.get(`/mock/${generationId}/download`, { responseType: 'stream' });
-      return ok(response.data as NodeJS.ReadableStream);
+      // Received whole, so a connection that drops part-way fails here and not while the caller saves a stream.
+      const response = await api.get<ArrayBuffer>(`/mock/${generationId}/download`, { responseType: 'arraybuffer' });
+      return ok(Readable.from([Buffer.from(response.data)]));
     } catch (error) {
-      // The body of a failed streamed response is itself a stream; left open, it hangs the CLI.
-      if (axios.isAxiosError(error)) {
-        discardStreamBody(error.response?.data);
-      }
       return err(mapTransportError(error));
     }
   }

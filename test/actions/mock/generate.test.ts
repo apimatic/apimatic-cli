@@ -18,7 +18,7 @@ import { ProjectContext } from '../../../src/types/project-context.js';
 import { optionsFor, running, send } from '../../helpers/mock-http.js';
 import { TestRequest } from '../../helpers/mock-requests.js';
 import { stubFixtures, successStub } from '../../helpers/mock-stubs.js';
-import { StubGenerationEndpoint } from '../../helpers/stub-generation-endpoint.js';
+import { cutShort, StubGenerationEndpoint } from '../../helpers/stub-generation-endpoint.js';
 
 const stubFile = (operation: string, route: string) =>
   successStub({ name: `${operation} 200`, operation, path: route });
@@ -285,6 +285,17 @@ describe('MockGenerateAction', () => {
       ]);
       expect(host.stubs.all).to.have.length(84);
       expect(answer.status).to.equal(200);
+    });
+
+    it('keeps the last set when the download breaks part-way, and says the stubs were not generated', async () => {
+      holding(OLD_SET);
+      endpoint.download = cutShort(zipOf(NEW_SET).subarray(0, 40));
+
+      const result = await execute(true);
+
+      expect(result.isFailed()).to.be.true;
+      expect(prompts.stubsNotGenerated.calledOnce).to.be.true;
+      expect(held()).to.deep.equal(Object.keys(OLD_SET));
     });
   });
 });

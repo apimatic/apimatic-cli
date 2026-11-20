@@ -42,6 +42,22 @@ export const zip =
     response.end(content);
   };
 
+/** A download whose connection drops after `sent`, short of the length it declared. */
+export const cutShort =
+  (sent: Buffer): Respond =>
+  (response) => {
+    response.writeHead(200, { 'Content-Type': 'application/zip', 'Content-Length': sent.length + 1024 });
+    response.write(sent, () => response.destroy());
+  };
+
+/** A download that sends `sent` and then nothing more, without closing. */
+export const stalled =
+  (sent: Buffer): Respond =>
+  (response) => {
+    response.writeHead(200, { 'Content-Type': 'application/zip', 'Content-Length': sent.length + 1024 });
+    response.write(sent);
+  };
+
 /** A finished run is a redirect to the download, as the gateway answers for `/plugin`. */
 export const redirect: Respond = (response) => {
   response.writeHead(302, { Location: `/mock/${GENERATION_ID}/download` });

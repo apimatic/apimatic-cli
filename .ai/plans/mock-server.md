@@ -384,6 +384,11 @@ Phase 8:
   `src` itself, because the destination is emptied; the download is unpacked in a temporary
   directory first, so a failed download or unzip leaves the stubs directory alone; and the build is
   `ProjectContext.buildZip`, what `sdk generate` uploads.
+- The download is received whole by the service, not handed on as a stream. A connection that
+  drops or stalls part-way is then one more failed request, reported with the wording of an
+  unexpected error and with the stubs directory left alone. As a stream it failed while the action
+  saved it, which threw out of the command; `plugin generate` and `sdk generate` still stream
+  theirs. A stub set is small, so holding it in memory costs nothing: Spec S is 23 files.
 - `stubs` is not among `OUTPUT_DIRECTORY_NAMES`, so `quickstart` does not add it to a project's
   `.gitignore`. Whether it should is decided when the command is shown.
 - Not known until the endpoint exists: the folder of the stub files inside the zip (ADR-0036 leaves

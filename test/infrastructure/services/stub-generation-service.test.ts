@@ -10,11 +10,13 @@ import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
 import { FilePath } from '../../../src/types/file/filePath.js';
 import {
   bare,
+  cutShort,
   GENERATION_ID,
   json,
   noAnswer,
   problem,
   redirect,
+  stalled,
   StubGenerationEndpoint
 } from '../../helpers/stub-generation-endpoint.js';
 
@@ -254,6 +256,25 @@ describe('StubGenerationService', () => {
       const error = errorFrom(await generateStubs());
 
       expect(error.errorMessage).to.equal(ServiceError.unauthorizedWithHint(null).errorMessage);
+    });
+
+    it('is reported when the connection drops part-way, with no half of a zip handed on', async () => {
+      endpoint.download = cutShort(Buffer.from('PK half of the stub'));
+
+      const result = await generateStubs();
+
+      expect(result.isErr()).to.be.true;
+      expect(errorFrom(result).code).to.equal(ServiceErrorCode.ServerError);
+    });
+
+    it('is given up on when it stalls part-way', async () => {
+      const impatient = new StubGenerationService({ pollIntervalMs: 1, requestTimeoutMs: 30 });
+      endpoint.download = stalled(Buffer.from('PK half of the stub'));
+
+      const result = await generateStubs(impatient);
+
+      expect(result.isErr()).to.be.true;
+      expect(errorFrom(result).code).to.equal(ServiceErrorCode.ServerError);
     });
   });
 });
