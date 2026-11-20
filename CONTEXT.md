@@ -85,7 +85,7 @@ A JSON array of stubs, by convention one file per operation, checked against `mo
 _Avoid_: Mapping file, mock file
 
 **Stubs directory**:
-The directory whose top-level `*.json` files `mock serve` loads, in file-name order: `--stubs`, else `./stubs` in the working directory.
+The directory whose top-level `*.json` files `mock serve` loads, in file-name order: `--stubs`, else `./stubs` in the working directory. `mock generate` replaces its contents: `--destination`, else `stubs` in the project directory.
 _Avoid_: Stubs folder, data directory, mock directory
 
 **Miss**:

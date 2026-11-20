@@ -2,6 +2,7 @@
 
 Status: in progress on `feat/mock-server`, cut from `dev` at `4b748d5d` on 2026-11-10.
 Phases 0 to 6 are done, committed and pushed as `feat/mock-server`. Phase 7 is done but for the CLI Reference rows in apimatic-docs, which wait for the release.
+Phase 8, `apimatic mock generate`, is built on `feat/mock-generate`, a branch stacked on `feat/mock-server`. The command is hidden until codegen-v2 serves the endpoint it calls.
 
 The mock that v4 SDK test suites run against exists as a C#/.NET proof of concept in
 `apimatic/mock-server-poc-v4` (reference commit `0d5a84f`: about 4,800 lines of source and 1,220
@@ -29,6 +30,7 @@ writes TypeScript.
 |---|---|
 | Command | `apimatic mock serve`, a new `mock` topic beside `portal serve` |
 | Defaults | `--port 4010`; a busy port fails and is never swapped for another. `--port 0` picks a free loopback port. `--stubs` defaults to `./stubs` in the working directory |
+| Stub files | Rendered by codegen-v2 and fetched by `apimatic mock generate` (phase 8), which writes `<input>/stubs`: with no flags, the directory `mock serve` reads |
 | Stub checking | `ajv` (draft 2020-12) against `mock-stubs.schema.json`, then the typed parser. Problem wording is the mock's own |
 | Admin API | A bounded request log of its own: `GET` and `DELETE /__admin/requests`. No WireMock shape |
 | HTTP | `node:http` directly; no framework |
@@ -50,6 +52,10 @@ src/infrastructure/mock/          stub directory reader; the node:http host, its
 src/actions/mock/serve.ts         MockServeAction
 src/prompts/mock/serve.ts         MockServePrompts
 src/commands/mock/serve.ts        the command
+src/infrastructure/services/stub-generation-service.ts
+                                  codegen's /mock endpoint: its three routes and where its download holds the stub files
+src/types/stubs-context.ts        the stubs directory as `mock generate` replaces it
+src/actions/mock/generate.ts      MockGenerateAction, with its prompts and command beside those of `mock serve`
 test/resources/mock/              the reference's stub sets: sample (20 stubs), spec-s (84), tester-poc (113)
 ```
 
@@ -115,6 +121,7 @@ array with its comparer stated.
 | 5b | Streams, multipart and binary answers, the request log | `PacedBody`, `PerRequestQueue`, `AdminApi` | `StreamingTests`, `PacedBodyTests`, `AdminApiTests`, the remaining Spec S suites | Done |
 | 6 | Command, action, prompts | `Program.cs` | `CommandLineTests`, `ExitCodeTests` (as a gated e2e test) | Done |
 | 7 | Acceptance: the C# SDK's contract suite on :4010; docs; the command shown | n/a | n/a | 103 contract tests pass |
+| 8 | `mock generate`: the stub files fetched from codegen-v2 | n/a | n/a | Built and hidden; shown once the endpoint is live |
 
 ## 6. Findings
 
@@ -333,8 +340,66 @@ Phase 7:
   line of stdout, and on Windows stopping the `apimatic.cmd` shim does not stop the Node process
   behind it.
 
+Phase 8:
+
+- `apimatic mock generate` is `commands/mock/generate.ts`, `actions/mock/generate.ts` and
+  `prompts/mock/generate.ts`, after `plugin generate`: it zips the project's `src`, sends it to
+  codegen-v2, waits for the run, downloads the stub files and writes the stubs directory. Flags:
+  `--input`, `--destination` (default `<input>/stubs`), `--force` and `--auth-key`. It asks for no
+  language and reads nothing from `apimatic.json`, since one stub set serves every SDK.
+- **The endpoint does not exist yet.** codegen-v2 can render the stub files (its ADR-0036, PR
+  #838); the HTTP endpoint and the gateway route come later. The command is built against the
+  planned contract, which has the shape of `/plugin`: `POST /mock` with the build as the multipart
+  field `file` and the `origin` query parameter, answered 202 with an `id`; `GET /mock/{id}/status`,
+  answered 200 with a status body while the run is under way and 302 once it has finished; and
+  `GET /mock/{id}/download`, a zip with the stub files at its root. All of it is in
+  `infrastructure/services/stub-generation-service.ts`: the three paths and
+  `STUB_FILES_IN_DOWNLOAD`. `docs/mock/generator-handoff.md` section 6 states it for codegen-v2.
+  The `origin` is `APIMATIC CLI mock:generate`: it carries the command's id, which oclif spells
+  with a colon, as `plugin generate` sends `plugin:generate`.
+- No test calls a real endpoint. `test/helpers/stub-generation-endpoint.ts` answers the three
+  routes on the loopback and 404 for any other path, so a test fails when the service calls another
+  one. One action test runs the service against it with the Spec S set as the download, then
+  starts the mock host on the directory the action wrote and gets a 200 from it.
+- **The built CLI was run against a stand-in for the endpoint** (2026-11-20, Windows), a local
+  server answering the three routes with a zip of the Spec S set: `apimatic mock generate` in a
+  project directory wrote 23 files to `./stubs`, and `apimatic mock serve` there, given no stubs
+  directory, served 84 stubs, answered `GET /health` with 200 and a request no stub describes with
+  418. A second run over a directory holding a left-over file removed it.
+- The stubs directory is named once, `STUBS_DIRECTORY_NAME` in `types/project-layout.ts`, for the
+  default of `mock generate` and of `mock serve`. With no flags the first writes what the second
+  reads; with `--input X` the stub files go to `X/stubs`, and the last line of the output is the
+  `mock serve --stubs` command that serves them.
+- A new set replaces the directory's contents and is never merged into them, because the loader
+  reads every file there and an operation's number moves when the specification changes. Only a
+  `.git` folder is kept. A directory that holds anything else is asked about first, and `--force`
+  skips the question.
+- **The download is loaded before it is written**, with the `StubDirectoryService` that `mock
+  serve` uses. A set it refuses is listed problem by problem, the command exits 1, and the stubs
+  directory keeps the last set; a download without a stub ends the same way. This is the first
+  place a generated set meets the loader: codegen-v2's tests load none, and its ADR-0036 names a
+  file it writes that the loader refuses (a status above 599). Loading the 113 TesterPoc stubs
+  takes about 50 ms.
+- Where it differs from `plugin generate`: a destination that holds `src` is refused, not only
+  `src` itself, because the destination is emptied; the download is unpacked in a temporary
+  directory first, so a failed download or unzip leaves the stubs directory alone; and the build is
+  `ProjectContext.buildZip`, what `sdk generate` uploads.
+- `stubs` is not among `OUTPUT_DIRECTORY_NAMES`, so `quickstart` does not add it to a project's
+  `.gitignore`. Whether it should is decided when the command is shown.
+- Not known until the endpoint exists: the folder of the stub files inside the zip (ADR-0036 leaves
+  it to the packaging change), the status values and the keys of a validation error, and that the
+  gateway answers a finished run with 302 on this route.
+- **To show the command**: run it against the live endpoint for each reference specification and
+  serve what it wrote; remove `hidden` from the command and its test; widen the `mock` topic's
+  description in `package.json`; run `pnpm readme`; add the `mock generate` rows to the CLI
+  Reference proposal of phase 7 (its four flags are `FlagsProvider`'s, as `plugin generate` has
+  them); and reword section 6 of the handoff from planned to served.
+
 ## 7. Risks
 
+- `mock generate` is written against an endpoint nobody has built. A difference in a route, the
+  status body or the zip is a change to `stub-generation-service.ts`; a difference in how a run is
+  started or finished is more.
 - Every SDK's CI needs Node and this CLI to run the mock, including SDKs in other languages. The
   core imports nothing from the CLI so that a package or binary of its own stays possible.
 - The 4010 default follows what generated SDK settings assume; `--port 0` is the hermetic choice.
@@ -342,5 +407,8 @@ Phase 7:
 
 ## 8. Not planned here
 
-Rendering stubs in the generator, `apimatic mock validate`, a standalone package or binary, a
-Docker image.
+`apimatic mock validate`, a standalone package or binary, a Docker image.
+
+Rendering the stub files is codegen-v2's work (its ADR-0036), and so are the `/mock` endpoint and
+the gateway route in front of it. Phase 8 is the CLI's side of that: it fetches what codegen-v2
+renders.

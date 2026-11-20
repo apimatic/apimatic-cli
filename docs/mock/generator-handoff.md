@@ -1,6 +1,6 @@
 # Generator handoff
 
-What codegen-v2 has to do so that every generated SDK's tests run against the mock: render stub files from the spec, and have the generated tests start `apimatic mock serve` and talk to it. Nothing of the mock is copied into an SDK.
+What codegen-v2 has to do so that every generated SDK's tests run against the mock: render stub files from the spec, serve them to `apimatic mock generate` ([section 6](#6-the-endpoint-apimatic-mock-generate-calls)), and have the generated tests start `apimatic mock serve` and talk to it. Nothing of the mock is copied into an SDK.
 
 ## 1. The mock ships in the CLI
 
@@ -21,6 +21,8 @@ apimatic mock serve [--port 4010] [--host localhost] [--stubs ./stubs] [--token-
 The stub format is the contract between the generator and the mock: [stub-format.md](stub-format.md), enforced by [`mock-stubs.schema.json`](../../mock-stubs.schema.json) and the loader's rules.
 
 ## 2. One stub file per operation
+
+codegen-v2's stub generator departs from this section in the places its ADR-0036 lists under "Where this departs from the mock's hand-off". What binds it is the stub format and the loader: `apimatic mock generate` loads every set it downloads and writes none the loader refuses.
 
 The format is specified in [stub-format.md](stub-format.md) and enforced by `mock-stubs.schema.json` plus the loader's semantic rules; the worked examples are the TesterPoc files in `test/resources/mock/tester-poc/` (113 stubs for 97 operations of five specs, the set the C# SDK's contract suite runs against) and the Spec S files in `test/resources/mock/spec-s/` (84 stubs for 22 operations). The generator writes `NN-<operationId>.json`, an array of stubs in UTF-8 (the loader reports a byte that is not), in the operation order of the spec so the file names sort like the documentation. The loader sorts names ordinally, so the number is zero-padded to the width of the largest (`001-` once a spec has 100 operations; unpadded, `100-` would sort before `11-`). In the name, every character of the operationId other than an ASCII letter, a digit, `-`, `_` or `.` becomes `-` (`repos/get` gives `01-repos-get.json`; a `/` would put the file in a subfolder, which the loader does not read), while the stub's `operation` keeps the operationId as written. The order has one exception: an operation comes before every operation of the same method whose path template also matches its path and more (`GET /v1/users/me` before `GET /v1/users/{user_id}`, `GET /repos/{repo}/releases/latest` before `GET /repos/{repo}/releases/{release_id}`), the more specific path first, as routers match it. The first matching stub answers, so otherwise the broader operation's error stubs would answer the other's `Prefer: code=` requests with their own body and headers; the loader refuses that order whenever the two share an error status, as they do whenever both serve a `default` as 500. Number in spec order and move an operation up only as far as it must go (a stable topological sort); such an order always exists, because the more specific path has fewer parameters, so no two operations can each need to come first. Within a file, success stubs come first; the first matching stub wins.
 
@@ -200,3 +202,31 @@ For anything built against `mock-server-poc-v4`. The stub format, the 418 report
 | A schema problem at load | the schema library's wording | the mock's own; the JSON pointers are the same |
 | A served JSON body | characters beyond the basic plane escaped (`\uD83D\uDE00`) | written as they are, so the bytes and `Content-Length` of such a body differ |
 | The 418 body's line ends | the platform's | LF |
+
+## 6. The endpoint `apimatic mock generate` calls
+
+`apimatic mock generate` fetches the stub files of a project: it sends the project's build, waits for the run, downloads the stub files and replaces the stubs directory with them, where `apimatic mock serve` reads them. The command is built and hidden, and is shown once this endpoint is live. Until then it is written against the contract below, which is planned and has the shape of `/plugin`. Everything the contract fixes is in one file of the CLI, `src/infrastructure/services/stub-generation-service.ts`.
+
+| Call | The CLI sends | The CLI expects |
+|---|---|---|
+| `POST /mock` | the query parameter `origin` (`APIMATIC CLI mock:generate`, the command's id, as `plugin generate` sends `APIMATIC CLI plugin:generate`) and a `multipart/form-data` body with one field, `file`: a zip of the project's `src` directory without `static/`, as `sdk generate` uploads it. No language and no `plugin` block, since one stub set serves every SDK | 202 with a JSON body whose `id` names the run |
+| `GET /mock/{id}/status` | `Accept: application/json`; a redirect is not followed | 200 with a status body while the run is under way, and 302 once it has finished, as the gateway answers for `/plugin` |
+| `GET /mock/{id}/download` | | 200 with a zip that holds the stub files at its root |
+
+Every call carries `Authorization: X-Auth-Key <key>`.
+
+A status body is `{ "status": "<value>", "errors": { "<key>": ["<message>"] } }`, with `errors` only on a run that failed:
+
+| `status` | What the CLI does |
+|---|---|
+| `Completed`, or a 302 in place of a body | downloads the stub files |
+| `ValidationError` | stops, and lists every message of `errors` without its HTML |
+| `SubscriptionError` | stops, and shows the first message of `errors` |
+| `Failed` | stops, with its own wording for an unexpected error |
+| any other value (`Queued`, `ExecutionStarted`, `GeneratingArtifacts`, `Unknown`) | asks again after 3 seconds, for 30 minutes at most |
+
+A 400 or 403 on `POST /mock` is read as problem details: its `title`, then the first message of `errors`, or else its `detail`. A 401 on any call tells the user to log in, and a 404 on the status call ends the run.
+
+The zip is unpacked and the `*.json` files at its root are loaded exactly as `apimatic mock serve` loads a stubs directory, before anything is written. A set the loader refuses is reported problem by problem, and the stubs directory is left as it was; so is a zip without a stub. Otherwise everything at the root of the zip replaces the contents of the stubs directory. The zip therefore holds the `NN-<operationId>.json` and `oauth2` files of [section 2](#2-one-stub-file-per-operation) at its root, and nothing a stubs directory should not hold.
+
+Two things are open on the generator's side, and each is one line of that file: the names of the three routes, and the folder of the stub files inside the zip, which ADR-0036 leaves to the packaging change.
