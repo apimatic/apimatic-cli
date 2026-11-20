@@ -108,6 +108,11 @@ describe('QuickstartPrompts', () => {
       expect(howToFix()).to.contain(
         'https://marketplace.visualstudio.com/items?itemName=apimatic-developers.apimatic-for-vscode'
       );
+      expect(howToFix()).to.contain(
+        "If a linting rule doesn't fit your API, turn it off or lower its severity in an 'APIMATIC-META.json' " +
+          'zipped together with your API definition:'
+      );
+      expect(howToFix()).to.contain('https://docs.apimatic.io/v4/define-validate/validate-lint/configuring-validation');
     });
 
     it('suggests validating a spec that came from a URL by its URL', () => {
@@ -115,6 +120,7 @@ describe('QuickstartPrompts', () => {
       write.restore();
 
       expect(howToFix()).to.contain('apimatic api validate --url=<url>');
+      expect(howToFix()).to.contain('zipped together with your API definition:');
     });
 
     it("names validate inline and with no flags for a project's spec/", () => {
@@ -123,6 +129,14 @@ describe('QuickstartPrompts', () => {
 
       expect(howToFix()).to.contain('Ask an AI coding agent to run apimatic api validate and fix what it reports.');
       expect(howToFix()).not.to.contain('--');
+    });
+
+    it("puts the rules for a project's spec/ in the APIMATIC-META.json beside it", () => {
+      prompts.specValidationFailed('project');
+      write.restore();
+
+      expect(howToFix()).to.contain("lower its severity in an 'APIMATIC-META.json' beside your API definition:");
+      expect(howToFix()).not.to.contain('zipped');
     });
   });
 });

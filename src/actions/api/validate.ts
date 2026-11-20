@@ -60,6 +60,9 @@ export class ValidateAction {
       if (this.hasValidationIssues(linting)) {
         this.prompts.displayValidationSummary(linting);
       }
+      if (!linting.isSuccess) {
+        this.prompts.lintingFailed(spec.kind());
+      }
     }
     return validation.isSuccess && linting.isSuccess
       ? ActionResult.success()

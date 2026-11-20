@@ -5,9 +5,11 @@ import { ValidationMessages } from '../../types/utils.js';
 import { Result } from 'neverthrow';
 import { ValidateApiResult, ValidationEntry, ValidationSummary } from '@apimatic/sdk';
 import { FilePath } from '../../types/file/filePath.js';
-import { ResolveProblem } from '../../types/resource-context.js';
+import { METADATA_FILE_NAME } from '../../types/project-layout.js';
+import { ResolveProblem, ResourceKind } from '../../types/resource-context.js';
 import { format as f } from '../format.js';
 import { notZippedForUpload, withSpinner } from '../prompt.js';
+import { CONFIGURING_VALIDATION_URL } from './links.js';
 
 export class ApiValidatePrompts {
   public async validateApi<E>(fn: Promise<Result<ValidateApiResult, E>>) {
@@ -81,6 +83,14 @@ export class ApiValidatePrompts {
 
   logValidationError(error: string): void {
     log.error(error);
+  }
+
+  public lintingFailed(kind: ResourceKind): void {
+    const where = kind === 'project' ? 'beside your API definition' : 'zipped together with your API definition';
+    const message =
+      `If a linting rule doesn't fit your API, turn it off or lower its severity in an ` +
+      `${f.var(METADATA_FILE_NAME)} ${where}:\n${f.link(CONFIGURING_VALIDATION_URL)}`;
+    log.info(message);
   }
 
   public specUnavailable(problem: ResolveProblem): void {
