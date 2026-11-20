@@ -3,10 +3,11 @@ import { MockHost } from '../../infrastructure/mock/mock-host.js';
 import { MockServePrompts } from '../../prompts/mock/serve.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { TokenLifetime } from '../../types/mock/routing/token-lifetime.js';
+import { STUBS_DIRECTORY_NAME } from '../../types/project-layout.js';
 import { ActionResult } from '../action-result.js';
 
 export const DEFAULT_MOCK_PORT = 4010;
-export const DEFAULT_STUBS_DIRECTORY = './stubs';
+export const DEFAULT_STUBS_DIRECTORY = `./${STUBS_DIRECTORY_NAME}`;
 
 export interface MockServeOptions {
   readonly stubs: DirectoryPath;
