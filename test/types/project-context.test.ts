@@ -37,6 +37,7 @@ describe('ProjectContext', () => {
       expect(project().sdkDirectory(Language.PYTHON).toString()).to.equal(inProject('sdk', 'python'));
       expect(project().portalDirectory().toString()).to.equal(inProject('portal'));
       expect(project().pluginDirectory().toString()).to.equal(inProject('plugin'));
+      expect(project().stubsDirectory().toString()).to.equal(inProject('stubs'));
     });
 
     it('writes where the destination flag says instead, when it says anywhere', () => {
@@ -44,6 +45,7 @@ describe('ProjectContext', () => {
         path.resolve('elsewhere')
       );
       expect(project().portalDirectory('').toString()).to.equal(inProject('portal'));
+      expect(project().stubsDirectory('mock/stubs').toString()).to.equal(path.resolve('mock', 'stubs'));
     });
 
     it('takes the project from the input flag, or the directory it runs in without one', () => {

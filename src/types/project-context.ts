@@ -13,7 +13,8 @@ import {
   LOCAL_ONLY_DIRECTORY_NAMES,
   OUTPUT_DIRECTORY_NAMES,
   SOURCE_DIRECTORY_NAME,
-  SPEC_DIRECTORY_NAME
+  SPEC_DIRECTORY_NAME,
+  STUBS_DIRECTORY_NAME
 } from './project-layout.js';
 import { Language } from './sdk/generate.js';
 import { SpecContext } from './spec-context.js';
@@ -77,6 +78,10 @@ export class ProjectContext {
 
   public pluginDirectory(destination?: string): DirectoryPath {
     return this.outputDirectory(OUTPUT_DIRECTORY_NAMES.plugin, destination);
+  }
+
+  public stubsDirectory(destination?: string): DirectoryPath {
+    return this.outputDirectory(STUBS_DIRECTORY_NAME, destination);
   }
 
   public async sourceExists(): Promise<boolean> {
