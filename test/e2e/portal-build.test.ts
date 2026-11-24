@@ -131,7 +131,6 @@ function portalBuilt(name: string, delivered: Delivered = {}, settings?: object)
   };
 }
 
-/** Where the card of this title on a prerendered page links to, or null for a page without one. */
 const cardLink = (page: string, title: string): string | null =>
   new RegExp(`<a [^>]*href="([^"]*)"[^>]*><h3[^>]*>${title}</h3>`).exec(page)?.[1] ?? null;
 
@@ -975,11 +974,13 @@ const stylesheetOf = (output: DirectoryPath) => {
   });
 
   // Fumadocs renders an external card as a plain link, outside the router that gives the others the path.
-  it("links the home page's external card to llms.txt under the path, where the host serves it", async () => {
-    const href = cardLink(read('index.html'), 'Agent-Friendly Docs');
-    expect(href).to.equal('/api/llms.txt');
+  // `/api/search.json` starts like the path, and still goes under it.
+  it("links an external card to the portal's own files under the path, where the host serves them", async () => {
+    const page = read('figures/index.html');
+    const hrefs = [cardLink(page, 'Agent-Friendly Docs'), cardLink(page, 'Search index')];
+    expect(hrefs).to.deep.equal(['/api/llms.txt', '/api/api/search.json']);
 
-    // A multi-page app, so a missing file answers 404 rather than the home page.
+    // On 127.0.0.1 as vite.config.ts pins the prerender's; a multi-page app, so a missing file answers 404.
     const host = await preview({
       configFile: false,
       root: built!.root,
@@ -987,10 +988,14 @@ const stylesheetOf = (output: DirectoryPath) => {
       appType: 'mpa',
       logLevel: 'silent',
       build: { outDir: output.toString() },
-      preview: { port: 0 }
+      preview: { host: '127.0.0.1', port: 0 }
     });
     try {
-      expect((await fetch(new URL(href!, host.resolvedUrls!.local[0]))).status).to.equal(200);
+      const origin = host.resolvedUrls!.local[0];
+      const statuses = await Promise.all(
+        hrefs.map(async (href) => (await globalThis.fetch(new URL(href!, origin))).status)
+      );
+      expect(statuses).to.deep.equal([200, 200]);
     } finally {
       await host.close();
     }

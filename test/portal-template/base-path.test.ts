@@ -29,15 +29,21 @@ describe('withBasePath', () => {
 });
 
 describe('externalHref', () => {
-  // A route writing a file has an extension on its last segment; robots.txt is written at the root of a host alone.
-  it('puts every file a route writes under the base, robots.txt aside', () => {
+  const UNPREFIXED = ['/robots.txt', '/{$}.md'];
+
+  // A route writing a file has an extension on its last segment.
+  it('puts every file a route writes under the base, but robots.txt and the pages’ .md copies', () => {
     const files = routePaths().filter((route) => /\.\w+$/.test(route));
-    expect(files).to.include.members(['/llms.txt', '/{$}.md']);
+    expect(files).to.include.members(['/llms.txt', ...UNPREFIXED]);
 
     for (const route of files) {
       const address = route.replace('{$}', 'guides/intro');
-      expect(externalHref(address, '/docs/'), route).to.equal(route === '/robots.txt' ? address : `/docs${address}`);
+      expect(externalHref(address, '/docs/'), route).to.equal(UNPREFIXED.includes(route) ? address : `/docs${address}`);
     }
+  });
+
+  it('puts a file under a base its own path starts with', () => {
+    expect(externalHref('/api/search.json', '/api/')).to.equal('/api/api/search.json');
   });
 });
 

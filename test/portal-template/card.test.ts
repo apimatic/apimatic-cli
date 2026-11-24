@@ -106,13 +106,16 @@ describe("an author's Card", function () {
         router: false,
         newTab: true
       });
-      expect(shown({ title: 'Guide', href: '/guides/intro.md', external: true }).href).to.equal(
-        '/docs/guides/intro.md'
-      );
     });
 
     it('leaves any other address as the author wrote it', () => {
-      const written = ['/pricing', 'https://example.com/llms.txt', '//cdn.example.com/llms.txt', '/docs/llms.txt'];
+      const written = [
+        '/pricing',
+        '/guides/intro.md',
+        'https://example.com/llms.txt',
+        '//cdn.example.com/llms.txt',
+        '/docs/llms.txt'
+      ];
 
       expect(written.map((href) => shown({ title: 'Elsewhere', href, external: true }).href)).to.deep.equal(written);
     });

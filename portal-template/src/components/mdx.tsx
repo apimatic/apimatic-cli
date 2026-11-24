@@ -29,8 +29,8 @@ export function getMDXComponents(components?: MDXComponents) {
       </CodeBlock>
     ),
     // Fumadocs' own, which renders an external card as a plain link that the router's base never reaches.
-    Card: ({ href, external, ...props }: CardProps) => (
-      <Card {...props} external={external} href={external && href !== undefined ? externalHref(href) : href} />
+    Card: ({ href, ...props }: CardProps) => (
+      <Card {...props} href={props.external && href ? externalHref(href) : href} />
     ),
     // Fumadocs' components beyond its defaults, so an author's page can use them without importing.
     Accordion,

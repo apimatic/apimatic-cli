@@ -68,8 +68,7 @@ export default [
         before: 'readonly',
         beforeEach: 'readonly',
         after: 'readonly',
-        afterEach: 'readonly',
-        fetch: 'readonly'
+        afterEach: 'readonly'
       }
     },
     rules: {

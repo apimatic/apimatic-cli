@@ -8,24 +8,12 @@ export function withBasePath(path: string, base: string = BASE): string {
   return `${base.replace(/\/$/, '')}${path}`;
 }
 
-/**
- * The files the portal writes beside its pages, at the paths of the routes that write them. Not
- * robots.txt: the build writes it only at the root of a host, where there is no base to add.
- */
+// Files the routes write; robots.txt exists only at a host's root, and `{$}.md` would claim a sibling app's `.md`.
 const FILES = new Set(['/llms.txt', '/llms-full.txt', '/sitemap.xml', '/api/search.json']);
 
-/** A page's Markdown copy, which the `{$}.md` route writes, at a path on the portal's own host. */
-const MARKDOWN_COPY = /^\/[^/].*\.md$/;
-
-/**
- * Where a link the router never sees leads. The router adds the base to its own links alone, so
- * one of the portal's files gets it here, unless the author already wrote it. Any other address,
- * such as `/pricing` on a sibling app of the same host, is left as written.
- */
+/** The router adds the base to its own links alone, so an external link to one of the portal's files gets it here. */
 export function externalHref(href: string, base: string = BASE): string {
-  const path = href.split(/[?#]/, 1)[0];
-  const portalFile = FILES.has(path) || MARKDOWN_COPY.test(path);
-  return portalFile && !path.startsWith(base) ? withBasePath(href, base) : href;
+  return FILES.has(href.split(/[?#]/, 1)[0]) ? withBasePath(href, base) : href;
 }
 
 /** A portal-relative path's full address as the browser sees it; the path itself where there is no window. */
