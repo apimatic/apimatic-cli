@@ -45,11 +45,12 @@ describe('PortalServeAction', () => {
   /** Stands in for the preview process dying, with what it printed on the way out. */
   let exit: (output: string) => void;
 
-  const execute = (projectDirectory = FIXTURE, openInBrowser = false) =>
+  const execute = (projectDirectory = FIXTURE, openInBrowser = false, analytics = true) =>
     new PortalServeAction(new DirectoryPath(root), COMMAND_METADATA, 'auth-key').execute(
       ProjectContext.in(projectDirectory),
       PORT,
-      openInBrowser
+      openInBrowser,
+      { analytics }
     );
 
   /** Stands in for the watch on `directory`, answered by `watching`; any other tree's watch is left alone. */
@@ -608,8 +609,8 @@ describe('PortalServeAction', () => {
       fs.writeFileSync(path.join(source.toString(), 'apimatic.json'), JSON.stringify(config));
 
     /** Runs the preview until `body` is done with it, then stops it as CTRL+C would. */
-    const whileServing = async (body: () => Promise<void>) => {
-      const running = execute(new DirectoryPath(root));
+    const whileServing = async (body: () => Promise<void>, analytics = true) => {
+      const running = execute(new DirectoryPath(root), false, analytics);
       const { onChange } = await watched;
       save = async (config: object) => {
         writeConfig(config);
@@ -888,6 +889,48 @@ describe('PortalServeAction', () => {
         expect(prompts.staticDirectoryNotServed.called).to.be.false;
         expect(appliedSaid()).to.equal(1);
       });
+    });
+
+    it('leaves the vendor tags and the events out of the project and of each rewrite under --no-analytics', async () => {
+      const applyConfig = sinon.spy(PortalProjectService.prototype, 'applyConfig');
+      const config = originalConfig();
+      config.portal.analytics = { googleTagManager: { containerId: 'GTM-ABC123' } };
+      writeConfig(config);
+
+      await whileServing(async () => {
+        config.portal.site.name = 'Renamed API';
+        await save(config);
+      }, false);
+
+      for (const { config: applied } of [shared.prepare.firstCall.args[1], applyConfig.lastCall.args[1]]) {
+        expect(applied.identity().analytics.googleTagManager).to.be.null;
+        expect(applied.identity().analytics.events).to.equal('off');
+      }
+    });
+
+    it('leaves the analytics and marketing scripts out of the project and of each rewrite under --no-analytics', async () => {
+      const applyConfig = sinon.spy(PortalProjectService.prototype, 'applyConfig');
+      const at = (name: string) => `https://cdn.example.com/${name}.js`;
+      const config = originalConfig();
+      config.portal.scripts = [
+        { src: at('banner'), category: 'necessary' },
+        { src: at('counter'), category: 'analytics' }
+      ];
+      writeConfig(config);
+
+      await whileServing(async () => {
+        config.portal.scripts.push(
+          { src: at('pixel'), category: 'marketing' },
+          { src: at('chat'), category: 'functional' }
+        );
+        await save(config);
+      }, false);
+
+      expect(shared.prepare.firstCall.args[1].config.identity().scripts).to.deep.equal([{ src: at('banner') }]);
+      expect(applyConfig.lastCall.args[1].config.identity().scripts).to.deep.equal([
+        { src: at('banner') },
+        { src: at('chat') }
+      ]);
     });
 
     it('reports a change it could not write to the preview', async () => {

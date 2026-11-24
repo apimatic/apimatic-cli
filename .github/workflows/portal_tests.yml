@@ -4,7 +4,16 @@ on:
   push:
     branches: [dev]
 
+  # A branch of the test suite can be named when a CLI change moves what the
+  # suite checks, so the two can be run together before either lands. A push
+  # to dev always runs the suite's main.
   workflow_dispatch:
+    inputs:
+      tests_ref:
+        description: Branch, tag or SHA of apimatic/v4-test-automation to run
+        required: false
+        default: main
+        type: string
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -82,6 +91,7 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           repository: apimatic/v4-test-automation
+          ref: ${{ inputs.tests_ref || 'main' }}
           path: tests
 
       - name: install test dependencies
@@ -196,6 +206,28 @@ jobs:
         shell: bash
         env:
           PORTAL: auth
+          PORTAL_PREBUILT: '1'
+          PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}\.playwright-browsers
+        run: pnpm test:functional
+
+      # Functional against the suite's petstore build: server selection, server
+      # variables and request parameters on the playground
+      # (tests/functional/petstore/). The tests intercept their own calls, so
+      # this needs no API Tester and no secrets beyond generation.
+      - name: generate the petstore portal
+        id: generate-petstore
+        if: ${{ !cancelled() }}
+        working-directory: tests
+        env:
+          PORTAL: petstore
+        run: pnpm portal:generate
+
+      - name: functional — petstore
+        if: ${{ !cancelled() && steps.generate-petstore.outcome == 'success' }}
+        working-directory: tests
+        shell: bash
+        env:
+          PORTAL: petstore
           PORTAL_PREBUILT: '1'
           PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}\.playwright-browsers
         run: pnpm test:functional

@@ -1,3 +1,5 @@
+import fs from 'fs';
+import path from 'path';
 import { ok } from 'neverthrow';
 import sinon from 'sinon';
 import { PortalProjectService } from '../../../src/infrastructure/portal-project-service';
@@ -32,6 +34,20 @@ export function completeArtifacts(
     new Map(languages.map((language) => [language, `## Installation\n\nInstall the ${language} SDK.\n`])),
     plugin ? new FilePath(delivered, new FileName('plugin.zip')) : undefined
   );
+}
+
+/** A copy of `fixture` at `directory`, its `portal.analytics` set to `analytics`. */
+export function fixtureWithAnalytics(
+  fixture: DirectoryPath,
+  directory: DirectoryPath,
+  analytics: object
+): DirectoryPath {
+  fs.cpSync(fixture.toString(), directory.toString(), { recursive: true });
+  const configFile = path.join(directory.toString(), 'src', 'apimatic.json');
+  const config = JSON.parse(fs.readFileSync(configFile, 'utf8'));
+  config.portal.analytics = analytics;
+  fs.writeFileSync(configFile, JSON.stringify(config));
+  return directory;
 }
 
 /**

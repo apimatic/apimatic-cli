@@ -22,7 +22,7 @@ export function AuthorizationFailure({ failure }: { failure: OAuthCallbackFailur
         <>
           <Explanation>
             This page completes an authorization started from an endpoint's playground, and none was started in this
-            browser. Open the endpoint's page and authorize from there.
+            tab. Open the endpoint's page and authorize from there.
           </Explanation>
           <HomeAction />
         </>

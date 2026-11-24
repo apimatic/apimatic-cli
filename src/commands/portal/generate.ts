@@ -28,6 +28,7 @@ The portal is built on your machine and written as static files for any static h
       default: false,
       description: 'write the generated portal as a .zip archive.'
     }),
+    ...FlagsProvider.noAnalytics,
     ...FlagsProvider.input,
     ...FlagsProvider.destination('portal', 'portal'),
     ...FlagsProvider.force,
@@ -36,7 +37,7 @@ The portal is built on your machine and written as static files for any static h
 
   async run(): Promise<void> {
     const {
-      flags: { input, destination, force, zip: zipPortal, 'auth-key': authKey }
+      flags: { input, destination, force, zip: zipPortal, 'no-analytics': noAnalytics, 'auth-key': authKey }
     } = await this.parse(PortalGenerate);
 
     const project = ProjectContext.at(input);
@@ -47,7 +48,9 @@ The portal is built on your machine and written as static files for any static h
 
     intro('Generate Portal');
     const action = new GenerateAction(this.getConfigDir(), commandMetadata, authKey);
-    const result = await action.execute(project, project.portalDirectory(destination), force, zipPortal);
+    const result = await action.execute(project, project.portalDirectory(destination), force, zipPortal, {
+      analytics: !noAnalytics
+    });
     outro(result);
   }
 

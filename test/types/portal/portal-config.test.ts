@@ -395,9 +395,425 @@ describe('PortalConfig', () => {
     });
   });
 
+  describe('analytics', () => {
+    const gtm = 'portal.analytics.googleTagManager';
+    const ga = 'portal.analytics.googleAnalytics';
+    const keep = 'portal.analytics.keepQueryParams';
+
+    it('tells the browser to load nothing when the block sets nothing', () => {
+      expect(config({}).identity().analytics).to.deep.equal({
+        googleTagManager: null,
+        googleAnalytics: null,
+        googleConsentMode: null,
+        keepQueryParams: [],
+        events: 'on'
+      });
+    });
+
+    it('keeps both vendors with their IDs trimmed, the environment and every kept name, an OAuth answer’s included', () => {
+      const analytics = {
+        googleTagManager: { containerId: ' GTM-ABC123 ', environment: { auth: 'a1_b-2', preview: 'env-3' } },
+        googleAnalytics: { measurementId: ' G-ABC123 ' },
+        keepQueryParams: ['campaign_id', ' code ']
+      };
+
+      expect(config({ analytics }).identity().analytics).to.deep.equal({
+        googleTagManager: { containerId: 'GTM-ABC123', environment: { auth: 'a1_b-2', preview: 'env-3' } },
+        googleAnalytics: { measurementId: 'G-ABC123' },
+        googleConsentMode: null,
+        keepQueryParams: ['campaign_id', 'code'],
+        events: 'on'
+      });
+    });
+
+    it('tells the browser to start the Google tags as denied, beside either vendor, both or neither', () => {
+      const googleConsentMode = { default: 'denied' };
+      const vendors = [
+        {},
+        { googleTagManager: { containerId: 'GTM-ABC123' } },
+        { googleAnalytics: { measurementId: 'G-ABC123' } },
+        { googleTagManager: { containerId: 'GTM-ABC123' }, googleAnalytics: { measurementId: 'G-ABC123' } }
+      ];
+
+      for (const set of vendors) {
+        expect(
+          config({ analytics: { ...set, googleConsentMode } }).identity().analytics.googleConsentMode,
+          JSON.stringify(set)
+        ).to.deep.equal(googleConsentMode);
+      }
+    });
+
+    it('refuses a consent mode that is not an object with default set to denied, each mistake by name', () => {
+      const mode = 'portal.analytics.googleConsentMode';
+      const errorsFor = (googleConsentMode: unknown) => errorsOf({ analytics: { googleConsentMode } });
+
+      expect(errorsFor('denied')).to.deep.equal([`'${mode}' must be a JSON object with 'default'.`]);
+      expect(errorsFor(true)).to.deep.equal([`'${mode}' must be a JSON object with 'default'.`]);
+      expect(errorsFor({})).to.deep.equal([`'${mode}.default' is required.`]);
+      expect(errorsFor({ default: 'granted' })).to.deep.equal([`'${mode}.default' must be 'denied'.`]);
+      expect(errorsFor({ default: 'Denied', region: ['DE'] })).to.deep.equal([
+        `'${mode}.region' is not a 'portal' setting.`,
+        `'${mode}.default' must be 'denied'.`
+      ]);
+    });
+
+    // What a build made with --no-analytics turns off is the flag's to say, never a line in the file.
+    it('hands events to scripts in every config as written, and takes no setting that says otherwise', () => {
+      expect(config({}).identity().analytics.events).to.equal('on');
+      expect(errorsOf({ analytics: { events: 'off' } })).to.deep.equal([
+        "'portal.analytics.events' is not a 'portal' setting."
+      ]);
+    });
+
+    it('refuses a block, a vendor or an environment that is not an object, as a bare ID is the likely slip', () => {
+      expect(errorsOf({ analytics: 'GTM-ABC123' })).to.deep.equal(["'portal.analytics' must be a JSON object."]);
+      expect(errorsOf({ analytics: { googleTagManager: 'GTM-ABC123' } })).to.deep.equal([
+        `'${gtm}' must be a JSON object with 'containerId'.`
+      ]);
+      expect(errorsOf({ analytics: { googleAnalytics: 'G-ABC123' } })).to.deep.equal([
+        `'${ga}' must be a JSON object with 'measurementId'.`
+      ]);
+      expect(
+        errorsOf({ analytics: { googleTagManager: { containerId: 'GTM-ABC123', environment: 'env-3' } } })
+      ).to.deep.equal([`'${gtm}.environment' must be a JSON object with 'auth' and 'preview'.`]);
+    });
+
+    it('requires each ID as a non-empty string, and leaves its format to the vendor', () => {
+      expect(errorsOf({ analytics: { googleTagManager: {}, googleAnalytics: {} } })).to.deep.equal([
+        `'${gtm}.containerId' is required.`,
+        `'${ga}.measurementId' is required.`
+      ]);
+      expect(
+        errorsOf({ analytics: { googleTagManager: { containerId: ' ' }, googleAnalytics: { measurementId: 1 } } })
+      ).to.deep.equal([
+        `'${gtm}.containerId' must be a non-empty string.`,
+        `'${ga}.measurementId' must be a non-empty string.`
+      ]);
+      expect(
+        config({ analytics: { googleTagManager: { containerId: 'gtm-abc123' } } }).identity().analytics.googleTagManager
+      ).to.deep.equal({ containerId: 'gtm-abc123', environment: null });
+    });
+
+    it('requires both environment values as non-empty strings', () => {
+      const withEnvironment = (environment: unknown) =>
+        errorsOf({ analytics: { googleTagManager: { containerId: 'GTM-ABC123', environment } } });
+
+      expect(withEnvironment({})).to.deep.equal([
+        `'${gtm}.environment.auth' is required.`,
+        `'${gtm}.environment.preview' is required.`
+      ]);
+      expect(withEnvironment({ auth: '', preview: 3 })).to.deep.equal([
+        `'${gtm}.environment.auth' must be a non-empty string.`,
+        `'${gtm}.environment.preview' must be a non-empty string.`
+      ]);
+    });
+
+    it('names an unknown key beside a vendor or an environment like any other', () => {
+      expect(
+        errorsOf({
+          analytics: {
+            posthog: {},
+            googleTagManager: {
+              containerId: 'GTM-ABC123',
+              serverUrl: 'x',
+              environment: { auth: 'a', preview: 'env-1', url: 'x' }
+            },
+            googleAnalytics: { measurementId: 'G-ABC123', debug: true }
+          }
+        })
+      ).to.deep.equal([
+        "'portal.analytics.posthog' is not a 'portal' setting.",
+        `'${gtm}.serverUrl' is not a 'portal' setting.`,
+        `'${gtm}.environment.url' is not a 'portal' setting.`,
+        `'${ga}.debug' is not a 'portal' setting.`
+      ]);
+    });
+
+    it('takes a list of kept names, each a non-empty string', () => {
+      expect(errorsOf({ analytics: { keepQueryParams: 'campaign_id' } })).to.deep.equal([
+        `'${keep}' must be a list of query parameter names.`
+      ]);
+      expect(errorsOf({ analytics: { keepQueryParams: ['', ' ', 1] } })).to.deep.equal([
+        `'${keep}[0]' must be a non-empty string.`,
+        `'${keep}[1]' must be a non-empty string.`,
+        `'${keep}[2]' must be a non-empty string.`
+      ]);
+    });
+
+    it('reports every fault at once, unknown keys first', () => {
+      expect(
+        errorsOf({
+          analytics: {
+            posthog: {},
+            googleTagManager: { containerId: '' },
+            googleAnalytics: 'G-1',
+            keepQueryParams: [1]
+          }
+        })
+      ).to.deep.equal([
+        "'portal.analytics.posthog' is not a 'portal' setting.",
+        `'${gtm}.containerId' must be a non-empty string.`,
+        `'${ga}' must be a JSON object with 'measurementId'.`,
+        `'${keep}[0]' must be a non-empty string.`
+      ]);
+    });
+
+    // A script such a build keeps may load a Google tag of its own, which has to start as denied there too.
+    it('tells a build without analytics to load no vendor and hand over no event, and keeps the consent default', () => {
+      const analytics = {
+        googleTagManager: { containerId: 'GTM-ABC123' },
+        googleAnalytics: { measurementId: 'G-ABC123' },
+        googleConsentMode: { default: 'denied' },
+        keepQueryParams: ['campaign_id']
+      };
+      const portal = config({ analytics });
+
+      expect(portal.withoutAnalytics().identity()).to.deep.equal({
+        ...portal.identity(),
+        analytics: {
+          googleTagManager: null,
+          googleAnalytics: null,
+          googleConsentMode: { default: 'denied' },
+          keepQueryParams: ['campaign_id'],
+          events: 'off'
+        }
+      });
+    });
+
+    it('refuses a null block, and an environment without its auth value', () => {
+      expect(errorsOf({ analytics: null })).to.deep.equal(["'portal.analytics' must be a JSON object."]);
+      expect(
+        errorsOf({ analytics: { googleTagManager: { containerId: 'GTM-ABC123', environment: { preview: 'env-3' } } } })
+      ).to.deep.equal([`'${gtm}.environment.auth' is required.`]);
+    });
+
+    it('keeps an empty list of names as none', () => {
+      expect(config({ analytics: { keepQueryParams: [] } }).identity().analytics.keepQueryParams).to.deep.equal([]);
+    });
+
+    it('uses Google Analytics only with a measurement ID', () => {
+      expect(config({}).usesGoogleAnalytics()).to.be.false;
+      expect(config({ analytics: { googleTagManager: { containerId: 'GTM-ABC123' } } }).usesGoogleAnalytics()).to.be
+        .false;
+      expect(config({ analytics: { googleAnalytics: { measurementId: 'G-ABC123' } } }).usesGoogleAnalytics()).to.be
+        .true;
+    });
+  });
+
+  describe('seo', () => {
+    it('carries the verification value to the browser, or null without one', () => {
+      expect(config({ seo: { googleSiteVerification: 'abc_123-XYZ' } }).identity().seo).to.deep.equal({
+        googleSiteVerification: 'abc_123-XYZ'
+      });
+      expect(config({}).identity().seo).to.deep.equal({ googleSiteVerification: null });
+    });
+
+    it('refuses a block that is not an object, and a blank value', () => {
+      expect(errorsOf({ seo: 'abc' })).to.deep.equal(["'portal.seo' must be a JSON object."]);
+      expect(errorsOf({ seo: null })).to.deep.equal(["'portal.seo' must be a JSON object."]);
+      expect(errorsOf({ seo: { foo: 1 } })).to.deep.equal(["'portal.seo.foo' is not a 'portal' setting."]);
+      expect(errorsOf({ seo: { googleSiteVerification: ' ' } })).to.deep.equal([
+        "'portal.seo.googleSiteVerification' must be a non-empty string."
+      ]);
+    });
+  });
+
+  describe('scripts', () => {
+    const SETUP = 'https://cdn.example.com/setup.js';
+    const WIDGET = 'https://cdn.example.com/widget.js';
+    const refused = (path: string) =>
+      `'${path}' must be an address starting with 'https://' and a host, with no spaces, for example ` +
+      "'https://cdn.example.com/widget.js'.";
+
+    it('lists none unless the block does', () => {
+      expect(config({}).identity().scripts).to.be.empty;
+    });
+
+    it('tells the browser each address, in the order listed', () => {
+      const scripts = [
+        { src: SETUP, category: 'necessary' },
+        { src: WIDGET, category: 'analytics' }
+      ];
+
+      expect(config({ scripts }).identity().scripts).to.deep.equal([{ src: SETUP }, { src: WIDGET }]);
+    });
+
+    it('must be a list', () => {
+      for (const scripts of [WIDGET, { src: WIDGET }, null, 7]) {
+        expect(errorsOf({ scripts }), JSON.stringify(scripts)).to.deep.equal([
+          "'portal.scripts' must be a list of scripts."
+        ]);
+      }
+    });
+
+    it('takes each entry as an object, never a bare address', () => {
+      for (const entry of [WIDGET, [WIDGET], null, 7]) {
+        expect(errorsOf({ scripts: [entry] }), JSON.stringify(entry)).to.deep.equal([
+          "'portal.scripts[0]' must be a JSON object with 'src' and 'category'."
+        ]);
+      }
+    });
+
+    // No category is assumed: --no-analytics drops a script by it, and a guess would drop one nobody meant to.
+    it('asks for src and for category, and assumes neither', () => {
+      expect(errorsOf({ scripts: [{}] })).to.deep.equal([
+        "'portal.scripts[0].src' is required.",
+        "'portal.scripts[0].category' is required."
+      ]);
+      expect(errorsOf({ scripts: [{ src: WIDGET }] })).to.deep.equal(["'portal.scripts[0].category' is required."]);
+    });
+
+    // Neither is a setting in this release: a file in static/ adds a tag that needs attributes of its own.
+    it('names a key it does not know, integrity and attributes among them', () => {
+      expect(
+        errorsOf({
+          scripts: [
+            { src: WIDGET, category: 'analytics', integrity: 'sha384-abc', attributes: { 'data-site': 'acme' } }
+          ]
+        })
+      ).to.deep.equal([
+        "'portal.scripts[0].integrity' is not a 'portal' setting.",
+        "'portal.scripts[0].attributes' is not a 'portal' setting."
+      ]);
+    });
+
+    // The browser runs what it fetches, and a portal served over https blocks a script that is not.
+    // A backslash reads as a slash to an address parser, which would take what follows it for the host.
+    it('refuses an address that is not https, that names no host, or that holds a space', () => {
+      for (const src of [
+        'http://cdn.example.com/widget.js',
+        'HTTP://cdn.example.com/widget.js',
+        'https://',
+        'https:///cdn.example.com/widget.js',
+        'https://\\cdn.example.com/widget.js',
+        'https://\\/cdn.example.com/widget.js',
+        'https://cdn.example.com\\widget.js',
+        'https:cdn.example.com/widget.js',
+        'https://cdn.example.com/my widget.js',
+        ' https://cdn.example.com/widget.js'
+      ]) {
+        expect(errorsOf({ scripts: [{ src, category: 'analytics' }] }), JSON.stringify(src)).to.deep.equal([
+          refused('portal.scripts[0].src')
+        ]);
+      }
+    });
+
+    it('takes a file in the static directory, however its path is written, and tells the browser its place in the portal', () => {
+      for (const src of ['static/js/widget.js', './static/js/widget.js', '.\\static\\js\\widget.js']) {
+        expect(config({ scripts: [{ src, category: 'analytics' }] }).identity().scripts, src).to.deep.equal([
+          { src: '/js/widget.js' }
+        ]);
+      }
+    });
+
+    it("names its files after the brand's, each by its entry, for the check that they are on disk", () => {
+      const portal = config({
+        brand: { favicon: 'static/favicon.ico' },
+        scripts: [
+          { src: WIDGET, category: 'analytics' },
+          { src: 'static/js/widget.js', category: 'functional' },
+          { src: 'static/js/setup.js', category: 'necessary' }
+        ]
+      });
+
+      expect(portal.staticFiles().map((file) => [file.settingPath(), file.portalPath()])).to.deep.equal([
+        ['portal.brand.favicon', '/favicon.ico'],
+        ['portal.scripts[1].src', '/js/widget.js'],
+        ['portal.scripts[2].src', '/js/setup.js']
+      ]);
+    });
+
+    // One report names both, since a path that is no file here is often an address without its https://.
+    it('refuses what is neither an https address nor a file in the static directory', () => {
+      for (const src of [
+        'js/widget.js',
+        'static',
+        'static/',
+        'static/../widget.js',
+        'static//widget.js',
+        '/static/js/widget.js',
+        '//cdn.example.com/widget.js',
+        'cdn.example.com/widget.js',
+        '',
+        ' ',
+        7,
+        null
+      ]) {
+        expect(errorsOf({ scripts: [{ src, category: 'analytics' }] }), JSON.stringify(src)).to.deep.equal([
+          "'portal.scripts[0].src' must be an address starting with 'https://', or a path relative to 'src' inside " +
+            "the 'static' directory, for example 'static/analytics.js'."
+        ]);
+      }
+    });
+
+    it('takes one of four categories, and refuses any other', () => {
+      for (const category of ['necessary', 'functional', 'analytics', 'marketing']) {
+        expect(parse({ scripts: [{ src: WIDGET, category }] }).isOk(), category).to.be.true;
+      }
+      for (const category of ['Necessary', 'essential', '', 7, null]) {
+        expect(errorsOf({ scripts: [{ src: WIDGET, category }] }), JSON.stringify(category)).to.deep.equal([
+          "'portal.scripts[0].category' must be one of 'necessary', 'functional', 'analytics' or 'marketing'."
+        ]);
+      }
+    });
+
+    it('keeps only necessary and functional scripts without analytics, in their order, and tells the browser no category', () => {
+      const at = (name: string) => `https://cdn.example.com/${name}.js`;
+      const portal = config({
+        scripts: [
+          { src: at('pixel'), category: 'marketing' },
+          { src: at('chat'), category: 'functional' },
+          { src: 'static/js/banner.js', category: 'necessary' },
+          { src: 'static/js/counter.js', category: 'analytics' }
+        ]
+      });
+
+      expect(portal.identity().scripts).to.deep.equal([
+        { src: at('pixel') },
+        { src: at('chat') },
+        { src: '/js/banner.js' },
+        { src: '/js/counter.js' }
+      ]);
+      expect(portal.withoutAnalytics().identity().scripts).to.deep.equal([
+        { src: at('chat') },
+        { src: '/js/banner.js' }
+      ]);
+      expect(
+        portal
+          .withoutAnalytics()
+          .staticFiles()
+          .map((file) => file.settingPath())
+      ).to.deep.equal(['portal.scripts[2].src']);
+    });
+
+    it('reports every entry at once, each by its place in the list', () => {
+      expect(
+        errorsOf({
+          scripts: [
+            { src: WIDGET, category: 'analytics' },
+            { src: 'http://cdn.example.com/a.js', category: 'analytics', defer: true },
+            WIDGET
+          ]
+        })
+      ).to.deep.equal([
+        "'portal.scripts[1].defer' is not a 'portal' setting.",
+        refused('portal.scripts[1].src'),
+        "'portal.scripts[2]' must be a JSON object with 'src' and 'category'."
+      ]);
+    });
+
+    it('keeps the address as it parses: the host in lowercase, and a query whole', () => {
+      const scripts = [{ src: 'https://CDN.Example.com/widget.js?site=a%2Fb&v=2', category: 'analytics' }];
+
+      expect(config({ scripts }).identity().scripts).to.deep.equal([
+        { src: 'https://cdn.example.com/widget.js?site=a%2Fb&v=2' }
+      ]);
+    });
+  });
+
   describe('pluginUrl', () => {
     const REFUSED =
-      "'portal.pluginUrl' must be an address starting with 'https://', with no spaces, for example " +
+      "'portal.pluginUrl' must be an address starting with 'https://' and a host, with no spaces, for example " +
       "'https://example.com/acme-plugin.zip'.";
 
     it('is absent unless the block gives one, so the plugin is bundled', () => {
@@ -416,6 +832,7 @@ describe('PortalConfig', () => {
         'http://plugins.acme.test/calc.zip',
         '/__downloads/plugin.zip',
         'https://',
+        'https://\\plugins.acme.test/calc.zip',
         'https:x.test',
         '',
         7
@@ -486,7 +903,16 @@ describe('PortalConfig', () => {
           { label: 'Status', url: 'https://status.example.com', external: true },
           { label: 'Changelog', url: '/changelog', external: false }
         ],
-        pageActions: false
+        pageActions: false,
+        analytics: {
+          googleTagManager: null,
+          googleAnalytics: null,
+          googleConsentMode: null,
+          keepQueryParams: [],
+          events: 'on'
+        },
+        seo: { googleSiteVerification: null },
+        scripts: []
       });
     });
 
@@ -499,7 +925,16 @@ describe('PortalConfig', () => {
         favicon: null,
         colorMode: 'both',
         links: [],
-        pageActions: true
+        pageActions: true,
+        analytics: {
+          googleTagManager: null,
+          googleAnalytics: null,
+          googleConsentMode: null,
+          keepQueryParams: [],
+          events: 'on'
+        },
+        seo: { googleSiteVerification: null },
+        scripts: []
       });
     });
 
