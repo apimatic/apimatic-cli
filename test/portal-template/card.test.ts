@@ -112,9 +112,9 @@ describe("an author's Card", function () {
     });
 
     it('leaves any other address as the author wrote it', () => {
-      for (const href of ['/pricing', 'https://example.com/llms.txt', '//cdn.example.com/llms.txt', '/docs/llms.txt']) {
-        expect(shown({ title: 'Elsewhere', href, external: true }).href, href).to.equal(href);
-      }
+      const written = ['/pricing', 'https://example.com/llms.txt', '//cdn.example.com/llms.txt', '/docs/llms.txt'];
+
+      expect(written.map((href) => shown({ title: 'Elsewhere', href, external: true }).href)).to.deep.equal(written);
     });
 
     // The router adds the path to its own links.
