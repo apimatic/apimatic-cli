@@ -4,6 +4,7 @@ import path from 'path';
 import { createRequire } from 'node:module';
 import { execa } from 'execa';
 import { expect } from 'chai';
+import { preview } from 'vite';
 import { PortalBuildService } from '../../src/infrastructure/portal-build-service';
 import { PortalProjectService } from '../../src/infrastructure/portal-project-service';
 import { PortalSourceContext } from '../../src/types/portal-source-context';
@@ -129,6 +130,10 @@ function portalBuilt(name: string, delivered: Delivered = {}, settings?: object)
     exists: (relative: string) => fs.existsSync(path.join(have().output.toString(), relative))
   };
 }
+
+/** Where the card of this title on a prerendered page links to, or null for a page without one. */
+const cardLink = (page: string, title: string): string | null =>
+  new RegExp(`<a [^>]*href="([^"]*)"[^>]*><h3[^>]*>${title}</h3>`).exec(page)?.[1] ?? null;
 
 /** Where each tab's link sits in a prerendered page's header, or -1 for a tab that is not there. */
 const tabPositions = (page: string, tabs: [href: string, name: string][]): number[] =>
@@ -559,6 +564,10 @@ const stylesheetOf = (output: DirectoryPath) => {
     }
   });
 
+  it("links an external card to one of the portal's files as written, at the root of its host", () => {
+    expect(cardLink(read('guides/components/index.html'), 'Agent-Friendly Docs')).to.equal('/llms.txt');
+  });
+
   // Emphasis reaches these files through a Markdown serializer that has broken on it twice: once
   // mangling the markers, once looping over one until the stack ran out. It has to read as written.
   it("keeps the emphasis in a language's SDK docs, in its twin and in llms-full.txt", () => {
@@ -963,6 +972,28 @@ const stylesheetOf = (output: DirectoryPath) => {
     expect(read('index.html')).to.match(/<img src="\/api\/images\/logo\.png"/);
     expect(read('index.html')).to.match(/<link rel="icon" href="\/api\/images\/logo\.png"/);
     expect(read('sdks/index.html')).to.contain('href="/api/__downloads/sdk/typescript.zip"');
+  });
+
+  // Fumadocs renders an external card as a plain link, outside the router that gives the others the path.
+  it("links the home page's external card to llms.txt under the path, where the host serves it", async () => {
+    const href = cardLink(read('index.html'), 'Agent-Friendly Docs');
+    expect(href).to.equal('/api/llms.txt');
+
+    // A multi-page app, so a missing file answers 404 rather than the home page.
+    const host = await preview({
+      configFile: false,
+      root: built!.root,
+      base: '/api/',
+      appType: 'mpa',
+      logLevel: 'silent',
+      build: { outDir: output.toString() },
+      preview: { port: 0 }
+    });
+    try {
+      expect((await fetch(new URL(href!, host.resolvedUrls!.local[0]))).status).to.equal(200);
+    } finally {
+      await host.close();
+    }
   });
 
   // Bundled, so it carries the base; a linked `/images/diagram.png` would be fetched from the host's
