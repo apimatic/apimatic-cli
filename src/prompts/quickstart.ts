@@ -11,11 +11,13 @@ import { APIMATIC_CONFIG_FILE_NAME, ConfigFinding, findingClause } from '../type
 import { PluginConfigWriteFailure } from '../types/plugin-config-context.js';
 import { PortalScaffoldProblem, PortalSourceProblem } from '../types/portal/portal-source.js';
 import { GENERATED, GITIGNORE, GitignoreFailure } from '../types/project-context.js';
+import { METADATA_FILE_NAME } from '../types/project-layout.js';
 import { DownloadProblem, FileReadProblem, ResourceKind } from '../types/resource-context.js';
 import { AVAILABLE_LANGUAGES, Language, languageLabel, UPCOMING_LANGUAGES } from '../types/sdk/generate.js';
 import { noteWrapped, withSpinner } from './prompt.js';
 import { reportAuthorizationFailure } from './portal/authorization.js';
 import { convertToOpenApi3, reportSourceProblem, specPath } from './portal/source.js';
+import { CONFIGURING_VALIDATION_URL } from './api/links.js';
 
 const vscodeExtensionUrl =
   'https://marketplace.visualstudio.com/items?itemName=apimatic-developers.apimatic-for-vscode';
@@ -134,11 +136,16 @@ Let's get started!`);
 
   public specValidationFailed(kind: ResourceKind) {
     log.error(`Oops, it looks like there are some errors in your API Definition`);
+    const where = kind === 'project' ? 'beside your API definition' : 'zipped together with your API definition';
     const message = [
       ...this.validateWithAgent(kind),
       '',
       `Or use APIMatic's interactive VS Code Extension:`,
-      f.link(vscodeExtensionUrl)
+      f.link(vscodeExtensionUrl),
+      '',
+      `If a linting rule doesn't fit your API, turn it off or lower its severity in an ` +
+        `${f.var(METADATA_FILE_NAME)} ${where}:`,
+      f.link(CONFIGURING_VALIDATION_URL)
     ].join('\n');
     noteWrapped(message, 'How to fix');
   }
