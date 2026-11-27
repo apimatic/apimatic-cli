@@ -130,6 +130,9 @@ function portalBuilt(name: string, delivered: Delivered = {}, settings?: object)
   };
 }
 
+const cardLink = (page: string, title: string): string | null =>
+  new RegExp(`<a [^>]*href="([^"]*)"[^>]*><h3[^>]*>${title}</h3>`).exec(page)?.[1] ?? null;
+
 /** Where each tab's link sits in a prerendered page's header, or -1 for a tab that is not there. */
 const tabPositions = (page: string, tabs: [href: string, name: string][]): number[] =>
   tabs.map(([href, name]) => page.search(new RegExp(`href="${href}"[^>]*><span[^>]*>${name}</span></a>`)));
@@ -559,6 +562,10 @@ const stylesheetOf = (output: DirectoryPath) => {
     }
   });
 
+  it('links an external card as written, at the root of its host', () => {
+    expect(cardLink(read('guides/components/index.html'), 'Agent-Friendly Docs')).to.equal('/llms.txt');
+  });
+
   // Emphasis reaches these files through a Markdown serializer that has broken on it twice: once
   // mangling the markers, once looping over one until the stack ran out. It has to read as written.
   it("keeps the emphasis in a language's SDK docs, in its twin and in llms-full.txt", () => {
@@ -963,6 +970,17 @@ const stylesheetOf = (output: DirectoryPath) => {
     expect(read('index.html')).to.match(/<img src="\/api\/images\/logo\.png"/);
     expect(read('index.html')).to.match(/<link rel="icon" href="\/api\/images\/logo\.png"/);
     expect(read('sdks/index.html')).to.contain('href="/api/__downloads/sdk/typescript.zip"');
+  });
+
+  // Fumadocs renders an external card as a plain link, outside the router that gives the others the path.
+  // `/api/search.json` starts like the path, and still goes under it.
+  it('links an external card under the path, as the router links the others', () => {
+    const page = read('figures/index.html');
+
+    expect([cardLink(page, 'Agent-Friendly Docs'), cardLink(page, 'Search index')]).to.deep.equal([
+      '/api/llms.txt',
+      '/api/api/search.json'
+    ]);
   });
 
   // Bundled, so it carries the base; a linked `/images/diagram.png` would be fetched from the host's

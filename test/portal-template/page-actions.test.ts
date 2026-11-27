@@ -1,8 +1,5 @@
 import { expect } from 'chai';
-import { createServer, type Plugin, type ViteDevServer } from 'vite';
-
-const ENTRY = 'virtual:page-actions-fixture';
-const ALWAYS_OPEN_POPOVER = '\0page-actions-always-open-popover';
+import { renderedUnder, type StandIn } from '../helpers/template-render';
 
 const fixture = `
 import { createElement } from 'react';
@@ -21,64 +18,46 @@ export function render(markdownUrl) {
 }
 `;
 
-const alwaysOpenPopover = `
+const alwaysOpenPopover: StandIn = {
+  replaces: (id, importer) => id.endsWith('/components/ui/popover.js') && !!importer?.includes('fumadocs-ui'),
+  source: `
 import { createElement, Fragment } from 'react';
 const passThrough = ({ children }) => createElement(Fragment, null, children);
 export const Popover = passThrough;
 export const PopoverTrigger = passThrough;
 export const PopoverContent = passThrough;
 export const PopoverClose = passThrough;
-`;
+`
+};
 
-function pageActionsFixture(): Plugin {
-  return {
-    name: 'page-actions-fixture',
-    enforce: 'pre',
-    resolveId(id, importer) {
-      if (id === ENTRY) return `\0${ENTRY}`;
-      if (id.endsWith('/components/ui/popover.js') && importer?.includes('fumadocs-ui')) return ALWAYS_OPEN_POPOVER;
-      return null;
-    },
-    load(id) {
-      if (id === `\0${ENTRY}`) return fixture;
-      if (id === ALWAYS_OPEN_POPOVER) return alwaysOpenPopover;
-      return null;
-    }
-  };
-}
+/** Where the popover's "View as Markdown" link goes, in a portal built under `base`. */
+function viewAsMarkdownHref(base: string): (markdownUrl: string) => string {
+  // Bundled, so Vite defines import.meta.env.BASE_URL for fumadocs-ui.
+  const render = renderedUnder<[string]>(base, fixture, { standIns: [alwaysOpenPopover], bundled: ['fumadocs-ui'] });
 
-async function viewAsMarkdownHref(base: string, markdownUrl: string): Promise<string> {
-  const server: ViteDevServer = await createServer({
-    configFile: false,
-    root: process.cwd(),
-    base,
-    logLevel: 'silent',
-    appType: 'custom',
-    server: { middlewareMode: true, hmr: false, ws: false, watch: null },
-    optimizeDeps: { noDiscovery: true, include: [] },
-    // Bundled, so Vite defines import.meta.env.BASE_URL for fumadocs-ui.
-    ssr: { noExternal: ['fumadocs-ui'] },
-    plugins: [pageActionsFixture()]
-  });
-  try {
-    const { render } = (await server.ssrLoadModule(ENTRY)) as { render: (url: string) => string };
-    const markup = render(markdownUrl);
-    const link = /<a [^>]*href="([^"]*)"[^>]*>(?:(?!<\/a>).)*View as Markdown/s.exec(markup);
+  return (markdownUrl) => {
+    const link = /<a [^>]*href="([^"]*)"[^>]*>(?:(?!<\/a>).)*View as Markdown/s.exec(render(markdownUrl));
     expect(link, 'the popover renders a "View as Markdown" link').to.not.be.null;
     return link![1];
-  } finally {
-    await server.close();
-  }
+  };
 }
 
 describe('the "View as Markdown" page action', function () {
   this.timeout(60 * 1000);
 
-  it('links under the base path the site is built with', async () => {
-    expect(await viewAsMarkdownHref('/docs/', '/guides/intro.md')).to.equal('/docs/guides/intro.md');
+  describe('in a portal under a path', () => {
+    const href = viewAsMarkdownHref('/docs/');
+
+    it('links under the base path the site is built with', () => {
+      expect(href('/guides/intro.md')).to.equal('/docs/guides/intro.md');
+    });
   });
 
-  it('links from the root when the site is hosted there', async () => {
-    expect(await viewAsMarkdownHref('/', '/guides/intro.md')).to.equal('/guides/intro.md');
+  describe('in a portal at the root of its host', () => {
+    const href = viewAsMarkdownHref('/');
+
+    it('links from the root when the site is hosted there', () => {
+      expect(href('/guides/intro.md')).to.equal('/guides/intro.md');
+    });
   });
 });
