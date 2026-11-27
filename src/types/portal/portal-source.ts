@@ -47,6 +47,12 @@ export interface PortalSource extends PortalSettings {
   contentNotices: ContentNotices;
 }
 
+/** What a run's flags change in the portal it builds from the source. */
+export interface PortalBuildOptions {
+  /** False under `--no-analytics`: the portal loads neither vendor tag, and no `analytics` or `marketing` script. */
+  analytics: boolean;
+}
+
 /** Why a source directory could not be written; each variant maps to its own message. */
 export type PortalScaffoldProblem =
   | { kind: 'configUnreadable' }

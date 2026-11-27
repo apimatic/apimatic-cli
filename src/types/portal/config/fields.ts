@@ -52,16 +52,26 @@ export function lightDark<T>(
   if (!isJsonObject(value)) {
     return err([`'${path}' must be a string, or an object with 'light' and 'dark'.`]);
   }
-  const mode = (name: 'light' | 'dark'): Parsed<T> =>
-    value[name] === undefined ? err([`'${path}.${name}' is required.`]) : parse(value[name], `${path}.${name}`);
   return allOf(
     unknownKeys(value, ['light', 'dark'], path),
-    Result.combineWithAllErrors([mode('light'), mode('dark')])
+    Result.combineWithAllErrors([
+      required(value.light, `${path}.light`, parse),
+      required(value.dark, `${path}.dark`, parse)
+    ])
   ).map(([light, dark]) => ({ light, dark, single: false }));
 }
 
 export function optional<T>(value: unknown, parse: (present: unknown) => Parsed<T>): Parsed<T | null> {
   return value === undefined ? ok(null) : parse(value);
+}
+
+/** Present, then parsed: a field left out is named as missing rather than as the wrong type. */
+export function required<T>(
+  value: unknown,
+  path: string,
+  parse: (present: unknown, path: string) => Parsed<T>
+): Parsed<T> {
+  return value === undefined ? err([`'${path}' is required.`]) : parse(value, path);
 }
 
 export function optionalBoolean(value: unknown, path: string, fallback: boolean): Parsed<boolean> {
@@ -71,10 +81,7 @@ export function optionalBoolean(value: unknown, path: string, fallback: boolean)
   return typeof value === 'boolean' ? ok(value) : err([`'${path}' must be true or false.`]);
 }
 
-export function oneOf<T extends string>(value: unknown, path: string, allowed: readonly T[], fallback: T): Parsed<T> {
-  if (value === undefined) {
-    return ok(fallback);
-  }
+export function oneOf<T extends string>(value: unknown, path: string, allowed: readonly T[]): Parsed<T> {
   if (typeof value === 'string' && (allowed as readonly string[]).includes(value)) {
     return ok(value as T);
   }
@@ -93,4 +100,18 @@ export function nonEmptyString(value: unknown, path: string): Parsed<string> {
   return typeof value === 'string' && value.trim().length > 0
     ? ok(value.trim())
     : err([`'${path}' must be a non-empty string.`]);
+}
+
+// The same addresses as `httpsAddress` in the schema, so an editor and a build give one verdict on a missing host.
+// No backslash in the host: an address parser reads one as a slash, and takes what follows it for the host.
+const HTTPS_ADDRESS = /^https:\/\/[^\s/\\?#]+(?:[/?#]\S*)?$/i;
+
+// https, since what it names is fetched and run; parsed, so it holds no space or quote wherever it is written out.
+export function httpsAddress(value: unknown, path: string, example: string): Parsed<UrlPath> {
+  const url = typeof value === 'string' && HTTPS_ADDRESS.test(value) ? URL.parse(value) : null;
+  return url === null
+    ? err([
+        `'${path}' must be an address starting with 'https://' and a host, with no spaces, for example '${example}'.`
+      ])
+    : ok(new UrlPath(url.href));
 }

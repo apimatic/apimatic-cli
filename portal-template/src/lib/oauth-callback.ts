@@ -1,3 +1,5 @@
+import { withBasePath } from './base-path';
+
 /**
  * The one redirect URI a portal owner registers with their OAuth provider, instead of the
  * address of every endpoint page that can start an authorization. The CLI keeps the user's
@@ -5,19 +7,26 @@
  */
 export const oauthCallbackPath = '/oauth/callback';
 
-/** The cookie the playground writes before it leaves, naming the page that started the flow. */
-const PAGE_COOKIE_NAME = 'fumadocs-openapi-oauth';
-const PAGE_COOKIE = new RegExp(`(?:^|;\\s*)${PAGE_COOKIE_NAME}=([^;]+)`);
+/** Whether a path is the callback's under `base`, Vite's own unless one is given; a static host may add a slash. */
+export function isOAuthCallbackPath(pathname: string, base?: string): boolean {
+  return pathname.replace(/\/$/, '') === withBasePath(oauthCallbackPath, base);
+}
+
+/** Where the playground notes the path of the page that started the flow before it leaves: this tab's session storage. */
+const STARTING_PAGE_KEY = 'fumadocs-openapi-oauth';
+
+/** Where the playground looks for the callback's address, the provider's answer in it, once its page loads again. */
+const ANSWER_KEY = 'fumadocs-openapi-oauth-returned';
 
 /** What the callback does with the browser that lands on it. */
 export type OAuthCallback =
-  /** Sends it back to the page that started the flow, with the provider's answer still attached. */
+  /** Sends it back to the page that started the flow, at its own address: the answer goes through the session. */
   | { kind: 'return'; url: string }
   /** Stays, to show the error the provider ended the authorization with, and a link back to that page. */
   | { kind: 'providerError'; error: string; description: string | null; page: string }
-  /** Stays, since the cookie names no page: no authorization was started in this browser. */
+  /** Stays, since no page is noted: no authorization was started in this tab. */
   | { kind: 'notStarted' }
-  /** Stays, since the cookie names a page on another site, or one that cannot be read. */
+  /** Stays, since the noted page is on another site, or cannot be read as an address. */
   | { kind: 'unknownPage' };
 
 /** Every outcome but sending the browser on, which leaves the callback before it renders again. */
@@ -25,20 +34,22 @@ export type OAuthCallbackFailure = Exclude<OAuthCallback, { kind: 'return' }>;
 
 /**
  * The provider answers in the query for the authorization code flow and in the fragment for the
- * implicit one, an error included. Only an authorization this browser started is answered with
+ * implicit one, an error included. Only an authorization this tab started is answered with
  * the provider's error: anyone can link here with an `error_description` of their own.
  */
-export function oauthCallback(cookie: string, location: Pick<Location, 'origin' | 'search' | 'hash'>): OAuthCallback {
-  const value = PAGE_COOKIE.exec(cookie)?.[1];
-  if (value === undefined) return { kind: 'notStarted' };
+export function oauthCallback(
+  startingPage: string | null,
+  location: Pick<Location, 'origin' | 'search' | 'hash'>
+): OAuthCallback {
+  if (startingPage === null) return { kind: 'notStarted' };
 
   let page: URL;
   try {
-    page = new URL(decodeURIComponent(value), location.origin);
+    page = new URL(startingPage, location.origin);
   } catch {
     return { kind: 'unknownPage' };
   }
-  // Anything else is an open redirect, carrying the authorization code to another site.
+  // Anything else is an open redirect.
   if (page.origin !== location.origin) return { kind: 'unknownPage' };
 
   const query = new URLSearchParams(location.search);
@@ -49,15 +60,21 @@ export function oauthCallback(cookie: string, location: Pick<Location, 'origin' 
   }
 
   // Whole, not as a path: a path of `//evil.test/x` would be read as another site's address.
-  page.search = location.search;
-  page.hash = location.hash;
   return { kind: 'return', url: page.href };
 }
 
 /**
- * The playground leaves the cookie for the session, so a later visit would be sent back to the
- * last page that started an authorization. Forgotten once read, it names only the flow just started.
+ * The page the playground noted, taken from the tab's session: left there, a later arrival would
+ * be sent back to the last page that started an authorization, so once read it names only the
+ * flow just started.
  */
-export function forgetStartingPage(): void {
-  document.cookie = `${PAGE_COOKIE_NAME}=; path=/; max-age=0`;
+export function takeStartingPage(): string | null {
+  const page = sessionStorage.getItem(STARTING_PAGE_KEY);
+  sessionStorage.removeItem(STARTING_PAGE_KEY);
+  return page;
+}
+
+/** Leaves the callback's address for the playground, as Fumadocs' handler does: no page's address holds the answer. */
+export function leaveAnswer(callbackAddress: string): void {
+  sessionStorage.setItem(ANSWER_KEY, callbackAddress);
 }

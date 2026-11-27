@@ -17,6 +17,7 @@ import { getMDXComponents } from '@/components/mdx';
 import { OpenAPIPage } from '@/components/api-page';
 import { MarkdownCopyButton } from '@/components/markdown-copy-button';
 import { slimOpenAPIPageProps } from '@/lib/openapi-slim';
+import { ListedScripts } from '@/components/listed-scripts';
 
 const rootRoute = getRouteApi('__root__');
 
@@ -186,12 +187,16 @@ function Page() {
       </DocsPage>
     );
   } else {
-    content = (
-      <Suspense>
-        <Content collection={page.collection} path={page.path} markdownUrl={page.markdownUrl} />
-      </Suspense>
-    );
+    content = <Content collection={page.collection} path={page.path} markdownUrl={page.markdownUrl} />;
   }
 
-  return <PortalLayout tree={pageTree}>{content}</PortalLayout>;
+  return (
+    <PortalLayout tree={pageTree}>
+      {/* One boundary for every page's content: React hydrates it last, and ListedScripts with it, never before it. */}
+      <Suspense>
+        {content}
+        <ListedScripts />
+      </Suspense>
+    </PortalLayout>
+  );
 }

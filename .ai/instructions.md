@@ -38,7 +38,7 @@ pnpm apimatic <command> -i <abs-path-to-dir-containing-src>   # -i: for commands
 
 `pnpm-workspace.yaml` sets `minimumReleaseAge: 10080` (7 days) as a supply-chain defense. Brand-new package versions are blocked from install until they've been on the registry for at least a week. `@apimatic/*` is exempt via `minimumReleaseAgeExclude`.
 
-If you hit `ERR_PNPM_PACKAGE_RECENTLY_PUBLISHED` adding a fresh release, either wait it out or run a one-off install with `pnpm install --ignore-minimum-release-age` (CI uses `--frozen-lockfile`, which bypasses the check entirely, so this only blocks manual `pnpm add` / `pnpm update`).
+If you hit `ERR_PNPM_PACKAGE_RECENTLY_PUBLISHED` adding a fresh release, either wait it out or run a one-off install with `pnpm install --config.minimumReleaseAge=0` (pnpm 11 has no `--ignore-minimum-release-age` flag; CI uses `--frozen-lockfile`, which bypasses the check entirely, so this only blocks manual `pnpm add` / `pnpm update`).
 
 ## TypeScript toolchain — two compilers, on purpose
 
@@ -106,7 +106,7 @@ Supporting: **Types** (`src/types/`) for value objects, context objects, and dom
 - **No private instance methods** — a class has `private readonly` fields and public methods; a helper is a `private static` method or a module-level function.
 - **No middlemen** — a method does something with each argument (reads it, transforms it, or combines it with the object's own state); no method only forwards to another call, and no layer re-exposes a service one to one.
 - **Functional core, imperative shell** — a step reads every fact it needs first, decides as a pure function over that data, then does its I/O. `execute` is the script of the run and the only place that speaks; prompts word the data they are handed and decide nothing; a value with several outcomes (`ShareHook`, `SnapshotFetch`, `ActionResult`) offers `match` over named handlers, so a caller that leaves one out fails to compile; contexts answer data and never print.
-- **Good code is not more functions** — a step's logic stays together where it reads as one thing; a function is split out only when it is used twice, when it separates a decision from I/O, or when its name says something the reader would otherwise work out. A one-line call does not get a wrapper.
+- **Good code is not more functions** — a step's logic stays together where it reads as one thing; a function is split out only when it is used twice, when it separates a decision from I/O, or when its name says something the reader would otherwise work out. Even then, a function or method whose boilerplate (its doc comment, signature and closing brace) has more characters than its body is an unnecessary abstraction, such as a wrapper around a one-line call: inline it.
 - **One prompts class per action** — wording is repeated per class rather than shared through a prompt module.
 - **Flag descriptions match the docs** — a flag's `description` (which the generated README carries) and its row in apimatic-docs' CLI Reference (`v4/src/content/apimatic-cli/cli-reference.mdx`) say the same words; change both, or flag the mismatch.
 - **Telemetry** — After `outro(result)`, commands optionally track failures via `result.match({ success: () => {}, failed: async () => { await new TelemetryService(configDir).trackEvent(new SomeFailedEvent(...), shell) }, cancelled: () => {}, actionRequired: () => {} })`. Event classes extend `DomainEvent` (`src/types/events/`). Only the `failed` handler is populated; the others are no-ops.

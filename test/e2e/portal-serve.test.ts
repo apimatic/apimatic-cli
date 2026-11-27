@@ -30,7 +30,7 @@ const enabled = process.env.APIMATIC_E2E === '1';
     const root = canonical(fs.mkdtempSync(path.join(os.tmpdir(), 'portal-serve-e2e-')));
     roots.push(root);
 
-    const resolved = (await new PortalSourceContext(source).resolve())._unsafeUnwrap();
+    const resolved = (await new PortalSourceContext(source).resolve({ analytics: true }))._unsafeUnwrap();
     const delivered = path.join(root, 'delivered');
     fs.mkdirSync(delivered, { recursive: true });
     fs.writeFileSync(path.join(delivered, 'typescript.zip'), 'PK typescript');

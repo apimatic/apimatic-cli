@@ -33,6 +33,14 @@ export class FlagsProvider {
     };
   }
 
+  public static readonly noAnalytics = {
+    'no-analytics': Flags.boolean({
+      default: false,
+      description:
+        "leave out the tags set in 'portal.analytics' and each script in 'portal.scripts' whose category is 'analytics' or 'marketing', and send no events to the scripts that stay."
+    })
+  };
+
   // Auth key group
   public static authKey = {
     'auth-key': Flags.string({

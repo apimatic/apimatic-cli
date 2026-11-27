@@ -49,7 +49,7 @@ describe('PortalSourceContext', () => {
 
   const REQUIRED_LANGUAGES = /^'languages' must name at least one SDK language/;
 
-  const resolve = () => new PortalSourceContext(new DirectoryPath(root)).resolve();
+  const resolve = () => new PortalSourceContext(new DirectoryPath(root)).resolve({ analytics: true });
 
   /** The ignored navigation files as the warning names them, relative to the source directory. */
   const ignored = (source: PortalSource): string[] =>
@@ -324,6 +324,24 @@ describe('PortalSourceContext', () => {
       ]);
     });
 
+    it('reports a listed script file that is not on disk, or is spelt in another case, by the entry that names it', async () => {
+      writeConfig({
+        scripts: [
+          { src: 'https://cdn.example.com/widget.js', category: 'analytics' },
+          { src: 'static/js/setup.js', category: 'necessary' },
+          { src: 'static/js/Widget.js', category: 'functional' },
+          { src: 'static/js/chat.js', category: 'functional' }
+        ]
+      });
+      write('static/js/widget.js', 'x');
+      write('static/js/chat.js', 'x');
+
+      expect(missingFiles(await resolve())).to.deep.equal([
+        ['portal.scripts[1].src', 'static/js/setup.js', null],
+        ['portal.scripts[2].src', 'static/js/Widget.js', 'static/js/widget.js']
+      ]);
+    });
+
     it('accepts files that are there', async () => {
       writeConfig({ brand: { logo: 'static/images/logo.png', favicon: 'static/favicon.ico' } });
       write('static/images/logo.png', 'x');
@@ -349,7 +367,7 @@ describe('PortalSourceContext', () => {
       writeConfig({ brand: { colors: { primary: '#1d4ed8' } } });
       const resolved = (await resolve())._unsafeUnwrap();
 
-      const reloaded = (await context().resolveSettings(resolved.suggestedSite))._unsafeUnwrap();
+      const reloaded = (await context().resolveSettings(resolved.suggestedSite, { analytics: true }))._unsafeUnwrap();
 
       expect(reloaded.config.toJSON()).to.deep.equal(resolved.config.toJSON());
       expect(reloaded.config.siteTitle()).to.equal(resolved.config.siteTitle());
@@ -359,7 +377,7 @@ describe('PortalSourceContext', () => {
     it('holds the file to the rules resolve holds it to', async () => {
       writeConfig({});
 
-      const errors = (await context().resolveSettings(null))._unsafeUnwrapErr();
+      const errors = (await context().resolveSettings(null, { analytics: true }))._unsafeUnwrapErr();
 
       expect(errors).to.deep.equal({
         kind: 'invalidConfig',
@@ -371,13 +389,82 @@ describe('PortalSourceContext', () => {
     it('reports a file the block names that is not on disk', async () => {
       writeConfig({ site: { name: 'Calc' }, brand: { favicon: 'static/favicon.ico' } });
 
-      expect(missingFiles(await context().resolveSettings(null))).to.deep.equal([
+      expect(missingFiles(await context().resolveSettings(null, { analytics: true }))).to.deep.equal([
         ['portal.brand.favicon', 'static/favicon.ico', null]
       ]);
     });
 
+    it('leaves out the vendor tags and the events under --no-analytics, and keeps the consent default and the query names', async () => {
+      writeConfig({
+        site: { name: 'Calc' },
+        analytics: {
+          googleTagManager: { containerId: 'GTM-ABC123' },
+          googleConsentMode: { default: 'denied' },
+          keepQueryParams: ['campaign_id']
+        }
+      });
+      const off = { analytics: false };
+
+      const resolved = (await new PortalSourceContext(new DirectoryPath(root)).resolve(off))._unsafeUnwrap();
+      const reloaded = (await context().resolveSettings(null, off))._unsafeUnwrap();
+      const kept = (await context().resolveSettings(null, { analytics: true }))._unsafeUnwrap();
+
+      for (const { config } of [resolved, reloaded]) {
+        expect(config.identity().analytics).to.deep.equal({
+          googleTagManager: null,
+          googleAnalytics: null,
+          googleConsentMode: { default: 'denied' },
+          keepQueryParams: ['campaign_id'],
+          events: 'off'
+        });
+      }
+      expect(kept.config.identity().analytics).to.deep.equal({
+        googleTagManager: { containerId: 'GTM-ABC123', environment: null },
+        googleAnalytics: null,
+        googleConsentMode: { default: 'denied' },
+        keepQueryParams: ['campaign_id'],
+        events: 'on'
+      });
+    });
+
+    it('leaves out the analytics and marketing scripts under --no-analytics, for resolve and for a reload alike', async () => {
+      const at = (name: string) => `https://cdn.example.com/${name}.js`;
+      writeConfig({
+        site: { name: 'Calc' },
+        scripts: [
+          { src: at('banner'), category: 'necessary' },
+          { src: at('counter'), category: 'analytics' },
+          { src: at('chat'), category: 'functional' },
+          { src: at('pixel'), category: 'marketing' }
+        ]
+      });
+      const off = { analytics: false };
+
+      const resolved = (await new PortalSourceContext(new DirectoryPath(root)).resolve(off))._unsafeUnwrap();
+      const reloaded = (await context().resolveSettings(null, off))._unsafeUnwrap();
+      const counted = (await context().resolveSettings(null, { analytics: true }))._unsafeUnwrap();
+
+      for (const { config } of [resolved, reloaded]) {
+        expect(config.identity().scripts).to.deep.equal([{ src: at('banner') }, { src: at('chat') }]);
+      }
+      expect(counted.config.identity().scripts).to.have.length(4);
+    });
+
+    // A staging build accepts exactly what a production build accepts.
+    it('reports a missing file of a script that --no-analytics would leave out', async () => {
+      writeConfig({ site: { name: 'Calc' }, scripts: [{ src: 'static/js/counter.js', category: 'analytics' }] });
+
+      for (const analytics of [false, true]) {
+        expect(missingFiles(await context().resolveSettings(null, { analytics })), `${analytics}`).to.deep.equal([
+          ['portal.scripts[0].src', 'static/js/counter.js', null]
+        ]);
+      }
+    });
+
     it('reports a file removed while the preview runs', async () => {
-      expect((await context().resolveSettings(null))._unsafeUnwrapErr()).to.deep.equal({ kind: 'missingConfig' });
+      expect((await context().resolveSettings(null, { analytics: true }))._unsafeUnwrapErr()).to.deep.equal({
+        kind: 'missingConfig'
+      });
     });
   });
 
@@ -1531,7 +1618,9 @@ describe('PortalSourceContext', () => {
       // Named, because nothing suggests a site when the specifications are not read again.
       writeFile({ portal: { site: { name: 'Calc' } }, languages: { csharp: {} }, plugin: {} });
 
-      const reloaded = (await new PortalSourceContext(new DirectoryPath(root)).resolveSettings(null))._unsafeUnwrap();
+      const reloaded = (
+        await new PortalSourceContext(new DirectoryPath(root)).resolveSettings(null, { analytics: true })
+      )._unsafeUnwrap();
 
       expect(generated(reloaded)).to.deep.equal(['sdks/index.mdx', 'sdks/csharp.mdx', 'context-plugin/index.mdx']);
     });
@@ -2601,11 +2690,11 @@ describe('PortalSourceContext', () => {
     it('writes a source directory it accepts itself, once a language is named', async () => {
       await scaffold(writeSpec({ title: 'Petstore', version: '1' }));
 
-      const unnamed = (await new PortalSourceContext(source).resolve())._unsafeUnwrapErr();
+      const unnamed = (await new PortalSourceContext(source).resolve({ analytics: true }))._unsafeUnwrapErr();
       expect(unnamed.kind === 'invalidConfig' ? unnamed.errors : []).to.have.lengthOf(1);
       addLanguages();
 
-      const resolved = (await new PortalSourceContext(source).resolve())._unsafeUnwrap();
+      const resolved = (await new PortalSourceContext(source).resolve({ analytics: true }))._unsafeUnwrap();
       expect(resolved.config.siteTitle()).to.equal('Petstore');
       expect(resolved.specs.map((spec) => spec.slug)).to.deep.equal(['petstore']);
       expect(resolved.contentDirectory).to.not.be.null;
@@ -2630,10 +2719,10 @@ describe('PortalSourceContext', () => {
     it('writes a block that resolves to the portal an empty block makes', async () => {
       await scaffold(writeSpec({ title: 'Petstore', version: '1', description: 'All the pets.' }));
       addLanguages();
-      const scaffolded = (await new PortalSourceContext(source).resolve())._unsafeUnwrap().config;
+      const scaffolded = (await new PortalSourceContext(source).resolve({ analytics: true }))._unsafeUnwrap().config;
 
       write('project/src/apimatic.json', JSON.stringify({ portal: {}, languages: LANGUAGES }));
-      const empty = (await new PortalSourceContext(source).resolve())._unsafeUnwrap().config;
+      const empty = (await new PortalSourceContext(source).resolve({ analytics: true }))._unsafeUnwrap().config;
 
       expect(scaffolded.toJSON()).to.deep.equal(empty.toJSON());
       expect(scaffolded.identity()).to.deep.equal(empty.identity());
@@ -2671,7 +2760,7 @@ describe('PortalSourceContext', () => {
       addLanguages();
 
       const contentFiles = fs.readdirSync(path.join(source.toString(), 'content')).sort();
-      const scaffolded = (await new PortalSourceContext(source).resolve())._unsafeUnwrap();
+      const scaffolded = (await new PortalSourceContext(source).resolve({ analytics: true }))._unsafeUnwrap();
 
       expect(contentFiles).to.deep.equal(['index.md', 'nav.json']);
       expect(scaffolded.contentNotices.ignoredNavigationFiles).to.deep.equal([]);
@@ -2788,7 +2877,7 @@ describe('PortalSourceContext', () => {
 
         await adopt();
 
-        const resolved = (await new PortalSourceContext(source).resolve())._unsafeUnwrap();
+        const resolved = (await new PortalSourceContext(source).resolve({ analytics: true }))._unsafeUnwrap();
         expect(resolved.config.siteTitle()).to.equal('Petstore');
         // The one that was there, and no copy of it beside itself.
         expect(fs.readdirSync(path.join(source.toString(), 'spec'))).to.deep.equal(['petstore.json']);
@@ -2901,7 +2990,7 @@ describe('PortalSourceContext', () => {
           await adopt();
 
           expect(portalBlock().site.name).to.equal(name);
-          const resolved = (await new PortalSourceContext(source).resolve())._unsafeUnwrap();
+          const resolved = (await new PortalSourceContext(source).resolve({ analytics: true }))._unsafeUnwrap();
           expect(resolved.config.siteTitle()).to.equal(name);
         });
       });
@@ -2920,7 +3009,7 @@ describe('PortalSourceContext', () => {
           await adopt();
 
           expect(portalBlock().site.name).to.equal('Alpha');
-          expect((await new PortalSourceContext(source).resolve()).isOk()).to.be.true;
+          expect((await new PortalSourceContext(source).resolve({ analytics: true })).isOk()).to.be.true;
         });
       });
     });

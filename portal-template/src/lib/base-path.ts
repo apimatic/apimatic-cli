@@ -8,6 +8,11 @@ export function withBasePath(path: string, base: string = BASE): string {
   return `${base.replace(/\/$/, '')}${path}`;
 }
 
+/** An address an author wrote, read as the router reads a link: a root-relative one under the base, any other as is. */
+export function underBase(address: string, base: string = BASE): string {
+  return /^\/(?!\/)/.test(address) ? withBasePath(address, base) : address;
+}
+
 /** A portal-relative path's full address as the browser sees it; the path itself where there is no window. */
 export function fullAddress(path: string): string {
   return typeof window === 'undefined' ? path : new URL(withBasePath(path), window.location.origin).toString();

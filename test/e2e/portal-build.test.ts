@@ -39,6 +39,8 @@ interface BuiltPortal {
   root: string;
   project: DirectoryPath;
   output: DirectoryPath;
+  /** What the build read: the fixture, or its copy when settings were added to it. */
+  source: DirectoryPath;
 }
 
 interface Delivered {
@@ -64,12 +66,22 @@ function deliveredInto(
   );
 }
 
-/** Resolves, prepares, builds and saves a fixture as `portal generate` does. */
-async function buildFixture(name: string, delivered: Delivered = {}): Promise<BuiltPortal> {
-  const fixture = new DirectoryPath(process.cwd()).join('test/resources/portal-inputs').join(name).join('src');
+/** Resolves, prepares, builds and saves a fixture as `portal generate` does, with `settings` added to its `portal` block. */
+async function buildFixture(name: string, delivered: Delivered = {}, settings?: object): Promise<BuiltPortal> {
+  let fixture = new DirectoryPath(process.cwd()).join('test/resources/portal-inputs').join(name).join('src');
   const root = canonical(fs.mkdtempSync(path.join(os.tmpdir(), 'portal-e2e-')));
 
-  const source = (await new PortalSourceContext(fixture).resolve())._unsafeUnwrap();
+  if (settings !== undefined) {
+    // A copy, so the fixture the other suites read stays as it is.
+    const copy = new DirectoryPath(root).join('src');
+    fs.cpSync(fixture.toString(), copy.toString(), { recursive: true });
+    const configFile = path.join(copy.toString(), 'apimatic.json');
+    const config = JSON.parse(fs.readFileSync(configFile, 'utf8'));
+    fs.writeFileSync(configFile, JSON.stringify({ ...config, portal: { ...config.portal, ...settings } }));
+    fixture = copy;
+  }
+
+  const source = (await new PortalSourceContext(fixture).resolve({ analytics: true }))._unsafeUnwrap();
 
   const project = new DirectoryPath(root).join('build');
   fs.mkdirSync(project.toString(), { recursive: true });
@@ -85,7 +97,7 @@ async function buildFixture(name: string, delivered: Delivered = {}): Promise<Bu
 
   const output = new DirectoryPath(root).join('portal');
   (await new PortalContext(output).save(build.value.output, false))._unsafeUnwrap();
-  return { root, project, output };
+  return { root, project, output, source: fixture };
 }
 
 function removeBuilt(built: BuiltPortal | undefined): void {
@@ -96,7 +108,7 @@ function removeBuilt(built: BuiltPortal | undefined): void {
  * One fixture built before a describe block's cases and removed after them, read through the
  * accessors, which resolve the build lazily since the hooks run after the block is declared.
  */
-function portalBuilt(name: string, delivered: Delivered = {}) {
+function portalBuilt(name: string, delivered: Delivered = {}, settings?: object) {
   let built: BuiltPortal | undefined;
   const have = (): BuiltPortal => {
     if (built === undefined) throw new Error(`${name} is not built`);
@@ -104,7 +116,7 @@ function portalBuilt(name: string, delivered: Delivered = {}) {
   };
 
   before(async () => {
-    built = await buildFixture(name, delivered);
+    built = await buildFixture(name, delivered, settings);
   });
 
   after(() => removeBuilt(built));
@@ -112,10 +124,14 @@ function portalBuilt(name: string, delivered: Delivered = {}) {
   return {
     output: () => have().output,
     project: () => have().project,
+    source: () => have().source,
     read: (relative: string) => fs.readFileSync(path.join(have().output.toString(), relative), 'utf8'),
     exists: (relative: string) => fs.existsSync(path.join(have().output.toString(), relative))
   };
 }
+
+const cardLink = (page: string, title: string): string | null =>
+  new RegExp(`<a [^>]*href="([^"]*)"[^>]*><h3[^>]*>${title}</h3>`).exec(page)?.[1] ?? null;
 
 /** Where each tab's link sits in a prerendered page's header, or -1 for a tab that is not there. */
 const tabPositions = (page: string, tabs: [href: string, name: string][]): number[] =>
@@ -167,6 +183,10 @@ const scriptsOf = (output: DirectoryPath) =>
     .filter((name) => name.endsWith('.js'))
     .map((name) => ({ name, text: fs.readFileSync(path.join(output.toString(), 'assets', name), 'utf8') }));
 
+/** By the setting's value: its name, and the defaults it queues, are in every build, with the setting or without. */
+const startsGoogleTagsDenied = (output: DirectoryPath) =>
+  scriptsOf(output).some(({ text }) => /googleConsentMode:\{default:["'`]denied["'`]\}/.test(text));
+
 const stylesheetOf = (output: DirectoryPath) => {
   const assets = path.join(output.toString(), 'assets');
   return fs
@@ -179,8 +199,22 @@ const stylesheetOf = (output: DirectoryPath) => {
 (enabled ? describe : describe.skip)('portal build (end to end)', function () {
   this.timeout(10 * 60 * 1000);
 
-  const fixture = new DirectoryPath(process.cwd()).join('test/resources/portal-inputs/default/src');
-  const portal = portalBuilt('default', { codeSampleCatalogs: CODE_SAMPLES });
+  const portal = portalBuilt(
+    'default',
+    { codeSampleCatalogs: CODE_SAMPLES },
+    {
+      analytics: {
+        googleTagManager: { containerId: 'GTM-E2ETEST' },
+        googleAnalytics: { measurementId: 'G-E2ETEST' },
+        googleConsentMode: { default: 'denied' }
+      },
+      seo: { googleSiteVerification: 'e2e-verification' },
+      scripts: [
+        { src: 'https://cdn.e2e.test/widget.js', category: 'necessary' },
+        { src: 'static/js/widget.js', category: 'functional' }
+      ]
+    }
+  );
   const { read, exists } = portal;
 
   /** The prerendered server-function cache entries carrying the sidebar tree. */
@@ -227,7 +261,9 @@ const stylesheetOf = (output: DirectoryPath) => {
 
   it('writes the one OAuth redirect URI every endpoint page authorizes through, kept out of search', () => {
     expect(read('oauth/callback/index.html')).to.contain('<meta name="robots" content="noindex"');
-    // The cookie it reads is the browser's, so the page is built to wait for it.
+    // The provider's answer is in its address: the page it returns to must not get it as the referrer.
+    expect(read('oauth/callback/index.html')).to.contain('<meta name="referrer" content="no-referrer"');
+    // The page it returns to is noted in the browser's session storage, so the page is built to wait for it.
     expect(read('oauth/callback/index.html')).to.contain('Completing authorization…');
     expect(read('sitemap.xml')).to.not.contain('/oauth/callback');
   });
@@ -244,6 +280,92 @@ const stylesheetOf = (output: DirectoryPath) => {
 
   it('marks each page canonical at its own address', () => {
     expect(read('index.html')).to.contain('<link rel="canonical" href="https://docs.test/"');
+  });
+
+  /** Every prerendered page, relative to the output. */
+  const pages = () =>
+    fs
+      .readdirSync(portal.output().toString(), { recursive: true, withFileTypes: true })
+      .filter((entry) => entry.isFile() && entry.name.endsWith('.html'))
+      .map((entry) => path.relative(portal.output().toString(), path.join(entry.parentPath, entry.name)));
+
+  it('tells the browser both vendor IDs in a script, and names the tag host in no prerendered page', () => {
+    const scripts = scriptsOf(portal.output());
+    expect(scripts.some(({ text }) => text.includes('GTM-E2ETEST') && text.includes('G-E2ETEST'))).to.be.true;
+    // The loader itself, not only the identity file the IDs sit in.
+    expect(scripts.some(({ text }) => text.includes('gtm.js?id=') && text.includes('/gtag/js?id='))).to.be.true;
+    for (const page of pages()) {
+      expect(read(page), page).to.not.contain('googletagmanager.com');
+    }
+  });
+
+  it('tells the browser to start the Google tags as denied, in a script that holds the defaults it queues', () => {
+    expect(startsGoogleTagsDenied(portal.output())).to.be.true;
+    // The defaults themselves, by the one key of theirs that nothing else in the bundle names.
+    expect(scriptsOf(portal.output()).some(({ text }) => text.includes('wait_for_update'))).to.be.true;
+    for (const page of pages()) {
+      expect(read(page), page).to.not.contain('wait_for_update');
+    }
+  });
+
+  it('tells the browser each listed script in a script, ships the file one of them names, and names neither in a prerendered page', () => {
+    const scripts = scriptsOf(portal.output());
+    expect(
+      scripts.some(({ text }) => text.includes('https://cdn.e2e.test/widget.js') && text.includes('/js/widget.js'))
+    ).to.be.true;
+    // The feed a listed script subscribes to, by the one message of its own that survives the build.
+    expect(scripts.some(({ text }) => text.includes('window.apimatic.analytics.subscribe() takes a function.'))).to.be
+      .true;
+    expect(read('js/widget.js')).to.equal(
+      fs.readFileSync(path.join(portal.source().toString(), 'static/js/widget.js'), 'utf8')
+    );
+    for (const page of pages()) {
+      expect(read(page), page).to.not.contain('cdn.e2e.test');
+      expect(read(page), page).to.not.contain('/js/widget.js');
+    }
+  });
+
+  it('carries the verification meta on every prerendered page', () => {
+    expect(pages()).to.have.length.greaterThan(3);
+    for (const page of pages()) {
+      expect(read(page), page).to.contain('<meta name="google-site-verification" content="e2e-verification"');
+    }
+  });
+
+  it('prerenders the operation page’s playground header inside the element session replays skip', () => {
+    const parts = read('api/apimatic-calculator/simple-calculator/Calculate/index.html').split(
+      'data-portal-playground'
+    );
+    expect(parts, 'one element').to.have.length(2);
+    // What Fumadocs' playground renders on the server: its header, with the method, the route and the trigger.
+    expect(parts[1].slice(0, 2000)).to.match(/>GET<[\s\S]*\{operation\}[\s\S]*aria-haspopup="dialog"/);
+    expect(parts[0].slice(parts[0].lastIndexOf('<div'))).to.contain('data-private=""');
+  });
+
+  it('prerenders the cURL sample, which follows what the reader types, inside an element session replays skip too', () => {
+    // The marked element's one child, past React's own comment, is the sample's block, with the command in it.
+    expect(read('api/apimatic-calculator/simple-calculator/Calculate/index.html')).to.match(
+      /data-private="">(?:<!--.*?-->)*<figure(?:(?!<\/figure>)[\s\S])*>curl<[\s\S]*?> -X<[\s\S]*?> GET</
+    );
+  });
+
+  it('renders the copy button of "Example Response" as the button[aria-live] its copies are reported by', () => {
+    // Fumadocs' own button, in the card's header: after the title, before the header closes.
+    expect(read('api/apimatic-calculator/simple-calculator/Calculate/index.html')).to.match(
+      />Example Response<\/span>(?:(?!<\/div>)[\s\S])*<button[^>]*\baria-live=/
+    );
+  });
+
+  it('lets both example cards shrink with their column, which Fumadocs keeps no taller than the window', () => {
+    const shrinks = '[^>]*[" ]flex min-h-0 flex-col[" ][^>]*>';
+    // Each box passes the height on: our layout, then the request card's tabs, open tab, marked element and block.
+    const boxes = new RegExp(
+      `@4xl:max-h-[^>]*><div${shrinks}[\\s\\S]*?<div${shrinks}<div(?=[^>]*role="tablist")[^>]*[" ]shrink-0[" ]` +
+        `[\\s\\S]*?<div${shrinks}<div${shrinks}(?:<!--.*?-->)*<figure${shrinks}` +
+        // The code scrolls in what the block has left.
+        `(?:(?!</figure>)[\\s\\S])*?<div[^>]*[" ]overflow-auto[" ][^>]*[" ]min-h-0[" ]`
+    );
+    expect(read('api/apimatic-calculator/simple-calculator/Calculate/index.html')).to.match(boxes);
   });
 
   it('keeps the server-side specification loader out of the browser bundle', () => {
@@ -286,13 +408,13 @@ const stylesheetOf = (output: DirectoryPath) => {
   // published: `portal.server.ts` holds the absolute path of every specification, and the
   // prepared project's own location has no business in the output either.
   it('publishes neither the specification paths nor the project directory', () => {
-    expect(filesNaming(portal.project().toString(), fixture.join('spec').toString())).to.deep.equal([]);
+    expect(filesNaming(portal.project().toString(), portal.source().join('spec').toString())).to.deep.equal([]);
   });
 
   // `defineDocs({ dir })` compiles its directory into the client bundle as the collection's
   // `base`, which is why the project reads a copy of the content by a relative name.
   it('publishes no absolute path from the build machine at all', () => {
-    expect(filesNaming(fixture.join('content').toString(), fixture.toString())).to.deep.equal([]);
+    expect(filesNaming(portal.source().join('content').toString(), portal.source().toString())).to.deep.equal([]);
   });
 
   it('writes the sidebar tree to one cache file instead of into every page payload', () => {
@@ -440,6 +562,10 @@ const stylesheetOf = (output: DirectoryPath) => {
     }
   });
 
+  it('links an external card as written, at the root of its host', () => {
+    expect(cardLink(read('guides/components/index.html'), 'Agent-Friendly Docs')).to.equal('/llms.txt');
+  });
+
   // Emphasis reaches these files through a Markdown serializer that has broken on it twice: once
   // mangling the markers, once looping over one until the stack ran out. It has to read as written.
   it("keeps the emphasis in a language's SDK docs, in its twin and in llms-full.txt", () => {
@@ -521,6 +647,7 @@ const stylesheetOf = (output: DirectoryPath) => {
 
   // Tailwind reads the template and the copy of the pages, and nothing else. A scan that missed the
   // template stacked the SDK cards; one that took in node_modules grew this from 93 KB to 134 KB.
+  // Fumadocs UI 16.18 and fumadocs-openapi 12.6 brought it to 119 KB with their own components.
   it('builds the stylesheet from the template and the pages alone', () => {
     const css = stylesheetOf(portal.output());
 
@@ -528,7 +655,7 @@ const stylesheetOf = (output: DirectoryPath) => {
     expect(css).to.contain('.\\@2xl\\:grid-cols-2');
     expect(read('authentication/index.html')).to.contain('class="tracking-[0.3125em]"');
     expect(css).to.contain('.tracking-\\[0\\.3125em\\]');
-    expect(css.length).to.be.below(100 * 1024);
+    expect(css.length).to.be.below(128 * 1024);
   });
 
   // The counterpart of the branded portal's forced mode: the same label, present here.
@@ -550,6 +677,12 @@ const stylesheetOf = (output: DirectoryPath) => {
 
   const portal = portalBuilt('branded', { plugin: true });
   const { read, exists } = portal;
+
+  // The other half of the default build's check: a build that sets no consent mode must not pass it.
+  it('does not tell the browser to start the Google tags as denied when the config sets no consent mode', () => {
+    expect(startsGoogleTagsDenied(portal.output())).to.be.false;
+    expect(scriptsOf(portal.output()).some(({ text }) => text.includes('googleConsentMode:null'))).to.be.true;
+  });
 
   // The minifier may merge the two modes' rules when they match, as they do for a primary
   // written once, so the selectors and their place are checked rather than one spelling.
@@ -839,6 +972,17 @@ const stylesheetOf = (output: DirectoryPath) => {
     expect(read('sdks/index.html')).to.contain('href="/api/__downloads/sdk/typescript.zip"');
   });
 
+  // Fumadocs renders an external card as a plain link, outside the router that gives the others the path.
+  // `/api/search.json` starts like the path, and still goes under it.
+  it('links an external card under the path, as the router links the others', () => {
+    const page = read('figures/index.html');
+
+    expect([cardLink(page, 'Agent-Friendly Docs'), cardLink(page, 'Search index')]).to.deep.equal([
+      '/api/llms.txt',
+      '/api/api/search.json'
+    ]);
+  });
+
   // Bundled, so it carries the base; a linked `/images/diagram.png` would be fetched from the host's
   // root. The image is over Vite's 4 KiB inline limit, or it would be a data: URI and prove nothing.
   it('bundles a Markdown image, under the path', () => {
@@ -877,7 +1021,11 @@ const stylesheetOf = (output: DirectoryPath) => {
     const page = read('api/apimatic-calculator/simple-calculator/Calculate/index.html');
 
     expect(page).to.match(/<img[^>]* src="\/api\/images\/diagram\.png"/);
-    expect(page).to.match(/<pre[^>]*><code><span class="line">\{ &quot;calculated&quot;: 9 \}<\/span><\/code><\/pre>/);
+    // Highlighted, so the text is spread over spans: read as text, the block is what the description wrote.
+    const codeBlocks = (page.match(/<pre[^>]*><code>[\s\S]*?<\/code><\/pre>/g) ?? []).map((block) =>
+      block.replace(/<[^>]+>/g, '')
+    );
+    expect(codeBlocks).to.include('{ &quot;calculated&quot;: 9 }');
   });
 
   // The dialog would load a result's image from the host's root, as Fumadocs prefixes none.

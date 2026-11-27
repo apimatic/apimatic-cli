@@ -8,7 +8,6 @@ import { LanguageLogo, LogoTile } from './logos';
 import { DownloadLink, ExternalLink, LINK, QUIET_LINK, SdkActions, type SdkActionsProps } from './sdk-actions';
 
 interface SdkCardProps extends SdkActionsProps {
-  language: string;
   name: string;
   /** The language's own page. */
   page: string;
@@ -41,7 +40,10 @@ function LinkContext({ name }: Readonly<{ name: string }>) {
 export function SdkCard({ language, name, page, install, ...actions }: Readonly<SdkCardProps>) {
   if (asMarkdown()) {
     const command = install ? `\`${install}\` · ` : '';
-    return [`- [${name}](${withBasePath(page)}): ${command}`, <SdkActions key="actions" {...actions} />];
+    return [
+      `- [${name}](${withBasePath(page)}): ${command}`,
+      <SdkActions key="actions" language={language} {...actions} />
+    ];
   }
   const { download, source, packageUrl, registry } = actions;
   return (
@@ -57,7 +59,7 @@ export function SdkCard({ language, name, page, install, ...actions }: Readonly<
         {install ? (
           <CommandBlock command={install} compact />
         ) : (
-          <DownloadLink href={download} className={DOWNLOAD_SLOT}>
+          <DownloadLink href={download} language={language} className={DOWNLOAD_SLOT}>
             <ArrowDownToLine className="size-4" />
             Download SDK
             <LinkContext name={name} />
@@ -65,7 +67,7 @@ export function SdkCard({ language, name, page, install, ...actions }: Readonly<
         )}
         <div className="mt-auto flex flex-wrap items-center gap-x-5 gap-y-2">
           {install ? (
-            <DownloadLink href={download} className={`${QUIET_LINK} font-medium`}>
+            <DownloadLink href={download} language={language} className={`${QUIET_LINK} font-medium`}>
               Download SDK
               <LinkContext name={name} />
               <ArrowDownToLine className="size-4" />
