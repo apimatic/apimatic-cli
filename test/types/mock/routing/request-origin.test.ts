@@ -45,7 +45,7 @@ describe('requestOrigin', () => {
     it(`reads no origin from ${what}`, () => {
       const read = requestOrigin(hosts);
 
-      expect(read).to.equal(undefined);
+      expect(read).to.be.undefined;
     });
   }
 

@@ -12,7 +12,7 @@ export function decodeBase64(text: string): Uint8Array | undefined {
   const compact = Array.from(text)
     .filter((character) => !WHITESPACE.includes(character))
     .join('');
-  const padding = compact.endsWith('==') ? 2 : compact.endsWith('=') ? 1 : 0;
+  const padding = paddingOf(compact);
   const digits = compact.slice(0, compact.length - padding);
   return compact.length % 4 === 0 && Array.from(digits).every((character) => isBase64Digit(character, '+/'))
     ? Buffer.from(compact, 'base64')
@@ -32,4 +32,11 @@ export function encodeBase64Url(bytes: Uint8Array): string {
 
 function isBase64Digit(character: string, marks: string): boolean {
   return isAsciiLetter(character) || isAsciiDigit(character) || marks.includes(character);
+}
+
+function paddingOf(text: string): number {
+  if (text.endsWith('==')) {
+    return 2;
+  }
+  return text.endsWith('=') ? 1 : 0;
 }

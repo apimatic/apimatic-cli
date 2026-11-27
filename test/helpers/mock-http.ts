@@ -1,8 +1,8 @@
 import { Buffer } from 'node:buffer';
-import fs from 'fs';
+import fs from 'node:fs';
 import http from 'node:http';
 import net from 'node:net';
-import os from 'os';
+import os from 'node:os';
 import { URL } from 'node:url';
 import { FREE_PORT } from '../../src/infrastructure/mock/listen.js';
 import {
@@ -109,11 +109,7 @@ function dispatch(
   const { method, target, headers, body, chunked } = request.toWire();
   const { hostname, port, host } = new URL(origin);
   const names = headers.map(([name]) => name.toLowerCase());
-  const framing: [string, string][] = chunked
-    ? [['Transfer-Encoding', 'chunked']]
-    : body.length > 0
-    ? [['Content-Length', String(body.length)]]
-    : [];
+  const framing = framingOf(chunked, body.length);
   const lines: [string, string][] = [
     ...(names.includes('host') ? [] : [['Host', host] as [string, string]]),
     ...headers,
@@ -149,7 +145,8 @@ export function send(origin: string, request: TestRequest): Promise<Answered> {
           arrivals.push(Date.now());
         });
         response.on('end', () => {
-          const spreadMs = arrivals.length === 0 ? 0 : arrivals[arrivals.length - 1] - arrivals[0];
+          const last = arrivals.at(-1);
+          const spreadMs = last === undefined ? 0 : last - arrivals[0];
           resolve(
             new Answered(response.statusCode ?? 0, pairsOf(response.rawHeaders), Buffer.concat(chunks), spreadMs)
           );
@@ -176,13 +173,7 @@ export function openStream(origin: string, request: TestRequest): Promise<OpenSt
       request,
       (response) => {
         response.once('data', (first: Buffer) => {
-          const chunks: Buffer[] = [];
-          response.on('data', (chunk: Buffer) => chunks.push(chunk));
-          response.on('error', () => undefined);
-          const rest = new Promise<string>((ended) => {
-            response.on('close', () => ended(Buffer.concat(chunks).toString('utf8')));
-          });
-          resolve({ first: first.toString('utf8'), rest, leave: () => sent.destroy() });
+          resolve({ first: first.toString('utf8'), rest: restOf(response), leave: () => sent.destroy() });
         });
       },
       reject
@@ -338,6 +329,23 @@ export function tempMocks() {
   };
 
   return { directory, start, tryStart, track };
+}
+
+function framingOf(chunked: boolean, length: number): [string, string][] {
+  if (chunked) {
+    return [['Transfer-Encoding', 'chunked']];
+  }
+  return length > 0 ? [['Content-Length', String(length)]] : [];
+}
+
+/** The rest of a body once it ends however it ends: a stream the client walks out of ends without an error. */
+function restOf(response: http.IncomingMessage): Promise<string> {
+  const chunks: Buffer[] = [];
+  response.on('data', (chunk: Buffer) => chunks.push(chunk));
+  response.on('error', () => undefined);
+  return new Promise((ended) => {
+    response.on('close', () => ended(Buffer.concat(chunks).toString('utf8')));
+  });
 }
 
 /** A header sent twice stays two lines: Node's client writes one line per value of a name. */

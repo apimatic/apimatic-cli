@@ -116,7 +116,7 @@ export function renderSseEvent(event: SseEvent): string {
       .split('\n')
       .map((line) => `data: ${line}`)
   ];
-  return `${lines.map((line) => `${line}\n`).join('')}\n`;
+  return `${lines.join('\n')}\n\n`;
 }
 
 /** What the body kind implies when the stub names none: its Content-Type, and for a stream the directive that keeps caches out of the way. */

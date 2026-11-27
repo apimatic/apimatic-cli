@@ -142,7 +142,7 @@ describe('the admin API', () => {
   it('leaves a path outside its prefix to the router', () => {
     const answer = adminAnswer(TestRequest.get('/v1/__admin/requests').build(), new RequestLog());
 
-    expect(answer).to.equal(undefined);
+    expect(answer).to.be.undefined;
   });
 
   it('serves the request log as JSON to a GET', () => {

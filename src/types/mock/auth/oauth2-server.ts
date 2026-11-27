@@ -309,7 +309,7 @@ function alternatives(choices: readonly string[]): string {
   if (choices.length === 0) {
     return 'none';
   }
-  return choices.length === 1 ? choices[0] : `${choices.slice(0, -1).join(', ')} or ${choices[choices.length - 1]}`;
+  return choices.length === 1 ? choices[0] : `${choices.slice(0, -1).join(', ')} or ${choices.at(-1)}`;
 }
 
 function issued(

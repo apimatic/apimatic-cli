@@ -20,9 +20,7 @@ export function writeJson(value: JsonValue): string {
     case 'array':
       return `[${value.items.map(writeJson).join(',')}]`;
     case 'object':
-      return `{${Array.from(value.members, ([name, member]) => `${JSON.stringify(name)}:${writeJson(member)}`).join(
-        ','
-      )}}`;
+      return `{${Array.from(value.members, ([name, member]) => memberText(name, member)).join(',')}}`;
   }
 }
 
@@ -41,4 +39,8 @@ export function writeIndentedJson(value: JsonValue, indent = ''): string {
     return `{\n${members.join(',\n')}\n${indent}}`;
   }
   return writeJson(value);
+}
+
+function memberText(name: string, member: JsonValue): string {
+  return `${JSON.stringify(name)}:${writeJson(member)}`;
 }

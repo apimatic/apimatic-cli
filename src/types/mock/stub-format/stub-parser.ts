@@ -201,7 +201,7 @@ function parseScope(node: JsonValue, site: Site, report: Report): string {
   if (!Array.from(scope).every(isScopeCharacter)) {
     report(
       site,
-      "A scope is an RFC 6749 scope-token: printable ASCII without a space, '\"' or '\\', because a space " +
+      String.raw`A scope is an RFC 6749 scope-token: printable ASCII without a space, '"' or '\', because a space ` +
         'separates scopes on the wire.'
     );
   }

@@ -66,5 +66,12 @@ export function describeRule(rule: ValueRule): string {
 
 /** The text the rule fixes at the start of a value, where an Authorization scheme stands; only an exact value and a prefix fix one. */
 export function openingOf(rule: ValueRule): string {
-  return rule.kind === 'exact' ? rule.value : rule.kind === 'startsWith' ? rule.prefix : '';
+  switch (rule.kind) {
+    case 'exact':
+      return rule.value;
+    case 'startsWith':
+      return rule.prefix;
+    default:
+      return '';
+  }
 }

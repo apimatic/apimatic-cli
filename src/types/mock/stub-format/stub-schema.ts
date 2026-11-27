@@ -15,8 +15,8 @@ interface Fault {
   readonly message: string;
 }
 
-const ANNOTATIONS = ['$schema', '$id', '$defs', 'title', 'description', 'default'];
-const ASSERTIONS = [
+const ANNOTATIONS = new Set(['$schema', '$id', '$defs', 'title', 'description', 'default']);
+const ASSERTIONS = new Set([
   '$ref',
   'type',
   'required',
@@ -37,7 +37,7 @@ const ASSERTIONS = [
   'if',
   'then',
   'else'
-];
+]);
 const KIND_RULE =
   "A stub of kind 'oauth2' has only 'oauth2'; any other kind has 'request' and 'response' and no 'oauth2'.";
 const SHOWN_VALUE_LENGTH = 40;
@@ -63,7 +63,7 @@ export class StubSchema {
     }
     const unexplained = subschemasOf(document)
       .flatMap((schema) => Object.keys(schema))
-      .filter((keyword) => !ANNOTATIONS.includes(keyword) && !ASSERTIONS.includes(keyword));
+      .filter((keyword) => !ANNOTATIONS.has(keyword) && !ASSERTIONS.has(keyword));
     if (unexplained.length > 0) {
       return err(
         `The stub schema uses ${quotedList([...new Set(unexplained)], 'and')}, which the loader cannot explain.`
@@ -324,7 +324,11 @@ function plain(value: JsonValue): unknown {
 
 function withArticle(type: string): string {
   const word = type === 'integer' ? 'whole number' : type;
-  return word === 'null' ? word : `${'aeiou'.includes(word[0]) ? 'an' : 'a'} ${word}`;
+  if (word === 'null') {
+    return word;
+  }
+  const article = 'aeiou'.includes(word[0]) ? 'an' : 'a';
+  return `${article} ${word}`;
 }
 
 const quotedTypes = (types: string[]): string => listed(types.map(withArticle), 'or');
@@ -341,7 +345,7 @@ const atLeast = (count: number | undefined, things: string): string =>
   count === 1 ? 'Must not be empty.' : `Must have at least ${count} ${things}.`;
 
 function listed(items: string[], joiner: string): string {
-  return items.length < 2 ? items.join('') : `${items.slice(0, -1).join(', ')} ${joiner} ${items[items.length - 1]}`;
+  return items.length < 2 ? items.join('') : `${items.slice(0, -1).join(', ')} ${joiner} ${items.at(-1)}`;
 }
 
 const shown = (text: string): string =>

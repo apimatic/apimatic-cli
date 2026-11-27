@@ -6,7 +6,7 @@ describe('the request body limit', () => {
     it(`reads a body that declares ${declared ?? 'no length'}`, () => {
       const refusal = declaredTooLong(declared);
 
-      expect(refusal).to.equal(undefined);
+      expect(refusal).to.be.undefined;
     });
   }
 

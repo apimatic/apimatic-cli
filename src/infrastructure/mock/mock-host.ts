@@ -130,7 +130,7 @@ export class MockHost {
     this.stopping.abort();
     const closing = this.servers.map(closed);
     const patience = new AbortController();
-    await Promise.race([Promise.allSettled([...this.exchanges]), sleep(STOP_GRACE_MS, patience.signal)]);
+    await Promise.race([Promise.allSettled(this.exchanges), sleep(STOP_GRACE_MS, patience.signal)]);
     patience.abort();
     this.servers.forEach((server) => server.closeAllConnections());
     await Promise.all(closing);

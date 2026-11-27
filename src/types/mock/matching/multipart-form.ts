@@ -38,11 +38,11 @@ export function parseMultipartForm(contentType: string, body: Uint8Array): Multi
     const parts = sections(Buffer.from(body), `--${boundary}`).map(partOf);
     const names = [...new Set(parts.map((part) => part.name))].sort(compareOrdinal);
     return { kind: 'parts', byName: new Map(names.map((name) => [name, parts.filter((part) => part.name === name)])) };
-  } catch (fault) {
-    if (fault instanceof Malformed) {
-      return { kind: 'unreadable', expected: MALFORMED, actual: fault.message };
+  } catch (error) {
+    if (error instanceof Malformed) {
+      return { kind: 'unreadable', expected: MALFORMED, actual: error.message };
     }
-    throw fault;
+    throw error;
   }
 }
 

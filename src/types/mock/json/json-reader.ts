@@ -48,11 +48,11 @@ function read(cursor: Cursor): Result<JsonValue, string> {
       throw faultAt(cursor, `${found(cursor)} follows the end of the JSON value`);
     }
     return ok(value);
-  } catch (fault) {
-    if (fault instanceof JsonFault) {
-      return err(fault.message);
+  } catch (error) {
+    if (error instanceof JsonFault) {
+      return err(error.message);
     }
-    throw fault;
+    throw error;
   }
 }
 

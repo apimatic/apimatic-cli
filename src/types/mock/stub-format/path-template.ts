@@ -70,9 +70,7 @@ export class PathTemplate {
   }
 
   public toString(): string {
-    return this.segments
-      .map((segment) => `/${segment.kind === 'literal' ? segment.text : `{${segment.name}}`}`)
-      .join('');
+    return this.segments.map((segment) => `/${segmentText(segment)}`).join('');
   }
 }
 
@@ -102,6 +100,10 @@ function segmentOf(segment: string): PathSegment {
   return segment.startsWith('{')
     ? { kind: 'parameter', name: segment.slice(1, -1) }
     : { kind: 'literal', text: segment };
+}
+
+function segmentText(segment: PathSegment): string {
+  return segment.kind === 'literal' ? segment.text : `{${segment.name}}`;
 }
 
 function isParameterName(name: string): boolean {

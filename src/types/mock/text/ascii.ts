@@ -19,7 +19,10 @@ export function equalsIgnoringAsciiCase(first: string, second: string): boolean 
 
 /** By UTF-16 code unit, as every list in a report is ordered: the same on every machine, whatever its locale. */
 export function compareOrdinal(first: string, second: string): number {
-  return first < second ? -1 : first > second ? 1 : 0;
+  if (first < second) {
+    return -1;
+  }
+  return first > second ? 1 : 0;
 }
 
 export function compareIgnoringAsciiCase(first: string, second: string): number {

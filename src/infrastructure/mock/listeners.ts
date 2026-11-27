@@ -69,7 +69,8 @@ export async function busyReason(addresses: readonly BindAddress[], port: number
   for (const { address } of addresses.filter((each) => isIP(each.address) !== 0)) {
     const probed = probeAddressOf(address);
     if (await answersAt(probed, port)) {
-      return `the port is already in use (something answers at ${isIP(probed) === 6 ? `[${probed}]` : probed}:${port})`;
+      const host = isIP(probed) === 6 ? `[${probed}]` : probed;
+      return `the port is already in use (something answers at ${host}:${port})`;
     }
   }
   return undefined;

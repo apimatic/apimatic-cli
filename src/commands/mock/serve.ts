@@ -28,7 +28,7 @@ A busy port is an error, never replaced by another one. Use only the fixed test 
     )} ${format.flag('verbose')}`
   ];
 
-  static flags = {
+  static readonly flags = {
     port: Flags.integer({
       char: 'p',
       description: 'port to serve the mock on; 0 picks a free port on localhost.',

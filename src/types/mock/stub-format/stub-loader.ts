@@ -44,14 +44,13 @@ export function loadStubs(files: readonly StubFile[], schema: StubSchema): Resul
   if (problems.length === 0) {
     return ok(stubSetOf(located.map(({ stub }) => stub)));
   }
-  return err(
-    problems.sort(
-      (first, second) =>
-        compareOrdinal(first.file, second.file) ||
-        stubIndex(first.path) - stubIndex(second.path) ||
-        compareOrdinal(first.path, second.path)
-    )
+  problems.sort(
+    (first, second) =>
+      compareOrdinal(first.file, second.file) ||
+      stubIndex(first.path) - stubIndex(second.path) ||
+      compareOrdinal(first.path, second.path)
   );
+  return err(problems);
 }
 
 /**

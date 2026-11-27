@@ -18,7 +18,7 @@ export class MockServePrompts {
       [
         `The mock is running at ${f.link(url)}, serving ${stubCount} stub(s) from ${f.path(stubsDirectory)}.`,
         `A request no stub describes is answered 418 with the difference from the closest stub.`,
-        `The requests it received are listed at ${f.link(`${url}${REQUEST_LOG_PATH}`)}.`,
+        `The requests it received are listed at ${f.link(url + REQUEST_LOG_PATH)}.`,
         '',
         'Press CTRL+C to stop the server.'
       ].join('\n')

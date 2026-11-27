@@ -277,7 +277,7 @@ describe('MockHost', () => {
 
       const second = await mock.host.stop();
 
-      expect(second).to.equal(undefined);
+      expect(second).to.be.undefined;
     });
   });
 

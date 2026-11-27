@@ -111,10 +111,10 @@ export const oauth2 = {
   authorizeImplicitWithout: (...keys: string[]): TestRequest => authorizeWith(without(implicitParameters, keys)),
 
   /** The consent request as Python, Go, JS and Ruby form encoders write it: a space as `+`, which `query` would send as `%20`. */
-  authorizeFormEncoded: (): TestRequest =>
-    TestRequest.get(
-      `${AUTHORIZE_PATH}?${codeParameters.map(([key, value]) => `${formEncoded(key)}=${formEncoded(value)}`).join('&')}`
-    ),
+  authorizeFormEncoded: (): TestRequest => {
+    const query = codeParameters.map(([key, value]) => `${formEncoded(key)}=${formEncoded(value)}`).join('&');
+    return TestRequest.get(`${AUTHORIZE_PATH}?${query}`);
+  },
 
   exchange: (code: string, verifier: string = VERIFIER): TestRequest =>
     token(

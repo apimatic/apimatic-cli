@@ -68,12 +68,12 @@ export class TestRequest {
     this.path = path;
   }
 
-  public static get = (path: string) => new TestRequest('GET', path);
-  public static post = (path: string) => new TestRequest('POST', path);
-  public static put = (path: string) => new TestRequest('PUT', path);
-  public static patch = (path: string) => new TestRequest('PATCH', path);
-  public static delete = (path: string) => new TestRequest('DELETE', path);
-  public static of = (method: string, path: string) => new TestRequest(method, path);
+  public static readonly get = (path: string) => new TestRequest('GET', path);
+  public static readonly post = (path: string) => new TestRequest('POST', path);
+  public static readonly put = (path: string) => new TestRequest('PUT', path);
+  public static readonly patch = (path: string) => new TestRequest('PATCH', path);
+  public static readonly delete = (path: string) => new TestRequest('DELETE', path);
+  public static readonly of = (method: string, path: string) => new TestRequest(method, path);
 
   public query(key: string, ...values: string[]): this {
     this.pairs.push(...values.map((value): [string, string] => [key, value]));

@@ -96,7 +96,7 @@ function rfc3339(text: string): Moment | undefined {
 
 function offset(zone: string): number | undefined {
   const parts = numbers(zone.slice(1), [2, ':', 2]);
-  if (parts === undefined || (zone[0] !== '+' && zone[0] !== '-')) {
+  if (parts === undefined || (!zone.startsWith('+') && !zone.startsWith('-'))) {
     return undefined;
   }
   const [hours, minutes] = parts;
@@ -104,7 +104,7 @@ function offset(zone: string): number | undefined {
   if (minutes > 59 || total > MAX_OFFSET_MINUTES) {
     return undefined;
   }
-  return zone[0] === '-' ? -total : total;
+  return zone.startsWith('-') ? -total : total;
 }
 
 /** `ddd, dd MMM yyyy HH:mm:ss GMT`, with the weekday the date falls on. */
