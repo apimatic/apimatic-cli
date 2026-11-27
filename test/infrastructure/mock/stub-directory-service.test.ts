@@ -4,7 +4,8 @@ import path from 'path';
 import { expect } from 'chai';
 import { StubDirectoryService } from '../../../src/infrastructure/mock/stub-directory-service.js';
 import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
-import { stubFixtures, successStub } from '../../helpers/mock-stubs.js';
+import { sampleFiles } from '../../helpers/mock-sample.js';
+import { successStub } from '../../helpers/mock-stubs.js';
 
 describe('StubDirectoryService', () => {
   let root: string;
@@ -20,17 +21,13 @@ describe('StubDirectoryService', () => {
     fs.rmSync(root, { recursive: true, force: true });
   });
 
-  for (const [set, stubs] of [
-    ['sample', 20],
-    ['spec-s', 84],
-    ['tester-poc', 113]
-  ] as const) {
-    it(`loads the ${stubs} stubs of the ${set} set from its directory`, async () => {
-      const loaded = await load(path.join(stubFixtures, set));
+  it('loads the 20 stubs of the sample set from its directory', async () => {
+    Object.entries(sampleFiles).forEach(([name, content]) => write(name, content));
 
-      expect(loaded._unsafeUnwrap().all).to.have.lengthOf(stubs);
-    });
-  }
+    const loaded = await load();
+
+    expect(loaded._unsafeUnwrap().all).to.have.lengthOf(20);
+  });
 
   it('loads no stubs from an empty directory', async () => {
     const loaded = await load();

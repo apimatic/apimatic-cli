@@ -10,7 +10,6 @@ import { chunksOf } from '../../../../src/types/mock/stub-format/stub-response.j
 import { ValueRule } from '../../../../src/types/mock/stub-format/value-rule.js';
 import {
   errorStub,
-  fixtureStubs,
   memberOf,
   oauth2Stub,
   problemsOf,
@@ -328,17 +327,6 @@ describe('loadStubs, reading the sample set', () => {
       paths: ['/oauth2/token', '/oauth2/authorize']
     });
   });
-
-  for (const [set, stubs] of [
-    ['spec-s', 84],
-    ['tester-poc', 113]
-  ] as const) {
-    it(`loads the ${stubs} stubs of the ${set} set`, () => {
-      const loaded = fixtureStubs(set);
-
-      expect(loaded.all).to.have.lengthOf(stubs);
-    });
-  }
 });
 
 describe('loadStubs, reading one rule at a time', () => {

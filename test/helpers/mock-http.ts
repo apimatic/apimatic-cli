@@ -3,7 +3,6 @@ import fs from 'fs';
 import http from 'node:http';
 import net from 'node:net';
 import os from 'os';
-import path from 'path';
 import { URL } from 'node:url';
 import { FREE_PORT } from '../../src/infrastructure/mock/listen.js';
 import {
@@ -18,7 +17,7 @@ import { compareJson } from '../../src/types/mock/matching/json-diff.js';
 import { LIFETIME_FROM_STUB } from '../../src/types/mock/routing/token-lifetime.js';
 import { describeProblems } from '../../src/types/mock/stub-format/stub-problem.js';
 import { TestRequest } from './mock-requests.js';
-import { StubFiles, stubFixtures } from './mock-stubs.js';
+import { stubDirectory, StubFiles } from './mock-stubs.js';
 
 export type HostSettings = Partial<Omit<MockHostOptions, 'stubs'>>;
 
@@ -280,18 +279,23 @@ export class TestMock {
   }
 }
 
-/** One mock over a stub set of test/resources/mock for a whole `describe` block, on a free port. */
-export function mockOver(set: string): () => TestMock {
+/** One mock over a stub set for a whole `describe` block, on a free port. */
+export function mockOver(files: StubFiles): () => TestMock {
   let mock: TestMock | undefined;
+  let directory: string | undefined;
   before(async () => {
-    mock = new TestMock(running(await MockHost.start(optionsFor(path.join(stubFixtures, set)))));
+    directory = stubDirectory(files);
+    mock = new TestMock(running(await MockHost.start(optionsFor(directory))));
   });
   after(async () => {
     await mock?.host.stop();
+    if (directory !== undefined) {
+      fs.rmSync(directory, { recursive: true, force: true });
+    }
   });
   return () => {
     if (mock === undefined) {
-      throw new Error(`The mock over the ${set} stubs has not started.`);
+      throw new Error('The mock over the stubs has not started.');
     }
     return mock;
   };
@@ -308,9 +312,8 @@ export function tempMocks() {
   });
 
   const directory = (files: StubFiles = {}): string => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'apimatic-mock-host-'));
+    const root = stubDirectory(files);
     directories.push(root);
-    Object.entries(files).forEach(([name, content]) => fs.writeFileSync(path.join(root, name), content));
     return root;
   };
 

@@ -139,10 +139,3 @@ export const oauth2 = {
 export async function clientCredentialsToken(mock: TestMock): Promise<string> {
   return (await mock.send(oauth2.clientCredentials())).expectJson(200).access_token;
 }
-
-/** Authorize with PKCE, follow the consent redirect by hand, exchange the code. */
-export async function authorizationCodeToken(mock: TestMock): Promise<string> {
-  const consent = await mock.send(oauth2.authorize());
-  consent.expect(302);
-  return (await mock.send(oauth2.exchange(oauth2.codeIn(consent.header('Location'))))).expectJson(200).access_token;
-}

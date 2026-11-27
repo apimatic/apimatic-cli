@@ -16,8 +16,9 @@ import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
 import { FilePath } from '../../../src/types/file/filePath.js';
 import { ProjectContext } from '../../../src/types/project-context.js';
 import { optionsFor, running, send } from '../../helpers/mock-http.js';
-import { TestRequest } from '../../helpers/mock-requests.js';
-import { stubFixtures, successStub } from '../../helpers/mock-stubs.js';
+import { sampleRequests } from '../../helpers/mock-requests.js';
+import { sampleFiles } from '../../helpers/mock-sample.js';
+import { successStub } from '../../helpers/mock-stubs.js';
 import { cutShort, StubGenerationEndpoint } from '../../helpers/stub-generation-endpoint.js';
 
 const stubFile = (operation: string, route: string) =>
@@ -264,9 +265,7 @@ describe('MockGenerateAction', () => {
     after(() => endpoint.stop());
 
     beforeEach(() => {
-      const specS = new AdmZip();
-      specS.addLocalFolder(path.join(stubFixtures, 'spec-s'));
-      endpoint.reset(specS.toBuffer());
+      endpoint.reset(zipOf(sampleFiles));
       // The service as it is, paced for a test: its default waits 3 seconds before the first poll.
       const paced = new StubGenerationService({ pollIntervalMs: 1 });
       generateStubs.callsFake((...run: Parameters<typeof generateOverHttp>) => generateOverHttp.apply(paced, run));
@@ -278,12 +277,12 @@ describe('MockGenerateAction', () => {
       const result = await execute();
 
       host = running(await MockHost.start(optionsFor(stubsDirectory)));
-      const answer = await send(host.url, TestRequest.get('/health'));
+      const answer = await send(host.url, sampleRequests.listAccountsPage2());
       expect(result.isSuccess()).to.be.true;
       expect(endpoint.generateRequests.map((request) => request.url)).to.deep.equal([
         '/mock?origin=APIMATIC+CLI+mock:generate'
       ]);
-      expect(host.stubs.all).to.have.length(84);
+      expect(host.stubs.all).to.have.length(20);
       expect(answer.status).to.equal(200);
     });
 

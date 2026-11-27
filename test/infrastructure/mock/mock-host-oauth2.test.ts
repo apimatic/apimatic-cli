@@ -3,13 +3,14 @@ import { lifetimeOfSeconds } from '../../../src/types/mock/routing/token-lifetim
 import { mockOver, placesOf, tempMocks } from '../../helpers/mock-http.js';
 import { oauth2 } from '../../helpers/mock-oauth2.js';
 import { ledger, TestRequest } from '../../helpers/mock-requests.js';
+import { sampleFiles } from '../../helpers/mock-sample.js';
 import { oauth2Stub, successStub } from '../../helpers/mock-stubs.js';
 
 const minimalClientCredentials = (path = '/oauth2/token') =>
   TestRequest.post(path).form(['grant_type', 'client_credentials'], ['client_id', 'c'], ['client_secret', 's']);
 
 describe('the OAuth2 authorization server over HTTP, on the sample stubs', () => {
-  const mock = mockOver('sample');
+  const mock = mockOver(sampleFiles);
   const temp = tempMocks();
 
   describe('the authorize endpoint', () => {

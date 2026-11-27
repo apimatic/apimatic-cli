@@ -1,5 +1,6 @@
 import { Buffer } from 'node:buffer';
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 import { ok } from 'neverthrow';
 import { JsonValue } from '../../src/types/mock/json/json-value.js';
@@ -9,8 +10,7 @@ import { StubProblem } from '../../src/types/mock/stub-format/stub-problem.js';
 import { StubSchema } from '../../src/types/mock/stub-format/stub-schema.js';
 import { ErrorStub, OAuth2Stub, StubSet, SuccessStub } from '../../src/types/mock/stub-format/stub.js';
 import { ValueRule } from '../../src/types/mock/stub-format/value-rule.js';
-
-export const stubFixtures = path.join(process.cwd(), 'test', 'resources', 'mock');
+import { sampleFiles } from './mock-sample.js';
 
 export const stubSchema = StubSchema.read(
   JSON.parse(fs.readFileSync(path.join(process.cwd(), 'mock-stubs.schema.json'), 'utf8'))
@@ -27,21 +27,21 @@ export function loadFiles(files: StubFiles) {
   return loadStubs(read, stubSchema);
 }
 
+/** Writes the files to a new directory under the system's temporary one; the caller removes it. */
+export function stubDirectory(files: StubFiles): string {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'apimatic-mock-stubs-'));
+  Object.entries(files).forEach(([name, content]) => fs.writeFileSync(path.join(root, name), content));
+  return root;
+}
+
 export const stubsOf = (files: StubFiles): StubSet => loadFiles(files)._unsafeUnwrap();
 
 export const problemsOf = (files: StubFiles): StubProblem[] => loadFiles(files)._unsafeUnwrapErr();
 
-/** One of the reference's stub sets under test/resources/mock, loaded through the pure loader. */
-export function fixtureStubs(set: string): StubSet {
-  const directory = path.join(stubFixtures, set);
-  const files = fs.readdirSync(directory).map((name) => [name, fs.readFileSync(path.join(directory, name))]);
-  return stubsOf(Object.fromEntries(files));
-}
-
 let samples: StubSet | undefined;
 
 export function sampleStubs(): StubSet {
-  samples ??= fixtureStubs('sample');
+  samples ??= stubsOf(sampleFiles);
   return samples;
 }
 

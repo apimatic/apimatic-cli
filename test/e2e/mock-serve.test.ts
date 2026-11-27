@@ -5,13 +5,13 @@ import path from 'path';
 import { expect } from 'chai';
 import { occupied, portOf, released, send } from '../helpers/mock-http.js';
 import { TestRequest } from '../helpers/mock-requests.js';
-import { stubFixtures } from '../helpers/mock-stubs.js';
+import { sampleFiles } from '../helpers/mock-sample.js';
+import { stubDirectory } from '../helpers/mock-stubs.js';
 
 // Opt-in: it runs the built CLI (`pnpm build` first) as a test harness in any language would.
 const enabled = process.env.APIMATIC_E2E === '1';
 
 const MARKER = 'MOCKSERVER_URL=';
-const SAMPLE = path.join(stubFixtures, 'sample');
 
 interface Run {
   readonly child: ChildProcess;
@@ -25,6 +25,13 @@ interface Run {
 
   const runs: Run[] = [];
   const roots: string[] = [];
+  let sampleDirectory: string;
+
+  before(() => {
+    sampleDirectory = stubDirectory(sampleFiles);
+  });
+
+  after(() => fs.rmSync(sampleDirectory, { recursive: true, force: true }));
 
   const run = (...flags: string[]): Run => {
     const child = spawn(process.execPath, [path.join('bin', 'run.js'), 'mock', 'serve', ...flags], {
@@ -72,7 +79,7 @@ interface Run {
   });
 
   it('prints the origin after its marker on stdout and serves the stubs there', async () => {
-    const origin = await originOf(run('--stubs', SAMPLE, '--port', '0'));
+    const origin = await originOf(run('--stubs', sampleDirectory, '--port', '0'));
 
     const response = await send(origin, TestRequest.get('/v1/nowhere'));
 
@@ -84,7 +91,7 @@ interface Run {
   });
 
   it('logs each request on stderr when verbose, and never on stdout', async () => {
-    const started = run('--stubs', SAMPLE, '--port', '0', '--verbose');
+    const started = run('--stubs', sampleDirectory, '--port', '0', '--verbose');
     const origin = await originOf(started);
 
     await send(origin, TestRequest.get('/v1/nowhere'));
@@ -96,7 +103,7 @@ interface Run {
   });
 
   it('issues tokens with the lifetime --token-ttl names', async () => {
-    const origin = await originOf(run('--stubs', SAMPLE, '--port', '0', '--token-ttl', '5'));
+    const origin = await originOf(run('--stubs', sampleDirectory, '--port', '0', '--token-ttl', '5'));
     const request = TestRequest.post('/oauth2/token').form(
       ['grant_type', 'client_credentials'],
       ['client_id', 'test-client-id'],
@@ -125,7 +132,7 @@ interface Run {
     const holder = await occupied('127.0.0.1');
     const port = portOf(holder);
 
-    const started = run('--stubs', SAMPLE, '--port', String(port));
+    const started = run('--stubs', sampleDirectory, '--port', String(port));
 
     const code = await started.exited.finally(() => released(holder));
     expect([
@@ -154,7 +161,7 @@ interface Run {
       if (process.platform === 'win32') {
         this.skip();
       }
-      const started = run('--stubs', SAMPLE, '--port', '0');
+      const started = run('--stubs', sampleDirectory, '--port', '0');
       await originOf(started);
 
       started.child.kill(signal);

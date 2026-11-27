@@ -6,13 +6,14 @@ import { parseMultipartForm } from '../../../src/types/mock/matching/multipart-f
 import { renderSseEvent } from '../../../src/types/mock/stub-format/stub-response.js';
 import { jsonDifferences, mockOver, tempMocks } from '../../helpers/mock-http.js';
 import { ledger, sampleRequests, TestRequest } from '../../helpers/mock-requests.js';
+import { sampleFiles } from '../../helpers/mock-sample.js';
 import { sampleSuccess, successStub } from '../../helpers/mock-stubs.js';
 
 const account = `/v1/accounts/${ledger.accountA}`;
 const document = `/v1/documents/${ledger.documentD1}`;
 
 describe('the mock over HTTP, on the sample stubs', () => {
-  const mock = mockOver('sample');
+  const mock = mockOver(sampleFiles);
   const temp = tempMocks();
 
   const events = () => TestRequest.get(`${account}/events`).header('Accept', 'text/event-stream').bearer();

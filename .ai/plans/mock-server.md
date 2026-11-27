@@ -56,7 +56,8 @@ src/infrastructure/services/stub-generation-service.ts
                                   codegen's /mock endpoint: its three routes and where its download holds the stub files
 src/types/stubs-context.ts        the stubs directory as `mock generate` replaces it
 src/actions/mock/generate.ts      MockGenerateAction, with its prompts and command beside those of `mock serve`
-test/resources/mock/              the reference's stub sets: sample (20 stubs), spec-s (84), tester-poc (113)
+test/helpers/mock-sample.ts       the sample stub set (20 stubs) the tests share, held in code; the
+                                  reference's Spec S and TesterPoc sets are not kept in this repository
 ```
 
 The folders under `src/types/mock` stay one level deep: the ESLint rule that keeps the core apart
@@ -307,7 +308,7 @@ Phase 7:
   request log, origin.
 - **The C# SDK's contract suite passes against the command** (2026-11-11): `tests/TesterPoc.ContractTests`
   of csharp-sdk-poc-v4 at `c266b88a` (branch `Shield-Jaguar/mock-server-v4`), against
-  `apimatic mock serve --stubs test/resources/mock/tester-poc --port 4010`: 103 of 103 on net10.0
+  `apimatic mock serve --stubs <the TesterPoc set> --port 4010`: 103 of 103 on net10.0
   and on net8.0. Each run logged 107 requests (103 answered 200, one 302, two 400 and one 403 from
   the OAuth2 server) and no 418. Built with the .NET SDK 11.0.100; its restore did not fetch the
   .NET 8 app host pack until given `-p:AppHostRuntimeIdentifier=win-x64 -p:EnableAppHostPackDownload=true`.
@@ -359,7 +360,7 @@ Phase 8:
   with a colon, as `plugin generate` sends `plugin:generate`.
 - No test calls a real endpoint. `test/helpers/stub-generation-endpoint.ts` answers the three
   routes on the loopback and 404 for any other path, so a test fails when the service calls another
-  one. One action test runs the service against it with the Spec S set as the download, then
+  one. One action test runs the service against it with the sample set as the download, then
   starts the mock host on the directory the action wrote and gets a 200 from it.
 - **The built CLI was run against a stand-in for the endpoint** (2026-11-20, Windows), a local
   server answering the three routes with a zip of the Spec S set: `apimatic mock generate` in a
