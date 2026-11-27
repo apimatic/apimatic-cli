@@ -57,6 +57,68 @@ export default [
     }
   },
   {
+    // The mock server's core decides everything and touches nothing: stub files reach it as bytes and
+    // requests as values, so what the HTTP host does is what the unit tests verify. It imports nothing
+    // from the rest of the CLI either, which keeps it liftable into a package of its own.
+    files: ['src/types/mock/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            'fs',
+            'node:fs',
+            'fs/promises',
+            'node:fs/promises',
+            'fs-extra',
+            'child_process',
+            'node:child_process',
+            'execa',
+            'http',
+            'node:http',
+            'https',
+            'node:https',
+            'net',
+            'node:net'
+          ].map((name) => ({ name, message: 'src/types/mock is pure: no file, process or network access.' })),
+          patterns: [
+            {
+              group: ['@clack/*', '@oclif/*'],
+              message: 'src/types/mock is pure: it prints nothing and knows no command.'
+            },
+            {
+              group: ['../../*'],
+              message: 'src/types/mock stands alone: it imports nothing from the rest of the CLI.'
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    // The stub format has no pattern rule and the mock compares with string operations alone, so a
+    // value is never matched by something a stub author cannot read off the stub.
+    files: [
+      'src/types/mock/**/*.ts',
+      'src/infrastructure/mock/**/*.ts',
+      'src/actions/mock/**/*.ts',
+      'src/prompts/mock/**/*.ts',
+      'src/commands/mock/**/*.ts',
+      'test/**/mock/**/*.ts'
+    ],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        ...['Literal[regex]', "NewExpression[callee.name='RegExp']", "CallExpression[callee.name='RegExp']"].map(
+          (selector) => ({
+            selector,
+            message: 'The mock server uses no regular expressions; compare with string operations.'
+          })
+        )
+      ]
+    }
+  },
+  {
     // Test files use Mocha's global TDD/BDD functions and chai assertion
     // expressions (e.g. `expect(x).to.be.true`), which the base config would
     // otherwise flag as undefined globals / unused expressions.

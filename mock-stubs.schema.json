@@ -1,0 +1,830 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://apimatic.io/mock-server/stubs.schema.json",
+  "title": "Mock server stub file",
+  "description": "One file holds the stubs of one operation (or the OAuth2 server). Each stub describes one exact request and the response it gets. See docs/stub-format.md.",
+  "type": "array",
+  "items": {
+    "$ref": "#/$defs/stub"
+  },
+  "$defs": {
+    "stub": {
+      "type": "object",
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Unique across all stub files; shown in mismatch reports."
+        },
+        "operation": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The spec's operationId."
+        },
+        "kind": {
+          "enum": [
+            "success",
+            "error",
+            "oauth2"
+          ],
+          "default": "success"
+        },
+        "description": {
+          "type": "string"
+        },
+        "example": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The spec's example name when the operation has several; a request selects this stub with Prefer: example=<name>. Success and error stubs only."
+        },
+        "request": {
+          "$ref": "#/$defs/request"
+        },
+        "response": {
+          "$ref": "#/$defs/response"
+        },
+        "oauth2": {
+          "$ref": "#/$defs/oauth2"
+        }
+      },
+      "additionalProperties": false,
+      "if": {
+        "required": [
+          "kind"
+        ],
+        "properties": {
+          "kind": {
+            "const": "oauth2"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "oauth2"
+        ],
+        "not": {
+          "type": "object",
+          "anyOf": [
+            {
+              "required": [
+                "request"
+              ]
+            },
+            {
+              "required": [
+                "response"
+              ]
+            }
+          ]
+        }
+      },
+      "else": {
+        "required": [
+          "operation",
+          "request",
+          "response"
+        ],
+        "not": {
+          "required": [
+            "oauth2"
+          ]
+        }
+      }
+    },
+    "request": {
+      "type": "object",
+      "required": [
+        "method",
+        "path"
+      ],
+      "properties": {
+        "method": {
+          "enum": [
+            "GET",
+            "POST",
+            "PUT",
+            "PATCH",
+            "DELETE",
+            "HEAD",
+            "OPTIONS"
+          ]
+        },
+        "path": {
+          "type": "string",
+          "description": "Literal path including the base path, each segment written decoded (no '%' or '+'); {name} segments match any one segment."
+        },
+        "query": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/multiValue"
+          }
+        },
+        "queryMode": {
+          "enum": [
+            "closed",
+            "open"
+          ],
+          "default": "closed"
+        },
+        "headers": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/value"
+          }
+        },
+        "cookies": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/value"
+          }
+        },
+        "auth": {
+          "$ref": "#/$defs/auth"
+        },
+        "body": {
+          "$ref": "#/$defs/requestBody"
+        }
+      },
+      "additionalProperties": false
+    },
+    "value": {
+      "description": "A string is an exact value; null or { \"absent\": true } means the name must not be sent; { \"startsWith\" | \"endsWith\" | \"contains\": … } matches part of the value (ordinal); { \"dateTime\": … } matches an instant in any spelling.",
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/textRule"
+        },
+        {
+          "$ref": "#/$defs/dateTimeRule"
+        },
+        {
+          "$ref": "#/$defs/absentRule"
+        }
+      ]
+    },
+    "multiValue": {
+      "description": "As value, plus an array for a name sent more than once (query keys and form fields): each item is an exact string or a rule.",
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        },
+        {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "$ref": "#/$defs/textRule"
+              },
+              {
+                "$ref": "#/$defs/dateTimeRule"
+              }
+            ]
+          }
+        },
+        {
+          "$ref": "#/$defs/textRule"
+        },
+        {
+          "$ref": "#/$defs/dateTimeRule"
+        },
+        {
+          "$ref": "#/$defs/absentRule"
+        }
+      ]
+    },
+    "textRule": {
+      "description": "The value must start with, end with or contain the given text (ordinal); exactly one of the three. No regular expressions.",
+      "type": "object",
+      "properties": {
+        "startsWith": {
+          "type": "string",
+          "minLength": 1
+        },
+        "endsWith": {
+          "type": "string",
+          "minLength": 1
+        },
+        "contains": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false,
+      "oneOf": [
+        {
+          "required": [
+            "startsWith"
+          ]
+        },
+        {
+          "required": [
+            "endsWith"
+          ]
+        },
+        {
+          "required": [
+            "contains"
+          ]
+        }
+      ]
+    },
+    "dateTimeRule": {
+      "description": "The value must be this instant, in any spelling: RFC 3339 with Z or an offset and any fraction, RFC 1123, or Unix seconds.",
+      "type": "object",
+      "required": [
+        "dateTime"
+      ],
+      "properties": {
+        "dateTime": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "absentRule": {
+      "type": "object",
+      "required": [
+        "absent"
+      ],
+      "properties": {
+        "absent": {
+          "const": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "auth": {
+      "type": "object",
+      "required": [
+        "anyOf"
+      ],
+      "properties": {
+        "anyOf": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/credentialSet"
+          },
+          "description": "Any one set satisfies the request; every credential in a set must be present."
+        }
+      },
+      "additionalProperties": false
+    },
+    "credentialSet": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "$ref": "#/$defs/credential"
+      },
+      "description": "Keys are the spec's security scheme names."
+    },
+    "credential": {
+      "type": "object",
+      "required": [
+        "in",
+        "name"
+      ],
+      "properties": {
+        "in": {
+          "enum": [
+            "header",
+            "query",
+            "cookie"
+          ]
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "value": {
+          "type": "string"
+        },
+        "startsWith": {
+          "type": "string",
+          "minLength": 1
+        },
+        "endsWith": {
+          "type": "string",
+          "minLength": 1
+        },
+        "contains": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dateTime": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false,
+      "oneOf": [
+        {
+          "required": [
+            "value"
+          ]
+        },
+        {
+          "required": [
+            "startsWith"
+          ]
+        },
+        {
+          "required": [
+            "endsWith"
+          ]
+        },
+        {
+          "required": [
+            "contains"
+          ]
+        },
+        {
+          "required": [
+            "dateTime"
+          ]
+        }
+      ]
+    },
+    "requestBody": {
+      "description": "null = no body; exactly one of json, text, bytes (base64), form, any or multipart. The body is compared as sent: no Content-Encoding is decoded.",
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "required": [
+            "json"
+          ],
+          "properties": {
+            "json": {}
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "text"
+          ],
+          "properties": {
+            "text": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "bytes"
+          ],
+          "properties": {
+            "bytes": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "form"
+          ],
+          "properties": {
+            "form": {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/$defs/multiValue"
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "any"
+          ],
+          "properties": {
+            "any": {
+              "const": true
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "multipart"
+          ],
+          "properties": {
+            "multipart": {
+              "$ref": "#/$defs/multipart"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "multipart": {
+      "type": "object",
+      "required": [
+        "parts"
+      ],
+      "properties": {
+        "parts": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "$ref": "#/$defs/part"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "part": {
+      "description": "One part, or an array of parts for a name the form sends more than once, in wire order.",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/partSpec"
+        },
+        {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/partSpec"
+          }
+        }
+      ]
+    },
+    "partSpec": {
+      "type": "object",
+      "properties": {
+        "filename": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Matched exactly. Not empty: a part sent with filename=\"\" reads as one without a filename, so an empty one could never match."
+        },
+        "contentType": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/$defs/textRule"
+            }
+          ]
+        },
+        "json": {},
+        "text": {
+          "type": "string"
+        },
+        "bytes": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "oneOf": [
+        {
+          "required": [
+            "json"
+          ]
+        },
+        {
+          "required": [
+            "text"
+          ]
+        },
+        {
+          "required": [
+            "bytes"
+          ]
+        }
+      ]
+    },
+    "response": {
+      "type": "object",
+      "required": [
+        "status"
+      ],
+      "properties": {
+        "status": {
+          "type": "integer",
+          "minimum": 200,
+          "maximum": 599,
+          "description": "A final status: a 1xx is interim, so the client would wait for a final response that never comes."
+        },
+        "headers": {
+          "type": "object",
+          "description": "Each name an RFC 9110 token and each value printable ASCII, the only headers the server sends (the loader checks); none the server writes itself or drops (Date, Connection, Transfer-Encoding and request headers such as Accept), and Content-Length only on a HEAD or 304 response without a body.",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "body": {
+          "$ref": "#/$defs/responseBody"
+        },
+        "chunkDelayMs": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647,
+          "description": "Pause between SSE events or ndjson lines; default 20."
+        }
+      },
+      "additionalProperties": false
+    },
+    "responseBody": {
+      "description": "Exactly one of json, text, bytes (base64), sse, ndjson or multipart. Omit the body for an empty response.",
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "json"
+          ],
+          "properties": {
+            "json": {}
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "text"
+          ],
+          "properties": {
+            "text": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "bytes"
+          ],
+          "properties": {
+            "bytes": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "sse"
+          ],
+          "properties": {
+            "sse": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/sseEvent"
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "ndjson"
+          ],
+          "properties": {
+            "ndjson": {
+              "type": "array",
+              "items": {}
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "multipart"
+          ],
+          "properties": {
+            "multipart": {
+              "$ref": "#/$defs/responseMultipart"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "sseEvent": {
+      "type": "object",
+      "required": [
+        "data"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "One line: no CR or LF, which SSE cannot escape (the loader checks)."
+        },
+        "event": {
+          "type": "string",
+          "description": "One line: no CR or LF, which SSE cannot escape (the loader checks)."
+        },
+        "retry": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647
+        },
+        "data": {
+          "description": "A string is sent as written (for example \"[DONE]\"); any other JSON value is serialized compactly."
+        }
+      },
+      "additionalProperties": false
+    },
+    "responseMultipart": {
+      "description": "A multipart/form-data response: one part per name, served in this order.",
+      "type": "object",
+      "required": [
+        "parts"
+      ],
+      "properties": {
+        "boundary": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 70,
+          "description": "Default mockserver-boundary. Letters, digits and '+_-. only, so the Content-Type parameter needs no quotes."
+        },
+        "parts": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "$ref": "#/$defs/responsePart"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "responsePart": {
+      "description": "Exactly one of json, text or bytes (base64). A filename makes a file part; contentType defaults to the content kind's own.",
+      "type": "object",
+      "properties": {
+        "filename": {
+          "type": "string",
+          "minLength": 1
+        },
+        "contentType": {
+          "type": "string",
+          "minLength": 1
+        },
+        "json": {},
+        "text": {
+          "type": "string"
+        },
+        "bytes": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "oneOf": [
+        {
+          "required": [
+            "json"
+          ]
+        },
+        {
+          "required": [
+            "text"
+          ]
+        },
+        {
+          "required": [
+            "bytes"
+          ]
+        }
+      ]
+    },
+    "oauth2": {
+      "type": "object",
+      "required": [
+        "tokenPath",
+        "flows",
+        "clientId",
+        "clientSecret"
+      ],
+      "properties": {
+        "tokenPath": {
+          "type": "string"
+        },
+        "flows": {
+          "$ref": "#/$defs/oauth2Flows"
+        },
+        "clientId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "clientSecret": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scopes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An RFC 6749 scope-token: printable ASCII without a space, '\"' or '\\'."
+          }
+        },
+        "expiresIn": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2147483647
+        }
+      },
+      "additionalProperties": false
+    },
+    "oauth2Flows": {
+      "type": "object",
+      "description": "The spec's flows, each with the tokens it issues; an empty object takes the defaults. At least one.",
+      "minProperties": 1,
+      "properties": {
+        "clientCredentials": {
+          "type": "object",
+          "properties": {
+            "accessToken": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false
+        },
+        "authorizationCode": {
+          "type": "object",
+          "required": [
+            "authorizePath"
+          ],
+          "properties": {
+            "authorizePath": {
+              "type": "string"
+            },
+            "accessTokenPrefix": {
+              "type": "string",
+              "minLength": 1
+            },
+            "refreshTokenPrefix": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false
+        },
+        "password": {
+          "type": "object",
+          "properties": {
+            "username": {
+              "type": "string",
+              "minLength": 1
+            },
+            "password": {
+              "type": "string",
+              "minLength": 1
+            },
+            "accessToken": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false
+        },
+        "implicit": {
+          "type": "object",
+          "required": [
+            "authorizePath"
+          ],
+          "properties": {
+            "authorizePath": {
+              "type": "string"
+            },
+            "accessToken": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

@@ -15,6 +15,9 @@ export const STATIC_DIRECTORY_NAME = 'static';
 /** The folders of `src/` the local site build copies to the site's root as they are, so no build upload sends them. */
 export const LOCAL_ONLY_DIRECTORY_NAMES = [STATIC_DIRECTORY_NAME] as const;
 
+/** Where `mock generate` writes the stub files and `mock serve` reads them, unless told otherwise. */
+export const STUBS_DIRECTORY_NAME = 'stubs';
+
 export const OUTPUT_DIRECTORY_NAMES = {
   sdk: 'sdk',
   portal: 'portal',
