@@ -1,8 +1,6 @@
 import { expect } from 'chai';
-import { createServer, type Plugin, type ViteDevServer } from 'vite';
 import type { OAuthCallbackFailure } from '../../portal-template/src/lib/oauth-callback';
-
-const ENTRY = 'virtual:authorization-failure-fixture';
+import { renderedUnder } from '../helpers/template-render';
 
 const fixture = `
 import { createElement } from 'react';
@@ -14,15 +12,6 @@ export function render(failure) {
 }
 `;
 
-function authorizationFailureFixture(): Plugin {
-  return {
-    name: 'authorization-failure-fixture',
-    enforce: 'pre',
-    resolveId: (id) => (id === ENTRY ? `\0${ENTRY}` : null),
-    load: (id) => (id === `\0${ENTRY}` ? fixture : null)
-  };
-}
-
 /** What the reader is told, as text, and where its one link goes. */
 interface Shown {
   text: string;
@@ -32,26 +21,8 @@ interface Shown {
 describe('the OAuth callback when it cannot complete the authorization', function () {
   this.timeout(60 * 1000);
 
-  let server: ViteDevServer;
-  let render: (failure: OAuthCallbackFailure) => string;
-
-  before(async () => {
-    server = await createServer({
-      configFile: false,
-      root: process.cwd(),
-      // Under a path, which the home link has to carry.
-      base: '/docs/',
-      resolve: { tsconfigPaths: true },
-      logLevel: 'silent',
-      appType: 'custom',
-      server: { middlewareMode: true, hmr: false, ws: false, watch: null },
-      optimizeDeps: { noDiscovery: true, include: [] },
-      plugins: [authorizationFailureFixture()]
-    });
-    ({ render } = (await server.ssrLoadModule(ENTRY)) as { render: typeof render });
-  });
-
-  after(() => server.close());
+  // Under a path, which the home link has to carry.
+  const render = renderedUnder<[OAuthCallbackFailure]>('/docs/', fixture);
 
   const shown = (failure: OAuthCallbackFailure): Shown => {
     const markup = render(failure);

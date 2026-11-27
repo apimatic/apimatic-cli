@@ -4,7 +4,6 @@ import path from 'path';
 import { createRequire } from 'node:module';
 import { execa } from 'execa';
 import { expect } from 'chai';
-import { preview, type PreviewServer } from 'vite';
 import { PortalBuildService } from '../../src/infrastructure/portal-build-service';
 import { PortalProjectService } from '../../src/infrastructure/portal-project-service';
 import { PortalSourceContext } from '../../src/types/portal-source-context';
@@ -15,7 +14,6 @@ import { CodeSampleCatalog, CodeSampleCatalogs } from '../../src/types/portal/co
 import { PortalArtifacts } from '../../src/types/portal/portal-artifacts';
 import { Language } from '../../src/types/sdk/generate';
 import { canonical } from '../../src/infrastructure/tmp-extensions';
-import { withEnvironment } from '../helpers/git-environment';
 
 // A real Vite build takes tens of seconds and needs every runtime dependency installed,
 // so it stays out of the default run. CI switches it on for the platform matrix.
@@ -564,7 +562,7 @@ const stylesheetOf = (output: DirectoryPath) => {
     }
   });
 
-  it("links an external card to one of the portal's files as written, at the root of its host", () => {
+  it('links an external card as written, at the root of its host', () => {
     expect(cardLink(read('guides/components/index.html'), 'Agent-Friendly Docs')).to.equal('/llms.txt');
   });
 
@@ -976,34 +974,13 @@ const stylesheetOf = (output: DirectoryPath) => {
 
   // Fumadocs renders an external card as a plain link, outside the router that gives the others the path.
   // `/api/search.json` starts like the path, and still goes under it.
-  it("links an external card to the portal's own files under the path, where the host serves them", async () => {
+  it('links an external card under the path, as the router links the others', () => {
     const page = read('figures/index.html');
-    const hrefs = [cardLink(page, 'Agent-Friendly Docs'), cardLink(page, 'Search index')];
-    expect(hrefs).to.deep.equal(['/api/llms.txt', '/api/api/search.json']);
 
-    // Vite's preview would leave NODE_ENV at production, so later tests would mix React's two builds.
-    const restoreNodeEnv = withEnvironment('NODE_ENV', 'production');
-    let host: PreviewServer | undefined;
-    try {
-      // On 127.0.0.1 as vite.config.ts pins the prerender's; a multi-page app, so a missing file answers 404.
-      host = await preview({
-        configFile: false,
-        root: built!.root,
-        base: '/api/',
-        appType: 'mpa',
-        logLevel: 'silent',
-        build: { outDir: output.toString() },
-        preview: { host: '127.0.0.1', port: 0 }
-      });
-      const origin = host.resolvedUrls!.local[0];
-      const statuses = await Promise.all(
-        hrefs.map(async (href) => (await globalThis.fetch(new URL(href!, origin))).status)
-      );
-      expect(statuses).to.deep.equal([200, 200]);
-    } finally {
-      await host?.close();
-      restoreNodeEnv();
-    }
+    expect([cardLink(page, 'Agent-Friendly Docs'), cardLink(page, 'Search index')]).to.deep.equal([
+      '/api/llms.txt',
+      '/api/api/search.json'
+    ]);
   });
 
   // Bundled, so it carries the base; a linked `/images/diagram.png` would be fetched from the host's

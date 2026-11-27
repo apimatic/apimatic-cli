@@ -1,18 +1,5 @@
-import fs from 'node:fs';
-import path from 'node:path';
 import { expect } from 'chai';
-import { externalHref, fullAddress, withBasePath } from '../../portal-template/src/lib/base-path';
-
-const ROUTES = 'portal-template/src/routes';
-
-/** The path each route file declares to `createFileRoute`. */
-const routePaths = (): string[] =>
-  fs
-    .readdirSync(ROUTES, { recursive: true, encoding: 'utf8' })
-    .filter((file) => /\.tsx?$/.test(file))
-    .flatMap(
-      (file) => /createFileRoute\('([^']*)'\)/.exec(fs.readFileSync(path.join(ROUTES, file), 'utf8'))?.[1] ?? []
-    );
+import { fullAddress, underBase, withBasePath } from '../../portal-template/src/lib/base-path';
 
 describe('withBasePath', () => {
   // Outside Vite there is no `import.meta.env`, so the portal is taken to be at the root.
@@ -28,22 +15,30 @@ describe('withBasePath', () => {
   });
 });
 
-describe('externalHref', () => {
-  const UNPREFIXED = ['/robots.txt', '/{$}.md'];
+describe('underBase', () => {
+  // Already under the base or not, as the router reads a link's `/docs/llms.txt` too.
+  it('puts a root-relative address under the base', () => {
+    const written = ['/llms.txt', '/pricing', '/guides/intro.md', '/docs/llms.txt', '/llms.txt?v=1#top'];
 
-  // A route writing a file has an extension on its last segment.
-  it('puts every file a route writes under the base, but robots.txt and the pages’ .md copies', () => {
-    const files = routePaths().filter((route) => /\.\w+$/.test(route));
-    expect(files).to.include.members(['/llms.txt', ...UNPREFIXED]);
-
-    for (const route of files) {
-      const address = route.replace('{$}', 'guides/intro');
-      expect(externalHref(address, '/docs/'), route).to.equal(UNPREFIXED.includes(route) ? address : `/docs${address}`);
-    }
+    expect(written.map((address) => underBase(address, '/docs/'))).to.deep.equal([
+      '/docs/llms.txt',
+      '/docs/pricing',
+      '/docs/guides/intro.md',
+      '/docs/docs/llms.txt',
+      '/docs/llms.txt?v=1#top'
+    ]);
   });
 
-  it('puts a file under a base its own path starts with', () => {
-    expect(externalHref('/api/search.json', '/api/')).to.equal('/api/api/search.json');
+  it('leaves any other address as written', () => {
+    const written = [
+      'https://example.com/llms.txt',
+      '//cdn.example.com/llms.txt',
+      'mailto:docs@example.com',
+      'guides/intro',
+      '#top'
+    ];
+
+    expect(written.map((address) => underBase(address, '/docs/'))).to.deep.equal(written);
   });
 });
 

@@ -8,12 +8,9 @@ export function withBasePath(path: string, base: string = BASE): string {
   return `${base.replace(/\/$/, '')}${path}`;
 }
 
-// Files the routes write; robots.txt exists only at a host's root, and `{$}.md` would claim a sibling app's `.md`.
-const FILES = new Set(['/llms.txt', '/llms-full.txt', '/sitemap.xml', '/api/search.json']);
-
-/** The router adds the base to its own links alone, so an external link to one of the portal's files gets it here. */
-export function externalHref(href: string, base: string = BASE): string {
-  return FILES.has(href.split(/[?#]/, 1)[0]) ? withBasePath(href, base) : href;
+/** An address an author wrote, read as the router reads a link: a root-relative one under the base, any other as is. */
+export function underBase(address: string, base: string = BASE): string {
+  return /^\/(?!\/)/.test(address) ? withBasePath(address, base) : address;
 }
 
 /** A portal-relative path's full address as the browser sees it; the path itself where there is no window. */

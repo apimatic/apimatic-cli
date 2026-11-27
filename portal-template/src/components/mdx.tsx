@@ -8,7 +8,7 @@ import { InlineTOC } from 'fumadocs-ui/components/inline-toc';
 import { Step, Steps } from 'fumadocs-ui/components/steps';
 import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
 import { TypeTable } from 'fumadocs-ui/components/type-table';
-import { externalHref } from '@/lib/base-path';
+import { underBase } from '@/lib/base-path';
 import { reportCodeCopy, reportCopies } from './code-copy';
 import { PluginInstall } from './plugin-install';
 import { PluginLanguage, PluginLanguages, PluginPlatforms } from './plugin-support';
@@ -29,9 +29,7 @@ export function getMDXComponents(components?: MDXComponents) {
       </CodeBlock>
     ),
     // Fumadocs' own, which renders an external card as a plain link that the router's base never reaches.
-    Card: ({ href, ...props }: CardProps) => (
-      <Card {...props} href={props.external && href ? externalHref(href) : href} />
-    ),
+    Card: ({ href, ...props }: CardProps) => <Card {...props} href={props.external && href ? underBase(href) : href} />,
     // Fumadocs' components beyond its defaults, so an author's page can use them without importing.
     Accordion,
     Accordions,

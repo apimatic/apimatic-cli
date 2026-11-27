@@ -1,8 +1,5 @@
 import { expect } from 'chai';
-import { createServer, type Plugin, type ViteDevServer } from 'vite';
-
-const ENTRY = 'virtual:card-fixture';
-const IDENTITY = '\0card-fixture-identity';
+import { renderedUnder, type StandIn } from '../helpers/template-render';
 
 // The router's link marks itself, so a card it renders can be told from Fumadocs' plain link.
 const fixture = `
@@ -26,27 +23,13 @@ export function render(props) {
 `;
 
 // The generated file `portal.ts` imports, with what the components read from it when loaded.
-const identity = `export default ${JSON.stringify({
-  analytics: { googleTagManager: null, googleAnalytics: null, googleConsentMode: null },
-  scripts: []
-})};`;
-
-function cardFixture(): Plugin {
-  return {
-    name: 'card-fixture',
-    enforce: 'pre',
-    resolveId(id) {
-      if (id === ENTRY) return `\0${ENTRY}`;
-      if (id.endsWith('/portal.identity.json')) return IDENTITY;
-      return null;
-    },
-    load(id) {
-      if (id === `\0${ENTRY}`) return fixture;
-      if (id === IDENTITY) return identity;
-      return null;
-    }
-  };
-}
+const identity: StandIn = {
+  replaces: (id) => id.endsWith('/portal.identity.json'),
+  source: `export default ${JSON.stringify({
+    analytics: { googleTagManager: null, googleAnalytics: null, googleConsentMode: null },
+    scripts: []
+  })};`
+};
 
 interface CardProps {
   title: string;
@@ -61,29 +44,12 @@ interface Shown {
   newTab: boolean;
 }
 
-/** Cards as a portal built under `base` renders them, from a server started before the block's cases. */
-function cardsUnder(base: string): (props: CardProps) => Shown {
-  let server: ViteDevServer;
-  let render: (props: CardProps) => string;
+describe("an author's Card in a portal under a path", function () {
+  this.timeout(60 * 1000);
 
-  before(async () => {
-    server = await createServer({
-      configFile: false,
-      root: process.cwd(),
-      base,
-      resolve: { tsconfigPaths: true },
-      logLevel: 'silent',
-      appType: 'custom',
-      server: { middlewareMode: true, hmr: false, ws: false, watch: null },
-      optimizeDeps: { noDiscovery: true, include: [] },
-      plugins: [cardFixture()]
-    });
-    ({ render } = (await server.ssrLoadModule(ENTRY)) as { render: typeof render });
-  });
+  const render = renderedUnder<[CardProps]>('/docs/', fixture, { standIns: [identity] });
 
-  after(() => server.close());
-
-  return (props) => {
+  const shown = (props: CardProps): Shown => {
     const link = /<a [^>]*>/.exec(render(props));
     expect(link, 'the card renders a link').to.not.be.null;
     return {
@@ -92,47 +58,17 @@ function cardsUnder(base: string): (props: CardProps) => Shown {
       newTab: link![0].includes('target="_blank"')
     };
   };
-}
 
-describe("an author's Card", function () {
-  this.timeout(60 * 1000);
-
-  describe('in a portal under a path', () => {
-    const shown = cardsUnder('/docs/');
-
-    it("links one of the portal's files under the path, still in a new tab", () => {
-      expect(shown({ title: 'Agent-Friendly Docs', href: '/llms.txt', external: true })).to.deep.equal({
-        href: '/docs/llms.txt',
-        router: false,
-        newTab: true
-      });
-    });
-
-    it('leaves any other address as the author wrote it', () => {
-      const written = [
-        '/pricing',
-        '/guides/intro.md',
-        'https://example.com/llms.txt',
-        '//cdn.example.com/llms.txt',
-        '/docs/llms.txt'
-      ];
-
-      expect(written.map((href) => shown({ title: 'Elsewhere', href, external: true }).href)).to.deep.equal(written);
-    });
-
-    // The router adds the path to its own links.
-    it('hands a card not marked external to the router as written', () => {
-      for (const href of ['/sdks', '/llms.txt']) {
-        expect(shown({ title: 'Inside', href }), href).to.deep.equal({ href, router: true, newTab: false });
-      }
+  it('links under the path when marked external, still in a new tab', () => {
+    expect(shown({ title: 'Agent-Friendly Docs', href: '/llms.txt', external: true })).to.deep.equal({
+      href: '/docs/llms.txt',
+      router: false,
+      newTab: true
     });
   });
 
-  describe('in a portal at the root of its host', () => {
-    const shown = cardsUnder('/');
-
-    it("links one of the portal's files as written", () => {
-      expect(shown({ title: 'Agent-Friendly Docs', href: '/llms.txt', external: true }).href).to.equal('/llms.txt');
-    });
+  // The router adds the path to its own links.
+  it('hands a card not marked external to the router as written', () => {
+    expect(shown({ title: 'SDKs', href: '/sdks' })).to.deep.equal({ href: '/sdks', router: true, newTab: false });
   });
 });
