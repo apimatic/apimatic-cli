@@ -1,7 +1,7 @@
 import { Buffer } from 'node:buffer';
-import fs from 'fs';
-import os from 'os';
-import path from 'path';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { ok } from 'neverthrow';
 import { JsonValue } from '../../src/types/mock/json/json-value.js';
 import { NamedRule } from '../../src/types/mock/stub-format/body-expectation.js';

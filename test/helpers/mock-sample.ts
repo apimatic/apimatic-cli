@@ -1,6 +1,6 @@
 /** The stub set most mock tests share: accounts, bodies, examples, files, streams and two OAuth2 servers. */
 export const sampleFiles: Record<string, string> = {
-  'accounts.json': String.raw`[
+  'accounts.json': `[
   {
     "name": "listAccounts 200 first page",
     "operation": "listAccounts",
@@ -291,7 +291,7 @@ export const sampleFiles: Record<string, string> = {
   }
 ]
 `,
-  'bodies.json': String.raw`[
+  'bodies.json': `[
   {
     "name": "settleAccount 200",
     "operation": "settleAccount",
@@ -453,7 +453,7 @@ export const sampleFiles: Record<string, string> = {
     }
   }
 ]`,
-  'examples.json': String.raw`[
+  'examples.json': `[
   {
     "name": "listTransactions 200 firstPage",
     "operation": "listTransactions",
@@ -574,7 +574,7 @@ export const sampleFiles: Record<string, string> = {
     }
   }
 ]`,
-  'files.json': String.raw`[
+  'files.json': `[
   {
     "name": "downloadDocumentBundle 200",
     "description": "A multipart response: the document's metadata as a JSON part and its content as a file part, served in this order under the default boundary.",
@@ -620,7 +620,7 @@ export const sampleFiles: Record<string, string> = {
     }
   }
 ]`,
-  'oauth2.json': String.raw`[
+  'oauth2.json': `[
   {
     "name": "oauth2 authorization server",
     "kind": "oauth2",
@@ -648,7 +648,7 @@ export const sampleFiles: Record<string, string> = {
   }
 ]
 `,
-  'partner-oauth2.json': String.raw`[
+  'partner-oauth2.json': `[
   {
     "name": "partner oauth2 server",
     "kind": "oauth2",
